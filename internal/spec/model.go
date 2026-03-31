@@ -49,20 +49,28 @@ func (d *Date) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// MarshalJSON outputs a Date as a "YYYY-MM-DD" JSON string.
+func (d Date) MarshalJSON() ([]byte, error) {
+	if d.IsZero() {
+		return []byte(`""`), nil
+	}
+	return []byte(`"` + d.Format(time.DateOnly) + `"`), nil
+}
+
 // Spec represents a parsed spec document with its YAML frontmatter and body.
 type Spec struct {
-	Title            string   `yaml:"title"`
-	Status           Status   `yaml:"status"`
-	DependsOn        []string `yaml:"depends_on"`
-	Affects          []string `yaml:"affects"`
-	Effort           Effort   `yaml:"effort"`
-	Created          Date     `yaml:"created"`
-	Updated          Date     `yaml:"updated"`
-	Author           string   `yaml:"author"`
-	DispatchedTaskID *string  `yaml:"dispatched_task_id"`
+	Title            string   `yaml:"title" json:"title"`
+	Status           Status   `yaml:"status" json:"status"`
+	DependsOn        []string `yaml:"depends_on" json:"depends_on"`
+	Affects          []string `yaml:"affects" json:"affects"`
+	Effort           Effort   `yaml:"effort" json:"effort"`
+	Created          Date     `yaml:"created" json:"created"`
+	Updated          Date     `yaml:"updated" json:"updated"`
+	Author           string   `yaml:"author" json:"author"`
+	DispatchedTaskID *string  `yaml:"dispatched_task_id" json:"dispatched_task_id"`
 
 	// Derived fields (not from YAML).
-	Path  string `yaml:"-"` // relative path from repo root
-	Track string `yaml:"-"` // first directory component of Path (e.g., "local")
-	Body  string `yaml:"-"` // markdown content below frontmatter
+	Path  string `yaml:"-" json:"path"`
+	Track string `yaml:"-" json:"track"`
+	Body  string `yaml:"-" json:"-"` // excluded from API responses (large)
 }

@@ -179,6 +179,15 @@ var Routes = []Route{
 		Tags:        []string{"ideate"},
 	},
 
+	// --- Spec tree ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/specs/tree", Name: "GetSpecTree",
+		JSName:      "tree",
+		Description: "Get the full spec tree with metadata and progress.",
+		Tags:        []string{"specs"},
+	},
+
 	// --- Planning sandbox ---
 
 	{

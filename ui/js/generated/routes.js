@@ -107,6 +107,13 @@ var Routes = {
     },
   },
 
+  specs: {
+    // GET /api/specs/tree
+    tree: function () {
+      return "/api/specs/tree";
+    },
+  },
+
   planning: {
     // GET /api/planning
     status: function () {

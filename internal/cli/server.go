@@ -673,6 +673,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"RenameWorkspace":  h.RenameWorkspace,
 		"UpdateWorkspaces": h.UpdateWorkspaces,
 
+		// Spec tree.
+		"GetSpecTree": h.GetSpecTree,
+
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
 		"TriggerIdeation":   h.TriggerIdeation,
