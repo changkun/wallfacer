@@ -180,6 +180,11 @@ function _loadAndRenderSpec() {
 
       if (bodyEl) {
         bodyEl.innerHTML = renderMarkdown(parsed.body);
+        // Remove the first h1 — it duplicates the title bar.
+        var firstH1 = bodyEl.querySelector("h1");
+        if (firstH1 && firstH1 === bodyEl.firstElementChild) {
+          firstH1.remove();
+        }
         // Render mermaid diagrams in code blocks.
         if (typeof renderMermaidBlocks === "function") {
           renderMermaidBlocks(bodyEl);
