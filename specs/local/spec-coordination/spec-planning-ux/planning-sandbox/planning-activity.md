@@ -1,12 +1,12 @@
 ---
 title: Add SandboxActivityPlanning constant
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/store/models.go
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
