@@ -130,14 +130,26 @@ const MOCK_TREE_DATA = {
   nodes: [
     {
       path: "local/foo.md",
-      spec: { title: "Foo", status: "validated", depends_on: [], affects: [] },
+      spec: {
+        title: "Foo",
+        status: "validated",
+        depends_on: [],
+        affects: [],
+        track: "local",
+      },
       children: ["local/foo/bar.md"],
       is_leaf: false,
       depth: 0,
     },
     {
       path: "local/foo/bar.md",
-      spec: { title: "Bar", status: "complete", depends_on: [], affects: [] },
+      spec: {
+        title: "Bar",
+        status: "complete",
+        depends_on: [],
+        affects: [],
+        track: "local",
+      },
       children: [],
       is_leaf: true,
       depth: 1,
@@ -153,6 +165,8 @@ describe("spec-explorer", () => {
 
   beforeEach(() => {
     ctx = makeContext();
+    // Expand the "local" track group so nodes inside it are visible.
+    ctx._specExpandedPaths.add("__track__local");
   });
 
   it("renderSpecTree renders nodes with titles", () => {
@@ -287,7 +301,12 @@ describe("spec-explorer", () => {
       nodes: [
         {
           path: "local/leaf.md",
-          spec: { title: "Leaf", status: "validated", depends_on: [] },
+          spec: {
+            title: "Leaf",
+            status: "validated",
+            depends_on: [],
+            track: "local",
+          },
           children: [],
           is_leaf: true,
           depth: 0,
@@ -322,7 +341,12 @@ describe("spec-explorer", () => {
       nodes: [
         {
           path: "local/leaf.md",
-          spec: { title: "Leaf", status: "validated", depends_on: [] },
+          spec: {
+            title: "Leaf",
+            status: "validated",
+            depends_on: [],
+            track: "local",
+          },
           children: [],
           is_leaf: true,
           depth: 0,

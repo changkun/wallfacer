@@ -159,9 +159,10 @@ function renderSpecTree() {
   var treeEl = document.getElementById("explorer-tree");
   if (!treeEl || !_specTreeData) return;
 
-  // Build a tree structure from the flat nodes array.
+  // Build a lookup and group root nodes by track.
   var nodesByPath = {};
-  var roots = [];
+  var trackGroups = {}; // track name -> [nodes]
+  var trackOrder = [];
   var nodes = _specTreeData.nodes || [];
 
   for (var i = 0; i < nodes.length; i++) {
@@ -170,13 +171,37 @@ function renderSpecTree() {
 
   for (var j = 0; j < nodes.length; j++) {
     if (nodes[j].depth === 0) {
-      roots.push(nodes[j]);
+      var track = (nodes[j].spec && nodes[j].spec.track) || "other";
+      if (!trackGroups[track]) {
+        trackGroups[track] = [];
+        trackOrder.push(track);
+      }
+      trackGroups[track].push(nodes[j]);
     }
   }
 
   var html = "";
-  for (var k = 0; k < roots.length; k++) {
-    html += _renderSpecNode(roots[k], nodesByPath);
+  for (var ti = 0; ti < trackOrder.length; ti++) {
+    var track = trackOrder[ti];
+    var trackExpanded = _specExpandedPaths.has("__track__" + track);
+    html +=
+      '<div class="spec-track-header" data-track="' +
+      escapeHtml(track) +
+      '">' +
+      '<span class="spec-node-toggle" data-path="__track__' +
+      escapeHtml(track) +
+      '">' +
+      (trackExpanded ? "\u25BE" : "\u25B8") +
+      "</span> " +
+      '<span class="spec-track-name">' +
+      escapeHtml(track) +
+      "</span></div>";
+    if (trackExpanded) {
+      var trackRoots = trackGroups[track];
+      for (var k = 0; k < trackRoots.length; k++) {
+        html += _renderSpecNode(trackRoots[k], nodesByPath);
+      }
+    }
   }
 
   treeEl.innerHTML = html;
@@ -191,6 +216,26 @@ function renderSpecTree() {
   var toggleEls = treeEl.querySelectorAll(".spec-node-toggle");
   for (var t = 0; t < toggleEls.length; t++) {
     toggleEls[t].addEventListener("click", _onSpecToggleClick);
+  }
+
+  // Track headers: clicking the header text also toggles.
+  var trackHeaders = treeEl.querySelectorAll(".spec-track-header");
+  for (var th = 0; th < trackHeaders.length; th++) {
+    trackHeaders[th].addEventListener("click", function (e) {
+      var track = e.currentTarget.getAttribute("data-track");
+      if (!track) return;
+      var key = "__track__" + track;
+      if (_specExpandedPaths.has(key)) {
+        _specExpandedPaths.delete(key);
+      } else {
+        _specExpandedPaths.add(key);
+      }
+      localStorage.setItem(
+        "wallfacer-spec-expanded",
+        JSON.stringify(Array.from(_specExpandedPaths)),
+      );
+      renderSpecTree();
+    });
   }
 
   // Attach checkbox handlers.

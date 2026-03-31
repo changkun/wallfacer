@@ -124,6 +124,30 @@
 
 /* ===== Spec Explorer Tree ===== */
 
+.spec-track-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.spec-track-header:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .spec-node {
   display: flex;
   align-items: center;
