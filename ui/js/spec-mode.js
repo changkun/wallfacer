@@ -31,10 +31,113 @@ function switchMode(mode) {
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
 
+  // Stop spec refresh poll when leaving spec mode.
+  if (mode !== "spec") {
+    _stopSpecRefreshPoll();
+  }
+
   // Switch explorer root (no-op until spec-explorer is wired).
   if (typeof switchExplorerRoot === "function") {
     switchExplorerRoot(mode === "spec" ? "specs" : "workspace");
   }
+}
+
+// --- Focused spec view ---
+
+var _focusedSpecPath = null;
+var _focusedSpecWorkspace = null;
+var _focusedSpecContent = null;
+var _specRefreshTimer = null;
+
+// focusSpec loads and renders a spec file in the focused markdown view.
+function focusSpec(specPath, workspace) {
+  _focusedSpecPath = specPath;
+  _focusedSpecWorkspace = workspace;
+  _loadAndRenderSpec();
+  _startSpecRefreshPoll();
+}
+
+function getFocusedSpecPath() {
+  return _focusedSpecPath;
+}
+
+function _loadAndRenderSpec() {
+  if (!_focusedSpecPath || !_focusedSpecWorkspace) return;
+
+  var url =
+    Routes.explorer.readFile() +
+    "?path=" +
+    encodeURIComponent(_focusedSpecPath) +
+    "&workspace=" +
+    encodeURIComponent(_focusedSpecWorkspace);
+
+  fetch(url, { headers: withBearerHeaders() })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.text();
+    })
+    .then(function (text) {
+      if (text === _focusedSpecContent) return;
+      _focusedSpecContent = text;
+
+      var parsed = parseSpecFrontmatter(text);
+      var titleEl = document.getElementById("spec-focused-title");
+      var statusEl = document.getElementById("spec-focused-status");
+      var bodyEl = document.getElementById("spec-focused-body");
+      var dispatchBtn = document.getElementById("spec-dispatch-btn");
+
+      if (titleEl)
+        titleEl.textContent = parsed.frontmatter.title || _focusedSpecPath;
+      if (statusEl) statusEl.textContent = parsed.frontmatter.status || "";
+      if (bodyEl) bodyEl.innerHTML = renderMarkdown(parsed.body);
+
+      // Show dispatch button only for validated leaf specs (no children).
+      if (dispatchBtn) {
+        var isValidated = parsed.frontmatter.status === "validated";
+        dispatchBtn.classList.toggle("hidden", !isValidated);
+      }
+    })
+    .catch(function (err) {
+      console.error("spec load error:", err);
+      var bodyEl = document.getElementById("spec-focused-body");
+      if (bodyEl) bodyEl.textContent = "Error loading spec: " + err.message;
+    });
+}
+
+function _startSpecRefreshPoll() {
+  _stopSpecRefreshPoll();
+  _specRefreshTimer = setInterval(function () {
+    _loadAndRenderSpec();
+  }, 2000);
+}
+
+function _stopSpecRefreshPoll() {
+  if (_specRefreshTimer) {
+    clearInterval(_specRefreshTimer);
+    _specRefreshTimer = null;
+  }
+}
+
+// parseSpecFrontmatter extracts YAML frontmatter and markdown body from spec text.
+function parseSpecFrontmatter(text) {
+  if (!text) return { frontmatter: {}, body: "" };
+  var match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) return { frontmatter: {}, body: text };
+
+  var fm = {};
+  var lines = match[1].split("\n");
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+    var key = line.substring(0, colonIdx).trim();
+    var val = line.substring(colonIdx + 1).trim();
+    if (key && val && !val.startsWith("-") && val !== "|" && val !== ">") {
+      fm[key] = val;
+    }
+  }
+
+  return { frontmatter: fm, body: match[2] };
 }
 
 // Restore persisted mode on page load.
