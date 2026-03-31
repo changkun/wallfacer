@@ -123,7 +123,12 @@ function _loadAndRenderSpec() {
 
       if (titleEl)
         titleEl.textContent = parsed.frontmatter.title || _focusedSpecPath;
-      if (statusEl) statusEl.textContent = parsed.frontmatter.status || "";
+      if (statusEl) {
+        var status = parsed.frontmatter.status || "";
+        statusEl.textContent = status;
+        statusEl.className = "spec-focused-view__status";
+        if (status) statusEl.classList.add("spec-status--" + status);
+      }
       if (bodyEl) bodyEl.innerHTML = renderMarkdown(parsed.body);
 
       // Show dispatch button only for validated leaf specs (no children).

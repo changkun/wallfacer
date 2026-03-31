@@ -36,6 +36,14 @@ function loadSpecTree() {
     .then(function (data) {
       _specTreeData = data;
       renderSpecTree();
+      // Update minimap with fresh tree data if a spec is focused.
+      if (
+        typeof renderMinimap === "function" &&
+        typeof getFocusedSpecPath === "function" &&
+        getFocusedSpecPath()
+      ) {
+        renderMinimap(getFocusedSpecPath(), _specTreeData);
+      }
     })
     .catch(function (err) {
       console.error("spec tree load error:", err);
@@ -72,6 +80,10 @@ function switchExplorerRoot(mode) {
   var dispatchBar = document.getElementById("spec-dispatch-bar");
   if (dispatchBar) {
     dispatchBar.classList.toggle("hidden", mode !== "specs");
+  }
+  var minimap = document.getElementById("spec-minimap");
+  if (minimap && mode !== "specs") {
+    minimap.classList.add("hidden");
   }
 
   if (mode === "specs") {
