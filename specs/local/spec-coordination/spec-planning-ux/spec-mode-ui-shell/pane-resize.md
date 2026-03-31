@@ -1,6 +1,6 @@
 ---
 title: Spec mode pane resize handle
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell/spec-mode-layout.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - ui/css/
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---

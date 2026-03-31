@@ -1,13 +1,13 @@
 ---
 title: Spec Mode UI Shell
-status: validated
+status: complete
 depends_on: []
 affects:
   - ui/index.html
   - ui/js/
 effort: large
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
@@ -82,11 +82,11 @@ Deep-linking uses `#spec/<path>` format (alongside existing `#<task-id>/<tab>`).
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Mode state and header tabs](spec-mode-ui-shell/mode-state-and-switching.md) | — | small | validated |
-| [Three-pane layout](spec-mode-ui-shell/spec-mode-layout.md) | mode-state-and-switching | medium | validated |
-| [Focused markdown view](spec-mode-ui-shell/focused-markdown-view.md) | spec-mode-layout | medium | validated |
-| [Deep-linking and keyboard shortcuts](spec-mode-ui-shell/spec-mode-deep-linking.md) | focused-markdown-view | small | validated |
-| [Pane resize handle](spec-mode-ui-shell/pane-resize.md) | spec-mode-layout | small | validated |
+| [Mode state and header tabs](spec-mode-ui-shell/mode-state-and-switching.md) | — | small | complete |
+| [Three-pane layout](spec-mode-ui-shell/spec-mode-layout.md) | mode-state-and-switching | medium | complete |
+| [Focused markdown view](spec-mode-ui-shell/focused-markdown-view.md) | spec-mode-layout | medium | complete |
+| [Deep-linking and keyboard shortcuts](spec-mode-ui-shell/spec-mode-deep-linking.md) | focused-markdown-view | small | complete |
+| [Pane resize handle](spec-mode-ui-shell/pane-resize.md) | spec-mode-layout | small | complete |
 
 ```mermaid
 graph LR
