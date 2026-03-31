@@ -276,22 +276,43 @@
 .spec-minimap {
   flex-shrink: 0;
   border-top: 1px solid var(--border);
-  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  height: 160px;
+  min-height: 80px;
+  max-height: 400px;
 }
 
 .spec-minimap__header {
   font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
-  margin-bottom: 4px;
+  padding: 4px 8px 2px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.spec-minimap__body {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px 6px;
 }
 
 .spec-minimap__svg {
   display: block;
-  width: 100%;
-  max-height: 200px;
+}
+
+.spec-minimap__resize {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.spec-minimap__resize:hover {
+  background: var(--accent);
 }
 
 .spec-workspace-files__header {

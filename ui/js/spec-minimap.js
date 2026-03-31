@@ -34,13 +34,27 @@ function buildReverseDeps(nodes) {
 }
 
 // renderMinimap draws the 1-hop dependency neighborhood of the focused spec.
+function _hideMinimap() {
+  var container = document.getElementById("spec-minimap");
+  if (container) container.classList.add("hidden");
+  var handle = document.getElementById("spec-minimap-resize");
+  if (handle) handle.classList.add("hidden");
+}
+
+function _showMinimap() {
+  var container = document.getElementById("spec-minimap");
+  if (container) container.classList.remove("hidden");
+  var handle = document.getElementById("spec-minimap-resize");
+  if (handle) handle.classList.remove("hidden");
+}
+
 function renderMinimap(specPath, treeData) {
   var container = document.getElementById("spec-minimap");
   var svg = document.getElementById("spec-minimap-svg");
   if (!container || !svg) return;
 
   if (!treeData || !treeData.nodes || !specPath) {
-    container.classList.add("hidden");
+    _hideMinimap();
     return;
   }
 
@@ -52,7 +66,7 @@ function renderMinimap(specPath, treeData) {
 
   var focused = nodesByPath[specPath];
   if (!focused) {
-    container.classList.add("hidden");
+    _hideMinimap();
     return;
   }
 
@@ -70,11 +84,11 @@ function renderMinimap(specPath, treeData) {
 
   // Hide minimap if no dependencies at all.
   if (upstreamPaths.length === 0 && downstreamPaths.length === 0) {
-    container.classList.add("hidden");
+    _hideMinimap();
     return;
   }
 
-  container.classList.remove("hidden");
+  _showMinimap();
 
   // Layout parameters.
   var nodeW = 120;
@@ -200,3 +214,51 @@ function _drawMinimapEdge(svg, ns, x1, y1, x2, y2) {
   line.setAttribute("stroke-width", 1);
   svg.appendChild(line);
 }
+
+// --- Minimap resize ---
+var _minimapStorageKey = "wallfacer-minimap-height";
+
+function _initMinimapResize() {
+  var handle = document.getElementById("spec-minimap-resize");
+  var panel = document.getElementById("spec-minimap");
+  if (!handle || !panel) return;
+
+  var stored = localStorage.getItem(_minimapStorageKey);
+  if (stored) {
+    var h = parseInt(stored, 10);
+    if (h >= 80 && h <= 400) panel.style.height = h + "px";
+  }
+
+  handle.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    var startY = e.clientY;
+    var startH = panel.offsetHeight;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "row-resize";
+
+    function onMouseMove(ev) {
+      // Resize handle is above the minimap, so dragging up = smaller.
+      var delta = ev.clientY - startY;
+      var newH = Math.min(400, Math.max(80, startH - delta));
+      panel.style.height = newH + "px";
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      localStorage.setItem(
+        _minimapStorageKey,
+        parseInt(panel.style.height, 10),
+      );
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  _initMinimapResize();
+});

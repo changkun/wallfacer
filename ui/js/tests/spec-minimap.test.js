@@ -78,6 +78,8 @@ function makeContext() {
   const container = makeEl("DIV", "spec-minimap");
   const svgEl = makeSvgEl("svg");
   registry.set("spec-minimap-svg", svgEl);
+  // Resize handle element.
+  const resizeEl = makeEl("DIV", "spec-minimap-resize");
 
   const ctx = {
     document: {
@@ -87,7 +89,17 @@ function makeContext() {
       createElementNS(ns, tag) {
         return makeSvgEl(tag);
       },
+      addEventListener() {},
+      removeEventListener() {},
+      body: { style: {} },
     },
+    localStorage: {
+      getItem() {
+        return null;
+      },
+      setItem() {},
+    },
+    parseInt,
     focusSpec: () => {},
     activeWorkspaces: ["/workspace"],
     Math,

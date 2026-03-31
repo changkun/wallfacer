@@ -109,6 +109,9 @@ function makeContext(opts = {}) {
     activeWorkspaces: ["/workspace/repo"],
     _loadExplorerRoots: opts._loadExplorerRoots || (() => {}),
     _startExplorerRefreshPoll: opts._startExplorerRefreshPoll || (() => {}),
+    _stopExplorerRefreshPoll: () => {},
+    _hideMinimap: () => {},
+    renderMinimap: () => {},
     setInterval: (fn) => {
       ctx._intervalFn = fn;
       return 42;

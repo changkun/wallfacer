@@ -81,9 +81,8 @@ function switchExplorerRoot(mode) {
   if (dispatchBar) {
     dispatchBar.classList.toggle("hidden", mode !== "specs");
   }
-  var minimap = document.getElementById("spec-minimap");
-  if (minimap && mode !== "specs") {
-    minimap.classList.add("hidden");
+  if (mode !== "specs") {
+    _hideMinimap();
   }
 
   if (mode === "specs") {
