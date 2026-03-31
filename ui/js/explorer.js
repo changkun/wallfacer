@@ -1049,7 +1049,16 @@ function reloadExplorerTree() {
   _explorerRoots = [];
   var panel = document.getElementById("explorer-panel");
   if (panel && panel.style.display !== "none") {
-    _loadExplorerRoots();
+    // In spec mode, reload the spec tree instead of workspace files.
+    if (
+      typeof getCurrentMode === "function" &&
+      getCurrentMode() === "spec" &&
+      typeof loadSpecTree === "function"
+    ) {
+      loadSpecTree();
+    } else {
+      _loadExplorerRoots();
+    }
   }
 }
 
@@ -1072,10 +1081,18 @@ function _initExplorer() {
   _initExplorerResize();
   _initExplorerKeyboard();
 
-  // Load tree if panel is already visible
+  // Load tree if panel is already visible.
   if (panel.style.display !== "none") {
-    _loadExplorerRoots();
-    _startExplorerRefreshPoll();
+    if (
+      typeof getCurrentMode === "function" &&
+      getCurrentMode() === "spec" &&
+      typeof switchExplorerRoot === "function"
+    ) {
+      switchExplorerRoot("specs");
+    } else {
+      _loadExplorerRoots();
+      _startExplorerRefreshPoll();
+    }
   }
 }
 
