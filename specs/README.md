@@ -32,6 +32,7 @@ Local Product                     Cloud Platform
   ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
   ✅ Pixel Agent Avatars              ○ Multi-Agent Consensus
                                     ○ Multi-Agent Debate
+                                    ○ Token & Cost Optimization
 ```
 
 ---
@@ -170,6 +171,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 | [multi-agent-consensus.md](shared/multi-agent-consensus.md) | Drafted | Both | Cross-provider adversarial verification, multi-agent consensus protocol, disagreement resolution. Builds on agent abstraction. |
 | [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
+| [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 
 ### Why these are shared
 
