@@ -27,7 +27,7 @@ Local Product                     Cloud Platform
   ○ Visual Verification             ○ Agent Abstraction
   ✅ OAuth Token Setup              ○ Native Sandboxes (Linux/macOS/Win)
   ○ Live Serve                      ○ Overlay Snapshots
-  ○ Terminal UI (TUI mode)
+  ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
   ✅ Pixel Agent Avatars
 ```
 
@@ -160,6 +160,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
 | [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
+| [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 
 ### Why these are shared
 
@@ -195,6 +196,7 @@ graph TB
     NSL[Native Sandbox Linux]
     NSM[Native Sandbox macOS]
     NSW[Native Sandbox Windows]
+    TEL[Telemetry & Observability]
   end
 
   subgraph Local [Local Product]
@@ -239,6 +241,8 @@ graph TB
 
   %% Shared → Cloud
   AUTH --> MT
+  AA --> TEL
+  TEL --> LS
 
   %% Cloud internal
   TFS --> K8S --> MT
