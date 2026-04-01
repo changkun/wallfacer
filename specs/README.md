@@ -27,6 +27,7 @@ Local Product                     Cloud Platform
   ○ Visual Verification             ○ Agent Abstraction
   ✅ OAuth Token Setup              ○ Native Sandboxes (Linux/macOS/Win)
   ○ Live Serve                      ○ Overlay Snapshots
+  ○ Pull Request Creation
   ○ Task Revert
   ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
   ✅ Pixel Agent Avatars
@@ -72,6 +73,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [oauth-token-setup.md](local/oauth-token-setup.md) | **Complete** | Browser-based OAuth sign-in for Claude and Codex credentials |
 | [pixel-agents.md](local/pixel-agents.md) | **Complete** | Pixel art office view — animated characters representing task agents |
 | [validation-barrier.md](local/validation-barrier.md) | Not started | User-defined test criteria persisted on tasks for targeted verification |
+| [pull-request.md](local/pull-request.md) | Drafted | Agent-generated GitHub PR from current branch via lightweight sandbox |
 | [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
@@ -89,6 +91,7 @@ graph LR
   HT --> DA
 
   ORS[Oversight Risk Scoring]
+  PR[Pull Request Creation]
   TR[Task Revert]
   VB[Validation Barrier]
   VV[Visual Verification]
