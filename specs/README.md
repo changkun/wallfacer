@@ -35,6 +35,7 @@ Local Product                     Cloud Platform
                                     ○ Multi-Agent Debate
                                     ○ Token & Cost Optimization
                                     ○ Sandbox Hooks
+                                    ○ Intelligence System
 ```
 
 ---
@@ -176,6 +177,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [sandbox-hooks.md](shared/sandbox-hooks.md) | Not started | Both | Agent lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Mechanism layer for token cost optimization. |
+| [intelligence-system.md](shared/intelligence-system.md) | Vague | Both | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. |
 
 ### Why these are shared
 
@@ -215,6 +217,7 @@ graph TB
     INB[Information Inbox]
     MAC[Multi-Agent Consensus]
     MAD[Multi-Agent Debate]
+    IS[Intelligence System]
   end
 
   subgraph Local [Local Product]
@@ -266,6 +269,9 @@ graph TB
   MAC --> MAD
   TEL --> MAD
   TEL --> LS
+  AA --> IS
+  TEL --> IS
+  MAC --> IS
 
   %% Cloud internal
   TFS --> K8S --> MT
