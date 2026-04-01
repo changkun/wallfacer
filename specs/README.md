@@ -31,6 +31,7 @@ Local Product                     Cloud Platform
   ○ Task Revert
   ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
   ✅ Pixel Agent Avatars              ○ Multi-Agent Consensus
+                                    ○ Multi-Agent Debate
 ```
 
 ---
@@ -168,6 +169,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 | [multi-agent-consensus.md](shared/multi-agent-consensus.md) | Drafted | Both | Cross-provider adversarial verification, multi-agent consensus protocol, disagreement resolution. Builds on agent abstraction. |
+| [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
 
 ### Why these are shared
 
@@ -205,6 +207,7 @@ graph TB
     NSW[Native Sandbox Windows]
     TEL[Telemetry & Observability]
     MAC[Multi-Agent Consensus]
+    MAD[Multi-Agent Debate]
   end
 
   subgraph Local [Local Product]
@@ -251,6 +254,8 @@ graph TB
   AUTH --> MT
   AA --> TEL
   AA --> MAC
+  MAC --> MAD
+  TEL --> MAD
   TEL --> LS
 
   %% Cloud internal
