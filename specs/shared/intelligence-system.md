@@ -5,6 +5,7 @@ depends_on:
   - specs/shared/agent-abstraction.md
   - specs/shared/telemetry-observability.md
   - specs/shared/multi-agent-consensus.md
+  - specs/shared/agent-memory-identity.md
 affects:
   - internal/runner/
   - internal/store/
