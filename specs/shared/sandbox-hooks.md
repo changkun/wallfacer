@@ -1,12 +1,16 @@
+---
+title: Sandbox Hooks
+status: drafted
+depends_on: []
+affects: [internal/runner/, internal/sandbox/, internal/handler/, internal/apicontract/, internal/store/]
+effort: xlarge
+created: 2026-04-01
+updated: 2026-04-02
+author: changkun
+dispatched_task_id: null
+---
+
 # Sandbox Hooks
-
-## Status
-
-Not started
-
-## Track
-
-Shared
 
 ## Problem
 
@@ -434,19 +438,23 @@ Per-task overrides possible via task metadata (e.g., disable compression for tas
 
 - Depends on sandbox images being rebuilt with hook config mount points.
 - Output compression (Phase 3) depends on RTK or equivalent being added to Dockerfiles.
-- Benefits from [token-cost-optimization.md](token-cost-optimization.md) for telemetry integration, but can ship independently.
+- Complementary with [token-cost-optimization.md](token-cost-optimization.md): this spec provides the delivery mechanism for several token cost features (output compression, cache break detection, budget warnings, anomaly telemetry). Neither spec blocks the other — hooks can ship infrastructure first, and token cost optimization can use runner-side heuristics as a fallback. See the "Relationship to Token Cost Optimization" section below for the full mapping.
 
 ## Relationship to Token Cost Optimization
 
-The [token-cost-optimization.md](token-cost-optimization.md) spec identifies the *what* (cache observability, output compression, regression modeling). This spec provides the *how* — hooks are the primary mechanism for implementing several of those optimizations:
+The [token-cost-optimization.md](token-cost-optimization.md) spec identifies the *what* (cache observability, output compression, budget intelligence). This spec provides the *how* — hooks are the primary delivery mechanism for implementing several of those optimizations:
 
-| Token Cost Optimization Item | Hook Mechanism |
-|------------------------------|---------------|
-| Cache break detection (§1.2) | `PreCompact`/`PostCompact` events |
-| Shell output compression (§2.1) | `PreToolUse` Bash rewriting |
-| AGENTS.md size tracking (§2.3) | `SessionStart` context recording |
-| Anomaly detection (§3.1) | `PostToolUse` + `StopFailure` telemetry |
-| Stop prevention (§4.2) | `Stop` guard |
+| Token Cost Optimization Item | Hook Mechanism | Notes |
+|------------------------------|---------------|-------|
+| Cache break detection (§1.2) | `PreCompact`/`PostCompact` events | Real-time cache break signal; complements the heuristic detection in §1.2 |
+| Shell output compression (§2.1) | `PreToolUse` Bash rewriting → Handler 1 | Hooks rewrite Bash commands with RTK compression pipes |
+| AGENTS.md size tracking (§2.3) | `SessionStart` context recording → Handler 4 | Record AGENTS.md hash and size at session start |
+| Anomaly detection (§3.1) | `PostToolUse` + `StopFailure` telemetry → Handler 2 | Per-tool-call cost signals feed the regression model |
+| Budget warnings (§4.2) | `UserPromptSubmit` hook (cc-budget pattern) | Alternative to runner-side injection: inject budget warnings via hook `additionalContext` |
+| Per-turn cost deltas (§4.3) | `PostToolUse` aggregation → Handler 2 | Tool-level cost data enables finer-grained delta display |
+| Stop prevention | `Stop` guard → Handler 3 | Prevent premature stops before budget-aware wrap-up |
+
+**Sequencing note**: Token cost optimization can ship its core features (cache telemetry, budget tracking, cost ledger) without sandbox hooks. But hooks unlock the compression and real-time telemetry features. Conversely, sandbox hooks can ship its infrastructure (config generation, HTTP server, basic handlers) before the token cost spec's analysis features exist. The two specs are complementary, not sequential — they share an implementation surface but neither blocks the other.
 
 ## Acceptance Criteria
 
