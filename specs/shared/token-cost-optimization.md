@@ -2,10 +2,10 @@
 title: Token & Cost Optimization
 status: drafted
 depends_on: []
-affects: [internal/runner/, internal/store/, internal/sandbox/]
+affects: [internal/runner/, internal/store/, internal/sandbox/, internal/envconfig/, internal/handler/, internal/cli/, internal/metrics/, internal/prompts/, ui/]
 effort: xlarge
 created: 2026-04-01
-updated: 2026-04-01
+updated: 2026-04-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -29,6 +29,24 @@ From [claude-design-docs](https://github.com/changkun/claude-design-docs):
 - **Cache invalidation triggers**: Changes to system prompt bytes, tool schemas, model string, beta headers, CLAUDE.md content mid-session, MCP connector reconnection.
 - **Compaction**: When context hits ~(window - 13K), auto-compact summarizes older messages. "From" direction preserves cache prefix; "up_to" direction invalidates it. Post-compaction restoration re-injects ~5-50K tokens of recently-accessed files and skills.
 - **Fork agent sharing**: Sub-agents share the parent's cache via byte-identical system prompts and tool pools. Only the final directive diverges.
+
+### Prior Art: cc-budget
+
+[cc-budget](https://github.com/boyand/cc-budget) is a budget awareness tool for Claude Code that uses two extension points:
+
+1. **Status line command** (`statusLine` in settings.json): Claude Code pipes a JSON payload containing `rate_limits` (5-hour and 7-day rolling windows with `used_percentage` and `resets_at`) and `cost` (`total_cost_usd`) on every assistant message. The script formats a rich ANSI status line with a progress bar and pacing marker.
+
+2. **UserPromptSubmit hook**: Fires before each user prompt. Reads persisted state, snapshots usage keyed by `session_id`, checks threshold crossings (90%/95% for 5h, 80%/90% for 7d), and injects a terse warning into `additionalContext` when a threshold is crossed — the agent sees this as part of its prompt context.
+
+Key ideas applicable to wallfacer:
+
+- **Pacing / burn-rate**: A `|` marker on the progress bar shows where usage *should* be for even distribution across the window (`elapsed / window_duration * 100`). Wallfacer can adapt this per-task against `MaxCostUSD`.
+- **Per-turn deltas**: Shows `(+N.N%)` or `(+$X.XX)` after each prompt by diffing pre-prompt snapshot vs post-response reading.
+- **Threshold warnings injected into agent context**: Under-20-token budget warnings injected via hook output, once per threshold crossing (not spammy). This is the mechanism for Part 4.2's live budget tracking.
+- **Peak/off-peak detection**: Uses `Intl.DateTimeFormat` for Anthropic's peak timezone (America/Los_Angeles, 5–11 AM PT weekdays). No external API calls.
+- **Daily/monthly cost ledger**: Persisted per-session cost tracking aggregated by day and month, with automatic pruning (48h for snapshots, 31d for ledger).
+- **Enterprise discount multiplier**: Config option for negotiated pricing (e.g., `enterprise_discount: 20` means 20% off list).
+- **Atomic state persistence**: PID-based temp file + `rename()` for concurrent-safe writes (wallfacer already uses similar patterns in its store).
 
 ### Known Bugs (as of early 2026)
 
@@ -62,7 +80,9 @@ Additionally, `--resume` has been reported to always break cache in some version
 2. **Cache correctness**: Ensure wallfacer's execution model (container-per-turn, `--resume`, feedback loops, AGENTS.md mounts) does not unnecessarily invalidate caches.
 3. **Token reduction**: Reduce raw token volume flowing through agent turns via output compression, without changing agent behavior.
 4. **Regression modeling**: Build a predictive model of expected token consumption per turn to detect anomalous cost spikes early.
-5. **Budget intelligence**: Move from post-hoc budget checks to prospective cost estimation.
+5. **Budget intelligence**: Move from post-hoc budget checks to prospective cost estimation with in-context warnings.
+6. **Burn-rate pacing**: Per-task pacing indicators showing whether cost consumption is on track relative to budget and progress.
+7. **Aggregate cost tracking**: Daily and monthly cost ledgers across all tasks with trend analysis and peak/off-peak awareness.
 
 ---
 
@@ -261,22 +281,85 @@ Before a task starts, estimate its cost range based on:
 
 Show in the task creation UI as: "Estimated cost: $0.50 – $2.00 (based on 12 similar tasks)".
 
-### 4.2 Live Budget Tracking
+### 4.2 Live Budget Tracking with In-Context Warnings
 
 Current behavior: budget check happens after each turn, comparing accumulated cost against `MaxCostUSD`. This is reactive — the task may have already overspent significantly on the final turn.
 
-**Enhancement**: After each turn, compute remaining budget and estimated turns remaining. If estimated remaining cost exceeds remaining budget, inject a warning into the next turn's prompt telling the agent to wrap up efficiently.
+**Enhancement** (inspired by [cc-budget](https://github.com/boyand/cc-budget)'s threshold hook): After each turn, compute remaining budget percentage and check threshold crossings. When a threshold is crossed *for the first time*, inject a terse warning into the next turn's prompt context. The warning must be short (<20 tokens) to avoid wasting the budget it's trying to protect.
+
+**Threshold levels** (configurable per-workspace):
+
+| Threshold | Default | Injected message |
+|-----------|---------|------------------|
+| Warn      | 80%     | `[Budget: 80% used. Wrap up current work.]` |
+| Critical  | 95%     | `[Budget: 95% used. Finish immediately.]` |
+
+**Implementation**: The runner already computes accumulated cost per turn. Add a `budgetWarned` map keyed by threshold level to avoid repeated injection. On each turn completion:
+
+1. Compute `usedPct = accumulatedCost / MaxCostUSD * 100`.
+2. If `usedPct` crosses a threshold not yet warned, set the flag and store the warning message for injection into the next `--resume` turn's prompt prefix.
+3. Warnings are injected via the existing feedback/continuation mechanism — appended to the prompt that resumes the session.
+
+This mirrors cc-budget's `UserPromptSubmit` hook pattern but adapted for wallfacer's container execution model where wallfacer controls the prompt, not a local hook.
+
+### 4.3 Per-Turn Cost Deltas
+
+Surface the cost delta for each turn prominently in the UI (inspired by cc-budget's `(+$X.XX)` display). The data already exists in `TurnUsageRecord` — compute the delta and display it:
+
+- In the task card: show the last turn's cost delta, e.g., `Last turn: +$0.12`.
+- In the turn-usage timeline: each row shows its absolute cost and the delta from the previous turn.
+- Color-code: green for below-average turns, yellow for 2x average, red for 3x+ average.
+
+### 4.4 Burn-Rate Pacing
+
+For tasks with a `MaxCostUSD` budget, compute and display a pacing indicator (inspired by cc-budget's progress bar with pacing marker):
+
+- **Burn rate**: `accumulatedCost / elapsedTurns` — average cost per turn.
+- **Projected total**: `burnRate * estimatedTotalTurns` (estimated from historical average or linear extrapolation).
+- **Pacing marker**: In a budget progress bar, show where the task *should* be if spending evenly across its expected lifetime. If actual spending is ahead of the pacing marker, the task is over-budget-pace.
+
+Display as a compact progress bar in the task card:
 
 ```
-[System: You have approximately $0.30 remaining in your budget (~2-3 turns). 
-Prioritize completing the most important remaining work.]
+Budget: ████████░░░░ 65% ($1.30/$2.00)  pace: 50% ← over-pace
 ```
 
-This gives the agent a chance to prioritize rather than being hard-cut mid-work.
-
-### 4.3 Cross-Task Cost Attribution
+### 4.5 Cross-Task Cost Attribution
 
 For multi-task workflows (batch creation, dependency chains), track aggregate cost across the group. Surface in the UI as a "batch cost" alongside individual task costs.
+
+### 4.6 Aggregate Cost Ledger
+
+Track costs across all tasks aggregated by day and month (inspired by cc-budget's daily/monthly ledger). This goes beyond per-task tracking to give workspace-level spend visibility:
+
+- **Daily ledger**: Total cost per day, broken down by sandbox type (Claude vs Codex) and model.
+- **Monthly ledger**: Running monthly total with trend projection ("on pace for $X this month").
+- **Retention**: Daily entries retained for 90 days, monthly entries indefinitely.
+- **Storage**: Append to a workspace-level `usage-ledger.jsonl` file (separate from per-task turn-usage files).
+
+Surface in the dashboard as a cost chart with daily bars and a monthly trend line.
+
+### 4.7 Peak/Off-Peak Scheduling Awareness
+
+Anthropic's rate limits are tighter during peak hours (America/Los_Angeles, roughly 5–11 AM PT weekdays, per cc-budget's detection logic). Wallfacer's auto-promoter can use this:
+
+- **Display**: Show peak/off-peak status and countdown in the UI header.
+- **Throttling** (opt-in): During peak hours, reduce `WALLFACER_MAX_PARALLEL` by a configurable factor (e.g., `WALLFACER_PEAK_THROTTLE_FACTOR=0.5` halves concurrency during peak).
+- **Scheduling preference**: When multiple backlog tasks are eligible for promotion, prefer cheaper/smaller tasks during peak and defer expensive tasks to off-peak.
+
+```
+WALLFACER_PEAK_THROTTLE_FACTOR — multiplier for max_parallel during peak hours (0 = no throttling, default: 0)
+```
+
+### 4.8 Enterprise Discount
+
+Support a configurable discount multiplier for organizations with negotiated Anthropic pricing:
+
+```
+WALLFACER_ENTERPRISE_DISCOUNT — percentage discount on list pricing for cost display (default: 0)
+```
+
+When set, all cost displays (per-turn, per-task, daily/monthly ledger, prospective estimates) apply the discount. The raw API-reported costs are stored unchanged; the discount is applied only at display time.
 
 ---
 
@@ -295,7 +378,12 @@ For multi-task workflows (batch creation, dependency chains), track aggregate co
 6. Usage report CLI command works on historical data.
 7. Cost anomaly detection flags turns exceeding 3x predicted cost.
 8. Prospective cost estimation appears in task creation UI.
-9. Live budget warning is injected when remaining budget is low.
+9. Threshold-based budget warnings are injected into agent context at 80% and 95% (configurable), once per crossing.
+10. Per-turn cost deltas are visible in the task card and turn-usage timeline.
+11. Burn-rate pacing indicator appears on tasks with a `MaxCostUSD` budget.
+12. Daily/monthly cost ledger aggregates workspace-level spend with trend projection.
+13. Peak/off-peak status is displayed; optional auto-promoter throttling during peak hours.
+14. Enterprise discount multiplier applies to all cost displays when configured.
 
 ## Non-Goals
 
@@ -311,3 +399,6 @@ For multi-task workflows (batch creation, dependency chains), track aggregate co
 3. Is RTK's compression lossy in ways that hurt agent accuracy? Need to test on wallfacer's typical workloads.
 4. Should the regression model be per-workspace or global? Per-workspace captures project-specific patterns but needs more data.
 5. What is the right `max_turns_per_session` default? Too low wastes context; too high hits compaction overhead.
+6. Are Anthropic's peak hours (5–11 AM PT weekdays, per cc-budget) stable enough to hardcode, or should wallfacer detect them dynamically from rate-limit response headers?
+7. Should budget threshold warnings be injected as system messages or appended to the user prompt? System messages may be more reliable but depend on Claude Code's prompt assembly order.
+8. What ledger retention policy balances storage cost vs analytics value? cc-budget uses 48h snapshots / 31d ledger; wallfacer may want longer retention given its multi-task nature.
