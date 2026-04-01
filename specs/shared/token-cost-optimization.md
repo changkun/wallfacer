@@ -1,12 +1,16 @@
+---
+title: Token & Cost Optimization
+status: drafted
+depends_on: []
+affects: [internal/runner/, internal/store/, internal/sandbox/]
+effort: xlarge
+created: 2026-04-01
+updated: 2026-04-01
+author: changkun
+dispatched_task_id: null
+---
+
 # Token & Cost Optimization
-
-## Status
-
-Not started
-
-## Track
-
-Shared
 
 ## Problem
 
