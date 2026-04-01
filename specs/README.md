@@ -30,7 +30,8 @@ Local Product                     Cloud Platform
   ○ Pull Request Creation
   ○ Task Revert
   ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
-  ✅ Pixel Agent Avatars              ○ Multi-Agent Consensus
+  ✅ Pixel Agent Avatars              ○ Information Inbox
+                                    ○ Multi-Agent Consensus
                                     ○ Multi-Agent Debate
                                     ○ Token & Cost Optimization
                                     ○ Sandbox Hooks
@@ -170,6 +171,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
+| [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
 | [multi-agent-consensus.md](shared/multi-agent-consensus.md) | Drafted | Both | Cross-provider adversarial verification, multi-agent consensus protocol, disagreement resolution. Builds on agent abstraction. |
 | [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
@@ -210,6 +212,7 @@ graph TB
     NSM[Native Sandbox macOS]
     NSW[Native Sandbox Windows]
     TEL[Telemetry & Observability]
+    INB[Information Inbox]
     MAC[Multi-Agent Consensus]
     MAD[Multi-Agent Debate]
   end
@@ -257,6 +260,8 @@ graph TB
   %% Shared → Cloud
   AUTH --> MT
   AA --> TEL
+  AA --> INB
+  TEL --> INB
   AA --> MAC
   MAC --> MAD
   TEL --> MAD
