@@ -154,14 +154,7 @@ func (b *LocalBackend) launchEphemeral(ctx context.Context, spec ContainerSpec) 
 		return nil, fmt.Errorf("stderr pipe: %w", err)
 	}
 
-	h := &localHandle{
-		name:    name,
-		cmd:     cmd,
-		stdout:  stdout,
-		stderr:  stderr,
-		command: b.command,
-	}
-	transition(&h.state, StateCreating)
+	h := newLocalHandle(name, cmd, stdout, stderr, b.command)
 
 	if err := cmd.Start(); err != nil {
 		transition(&h.state, StateFailed)
@@ -254,6 +247,21 @@ type localHandle struct {
 	stderr  io.ReadCloser
 	command string // runtime binary, needed for kill/rm
 	state   atomic.Int32
+}
+
+// newLocalHandle constructs a localHandle with its state explicitly set to
+// StateCreating. All construction of localHandle must go through this function
+// so the initial state is never ambiguous.
+func newLocalHandle(name string, cmd *exec.Cmd, stdout, stderr io.ReadCloser, command string) *localHandle {
+	h := &localHandle{
+		name:    name,
+		cmd:     cmd,
+		stdout:  stdout,
+		stderr:  stderr,
+		command: command,
+	}
+	h.state.Store(int32(StateCreating))
+	return h
 }
 
 // State returns the current lifecycle state, read atomically so it is safe

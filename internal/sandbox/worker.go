@@ -117,14 +117,7 @@ func (w *taskWorker) exec(ctx context.Context, cmd []string, workDir string) (Ha
 		return nil, fmt.Errorf("exec stderr pipe: %w", err)
 	}
 
-	lh := &localHandle{
-		name:    w.containerName,
-		cmd:     c,
-		stdout:  stdout,
-		stderr:  stderr,
-		command: w.command,
-	}
-	transition(&lh.state, StateCreating)
+	lh := newLocalHandle(w.containerName, c, stdout, stderr, w.command)
 
 	if err := c.Start(); err != nil {
 		transition(&lh.state, StateFailed)
