@@ -20,8 +20,24 @@ The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). Wh
 
 - **Read `specs/README.md` first** to understand the track organization and dependency graph.
 - **Place new specs** in the appropriate track directory. Use descriptive filenames without numeric prefixes (e.g., `specs/local/live-serve.md`).
+- **Every spec MUST have valid YAML frontmatter** matching the spec document model (see `specs/local/spec-coordination/spec-document-model.md`). Required fields:
+  ```yaml
+  ---
+  title: Human-readable title
+  status: drafted          # vague | drafted | validated | complete | stale
+  depends_on:              # list of spec paths this one requires (DAG edges)
+    - specs/shared/agent-abstraction.md
+  affects:                 # packages and files this spec describes
+    - internal/runner/
+  effort: large            # small | medium | large | xlarge
+  created: 2026-04-01      # ISO date
+  updated: 2026-04-01      # ISO date, must be >= created
+  author: changkun
+  dispatched_task_id: null  # null or UUID (leaf specs only)
+  ---
+  ```
 - **Assess cross-impacts** with existing specs. If a new spec modifies interfaces defined in foundations (`SandboxBackend`, `StorageBackend`), it must declare the dependency.
-- **Update `specs/README.md`** when adding a spec — add it to the appropriate track table.
+- **Update `specs/README.md`** when adding a spec — add it to the appropriate track table, the status overview, and the dependency graph.
 
 ## Build & Run Commands
 
