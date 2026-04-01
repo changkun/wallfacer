@@ -33,6 +33,7 @@ Local Product                     Cloud Platform
   ✅ Pixel Agent Avatars              ○ Multi-Agent Consensus
                                     ○ Multi-Agent Debate
                                     ○ Token & Cost Optimization
+                                    ○ Sandbox Hooks
 ```
 
 ---
@@ -172,6 +173,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [multi-agent-consensus.md](shared/multi-agent-consensus.md) | Drafted | Both | Cross-provider adversarial verification, multi-agent consensus protocol, disagreement resolution. Builds on agent abstraction. |
 | [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
+| [sandbox-hooks.md](shared/sandbox-hooks.md) | Not started | Both | Agent lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Mechanism layer for token cost optimization. |
 
 ### Why these are shared
 
