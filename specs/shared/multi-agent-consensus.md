@@ -5,7 +5,7 @@ depends_on: [specs/shared/agent-abstraction.md]
 affects: [internal/runner/, internal/store/, internal/sandbox/, internal/envconfig/, ui/]
 effort: xlarge
 created: 2026-04-01
-updated: 2026-04-01
+updated: 2026-04-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -20,6 +20,20 @@ Today every sub-agent activity (implementation, testing, oversight, etc.) is exe
 
 2. **Single-point-of-failure decisions.** Critical decisions — whether code is correct, whether a task is done, whether a commit message is accurate — rest on one agent's judgment. There is no mechanism for requiring agreement between multiple independent agents before a decision is accepted.
 
+3. **Correlated failure modes.** When all agents share the same base model (or even the same training data distribution across providers), their failure modes are correlated. This is precisely the condition that breaks classical fault tolerance guarantees. Cross-provider diversity helps, but doesn't eliminate the problem — LLM providers share training corpora, RLHF patterns, and architectural conventions.
+
+### The Byzantine Fault Tolerance Parallel
+
+Distributed systems engineers solved a harder version of this problem 40 years ago under the name Byzantine Fault Tolerance (BFT). The core challenge: reaching agreement when some participants are unreliable, deceptive, or just confidently wrong.
+
+LLM hallucinations are structurally identical to a Byzantine node sending contradictory messages to different peers. An agent that confidently asserts incorrect code passes tests is indistinguishable — from the orchestrator's perspective — from a malicious node in a Byzantine system. The difference is intent, but the system design problem is the same: you cannot trust any single participant's claim without independent corroboration.
+
+Classical BFT results (Lamport, Shostak, Pease 1982) require 3f+1 nodes to tolerate f Byzantine faults. This gives us a useful frame: if we want to tolerate one unreliable agent, we need at least 4 independent agents — not 3, because with 3 agents and one faulty, the remaining two cannot distinguish which of the other two is lying. In practice, we won't run 4 providers for every activity. But the theory tells us exactly when our consensus guarantees degrade and why.
+
+**The liveness problem.** Recent research on LLM agent consensus tasks shows that even without adversaries, agreement is unreliable and degrades as group size grows. Agents don't just converge on wrong answers — they fail to converge at all. This suggests multi-agent coordination has a liveness problem (the system cannot make progress) in addition to the more obvious safety problem (the system makes the wrong decision). Our consensus protocol must handle both: safety (don't accept a wrong verdict) and liveness (don't deadlock when agents can't agree).
+
+**Correlated failures undermine independence.** Classical BFT assumes independent failure modes. When all agents share training data biases, cross-checking provides less value than the math suggests. The effective number of independent agents is lower than the actual count. This means: (a) cross-provider diversity is necessary but not sufficient, (b) mixing deterministic verifiers (linters, type checkers, fuzz testers) with stochastic LLM agents improves true independence, and (c) we should measure empirical agreement rates to detect when providers are insufficiently independent.
+
 ### Why This Matters Now
 
 - The sandbox routing infrastructure already supports per-activity provider selection (4-tier hierarchy in `container.go`). But routing alone is passive — it doesn't enforce cross-checking.
@@ -33,6 +47,8 @@ Today every sub-agent activity (implementation, testing, oversight, etc.) is exe
 - **G3 — Disagreement resolution.** When agents disagree, provide a structured escalation path — automated tie-breaking, human review, or a third-party arbiter.
 - **G4 — Provider-agnostic.** The consensus mechanism must work across Claude, Codex, Gemini, and future providers without assuming provider-specific capabilities.
 - **G5 — Incremental adoption.** Each layer is independently useful. Cross-provider testing alone delivers value without requiring full consensus.
+- **G6 — Liveness under disagreement.** The system must always make progress. Perpetual disagreement must resolve within bounded time via escalation, not spin indefinitely.
+- **G7 — Disagreement as signal.** When agents disagree, the disagreement itself is informative — often more informative than any individual verdict. The system should surface, structure, and preserve disagreement rather than averaging it away.
 
 ## Current Architecture (Relevant)
 
@@ -86,9 +102,13 @@ This is more expensive (2x test containers) but catches cases where one provider
 
 **Verdict comparison:** The test activity already produces structured output (pass/fail + reasoning). Comparing verdicts is a string comparison on the structured result.
 
+**Testing as distributed consensus.** Reframing: testing is not "run tests and check pass/fail." Testing is a consensus problem — multiple independent agents must agree on pass/fail. When they disagree, the disagreement often points to ambiguity in the specification itself, not just a bug in the code or a mistake by one agent. A test where Claude says "pass" and Codex says "fail" is a signal that the acceptance criteria are underspecified. This reframing makes disagreement the most valuable output of the testing activity.
+
 ### Layer 2 — Multi-Agent Consensus
 
 Generalize dual verification into a consensus protocol for any activity.
+
+**Hard gate vs. soft aggregation.** Most current multi-agent setups use soft aggregation: generate multiple outputs, pick the best one through voting or scoring. This spec takes the harder position. For designated activities, consensus is a *hard gate* — certain actions simply cannot proceed until independent agents genuinely converge. The absence of convergence is itself a signal that something is underspecified or wrong, and the system blocks rather than guessing. This is the fundamental difference between "pick the best answer" and "verify the answer is right."
 
 #### Consensus Modes
 
@@ -163,7 +183,9 @@ Parallel execution is natural here — agents are independent containers with no
 
 ### Layer 3 — Disagreement Resolution
 
-When agents disagree and consensus is not reached:
+When agents disagree and consensus is not reached.
+
+**Design principle: disagreement is the most informative signal.** The natural instinct is to treat disagreement as an obstacle — something to be resolved so the system can move on. But if agreement among stochastic agents is fundamentally fragile, the right design treats disagreement as the primary output of the consensus mechanism. A unanimous "pass" tells you less than a split verdict, because the split verdict localizes uncertainty. The system should be designed to *preserve and surface* disagreement structure, not just resolve it.
 
 #### 3A — Arbiter Agent
 
@@ -253,6 +275,85 @@ For Gemini specifically:
 
 The CLI wrapper is necessary because Google's Gemini doesn't have a direct equivalent of `claude -p` or `codex`. The wrapper translates between wallfacer's container protocol and the Gemini API.
 
+### Layer 5 — Consensus-Gated Actions & Partial Agreement Maps
+
+Layers 1–4 treat consensus as binary: reached or not. This layer introduces risk-stratified gating and partial agreement as a continuous signal.
+
+#### 5A — Risk-Stratified Consensus Gates
+
+Not all actions need the same level of agreement. Instead of applying a single consensus mode per activity type, gate the consensus requirement on the *risk level* of the specific action:
+
+| Risk Level | Gate Requirement | Example Actions |
+|------------|-----------------|-----------------|
+| Low | `single` (no gate) | Title generation, commit message drafts |
+| Medium | `cross` (different provider verifies) | Test verdicts, routine code changes |
+| High | `majority` (N-of-M agreement) | Spec modifications, dependency changes, large refactors |
+| Critical | `unanimous` + human confirmation | Destructive operations, security-sensitive changes, release decisions |
+
+Risk classification can be heuristic (file count, diff size, presence of security-sensitive paths) or explicit (per-task annotation). The key insight: consensus cost should scale with decision risk, not be applied uniformly.
+
+```go
+type RiskLevel string
+
+const (
+    RiskLow      RiskLevel = "low"
+    RiskMedium   RiskLevel = "medium"
+    RiskHigh     RiskLevel = "high"
+    RiskCritical RiskLevel = "critical"
+)
+
+type RiskGateConfig struct {
+    // Maps risk levels to consensus modes.
+    // Actions below the threshold flow through freely;
+    // actions at or above must pass the consensus gate.
+    Gates map[RiskLevel]ConsensusMode `json:"gates"`
+}
+```
+
+#### 5B — Partial Agreement Maps
+
+Instead of reducing consensus to a binary (agreed / not agreed), produce a structured map of where agents converge and where they diverge:
+
+```go
+type AgreementMap struct {
+    Activity    store.SandboxActivity
+    Dimensions  []AgreementDimension
+    Overall     float64  // 0.0 (total disagreement) to 1.0 (full agreement)
+}
+
+type AgreementDimension struct {
+    Name       string            // e.g., "correctness", "completeness", "style"
+    Agreement  float64           // agreement ratio for this dimension
+    Positions  []AgentPosition   // each agent's stance
+}
+
+type AgentPosition struct {
+    Provider   sandbox.Type
+    Stance     string   // structured position on this dimension
+    Confidence string   // agent's self-reported confidence (if available)
+}
+```
+
+This turns consensus from an all-or-nothing binary into a gradient that tells you *where* human attention is needed. A task where all agents agree on correctness but disagree on completeness needs different human intervention than one where they disagree on whether the code even compiles.
+
+**UI integration:** The disagreement review panel (Layer 3) shows the agreement map as a heatmap or radar chart — green where agents converge, red where they diverge. This gives the human reviewer immediate visual triage: focus attention on the red zones.
+
+**Structured verdict protocol.** To produce agreement maps, consensus activities must emit structured verdicts with per-dimension scores, not just a single pass/fail. The verdict schema:
+
+```json
+{
+  "verdict": "pass",
+  "dimensions": {
+    "correctness": { "pass": true, "reasoning": "..." },
+    "completeness": { "pass": true, "reasoning": "..." },
+    "test_coverage": { "pass": false, "reasoning": "..." },
+    "style": { "pass": true, "reasoning": "..." }
+  }
+}
+```
+
+This is backwards-compatible — agents that emit only `{"verdict": "pass"}` are treated as agreeing on all dimensions. Richer verdicts enable finer-grained agreement analysis.
+
 ## Data Model Changes
 
 ### Task Model
@@ -283,6 +384,8 @@ const (
     EventConsensusReached  EventType = "consensus_reached"   // agreement achieved
     EventConsensusFailed   EventType = "consensus_failed"    // disagreement, escalating
     EventArbiterVerdict    EventType = "arbiter_verdict"     // arbiter decision
+    EventAgreementMap      EventType = "agreement_map"       // partial agreement analysis
+    EventRiskGateApplied   EventType = "risk_gate_applied"   // risk-stratified gate resolved
 )
 ```
 
@@ -383,6 +486,16 @@ Generalize cross-provider verification into configurable consensus.
 3. Add Gemini env vars and sandbox constant.
 4. Validate that consensus works across 3 providers.
 
+### Phase 5 — Consensus Gates & Agreement Maps (Layer 5)
+
+1. Define `RiskLevel` enum and `RiskGateConfig` in `internal/store/models.go`.
+2. Implement risk classification heuristics (diff size, file sensitivity, explicit annotation).
+3. Wire risk-gated consensus into the runner: resolve risk level before selecting consensus mode.
+4. Define structured verdict schema with per-dimension scores.
+5. Implement agreement map computation from multi-provider structured verdicts.
+6. Add agreement map visualization to the disagreement review UI (heatmap/radar chart).
+7. Add empirical independence tracking: log agreement rates across provider pairs over time to detect correlated failures.
+
 ## Cost Considerations
 
 Multi-agent consensus multiplies per-activity cost:
@@ -408,15 +521,24 @@ Mitigation strategies:
 
 3. **Latency impact.** Parallel consensus adds wall-clock time (slowest provider). Sequential consensus (for budget reasons) adds cumulative time. Is there a latency SLA?
 
-4. **Provider bias correlation.** Cross-provider checking assumes independent failure modes. If all LLM providers share training data biases, cross-checking provides less value. How do we measure the actual independence?
+4. **Provider bias correlation and effective independence.** Cross-provider checking assumes independent failure modes. If all LLM providers share training data biases (which they do to varying degrees), the *effective* number of independent agents is lower than the actual count. Classical BFT requires 3f+1 truly independent nodes to tolerate f faults — but if two of our three providers share a failure mode, we effectively have 2 nodes, not 3. How do we measure empirical independence? One approach: track agreement rates across provider pairs over time. If Claude and Codex agree 98% of the time, they provide much less cross-checking value than if they agree 70% of the time. This metric should inform consensus configuration recommendations.
 
 5. **Consensus for implementation.** This spec focuses on verification/decision activities. Should the implementation itself ever require consensus (e.g., two agents implement independently, then a merge agent combines the best parts)? This is architecturally different and likely a separate spec.
 
 6. **Interaction with auto-retry.** If consensus fails and the task is auto-retried, should the retry use the same consensus config or fall back to single-provider?
+
+7. **Liveness guarantees under persistent disagreement.** If agents systematically disagree on a class of tasks (e.g., style-sensitive decisions where reasonable people also disagree), the consensus mechanism could block progress indefinitely. The escalation chain (Layer 3) provides eventual liveness via human escalation, but this is expensive. Should there be a configurable timeout after which the system falls back to single-agent mode with a warning, rather than blocking? How do we distinguish "productive disagreement" (reveals a real problem) from "noise disagreement" (agents have different style preferences)?
+
+8. **Deterministic verifiers as consensus participants.** Linters, type checkers, and fuzz testers have truly independent failure modes from LLM agents — they don't share training biases. Should these count as "votes" in the consensus protocol? A type checker that says "this compiles" is arguably a stronger signal than three LLMs agreeing it looks correct. This would make the consensus group heterogeneous (deterministic + stochastic participants) which changes the math but improves real independence.
+
+9. **Agreement map granularity.** The structured verdict schema (Layer 5B) assumes we can decompose verdicts into named dimensions (correctness, completeness, style). Who defines these dimensions — the system, the user, or the agents themselves? If agents self-select dimensions, they may not produce comparable breakdowns. If the system imposes dimensions, it may miss task-specific concerns.
 
 ## Deferred Work
 
 - **User-configurable consensus pipelines via UI.** Phase 2 supports config via env vars and API; a visual pipeline editor is a separate effort.
 - **Dynamic provider selection based on task characteristics.** E.g., routing security-sensitive tasks to providers with better safety training. Requires task classification infrastructure.
 - **Consensus for multi-turn implementation.** Requiring agreement during implementation (not just verification) is a fundamentally different problem — it requires inter-agent communication during execution, not just post-hoc comparison.
-- **Formal verification integration.** Using deterministic tools (linters, type checkers, fuzz testers) as "agents" in the consensus group alongside LLM providers. These could count as votes in the consensus protocol.
+- **Formal verification integration.** Using deterministic tools (linters, type checkers, fuzz testers) as "agents" in the consensus group alongside LLM providers. These could count as votes in the consensus protocol. See Open Question 8.
+- **Empirical independence measurement.** Continuous tracking of provider-pair agreement rates to quantify actual cross-checking value. When two providers agree too often, the system should recommend adding a third or mixing in deterministic verifiers.
+- **Adversarial red-teaming mode.** Explicitly instruct one agent to argue against the others' verdicts — a designated devil's advocate. This is different from independent verification; it's directed adversarial analysis. Useful for security-sensitive reviews.
+- **Consensus history and learning.** Over time, the system accumulates data on which activities produce disagreement and which providers disagree most often. This data could drive adaptive consensus configuration — automatically escalating consensus requirements for activities that historically produce disagreement.
