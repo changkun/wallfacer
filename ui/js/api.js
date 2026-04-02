@@ -723,104 +723,56 @@ function updateWatcherHealth(entries) {
   el.innerHTML = html;
 }
 
-async function toggleAutopilot() {
-  var toggle = document.getElementById("autopilot-toggle");
-  var enabled = toggle ? toggle.checked : !autopilot;
-  try {
-    var res = await api(Routes.config.update(), {
-      method: "PUT",
-      body: JSON.stringify({ autopilot: enabled }),
-    });
-    autopilot = !!res.autopilot;
-    if (toggle) toggle.checked = autopilot;
-    updateAutomationActiveCount();
-  } catch (e) {
-    showAlert("Error toggling autopilot: " + e.message);
-    if (toggle) toggle.checked = autopilot;
-  }
-}
+var toggleAutopilot = createConfigToggle({
+  elementId: "autopilot-toggle",
+  configKey: "autopilot",
+  getState: function () { return autopilot; },
+  setState: function (v) { autopilot = v; },
+  label: "autopilot",
+  onUpdate: updateAutomationActiveCount,
+});
 
-async function toggleAutotest() {
-  var toggle = document.getElementById("autotest-toggle");
-  var enabled = toggle ? toggle.checked : !autotest;
-  try {
-    var res = await api(Routes.config.update(), {
-      method: "PUT",
-      body: JSON.stringify({ autotest: enabled }),
-    });
-    autotest = !!res.autotest;
-    if (toggle) toggle.checked = autotest;
-    updateAutomationActiveCount();
-  } catch (e) {
-    showAlert("Error toggling auto-test: " + e.message);
-    if (toggle) toggle.checked = autotest;
-  }
-}
+var toggleAutotest = createConfigToggle({
+  elementId: "autotest-toggle",
+  configKey: "autotest",
+  getState: function () { return autotest; },
+  setState: function (v) { autotest = v; },
+  label: "auto-test",
+  onUpdate: updateAutomationActiveCount,
+});
 
-async function toggleAutosubmit() {
-  var toggle = document.getElementById("autosubmit-toggle");
-  var enabled = toggle ? toggle.checked : !autosubmit;
-  try {
-    var res = await api(Routes.config.update(), {
-      method: "PUT",
-      body: JSON.stringify({ autosubmit: enabled }),
-    });
-    autosubmit = !!res.autosubmit;
-    if (toggle) toggle.checked = autosubmit;
-    updateAutomationActiveCount();
-  } catch (e) {
-    showAlert("Error toggling auto-submit: " + e.message);
-    if (toggle) toggle.checked = autosubmit;
-  }
-}
+var toggleAutosubmit = createConfigToggle({
+  elementId: "autosubmit-toggle",
+  configKey: "autosubmit",
+  getState: function () { return autosubmit; },
+  setState: function (v) { autosubmit = v; },
+  label: "auto-submit",
+  onUpdate: updateAutomationActiveCount,
+});
 
-async function toggleAutorefine() {
-  var toggle = document.getElementById("autorefine-toggle");
-  var enabled = toggle ? toggle.checked : !autorefine;
-  try {
-    var res = await api(Routes.config.update(), {
-      method: "PUT",
-      body: JSON.stringify({ autorefine: enabled }),
-    });
-    autorefine = !!res.autorefine;
-    if (toggle) toggle.checked = autorefine;
-    updateAutomationActiveCount();
-  } catch (e) {
-    showAlert("Error toggling auto-refine: " + e.message);
-    if (toggle) toggle.checked = autorefine;
-  }
-}
+var toggleAutorefine = createConfigToggle({
+  elementId: "autorefine-toggle",
+  configKey: "autorefine",
+  getState: function () { return autorefine; },
+  setState: function (v) { autorefine = v; },
+  label: "auto-refine",
+  onUpdate: updateAutomationActiveCount,
+});
 
-async function toggleAutosync() {
-  var toggle = document.getElementById("autosync-toggle");
-  var enabled = toggle ? toggle.checked : !autosync;
-  try {
-    var res = await api(Routes.config.update(), {
-      method: "PUT",
-      body: JSON.stringify({ autosync: enabled }),
-    });
-    autosync = !!res.autosync;
-    if (toggle) toggle.checked = autosync;
-    updateAutomationActiveCount();
-  } catch (e) {
-    showAlert("Error toggling auto-sync: " + e.message);
-    if (toggle) toggle.checked = autosync;
-  }
-}
+var toggleAutosync = createConfigToggle({
+  elementId: "autosync-toggle",
+  configKey: "autosync",
+  getState: function () { return autosync; },
+  setState: function (v) { autosync = v; },
+  label: "auto-sync",
+  onUpdate: updateAutomationActiveCount,
+});
 
-async function toggleAutopush() {
-  var toggle = document.getElementById("autopush-toggle");
-  var enabled = toggle ? toggle.checked : !autopush;
-  try {
-    var res = await api(Routes.config.update(), {
-      method: "PUT",
-      body: JSON.stringify({ autopush: enabled }),
-    });
-    autopush = !!res.autopush;
-    if (toggle) toggle.checked = autopush;
-    updateAutomationActiveCount();
-  } catch (e) {
-    showAlert("Error toggling auto-push: " + e.message);
-    if (toggle) toggle.checked = autopush;
-  }
-}
+var toggleAutopush = createConfigToggle({
+  elementId: "autopush-toggle",
+  configKey: "autopush",
+  getState: function () { return autopush; },
+  setState: function (v) { autopush = v; },
+  label: "auto-push",
+  onUpdate: updateAutomationActiveCount,
+});
