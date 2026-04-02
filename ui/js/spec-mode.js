@@ -190,14 +190,17 @@ function _loadAndRenderSpec() {
         if (firstChild && firstChild.tagName === "HR") {
           firstChild.remove();
         }
-        // Render mermaid diagrams in code blocks.
-        if (typeof renderMermaidBlocks === "function") {
-          renderMermaidBlocks(bodyEl);
-        }
-        // Intercept clicks on links to .md files and navigate within spec mode.
-        bodyEl.addEventListener("click", _onSpecBodyLinkClick);
-        // Build table of contents from rendered headings.
-        _buildSpecToc(bodyEl);
+        // Post-process: mermaid diagrams and spec link navigation.
+        _mdRender
+          .enhanceMarkdown(bodyEl, {
+            links: true,
+            linkHandler: "spec",
+            basePath: _focusedSpecPath || "",
+            workspace: _focusedSpecWorkspace,
+          })
+          .then(function () {
+            _buildSpecToc(bodyEl);
+          });
       }
 
       // Show dispatch button for any validated spec (design or implementation).
@@ -319,40 +322,6 @@ function _buildSpecToc(bodyEl) {
   }
 }
 
-// _onSpecBodyLinkClick intercepts clicks on markdown links to .md files
-// and navigates within spec mode instead of following the link.
-function _onSpecBodyLinkClick(e) {
-  var target = e.target;
-  // Walk up to find the <a> element.
-  while (target && target.tagName !== "A") {
-    target = target.parentElement;
-  }
-  if (!target) return;
-
-  var href = target.getAttribute("href");
-  if (!href || !href.endsWith(".md")) return;
-
-  e.preventDefault();
-
-  // Resolve relative paths against the current spec's directory.
-  var basePath = _focusedSpecPath || "";
-  var baseDir = basePath.substring(0, basePath.lastIndexOf("/") + 1);
-
-  // Normalize: resolve "./" and "../" components.
-  var resolved = baseDir + href;
-  var parts = resolved.split("/");
-  var normalized = [];
-  for (var i = 0; i < parts.length; i++) {
-    if (parts[i] === "..") {
-      normalized.pop();
-    } else if (parts[i] !== "." && parts[i] !== "") {
-      normalized.push(parts[i]);
-    }
-  }
-  var specPath = normalized.join("/");
-
-  focusSpec(specPath, _focusedSpecWorkspace);
-}
 
 // --- Spec mode keyboard shortcut stubs ---
 

@@ -671,6 +671,8 @@ function renderResultsFromEvents(results, opts) {
       }
     })
     .join("");
+  // Post-process: render mermaid diagrams in result entries.
+  _mdRender.enhanceMarkdown(listEl);
 }
 
 function renderTestResultsFromEvents(results) {

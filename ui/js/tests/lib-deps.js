@@ -15,13 +15,15 @@ const jsDir = join(__dirname, "..");
 const LIB_DEPS = {
   "utils.js": ["lib/formatting.js", "lib/modal.js"],
   "markdown.js": ["lib/clipboard.js", "lib/toggle.js"],
-  "modal.js": ["lib/tab-switcher.js"],
+  "modal.js": ["lib/tab-switcher.js", "lib/markdown-render.js"],
+  "modal-core.js": ["lib/tab-switcher.js", "lib/markdown-render.js"],
   "modal-logs.js": ["lib/scheduling.js", "lib/tab-switcher.js"],
   "modal-results.js": [
     "lib/formatting.js",
     "lib/clipboard.js",
     "lib/toggle.js",
     "lib/tab-switcher.js",
+    "lib/markdown-render.js",
   ],
   "render.js": ["lib/scheduling.js"],
   "refine.js": ["lib/scheduling.js"],
@@ -29,7 +31,11 @@ const LIB_DEPS = {
   "keyboard-shortcuts.js": ["lib/modal.js", "lib/modal-controller.js"],
   "instructions.js": ["lib/modal.js", "lib/modal-controller.js"],
   "containers.js": ["lib/modal.js", "lib/modal-controller.js"],
-  "docs.js": ["lib/modal.js", "lib/modal-controller.js"],
+  "docs.js": [
+    "lib/modal.js",
+    "lib/modal-controller.js",
+    "lib/markdown-render.js",
+  ],
   "api.js": ["lib/config-toggle.js"],
 };
 

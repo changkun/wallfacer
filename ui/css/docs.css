@@ -114,21 +114,6 @@
   border-top: 1px solid var(--border);
   margin: 20px 0;
 }
-.markdown-body .mermaid-diagram {
-  margin: 12px 0;
-  overflow-x: auto;
-  cursor: pointer;
-}
-.markdown-body .mermaid-diagram:hover {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-  border-radius: 4px;
-}
-.markdown-body .mermaid-diagram svg {
-  max-width: 100%;
-  height: auto;
-}
-
 /* --- Docs TOC (right sidebar) --- */
 .docs-toc-link {
   display: block;
@@ -162,52 +147,3 @@
   border-left-color: var(--accent);
 }
 
-.diagram-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: var(--bg-card);
-  display: flex;
-  flex-direction: column;
-}
-.diagram-overlay__viewport {
-  flex: 1;
-  overflow: hidden;
-  cursor: grab;
-  position: relative;
-}
-.diagram-overlay__surface {
-  transform-origin: 0 0;
-  will-change: transform;
-  display: inline-block;
-}
-.diagram-overlay__surface svg {
-  display: block;
-}
-.diagram-overlay__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-card);
-  flex-shrink: 0;
-}
-.diagram-overlay__toolbar button {
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-input);
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-}
-.diagram-overlay__toolbar button:hover {
-  background: var(--bg-raised);
-}
-.diagram-overlay__hint {
-  flex: 1;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-muted);
-}

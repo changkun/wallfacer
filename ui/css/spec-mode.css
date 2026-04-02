@@ -312,26 +312,6 @@
 }
 
 /* Mermaid diagram blocks */
-.mermaid-block {
-  margin: 0.75em 0;
-  text-align: center;
-}
-
-.mermaid-rendered {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.mermaid-rendered svg {
-  max-width: 100%;
-  height: auto;
-}
-
-.mermaid-src {
-  text-align: left;
-}
 
 /* Right pane: chat stream */
 .spec-chat-stream {

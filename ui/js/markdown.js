@@ -49,31 +49,6 @@ function renderMarkdown(text) {
   return marked.parse(text);
 }
 
-// renderMermaidBlocks finds .mermaid-block elements inside a container and
-// renders them as SVG diagrams using the Mermaid library.
-function renderMermaidBlocks(container) {
-  if (typeof mermaid === "undefined" || !container) return;
-  var blocks = container.querySelectorAll(".mermaid-block");
-  if (!blocks || blocks.length === 0) return;
-
-  for (var i = 0; i < blocks.length; i++) {
-    (function (block, idx) {
-      var code = block.getAttribute("data-mermaid");
-      if (!code) return;
-      var id = "mermaid-diagram-" + Date.now() + "-" + idx;
-      mermaid
-        .render(id, code)
-        .then(function (result) {
-          block.innerHTML = result.svg;
-          block.classList.add("mermaid-rendered");
-        })
-        .catch(function () {
-          // Keep the source code block visible on render failure.
-        });
-    })(blocks[i], i);
-  }
-}
-
 function renderMarkdownInline(text) {
   if (!text) return "";
   if (typeof marked === "undefined") return escapeHtml(text);

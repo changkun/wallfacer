@@ -68,6 +68,7 @@ function switchEditTab(section, mode) {
     // Render markdown, then match preview height to the textarea's current height.
     var textareaH = textarea.offsetHeight;
     preview.innerHTML = renderMarkdown(textarea.value || "");
+    _mdRender.enhanceMarkdown(preview);
     if (textareaH > 0) preview.style.minHeight = textareaH + "px";
     textarea.classList.add("hidden");
     preview.classList.remove("hidden");
@@ -510,6 +511,7 @@ async function openModal(id) {
     if (hasDistinctGoal) {
       goalSection.classList.remove("hidden");
       goalRendered.innerHTML = renderMarkdown(goalVal);
+      _mdRender.enhanceMarkdown(goalRendered);
       goalRendered.classList.remove("hidden");
     } else {
       goalSection.classList.add("hidden");
@@ -519,6 +521,7 @@ async function openModal(id) {
 
     promptRaw.textContent = specVal;
     promptRendered.innerHTML = renderMarkdown(specVal);
+    _mdRender.enhanceMarkdown(promptRendered);
     promptRendered.classList.remove("hidden");
     promptRaw.classList.add("hidden");
     promptActions.classList.remove("hidden");

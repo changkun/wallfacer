@@ -162,6 +162,8 @@ function renderResultsFromEvents(results, opts) {
       }
     })
     .join("");
+  // Post-process: render mermaid diagrams in result entries.
+  _mdRender.enhanceMarkdown(listEl);
 }
 
 function renderTestResultsFromEvents(results) {
@@ -292,6 +294,7 @@ async function openModal(id) {
     const promptRendered = document.getElementById("modal-prompt-rendered");
     promptRaw.textContent = displayPrompt;
     promptRendered.innerHTML = renderMarkdown(displayPrompt);
+    _mdRender.enhanceMarkdown(promptRendered);
     promptRendered.classList.remove("hidden");
     promptRaw.classList.add("hidden");
     document.getElementById("modal-prompt-actions").classList.remove("hidden");
@@ -337,6 +340,7 @@ async function openModal(id) {
     const promptRendered = document.getElementById("modal-prompt-rendered");
     promptRaw.textContent = displayPrompt;
     promptRendered.innerHTML = renderMarkdown(displayPrompt);
+    _mdRender.enhanceMarkdown(promptRendered);
     promptRendered.classList.remove("hidden");
     promptRaw.classList.add("hidden");
     document.getElementById("modal-prompt-actions").classList.remove("hidden");

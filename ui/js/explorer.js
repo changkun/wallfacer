@@ -461,6 +461,8 @@ function _openFilePreview(node) {
           '<div id="explorer-md-raw" class="hidden">' +
           _renderHighlightedContent(result.content, node.name) +
           "</div>";
+        var mdRendered = document.getElementById("explorer-md-rendered");
+        if (mdRendered) _mdRender.enhanceMarkdown(mdRendered);
       } else {
         contentEl.innerHTML = _renderHighlightedContent(
           result.content,
@@ -645,6 +647,26 @@ function closeExplorerPreview() {
     _previewFocusReturn.focus();
     _previewFocusReturn = null;
   }
+}
+
+// Open a file in the explorer preview by its relative path.
+// Used by the unified markdown link handler to open code file references.
+function openExplorerFile(relPath) {
+  var workspaces =
+    typeof activeWorkspaces !== "undefined" && Array.isArray(activeWorkspaces)
+      ? activeWorkspaces
+      : [];
+  if (!workspaces.length) return;
+  // Default to the first workspace.
+  var ws = workspaces[0];
+  var fullPath = ws + "/" + relPath;
+  var name = relPath.substring(relPath.lastIndexOf("/") + 1) || relPath;
+  _openFilePreview({
+    path: fullPath,
+    name: name,
+    type: "file",
+    workspace: ws,
+  });
 }
 
 // ---------------------------------------------------------------------------
