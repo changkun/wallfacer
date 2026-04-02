@@ -322,7 +322,6 @@ function _buildSpecToc(bodyEl) {
   }
 }
 
-
 // --- Spec mode keyboard shortcut stubs ---
 
 // openSelectedSpec opens the currently selected explorer node in the focused view.

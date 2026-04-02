@@ -19,7 +19,8 @@ var _mdRender = (function () {
     if (_mermaidLoaded) return Promise.resolve();
     return new Promise(function (resolve) {
       var script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
+      script.src =
+        "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
       script.onload = function () {
         if (typeof mermaid !== "undefined") {
           _initMermaidTheme();

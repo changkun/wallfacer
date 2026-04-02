@@ -280,4 +280,3 @@ function _appendDocNav(container, currentSlug) {
   }
   container.appendChild(nav);
 }
-
