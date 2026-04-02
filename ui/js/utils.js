@@ -92,63 +92,9 @@ function showPrompt(message, defaultValue) {
   });
 }
 
-function escapeHtml(s) {
-  if (!s) return "";
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function createModalStateController(nodes) {
-  var loadingEl = nodes && nodes.loadingEl;
-  var errorEl = nodes && nodes.errorEl;
-  var emptyEl = nodes && nodes.emptyEl;
-  var contentEl = nodes && nodes.contentEl;
-  var contentState = (nodes && nodes.contentState) || "content";
-
-  return function setModalState(state, msg) {
-    if (loadingEl)
-      loadingEl.style.display = state === "loading" ? "flex" : "none";
-    if (errorEl) errorEl.classList.toggle("hidden", state !== "error");
-    if (emptyEl) emptyEl.classList.toggle("hidden", state !== "empty");
-    if (contentEl) contentEl.classList.toggle("hidden", state !== contentState);
-    if (state === "error" && errorEl)
-      errorEl.textContent = msg || "Unknown error";
-  };
-}
-
-function openModalPanel(modal) {
-  if (!modal) return;
-  modal.classList.remove("hidden");
-  modal.style.display = "flex";
-}
-
-function closeModalPanel(modal) {
-  if (!modal) return;
-  modal.classList.add("hidden");
-  modal.style.display = "";
-}
-
-// bindModalDismiss adds click-outside and Escape-to-close behavior to a
-// modal overlay. Call the returned function to remove the listeners.
-function bindModalDismiss(modal, onClose) {
-  if (!modal || typeof onClose !== "function") return function () {};
-  function onBackdropClick(e) {
-    if (e.target === modal) onClose();
-  }
-  function onEsc(e) {
-    if (e.key === "Escape") onClose();
-  }
-  modal.addEventListener("click", onBackdropClick);
-  document.addEventListener("keydown", onEsc);
-  return function unbind() {
-    modal.removeEventListener("click", onBackdropClick);
-    document.removeEventListener("keydown", onEsc);
-  };
-}
+// escapeHtml, timeAgo, formatTimeout → moved to js/lib/formatting.js.
+// createModalStateController, openModalPanel, closeModalPanel,
+// bindModalDismiss → moved to js/lib/modal.js.
 
 function bindModalBackdropClose(modal, onClose) {
   bindModalDismiss(modal, onClose);
@@ -233,22 +179,6 @@ function closeFirstVisibleModal(modals) {
     return true;
   }
   return false;
-}
-
-function timeAgo(dateStr) {
-  const d = new Date(dateStr);
-  const s = Math.floor((Date.now() - d) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s / 60) + "m ago";
-  if (s < 86400) return Math.floor(s / 3600) + "h ago";
-  return Math.floor(s / 86400) + "d ago";
-}
-
-function formatTimeout(minutes) {
-  if (!minutes) return "5m";
-  if (minutes < 60) return minutes + "m";
-  if (minutes % 60 === 0) return minutes / 60 + "h";
-  return Math.floor(minutes / 60) + "h" + (minutes % 60) + "m";
 }
 
 // taskDisplayPrompt returns the prompt text that should be shown to users.

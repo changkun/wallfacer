@@ -222,6 +222,7 @@ function makeLogsContext() {
   ctx.getOpenModalTaskId = function () {
     return ctx._modalState.taskId;
   };
+  loadScript("lib/scheduling.js", ctx);
   loadScript("modal-logs.js", ctx);
   return { ctx, elements };
 }

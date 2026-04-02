@@ -81,80 +81,40 @@ function renderMarkdownInline(text) {
 }
 
 function toggleModalSection(section) {
-  const renderedEl = document.getElementById("modal-" + section + "-rendered");
-  const rawEl = document.getElementById("modal-" + section);
-  const btn = document.getElementById("toggle-" + section + "-btn");
-  const showingRaw = !rawEl.classList.contains("hidden");
-  if (showingRaw) {
-    renderedEl.classList.remove("hidden");
-    rawEl.classList.add("hidden");
-    btn.textContent = "Raw";
-  } else {
-    renderedEl.classList.add("hidden");
-    rawEl.classList.remove("hidden");
-    btn.textContent = "Preview";
-  }
+  var renderedEl = document.getElementById("modal-" + section + "-rendered");
+  var rawEl = document.getElementById("modal-" + section);
+  var btn = document.getElementById("toggle-" + section + "-btn");
+  toggleRenderedRaw(renderedEl, rawEl, btn);
 }
 
 function copyModalText(section) {
-  const rawEl = document.getElementById("modal-" + section);
-  const text = rawEl.textContent;
-  const btn = document.getElementById("copy-" + section + "-btn");
-  navigator.clipboard
-    .writeText(text)
-    .then(function () {
-      const origHTML = btn.innerHTML;
-      btn.textContent = "Copied!";
-      setTimeout(function () {
-        btn.innerHTML = origHTML;
-      }, 1500);
-    })
-    .catch(function () {});
+  var rawEl = document.getElementById("modal-" + section);
+  var btn = document.getElementById("copy-" + section + "-btn");
+  copyWithFeedback(rawEl.textContent, btn);
 }
 
 function toggleCardMarkdown(event, btn) {
   event.stopPropagation();
-  const card = btn.closest(".card");
-  const renderedEls = card.querySelectorAll(".card-md-rendered");
-  const rawEls = card.querySelectorAll(".card-md-raw");
-  const nowShowingRaw = card.dataset.rawView === "true";
-  if (nowShowingRaw) {
-    card.dataset.rawView = "false";
-    renderedEls.forEach(function (el) {
-      el.classList.remove("hidden");
-    });
-    rawEls.forEach(function (el) {
-      el.classList.add("hidden");
-    });
-    btn.textContent = "Raw";
-  } else {
-    card.dataset.rawView = "true";
-    renderedEls.forEach(function (el) {
-      el.classList.add("hidden");
-    });
-    rawEls.forEach(function (el) {
-      el.classList.remove("hidden");
-    });
-    btn.textContent = "Preview";
-  }
+  var card = btn.closest(".card");
+  var renderedEls = card.querySelectorAll(".card-md-rendered");
+  var rawEls = card.querySelectorAll(".card-md-raw");
+  var nowShowingRaw = card.dataset.rawView === "true";
+  card.dataset.rawView = nowShowingRaw ? "false" : "true";
+  renderedEls.forEach(function (el) {
+    el.classList.toggle("hidden", !nowShowingRaw);
+  });
+  rawEls.forEach(function (el) {
+    el.classList.toggle("hidden", nowShowingRaw);
+  });
+  btn.textContent = nowShowingRaw ? "Raw" : "Preview";
 }
 
 function copyCardText(event, taskId) {
   event.stopPropagation();
-  const task = tasks.find(function (t) {
+  var task = tasks.find(function (t) {
     return t.id === taskId;
   });
   if (!task) return;
-  const text = task.prompt + (task.result ? "\n\n" + task.result : "");
-  const btn = event.currentTarget;
-  navigator.clipboard
-    .writeText(text)
-    .then(function () {
-      const origHTML = btn.innerHTML;
-      btn.textContent = "\u2713";
-      setTimeout(function () {
-        btn.innerHTML = origHTML;
-      }, 1500);
-    })
-    .catch(function () {});
+  var text = task.prompt + (task.result ? "\n\n" + task.result : "");
+  copyWithFeedback(text, event.currentTarget, "\u2713");
 }

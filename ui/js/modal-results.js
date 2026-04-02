@@ -21,36 +21,15 @@ function detectResultType(text) {
 }
 
 function copyResultEntry(entryId) {
-  const rawEl = document.getElementById(entryId + "-raw");
+  var rawEl = document.getElementById(entryId + "-raw");
   if (!rawEl) return;
-  const text = rawEl.textContent;
-  const btn = event.currentTarget;
-  navigator.clipboard
-    .writeText(text)
-    .then(function () {
-      const origHTML = btn.innerHTML;
-      btn.textContent = "Copied!";
-      setTimeout(function () {
-        btn.innerHTML = origHTML;
-      }, 1500);
-    })
-    .catch(function () {});
+  copyWithFeedback(rawEl.textContent, event.currentTarget);
 }
 
 function toggleResultEntryRaw(entryId) {
-  const renderedEl = document.getElementById(entryId + "-rendered");
-  const rawEl = document.getElementById(entryId + "-raw");
-  const btn = event.currentTarget;
-  const showingRaw = !rawEl.classList.contains("hidden");
-  if (showingRaw) {
-    renderedEl.classList.remove("hidden");
-    rawEl.classList.add("hidden");
-    btn.textContent = "Raw";
-  } else {
-    renderedEl.classList.add("hidden");
-    rawEl.classList.remove("hidden");
-    btn.textContent = "Preview";
-  }
+  var renderedEl = document.getElementById(entryId + "-rendered");
+  var rawEl = document.getElementById(entryId + "-raw");
+  toggleRenderedRaw(renderedEl, rawEl, event.currentTarget);
 }
 
 const _copyIcon =
@@ -164,14 +143,7 @@ function _attachTimelineTips(container) {
   });
 }
 
-// Format a millisecond duration as human-readable string.
-function _fmtMs(ms) {
-  if (ms < 1000) return ms + "ms";
-  if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
-  var m = Math.floor(ms / 60000);
-  var s = Math.round((ms % 60000) / 1000);
-  return m + "m\u202f" + s + "s";
-}
+// _fmtMs → moved to js/lib/formatting.js as fmtMs.
 
 // True when a span has no valid end time (Go zero time or missing).
 function _spanIsOpen(span) {
@@ -260,9 +232,9 @@ function _buildTimelineHtml(spans) {
       var gapRight = timeMap.toPercent(seg.end);
       var gapWidth = gapRight - gapLeft;
       if (gapWidth < 0.1) return;
-      var gapDur = _fmtMs(seg.end - seg.start);
-      var gapStartLabel = _fmtMs(seg.start - t0);
-      var gapEndLabel = _fmtMs(seg.end - t0);
+      var gapDur = fmtMs(seg.end - seg.start);
+      var gapStartLabel = fmtMs(seg.start - t0);
+      var gapEndLabel = fmtMs(seg.end - t0);
       var tipText =
         "Idle " + gapDur + "\n" + gapStartLabel + " \u2192 " + gapEndLabel;
       ticksHtml +=
@@ -305,9 +277,9 @@ function _buildTimelineHtml(spans) {
       var gapRight = timeMap.toPercent(seg.end);
       var gapWidth = gapRight - gapLeft;
       if (gapWidth < 0.1) return;
-      var gapDur = _fmtMs(seg.end - seg.start);
-      var gapStartLabel = _fmtMs(seg.start - t0);
-      var gapEndLabel = _fmtMs(seg.end - t0);
+      var gapDur = fmtMs(seg.end - seg.start);
+      var gapStartLabel = fmtMs(seg.start - t0);
+      var gapEndLabel = fmtMs(seg.end - t0);
       var tipText =
         "Idle " + gapDur + "\n" + gapStartLabel + " \u2192 " + gapEndLabel;
       rowGapHtml +=
@@ -338,8 +310,8 @@ function _buildTimelineHtml(spans) {
     var left = leftPct;
     var width = Math.max(rightPct - leftPct, 0.5);
     var color = _phaseColor(span.phase);
-    var durStr = _fmtMs(dur);
-    var relStart = "+" + _fmtMs(ts - t0);
+    var durStr = fmtMs(dur);
+    var relStart = "+" + fmtMs(ts - t0);
     var absStart = new Date(ts).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
@@ -460,9 +432,9 @@ function _buildTimelineHtml(spans) {
       var gapRight = timeMap.toPercent(seg.end);
       var gapWidth = gapRight - gapLeft;
       if (gapWidth < 0.1) return;
-      var gapDur = _fmtMs(seg.end - seg.start);
-      var gapStartLabel = _fmtMs(seg.start - t0);
-      var gapEndLabel = _fmtMs(seg.end - t0);
+      var gapDur = fmtMs(seg.end - seg.start);
+      var gapStartLabel = fmtMs(seg.start - t0);
+      var gapEndLabel = fmtMs(seg.end - t0);
       var tipText =
         "Idle " + gapDur + "\n" + gapStartLabel + " \u2192 " + gapEndLabel;
       gapLabelOverlay +=

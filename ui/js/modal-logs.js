@@ -9,25 +9,13 @@ var _renderedLogMode = ""; // last logsMode value rendered — full rebuild when
 var _renderedLogQuery = ""; // last logSearchQuery rendered — full rebuild when this changes
 var MAX_LOG_LINES = 10000; // cap to prevent browser OOM for runaway agents
 
-let _logRenderPending = false;
-function scheduleLogRender() {
-  if (_logRenderPending) return;
-  _logRenderPending = true;
-  requestAnimationFrame(function () {
-    _logRenderPending = false;
-    renderLogs();
-  });
-}
+var scheduleLogRender = createRAFScheduler(function () {
+  renderLogs();
+});
 
-let _testLogRenderPending = false;
-function scheduleTestLogRender() {
-  if (_testLogRenderPending) return;
-  _testLogRenderPending = true;
-  requestAnimationFrame(function () {
-    _testLogRenderPending = false;
-    renderTestLogs();
-  });
-}
+var scheduleTestLogRender = createRAFScheduler(function () {
+  renderTestLogs();
+});
 
 function _isCurrentModalSeq(seq) {
   return typeof seq !== "number" || _modalState.seq === seq;

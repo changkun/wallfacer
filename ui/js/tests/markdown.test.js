@@ -75,6 +75,17 @@ function makeContext(extra = {}) {
 }
 
 function loadScript(ctx, filename) {
+  // Auto-load lib dependencies required by the target script.
+  const libDeps = {
+    "markdown.js": ["lib/clipboard.js", "lib/toggle.js"],
+  };
+  const deps = libDeps[filename];
+  if (deps) {
+    for (const dep of deps) {
+      const depCode = readFileSync(join(jsDir, dep), "utf8");
+      vm.runInContext(depCode, ctx, { filename: join(jsDir, dep) });
+    }
+  }
   const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;

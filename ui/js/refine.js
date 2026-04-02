@@ -165,17 +165,9 @@ async function cancelRefinement() {
 }
 
 // --- Refine log render scheduler ---
-// Coalesces rapid chunk arrivals into a single paint per animation frame,
-// mirroring the scheduleLogRender() pattern used by modal-logs.js.
-let _refineLogRenderPending = false;
-function scheduleRefineLogRender() {
-  if (_refineLogRenderPending) return;
-  _refineLogRenderPending = true;
-  requestAnimationFrame(function () {
-    _refineLogRenderPending = false;
-    renderRefineLogs();
-  });
-}
+var scheduleRefineLogRender = createRAFScheduler(function () {
+  renderRefineLogs();
+});
 
 // renderRefineLogs re-renders the refine log area from refineRawLogBuffer.
 function renderRefineLogs() {
