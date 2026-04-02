@@ -105,7 +105,7 @@
   font-size: 9px;
   line-height: 1.5;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-  max-height: 8em;
+  max-height: 12em;
   overflow-y: auto;
   overflow-x: hidden;
   color: var(--text-secondary);
@@ -136,6 +136,48 @@
 }
 [data-theme="dark"] .diff-header {
   color: #e3b341;
+}
+
+/* --- Card-level file-split diffs --- */
+.diff-block .diff-file {
+  border-radius: 3px;
+  margin-bottom: 2px;
+}
+.diff-block .diff-file-summary {
+  padding: 2px 4px;
+}
+.diff-block .diff-filename {
+  font-size: 9px;
+  font-weight: 500;
+}
+.diff-block .diff-stats {
+  font-size: 8px;
+  gap: 3px;
+}
+.diff-block .diff-block-modal {
+  font-size: 9px;
+  line-height: 1.4;
+  padding: 2px 4px;
+  max-height: none;
+}
+.diff-card-hidden {
+  display: none;
+}
+.diff-card-expand {
+  text-align: center;
+  padding: 2px 0;
+}
+.diff-card-expand button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-style: italic;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.diff-card-expand button:hover {
+  color: var(--text);
 }
 
 /* --- Diff per-file (modal detail view) --- */
@@ -402,8 +444,4 @@
 .diff-workspace-label {
   color: var(--accent);
   font-weight: 600;
-}
-.diff-truncated {
-  color: var(--text-muted);
-  font-style: italic;
 }

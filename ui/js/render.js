@@ -458,43 +458,6 @@ function invalidateDiffBehindCounts(taskId) {
   }
 }
 
-function renderDiffInto(el, diff, maxLines) {
-  if (!diff) {
-    el.innerHTML = '<span style="color:var(--text-muted)">no changes</span>';
-    return;
-  }
-  const allLines = diff.split("\n");
-  const truncated = maxLines && allLines.length > maxLines;
-  const lines = truncated ? allLines.slice(0, maxLines) : allLines;
-  el.innerHTML =
-    lines
-      .map((line) => {
-        const escaped = escapeHtml(line);
-        if (/^=== .+ ===$/.test(line)) {
-          return `<span class="diff-workspace-label">${escaped}</span>`;
-        } else if (line.startsWith("+") && !line.startsWith("+++")) {
-          return `<span class="diff-add">${escaped}</span>`;
-        } else if (line.startsWith("-") && !line.startsWith("---")) {
-          return `<span class="diff-del">${escaped}</span>`;
-        } else if (line.startsWith("@@")) {
-          return `<span class="diff-hunk">${escaped}</span>`;
-        } else if (
-          line.startsWith("diff ") ||
-          line.startsWith("--- ") ||
-          line.startsWith("+++ ") ||
-          line.startsWith("index ") ||
-          line.startsWith("Binary ")
-        ) {
-          return `<span class="diff-header">${escaped}</span>`;
-        }
-        return escaped;
-      })
-      .join("\n") +
-    (truncated
-      ? `\n<span class="diff-truncated">\u2026 ${allLines.length - maxLines} more lines</span>`
-      : "");
-}
-
 async function fetchDiff(card, taskId, updatedAt) {
   const cached = diffCache.get(taskId);
   if (cached && cached.loading) return;
@@ -563,7 +526,33 @@ function applyDiffToCard(el, diff, behindCounts, taskId) {
       `</div>`;
   }
   const tmp = document.createElement("div");
-  renderDiffInto(tmp, diff, CARD_DIFF_MAX_LINES);
+  renderDiffFiles(tmp, diff);
+  // Truncate to CARD_DIFF_MAX_LINES: count diff lines across all file
+  // blocks and hide overflow behind an expandable indicator.
+  const totalLines = diff ? diff.split("\n").length : 0;
+  if (totalLines > CARD_DIFF_MAX_LINES) {
+    const details = tmp.querySelectorAll("details.diff-file");
+    let linesSoFar = 0;
+    let hiddenFiles = 0;
+    for (const d of details) {
+      const pre = d.querySelector("pre");
+      const fileLines = pre ? pre.innerHTML.split("\n").length : 0;
+      if (linesSoFar + fileLines > CARD_DIFF_MAX_LINES && linesSoFar > 0) {
+        d.classList.add("diff-card-hidden");
+        hiddenFiles++;
+      }
+      linesSoFar += fileLines;
+    }
+    if (hiddenFiles > 0) {
+      const remaining = totalLines - CARD_DIFF_MAX_LINES;
+      const expandBtn = document.createElement("div");
+      expandBtn.className = "diff-card-expand";
+      expandBtn.innerHTML =
+        `<button onclick="event.stopPropagation();this.parentElement.parentElement.querySelectorAll('.diff-card-hidden').forEach(function(e){e.classList.remove('diff-card-hidden')});this.parentElement.remove()">` +
+        `\u2026 ${remaining} more lines in ${hiddenFiles} file${hiddenFiles !== 1 ? "s" : ""}</button>`;
+      tmp.appendChild(expandBtn);
+    }
+  }
   el.innerHTML = warning + tmp.innerHTML;
 }
 
@@ -760,15 +749,9 @@ function render() {
 // --- Board render scheduler ---
 // Coalesces rapid back-to-back render() calls (e.g. SSE bursts) into a single
 // paint per animation frame so the main thread stays responsive.
-let _renderPending = false;
-function scheduleRender() {
-  if (_renderPending) return;
-  _renderPending = true;
-  requestAnimationFrame(function () {
-    _renderPending = false;
-    render();
-  });
-}
+var scheduleRender = createRAFScheduler(function () {
+  render();
+});
 
 // --- Markdown cache ---
 // marked.parse() is expensive; cache results keyed by source text so unchanged
@@ -1151,7 +1134,6 @@ if (typeof module !== "undefined") {
     invalidateDiffBehindCounts,
     BEHIND_TTL_MS,
     CARD_DIFF_MAX_LINES,
-    renderDiffInto,
     diffCache,
     cardOversightCache,
     fetchDiff,

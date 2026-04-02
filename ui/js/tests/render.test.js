@@ -8,6 +8,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
 
 function loadScript(filename, ctx) {
+  const libDeps = {
+    "render.js": ["lib/scheduling.js"],
+  };
+  const deps = libDeps[filename];
+  if (deps) {
+    for (const dep of deps) {
+      const depCode = readFileSync(join(jsDir, dep), "utf8");
+      vm.runInContext(depCode, ctx, { filename: join(jsDir, dep) });
+    }
+  }
   const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
 }
@@ -884,54 +894,6 @@ describe("render.js backlog dependency badge", () => {
 
     expect(card.innerHTML).not.toContain("badge-blocked");
     expect(card.innerHTML).not.toContain("badge-deps-met");
-  });
-});
-
-describe("renderDiffInto truncation", () => {
-  let ctx;
-  let renderExports;
-
-  beforeEach(() => {
-    ({ ctx, renderExports } = loadRenderHarness());
-  });
-
-  it("renders all lines when maxLines is not provided", () => {
-    const el = { innerHTML: "" };
-    const diff = "line1\nline2\nline3";
-    renderExports.renderDiffInto(el, diff);
-    expect(el.innerHTML).not.toContain("more lines");
-    expect(el.innerHTML).toContain("line1");
-    expect(el.innerHTML).toContain("line3");
-  });
-
-  it("renders all lines when under the maxLines limit", () => {
-    const el = { innerHTML: "" };
-    const diff = "line1\nline2\nline3";
-    renderExports.renderDiffInto(el, diff, 10);
-    expect(el.innerHTML).not.toContain("more lines");
-    expect(el.innerHTML).toContain("line3");
-  });
-
-  it("truncates lines and shows indicator when exceeding maxLines", () => {
-    const el = { innerHTML: "" };
-    const lines = Array.from({ length: 200 }, (_, i) => `line${i}`);
-    const diff = lines.join("\n");
-    renderExports.renderDiffInto(el, diff, 5);
-    expect(el.innerHTML).toContain("line0");
-    expect(el.innerHTML).toContain("line4");
-    expect(el.innerHTML).not.toContain("line5");
-    expect(el.innerHTML).toContain("diff-truncated");
-    expect(el.innerHTML).toContain("195 more lines");
-  });
-
-  it("shows no changes message for empty diff", () => {
-    const el = { innerHTML: "" };
-    renderExports.renderDiffInto(el, null, 5);
-    expect(el.innerHTML).toContain("no changes");
-  });
-
-  it("CARD_DIFF_MAX_LINES is 150", () => {
-    expect(renderExports.CARD_DIFF_MAX_LINES).toBe(150);
   });
 });
 
