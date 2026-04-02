@@ -959,7 +959,11 @@ function clearWorkspaceSelection() {
 async function saveWorkspaceGroups() {
   await api(Routes.config.update(), {
     method: "PUT",
-    body: JSON.stringify({ workspace_groups: workspaceGroups.map(function (g) { return { name: g.name, workspaces: g.workspaces }; }) }),
+    body: JSON.stringify({
+      workspace_groups: workspaceGroups.map(function (g) {
+        return { name: g.name, workspaces: g.workspaces };
+      }),
+    }),
   });
 }
 

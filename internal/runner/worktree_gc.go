@@ -8,9 +8,9 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/pkg/envutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/envutil"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )

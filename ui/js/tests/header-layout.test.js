@@ -27,7 +27,9 @@ describe("header layout", () => {
     expect(automationHtml).toContain('id="automation-menu-btn"');
     expect(automationHtml).toContain('id="automation-menu"');
     expect(automationHtml).toContain('class="header-toggle-strip"');
-    expect(automationHtml.match(/class="header-toggle-chip"/g) || []).toHaveLength(7);
+    expect(
+      automationHtml.match(/class="header-toggle-chip"/g) || [],
+    ).toHaveLength(7);
     expect(automationHtml).toContain('id="autopilot-toggle"');
     expect(automationHtml).toContain('id="autotest-toggle"');
     expect(automationHtml).toContain('id="autosubmit-toggle"');

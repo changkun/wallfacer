@@ -726,8 +726,12 @@ function updateWatcherHealth(entries) {
 var toggleAutopilot = createConfigToggle({
   elementId: "autopilot-toggle",
   configKey: "autopilot",
-  getState: function () { return autopilot; },
-  setState: function (v) { autopilot = v; },
+  getState: function () {
+    return autopilot;
+  },
+  setState: function (v) {
+    autopilot = v;
+  },
   label: "autopilot",
   onUpdate: updateAutomationActiveCount,
 });
@@ -735,8 +739,12 @@ var toggleAutopilot = createConfigToggle({
 var toggleAutotest = createConfigToggle({
   elementId: "autotest-toggle",
   configKey: "autotest",
-  getState: function () { return autotest; },
-  setState: function (v) { autotest = v; },
+  getState: function () {
+    return autotest;
+  },
+  setState: function (v) {
+    autotest = v;
+  },
   label: "auto-test",
   onUpdate: updateAutomationActiveCount,
 });
@@ -744,8 +752,12 @@ var toggleAutotest = createConfigToggle({
 var toggleAutosubmit = createConfigToggle({
   elementId: "autosubmit-toggle",
   configKey: "autosubmit",
-  getState: function () { return autosubmit; },
-  setState: function (v) { autosubmit = v; },
+  getState: function () {
+    return autosubmit;
+  },
+  setState: function (v) {
+    autosubmit = v;
+  },
   label: "auto-submit",
   onUpdate: updateAutomationActiveCount,
 });
@@ -753,8 +765,12 @@ var toggleAutosubmit = createConfigToggle({
 var toggleAutorefine = createConfigToggle({
   elementId: "autorefine-toggle",
   configKey: "autorefine",
-  getState: function () { return autorefine; },
-  setState: function (v) { autorefine = v; },
+  getState: function () {
+    return autorefine;
+  },
+  setState: function (v) {
+    autorefine = v;
+  },
   label: "auto-refine",
   onUpdate: updateAutomationActiveCount,
 });
@@ -762,8 +778,12 @@ var toggleAutorefine = createConfigToggle({
 var toggleAutosync = createConfigToggle({
   elementId: "autosync-toggle",
   configKey: "autosync",
-  getState: function () { return autosync; },
-  setState: function (v) { autosync = v; },
+  getState: function () {
+    return autosync;
+  },
+  setState: function (v) {
+    autosync = v;
+  },
   label: "auto-sync",
   onUpdate: updateAutomationActiveCount,
 });
@@ -771,8 +791,12 @@ var toggleAutosync = createConfigToggle({
 var toggleAutopush = createConfigToggle({
   elementId: "autopush-toggle",
   configKey: "autopush",
-  getState: function () { return autopush; },
-  setState: function (v) { autopush = v; },
+  getState: function () {
+    return autopush;
+  },
+  setState: function (v) {
+    autopush = v;
+  },
   label: "auto-push",
   onUpdate: updateAutomationActiveCount,
 });

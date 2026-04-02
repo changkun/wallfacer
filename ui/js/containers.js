@@ -208,4 +208,3 @@ function relativeTime(ms) {
   var d = Math.floor(h / 24);
   return d + "d ago";
 }
-
