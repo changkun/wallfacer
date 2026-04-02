@@ -8,6 +8,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/pkg/envutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/store"
@@ -246,12 +247,7 @@ func (r *Runner) StartWorktreeGC(ctx context.Context) {
 	r.backgroundWg.Add("worktree-gc")
 	defer r.backgroundWg.Done("worktree-gc")
 
-	interval := constants.DefaultWorktreeGCInterval
-	if v := os.Getenv("WALLFACER_WORKTREE_GC_INTERVAL"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			interval = d
-		}
-	}
+	interval := envutil.Duration("WALLFACER_WORKTREE_GC_INTERVAL", constants.DefaultWorktreeGCInterval)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,6 +14,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/envutil"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
@@ -384,18 +384,8 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	// Defaults: 5 consecutive failures trip the breaker; it stays open for
 	// 30 s before allowing a single probe (half-open).
 	// Both values can be overridden via environment variables.
-	cbThreshold := constants.DefaultCBThreshold
-	cbOpenSec := 30
-	if v := os.Getenv("WALLFACER_CONTAINER_CB_THRESHOLD"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			cbThreshold = n
-		}
-	}
-	if v := os.Getenv("WALLFACER_CONTAINER_CB_OPEN_SECONDS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			cbOpenSec = n
-		}
-	}
+	cbThreshold := envutil.IntMin("WALLFACER_CONTAINER_CB_THRESHOLD", constants.DefaultCBThreshold, 1)
+	cbOpenSec := envutil.IntMin("WALLFACER_CONTAINER_CB_OPEN_SECONDS", 30, 1)
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	localCfg := sandbox.LocalBackendConfig{
 		EnableTaskWorkers: true, // default; overridden by envconfig if available

@@ -3,7 +3,6 @@ package store
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,6 +10,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/envutil"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"github.com/google/uuid"
 )
@@ -91,17 +91,6 @@ type Store struct {
 	eventsLoaded map[uuid.UUID]bool
 }
 
-// readEnvInt reads an integer from an environment variable. If the variable is
-// absent or cannot be parsed as an integer, defaultVal is returned.
-func readEnvInt(key string, defaultVal int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
-	}
-	return defaultVal
-}
-
 // NewStore creates a Store backed by the given StorageBackend, loading all
 // existing tasks from the backend into memory.
 func NewStore(backend StorageBackend) (*Store, error) {
@@ -115,10 +104,10 @@ func NewStore(backend StorageBackend) (*Store, error) {
 		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
 		hub:                 pubsub.NewHub[TaskDelta](pubsub.WithClone(cloneTaskDelta)),
-		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", constants.DefaultRetryHistoryLimit),
-		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", constants.DefaultRefineSessionsLimit),
-		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", constants.DefaultPromptHistoryLimit),
-		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", constants.DefaultMaxTurnOutputBytes),
+		retryHistoryLimit:   envutil.Int("WALLFACER_RETRY_HISTORY_LIMIT", constants.DefaultRetryHistoryLimit),
+		refineSessionsLimit: envutil.Int("WALLFACER_REFINE_SESSIONS_LIMIT", constants.DefaultRefineSessionsLimit),
+		promptHistoryLimit:  envutil.Int("WALLFACER_PROMPT_HISTORY_LIMIT", constants.DefaultPromptHistoryLimit),
+		maxTurnOutputBytes:  envutil.Int("WALLFACER_MAX_TURN_OUTPUT_BYTES", constants.DefaultMaxTurnOutputBytes),
 	}
 
 	if err := s.loadAll(); err != nil {

@@ -2,25 +2,18 @@ package runner
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/envutil"
 	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 )
 
 // ideationHistoryTTL is how long rejected-idea records are retained (default 30 days).
 // Override via WALLFACER_IDEATION_HISTORY_TTL (e.g. "720h"). Evaluated once at init.
-var ideationHistoryTTL = func() time.Duration {
-	if v := os.Getenv("WALLFACER_IDEATION_HISTORY_TTL"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d > 0 {
-			return d
-		}
-	}
-	return 30 * 24 * time.Hour
-}()
+var ideationHistoryTTL = envutil.DurationMin("WALLFACER_IDEATION_HISTORY_TTL", 30*24*time.Hour, 1)
 
 // HistoryEntry records the outcome of a single idea evaluated during ideation.
 type HistoryEntry struct {
