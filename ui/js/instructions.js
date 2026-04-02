@@ -1,19 +1,16 @@
 // --- Workspace AGENTS.md (Instructions) ---
 
-var _instructionsDismiss = null;
+var _instructionsCtrl = createModalController("instructions-modal");
+
 async function showInstructionsEditor(event, preloadedContent) {
   if (event) event.stopPropagation();
   closeSettings();
 
-  var modal = document.getElementById("instructions-modal");
+  _instructionsCtrl.open();
+
   var textarea = document.getElementById("instructions-content");
   var pathEl = document.getElementById("instructions-path");
   var statusEl = document.getElementById("instructions-status");
-
-  modal.classList.remove("hidden");
-  modal.style.display = "flex";
-  if (_instructionsDismiss) _instructionsDismiss();
-  _instructionsDismiss = bindModalDismiss(modal, closeInstructionsEditor);
   textarea.value = preloadedContent != null ? preloadedContent : "";
   pathEl.textContent = "";
 
@@ -51,13 +48,7 @@ async function showInstructionsEditor(event, preloadedContent) {
 }
 
 function closeInstructionsEditor() {
-  var modal = document.getElementById("instructions-modal");
-  modal.classList.add("hidden");
-  modal.style.display = "";
-  if (_instructionsDismiss) {
-    _instructionsDismiss();
-    _instructionsDismiss = null;
-  }
+  _instructionsCtrl.close();
 }
 
 async function saveInstructions() {
@@ -104,12 +95,3 @@ async function reinitInstructionsFromEditor() {
   }
 }
 
-// Close instructions modal on outside click.
-document.addEventListener("click", function (e) {
-  var modal = document.getElementById("instructions-modal");
-  if (!modal || modal.classList.contains("hidden")) return;
-  var card = modal.querySelector(".modal-card");
-  if (card && !card.contains(e.target)) {
-    closeInstructionsEditor();
-  }
-});

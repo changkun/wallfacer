@@ -1,6 +1,6 @@
 // --- Documentation viewer ---
 
-var _docsDismiss = null;
+var _docsCtrl = createModalController("docs-modal");
 var _docsEntries = [];
 var _docsCurrentSlug = "";
 var _mermaidLoaded = false;
@@ -313,10 +313,7 @@ function _expandDiagram(sourceDiv) {
 async function openDocs(slug) {
   var modal = document.getElementById("docs-modal");
   if (!modal) return;
-  modal.classList.remove("hidden");
-  modal.style.display = "flex";
-  if (_docsDismiss) _docsDismiss();
-  _docsDismiss = bindModalDismiss(modal, closeDocs);
+  _docsCtrl.open();
 
   if (!_docsEntries.length) {
     try {
@@ -332,14 +329,7 @@ async function openDocs(slug) {
 }
 
 function closeDocs() {
-  var modal = document.getElementById("docs-modal");
-  if (!modal) return;
-  modal.classList.add("hidden");
-  modal.style.display = "";
-  if (_docsDismiss) {
-    _docsDismiss();
-    _docsDismiss = null;
-  }
+  _docsCtrl.close();
 }
 
 function toggleDocsFullscreen() {

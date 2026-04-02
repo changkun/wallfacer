@@ -20,6 +20,11 @@ const LIB_DEPS = {
   "render.js": ["lib/scheduling.js"],
   "refine.js": ["lib/scheduling.js"],
   "workspace.js": ["lib/modal.js"],
+  "keyboard-shortcuts.js": ["lib/modal.js", "lib/modal-controller.js"],
+  "instructions.js": ["lib/modal.js", "lib/modal-controller.js"],
+  "containers.js": ["lib/modal.js", "lib/modal-controller.js"],
+  "docs.js": ["lib/modal.js", "lib/modal-controller.js"],
+  "api.js": ["lib/config-toggle.js"],
 };
 
 /**

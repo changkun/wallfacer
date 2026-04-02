@@ -3,12 +3,20 @@
 var containerMonitorInterval = null;
 var containerMonitorStateCtrl;
 
+var _containerMonitorCtrl = createModalController("container-monitor-modal", {
+  onClose: function () {
+    if (containerMonitorInterval) {
+      clearInterval(containerMonitorInterval);
+      containerMonitorInterval = null;
+    }
+  },
+});
+
 function showContainerMonitor(e) {
   if (e) e.stopPropagation();
   closeSettings();
 
-  var modal = document.getElementById("container-monitor-modal");
-  openModalPanel(modal);
+  _containerMonitorCtrl.open();
 
   // Show loading, hide others.
   setContainerMonitorState("loading");
@@ -19,12 +27,7 @@ function showContainerMonitor(e) {
 }
 
 function closeContainerMonitor() {
-  var modal = document.getElementById("container-monitor-modal");
-  closeModalPanel(modal);
-  if (containerMonitorInterval) {
-    clearInterval(containerMonitorInterval);
-    containerMonitorInterval = null;
-  }
+  _containerMonitorCtrl.close();
 }
 
 function refreshContainerMonitor() {
@@ -206,10 +209,3 @@ function relativeTime(ms) {
   return d + "d ago";
 }
 
-// Close modal on backdrop click.
-(function () {
-  var modal = document.getElementById("container-monitor-modal");
-  if (typeof bindModalBackdropClose === "function") {
-    bindModalBackdropClose(modal, closeContainerMonitor);
-  }
-})();
