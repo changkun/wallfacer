@@ -9,21 +9,29 @@ const repoRoot = join(__dirname, "..", "..", "..");
 
 describe("header layout", () => {
   it("places automation toggles inside a dropdown menu in the primary header", () => {
-    const html = readFileSync(
+    const layoutHtml = readFileSync(
       join(repoRoot, "ui/partials/initial-layout.html"),
       "utf8",
     );
+    const automationHtml = readFileSync(
+      join(repoRoot, "ui/partials/automation-menu.html"),
+      "utf8",
+    );
 
-    expect(html).toContain('class="app-header"');
-    expect(html).toContain('class="app-header__primary"');
-    expect(html).toContain('id="automation-menu-btn"');
-    expect(html).toContain('id="automation-menu"');
-    expect(html).toContain('class="header-toggle-strip"');
-    expect(html.match(/class="header-toggle-chip"/g) || []).toHaveLength(7);
-    expect(html).toContain('id="autopilot-toggle"');
-    expect(html).toContain('id="autotest-toggle"');
-    expect(html).toContain('id="autosubmit-toggle"');
-    expect(html).not.toContain('class="app-header__secondary"');
+    // Layout includes the automation-menu partial via Go template
+    expect(layoutHtml).toContain('class="app-header"');
+    expect(layoutHtml).toContain('class="app-header__primary"');
+    expect(layoutHtml).toContain('{{template "automation-menu.html"}}');
+
+    // Automation menu partial contains the toggle controls
+    expect(automationHtml).toContain('id="automation-menu-btn"');
+    expect(automationHtml).toContain('id="automation-menu"');
+    expect(automationHtml).toContain('class="header-toggle-strip"');
+    expect(automationHtml.match(/class="header-toggle-chip"/g) || []).toHaveLength(7);
+    expect(automationHtml).toContain('id="autopilot-toggle"');
+    expect(automationHtml).toContain('id="autotest-toggle"');
+    expect(automationHtml).toContain('id="autosubmit-toggle"');
+    expect(layoutHtml).not.toContain('class="app-header__secondary"');
   });
 
   it("defines automation menu and toggle chip styles", () => {
