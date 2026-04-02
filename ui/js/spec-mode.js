@@ -238,12 +238,20 @@ function _loadAndRenderSpec() {
       _focusedSpecPath = null;
       _focusedSpecWorkspace = null;
       _focusedSpecContent = null;
-      var titleEl = document.getElementById("spec-focused-title");
-      if (titleEl) titleEl.textContent = "";
-      var statusEl = document.getElementById("spec-focused-status");
-      if (statusEl) { statusEl.textContent = ""; statusEl.className = "spec-focused-view__status"; }
+      var ids = ["spec-focused-title", "spec-focused-status", "spec-focused-kind",
+        "spec-focused-effort", "spec-focused-meta"];
+      for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el) { el.textContent = ""; el.className = el.className.replace(/ spec-\S+/g, ""); }
+      }
       var bodyEl = document.getElementById("spec-focused-body");
       if (bodyEl) bodyEl.innerHTML = "";
+      var tocEl = document.getElementById("spec-toc");
+      if (tocEl) tocEl.remove();
+      var dispatchBtn = document.getElementById("spec-dispatch-btn");
+      if (dispatchBtn) dispatchBtn.classList.add("hidden");
+      var breakdownBtn = document.getElementById("spec-summarize-btn");
+      if (breakdownBtn) breakdownBtn.classList.add("hidden");
       if (location.hash && location.hash.indexOf("#spec/") === 0) {
         history.replaceState(null, "", location.pathname);
       }
