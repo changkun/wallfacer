@@ -233,8 +233,20 @@ function _loadAndRenderSpec() {
     })
     .catch(function (err) {
       console.error("spec load error:", err);
+      // Stop polling — the spec is unreachable in the current workspace.
+      _stopSpecRefreshPoll();
+      _focusedSpecPath = null;
+      _focusedSpecWorkspace = null;
+      _focusedSpecContent = null;
+      var titleEl = document.getElementById("spec-focused-title");
+      if (titleEl) titleEl.textContent = "";
+      var statusEl = document.getElementById("spec-focused-status");
+      if (statusEl) { statusEl.textContent = ""; statusEl.className = "spec-focused-view__status"; }
       var bodyEl = document.getElementById("spec-focused-body");
-      if (bodyEl) bodyEl.textContent = "Error loading spec: " + err.message;
+      if (bodyEl) bodyEl.innerHTML = "";
+      if (location.hash && location.hash.indexOf("#spec/") === 0) {
+        history.replaceState(null, "", location.pathname);
+      }
     });
 }
 
