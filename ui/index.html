@@ -23,29 +23,7 @@
 
 {{template "board.html"}}
 
-<div id="spec-mode-container" class="spec-mode-container" style="display: none">
-  <div id="spec-focused-view" class="spec-focused-view">
-    <div class="spec-focused-view__header">
-      <span id="spec-focused-title" class="spec-focused-view__title">Select a spec</span>
-      <span id="spec-focused-status" class="spec-focused-view__status"></span>
-      <span id="spec-focused-kind" class="spec-focused-view__kind"></span>
-      <span id="spec-focused-effort" class="spec-focused-view__effort"></span>
-      <span class="spec-focused-view__spacer"></span>
-      <button id="spec-dispatch-btn" class="spec-dispatch-btn hidden">Dispatch</button>
-      <button id="spec-summarize-btn" class="spec-summarize-btn hidden">Summarize</button>
-    </div>
-    <div id="spec-focused-meta" class="spec-focused-view__meta"></div>
-    <div id="spec-focused-body" class="spec-focused-view__body prose-content"></div>
-  </div>
-  <div id="spec-chat-resize" class="spec-chat-resize" role="separator" aria-orientation="horizontal"></div>
-  <div id="spec-chat-stream" class="spec-chat-stream">
-    <div id="spec-chat-messages" class="spec-chat-stream__messages"></div>
-    <div class="spec-chat-stream__input">
-      <textarea id="spec-chat-input" class="spec-chat-input" placeholder="Type a directive..." rows="2"></textarea>
-      <button id="spec-chat-send" class="spec-chat-send-btn">Send</button>
-    </div>
-  </div>
-</div>
+{{template "spec-mode.html"}}
 </div>
 
 {{template "status-bar.html"}}
