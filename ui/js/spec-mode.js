@@ -104,17 +104,26 @@ function getFocusedSpecPath() {
 }
 
 function _loadAndRenderSpec() {
-  if (!_focusedSpecPath || !_focusedSpecWorkspace) return;
+  if (!_focusedSpecPath) return;
+
+  // Always use the current active workspace so that a workspace-group
+  // switch doesn't leave us requesting a stale, now-rejected workspace.
+  var ws =
+    typeof activeWorkspaces !== "undefined" && activeWorkspaces.length > 0
+      ? activeWorkspaces[0]
+      : _focusedSpecWorkspace;
+  if (!ws) return;
+  _focusedSpecWorkspace = ws;
 
   // The spec tree returns paths relative to specs/ (e.g., "local/foo.md").
   // The explorer file API expects an absolute path within the workspace.
-  var absPath = _focusedSpecWorkspace + "/specs/" + _focusedSpecPath;
+  var absPath = ws + "/specs/" + _focusedSpecPath;
   var url =
     Routes.explorer.readFile() +
     "?path=" +
     encodeURIComponent(absPath) +
     "&workspace=" +
-    encodeURIComponent(_focusedSpecWorkspace);
+    encodeURIComponent(ws);
 
   fetch(url, { headers: withBearerHeaders() })
     .then(function (res) {
