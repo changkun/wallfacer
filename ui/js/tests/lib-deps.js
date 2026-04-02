@@ -15,8 +15,14 @@ const jsDir = join(__dirname, "..");
 const LIB_DEPS = {
   "utils.js": ["lib/formatting.js", "lib/modal.js"],
   "markdown.js": ["lib/clipboard.js", "lib/toggle.js"],
-  "modal-logs.js": ["lib/scheduling.js"],
-  "modal-results.js": ["lib/formatting.js", "lib/clipboard.js", "lib/toggle.js"],
+  "modal.js": ["lib/tab-switcher.js"],
+  "modal-logs.js": ["lib/scheduling.js", "lib/tab-switcher.js"],
+  "modal-results.js": [
+    "lib/formatting.js",
+    "lib/clipboard.js",
+    "lib/toggle.js",
+    "lib/tab-switcher.js",
+  ],
   "render.js": ["lib/scheduling.js"],
   "refine.js": ["lib/scheduling.js"],
   "workspace.js": ["lib/modal.js"],

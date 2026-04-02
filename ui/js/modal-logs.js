@@ -223,34 +223,34 @@ function onLogSearchInput(value) {
   renderLogs();
 }
 
-function setRightTab(tab) {
-  ["implementation", "testing", "changes", "spans", "timeline"].forEach(
-    function (t) {
-      const btn = document.getElementById("right-tab-" + t);
-      const panel = document.getElementById("right-panel-" + t);
-      const active = t === tab;
-      if (btn) btn.classList.toggle("active", active);
-      if (panel) panel.classList.toggle("hidden", !active);
+var _switchRightTab = createTabSwitcher({
+  tabs: ["implementation", "testing", "changes", "spans", "timeline"],
+  prefix: "right",
+  onActivate: {
+    spans: function () {
+      if (typeof loadFlamegraph !== "undefined" && getOpenModalTaskId()) {
+        loadFlamegraph(getOpenModalTaskId());
+      }
     },
-  );
-  if (
-    tab === "spans" &&
-    typeof loadFlamegraph !== "undefined" &&
-    getOpenModalTaskId()
-  ) {
-    loadFlamegraph(getOpenModalTaskId());
-  }
-  if (tab === "timeline") {
-    if (getOpenModalTaskId()) {
-      renderTimeline(getOpenModalTaskId());
-      _startTimelineRefresh(getOpenModalTaskId());
+    timeline: function () {
+      if (getOpenModalTaskId()) {
+        renderTimeline(getOpenModalTaskId());
+        _startTimelineRefresh(getOpenModalTaskId());
+      }
+    },
+  },
+  onSwitch: function (tab) {
+    if (tab !== "timeline") {
+      _stopTimelineRefresh();
     }
-  } else {
-    _stopTimelineRefresh();
-  }
-  if (getOpenModalTaskId()) {
-    history.replaceState(null, "", "#" + getOpenModalTaskId() + "/" + tab);
-  }
+    if (getOpenModalTaskId()) {
+      history.replaceState(null, "", "#" + getOpenModalTaskId() + "/" + tab);
+    }
+  },
+});
+
+function setRightTab(tab) {
+  _switchRightTab(tab);
 }
 
 function setLogsMode(mode) {

@@ -35,17 +35,18 @@ function toggleResultEntryRaw(entryId) {
 const _copyIcon =
   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
+var _switchLeftTab = createTabSwitcher({
+  tabs: ["implementation", "testing"],
+  prefix: "left",
+  onSwitch: function (tab) {
+    if (getOpenModalTaskId()) {
+      history.replaceState(null, "", "#" + getOpenModalTaskId() + "/" + tab);
+    }
+  },
+});
+
 function setLeftTab(tab) {
-  ["implementation", "testing"].forEach(function (t) {
-    const btn = document.getElementById("left-tab-" + t);
-    const panel = document.getElementById("left-panel-" + t);
-    const active = t === tab;
-    if (btn) btn.classList.toggle("active", active);
-    if (panel) panel.classList.toggle("hidden", !active);
-  });
-  if (getOpenModalTaskId()) {
-    history.replaceState(null, "", "#" + getOpenModalTaskId() + "/" + tab);
-  }
+  _switchLeftTab(tab);
 }
 
 // --- Timeline Gantt chart ---
