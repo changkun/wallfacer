@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
@@ -78,9 +79,9 @@ func RunDoctor(configDir string) {
 	apiKey := vals["ANTHROPIC_API_KEY"]
 	switch {
 	case oauthToken != "" && oauthToken != "your-oauth-token-here":
-		fmt.Printf("[ok] CLAUDE_CODE_OAUTH_TOKEN is set (%s)\n", maskToken(oauthToken))
+		fmt.Printf("[ok] CLAUDE_CODE_OAUTH_TOKEN is set (%s)\n", envconfig.MaskToken(oauthToken))
 	case apiKey != "":
-		fmt.Printf("[ok] ANTHROPIC_API_KEY is set (%s)\n", maskToken(apiKey))
+		fmt.Printf("[ok] ANTHROPIC_API_KEY is set (%s)\n", envconfig.MaskToken(apiKey))
 	default:
 		fmt.Printf("[!] No Claude credential (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY)\n")
 		fmt.Printf("    Set one in Settings → API Configuration.\n")
@@ -94,7 +95,7 @@ func RunDoctor(configDir string) {
 	fmt.Println()
 	fmt.Println("OpenAI Codex sandbox:")
 	if openAIKey := vals["OPENAI_API_KEY"]; openAIKey != "" {
-		fmt.Printf("[ok] OPENAI_API_KEY is set (%s)\n", maskToken(openAIKey))
+		fmt.Printf("[ok] OPENAI_API_KEY is set (%s)\n", envconfig.MaskToken(openAIKey))
 	} else {
 		fmt.Printf("[ ] OPENAI_API_KEY not set\n")
 	}
@@ -174,14 +175,6 @@ func RunDoctor(configDir string) {
 	} else {
 		fmt.Printf("%d issue(s) found. Fix the items marked [!] above.\n", issues)
 	}
-}
-
-// maskToken returns a masked version of a credential value.
-func maskToken(s string) string {
-	if len(s) <= 8 {
-		return strings.Repeat("*", len(s))
-	}
-	return s[:4] + "..." + s[len(s)-4:]
 }
 
 // printOptionalVar prints the value of an optional env variable or a
