@@ -3,21 +3,13 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import vm from "vm";
+import { loadLibDeps } from "./lib-deps.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
 
 function loadScript(filename, ctx) {
-  const libDeps = {
-    "render.js": ["lib/scheduling.js"],
-  };
-  const deps = libDeps[filename];
-  if (deps) {
-    for (const dep of deps) {
-      const depCode = readFileSync(join(jsDir, dep), "utf8");
-      vm.runInContext(depCode, ctx, { filename: join(jsDir, dep) });
-    }
-  }
+  loadLibDeps(filename, ctx);
   const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
 }

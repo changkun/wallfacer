@@ -3,12 +3,14 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import vm from "vm";
+import { loadLibDeps } from "./lib-deps.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
 const uiDir = join(__dirname, "..", "..");
 
 function loadScript(ctx, filename) {
+  loadLibDeps(filename, ctx);
   const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;

@@ -10,11 +10,13 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import vm from "vm";
+import { loadLibDeps } from "./lib-deps.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
 
 function loadScript(filename, ctx) {
+  loadLibDeps(filename, ctx);
   const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
@@ -222,7 +224,6 @@ function makeLogsContext() {
   ctx.getOpenModalTaskId = function () {
     return ctx._modalState.taskId;
   };
-  loadScript("lib/scheduling.js", ctx);
   loadScript("modal-logs.js", ctx);
   return { ctx, elements };
 }
