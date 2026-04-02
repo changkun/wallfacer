@@ -355,36 +355,6 @@ func TestPrettyHandlerHandle_NoExtraAttrs(t *testing.T) {
 	}
 }
 
-// TestIsUUID covers valid and invalid UUID strings.
-func TestIsUUID(t *testing.T) {
-	tests := []struct {
-		s    string
-		want bool
-	}{
-		{"550e8400-e29b-41d4-a716-446655440000", true},
-		{"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE", true},
-		{"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", true},
-		// Wrong length.
-		{"", false},
-		{"too-short", false},
-		{"550e8400-e29b-41d4-a716-44665544000", false},   // 35 chars
-		{"550e8400-e29b-41d4-a716-4466554400000", false}, // 37 chars
-		// Wrong separator positions.
-		{"550e8400Xe29b-41d4-a716-446655440000", false},
-		{"550e8400-e29bX41d4-a716-446655440000", false},
-		{"550e8400-e29b-41d4Xa716-446655440000", false},
-		{"550e8400-e29b-41d4-a716X446655440000", false},
-		// Invalid hex character.
-		{"gggggggg-e29b-41d4-a716-446655440000", false},
-	}
-
-	for _, tc := range tests {
-		if got := isUUID(tc.s); got != tc.want {
-			t.Errorf("isUUID(%q) = %v, want %v", tc.s, got, tc.want)
-		}
-	}
-}
-
 // TestNeedsQuoting covers all triggering characters and clean strings.
 func TestNeedsQuoting(t *testing.T) {
 	tests := []struct {

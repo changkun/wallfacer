@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/uuidutil"
 )
 
 // containerJSON is the union of fields emitted by `podman ps --format json`
@@ -104,7 +106,7 @@ func ParseContainerList(out []byte) ([]ContainerInfo, error) {
 		}
 		if taskID == "" {
 			candidate := strings.TrimPrefix(name, "wallfacer-")
-			if candidate != name && IsUUID(candidate) {
+			if candidate != name && uuidutil.IsValid(candidate) {
 				taskID = candidate
 			}
 		}
@@ -120,23 +122,4 @@ func ParseContainerList(out []byte) ([]ContainerInfo, error) {
 		})
 	}
 	return result, nil
-}
-
-// IsUUID returns true if s looks like a standard UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
-func IsUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		// Positions 8, 13, 18, 23 are the four hyphen separators in a UUID:
-		// xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			if c != '-' {
-				return false
-			}
-		} else if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
-			return false
-		}
-	}
-	return true
 }

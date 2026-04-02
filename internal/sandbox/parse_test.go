@@ -98,30 +98,6 @@ func TestParseContainerListTaskIDFallback(t *testing.T) {
 	}
 }
 
-// TestIsUUID validates the UUID format checker against valid, invalid, and
-// edge-case inputs (wrong length, non-hex chars, wrong separators).
-func TestIsUUID(t *testing.T) {
-	tests := []struct {
-		input string
-		want  bool
-	}{
-		{"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", true},
-		{"12345678-1234-1234-1234-123456789abc", true},
-		{"AABBCCDD-EEFF-0011-2233-445566778899", true},
-		{"not-a-uuid", false},
-		{"", false},
-		{"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee", false},   // too short
-		{"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeeee", false}, // too long
-		{"aaaaaaaa_bbbb-cccc-dddd-eeeeeeeeeeee", false},  // underscore
-		{"gaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", false},  // non-hex
-	}
-	for _, tt := range tests {
-		if got := IsUUID(tt.input); got != tt.want {
-			t.Errorf("IsUUID(%q) = %v, want %v", tt.input, got, tt.want)
-		}
-	}
-}
-
 // TestBackendStateString verifies the human-readable name for each backend
 // lifecycle state, including the "unknown" fallback for out-of-range values.
 func TestBackendStateString(t *testing.T) {

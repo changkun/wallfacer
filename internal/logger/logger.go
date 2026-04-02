@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/uuidutil"
 )
 
 // Package-level named loggers, populated by Init.
@@ -257,7 +258,7 @@ func prettyValue(v slog.Value) string {
 	} else {
 		s = fmt.Sprintf("%v", v.Any())
 	}
-	if isUUID(s) {
+	if uuidutil.IsValid(s) {
 		return s[:8]
 	}
 	if len(s) > constants.LogValueMaxLen {
@@ -267,27 +268,6 @@ func prettyValue(v slog.Value) string {
 		return fmt.Sprintf("%q", s)
 	}
 	return s
-}
-
-// isUUID reports whether s has the canonical UUID string format
-// (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, 36 chars with hyphens at fixed positions).
-func isUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, r := range s {
-		switch i {
-		case 8, 13, 18, 23: // Positions of the four hyphens in a UUID.
-			if r != '-' {
-				return false
-			}
-		default:
-			if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 // needsQuoting reports whether s must be wrapped in quotes for visual clarity.
