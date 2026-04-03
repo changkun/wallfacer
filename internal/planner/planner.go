@@ -31,6 +31,7 @@ type Config struct {
 	Network          string          // container network (empty defaults to "host")
 	CPUs             string          // container CPU limit (e.g. "2.0")
 	Memory           string          // container memory limit (e.g. "4g")
+	ConfigDir        string          // base config directory (~/.wallfacer/) for conversation persistence
 }
 
 // Planner manages a singleton long-lived planning container for a workspace.
@@ -47,13 +48,15 @@ type Planner struct {
 	cpus             string
 	memory           string
 
-	handle sandbox.Handle // non-nil when a planning invocation is active
-	active bool           // true after Start, false after Stop
+	handle       sandbox.Handle     // non-nil when a planning invocation is active
+	active       bool               // true after Start, false after Stop
+	conversation *ConversationStore // chat message persistence (nil if configDir empty)
 }
 
 // New creates a Planner from the given configuration.
+// If ConfigDir is set, a ConversationStore is created for chat persistence.
 func New(cfg Config) *Planner {
-	return &Planner{
+	p := &Planner{
 		backend:          cfg.Backend,
 		command:          cfg.Command,
 		image:            cfg.Image,
@@ -65,6 +68,19 @@ func New(cfg Config) *Planner {
 		cpus:             cfg.CPUs,
 		memory:           cfg.Memory,
 	}
+	if cfg.ConfigDir != "" && cfg.Fingerprint != "" {
+		cs, err := NewConversationStore(cfg.ConfigDir, cfg.Fingerprint)
+		if err == nil {
+			p.conversation = cs
+		}
+	}
+	return p
+}
+
+// Conversation returns the conversation store for chat persistence,
+// or nil if conversation storage is not configured.
+func (p *Planner) Conversation() *ConversationStore {
+	return p.conversation
 }
 
 // Start marks the planner as active. The actual container is created lazily

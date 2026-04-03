@@ -198,6 +198,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		Network:          envCfg.ContainerNetwork,
 		CPUs:             envCfg.ContainerCPUs,
 		Memory:           envCfg.ContainerMemory,
+		ConfigDir:        configDir,
 	})
 	h.SetPlanner(p)
 
