@@ -762,6 +762,31 @@
   margin-bottom: 0;
 }
 
+/* Scale down prose headings inside chat bubbles so they don't dominate. */
+.planning-chat-bubble--assistant .prose-content h1 {
+  font-size: 1.15em;
+  border-bottom: none;
+  margin-top: 0.75em;
+  padding-bottom: 0;
+}
+.planning-chat-bubble--assistant .prose-content h2 {
+  font-size: 1.05em;
+  border-bottom: none;
+  margin-top: 0.75em;
+  padding-bottom: 0;
+}
+.planning-chat-bubble--assistant .prose-content h3 {
+  font-size: 1em;
+  margin-top: 0.5em;
+}
+.planning-chat-bubble--assistant .prose-content h4 {
+  font-size: 1em;
+  margin-top: 0.5em;
+}
+.planning-chat-bubble--assistant .prose-content p {
+  margin: 0.5em 0;
+}
+
 .planning-chat-bubble__time {
   font-size: 10px;
   color: var(--text-muted);
@@ -798,7 +823,14 @@
 
 .planning-chat-activity {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 11px;
+}
+
+/* Normalize cc-result-text inside the activity log so <pre> matches
+   the surrounding tool-input spans in size and font. */
+.planning-chat-activity .cc-result-text {
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .planning-chat-activity summary {
