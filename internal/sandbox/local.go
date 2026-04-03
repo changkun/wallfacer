@@ -183,11 +183,18 @@ func (b *LocalBackend) StopTaskWorker(taskID string) {
 func (b *LocalBackend) ShutdownWorkers() {
 	b.taskWorkersMu.Lock()
 	workers := make([]*taskWorker, 0, len(b.taskWorkers))
-	for _, w := range b.taskWorkers {
+	names := make([]string, 0, len(b.taskWorkers))
+	for id, w := range b.taskWorkers {
 		workers = append(workers, w)
+		names = append(names, w.containerName+" ("+id+")")
 	}
 	b.taskWorkers = make(map[string]*taskWorker)
 	b.taskWorkersMu.Unlock()
+
+	if len(workers) == 0 {
+		return
+	}
+	logger.Runner.Info("stopping task workers", "count", len(workers), "workers", names)
 
 	var wg sync.WaitGroup
 	for _, w := range workers {
@@ -198,6 +205,7 @@ func (b *LocalBackend) ShutdownWorkers() {
 		}()
 	}
 	wg.Wait()
+	logger.Runner.Info("all task workers stopped")
 }
 
 // WorkerStats returns aggregate statistics about the worker lifecycle.

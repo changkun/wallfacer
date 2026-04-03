@@ -72,14 +72,20 @@ type ServerComponents struct {
 // for background runner goroutines to finish.
 func (sc *ServerComponents) Shutdown() {
 	sc.Stop()
+
+	logger.Main.Info("shutting down http server")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
 		logger.Main.Error("http server shutdown", "error", err)
 	}
-	if sc.Planner != nil {
+
+	if sc.Planner != nil && sc.Planner.IsRunning() {
+		logger.Main.Info("stopping planning sandbox")
 		sc.Planner.Stop()
 	}
+
+	logger.Main.Info("shutting down runner")
 	sc.Runner.Shutdown()
 	logger.Main.Info("shutdown complete")
 }
