@@ -190,7 +190,9 @@ var _mdRender = (function () {
   // dark text.
 
   function _fixMermaidNodeContrast(container) {
-    var rects = container.querySelectorAll("svg .node rect, svg .node polygon, svg .node circle");
+    var rects = container.querySelectorAll(
+      "svg .node rect, svg .node polygon, svg .node circle",
+    );
     for (var i = 0; i < rects.length; i++) {
       var shape = rects[i];
       var fill = shape.getAttribute("style");
@@ -214,7 +216,8 @@ var _mdRender = (function () {
   // Returns -1 on parse failure.
   function _hexLuminance(hex) {
     hex = hex.replace("#", "");
-    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    if (hex.length === 3)
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
     if (hex.length < 6) return -1;
     var r = parseInt(hex.substring(0, 2), 16) / 255;
     var g = parseInt(hex.substring(2, 4), 16) / 255;
