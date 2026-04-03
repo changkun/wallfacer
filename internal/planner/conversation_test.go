@@ -221,3 +221,58 @@ func TestPlannerConversation_NoConfigDir(t *testing.T) {
 		t.Error("Conversation() should be nil when ConfigDir is empty")
 	}
 }
+
+func TestExtractSessionID(t *testing.T) {
+	raw := `{"type":"init","session_id":"sess-abc123"}
+{"result":"hello","stop_reason":"end_turn"}`
+	got := ExtractSessionID([]byte(raw))
+	if got != "sess-abc123" {
+		t.Errorf("ExtractSessionID = %q, want %q", got, "sess-abc123")
+	}
+}
+
+func TestExtractSessionID_ThreadID(t *testing.T) {
+	raw := `{"thread_id":"thread-xyz"}`
+	got := ExtractSessionID([]byte(raw))
+	if got != "thread-xyz" {
+		t.Errorf("ExtractSessionID = %q, want %q", got, "thread-xyz")
+	}
+}
+
+func TestExtractSessionID_Empty(t *testing.T) {
+	got := ExtractSessionID([]byte("no json here"))
+	if got != "" {
+		t.Errorf("ExtractSessionID = %q, want empty", got)
+	}
+}
+
+func TestExtractResultText(t *testing.T) {
+	raw := `{"result":"","session_id":"sess-abc","stop_reason":""}
+{"result":"Here is the summary.","stop_reason":"end_turn"}`
+	got := ExtractResultText([]byte(raw))
+	if got != "Here is the summary." {
+		t.Errorf("ExtractResultText = %q, want %q", got, "Here is the summary.")
+	}
+}
+
+func TestExtractResultText_Empty(t *testing.T) {
+	got := ExtractResultText([]byte("no json here"))
+	if got != "" {
+		t.Errorf("ExtractResultText = %q, want empty", got)
+	}
+}
+
+func TestPlannerIsBusy(t *testing.T) {
+	p := New(Config{Command: "podman"})
+	if p.IsBusy() {
+		t.Error("new planner should not be busy")
+	}
+	p.SetBusy(true)
+	if !p.IsBusy() {
+		t.Error("IsBusy should be true after SetBusy(true)")
+	}
+	p.SetBusy(false)
+	if p.IsBusy() {
+		t.Error("IsBusy should be false after SetBusy(false)")
+	}
+}

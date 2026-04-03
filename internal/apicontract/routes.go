@@ -214,6 +214,27 @@ var Routes = []Route{
 		Tags:        []string{"planning"},
 	},
 
+	// --- Planning messages ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/planning/messages", Name: "GetPlanningMessages",
+		JSName:      "messages",
+		Description: "Retrieve conversation history.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning/messages", Name: "SendPlanningMessage",
+		JSName:      "sendMessage",
+		Description: "Send a user message, triggers agent exec.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodDelete, Pattern: "/api/planning/messages", Name: "ClearPlanningMessages",
+		JSName:      "clearMessages",
+		Description: "Clear conversation history.",
+		Tags:        []string{"planning"},
+	},
+
 	// --- Environment configuration ---
 
 	{

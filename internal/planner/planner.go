@@ -50,6 +50,7 @@ type Planner struct {
 
 	handle       sandbox.Handle     // non-nil when a planning invocation is active
 	active       bool               // true after Start, false after Stop
+	busy         bool               // true while a chat exec is in flight
 	conversation *ConversationStore // chat message persistence (nil if configDir empty)
 }
 
@@ -144,6 +145,20 @@ func (p *Planner) Exec(ctx context.Context, cmd []string) (sandbox.Handle, error
 	p.mu.Unlock()
 
 	return h, nil
+}
+
+// IsBusy reports whether a chat exec is currently in flight.
+func (p *Planner) IsBusy() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.busy
+}
+
+// SetBusy marks the planner as busy (exec in flight).
+func (p *Planner) SetBusy(b bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.busy = b
 }
 
 // UpdateWorkspaces destroys the current planning container (if any) and

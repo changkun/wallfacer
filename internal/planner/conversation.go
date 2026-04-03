@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -148,4 +149,49 @@ func (s *ConversationStore) LoadSession() (SessionInfo, error) {
 		return SessionInfo{}, err
 	}
 	return info, nil
+}
+
+// ExtractSessionID scans NDJSON output for the first session_id or thread_id
+// field. Returns empty string if not found.
+func ExtractSessionID(raw []byte) string {
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			SessionID string `json:"session_id"`
+			ThreadID  string `json:"thread_id"`
+		}
+		if json.Unmarshal([]byte(line), &obj) == nil {
+			if obj.SessionID != "" {
+				return obj.SessionID
+			}
+			if obj.ThreadID != "" {
+				return obj.ThreadID
+			}
+		}
+	}
+	return ""
+}
+
+// ExtractResultText scans NDJSON output backwards for the last line with a
+// non-empty "result" field and a stop_reason of "end_turn". Returns empty
+// string if not found.
+func ExtractResultText(raw []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			Result     string `json:"result"`
+			StopReason string `json:"stop_reason"`
+		}
+		if json.Unmarshal([]byte(line), &obj) == nil && obj.Result != "" {
+			return obj.Result
+		}
+	}
+	return ""
 }

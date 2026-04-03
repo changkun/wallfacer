@@ -131,6 +131,18 @@ var Routes = {
     stop: function () {
       return "/api/planning";
     },
+    // GET /api/planning/messages
+    messages: function () {
+      return "/api/planning/messages";
+    },
+    // POST /api/planning/messages
+    sendMessage: function () {
+      return "/api/planning/messages";
+    },
+    // DELETE /api/planning/messages
+    clearMessages: function () {
+      return "/api/planning/messages";
+    },
   },
 
   env: {
