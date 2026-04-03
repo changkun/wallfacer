@@ -5,6 +5,8 @@
 
 var _specTreeData = null;
 var _specTreeTimer = null;
+var _specStreamSource = null;
+var _specStreamRetryDelay = 1000;
 var _specExpandedPaths = new Set(
   JSON.parse(localStorage.getItem("wallfacer-spec-expanded") || "[]"),
 );
@@ -177,15 +179,63 @@ function toggleSpecWorkspaceFiles(checked) {
 
 function _startSpecTreePoll() {
   _stopSpecTreePoll();
-  _specTreeTimer = setInterval(function () {
-    loadSpecTree();
-  }, 3000);
+  _startSpecTreeStream();
 }
 
 function _stopSpecTreePoll() {
   if (_specTreeTimer) {
     clearInterval(_specTreeTimer);
     _specTreeTimer = null;
+  }
+  _stopSpecTreeStream();
+}
+
+function _startSpecTreeStream() {
+  _stopSpecTreeStream();
+  if (!Routes || !Routes.specs || !Routes.specs.stream) return;
+
+  var url = withAuthToken(Routes.specs.stream());
+  _specStreamSource = new EventSource(url);
+  _specStreamRetryDelay = 1000;
+
+  _specStreamSource.addEventListener("snapshot", function (e) {
+    _specStreamRetryDelay = 1000;
+    try {
+      _specTreeData = JSON.parse(e.data);
+      renderSpecTree();
+      if (
+        typeof renderMinimap === "function" &&
+        typeof getFocusedSpecPath === "function" &&
+        getFocusedSpecPath()
+      ) {
+        renderMinimap(getFocusedSpecPath(), _specTreeData);
+      }
+    } catch (err) {
+      console.error("spec stream parse error:", err);
+    }
+  });
+
+  _specStreamSource.addEventListener("heartbeat", function () {
+    // Connection alive — nothing to do.
+  });
+
+  _specStreamSource.onerror = function () {
+    if (
+      _specStreamSource &&
+      _specStreamSource.readyState === EventSource.CLOSED
+    ) {
+      _specStreamSource = null;
+      var jittered = _specStreamRetryDelay * (1 + Math.random());
+      _specTreeTimer = setTimeout(_startSpecTreeStream, jittered);
+      _specStreamRetryDelay = Math.min(_specStreamRetryDelay * 2, 30000);
+    }
+  };
+}
+
+function _stopSpecTreeStream() {
+  if (_specStreamSource) {
+    _specStreamSource.close();
+    _specStreamSource = null;
   }
 }
 

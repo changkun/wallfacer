@@ -12,6 +12,8 @@ var _explorerStorageKeyWidth = "wallfacer-explorer-width";
 var _explorerRoots = [];
 var _explorerLoaded = false;
 var _explorerRefreshTimer = null;
+var _explorerStreamSource = null;
+var _explorerStreamRetryDelay = 1000;
 
 // ---------------------------------------------------------------------------
 // Toggle & resize (Task 3)
@@ -55,15 +57,53 @@ function toggleExplorer() {
 
 function _startExplorerRefreshPoll() {
   _stopExplorerRefreshPoll();
-  _explorerRefreshTimer = setInterval(function () {
-    if (_explorerLoaded) _refreshExpandedNodes();
-  }, 3000);
+  _startExplorerStream();
 }
 
 function _stopExplorerRefreshPoll() {
   if (_explorerRefreshTimer) {
     clearInterval(_explorerRefreshTimer);
     _explorerRefreshTimer = null;
+  }
+  _stopExplorerStream();
+}
+
+function _startExplorerStream() {
+  _stopExplorerStream();
+  if (!Routes || !Routes.explorer || !Routes.explorer.stream) return;
+
+  var url = withAuthToken(Routes.explorer.stream());
+  _explorerStreamSource = new EventSource(url);
+  _explorerStreamRetryDelay = 1000;
+
+  _explorerStreamSource.addEventListener("refresh", function () {
+    if (_explorerLoaded) _refreshExpandedNodes();
+  });
+
+  _explorerStreamSource.addEventListener("heartbeat", function () {
+    // Connection alive — nothing to do.
+  });
+
+  _explorerStreamSource.onerror = function () {
+    if (
+      _explorerStreamSource &&
+      _explorerStreamSource.readyState === EventSource.CLOSED
+    ) {
+      _explorerStreamSource = null;
+      var jittered = _explorerStreamRetryDelay * (1 + Math.random());
+      _explorerRefreshTimer = setTimeout(_startExplorerStream, jittered);
+      _explorerStreamRetryDelay = Math.min(
+        _explorerStreamRetryDelay * 2,
+        30000,
+      );
+    }
+  };
+}
+
+function _stopExplorerStream() {
+  if (_explorerStreamSource) {
+    _explorerStreamSource.close();
+    _explorerStreamSource = null;
   }
 }
 

@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -115,6 +118,93 @@ func (h *Handler) ExplorerTree(w http.ResponseWriter, r *http.Request) {
 	})
 
 	httpjson.Write(w, http.StatusOK, result)
+}
+
+// ExplorerStream sends SSE notifications when workspace directory contents
+// change. The client provides a comma-separated list of expanded directory
+// paths via the "paths" query param and the workspace via "workspace".
+// The server polls those directories every 3 seconds and sends a "refresh"
+// event whenever the content fingerprint changes, so the client can re-fetch
+// only the affected nodes.
+func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	// Compute a fingerprint of a directory listing (names + types + sizes + mtimes).
+	fingerprint := func(dirPath string) string {
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			return ""
+		}
+		hash := sha256.New()
+		for _, e := range entries {
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			_, _ = fmt.Fprintf(hash, "%s:%v:%d:%d;", e.Name(), e.IsDir(), info.Size(), info.ModTime().UnixNano())
+		}
+		return fmt.Sprintf("%x", hash.Sum(nil))
+	}
+
+	// Build initial fingerprints for all workspace roots.
+	workspaces := h.currentWorkspaces()
+	prevFingerprints := make(map[string]string)
+	for _, ws := range workspaces {
+		prevFingerprints[ws] = fingerprint(ws)
+	}
+
+	// Send initial connected event.
+	if _, err := fmt.Fprintf(w, "event: connected\ndata: {}\n\n"); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-keepalive.C:
+			if _, err := fmt.Fprintf(w, "event: heartbeat\ndata: {}\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-ticker.C:
+			// Re-read current workspaces in case they changed.
+			currentWS := h.currentWorkspaces()
+			var changed []string
+			newFingerprints := make(map[string]string)
+			for _, ws := range currentWS {
+				fp := fingerprint(ws)
+				newFingerprints[ws] = fp
+				if fp != prevFingerprints[ws] {
+					changed = append(changed, ws)
+				}
+			}
+			prevFingerprints = newFingerprints
+
+			if len(changed) > 0 {
+				data, _ := json.Marshal(map[string]any{"workspaces": changed})
+				if _, err := fmt.Fprintf(w, "event: refresh\ndata: %s\n\n", data); err != nil {
+					return
+				}
+				flusher.Flush()
+			}
+		}
+	}
 }
 
 // isBinaryContent reports whether data contains a null byte, indicating

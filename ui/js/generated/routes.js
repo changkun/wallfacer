@@ -112,6 +112,10 @@ var Routes = {
     tree: function () {
       return "/api/specs/tree";
     },
+    // GET /api/specs/stream
+    stream: function () {
+      return "/api/specs/stream";
+    },
   },
 
   planning: {
@@ -257,6 +261,10 @@ var Routes = {
     // GET /api/explorer/tree
     tree: function () {
       return "/api/explorer/tree";
+    },
+    // GET /api/explorer/stream
+    stream: function () {
+      return "/api/explorer/stream";
     },
     // GET /api/explorer/file
     readFile: function () {

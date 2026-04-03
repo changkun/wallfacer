@@ -187,6 +187,11 @@ var Routes = []Route{
 		Description: "Get the full spec tree with metadata and progress.",
 		Tags:        []string{"specs"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/specs/stream", Name: "SpecTreeStream",
+		Description: "SSE stream of spec tree change notifications.",
+		Tags:        []string{"specs", "sse"},
+	},
 
 	// --- Planning sandbox ---
 
@@ -533,6 +538,11 @@ var Routes = []Route{
 		JSName:      "tree",
 		Description: "List one level of a workspace directory.",
 		Tags:        []string{"explorer"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/explorer/stream", Name: "ExplorerStream",
+		Description: "SSE stream of file tree change notifications for workspace directories.",
+		Tags:        []string{"explorer", "sse"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/explorer/file", Name: "ExplorerReadFile",

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
 )
@@ -565,5 +568,109 @@ func TestExplorerWriteFile_CreateParentDirs(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "parent directory") {
 		t.Errorf("expected error about parent directory, got %q", w.Body.String())
+	}
+}
+
+func TestExplorerStream_SendsRefreshOnChange(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	// Use a short-lived context so the SSE handler exits quickly.
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/stream", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.ExplorerStream(w, req)
+	}()
+
+	// Wait for the connected event.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			cancel()
+			<-done
+			t.Fatal("timed out waiting for connected event")
+		default:
+		}
+		if strings.Contains(w.Body.String(), "event: connected") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Create a file to trigger a change.
+	if err := os.WriteFile(filepath.Join(ws, "newfile.txt"), []byte("hello"), 0644); err != nil {
+		cancel()
+		<-done
+		t.Fatal(err)
+	}
+
+	// Wait for a refresh event (poll interval is 3s).
+	deadline = time.After(10 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			cancel()
+			<-done
+			t.Fatal("timed out waiting for refresh event")
+		default:
+		}
+		if strings.Contains(w.Body.String(), "event: refresh") {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	cancel()
+	<-done
+
+	// Verify the refresh event contains workspace info.
+	body := w.Body.String()
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data: ") && strings.Contains(line, "workspaces") {
+			var payload struct {
+				Workspaces []string `json:"workspaces"`
+			}
+			if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &payload); err != nil {
+				t.Fatalf("failed to parse refresh data: %v", err)
+			}
+			if len(payload.Workspaces) == 0 {
+				t.Error("expected at least one workspace in refresh event")
+			}
+			return
+		}
+	}
+	t.Error("refresh event data not found in response body")
+}
+
+func TestExplorerStream_NoRefreshWhenUnchanged(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/stream", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.ExplorerStream(w, req)
+	}()
+
+	// Wait for connected event + one poll cycle (3s).
+	time.Sleep(4 * time.Second)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if strings.Contains(body, "event: refresh") {
+		t.Error("expected no refresh event when workspace is unchanged")
+	}
+	if !strings.Contains(body, "event: connected") {
+		t.Error("expected connected event")
 	}
 }

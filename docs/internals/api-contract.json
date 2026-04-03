@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 89,
+  "route_count": 91,
   "routes": [
     {
       "method": "GET",
@@ -190,6 +190,16 @@
       "description": "Get the full spec tree with metadata and progress.",
       "tags": [
         "specs"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/specs/stream",
+      "name": "SpecTreeStream",
+      "description": "SSE stream of spec tree change notifications.",
+      "tags": [
+        "specs",
+        "sse"
       ]
     },
     {
@@ -716,6 +726,16 @@
       "description": "List one level of a workspace directory.",
       "tags": [
         "explorer"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/explorer/stream",
+      "name": "ExplorerStream",
+      "description": "SSE stream of file tree change notifications for workspace directories.",
+      "tags": [
+        "explorer",
+        "sse"
       ]
     },
     {

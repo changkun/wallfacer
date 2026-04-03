@@ -674,7 +674,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateWorkspaces": h.UpdateWorkspaces,
 
 		// Spec tree.
-		"GetSpecTree": h.GetSpecTree,
+		"GetSpecTree":    h.GetSpecTree,
+		"SpecTreeStream": h.SpecTreeStream,
 
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
@@ -708,6 +709,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// File explorer.
 		"ExplorerTree":      h.ExplorerTree,
+		"ExplorerStream":    h.ExplorerStream,
 		"ExplorerReadFile":  h.ExplorerReadFile,
 		"ExplorerWriteFile": h.ExplorerWriteFile,
 

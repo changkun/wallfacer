@@ -96,6 +96,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/{id}/oversight/test` | Test oversight summary for a task |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
+| `GET /api/explorer/stream` | SSE stream of file tree change notifications |
 | `GET /api/explorer/file` | Read file contents from a workspace |
 | `PUT /api/explorer/file` | Write file contents to a workspace |
 | **OAuth authentication** | |
@@ -152,7 +153,7 @@ srv := &http.Server{
 |---|---|---|
 | **Logging** | `server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **Auth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead (browser WebSocket and EventSource APIs cannot set custom headers). No-op when no API key is configured. |
+| **Auth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead (browser WebSocket and EventSource APIs cannot set custom headers). No-op when no API key is configured. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Instructions: 5 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`. |
 
@@ -238,6 +239,18 @@ In addition to the full-delta channel, the store provides a lightweight `Subscri
 ### Git Status Stream (`GET /api/git/stream`)
 
 Implemented in `Handler.GitStatusStream()` (`internal/handler/git.go`). Unlike the task stream, git status uses a **polling ticker** (every 5 seconds) rather than store-driven pub/sub. On each tick, the handler collects `git status` for all workspaces, JSON-marshals the result, compares it byte-for-byte with the previous emission, and only sends an SSE frame if the data has changed.
+
+### Explorer Stream (`GET /api/explorer/stream`)
+
+Implemented in `Handler.ExplorerStream()` (`internal/handler/explorer.go`). Uses a **polling ticker** (every 3 seconds) to fingerprint workspace root directories (hashing entry names, types, sizes, and modification times). Only sends a `refresh` event when a directory's fingerprint changes, so the frontend can re-fetch affected nodes. This replaces the previous approach where the frontend polled `GET /api/explorer/tree` every 3 seconds for each expanded directory.
+
+**Events:** `connected` (on first connect), `refresh` (with `{workspaces: [...]}` payload listing changed workspace paths), `heartbeat` (every 15 seconds).
+
+### Spec Tree Stream (`GET /api/specs/stream`)
+
+Implemented in `Handler.SpecTreeStream()` (`internal/handler/specs.go`). Uses a **polling ticker** (every 3 seconds) to rebuild the spec tree and compare it byte-for-byte with the previous emission. Sends a `snapshot` event with the full tree data only when the content has changed. This replaces the previous frontend polling of `GET /api/specs/tree` every 3 seconds.
+
+**Events:** `snapshot` (initial and on change, with full tree JSON), `heartbeat` (every 15 seconds).
 
 ### Live Container Logs (`GET /api/tasks/{id}/logs`)
 
