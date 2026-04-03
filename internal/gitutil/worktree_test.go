@@ -190,6 +190,32 @@ func TestCreateWorktree_AlreadyRegisteredWorktreeFallback(t *testing.T) {
 	}
 }
 
+// TestCreateWorktree_InvalidWorktreePath verifies CreateWorktree returns a
+// generic error (not "already exists") when the worktree path is invalid.
+func TestCreateWorktree_InvalidWorktreePath(t *testing.T) {
+	repo := setupRepo(t)
+	// Use an existing file as the worktree path — git can't create a directory.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	writeFile(t, blocker, "x")
+	err := CreateWorktree(repo, blocker, "fail-branch")
+	if err == nil {
+		t.Fatal("expected error when worktree path is a file")
+	}
+}
+
+// TestCreateWorktreeAt_InvalidWorktreePath verifies error propagation when
+// worktree add fails with a non-"already exists" error.
+func TestCreateWorktreeAt_InvalidWorktreePath(t *testing.T) {
+	repo := setupRepo(t)
+	baseCommit := gitRun(t, repo, "rev-parse", "HEAD")
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	writeFile(t, blocker, "x")
+	err := CreateWorktreeAt(repo, blocker, "fail-branch", baseCommit)
+	if err == nil {
+		t.Fatal("expected error when worktree path is a file")
+	}
+}
+
 // TestCreateWorktreeAt validates worktree creation at a specific base commit,
 // including recovery when the branch already exists from a previous incomplete run.
 func TestCreateWorktreeAt(t *testing.T) {
