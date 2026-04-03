@@ -189,7 +189,11 @@ function filterSpecTree(filter) {
 // setSpecTextFilter updates the text filter and re-renders the spec tree.
 function setSpecTextFilter(query) {
   _specTextFilter = (query || "").toLowerCase();
-  renderSpecTree();
+  // Only re-render the spec tree when actually in spec mode.
+  // Calling renderSpecTree in board mode overwrites the workspace file tree.
+  if (_explorerRootMode === "specs") {
+    renderSpecTree();
+  }
 }
 
 // _nodeMatchesFilter checks if a node or any of its descendants match
