@@ -117,6 +117,10 @@ var PlanningChat = (function () {
   }
 
   function _onInputKeydown(e) {
+    // If the @-mention dropdown is open (managed by mention.js), let it
+    // handle arrow keys, Enter, Tab, and Escape — don't intercept here.
+    if (document.querySelector(".mention-dropdown")) return;
+
     // If user presses arrow key while typing a slash command but autocomplete
     // hasn't rendered yet, trigger it synchronously.
     if (!_autocompleteEl && _input.value.startsWith("/") && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -540,12 +544,21 @@ var PlanningChat = (function () {
 
   function _highlightAutocomplete() {
     if (!_autocompleteEl) return;
+    // Clamp index to valid range when results shrink.
+    if (_autocompleteIndex >= _autocompleteEl.children.length) {
+      _autocompleteIndex = Math.max(0, _autocompleteEl.children.length - 1);
+    }
     var items = _autocompleteEl.children;
     for (var i = 0; i < items.length; i++) {
       items[i].classList.toggle(
         "planning-chat-autocomplete__item--active",
         i === _autocompleteIndex,
       );
+    }
+    // Scroll active item into view.
+    if (_autocompleteIndex >= 0 && items[_autocompleteIndex] &&
+        typeof items[_autocompleteIndex].scrollIntoView === "function") {
+      items[_autocompleteIndex].scrollIntoView({ block: "nearest" });
     }
   }
 

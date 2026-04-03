@@ -55,6 +55,14 @@ function _mentionFilter(files, query, priorityPrefix) {
   return scored.slice(0, 20).map((s) => s.f);
 }
 
+function _scrollSelectedIntoView(dropdown, index) {
+  if (!dropdown || index < 0) return;
+  var item = dropdown.children && dropdown.children[index];
+  if (item && typeof item.scrollIntoView === "function") {
+    item.scrollIntoView({ block: "nearest" });
+  }
+}
+
 // Attach @-mention autocomplete to a single textarea element.
 // Options:
 //   position: "below" (default) — dropdown appears below the textarea
@@ -192,10 +200,12 @@ function attachMentionAutocomplete(textarea, opts) {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, currentMatches.length - 1);
       renderItems(currentMatches);
+      _scrollSelectedIntoView(dropdown, selectedIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      selectedIndex = Math.max(selectedIndex - 1, -1);
+      selectedIndex = Math.max(selectedIndex - 1, 0);
       renderItems(currentMatches);
+      _scrollSelectedIntoView(dropdown, selectedIndex);
     } else if ((e.key === "Enter" || e.key === "Tab") && selectedIndex >= 0) {
       e.preventDefault();
       selectFile(currentMatches[selectedIndex]);
