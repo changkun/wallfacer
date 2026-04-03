@@ -1,9 +1,11 @@
 package oauth
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"testing"
 )
 
@@ -75,5 +77,48 @@ func TestGenerateState(t *testing.T) {
 	}
 	if s == s2 {
 		t.Error("two calls returned the same state")
+	}
+}
+
+type failReader struct{}
+
+func (failReader) Read([]byte) (int, error) {
+	return 0, errors.New("rand failure")
+}
+
+func TestGenerateCodeVerifier_RandError(t *testing.T) {
+	old := randReader
+	randReader = failReader{}
+	defer func() { randReader = old }()
+
+	_, err := GenerateCodeVerifier()
+	if err == nil {
+		t.Fatal("expected error from rand failure")
+	}
+}
+
+func TestGenerateState_RandError(t *testing.T) {
+	old := randReader
+	randReader = failReader{}
+	defer func() { randReader = old }()
+
+	_, err := GenerateState()
+	if err == nil {
+		t.Fatal("expected error from rand failure")
+	}
+}
+
+func TestGenerateCodeVerifier_UsesRandReader(t *testing.T) {
+	// Ensure production code uses crypto/rand by default.
+	old := randReader
+	randReader = rand.Reader
+	defer func() { randReader = old }()
+
+	v, err := GenerateCodeVerifier()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(v) != 43 {
+		t.Errorf("verifier length = %d; want 43", len(v))
 	}
 }

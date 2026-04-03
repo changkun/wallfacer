@@ -6,13 +6,17 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"io"
 )
+
+// randReader is the source of randomness. Tests may override it.
+var randReader io.Reader = rand.Reader
 
 // GenerateCodeVerifier returns a cryptographically random PKCE code verifier
 // (32 random bytes, base64url-encoded without padding, yielding 43 characters).
 func GenerateCodeVerifier() (string, error) {
 	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	if _, err := io.ReadFull(randReader, b); err != nil {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
@@ -29,7 +33,7 @@ func S256Challenge(verifier string) string {
 // (16 random bytes, hex-encoded, yielding 32 characters).
 func GenerateState() (string, error) {
 	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
+	if _, err := io.ReadFull(randReader, b); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil

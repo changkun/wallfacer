@@ -125,6 +125,76 @@ func TestCallbackServer_Close(t *testing.T) {
 	}
 }
 
+func TestCallbackServer_CustomPath(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	srv, err := NewCallbackServer(ctx, 0, "/auth/callback")
+	if err != nil {
+		t.Fatalf("NewCallbackServer: %v", err)
+	}
+	defer srv.Close()
+
+	url := fmt.Sprintf("http://127.0.0.1:%d/auth/callback?code=custom-path&state=s1", srv.Port())
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Errorf("status = %d; want 200", resp.StatusCode)
+	}
+
+	result, err := srv.Wait()
+	if err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+	if result.Code != "custom-path" {
+		t.Errorf("Code = %q; want %q", result.Code, "custom-path")
+	}
+}
+
+func TestCallbackServer_FixedPort(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Find a free port to use as "fixed" port.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixedPort := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+
+	srv, err := NewCallbackServer(ctx, fixedPort, "")
+	if err != nil {
+		t.Fatalf("NewCallbackServer: %v", err)
+	}
+	defer srv.Close()
+
+	if srv.Port() != fixedPort {
+		t.Errorf("port = %d; want %d", srv.Port(), fixedPort)
+	}
+}
+
+func TestCallbackServer_BindFail(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Bind a port first, then try to bind same port.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	port := ln.Addr().(*net.TCPAddr).Port
+
+	_, err = NewCallbackServer(ctx, port, "")
+	if err == nil {
+		t.Fatal("expected error when port is already in use")
+	}
+}
+
 func TestCallbackServer_BindsLocalhost(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
