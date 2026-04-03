@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -144,6 +145,9 @@ func TestRunDoctor_ContainerRuntimeNotFound(t *testing.T) {
 // TestRunDoctor_RuntimeRespondingWithVersion verifies that doctor shows the
 // container runtime version when the runtime binary responds.
 func TestRunDoctor_RuntimeRespondingWithVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses shell scripts")
+	}
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
@@ -171,6 +175,9 @@ func TestRunDoctor_RuntimeRespondingWithVersion(t *testing.T) {
 // TestRunDoctor_RuntimeNotResponding verifies that doctor warns when the
 // container runtime binary exists but doesn't respond.
 func TestRunDoctor_RuntimeNotResponding(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses shell scripts")
+	}
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
@@ -241,6 +248,9 @@ func TestRunDoctor_MalformedEnvLine(t *testing.T) {
 // TestRunDoctor_SandboxImageFallback verifies that doctor reports the fallback
 // image when the primary image is not cached but the fallback is.
 func TestRunDoctor_SandboxImageFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses shell scripts")
+	}
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
@@ -274,6 +284,9 @@ func TestRunDoctor_SandboxImageFallback(t *testing.T) {
 // TestRunDoctor_VersionTaggedCodex verifies that when Version is set, the
 // codex sandbox image uses the version tag.
 func TestRunDoctor_VersionTaggedCodex(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses shell scripts")
+	}
 	old := Version
 	Version = "1.0.0"
 	defer func() { Version = old }()
@@ -305,6 +318,9 @@ func TestRunDoctor_VersionTaggedCodex(t *testing.T) {
 // TestRunDoctor_SandboxImageCached verifies that doctor reports a cached
 // sandbox image when the runtime responds that it exists.
 func TestRunDoctor_SandboxImageCached(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses shell scripts")
+	}
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
