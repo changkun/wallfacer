@@ -16,10 +16,11 @@ import (
 
 // Message is a single entry in the planning conversation log.
 type Message struct {
-	Role        string    `json:"role"`                   // "user" or "assistant"
-	Content     string    `json:"content"`                // message text
-	Timestamp   time.Time `json:"timestamp"`              // when the message was recorded
-	FocusedSpec string    `json:"focused_spec,omitempty"` // spec path focused at the time
+	Role        string    `json:"role"`                     // "user" or "assistant"
+	Content     string    `json:"content"`                  // message text
+	Timestamp   time.Time `json:"timestamp"`                // when the message was recorded
+	FocusedSpec string    `json:"focused_spec,omitempty"`   // spec path focused at the time
+	RawOutput   string    `json:"raw_output,omitempty"`     // raw NDJSON output (assistant only)
 }
 
 // SessionInfo tracks the active Claude Code session for --resume.

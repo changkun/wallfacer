@@ -216,7 +216,15 @@ var PlanningChat = (function () {
       if (msgs && msgs.length > 0) {
         _messagesEl.innerHTML = "";
         msgs.forEach(function (m) {
-          _appendMessageBubble(m.role, m.content, m.timestamp);
+          if (m.role === "assistant" && m.raw_output) {
+            _appendMessageBubbleWithActivity(
+              m.content,
+              m.raw_output,
+              m.timestamp,
+            );
+          } else {
+            _appendMessageBubble(m.role, m.content, m.timestamp);
+          }
         });
         _scrollToBottom();
       }
@@ -486,6 +494,27 @@ var PlanningChat = (function () {
       } else {
         contentEl.textContent = content;
       }
+    }
+    if (timestamp) {
+      var timeEl = bubble.querySelector(".planning-chat-bubble__time");
+      if (timeEl) {
+        var d = new Date(timestamp);
+        timeEl.textContent = d.toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+    }
+    _messagesEl.appendChild(bubble);
+  }
+
+  // _appendMessageBubbleWithActivity renders an assistant bubble with
+  // the collapsible agent activity section restored from raw NDJSON output.
+  function _appendMessageBubbleWithActivity(content, rawOutput, timestamp) {
+    var bubble = _createBubble("assistant");
+    var contentEl = bubble.querySelector(".planning-chat-bubble__content");
+    if (contentEl) {
+      _renderChatResponse(contentEl, content, rawOutput, false);
     }
     if (timestamp) {
       var timeEl = bubble.querySelector(".planning-chat-bubble__time");

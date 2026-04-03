@@ -236,6 +236,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 					Content:     resultText,
 					Timestamp:   time.Now().UTC(),
 					FocusedSpec: req.FocusedSpec,
+					RawOutput:   string(rawStdout),
 				})
 			}
 		}
