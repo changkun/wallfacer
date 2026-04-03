@@ -130,13 +130,14 @@ Development is organized into three parallel tracks with shared foundations. See
 
 | # | Reference | Topics |
 |---|-----------|--------|
-| 1 | [Architecture](docs/internals/architecture.md) | System design, end-to-end walkthrough, concurrency model, where to look |
-| 2 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, search index |
-| 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, board context |
-| 4 | [Git Worktrees](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
-| 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP routes, SSE, metrics, middleware |
-| 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers |
+| 1 | [Architecture](docs/internals/architecture.md) | System design, package map, handler organisation, end-to-end walkthrough |
+| 2 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, spec document model |
+| 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
+| 4 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
+| 5 | [API & Transport](docs/internals/api-and-transport.md) | 97 HTTP routes, SSE, WebSocket terminal, middleware |
+| 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, ideation |
 | 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
+| 8 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 
 ## Origin
 
