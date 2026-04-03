@@ -6,7 +6,11 @@ depends_on:
 affects:
   - internal/runner/drift.go
   - internal/store/
+  - internal/spec/
   - internal/handler/explorer.go
+  - internal/handler/specs.go
+  - ui/js/spec-explorer.js
+  - ui/js/spec-mode.js
 effort: large
 created: 2026-03-29
 updated: 2026-04-04

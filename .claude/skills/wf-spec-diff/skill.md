@@ -119,12 +119,15 @@ Work" or "Open Questions" sections):
 - **<file/function>**: <classification and brief description>
 ````
 
-If drift is significant, also update the spec's `status` to `stale` in the
-frontmatter and set `updated` to today's date. Add a note explaining why the
-spec needs revision.
+Update the spec's status based on drift level:
+- **Minimal**: set `status` to `complete` (promotes from `done`)
+- **Moderate**: set `status` to `complete`, but the Outcome section documents
+  divergences. Suggest `/wf-spec-refine` to update the spec text.
+- **Significant**: set `status` to `stale`. The spec no longer matches what
+  was built. The user should `/wf-spec-refine` to update the spec, then
+  optionally `/wf-spec-dispatch` again for remaining work.
 
-If drift is minimal or moderate, leave `status` as `complete` (the layer 1
-hook already set it).
+Set `updated` to today's date in all cases.
 
 ## Step 7: Run tests
 
