@@ -543,7 +543,9 @@ function _buildTaskListSections(groups) {
           ? "command-palette-row-task"
           : row.type === "spec"
             ? "command-palette-row-spec"
-            : "command-palette-row-action");
+            : row.type === "doc"
+              ? "command-palette-row-doc"
+              : "command-palette-row-action");
 
       if (row.type === "task") {
         const title = row.title || "(untitled)";
@@ -587,6 +589,16 @@ function _buildTaskListSections(groups) {
           escapeHtml(row.hint) +
           "</span>" +
           specStatus +
+          "</div>";
+      } else if (row.type === "doc") {
+        rowEl.innerHTML =
+          '<div class="command-palette-row-title">' +
+          escapeHtml(row.title) +
+          "</div>" +
+          '<div class="command-palette-row-meta">' +
+          '<span class="command-palette-task-id">' +
+          escapeHtml(row.hint) +
+          "</span>" +
           "</div>";
       } else {
         rowEl.innerHTML =
@@ -698,27 +710,87 @@ function _localSpecRowsForQuery(query) {
   });
 }
 
+function _buildDocRow(entry) {
+  return {
+    type: "doc",
+    id: "doc:" + entry.slug,
+    docSlug: entry.slug,
+    title: entry.title || entry.slug,
+    hint: entry.slug,
+    execute: function () {
+      if (typeof openDocs === "function") openDocs(entry.slug);
+    },
+  };
+}
+
+function _localDocRowsForQuery(query) {
+  if (
+    typeof _docsEntries === "undefined" ||
+    !Array.isArray(_docsEntries) ||
+    !_docsEntries.length
+  )
+    return [];
+  var q = String(query || "")
+    .trim()
+    .toLowerCase();
+  var results = [];
+  for (var i = 0; i < _docsEntries.length; i++) {
+    var entry = _docsEntries[i];
+    if (!q) {
+      results.push({ entry: entry, score: 0 });
+      continue;
+    }
+    var title = (entry.title || "").toLowerCase();
+    var slug = (entry.slug || "").toLowerCase();
+    var score = 0;
+    if (title.includes(q)) score = title.startsWith(q) ? 3 : 2;
+    else if (slug.includes(q)) score = 1;
+    if (score > 0) results.push({ entry: entry, score: score });
+  }
+  results.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    return (a.entry.title || "").localeCompare(b.entry.title || "");
+  });
+  return results.map(function (r) {
+    return _buildDocRow(r.entry);
+  });
+}
+
 function _searchLocal(query) {
   const taskRows = _localTaskRowsForQuery(query);
   const specRows = _localSpecRowsForQuery(query);
+  const docRows = _localDocRowsForQuery(query);
   _commandPaletteTaskRows = taskRows;
   _commandPaletteActiveTaskId = "";
   _commandPaletteActiveIndex = -1;
 
   // Prioritize based on current view mode.
-  var inSpecMode =
-    typeof getCurrentMode === "function" && getCurrentMode() === "spec";
+  var mode = typeof getCurrentMode === "function" ? getCurrentMode() : "board";
+  // Only include the Docs group when entries have been loaded; in docs mode
+  // always show it so the user can see there are no matches for their query.
+  var docsAvailable =
+    typeof _docsEntries !== "undefined" &&
+    Array.isArray(_docsEntries) &&
+    _docsEntries.length > 0;
   var groups;
-  if (inSpecMode) {
+  if (mode === "docs") {
+    groups = [
+      _groupWithTitle("Docs", docRows),
+      _groupWithTitle("Tasks", taskRows),
+      _groupWithTitle("Specs", specRows),
+    ];
+  } else if (mode === "spec") {
     groups = [
       _groupWithTitle("Specs", specRows),
       _groupWithTitle("Tasks", taskRows),
     ];
+    if (docsAvailable) groups.push(_groupWithTitle("Docs", docRows));
   } else {
     groups = [
       _groupWithTitle("Tasks", taskRows),
       _groupWithTitle("Specs", specRows),
     ];
+    if (docsAvailable) groups.push(_groupWithTitle("Docs", docRows));
   }
 
   // Append context actions for the first task result.

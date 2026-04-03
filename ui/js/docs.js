@@ -4,6 +4,18 @@ var _docsEntries = [];
 var _docsCurrentSlug = "";
 var _docsLoaded = false;
 
+// Pre-load the docs index in the background so cmd+k search can find docs
+// from any view, even before the user navigates to the Docs page.
+document.addEventListener("DOMContentLoaded", function () {
+  if (!_docsEntries.length) {
+    api("/api/docs")
+      .then(function (entries) {
+        _docsEntries = entries || [];
+      })
+      .catch(function () {});
+  }
+});
+
 // openDocs switches to docs mode and optionally loads a specific doc.
 function openDocs(slug) {
   switchMode("docs");
