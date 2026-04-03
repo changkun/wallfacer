@@ -35,6 +35,7 @@ const LIB_DEPS = {
     "lib/modal.js",
     "lib/modal-controller.js",
     "lib/markdown-render.js",
+    "lib/floating-toc.js",
   ],
   "api.js": ["lib/config-toggle.js"],
 };

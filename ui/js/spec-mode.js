@@ -315,8 +315,7 @@ function _loadAndRenderSpec() {
       }
       var bodyInner = document.getElementById("spec-focused-body-inner");
       if (bodyInner) bodyInner.innerHTML = "";
-      var tocEl = document.getElementById("spec-toc");
-      if (tocEl) tocEl.remove();
+      teardownFloatingToc();
       var dispatchBtn = document.getElementById("spec-dispatch-btn");
       if (dispatchBtn) dispatchBtn.classList.add("hidden");
       var breakdownBtn = document.getElementById("spec-summarize-btn");
@@ -361,290 +360,6 @@ function parseSpecFrontmatter(text) {
   }
 
   return { frontmatter: fm, body: match[2] };
-}
-
-// _buildSpecToc extracts headings from the rendered markdown body and
-// builds a floating table of contents in the top-right of the focused view.
-// A scroll-driven exclusion zone dynamically adds margin-right to body
-// elements that overlap the TOC so text reflows around it on scroll.
-function _buildSpecToc(bodyEl) {
-  // Remove existing TOC and detach previous scroll listener.
-  var existing = document.getElementById("spec-toc");
-  if (existing) existing.remove();
-  _teardownTocExclusion();
-
-  var headings = bodyEl.querySelectorAll("h1, h2, h3, h4");
-  if (!headings || headings.length < 2) return;
-
-  var toc = document.createElement("div");
-  toc.id = "spec-toc";
-  toc.className = "spec-toc";
-
-  var tocTitle = document.createElement("div");
-  tocTitle.className = "spec-toc__title";
-  tocTitle.textContent = "Contents";
-  toc.appendChild(tocTitle);
-
-  for (var i = 0; i < headings.length; i++) {
-    var h = headings[i];
-    // Give headings an id if they don't have one.
-    if (!h.id) {
-      h.id =
-        "spec-heading-" +
-        h.textContent
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
-    }
-    var level = parseInt(h.tagName.substring(1), 10);
-    var link = document.createElement("a");
-    link.className = "spec-toc__link spec-toc__link--h" + level;
-    link.href = "#" + h.id;
-    link.textContent = h.textContent;
-    link.addEventListener(
-      "click",
-      (function (targetId) {
-        return function (e) {
-          e.preventDefault();
-          var target = document.getElementById(targetId);
-          if (target) target.scrollIntoView({ behavior: "smooth" });
-        };
-      })(h.id),
-    );
-    toc.appendChild(link);
-  }
-
-  // Append to spec-focused-view (not bodyEl) so it stays fixed on scroll.
-  var focusedView = document.getElementById("spec-focused-view");
-  if (focusedView) {
-    focusedView.appendChild(toc);
-  } else {
-    bodyEl.appendChild(toc);
-  }
-
-  // Start exclusion-zone tracking.
-  _setupTocExclusion();
-}
-
-// --- TOC exclusion zone (Pretext-powered) ---
-//
-// Uses @chenglou/pretext to predict paragraph heights at any width via
-// pure arithmetic — no DOM reflow.  The workflow follows pretext's design:
-//
-//   prepare()  — one-time per spec load (expensive: measures text segments)
-//   layout()   — cheap hot path rerun on every scroll frame and resize
-//
-// For non-text blocks (tables, pre, lists, etc.) we fall back to DOM
-// measurement, but only on resize — not per scroll frame.
-
-var _tocItems = null; // array of per-block data, survives resize
-var _tocScrollHandler = null;
-var _tocScrollRaf = null;
-var _tocResizeHandler = null;
-var _tocResizeTimer = null;
-var _tocLayout = null; // width-dependent data, rebuilt on resize
-
-function _setupTocExclusion() {
-  var scrollEl = document.getElementById("spec-focused-body");
-  var innerEl = document.getElementById("spec-focused-body-inner");
-  var toc = document.getElementById("spec-toc");
-  if (!scrollEl || !innerEl || !toc) return;
-
-  _tocPrepare(scrollEl, innerEl);
-  _tocRelayout(scrollEl, innerEl, toc);
-  _tocApply();
-
-  _tocScrollHandler = function () {
-    if (_tocScrollRaf) return;
-    _tocScrollRaf = requestAnimationFrame(function () {
-      _tocScrollRaf = null;
-      _tocApply();
-    });
-  };
-  scrollEl.addEventListener("scroll", _tocScrollHandler);
-
-  _tocResizeHandler = function () {
-    clearTimeout(_tocResizeTimer);
-    _tocResizeTimer = setTimeout(function () {
-      var s = document.getElementById("spec-focused-body");
-      var inn = document.getElementById("spec-focused-body-inner");
-      var t = document.getElementById("spec-toc");
-      if (!s || !inn || !t) return;
-      _tocRelayout(s, inn, t);
-      _tocApply();
-    }, 100);
-  };
-  window.addEventListener("resize", _tocResizeHandler);
-}
-
-// _tocPrepare runs once per spec load.  Calls pretext.prepare() for every
-// text block and caches the prepared handle + font metrics.  Non-text blocks
-// store a DOM reference for later measurement.
-//
-// scrollEl = outer scroll container (#spec-focused-body)
-// innerEl  = centered content wrapper (#spec-focused-body-inner)
-function _tocPrepare(scrollEl, innerEl) {
-  var pt = window.pretext || null;
-  var blocks = innerEl.querySelectorAll(":scope > *");
-  if (blocks.length === 0) return;
-
-  var innerCS = getComputedStyle(innerEl);
-  var padT = parseFloat(innerCS.paddingTop) || 0;
-  var scrollRect = scrollEl.getBoundingClientRect();
-
-  var items = [];
-  for (var i = 0; i < blocks.length; i++) {
-    var block = blocks[i];
-    var rect = block.getBoundingClientRect();
-    var contentY = rect.top - scrollRect.top + scrollEl.scrollTop - padT;
-    var isText = block.tagName === "P" || /^H[1-6]$/.test(block.tagName);
-    var item = { el: block, contentY: contentY };
-
-    if (isText && pt) {
-      var cs = getComputedStyle(block);
-      var font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
-      var lh = parseFloat(cs.lineHeight);
-      if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.7;
-      try {
-        item.prepared = pt.prepare(block.textContent || "", font);
-        item.lineHeight = lh;
-        item.overhead = Math.max(
-          0,
-          rect.height - pt.layout(item.prepared, rect.width, lh).height,
-        );
-      } catch (_e) {
-        item.prepared = null;
-      }
-    }
-    items.push(item);
-  }
-
-  // Record initial heights and derive inter-element gaps.
-  for (var k = 0; k < items.length; k++) {
-    items[k].heightAtSetup = items[k].el.getBoundingClientRect().height;
-  }
-  for (var j = 0; j < items.length; j++) {
-    if (j === 0) {
-      items[j].gap = items[j].contentY;
-    } else {
-      var pe = items[j - 1].contentY + items[j - 1].heightAtSetup;
-      items[j].gap = Math.max(0, items[j].contentY - pe);
-    }
-  }
-
-  _tocItems = items;
-}
-
-// _tocRelayout recomputes width-dependent data.  For text blocks it only
-// calls pretext.layout() (pure arithmetic).  For non-text blocks it does
-// one DOM measurement.
-function _tocRelayout(scrollEl, innerEl, toc) {
-  if (!_tocItems) return;
-
-  // Clear stale constraints before measuring.
-  for (var c = 0; c < _tocItems.length; c++) {
-    _tocItems[c].el.style.maxWidth = "";
-  }
-
-  var pt = window.pretext || null;
-  var tocW = toc.offsetWidth + 24;
-  var innerCS = getComputedStyle(innerEl);
-  var padL = parseFloat(innerCS.paddingLeft) || 0;
-  var padR = parseFloat(innerCS.paddingRight) || 0;
-  var padT = parseFloat(innerCS.paddingTop) || 0;
-  var fullWidth = innerEl.clientWidth - padL - padR;
-  var narrowWidth = Math.max(fullWidth - tocW, 80);
-
-  var tocRect = toc.getBoundingClientRect();
-  var innerRect = innerEl.getBoundingClientRect();
-
-  // If the inner column doesn't reach the TOC, no exclusion needed.
-  if (tocRect.left >= innerRect.right) {
-    _tocLayout = null;
-    return;
-  }
-
-  var scrollRect = scrollEl.getBoundingClientRect();
-  var tocScrollTop = tocRect.top - scrollRect.top;
-  var tocScrollBottom = tocRect.bottom - scrollRect.top;
-
-  for (var i = 0; i < _tocItems.length; i++) {
-    var item = _tocItems[i];
-
-    if (item.prepared && pt) {
-      item.heightFull =
-        pt.layout(item.prepared, fullWidth, item.lineHeight).height +
-        item.overhead;
-      item.heightNarrow =
-        pt.layout(item.prepared, narrowWidth, item.lineHeight).height +
-        item.overhead;
-    } else {
-      item.heightFull = item.el.getBoundingClientRect().height;
-      var origMW = item.el.style.maxWidth;
-      item.el.style.maxWidth = narrowWidth + "px";
-      item.heightNarrow = item.el.getBoundingClientRect().height;
-      item.el.style.maxWidth = origMW;
-    }
-  }
-
-  _tocLayout = {
-    narrowWidth: narrowWidth,
-    tocScrollTop: tocScrollTop,
-    tocScrollBottom: tocScrollBottom,
-    innerPadTop: padT,
-    scrollEl: scrollEl,
-  };
-}
-
-// _tocApply runs per scroll frame.  Pure arithmetic for pretext blocks;
-// only sets/clears max-width on DOM elements that change state.
-function _tocApply() {
-  if (!_tocLayout || !_tocItems) return;
-  var d = _tocLayout;
-  var scrollTop = d.scrollEl.scrollTop;
-  var tocTop = scrollTop + d.tocScrollTop - d.innerPadTop;
-  var tocBottom = scrollTop + d.tocScrollBottom - d.innerPadTop;
-
-  var y = 0;
-  for (var i = 0; i < _tocItems.length; i++) {
-    var item = _tocItems[i];
-    y += item.gap;
-    var overlap = y + item.heightFull > tocTop && y < tocBottom;
-    if (overlap) {
-      item.el.style.maxWidth = d.narrowWidth + "px";
-      y += item.heightNarrow;
-    } else {
-      item.el.style.maxWidth = "";
-      y += item.heightFull;
-    }
-  }
-}
-
-function _teardownTocExclusion() {
-  if (_tocLayout) {
-    var scrollEl = _tocLayout.scrollEl;
-    if (scrollEl && _tocScrollHandler) {
-      scrollEl.removeEventListener("scroll", _tocScrollHandler);
-    }
-  }
-  if (_tocItems) {
-    for (var i = 0; i < _tocItems.length; i++) {
-      _tocItems[i].el.style.maxWidth = "";
-    }
-  }
-  _tocScrollHandler = null;
-  _tocItems = null;
-  _tocLayout = null;
-  if (_tocScrollRaf) {
-    cancelAnimationFrame(_tocScrollRaf);
-    _tocScrollRaf = null;
-  }
-  if (_tocResizeHandler) {
-    window.removeEventListener("resize", _tocResizeHandler);
-    _tocResizeHandler = null;
-  }
-  clearTimeout(_tocResizeTimer);
-  _tocResizeTimer = null;
 }
 
 // --- Spec pane visibility based on spec availability ---
@@ -732,7 +447,14 @@ function _showSpecReadme() {
             workspace: ws,
           })
           .then(function () {
-            _buildSpecToc(innerEl);
+            var scrollEl = document.getElementById("spec-focused-body");
+            var anchorEl = document.getElementById("spec-focused-view");
+            if (scrollEl && anchorEl) {
+              buildFloatingToc(innerEl, scrollEl, anchorEl, {
+                headingSelector: "h1, h2, h3, h4",
+                idPrefix: "spec-heading",
+              });
+            }
           });
       }
     })
@@ -836,13 +558,8 @@ function _initSpecChatResize() {
         _specChatStorageKey,
         parseInt(chatPane.style.width, 10),
       );
-      var s = document.getElementById("spec-focused-body");
-      var inn = document.getElementById("spec-focused-body-inner");
-      var t = document.getElementById("spec-toc");
-      if (s && inn && t) {
-        _tocRelayout(s, inn, t);
-        _tocApply();
-      }
+      // Trigger TOC relayout after chat pane resize.
+      window.dispatchEvent(new Event("resize"));
     }
 
     document.addEventListener("mousemove", onMouseMove);
