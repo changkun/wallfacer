@@ -175,23 +175,51 @@ func ExtractSessionID(raw []byte) string {
 	return ""
 }
 
-// ExtractResultText scans NDJSON output backwards for the last line with a
-// non-empty "result" field and a stop_reason of "end_turn". Returns empty
-// string if not found.
+// ExtractResultText scans NDJSON output for the response text.
+// It checks both the "result" line (type=result) and "assistant" lines
+// (type=assistant with message.content[].text). Returns the result text
+// if found, otherwise concatenated assistant message text.
 func ExtractResultText(raw []byte) string {
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+
+	// First pass: look for a "result" line (most reliable).
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
 		var obj struct {
-			Result     string `json:"result"`
-			StopReason string `json:"stop_reason"`
+			Type   string `json:"type"`
+			Result string `json:"result"`
 		}
-		if json.Unmarshal([]byte(line), &obj) == nil && obj.Result != "" {
+		if json.Unmarshal([]byte(line), &obj) == nil && obj.Type == "result" && obj.Result != "" {
 			return obj.Result
 		}
 	}
-	return ""
+
+	// Fallback: extract text from assistant message content blocks.
+	var text strings.Builder
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(rawLine)
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			Type    string `json:"type"`
+			Message struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"message"`
+		}
+		if json.Unmarshal([]byte(line), &obj) == nil && obj.Type == "assistant" {
+			for _, c := range obj.Message.Content {
+				if c.Type == "text" && c.Text != "" {
+					text.WriteString(c.Text)
+				}
+			}
+		}
+	}
+	return text.String()
 }

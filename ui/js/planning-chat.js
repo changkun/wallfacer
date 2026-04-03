@@ -176,34 +176,92 @@ var PlanningChat = (function () {
     if (_interruptBtn) _interruptBtn.style.display = "";
     if (_sendBtn) _sendBtn.style.display = "none";
     var assistantBubble = null;
-    var rawChunks = [];
+    var assistantText = "";
+    var ndjsonBuf = ""; // buffer for incomplete NDJSON lines
 
     _eventSource = new EventSource(Routes.planning.messageStream());
 
     _eventSource.onmessage = function (event) {
-      rawChunks.push(event.data);
-      if (!assistantBubble) {
-        assistantBubble = _createBubble("assistant");
-        _messagesEl.appendChild(assistantBubble);
+      // The SSE data may contain one or more NDJSON lines (or partial lines).
+      ndjsonBuf += event.data;
+      var lines = ndjsonBuf.split("\n");
+      // Keep the last element as buffer (may be incomplete).
+      ndjsonBuf = lines.pop() || "";
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line[0] !== "{") continue;
+        try {
+          var obj = JSON.parse(line);
+          var extracted = _extractText(obj);
+          if (extracted) {
+            assistantText += extracted;
+            if (!assistantBubble) {
+              assistantBubble = _createBubble("assistant");
+              _messagesEl.appendChild(assistantBubble);
+            }
+            var contentEl = assistantBubble.querySelector(
+              ".planning-chat-bubble__content",
+            );
+            if (contentEl) {
+              contentEl.innerHTML = renderMarkdown(assistantText);
+            }
+            _scrollToBottom();
+          }
+          // Show errors as system messages.
+          if (obj.type === "result" && obj.is_error) {
+            _appendSystemMessage("Error: " + (obj.result || "unknown error"));
+          }
+        } catch (_) {
+          // Skip malformed JSON.
+        }
       }
-      // Render accumulated text as markdown.
-      var fullText = rawChunks.join("");
-      var contentEl = assistantBubble.querySelector(
-        ".planning-chat-bubble__content",
-      );
-      if (contentEl) {
-        contentEl.innerHTML = renderMarkdown(fullText);
-      }
-      _scrollToBottom();
     };
 
     _eventSource.addEventListener("done", function () {
+      // Flush any remaining buffer.
+      if (ndjsonBuf.trim()) {
+        try {
+          var obj = JSON.parse(ndjsonBuf.trim());
+          var extracted = _extractText(obj);
+          if (extracted) assistantText += extracted;
+        } catch (_) {}
+      }
+      if (assistantBubble && assistantText) {
+        var contentEl = assistantBubble.querySelector(
+          ".planning-chat-bubble__content",
+        );
+        if (contentEl) {
+          contentEl.innerHTML = renderMarkdown(assistantText);
+        }
+      }
       _stopStreaming(false);
     });
 
     _eventSource.onerror = function () {
       _stopStreaming(false);
     };
+  }
+
+  // _extractText pulls displayable text from a Claude Code stream-json object.
+  // Returns the text to append, or empty string if the object has no display text.
+  function _extractText(obj) {
+    // assistant message — contains the response text in content blocks.
+    if (obj.type === "assistant" && obj.message && obj.message.content) {
+      var parts = obj.message.content;
+      var text = "";
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].type === "text" && parts[i].text) {
+          text += parts[i].text;
+        }
+      }
+      return text;
+    }
+    // result — contains final result text.
+    if (obj.type === "result" && obj.result && !obj.is_error) {
+      return obj.result;
+    }
+    return "";
   }
 
   function _stopStreaming(interrupted) {

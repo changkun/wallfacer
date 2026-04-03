@@ -247,11 +247,19 @@ func TestExtractSessionID_Empty(t *testing.T) {
 }
 
 func TestExtractResultText(t *testing.T) {
-	raw := `{"result":"","session_id":"sess-abc","stop_reason":""}
-{"result":"Here is the summary.","stop_reason":"end_turn"}`
+	raw := `{"type":"system","session_id":"sess-abc"}
+{"type":"result","result":"Here is the summary.","stop_reason":"end_turn"}`
 	got := ExtractResultText([]byte(raw))
 	if got != "Here is the summary." {
 		t.Errorf("ExtractResultText = %q, want %q", got, "Here is the summary.")
+	}
+}
+
+func TestExtractResultText_AssistantMessage(t *testing.T) {
+	raw := `{"type":"assistant","message":{"content":[{"type":"text","text":"Hello world"}]}}`
+	got := ExtractResultText([]byte(raw))
+	if got != "Hello world" {
+		t.Errorf("ExtractResultText = %q, want %q", got, "Hello world")
 	}
 }
 
