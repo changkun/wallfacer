@@ -162,13 +162,7 @@ var PlanningChat = (function () {
 
   function _updatePlaceholder() {
     if (!_input) return;
-    var isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
-    var mod = isMac ? "\u2318" : "Ctrl";
-    if (_sendMode === "cmd-enter") {
-      _input.placeholder = "Message... (" + mod + "+Enter to send, @ for files, / for commands)";
-    } else {
-      _input.placeholder = "Message... (Enter to send, Shift+Enter for newline, @ for files, / for commands)";
-    }
+    _input.placeholder = "Message...";
   }
 
   function _autoGrow() {
