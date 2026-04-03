@@ -32,8 +32,14 @@ Start here for the full reading order.
 ### Workspaces & Git
 [Workspaces](workspaces.md) — Workspace management, git integration, branches, auto-push.
 
+### Refinement & Ideation
+[Refinement & Ideation](refinement-and-ideation.md) — Prompt refinement agent, brainstorm agent, auto-refine.
+
 ### Configuration
 [Configuration](configuration.md) — Settings, env vars, sandboxes, CLI, keyboard shortcuts.
+
+### Circuit Breakers
+[Circuit Breakers](circuit-breakers.md) — Fault isolation, self-healing automation, container launch protection.
 
 ## Common Workflows
 
