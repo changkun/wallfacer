@@ -856,12 +856,19 @@
   border-left: 2px solid var(--border);
 }
 
-/* Flatten tool results inside chat activity — no indent, inline flow. */
+/* Flatten tool results inside chat activity — no indent, inline flow.
+   Override .prose-content pre styling so <pre class="cc-result-text">
+   renders the same way as in the task detail panel (no box). */
 .planning-chat-activity .cc-tool-result {
   padding-left: 0;
 }
 
-.planning-chat-activity .cc-result-text {
+.planning-chat-activity pre.cc-result-text {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
   font-size: 11px;
   line-height: 1.5;
 }
