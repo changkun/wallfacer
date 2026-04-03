@@ -209,6 +209,12 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `GET /api/planning` — Get planning sandbox status (running or not)
 - `POST /api/planning` — Start the planning sandbox container (idempotent)
 - `DELETE /api/planning` — Stop the planning sandbox container
+- `GET /api/planning/messages` — Retrieve conversation history (supports `?before=<RFC3339>` pagination)
+- `POST /api/planning/messages` — Send a user message, triggers agent exec (returns 202; 409 if busy)
+- `DELETE /api/planning/messages` — Clear conversation history and session
+- `GET /api/planning/messages/stream` — SSE: stream agent response tokens (204 if not busy)
+- `POST /api/planning/messages/interrupt` — Interrupt current agent turn (409 if not busy)
+- `GET /api/planning/commands` — List available slash commands for UI autocomplete
 
 ### Usage & Statistics
 - `GET /api/usage` — Aggregated token and cost usage statistics
