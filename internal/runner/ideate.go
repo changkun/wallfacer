@@ -183,6 +183,108 @@ type IdeateResult struct {
 // prompt is the full ideation prompt to send to the container; callers should
 // generate it with buildIdeationPrompt() and persist it before calling here.
 func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) { //nolint:revive // ideaRejection is intentionally unexported
+	if r.planner != nil {
+		return r.runIdeationViaPlanner(ctx, taskID, prompt)
+	}
+	return r.runIdeationEphemeral(ctx, taskID, prompt)
+}
+
+// runIdeationViaPlanner runs ideation through the long-lived planning worker
+// container. The planner is auto-started if not already running.
+func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
+	// Auto-start the planner if needed (first caller creates the container).
+	if !r.planner.IsRunning() {
+		if err := r.planner.Start(ctx); err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("auto-start planner for ideation: %w", err)
+		}
+	}
+
+	sb := sandbox.Claude
+	if taskID != uuid.Nil {
+		if task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
+			sb = r.sandboxForTaskActivity(task, activityIdeaAgent)
+		}
+	}
+
+	model := r.modelFromEnvForSandbox(sb)
+	cmd := buildAgentCmd(prompt, model)
+
+	logger.Runner.Debug("ideate exec via planner", "sandbox", sb)
+	if taskID != uuid.Nil {
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+	}
+
+	handle, launchErr := r.planner.Exec(ctx, cmd)
+	if launchErr != nil {
+		if taskID != uuid.Nil {
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+		}
+		return nil, nil, nil, nil, nil, fmt.Errorf("planner exec ideation: %w", launchErr)
+	}
+
+	// Register the handle so kill and log streaming work through standard paths.
+	containerName := handle.Name()
+	if taskID != uuid.Nil {
+		r.taskContainers.Set(taskID, containerName)
+		r.taskContainers.SetHandle(taskID, handle, nil)
+		defer r.taskContainers.Delete(taskID)
+	}
+	r.ideateContainer.SetSingleton(containerName)
+	r.ideateContainer.SetSingletonHandle(handle, nil)
+	defer r.ideateContainer.DeleteSingleton()
+
+	rawStdout, _ := io.ReadAll(handle.Stdout())
+	rawStderr, _ := io.ReadAll(handle.Stderr())
+	exitCode, waitErr := handle.Wait()
+	if taskID != uuid.Nil {
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+	}
+
+	if ctx.Err() != nil {
+		_ = handle.Kill()
+		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("ideation container terminated: %w", ctx.Err())
+	}
+
+	raw := strings.TrimSpace(string(rawStdout))
+	if raw == "" {
+		if waitErr != nil || exitCode != 0 {
+			return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("container exited %d: stderr=%s", exitCode, string(rawStderr))
+		}
+		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("empty output from ideation container")
+	}
+
+	output, parseErr := parseOutput(raw)
+	if parseErr != nil {
+		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("parse ideation output: %w", parseErr)
+	}
+	if output == nil || output.Result == "" {
+		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("no result in ideation output")
+	}
+
+	// Skip Codex fallback when running through planner — the planner
+	// container uses the Claude sandbox. Codex support is deferred to
+	// planning-codex-compat.md.
+	if output.IsError && isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("ideation: token limit hit via planner; codex fallback not available for planner containers", "task", taskID)
+	}
+
+	ideas, rejections, extractErr := extractIdeas(output.Result)
+	if extractErr != nil {
+		recovered, recoveredRejections, recoverErr := extractIdeasFromRunOutput(output.Result, rawStdout, rawStderr)
+		if recoverErr == nil {
+			return recovered, recoveredRejections, output, rawStdout, rawStderr, nil
+		}
+		if looksLikeNoCodebaseOutput(output.Result) {
+			return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("no source code found in workspace — the ideation agent cannot propose improvements for an empty project")
+		}
+		return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", extractErr, truncate(output.Result, 300))
+	}
+	return ideas, rejections, output, rawStdout, rawStderr, nil
+}
+
+// runIdeationEphemeral is the legacy path that launches an ephemeral container
+// per ideation run. Used when no planner is configured.
+func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
 
 	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
 
@@ -280,8 +382,6 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 			rejections = recoveredRejections
 			err = nil
 		} else {
-			// When the agent explains that there is no code to analyse,
-			// surface a clear message instead of the raw JSON-parse error.
 			if looksLikeNoCodebaseOutput(output.Result) {
 				return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("no source code found in workspace — the ideation agent cannot propose improvements for an empty project")
 			}

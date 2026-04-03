@@ -201,6 +201,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		ConfigDir:        configDir,
 	})
 	h.SetPlanner(p)
+	r.SetPlanner(p)
 
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)

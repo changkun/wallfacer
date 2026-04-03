@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 // testRunnerForPrompts returns a minimal Runner suitable for prompt-rendering
@@ -1113,5 +1115,113 @@ func TestIdeationHistoryRound(t *testing.T) {
 	}
 	if hist2.Round() != 2 {
 		t.Errorf("expected 2 rounds, got %d", hist2.Round())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Planner-based ideation
+// ---------------------------------------------------------------------------
+
+// TestIdeationViaPlanner verifies that when a planner is set on the runner,
+// RunIdeation routes through runIdeationViaPlanner and the planner is
+// auto-started.
+func TestIdeationViaPlanner(t *testing.T) {
+	ideas := []IdeateResult{
+		{Title: "Add tests", Prompt: "Write unit tests.", ImpactScore: 80},
+	}
+	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	// Create a planner backed by the same sandbox backend the runner uses.
+	p := planner.New(planner.Config{
+		Backend:     r.backend,
+		Command:     r.command,
+		Image:       r.sandboxImage,
+		Workspaces:  r.workspaces,
+		Fingerprint: "test-fp",
+	})
+	r.SetPlanner(p)
+
+	// Planner is not started — auto-start should happen inside RunIdeation.
+	if p.IsRunning() {
+		t.Fatal("planner should not be running before RunIdeation")
+	}
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "brainstorm",
+		Timeout: 5,
+		Kind:    store.TaskKindIdeaAgent,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultIdeas, _, _, _, _, err := r.RunIdeation(ctx, task.ID, "brainstorm prompt")
+	if err != nil {
+		t.Fatalf("RunIdeation via planner: %v", err)
+	}
+
+	if !p.IsRunning() {
+		t.Error("planner should have been auto-started by RunIdeation")
+	}
+
+	if len(resultIdeas) != 1 {
+		t.Fatalf("expected 1 idea, got %d", len(resultIdeas))
+	}
+	if resultIdeas[0].Title != "Add tests" {
+		t.Errorf("idea title = %q, want %q", resultIdeas[0].Title, "Add tests")
+	}
+}
+
+// TestIdeationViaPlannerCodexFallbackSkipped verifies that when running
+// through the planner, Codex fallback is skipped (logged, not retried).
+func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
+	// Simulate a token limit error output.
+	tokenLimitOutput := `{"result":"Error: token limit exceeded","session_id":"ideate-sess","stop_reason":"end_turn","is_error":true,"subtype":"token_limit","total_cost_usd":0.001}`
+	cmd := fakeCmdScript(t, tokenLimitOutput, 0)
+	_, r := setupRunnerWithCmd(t, nil, cmd)
+
+	p := planner.New(planner.Config{
+		Backend:     r.backend,
+		Command:     r.command,
+		Image:       r.sandboxImage,
+		Workspaces:  r.workspaces,
+		Fingerprint: "test-fp",
+	})
+	r.SetPlanner(p)
+
+	ctx := context.Background()
+	// RunIdeation should not panic or retry with Codex — it should return
+	// the error output directly. The token limit error makes extractIdeas
+	// fail, which is expected.
+	_, _, output, _, _, _ := r.RunIdeation(ctx, uuid.Nil, "brainstorm prompt")
+
+	// If we got output, the planner path was used (no codex retry).
+	if output != nil && !output.IsError {
+		t.Error("expected error output from token-limited planner run")
+	}
+}
+
+// TestIdeationFallsBackToEphemeralWithoutPlanner verifies that RunIdeation
+// uses the ephemeral container path when no planner is set.
+func TestIdeationFallsBackToEphemeralWithoutPlanner(t *testing.T) {
+	ideas := []IdeateResult{
+		{Title: "Improve docs", Prompt: "Update README.", ImpactScore: 75},
+	}
+	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
+	_, r := setupRunnerWithCmd(t, nil, cmd)
+	// No planner set — should use ephemeral path.
+
+	ctx := context.Background()
+	resultIdeas, _, _, _, _, err := r.RunIdeation(ctx, uuid.Nil, "brainstorm prompt")
+	if err != nil {
+		t.Fatalf("RunIdeation ephemeral: %v", err)
+	}
+	if len(resultIdeas) != 1 {
+		t.Fatalf("expected 1 idea, got %d", len(resultIdeas))
+	}
+	if resultIdeas[0].Title != "Improve docs" {
+		t.Errorf("idea title = %q, want %q", resultIdeas[0].Title, "Improve docs")
 	}
 }

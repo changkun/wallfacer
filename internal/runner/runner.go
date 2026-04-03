@@ -17,6 +17,7 @@ import (
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/envutil"
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"changkun.de/x/wallfacer/internal/pkg/syncmap"
@@ -120,8 +121,9 @@ type Runner struct {
 	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
-	autosubmitFn           func() bool    // returns true when auto-submit is enabled
-	ideationExploitRatioFn func() float64 // returns the current exploitation ratio (0–1)
+	autosubmitFn           func() bool        // returns true when auto-submit is enabled
+	ideationExploitRatioFn func() float64     // returns the current exploitation ratio (0–1)
+	planner                *planner.Planner   // planning sandbox for ideation and chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
@@ -235,6 +237,12 @@ func (r *Runner) isAutosubmitEnabled() bool {
 // exploitation ratio (0–1) for the ideation prompt. Default is 0.8.
 func (r *Runner) SetIdeationExploitRatioFunc(fn func() float64) {
 	r.ideationExploitRatioFn = fn
+}
+
+// SetPlanner registers the planning sandbox so that ideation runs through
+// the long-lived planning worker container instead of ephemeral containers.
+func (r *Runner) SetPlanner(p *planner.Planner) {
+	r.planner = p
 }
 
 // ideationExploitRatio returns the current exploitation ratio (0-1) for ideation.
