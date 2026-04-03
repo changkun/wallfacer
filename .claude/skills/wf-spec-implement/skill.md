@@ -35,7 +35,7 @@ Before writing any code, verify:
      Ask whether to proceed anyway.
    - `vague` → stop. The spec is not ready for implementation.
    - `complete` → already done. Confirm with the user before re-implementing.
-   - `stale` → warn the user the spec may not match reality. Suggest `/refine`
+   - `stale` → warn the user the spec may not match reality. Suggest `/wf-spec-refine`
      first.
 2. **Dependencies are met** — read the `depends_on` list from frontmatter.
    For each dependency path, read that spec's frontmatter and confirm its

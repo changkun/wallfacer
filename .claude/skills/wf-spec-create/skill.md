@@ -1,5 +1,5 @@
 ---
-name: spec
+name: wf-spec-create
 description: Create a new design spec in specs/. Gathers context, explores the codebase, writes the spec with proper frontmatter, and updates specs/README.md. Use when the user says "create a spec", "write a spec", "new spec", or "/spec".
 argument-hint: <track/name> [one-line description...]
 user-invocable: true
@@ -191,6 +191,6 @@ Report to the user:
   - If large/xlarge: "Run `/wf-spec-breakdown <spec-path> design` to decompose
     into sub-design problems"
   - If small/medium: "Run `/wf-spec-breakdown <spec-path> tasks` to create
-    implementable tasks, or `/implement-spec <spec-path>` to implement directly"
+    implementable tasks, or `/wf-spec-implement <spec-path>` to implement directly"
   - If dependencies are incomplete: "Blocked by <spec>; implement that first
-    or run `/check-impact <spec-path>` for full analysis"
+    or run `/wf-spec-impact <spec-path>` for full analysis"

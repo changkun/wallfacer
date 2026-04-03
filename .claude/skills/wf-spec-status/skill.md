@@ -67,9 +67,9 @@ For each non-complete spec:
 
 From the actionable specs, determine the recommended next steps:
 
-- Specs with task breakdowns ready → can start `/implement-spec`.
+- Specs with task breakdowns ready → can start `/wf-spec-implement`.
 - Specs without task breakdowns → need `/wf-spec-breakdown <spec> tasks` first.
-- Specs that need updating → suggest `/refine` first.
+- Specs that need updating → suggest `/wf-spec-refine` first.
 
 ## Step 5: Generate report
 
@@ -134,4 +134,4 @@ state within each track:
 - Status is derived from source of truth (files, git), not from manually
   maintained tables in README.md.
 - If the report reveals that `specs/README.md` status is stale, note the
-  discrepancies but do not fix them (suggest `/refine` or manual update).
+  discrepancies but do not fix them (suggest `/wf-spec-refine` or manual update).

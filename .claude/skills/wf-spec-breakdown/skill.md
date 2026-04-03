@@ -24,7 +24,7 @@ If no mode is given, determine it from the spec's lifecycle state:
   The spec's design problems need further exploration before implementation.
 - `validated` with a clear implementation plan → **tasks** mode.
   The design is settled; decompose into implementable leaf specs.
-- `stale` → warn the user and suggest `/refine` first.
+- `stale` → warn the user and suggest `/wf-spec-refine` first.
 - `complete` → warn the user; completed specs don't normally need breakdown.
 
 If the heuristic is ambiguous (e.g., `drafted` but the spec has a detailed
