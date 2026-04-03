@@ -185,25 +185,7 @@ You can also manage overrides via the API:
 - `PUT /api/system-prompts/{name}` -- write an override
 - `DELETE /api/system-prompts/{name}` -- restore the embedded default
 
-### API Endpoints
-
-**Refinement**
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/tasks/{id}/refine` | Start refinement (optional body: `{"user_instructions": "..."}`) |
-| `DELETE` | `/api/tasks/{id}/refine` | Cancel a running refinement |
-| `GET` | `/api/tasks/{id}/refine/logs` | Stream live refinement container logs |
-| `POST` | `/api/tasks/{id}/refine/apply` | Apply refined prompt (body: `{"prompt": "..."}`) |
-| `POST` | `/api/tasks/{id}/refine/dismiss` | Dismiss refinement result without applying |
-
-**Ideation**
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/ideate` | Get ideation status (enabled, running, next scheduled run) |
-| `POST` | `/api/ideate` | Trigger a brainstorm run immediately |
-| `DELETE` | `/api/ideate` | Cancel a running brainstorm |
+For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 
 ### Configuration Variables
 

@@ -253,22 +253,7 @@ Prefix your query with `@` to trigger server-side full-text search. This searche
 
 Server-side search requires at least 2 characters after the `@` prefix and debounces requests to avoid excessive API calls.
 
-### API Endpoints
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/tasks/{id}/oversight` | GET | Get implementation oversight summary |
-| `/api/tasks/{id}/oversight/test` | GET | Get test oversight summary |
-| `/api/tasks/generate-oversight` | POST | Bulk-generate missing oversight summaries |
-| `/api/tasks/{id}/logs` | GET | Stream live logs (SSE) or serve saved output |
-| `/api/tasks/{id}/turn-usage` | GET | Per-turn token usage breakdown |
-| `/api/tasks/{id}/spans` | GET | Span timing data for flamegraph |
-| `/api/debug/spans` | GET | Aggregate span statistics across all tasks |
-| `/api/usage` | GET | Aggregated usage stats (period-filtered) |
-| `/api/stats` | GET | Full analytics dashboard data |
-| `/api/tasks/summaries` | GET | Immutable summaries for done tasks |
-| `/api/containers` | GET | List running containers |
-| `/api/tasks/search` | GET | Server-side full-text search |
+For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 
 ### Configuration Variables
 

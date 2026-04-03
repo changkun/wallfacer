@@ -256,43 +256,7 @@ WALLFACER_WORKSPACES=/Users/you/project-a:/Users/you/project-b
 
 When you switch workspaces in the UI, this variable is updated automatically.
 
-### API Reference
-
-#### Workspace endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/workspaces/browse?path=...` | List child directories for workspace selection |
-| `PUT` | `/api/workspaces` | Replace the active workspace set |
-
-#### Instruction endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/instructions` | Get current AGENTS.md content |
-| `PUT` | `/api/instructions` | Save AGENTS.md content |
-| `POST` | `/api/instructions/reinit` | Rebuild AGENTS.md from defaults and repo files |
-
-#### Git endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/git/status` | Git status for all workspaces |
-| `GET` | `/api/git/stream` | SSE stream of git status updates (5-second poll) |
-| `POST` | `/api/git/push` | Push a workspace |
-| `POST` | `/api/git/sync` | Fetch and rebase a workspace |
-| `POST` | `/api/git/rebase-on-main` | Rebase a workspace onto origin's default branch |
-| `GET` | `/api/git/branches?workspace=...` | List branches for a workspace |
-| `POST` | `/api/git/checkout` | Switch branch |
-| `POST` | `/api/git/create-branch` | Create and checkout a new branch |
-| `POST` | `/api/git/open-folder` | Open workspace in OS file manager |
-
-#### Task git endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/tasks/{id}/diff` | Git diff for task worktrees vs default branch |
-| `POST` | `/api/tasks/{id}/sync` | Rebase task worktrees onto latest default branch |
+For the full HTTP API reference (workspace, git, and instruction endpoints), see [API & Transport](../internals/api-and-transport.md).
 
 #### Configuration
 

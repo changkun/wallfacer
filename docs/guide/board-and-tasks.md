@@ -412,43 +412,7 @@ Press **Cmd+K** (or Ctrl+K) to open the command palette. It provides:
 
 Navigate with arrow keys, press Enter to execute, and Escape to close.
 
-### API Reference
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/tasks` | `GET` | List all tasks (use `?include_archived=true` for archived) |
-| `/api/tasks` | `POST` | Create a single task |
-| `/api/tasks/batch` | `POST` | Create multiple tasks atomically with dependency wiring |
-| `/api/tasks/{id}` | `PATCH` | Update task status, prompt, settings, dependencies, etc. |
-| `/api/tasks/{id}` | `DELETE` | Soft-delete task (tombstone) |
-| `/api/tasks/{id}/feedback` | `POST` | Submit feedback for a waiting task |
-| `/api/tasks/{id}/done` | `POST` | Mark a waiting task as done (triggers commit pipeline) |
-| `/api/tasks/{id}/cancel` | `POST` | Cancel task, discard worktrees |
-| `/api/tasks/{id}/resume` | `POST` | Resume a failed task in its existing session |
-| `/api/tasks/{id}/restore` | `POST` | Restore a soft-deleted task |
-| `/api/tasks/{id}/sync` | `POST` | Rebase task worktrees onto the default branch |
-| `/api/tasks/{id}/test` | `POST` | Run test verification agent |
-| `/api/tasks/{id}/archive` | `POST` | Archive a done/cancelled task |
-| `/api/tasks/{id}/unarchive` | `POST` | Unarchive a task |
-| `/api/tasks/archive-done` | `POST` | Archive all done tasks |
-| `/api/tasks/generate-titles` | `POST` | Auto-generate missing task titles |
-| `/api/tasks/generate-oversight` | `POST` | Generate missing oversight summaries |
-| `/api/tasks/search` | `GET` | Search tasks by keyword |
-| `/api/tasks/summaries` | `GET` | Immutable task summaries for completed tasks |
-| `/api/tasks/deleted` | `GET` | List soft-deleted tasks within retention window |
-| `/api/tasks/stream` | `GET` | SSE stream: pushes task list on state changes |
-| `/api/tasks/{id}/events` | `GET` | Task event timeline (supports cursor pagination) |
-| `/api/tasks/{id}/diff` | `GET` | Git diff for task worktrees vs default branch |
-| `/api/tasks/{id}/outputs/{filename}` | `GET` | Raw agent output for a specific turn |
-| `/api/tasks/{id}/logs` | `GET` | SSE stream: live container logs |
-| `/api/tasks/{id}/turn-usage` | `GET` | Per-turn token usage breakdown |
-| `/api/tasks/{id}/spans` | `GET` | Span timing statistics |
-| `/api/tasks/{id}/oversight` | `GET` | Task oversight summary |
-| `/api/tasks/{id}/oversight/test` | `GET` | Test oversight summary |
-| `/api/tasks/{id}/board` | `GET` | Board manifest as it appeared to this task |
-| `/api/templates` | `GET` | List all prompt templates |
-| `/api/templates` | `POST` | Create a prompt template |
-| `/api/templates/{id}` | `DELETE` | Delete a prompt template |
+For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 
 ---
 

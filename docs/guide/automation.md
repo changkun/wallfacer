@@ -349,18 +349,7 @@ All automation toggles (except Auto-push) are also available via
 `PUT /api/config` with the fields `autopilot`, `autotest`, `autosubmit`,
 `autosync`, and `autorefine`.
 
-### API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/config` | Current toggle states and watcher health |
-| `PUT` | `/api/config` | Update toggle states |
-| `GET` | `/api/debug/runtime` | Container circuit breaker state |
-| `POST` | `/api/tasks/{id}/test` | Manually trigger test verification |
-| `POST` | `/api/tasks/{id}/sync` | Manually sync task worktrees |
-| `POST` | `/api/tasks/{id}/done` | Manually mark task as done |
-| `POST` | `/api/tasks/{id}/resume` | Resume a failed task |
-| `POST` | `/api/tasks/batch` | Create tasks with dependency wiring |
+For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 
 ---
 
