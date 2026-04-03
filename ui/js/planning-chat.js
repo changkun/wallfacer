@@ -409,6 +409,12 @@ var PlanningChat = (function () {
       html = '<span class="planning-chat-empty">No response</span>';
     }
     el.innerHTML = html;
+
+    // Auto-scroll the activity log to the bottom during streaming.
+    if (streaming) {
+      var logEl = el.querySelector(".planning-chat-activity__log");
+      if (logEl) logEl.scrollTop = logEl.scrollHeight;
+    }
   }
 
   function _escapeForHtml(s) {
