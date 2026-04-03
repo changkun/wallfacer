@@ -355,7 +355,9 @@ describe("renderTestOversightInTestLogs", () => {
     const { ctx, logsEl } = makeTestOversightCtx();
     vm.runInContext('testOversightData = { status: "pending" };', ctx);
     ctx.renderTestOversightInTestLogs();
-    expect(logsEl.innerHTML).toContain("Test oversight summary not yet generated");
+    expect(logsEl.innerHTML).toContain(
+      "Test oversight summary not yet generated",
+    );
   });
 
   it("renders generating test oversight status", () => {

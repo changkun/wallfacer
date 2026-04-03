@@ -11,15 +11,21 @@ function makeContext(overrides = {}) {
   const ctx = {
     console,
     Promise,
-    TextDecoder: overrides.TextDecoder || class {
-      decode(chunk) { return new TextDecoder().decode(chunk); }
-    },
-    AbortController: overrides.AbortController || class {
-      constructor() {
-        this.signal = { addEventListener: vi.fn() };
-        this.abort = vi.fn();
-      }
-    },
+    TextDecoder:
+      overrides.TextDecoder ||
+      class {
+        decode(chunk) {
+          return new TextDecoder().decode(chunk);
+        }
+      },
+    AbortController:
+      overrides.AbortController ||
+      class {
+        constructor() {
+          this.signal = { addEventListener: vi.fn() };
+          this.abort = vi.fn();
+        }
+      },
     fetch: overrides.fetch || vi.fn(),
     withAuthToken: (url) => url + "?auth=1",
     withBearerHeaders: () => ({ Authorization: "Bearer tok" }),
@@ -40,7 +46,11 @@ describe("lib/log-stream.js", () => {
       const ctx = makeContext({
         fetch: vi.fn().mockResolvedValue({
           ok: true,
-          body: { getReader: () => ({ read: vi.fn().mockResolvedValue({ done: true }) }) },
+          body: {
+            getReader: () => ({
+              read: vi.fn().mockResolvedValue({ done: true }),
+            }),
+          },
         }),
       });
       loadScript(ctx);
@@ -92,7 +102,8 @@ describe("lib/log-stream.js", () => {
       const onDone = vi.fn();
       const onChunk = vi.fn();
       const reader = {
-        read: vi.fn()
+        read: vi
+          .fn()
           .mockResolvedValueOnce({
             done: false,
             value: new TextEncoder().encode("hello"),
@@ -119,7 +130,8 @@ describe("lib/log-stream.js", () => {
       const onFirstChunk = vi.fn();
       const onChunk = vi.fn();
       const reader = {
-        read: vi.fn()
+        read: vi
+          .fn()
           .mockResolvedValueOnce({
             done: false,
             value: new TextEncoder().encode("a"),
@@ -150,7 +162,8 @@ describe("lib/log-stream.js", () => {
       const onChunk = vi.fn();
       let stale = false;
       const reader = {
-        read: vi.fn()
+        read: vi
+          .fn()
           .mockResolvedValueOnce({
             done: false,
             value: new TextEncoder().encode("first"),
