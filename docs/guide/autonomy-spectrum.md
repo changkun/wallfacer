@@ -4,9 +4,9 @@ Every AI coding tool pins you to one interaction mode. Some are chatbots that re
 
 ```mermaid
 graph LR
-  Chat["Chat\nExplore ideas"] --> Spec["Spec\nDesign structure"]
-  Spec --> Task["Task\nExecute & test"]
-  Task --> Code["Code\nDirect control"]
+  Chat["💬 Chat\nExplore ideas"] --> Spec["📋 Spec\nDesign structure"]
+  Spec --> Task["⚡ Task\nExecute & test"]
+  Task --> Code["🔧 Code\nDirect control"]
 ```
 
 ---
@@ -47,22 +47,22 @@ At each level, you choose how much freedom the agent gets. Three broad modes exi
 
 ```mermaid
 graph TD
-  subgraph Manual
+  subgraph Manual["🔒 Manual"]
     M1["Create tasks yourself"]
     M2["Review every diff"]
     M3["Approve every commit"]
   end
-  subgraph Semi-Auto
+  subgraph Semi["⚖️ Semi-Auto"]
     S1["Auto-test on completion"]
     S2["Auto-retry on failure"]
     S3["Manual approve & push"]
   end
-  subgraph Full-Auto
+  subgraph Full["🚀 Full Auto"]
     F1["Autopilot promotes backlog"]
     F2["Auto-submit on pass"]
     F3["Auto-push to remote"]
   end
-  Manual --> Semi-Auto --> Full-Auto
+  Manual --> Semi --> Full
 ```
 
 **Manual** -- You create tasks yourself, review every diff, approve every commit. Maximum control, minimum throughput.
