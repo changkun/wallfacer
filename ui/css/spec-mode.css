@@ -926,9 +926,14 @@
   cursor: pointer;
 }
 
-.planning-chat-autocomplete__item:hover,
-.planning-chat-autocomplete__item--active {
+.planning-chat-autocomplete__item:hover {
   background: var(--bg-hover);
+}
+
+.planning-chat-autocomplete__item--active {
+  background: var(--bg-raised, var(--bg-hover));
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .planning-chat-autocomplete__item strong {
