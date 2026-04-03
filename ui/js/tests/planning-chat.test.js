@@ -103,6 +103,13 @@ function makeContext() {
       querySelector() { return null; },
     },
     window: {},
+    navigator: { platform: "MacIntel" },
+    localStorage: {
+      _data: {},
+      getItem(k) { return this._data[k] || null; },
+      setItem(k, v) { this._data[k] = v; },
+      removeItem(k) { delete this._data[k]; },
+    },
     console,
     setTimeout,
     clearTimeout,

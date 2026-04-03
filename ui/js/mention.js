@@ -50,8 +50,12 @@ function _mentionFilter(files, query) {
 }
 
 // Attach @-mention autocomplete to a single textarea element.
-function attachMentionAutocomplete(textarea) {
+// Options:
+//   position: "below" (default) — dropdown appears below the textarea
+//   position: "above" — dropdown appears above the textarea
+function attachMentionAutocomplete(textarea, opts) {
   if (!textarea) return;
+  var position = (opts && opts.position) || "below";
 
   let dropdown = null;
   let selectedIndex = -1;
@@ -95,11 +99,16 @@ function attachMentionAutocomplete(textarea) {
       document.body.appendChild(dropdown);
     }
 
-    // Position fixed, just below the textarea.
     const rect = textarea.getBoundingClientRect();
-    dropdown.style.top = rect.bottom + 4 + "px";
     dropdown.style.left = rect.left + "px";
     dropdown.style.width = Math.max(320, rect.width) + "px";
+    if (position === "above") {
+      dropdown.style.bottom = (window.innerHeight - rect.top + 4) + "px";
+      dropdown.style.top = "auto";
+    } else {
+      dropdown.style.top = rect.bottom + 4 + "px";
+      dropdown.style.bottom = "auto";
+    }
 
     dropdown.innerHTML = "";
 

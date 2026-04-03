@@ -355,7 +355,14 @@
   letter-spacing: 0.04em;
 }
 
-.spec-chat-clear-btn {
+.spec-chat-stream__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.spec-chat-clear-btn,
+.spec-chat-mode-btn {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 3px;
@@ -365,7 +372,8 @@
   border: 1px solid var(--border);
 }
 
-.spec-chat-clear-btn:hover {
+.spec-chat-clear-btn:hover,
+.spec-chat-mode-btn:hover {
   color: var(--text);
   border-color: var(--text-muted);
 }

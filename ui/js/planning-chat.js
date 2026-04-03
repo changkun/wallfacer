@@ -10,6 +10,9 @@ var PlanningChat = (function () {
   var _streaming = false;
   var _activeStream = null; // handle from startStreamingFetch
   var _commandsCache = null;
+  // Send mode: "enter" = Enter sends (Shift+Enter for newline),
+  //            "cmd-enter" = Cmd/Ctrl+Enter sends (Enter for newline).
+  var _sendMode = localStorage.getItem("wallfacer-chat-send-mode") || "enter";
   var _autocompleteEl = null;
   var _autocompleteIndex = -1;
   var _queue = []; // Array of {id, text}
@@ -41,15 +44,27 @@ var PlanningChat = (function () {
     }
 
     // Attach @-mention file autocomplete (reuses the task board's mention module).
+    // Position above the input since the chat input is at the bottom of the pane.
     if (typeof attachMentionAutocomplete === "function") {
-      attachMentionAutocomplete(_input);
+      attachMentionAutocomplete(_input, { position: "above" });
     }
 
-    // Wire clear button.
+    // Wire clear button and send-mode toggle.
     var clearBtn = document.getElementById("spec-chat-clear");
     if (clearBtn) {
       clearBtn.addEventListener("click", clearHistory);
     }
+    var modeBtn = document.getElementById("spec-chat-send-mode");
+    if (modeBtn) {
+      _updateModeBtn(modeBtn);
+      modeBtn.addEventListener("click", function () {
+        _sendMode = _sendMode === "enter" ? "cmd-enter" : "enter";
+        localStorage.setItem("wallfacer-chat-send-mode", _sendMode);
+        _updateModeBtn(modeBtn);
+        _updatePlaceholder();
+      });
+    }
+    _updatePlaceholder();
 
     // Create interrupt button (hidden by default).
     _interruptBtn = document.createElement("button");
@@ -69,6 +84,7 @@ var PlanningChat = (function () {
     }
 
     _loadHistory();
+    _fetchCommands(); // pre-fetch so autocomplete is instant
   }
 
   function _onInputKeydown(e) {
@@ -101,11 +117,43 @@ var PlanningChat = (function () {
       }
     }
 
-    // Enter or Cmd+Enter sends; Shift+Enter inserts newline.
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
-      e.preventDefault();
-      var text = _input.value.trim();
-      if (text) sendMessage(text);
+    if (e.key === "Enter") {
+      var shouldSend = false;
+      if (_sendMode === "cmd-enter") {
+        // Cmd/Ctrl+Enter sends; plain Enter inserts newline.
+        shouldSend = e.metaKey || e.ctrlKey;
+      } else {
+        // Enter sends; Shift+Enter inserts newline. Cmd/Ctrl+Enter also sends.
+        shouldSend = !e.shiftKey || e.metaKey || e.ctrlKey;
+      }
+      if (shouldSend) {
+        e.preventDefault();
+        var text = _input.value.trim();
+        if (text) sendMessage(text);
+      }
+    }
+  }
+
+  function _updateModeBtn(btn) {
+    var isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+    var mod = isMac ? "\u2318" : "Ctrl";
+    if (_sendMode === "cmd-enter") {
+      btn.textContent = mod + "+\u21B5 Send";
+      btn.title = "Currently: " + mod + "+Enter to send. Click to switch to Enter.";
+    } else {
+      btn.textContent = "\u21B5 Send";
+      btn.title = "Currently: Enter to send. Click to switch to " + mod + "+Enter.";
+    }
+  }
+
+  function _updatePlaceholder() {
+    if (!_input) return;
+    var isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+    var mod = isMac ? "\u2318" : "Ctrl";
+    if (_sendMode === "cmd-enter") {
+      _input.placeholder = "Message... (" + mod + "+Enter to send, @ for files, / for commands)";
+    } else {
+      _input.placeholder = "Message... (Enter to send, Shift+Enter for newline, @ for files, / for commands)";
     }
   }
 
