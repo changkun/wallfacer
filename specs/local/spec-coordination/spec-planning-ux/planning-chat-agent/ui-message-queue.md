@@ -1,6 +1,6 @@
 ---
 title: UI Message Queue and Interrupt
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-chat-agent/ui-chat-send-stream.md

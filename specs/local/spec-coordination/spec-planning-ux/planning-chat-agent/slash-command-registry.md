@@ -1,6 +1,6 @@
 ---
 title: Slash Command Registry
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-chat-agent/message-api.md
