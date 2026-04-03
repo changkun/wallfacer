@@ -117,7 +117,7 @@ function makeContext(overrides = {}) {
     ["modal-edit-goal", makeEl("TEXTAREA", { id: "modal-edit-goal" })],
     ["modal-edit-timeout", makeEl("INPUT", { id: "modal-edit-timeout" })],
   ]);
-  for (const [k, v] of (overrides.elements || [])) {
+  for (const [k, v] of overrides.elements || []) {
     baseElements.set(k, v);
   }
   const elements = baseElements;

@@ -2022,7 +2022,7 @@ func TestLoadAll_SkipsMissingTaskJSON(t *testing.T) {
 func TestLoadAll_SkipsInvalidTaskJSON(t *testing.T) {
 	dir := t.TempDir()
 	taskDir := filepath.Join(dir, uuid.New().String())
-	os.MkdirAll(taskDir, 0755)                                            //nolint:errcheck
+	os.MkdirAll(taskDir, 0755)                                             //nolint:errcheck
 	os.WriteFile(filepath.Join(taskDir, "task.json"), []byte("bad"), 0644) //nolint:errcheck
 	s, err := NewFileStore(dir)
 	if err != nil {
@@ -2111,11 +2111,11 @@ func TestListBlobs_PrefixFilterCoverage(t *testing.T) {
 func TestListBlobOwners_SkipsNonUUIDAndFilesCoverage(t *testing.T) {
 	dir := t.TempDir()
 	backend, _ := NewFilesystemBackend(dir)
-	os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755)                               //nolint:errcheck
+	os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755)                           //nolint:errcheck
 	os.WriteFile(filepath.Join(dir, "not-a-uuid", "test.txt"), []byte("x"), 0644) //nolint:errcheck
 	os.WriteFile(filepath.Join(dir, "stray-file.txt"), []byte("x"), 0644)         //nolint:errcheck
 	id := uuid.New()
-	os.MkdirAll(filepath.Join(dir, id.String()), 0755)                              //nolint:errcheck
+	os.MkdirAll(filepath.Join(dir, id.String()), 0755)                           //nolint:errcheck
 	os.WriteFile(filepath.Join(dir, id.String(), "test.txt"), []byte("x"), 0644) //nolint:errcheck
 	os.MkdirAll(filepath.Join(dir, uuid.New().String()), 0755)                   //nolint:errcheck
 	owners, _ := backend.ListBlobOwners("test.txt")
@@ -2233,9 +2233,9 @@ func TestDeleteTask_RemovesOrphanedDepsMultipleCoverage(t *testing.T) {
 func TestResetTaskForRetry_TruncatesLongResultCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "long", Timeout: 5})
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                              //nolint:errcheck
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                  //nolint:errcheck
 	s.UpdateTaskResult(bg(), task.ID, strings.Repeat("x", 3000), "s", "r", 1) //nolint:errcheck
-	s.ResetTaskForRetry(bg(), task.ID, "new", true)                                     //nolint:errcheck
+	s.ResetTaskForRetry(bg(), task.ID, "new", true)                           //nolint:errcheck
 	got, _ := s.GetTask(bg(), task.ID)
 	if len(got.RetryHistory) != 1 || len(got.RetryHistory[0].Result) > 2010 {
 		t.Error("result should be truncated in retry history")
@@ -2246,8 +2246,8 @@ func TestBuildAndSaveSummary_WithOversightCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary", Timeout: 5})
 	s.SaveOversight(task.ID, TaskOversight{Status: OversightStatusReady, Phases: []OversightPhase{{Title: "P1"}, {Title: "P2"}}}) //nolint:errcheck
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusInProgress)                                                                   //nolint:errcheck
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)                                                                         //nolint:errcheck
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusInProgress)                                                                  //nolint:errcheck
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)                                                                        //nolint:errcheck
 	s.WaitCompaction()
 	summary, _ := s.LoadSummary(task.ID)
 	if summary == nil || summary.PhaseCount != 2 {
@@ -2271,7 +2271,7 @@ func TestSaveBlob_NestedPathCoverage(t *testing.T) {
 	dir := t.TempDir()
 	backend, _ := NewFilesystemBackend(dir)
 	id := uuid.New()
-	os.MkdirAll(filepath.Join(dir, id.String()), 0755) //nolint:errcheck
+	os.MkdirAll(filepath.Join(dir, id.String()), 0755)        //nolint:errcheck
 	backend.SaveBlob(id, "deep/nested/f.txt", []byte("deep")) //nolint:errcheck
 	data, _ := backend.ReadBlob(id, "deep/nested/f.txt")
 	if string(data) != "deep" {
