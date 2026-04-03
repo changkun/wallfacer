@@ -84,6 +84,10 @@ ENV GOPATH=/home/${USERNAME}/go
 ENV PATH=$PATH:/home/${USERNAME}/go/bin
 RUN npm install -g @openai/codex
 
+# --- RTK (token-optimized CLI proxy) ---
+RUN curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh && \
+    rtk init --global
+
 # --- Entrypoint ---
 COPY --chown=${USERNAME}:${USERNAME} entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
