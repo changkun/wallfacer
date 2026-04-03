@@ -6,6 +6,23 @@ The planning chat is a conversational interface for exploring ideas with an AI a
 
 ## Essentials
 
+```mermaid
+sequenceDiagram
+  participant User
+  participant Server
+  participant Agent as Claude Code
+  User->>Server: POST /api/planning/messages
+  Server->>Server: Append to messages.jsonl
+  Server-->>User: 202 Accepted
+  Server->>Agent: claude -p "message" --resume
+  User->>Server: GET /api/planning/messages/stream
+  Agent-->>Server: NDJSON stream
+  Server-->>User: Live text stream
+  Agent->>Agent: Read/write spec files
+  Agent-->>Server: Done
+  Server->>Server: Save session + assistant message
+```
+
 ### Opening the Planning Chat
 
 Switch to spec mode by pressing **S** (or clicking the mode toggle in the header). The chat pane appears on the right side of the layout. Press **C** to toggle it open or closed.

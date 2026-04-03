@@ -46,6 +46,16 @@ Clicking a spec in the explorer opens it in the center pane. The content is rend
 
 Large specs can be decomposed into smaller child specs. Press **B** or use `/break-down` in the planning chat. The agent analyzes the parent spec and creates child specs in a subdirectory named after the parent file. Each child gets its own frontmatter, dependencies, and acceptance criteria.
 
+```
+specs/
+  local/
+    my-feature.md              <- non-leaf (has children)
+    my-feature/
+      define-interface.md      <- leaf (dispatchable)
+      implement-backend.md     <- leaf
+      implement-frontend.md    <- leaf
+```
+
 ### Dispatching to the Board
 
 When a leaf spec is validated and ready for implementation, press **D** or use `/dispatch` in the chat. This creates a task on the kanban board with the spec's content as the prompt. The spec's `dispatched_task_id` field is updated to link back to the created task.
@@ -93,6 +103,19 @@ Specs progress through a defined lifecycle:
 | `validated` | Reviewed, dependencies checked, ready for implementation or dispatch |
 | `complete` | Fully implemented and verified |
 | `stale` | Overtaken by events or no longer relevant |
+
+```mermaid
+stateDiagram-v2
+  [*] --> vague
+  vague --> drafted
+  drafted --> validated
+  drafted --> stale
+  validated --> complete
+  validated --> stale
+  complete --> stale
+  stale --> drafted
+  stale --> validated
+```
 
 Any status can transition to `stale`. Leaf specs should reach `validated` before being dispatched to the task board.
 

@@ -136,6 +136,13 @@ Every task runs on an isolated git branch and worktree, so multiple tasks can wo
 
 #### How worktrees are created
 
+```
+main branch ─────────────────────────
+  ├── task-abc worktree (isolated)
+  ├── task-def worktree (isolated)
+  └── task-ghi worktree (isolated)
+```
+
 When a task moves to **In Progress**:
 
 1. Wallfacer creates a new branch named `task/<first-8-chars-of-task-id>` from the current HEAD of each workspace

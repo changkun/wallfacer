@@ -9,6 +9,12 @@ Wallfacer provides a suite of monitoring and analytics tools that help you under
 - **Turns** -- Individual execution cycles of the agent. Each turn corresponds to one prompt-response round trip. Per-turn usage records track token consumption and cost for every turn.
 - **Usage** -- Token and cost accounting broken down by sub-agent activity (implementation, testing, refinement, title generation, oversight, commit message, ideation).
 
+```mermaid
+graph LR
+  Running["🔄 Running<br/>Live logs<br/>Per-turn usage<br/>Spans"] --> Terminal["⏹️ Terminal State<br/>Oversight summary<br/>Diff & commit<br/>Flamegraph"]
+  Terminal --> Dashboard["📊 Dashboard<br/>Aggregate stats<br/>Cost breakdown<br/>Task summaries"]
+```
+
 ---
 
 ## ✅ Essentials
