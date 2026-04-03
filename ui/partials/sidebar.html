@@ -1,7 +1,7 @@
 <nav id="app-sidebar" class="app-sidebar flex flex-col flex-shrink-0">
   <!-- Logo -->
   <div
-    class="sidebar-logo-row flex items-center gap-3 pl-7 pr-4 pt-5 pb-4"
+    class="sidebar-logo-row flex items-center gap-3 pl-8 pr-4 pt-5 pb-4"
     onclick="expandSidebar()"
   >
     <svg
@@ -123,7 +123,13 @@
         <polyline points="10 9 9 9 8 9"></polyline></svg
       ><span>Specs</span>
     </button>
+  </div>
 
+  <!-- Spacer -->
+  <div class="flex-1"></div>
+
+  <!-- Bottom: Docs & Settings -->
+  <div class="pb-3">
     <button
       id="sidebar-nav-docs"
       class="sidebar-nav"
@@ -168,7 +174,4 @@
       ><span>Settings</span>
     </button>
   </div>
-
-  <!-- Spacer -->
-  <div class="flex-1"></div>
 </nav>
