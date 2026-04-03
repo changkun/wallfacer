@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -209,7 +208,9 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"status": "accepted"})
 }
 
-// StreamPlanningMessages streams the current planning exec's stdout via SSE.
+// StreamPlanningMessages streams the current planning exec's raw stdout.
+// Uses the same plain-text streaming pattern as task log streaming
+// (streamLiveLog) so the frontend can reuse renderPrettyLogs().
 // Returns 204 No Content if no exec is in flight.
 func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request) {
 	if h.planner == nil {
@@ -229,7 +230,7 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -259,15 +260,16 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 			return
 		case data, ok := <-ch:
 			if !ok {
-				// Exec finished — send done event.
-				_, _ = fmt.Fprintf(w, "event: done\ndata: {}\n\n")
-				flusher.Flush()
 				return
 			}
-			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+			if _, err := w.Write(data); err != nil {
+				return
+			}
 			flusher.Flush()
 		case <-keepalive.C:
-			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
+			if _, err := w.Write([]byte("\n")); err != nil {
+				return
+			}
 			flusher.Flush()
 		}
 	}
