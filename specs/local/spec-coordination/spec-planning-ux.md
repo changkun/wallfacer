@@ -436,6 +436,7 @@ Additional mitigations:
 | 6 | [Undo & Snapshot System](spec-planning-ux/undo-snapshots.md) | Per-round implicit snapshots for reversible agent writes | planning-sandbox | medium | drafted |
 | 7 | [Progress & Cost Tracking](spec-planning-ux/progress-cost-tracking.md) | Recursive progress aggregation and per-spec cost attribution across planning and execution | spec-explorer, planning-sandbox | medium | drafted |
 | 8 | [Planning Codex Compatibility](spec-planning-ux/planning-codex-compat.md) | Codex sandbox support for the planning chat agent (CLI flags, session resumption, output format) | planning-chat-agent | medium | vague |
+| 9 | [Session Persistence & Recovery](spec-planning-ux/planning-chat-agent/session-persistence.md) | Per-turn NDJSON storage, dedicated volume, context reconstruction from tool trajectories on session loss | planning-chat-agent | large | drafted |
 
 ```mermaid
 graph LR
@@ -447,6 +448,7 @@ graph LR
   B --> E[Dispatch & Board]
   C --> G
   D --> H[Planning Codex Compat]
+  D --> I[Session Persistence]
 ```
 
 **Recommended iteration order:** Start with #1 (Planning Sandbox) and #2 (Spec Mode UI Shell) in parallel — they are independent foundations. Then #3 (Spec Explorer) and #5 (Dispatch) can proceed in parallel once the UI shell is designed. #4 (Planning Chat Agent) requires both the sandbox and UI shell. #6 (Undo) depends only on the sandbox design. #7 (Progress & Cost) comes last as it integrates data from the explorer and sandbox.
