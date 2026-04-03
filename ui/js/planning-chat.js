@@ -294,7 +294,7 @@ var PlanningChat = (function () {
               receivedContent = true;
             }
             if (receivedContent) {
-              _renderChatResponse(contentEl, assistantText, rawBuffer);
+              _renderChatResponse(contentEl, assistantText, rawBuffer, true);
             }
           }
           _scrollToBottom();
@@ -308,7 +308,7 @@ var PlanningChat = (function () {
           }
           assistantText = _extractAssistantText(rawBuffer);
           if (contentEl) {
-            _renderChatResponse(contentEl, assistantText, rawBuffer);
+            _renderChatResponse(contentEl, assistantText, rawBuffer, false);
           }
           _stopStreaming(false);
         },
@@ -384,8 +384,10 @@ var PlanningChat = (function () {
 
   // _renderChatResponse renders the assistant text as markdown with an
   // optional collapsible activity log showing tool calls. Errors are
-  // shown as styled error blocks.
-  function _renderChatResponse(el, text, rawBuffer) {
+  // shown as styled error blocks. When streaming is true the activity
+  // section stays open so the user can follow along live; it collapses
+  // once the response is complete.
+  function _renderChatResponse(el, text, rawBuffer, streaming) {
     var html = "";
     var errorMsg = _extractError(rawBuffer);
     if (errorMsg) {
@@ -396,8 +398,9 @@ var PlanningChat = (function () {
     }
     // Show tool activity in a collapsible details element.
     if (_hasToolActivity(rawBuffer) && typeof renderPrettyLogs === "function") {
+      var openAttr = streaming ? " open" : "";
       html +=
-        '<details class="planning-chat-activity"><summary>Agent activity</summary>' +
+        '<details class="planning-chat-activity"' + openAttr + '><summary>Agent activity</summary>' +
         '<div class="planning-chat-activity__log">' +
         renderPrettyLogs(rawBuffer) +
         "</div></details>";
