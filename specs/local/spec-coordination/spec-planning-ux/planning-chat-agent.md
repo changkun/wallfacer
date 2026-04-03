@@ -26,7 +26,7 @@ How does the chat-driven iteration model work end-to-end? The right pane of spec
 Key constraints:
 - The agent runs inside the planning sandbox (per the planning-sandbox sub-design, already implemented in `internal/planner/`)
 - Zero permission prompts — the agent writes to `specs/` autonomously
-- Global conversation persistence across spec switches and across sessions (stored in `~/.wallfacer/planning/`)
+- Global conversation persistence across spec switches and sessions — agent state via Claude Code's `--resume` session (persisted in the container's `claude-config` volume), UI replay log in `~/.wallfacer/planning/`
 - The agent has full read access to the workspace codebase (not just specs)
 - Agent has spec-creation skills (API endpoint, refactor, bug fix, migration patterns)
 - Agent proactively updates entry-point documents on spec status changes
@@ -43,15 +43,15 @@ The following infrastructure is already implemented:
 
 ## Design
 
-### Approach: Conversation Wrapper over Container Exec
+### Approach: Headless Claude/Codex over Container Exec
 
-The planning container is the existing long-lived worker from `internal/planner/`. Each user message is sent as a `podman exec` invocation with the message as input. The agent processes the message, writes files, and returns a response. Conversation history is maintained server-side in `~/.wallfacer/planning/<fingerprint>/` for persistence across browser reloads and application restarts.
+The planning agent is not a custom LLM orchestrator — it wraps Claude Code's (or Codex's) headless mode inside the existing planning container. The same `-p <prompt> --output-format stream-json` invocation pattern used by task execution (`internal/runner/container.go`) applies here. Multi-turn conversation uses `--resume <session-id>` to continue the same Claude Code session across user messages.
 
 This approach is chosen because:
-- The planning container already exists as a long-lived worker — adding exec-based conversation is a thin layer on top
-- Server-side persistence in `~/.wallfacer/` means the user sees prior conversation when reopening the application
-- No new streaming infrastructure needed — each exec produces stdout that can be streamed via SSE
-- Context window management is explicit: the server controls what history is prepended to each exec
+- Claude Code already handles conversation context, tool use, file reading/writing, and context window management internally — the server doesn't need to reimplement any of this
+- The `--resume` flag carries session state across turns; Claude Code persists sessions in `~/.claude/` inside the container, which is already a named volume (`claude-config`) that survives container restarts
+- The `--output-format stream-json` output is already parsed by the task runner's log infrastructure — the same parsing works for planning responses
+- System prompt customization is done via `CLAUDE.md` / `--system-prompt` flags, matching existing patterns
 
 ### Unified Planning Worker
 
@@ -65,35 +65,41 @@ The planning worker container and the ideation agent should share a single long-
 
 ### Conversation Persistence
 
-Conversation history is stored in `~/.wallfacer/planning/<fingerprint>/`:
+Two layers of persistence:
 
-- **`messages.jsonl`** — append-only log of all messages (role, content, timestamp, focused spec path, modified files list)
-- **`context.json`** — current session metadata (last active timestamp, focused spec, token count estimate)
+**Agent-side (inside container):** Claude Code's own session state lives in the `claude-config` named volume at `~/.claude/` inside the container. The `--resume <session-id>` flag tells Claude Code to continue from where it left off, including its internal conversation history and context window management. This survives container restarts (the planning container is a long-lived worker) and gives us multi-turn context for free.
+
+**Server-side (for UI replay):** The server maintains a conversation log in `~/.wallfacer/planning/<fingerprint>/`:
+
+- **`messages.jsonl`** — append-only log of user messages and parsed agent responses (role, content, timestamp, focused spec path). This is for the UI to display conversation history — the actual agent context is managed by Claude Code internally.
+- **`session.json`** — maps the workspace fingerprint to the active Claude Code session ID, plus metadata (last active timestamp, focused spec). When the user reopens the application, the server reads this to resume the same session via `--resume`.
 - One directory per workspace fingerprint, matching the planning container keying
-- On application startup, the server loads the conversation history and serves it to the UI on connect
-- Old messages beyond a configurable token budget are summarized into a `summary.md` that is prepended to new exec calls instead of the full history
+- On application startup, the server loads the message log and serves it to the UI; the next user message resumes the Claude Code session via `--resume`
 
 ### Message Flow
 
 1. User types message in the chat stream pane
 2. `POST /api/planning/messages` sends the message to the server
 3. Server appends user message to `messages.jsonl`
-4. Server builds the exec payload: system prompt + conversation context (recent messages or summary + recent messages) + focused spec content + user message
-5. `Planner.Exec()` runs the agent inside the planning container
-6. Agent stdout streams back via SSE (`GET /api/planning/messages/stream`)
-7. Agent writes spec files during execution; response includes a list of modified files
-8. Server appends assistant message to `messages.jsonl`
-9. UI receives the modified-files list and triggers explorer refresh + focused view re-render for affected paths
+4. Server builds the exec args: `-p <message> --output-format stream-json --resume <session-id>` (or without `--resume` for the first message in a new session)
+5. `Planner.Exec()` runs the command inside the planning container — same as task execution but through the worker container
+6. Agent stdout (`stream-json` events) streams back via SSE (`GET /api/planning/messages/stream`); the server parses these using the same log parsing infrastructure as `StreamLogs`
+7. Claude Code reads/writes files autonomously inside the container — spec files are written directly since `specs/` is mounted read-write
+8. Server extracts the session ID from the first response event and stores it in `session.json` for future `--resume` calls
+9. Server parses the final response text and appends it to `messages.jsonl` for UI replay
+10. `ExplorerStream` and `SpecTreeStream` detect the file changes automatically within their polling cycle
 
 ### System Prompt
 
-A new `planning.tmpl` in `internal/prompts/` establishes the agent's role:
+A `CLAUDE.md` file is generated and mounted into the planning container (or passed via `--system-prompt`) to establish the agent's role. This follows the same pattern as the workspace `AGENTS.md` for task containers:
 
 - **Identity**: Spec writer and planning assistant, not a code implementer
 - **Permissions**: Read all workspace files, write only to `specs/` directories
 - **Skills**: Slash-command skill set (see "Slash Commands" section below)
 - **Conventions**: Spec document model (frontmatter schema, lifecycle states, DAG rules), naming conventions, track organization
-- **Context injection**: Current spec tree state (from `GET /api/specs/tree` data), focused spec content, recent conversation summary
+- **Context injection**: The focused spec path and current spec tree summary are included in each `-p` prompt, not the system prompt — this allows per-message context without restarting the session
+
+The system prompt template lives in `internal/prompts/planning.tmpl` and is rendered once when the planning session starts. Per-message context (focused spec, slash command expansion) is prepended to the `-p` prompt text.
 
 ### Live File Update Detection
 
@@ -130,12 +136,11 @@ When a slash command or free-form directive changes a spec's status (e.g., `draf
 
 ### Context Window Management
 
-For long planning sessions:
+Claude Code manages its own context window internally via the `--resume` session mechanism — the server does not need to implement sliding windows, summarization, or token counting. Claude Code's built-in context compression handles long sessions automatically.
 
-- The server maintains a running token estimate for the conversation
-- When the estimate exceeds a threshold (configurable, default ~80k tokens), the server triggers a summarization pass: older messages are replaced by a condensed summary stored in `summary.md`
-- Each exec receives: summary (if any) + last N messages (sliding window) + focused spec + system prompt
-- The `context.json` file tracks the current window boundaries so the server can resume efficiently after restart
+The server's only responsibility is:
+- Storing the session ID so `--resume` works across application restarts
+- Starting a new session (dropping `--resume`) if the user explicitly clears the conversation via `DELETE /api/planning/messages`, which also clears `messages.jsonl`
 
 ## New API Endpoints
 
@@ -148,9 +153,8 @@ For long planning sessions:
 ## Open Questions
 
 1. **Ideation migration path**: Should the ideation runner switch to using `Planner.Exec()` immediately, or should it fall back to ephemeral containers when the planning container is not running? The planner auto-starts on server init, so fallback may be unnecessary.
-2. **Multi-turn within a single message**: Can the agent ask clarifying questions back to the user within a single exec, or is it strictly one-message-in, one-response-out? The simpler model (single turn per exec) is recommended to start.
-3. **Concurrent access**: If the user sends a new message while the agent is still responding to the previous one, should the server queue it, reject it, or cancel the in-flight exec? Queuing with a depth limit of 1 seems safest.
-4. **Token budget defaults**: What's the right default for the context window threshold before summarization kicks in? Depends on the model's context window size and the cost tolerance for planning sessions.
+2. **Concurrent access**: If the user sends a new message while the agent is still responding to the previous one, should the server queue it, reject it, or cancel the in-flight exec? Queuing with a depth limit of 1 seems safest.
+3. **Codex parity**: Codex's headless mode may have different flags than Claude Code's `-p --resume --output-format stream-json`. Need to verify the Codex equivalent and whether the planner needs sandbox-specific argument building (similar to how `internal/runner/container.go` already branches on sandbox type).
 
 ## Affects
 
