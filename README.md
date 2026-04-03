@@ -13,8 +13,12 @@ Wallfacer is an autonomous engineering platform that works across multiple level
 
 Open source. Runs locally. No IDE lock-in. No cloud dependency. Bring your own LLM provider.
 
-![Wallfacer overview](./assets/overview-kanban.png)
-![Wallfacer overview](./assets/overview-spec.png)
+<table>
+<tr>
+<td width="50%"><img src="./assets/overview-kanban.png" alt="Task board view"/><br/><em>Task board — coordinate parallel agent execution</em></td>
+<td width="50%"><img src="./assets/overview-spec.png" alt="Spec mode view"/><br/><em>Spec mode — design before you build</em></td>
+</tr>
+</table>
 
 ## Why Wallfacer
 
