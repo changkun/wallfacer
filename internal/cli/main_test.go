@@ -242,6 +242,20 @@ func TestDetectContainerRuntime_EnvOverrideTrimmed(t *testing.T) {
 	}
 }
 
+// TestConfigDir_ReturnsPath verifies that ConfigDir returns a path ending
+// in .wallfacer under the user's home directory.
+func TestConfigDir_ReturnsPath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("cannot determine home dir: %v", err)
+	}
+	got := ConfigDir()
+	want := filepath.Join(home, ".wallfacer")
+	if got != want {
+		t.Fatalf("ConfigDir() = %q, want %q", got, want)
+	}
+}
+
 // TestPrintUsage_IncludesVersion verifies that PrintUsage includes the version
 // string when Version is set.
 func TestPrintUsage_IncludesVersion(t *testing.T) {

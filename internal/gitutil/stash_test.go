@@ -6,6 +6,14 @@ import (
 	"testing"
 )
 
+// TestStashIfDirty_NonGitDir verifies that StashIfDirty returns false when
+// git status fails (e.g. on a non-git directory).
+func TestStashIfDirty_NonGitDir(t *testing.T) {
+	if StashIfDirty(t.TempDir()) {
+		t.Error("expected false for non-git directory")
+	}
+}
+
 // TestStashIfDirty validates stash creation for clean, untracked, and modified states.
 func TestStashIfDirty(t *testing.T) {
 	t.Run("clean tree returns false", func(t *testing.T) {

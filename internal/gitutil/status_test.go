@@ -79,6 +79,42 @@ func TestWorkspaceStatus(t *testing.T) {
 		}
 	})
 
+	t.Run("git repo behind main on different branch", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "main")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		gitRun(t, repo, "push", "-u", "origin", "main")
+
+		// Create a feature branch.
+		gitRun(t, repo, "checkout", "-b", "feature")
+		gitRun(t, repo, "push", "-u", "origin", "feature")
+
+		// Advance main on origin by pushing from a temporary clone.
+		clone := t.TempDir()
+		gitRun(t, clone, "clone", origin, ".")
+		gitRun(t, clone, "config", "user.email", "test@example.com")
+		gitRun(t, clone, "config", "user.name", "Test")
+		writeFile(t, filepath.Join(clone, "ahead.txt"), "ahead\n")
+		gitRun(t, clone, "add", ".")
+		gitRun(t, clone, "commit", "-m", "advance main")
+		gitRun(t, clone, "push", "origin", "main")
+
+		// Fetch in the repo so origin/main is updated.
+		gitRun(t, repo, "fetch", "origin")
+
+		s := WorkspaceStatus(repo)
+		if s.Branch != "feature" {
+			t.Fatalf("Branch = %q, want %q", s.Branch, "feature")
+		}
+		if s.MainBranch != "main" {
+			t.Fatalf("MainBranch = %q, want %q", s.MainBranch, "main")
+		}
+		if s.BehindMainCount != 1 {
+			t.Errorf("BehindMainCount = %d, want 1", s.BehindMainCount)
+		}
+	})
+
 	t.Run("git repo ahead of remote", func(t *testing.T) {
 		origin := t.TempDir()
 		gitRun(t, origin, "init", "--bare", "-b", "main")

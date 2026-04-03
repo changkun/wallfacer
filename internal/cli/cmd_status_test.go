@@ -266,6 +266,58 @@ func TestRunStatus(t *testing.T) {
 	}
 }
 
+// errorReader is an io.ReadCloser that always returns an error on Read.
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+func (errorReader) Close() error             { return nil }
+
+// TestFetchTasks_ReadBodyError verifies that fetchTasks returns an error when
+// the response body cannot be read.
+func TestFetchTasks_ReadBodyError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Write header with a content-length that exceeds the actual body,
+		// which causes the body read to fail. Use a hijack-based approach instead.
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		// Only write a few bytes then close the connection.
+		if h, ok := w.(http.Hijacker); ok {
+			conn, _, _ := h.Hijack()
+			_ = conn.Close()
+			return
+		}
+		// Fallback: write truncated body.
+		_, _ = w.Write([]byte(`[`))
+	}))
+	defer ts.Close()
+
+	_, err := fetchTasks(ts.URL)
+	if err == nil {
+		t.Fatal("expected error when body read fails or JSON is truncated")
+	}
+}
+
+// TestFetchContainers_ReadBodyError verifies error handling when the container
+// response body is malformed.
+func TestFetchContainers_ReadBodyError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		if h, ok := w.(http.Hijacker); ok {
+			conn, _, _ := h.Hijack()
+			_ = conn.Close()
+			return
+		}
+		_, _ = w.Write([]byte(`[`))
+	}))
+	defer ts.Close()
+
+	_, err := fetchContainers(ts.URL)
+	if err == nil {
+		t.Fatal("expected error when body read fails or JSON is truncated")
+	}
+}
+
 // TestFetchContainers_InvalidJSON verifies that fetchContainers returns an
 // error when the server responds with malformed JSON.
 func TestFetchContainers_InvalidJSON(t *testing.T) {

@@ -208,6 +208,84 @@ func TestConflictError_Error(t *testing.T) {
 	}
 }
 
+// TestDefaultBranch_DetachedWithOriginHEAD verifies that when HEAD is detached
+// and origin/HEAD is configured, the branch name from origin/HEAD is returned.
+func TestDefaultBranch_DetachedWithOriginHEAD(t *testing.T) {
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare", "-b", "develop")
+	repo := setupRepo(t)
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	// Push main to origin under the name "develop".
+	gitRun(t, repo, "push", "origin", "main:develop")
+	gitRun(t, repo, "remote", "set-head", "origin", "develop")
+
+	// Detach HEAD so branch --show-current returns empty.
+	hash := gitRun(t, repo, "rev-parse", "HEAD")
+	gitRun(t, repo, "checkout", hash)
+
+	branch, err := DefaultBranch(repo)
+	if err != nil {
+		t.Fatalf("DefaultBranch: %v", err)
+	}
+	if branch != "develop" {
+		t.Errorf("got %q, want %q", branch, "develop")
+	}
+}
+
+// TestRemoteDefaultBranch validates probing fallback logic for origin/main and
+// origin/master when origin/HEAD is not configured.
+func TestRemoteDefaultBranch(t *testing.T) {
+	t.Run("returns branch from origin/HEAD", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "develop")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		gitRun(t, repo, "push", "origin", "main:develop")
+		gitRun(t, repo, "remote", "set-head", "origin", "develop")
+
+		got := RemoteDefaultBranch(repo)
+		if got != "develop" {
+			t.Errorf("RemoteDefaultBranch = %q, want %q", got, "develop")
+		}
+	})
+
+	t.Run("probes origin/main when origin/HEAD not set", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "main")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		gitRun(t, repo, "push", "origin", "main")
+		// Do NOT set origin/HEAD — force probing path.
+
+		got := RemoteDefaultBranch(repo)
+		if got != "main" {
+			t.Errorf("RemoteDefaultBranch = %q, want %q", got, "main")
+		}
+	})
+
+	t.Run("probes origin/master fallback", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "master")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		gitRun(t, repo, "push", "origin", "main:master")
+		// No origin/HEAD, no origin/main → should find origin/master.
+
+		got := RemoteDefaultBranch(repo)
+		if got != "master" {
+			t.Errorf("RemoteDefaultBranch = %q, want %q", got, "master")
+		}
+	})
+
+	t.Run("defaults to main without any remote", func(t *testing.T) {
+		repo := setupRepo(t)
+		got := RemoteDefaultBranch(repo)
+		if got != "main" {
+			t.Errorf("RemoteDefaultBranch = %q, want %q", got, "main")
+		}
+	})
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
 		func() bool {

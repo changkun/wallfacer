@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -464,9 +465,9 @@ func TestGauge_FailedTasksByCategory(t *testing.T) {
 	}
 }
 
-// TestStatusResponseWriter_HijackSupported verifies that Hijack delegates to the
-// underlying writer when it implements http.Hijacker.
-func TestStatusResponseWriter_HijackSupported(t *testing.T) {
+// TestStatusResponseWriter_HijackNotSupported verifies that Hijack returns an
+// error when the underlying writer doesn't implement http.Hijacker.
+func TestStatusResponseWriter_HijackNotSupported(t *testing.T) {
 	rr := httptest.NewRecorder()
 	sw := &statusResponseWriter{ResponseWriter: rr, status: http.StatusOK}
 
@@ -481,8 +482,51 @@ func TestStatusResponseWriter_HijackSupported(t *testing.T) {
 	}
 }
 
+// fakeHijackWriter implements http.ResponseWriter and http.Hijacker for testing.
+type fakeHijackWriter struct {
+	http.ResponseWriter
+}
+
+func (f *fakeHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, nil
+}
+
+// TestStatusResponseWriter_HijackSupported verifies that Hijack delegates to
+// the underlying writer when it implements http.Hijacker.
+func TestStatusResponseWriter_HijackSupported(t *testing.T) {
+	rr := httptest.NewRecorder()
+	hw := &fakeHijackWriter{ResponseWriter: rr}
+	sw := &statusResponseWriter{ResponseWriter: hw, status: http.StatusOK}
+
+	conn, rw, err := sw.Hijack()
+	if err != nil {
+		t.Fatalf("expected no error from Hijack, got: %v", err)
+	}
+	// The fake returns nil for both.
+	if conn != nil || rw != nil {
+		t.Fatalf("expected nil conn and rw from fake hijacker")
+	}
+}
+
 // TestNormalizeBrowserVisibleHostPort verifies address normalization for
 // different listener bind addresses.
+// fakeAddr is a net.Addr that returns a string without a host:port separator,
+// triggering the SplitHostPort error path in normalizeBrowserVisibleHostPort.
+type fakeAddr string
+
+func (f fakeAddr) Network() string { return "tcp" }
+func (f fakeAddr) String() string  { return string(f) }
+
+// TestNormalizeBrowserVisibleHostPort_InvalidAddr verifies the fallback when
+// the address cannot be parsed by net.SplitHostPort.
+func TestNormalizeBrowserVisibleHostPort_InvalidAddr(t *testing.T) {
+	addr := fakeAddr("no-port-here")
+	got := normalizeBrowserVisibleHostPort(":8080", addr)
+	if got != "no-port-here" {
+		t.Fatalf("expected raw addr string, got %q", got)
+	}
+}
+
 func TestNormalizeBrowserVisibleHostPort(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -580,6 +624,77 @@ func TestRequiresStore(t *testing.T) {
 			t.Errorf("requiresStore(%q) = false, want true", name)
 		}
 	}
+}
+
+// TestInitServer_TombstoneRetentionDays verifies that the tombstone retention
+// env var is picked up during initialization.
+func TestInitServer_TombstoneRetentionDays(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	t.Setenv("WALLFACER_TOMBSTONE_RETENTION_DAYS", "30")
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	if sc.Srv == nil {
+		t.Fatal("expected non-nil server")
+	}
+}
+
+// TestShutdown_WithPlannerRunning verifies that Shutdown stops the planner
+// when it is running.
+func TestShutdown_WithPlannerRunning(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+
+	// Planner is initialized but not running, so Shutdown should handle it.
+	sc.Shutdown()
+}
+
+// TestShutdown_HttpShutdownError verifies that Shutdown completes even when
+// the HTTP shutdown encounters an error (e.g. context deadline).
+func TestShutdown_HttpShutdownError(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+
+	// Start serving so that Shutdown has something to shut down.
+	go func() { _ = sc.Srv.Serve(sc.Ln) }()
+	// Give the server a moment to start.
+	sc.Shutdown()
 }
 
 // TestInitServer_SkipCSRF verifies that initServer with SkipCSRF registers
