@@ -125,14 +125,14 @@ async function loadDoc(slug) {
 }
 
 // Build a table-of-contents from headings in the rendered content.
+// Uses the same spec-toc classes and DOM construction as _buildSpecToc in spec-mode.js.
 function _renderDocToc(content) {
   var toc = document.getElementById("docs-toc");
   if (!toc) return;
+  toc.innerHTML = "";
+
   var headings = content.querySelectorAll("h2, h3");
-  if (headings.length === 0) {
-    toc.innerHTML = "";
-    return;
-  }
+  if (headings.length === 0) return;
 
   // Ensure each heading has an id for anchor links.
   for (var i = 0; i < headings.length; i++) {
@@ -141,28 +141,25 @@ function _renderDocToc(content) {
     }
   }
 
-  // Header label — matches the left nav category labels.
-  var html =
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:8px;">On this page</div>';
+  var tocTitle = document.createElement("div");
+  tocTitle.className = "spec-toc__title";
+  tocTitle.textContent = "Contents";
+  toc.appendChild(tocTitle);
+
+  var tocLinks = [];
   for (var j = 0; j < headings.length; j++) {
     var h = headings[j];
-    var isH3 = h.tagName === "H3";
-    // h2 = top-level section, h3 = subsection (indented, smaller).
-    html +=
-      '<a href="#' +
-      h.id +
-      '" class="docs-toc-link' +
-      (isH3 ? " docs-toc-link--sub" : "") +
-      '" data-toc-target="' +
-      h.id +
-      '">' +
-      escapeHtml(h.textContent) +
-      "</a>";
+    var level = parseInt(h.tagName.substring(1), 10);
+    var link = document.createElement("a");
+    link.className = "spec-toc__link spec-toc__link--h" + level;
+    link.href = "#" + h.id;
+    link.textContent = h.textContent;
+    link.setAttribute("data-toc-target", h.id);
+    toc.appendChild(link);
+    tocLinks.push(link);
   }
-  toc.innerHTML = html;
 
   // Click handler: scroll heading into view and highlight immediately.
-  var tocLinks = toc.querySelectorAll("a[data-toc-target]");
   for (var k = 0; k < tocLinks.length; k++) {
     tocLinks[k].onclick = (function (id, allLinks) {
       return function (e) {
@@ -173,7 +170,7 @@ function _renderDocToc(content) {
         // trigger a scroll event if the target is already in view.
         for (var m = 0; m < allLinks.length; m++) {
           allLinks[m].classList.toggle(
-            "docs-toc-link--active",
+            "spec-toc__link--active",
             allLinks[m].getAttribute("data-toc-target") === id,
           );
         }
@@ -201,7 +198,7 @@ function _setupTocScrollSpy(content, headings, tocLinks) {
     }
     for (var j = 0; j < tocLinks.length; j++) {
       var isActive = tocLinks[j].getAttribute("data-toc-target") === activeId;
-      tocLinks[j].classList.toggle("docs-toc-link--active", isActive);
+      tocLinks[j].classList.toggle("spec-toc__link--active", isActive);
     }
   };
   content._tocScrollHandler = handler;

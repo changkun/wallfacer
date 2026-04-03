@@ -158,10 +158,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.15s;
 }
 
 .spec-toc__link:hover {
   color: var(--text);
+}
+
+.spec-toc__link--active {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .spec-toc__link--h1 {
