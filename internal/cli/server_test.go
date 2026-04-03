@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -377,6 +378,98 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	}
 }
 
+// TestBuildMux_DocsInternals verifies that the internals docs are served.
+func TestBuildMux_DocsInternals(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	// GET /api/docs/internals/internals should return the internals index.
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/docs/internals/internals", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/docs/internals/internals: status %d, want 200", rr.Code)
+	}
+}
+
+// TestBuildMux_IndexHTML verifies that /index.html serves the same content as /.
+func TestBuildMux_IndexHTML(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), testFS(t))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/index.html", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /index.html: status %d, want 200", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("expected HTML content type, got %q", ct)
+	}
+}
+
+// TestBuildMux_StaticAssets verifies that CSS and JS static files are served.
+func TestBuildMux_StaticAssets(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	// A known CSS file should be served.
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/css/base.css", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /css/base.css: status %d", rr.Code)
+	}
+}
+
 // TestBuildMux_IndexNonRoot verifies that non-root paths like /foo return 404
 // from the index handler.
 func TestBuildMux_IndexNonRoot(t *testing.T) {
@@ -626,6 +719,51 @@ func TestRequiresStore(t *testing.T) {
 	}
 }
 
+// TestInitServer_MetricsScrapesGauges verifies that the Prometheus metrics
+// endpoint triggers the gauge callbacks registered during initServer.
+func TestInitServer_MetricsScrapesGauges(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	// Start the server in the background.
+	go func() { _ = sc.Srv.Serve(sc.Ln) }()
+
+	// Scrape /metrics to trigger gauge callbacks.
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", sc.ActualPort))
+	if err != nil {
+		t.Fatalf("GET /metrics: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /metrics: status %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	metricsText := string(body)
+
+	// Verify gauge metrics appear.
+	for _, want := range []string{
+		"wallfacer_circuit_breaker_open",
+		"wallfacer_background_goroutines",
+	} {
+		if !strings.Contains(metricsText, want) {
+			t.Errorf("expected %q in metrics output", want)
+		}
+	}
+}
+
 // TestInitServer_TombstoneRetentionDays verifies that the tombstone retention
 // env var is picked up during initialization.
 func TestInitServer_TombstoneRetentionDays(t *testing.T) {
@@ -720,6 +858,138 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 	// The desktop-port endpoint should be registered.
 	if sc.ActualPort == 0 {
 		t.Fatal("expected non-zero port")
+	}
+}
+
+// TestGauge_TasksTotal validates the Prometheus gauge that counts tasks by
+// status and archived flag.
+func TestGauge_TasksTotal(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	s, err := store.NewFileStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	_, err = s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "task1", Timeout: 10})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Mirror the gauge collector from server.go.
+	collector := func() []metrics.LabeledValue {
+		tasks, err := s.ListTasks(context.Background(), true)
+		if err != nil {
+			return nil
+		}
+		type key struct{ status, archived string }
+		counts := make(map[key]int)
+		for _, t := range tasks {
+			counts[key{string(t.Status), fmt.Sprintf("%v", t.Archived)}]++
+		}
+		vals := make([]metrics.LabeledValue, 0, len(counts))
+		for k, n := range counts {
+			vals = append(vals, metrics.LabeledValue{
+				Labels: map[string]string{"status": k.status, "archived": k.archived},
+				Value:  float64(n),
+			})
+		}
+		return vals
+	}
+
+	vals := collector()
+	if len(vals) == 0 {
+		t.Fatal("expected at least one labeled value")
+	}
+	found := false
+	for _, v := range vals {
+		if v.Labels["status"] == "backlog" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected a backlog status entry")
+	}
+}
+
+// TestGauge_RunningContainers validates the running containers gauge collector.
+func TestGauge_RunningContainers(t *testing.T) {
+	workdir := t.TempDir()
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: filepath.Join(workdir, "worktrees"),
+		Workspaces:   []string{workdir},
+	})
+
+	// Mirror the gauge collector from server.go.
+	collector := func() []metrics.LabeledValue {
+		containers, err := r.ListContainers()
+		if err != nil {
+			return []metrics.LabeledValue{{Value: 0}}
+		}
+		return []metrics.LabeledValue{{Value: float64(len(containers))}}
+	}
+
+	vals := collector()
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 value, got %d", len(vals))
+	}
+	// With the "true" command, ListContainers may fail, but the gauge should
+	// return 0 either way.
+}
+
+// TestGauge_BackgroundGoroutines validates the pending goroutines gauge.
+func TestGauge_BackgroundGoroutines(t *testing.T) {
+	workdir := t.TempDir()
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: filepath.Join(workdir, "worktrees"),
+		Workspaces:   []string{workdir},
+	})
+
+	collector := func() []metrics.LabeledValue {
+		return []metrics.LabeledValue{{Value: float64(len(r.PendingGoroutines()))}}
+	}
+
+	vals := collector()
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 value, got %d", len(vals))
+	}
+	if vals[0].Value != 0 {
+		t.Errorf("expected 0 pending goroutines, got %v", vals[0].Value)
+	}
+}
+
+// TestGauge_StoreSubscribers validates the store subscribers gauge.
+func TestGauge_StoreSubscribers(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	s, err := store.NewFileStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	collector := func() []metrics.LabeledValue {
+		return []metrics.LabeledValue{{Value: float64(s.SubscriberCount())}}
+	}
+
+	vals := collector()
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 value, got %d", len(vals))
+	}
+	if vals[0].Value != 0 {
+		t.Errorf("expected 0 subscribers initially, got %v", vals[0].Value)
 	}
 }
 

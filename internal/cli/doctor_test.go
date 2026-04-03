@@ -141,6 +141,84 @@ func TestRunDoctor_ContainerRuntimeNotFound(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_RuntimeRespondingWithVersion verifies that doctor shows the
+// container runtime version when the runtime binary responds.
+func TestRunDoctor_RuntimeRespondingWithVersion(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Create a fake container runtime that responds with a version.
+	fakeRuntime := filepath.Join(t.TempDir(), "podman")
+	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\nif [ \"$1\" = \"images\" ]; then echo \"\"; exit 0; fi\nexit 0\n"
+	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake runtime: %v", err)
+	}
+
+	t.Setenv("CONTAINER_CMD", fakeRuntime)
+
+	out := captureStdout(func() {
+		RunDoctor(configDir)
+	})
+
+	if !strings.Contains(out, "[ok] Container runtime") {
+		t.Errorf("expected container runtime ok, got:\n%s", out)
+	}
+}
+
+// TestRunDoctor_RuntimeNotResponding verifies that doctor warns when the
+// container runtime binary exists but doesn't respond.
+func TestRunDoctor_RuntimeNotResponding(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Create a fake runtime that fails on version check.
+	fakeRuntime := filepath.Join(t.TempDir(), "podman")
+	script := "#!/bin/sh\nexit 1\n"
+	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake runtime: %v", err)
+	}
+
+	t.Setenv("CONTAINER_CMD", fakeRuntime)
+
+	out := captureStdout(func() {
+		RunDoctor(configDir)
+	})
+
+	if !strings.Contains(out, "not responding") {
+		t.Errorf("expected 'not responding' warning, got:\n%s", out)
+	}
+}
+
+// TestRunDoctor_ConfigDirIsFile verifies that doctor warns when the config
+// path exists but is a regular file instead of a directory.
+func TestRunDoctor_ConfigDirIsFile(t *testing.T) {
+	tmp := t.TempDir()
+	configPath := filepath.Join(tmp, "config")
+	if err := os.WriteFile(configPath, []byte("not a dir"), 0600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	envFile := filepath.Join(tmp, ".env")
+	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("ENV_FILE", envFile)
+	t.Setenv("CONTAINER_CMD", "/nonexistent/runtime")
+
+	out := captureStdout(func() {
+		RunDoctor(configPath)
+	})
+
+	if !strings.Contains(out, "is not a directory") {
+		t.Errorf("expected 'is not a directory' warning, got:\n%s", out)
+	}
+}
+
 // TestRunDoctor_GitCheck verifies that doctor detects git on the system PATH
 // (expected to be present in CI and development environments).
 func TestRunDoctor_GitCheck(t *testing.T) {
