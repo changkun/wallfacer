@@ -290,4 +290,4 @@ Report to the user:
 - Suggested next steps:
   - Design mode: "Iterate on sub-designs, then `/wf-spec-breakdown <child> tasks`
     when each is validated"
-  - Tasks mode: "Run `/review-breakdown <spec>` to validate, then dispatch"
+  - Tasks mode: "Run `/wf-review-breakdown <spec>` to validate, then dispatch"

@@ -1,5 +1,5 @@
 ---
-name: review-breakdown
+name: wf-review-breakdown
 description: Validate a task breakdown for correctness — check dependency ordering, task sizing, gap coverage, and boundary conflicts. Use after wf-spec-breakdown to catch issues before implementation.
 argument-hint: <spec-file.md or task-folder/>
 allowed-tools: Read, Grep, Glob, Agent, Bash(ls *)

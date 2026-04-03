@@ -1,5 +1,5 @@
 ---
-name: review-impl
+name: wf-review-impl
 description: Review an implementation against its spec or task. Check that acceptance criteria are met, no unintended changes were made, and tests cover the requirements. Use after implement-spec or after a task completes.
 argument-hint: <spec-file.md or task-file.md> [commit-range]
 allowed-tools: Read, Grep, Glob, Agent, Bash(git diff *), Bash(git log *), Bash(git show *), Bash(go test *), Bash(ls *)
