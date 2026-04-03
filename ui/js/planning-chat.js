@@ -176,30 +176,96 @@ var PlanningChat = (function () {
     if (_interruptBtn) _interruptBtn.style.display = "";
     if (_sendBtn) _sendBtn.style.display = "none";
 
-    // Create a bubble for the streaming response. Use renderPrettyLogs
-    // (from modal-ndjson.js) to render the raw NDJSON output in the same
-    // terminal-style format as the task board log viewer.
+    // Create two sections: a collapsible activity log (tool calls etc.)
+    // and the main assistant text rendered as markdown.
     var bubble = _createBubble("assistant");
     _messagesEl.appendChild(bubble);
     var contentEl = bubble.querySelector(".planning-chat-bubble__content");
     var rawBuffer = "";
+    var assistantText = "";
 
     _activeStream = startStreamingFetch({
       url: Routes.planning.messageStream(),
       onChunk: function (chunk) {
         rawBuffer += chunk;
-        if (contentEl && typeof renderPrettyLogs === "function") {
-          contentEl.innerHTML = renderPrettyLogs(rawBuffer);
+        // Extract assistant text from NDJSON for the chat display.
+        assistantText = _extractAssistantText(rawBuffer);
+        if (contentEl) {
+          _renderChatResponse(contentEl, assistantText, rawBuffer);
         }
         _scrollToBottom();
       },
       onDone: function () {
+        // Final render with complete buffer.
+        assistantText = _extractAssistantText(rawBuffer);
+        if (contentEl) {
+          _renderChatResponse(contentEl, assistantText, rawBuffer);
+        }
         _stopStreaming(false);
       },
       onError: function () {
         _stopStreaming(false);
       },
     });
+  }
+
+  // _extractAssistantText pulls all assistant text from raw NDJSON output.
+  function _extractAssistantText(raw) {
+    var text = "";
+    var lines = raw.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || line[0] !== "{") continue;
+      try {
+        var obj = JSON.parse(line);
+        if (obj.type === "assistant" && obj.message && obj.message.content) {
+          for (var j = 0; j < obj.message.content.length; j++) {
+            var block = obj.message.content[j];
+            if (block.type === "text" && block.text) {
+              text += block.text;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return text;
+  }
+
+  // _hasToolActivity checks if the NDJSON contains tool calls.
+  function _hasToolActivity(raw) {
+    var lines = raw.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || line[0] !== "{") continue;
+      try {
+        var obj = JSON.parse(line);
+        if (obj.type === "assistant" && obj.message && obj.message.content) {
+          for (var j = 0; j < obj.message.content.length; j++) {
+            if (obj.message.content[j].type === "tool_use") return true;
+          }
+        }
+        if (obj.type === "user") return true; // tool results
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  // _renderChatResponse renders the assistant text as markdown with an
+  // optional collapsible activity log showing tool calls.
+  function _renderChatResponse(el, text, rawBuffer) {
+    var html = "";
+    if (text) {
+      html += renderMarkdown(text);
+    }
+    // Show tool activity in a collapsible details element.
+    if (_hasToolActivity(rawBuffer) && typeof renderPrettyLogs === "function") {
+      html +=
+        '<details class="planning-chat-activity"><summary>Agent activity</summary>' +
+        '<div class="planning-chat-activity__log">' +
+        renderPrettyLogs(rawBuffer) +
+        "</div></details>";
+    }
+    el.innerHTML = html;
   }
 
   function _stopStreaming(interrupted) {

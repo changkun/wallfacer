@@ -193,15 +193,17 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		// Parse response text and append assistant message.
-		resultText := planner.ExtractResultText(rawStdout)
-		if resultText != "" {
-			_ = cs.AppendMessage(planner.Message{
-				Role:        "assistant",
-				Content:     resultText,
-				Timestamp:   time.Now().UTC(),
-				FocusedSpec: req.FocusedSpec,
-			})
+		// Parse response text and append assistant message (skip errors).
+		if !planner.IsErrorResult(rawStdout) {
+			resultText := planner.ExtractResultText(rawStdout)
+			if resultText != "" {
+				_ = cs.AppendMessage(planner.Message{
+					Role:        "assistant",
+					Content:     resultText,
+					Timestamp:   time.Now().UTC(),
+					FocusedSpec: req.FocusedSpec,
+				})
+			}
 		}
 	}()
 

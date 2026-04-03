@@ -223,3 +223,22 @@ func ExtractResultText(raw []byte) string {
 	}
 	return text.String()
 }
+
+// IsErrorResult checks if the NDJSON output contains an error result.
+func IsErrorResult(raw []byte) bool {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			Type    string `json:"type"`
+			IsError bool   `json:"is_error"`
+		}
+		if json.Unmarshal([]byte(line), &obj) == nil && obj.Type == "result" {
+			return obj.IsError
+		}
+	}
+	return false
+}
