@@ -84,11 +84,10 @@ var PlanningChat = (function () {
     }
 
     // Track scroll position to suppress auto-scroll when user reads history.
-    if (_streamEl) {
-      _streamEl.addEventListener("scroll", function () {
-        var el = _streamEl;
-        // Consider "at bottom" if within 40px of the end.
-        _userScrolledUp = el.scrollTop + el.clientHeight < el.scrollHeight - 40;
+    // The scrollable element is _messagesEl, not the outer _streamEl container.
+    if (_messagesEl) {
+      _messagesEl.addEventListener("scroll", function () {
+        _userScrolledUp = _messagesEl.scrollTop + _messagesEl.clientHeight < _messagesEl.scrollHeight - 40;
       });
     }
 
@@ -97,6 +96,12 @@ var PlanningChat = (function () {
   }
 
   function _onInputKeydown(e) {
+    // If user presses arrow key while typing a slash command but autocomplete
+    // hasn't rendered yet, trigger it synchronously.
+    if (!_autocompleteEl && _input.value.startsWith("/") && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      _showAutocomplete(_input.value);
+    }
+
     if (_autocompleteEl) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -459,9 +464,9 @@ var PlanningChat = (function () {
   var _userScrolledUp = false;
 
   function _scrollToBottom(force) {
-    if (!_streamEl) return;
+    if (!_messagesEl) return;
     if (force || !_userScrolledUp) {
-      _streamEl.scrollTop = _streamEl.scrollHeight;
+      _messagesEl.scrollTop = _messagesEl.scrollHeight;
     }
   }
 
