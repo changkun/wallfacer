@@ -753,6 +753,40 @@ function breakDownFocusedSpec() {
   }
 }
 
+// --- Chat pane toggle ---
+
+var _specChatOpenKey = "wallfacer-spec-chat-open";
+
+// toggleSpecChat shows/hides the chat pane and its resize handle.
+// When opened, auto-focuses the chat input.
+function toggleSpecChat() {
+  var chatStream = document.getElementById("spec-chat-stream");
+  var resizeHandle = document.getElementById("spec-chat-resize");
+  if (!chatStream) return;
+
+  var isHidden = chatStream.style.display === "none";
+  chatStream.style.display = isHidden ? "" : "none";
+  if (resizeHandle) resizeHandle.style.display = isHidden ? "" : "none";
+  localStorage.setItem(_specChatOpenKey, isHidden ? "1" : "0");
+
+  // Auto-focus the input when opening.
+  if (isHidden) {
+    var input = document.getElementById("spec-chat-input");
+    if (input) input.focus();
+  }
+}
+
+function _restoreSpecChatState() {
+  var saved = localStorage.getItem(_specChatOpenKey);
+  // Default to open if no saved state.
+  if (saved === "0") {
+    var chatStream = document.getElementById("spec-chat-stream");
+    var resizeHandle = document.getElementById("spec-chat-resize");
+    if (chatStream) chatStream.style.display = "none";
+    if (resizeHandle) resizeHandle.style.display = "none";
+  }
+}
+
 // --- Chat pane resize ---
 
 var _specChatMinWidth = 280;
@@ -818,6 +852,7 @@ document.addEventListener("DOMContentLoaded", function () {
   if (currentMode !== "board") {
     _applyMode(currentMode);
   }
+  _restoreSpecChatState();
   _initSpecChatResize();
   if (typeof PlanningChat !== "undefined") {
     PlanningChat.init();

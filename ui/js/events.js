@@ -38,6 +38,7 @@ document.addEventListener("keydown", (e) => {
     e.key !== "?" &&
     e.key !== "e" &&
     e.key !== "s" &&
+    e.key !== "c" &&
     e.key !== "d" &&
     e.key !== "b"
   )
@@ -71,6 +72,7 @@ document.addEventListener("keydown", (e) => {
     switchMode(getCurrentMode() === "board" ? "spec" : "board");
   // Spec-mode-only shortcuts.
   if (getCurrentMode() === "spec") {
+    if (e.key === "c") toggleSpecChat();
     if (e.key === "d") dispatchFocusedSpec();
     if (e.key === "b") breakDownFocusedSpec();
   }
