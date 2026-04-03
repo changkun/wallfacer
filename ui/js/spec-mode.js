@@ -58,10 +58,12 @@ function _applyMode(mode) {
     switchExplorerRoot(mode === "spec" ? "specs" : "workspace");
   }
 
-  // Auto-show explorer in spec mode, hide in other modes.
+  // In spec mode, hide explorer initially — it will be shown by
+  // _updateSpecPaneVisibility() after the spec tree loads.
+  // In other modes, always hide it.
   var explorerPanel = document.getElementById("explorer-panel");
   if (explorerPanel) {
-    explorerPanel.style.display = mode === "spec" ? "" : "none";
+    explorerPanel.style.display = "none";
   }
 
   // Hide workspace bar and content header in docs mode.
@@ -638,6 +640,102 @@ function _teardownTocExclusion() {
   _tocResizeTimer = null;
 }
 
+// --- Spec pane visibility based on spec availability ---
+
+// _updateSpecPaneVisibility is called after the spec tree loads. If specs
+// exist, the three-pane layout (explorer + focused view + chat) is shown.
+// If no specs exist, only the chat pane is shown (full width).
+function _updateSpecPaneVisibility(hasSpecs) {
+  var container = document.getElementById("spec-mode-container");
+  var explorerPanel = document.getElementById("explorer-panel");
+
+  if (container) {
+    container.classList.toggle("spec-mode--chat-only", !hasSpecs);
+  }
+  if (explorerPanel) {
+    explorerPanel.style.display =
+      hasSpecs && getCurrentMode() === "spec" ? "" : "none";
+  }
+
+  // Auto-show README.md as the default focused content when specs exist
+  // but nothing is focused yet.
+  if (hasSpecs && !_focusedSpecPath) {
+    _showSpecReadme();
+  }
+}
+
+// _showSpecReadme loads and renders specs/README.md in the focused view as
+// the default landing content when no specific spec is selected.
+function _showSpecReadme() {
+  var ws =
+    typeof activeWorkspaces !== "undefined" && activeWorkspaces.length > 0
+      ? activeWorkspaces[0]
+      : null;
+  if (!ws) return;
+
+  var absPath = ws + "/specs/README.md";
+  var url =
+    Routes.explorer.readFile() +
+    "?path=" +
+    encodeURIComponent(absPath) +
+    "&workspace=" +
+    encodeURIComponent(ws);
+
+  // Clear header metadata — README is not a spec.
+  var titleEl = document.getElementById("spec-focused-title");
+  var statusEl = document.getElementById("spec-focused-status");
+  var kindEl = document.getElementById("spec-focused-kind");
+  var effortEl = document.getElementById("spec-focused-effort");
+  var metaEl = document.getElementById("spec-focused-meta");
+  if (titleEl) titleEl.textContent = "Specs";
+  if (statusEl) {
+    statusEl.textContent = "";
+    statusEl.className = "spec-focused-view__status";
+  }
+  if (kindEl) {
+    kindEl.textContent = "";
+    kindEl.className = "spec-focused-view__kind";
+  }
+  if (effortEl) effortEl.textContent = "";
+  if (metaEl) metaEl.textContent = "";
+  var dispatchBtn = document.getElementById("spec-dispatch-btn");
+  if (dispatchBtn) dispatchBtn.classList.add("hidden");
+  var breakdownBtn = document.getElementById("spec-summarize-btn");
+  if (breakdownBtn) breakdownBtn.classList.add("hidden");
+
+  var innerEl = document.getElementById("spec-focused-body-inner");
+  if (innerEl)
+    innerEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
+
+  fetch(url, { headers: withBearerHeaders() })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.text();
+    })
+    .then(function (text) {
+      if (!innerEl) return;
+      innerEl.innerHTML = renderMarkdown(text);
+      // Post-process: mermaid diagrams and spec link navigation.
+      if (typeof _mdRender !== "undefined" && _mdRender.enhanceMarkdown) {
+        _mdRender
+          .enhanceMarkdown(innerEl, {
+            links: true,
+            linkHandler: "spec",
+            basePath: "",
+            workspace: ws,
+          })
+          .then(function () {
+            _buildSpecToc(innerEl);
+          });
+      }
+    })
+    .catch(function () {
+      // README.md doesn't exist — show a placeholder.
+      if (innerEl) innerEl.innerHTML = "";
+      if (titleEl) titleEl.textContent = "Select a spec";
+    });
+}
+
 // --- Spec mode keyboard shortcut stubs ---
 
 // openSelectedSpec opens the currently selected explorer node in the focused view.
@@ -648,12 +746,10 @@ function openSelectedSpec() {}
 // No-op stub — wired by dispatch-workflow spec.
 function dispatchFocusedSpec() {}
 
-// breakDownFocusedSpec pre-fills the chat input with a breakdown directive.
+// breakDownFocusedSpec sends the /break-down slash command via the planning chat.
 function breakDownFocusedSpec() {
-  var input = document.getElementById("spec-chat-input");
-  if (input) {
-    input.value = "Break this into sub-specs";
-    input.focus();
+  if (typeof PlanningChat !== "undefined") {
+    PlanningChat.sendMessage("/break-down");
   }
 }
 
@@ -723,4 +819,7 @@ document.addEventListener("DOMContentLoaded", function () {
     _applyMode(currentMode);
   }
   _initSpecChatResize();
+  if (typeof PlanningChat !== "undefined") {
+    PlanningChat.init();
+  }
 });
