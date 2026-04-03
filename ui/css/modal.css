@@ -60,7 +60,7 @@
 .modal-wide #modal-backlog-right.hidden {
   display: none;
 }
-.modal-wide #modal-right > div:not(.right-panel-tabs) {
+.modal-wide #modal-right > div:not(.right-panel-tabs):not(.hidden) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
