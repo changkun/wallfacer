@@ -47,6 +47,12 @@ function makeEl(tag, registry) {
       child.parentElement = el;
       _children.push(child);
     },
+    insertBefore(newChild, refChild) {
+      newChild.parentElement = el;
+      const idx = _children.indexOf(refChild);
+      if (idx >= 0) _children.splice(idx, 0, newChild);
+      else _children.push(newChild);
+    },
     remove() {},
     addEventListener(type, fn) {
       if (!_listeners[type]) _listeners[type] = [];
@@ -81,16 +87,23 @@ function makeContext() {
   const registry = new Map();
   const ids = [
     "spec-chat-stream", "spec-chat-messages", "spec-chat-input", "spec-chat-send",
+    "spec-chat-send-mode", "spec-chat-send-hint", "spec-chat-slash-hint", "spec-chat-at-hint",
   ];
   for (const id of ids) {
     const el = makeEl("DIV", registry);
     el.id = id;
   }
-  // Set up parent for input (autocomplete appends to it).
+  // Set up parent hierarchy for the composer.
   const inputEl = registry.get("spec-chat-input");
-  const inputWrapper = makeEl("DIV", registry);
-  inputEl.parentElement = inputWrapper;
-  inputWrapper.appendChild = function(child) { child.parentElement = inputWrapper; };
+  const sendBtn = registry.get("spec-chat-send");
+  const sendGroup = makeEl("DIV", registry);
+  sendGroup.className = "spec-chat-send-group";
+  sendBtn.parentElement = sendGroup;
+  const composer = makeEl("DIV", registry);
+  composer.className = "spec-chat-composer";
+  inputEl.parentElement = composer;
+  const streamEl = registry.get("spec-chat-stream");
+  composer.parentElement = streamEl;
 
   let fetchResult = { status: 200, ok: true, json: () => Promise.resolve([]), text: () => Promise.resolve("") };
   let apiResult = [];
@@ -100,7 +113,10 @@ function makeContext() {
       getElementById(id) { return registry.get(id) || null; },
       createElement(tag) { return makeEl(tag, registry); },
       addEventListener() {},
-      querySelector() { return null; },
+      querySelector(sel) {
+        if (sel === ".spec-chat-composer") return composer;
+        return null;
+      },
     },
     window: {},
     navigator: { platform: "MacIntel" },

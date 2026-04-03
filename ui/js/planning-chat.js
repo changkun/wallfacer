@@ -43,44 +43,65 @@ var PlanningChat = (function () {
       });
     }
 
-    // Attach @-mention file autocomplete (reuses the task board's mention module).
-    // Position above the input since the chat input is at the bottom of the pane.
+    // Attach @-mention file autocomplete.
     if (typeof attachMentionAutocomplete === "function") {
       attachMentionAutocomplete(_input, { position: "above", priorityPrefix: "specs/" });
     }
 
-    // Wire clear button and send-mode toggle.
+    // Wire clear button.
     var clearBtn = document.getElementById("spec-chat-clear");
     if (clearBtn) {
       clearBtn.addEventListener("click", clearHistory);
     }
+
+    // Wire send-mode toggle and hint.
     var modeBtn = document.getElementById("spec-chat-send-mode");
+    var hintEl = document.getElementById("spec-chat-send-hint");
     if (modeBtn) {
-      _updateModeBtn(modeBtn);
+      _updateSendHint(hintEl);
       modeBtn.addEventListener("click", function () {
         _sendMode = _sendMode === "enter" ? "cmd-enter" : "enter";
         localStorage.setItem("wallfacer-chat-send-mode", _sendMode);
-        _updateModeBtn(modeBtn);
-        _updatePlaceholder();
+        _updateSendHint(hintEl);
       });
     }
-    _updatePlaceholder();
 
-    // Create interrupt button (hidden by default).
-    _interruptBtn = document.createElement("button");
-    _interruptBtn.className = "planning-chat-interrupt-btn";
-    _interruptBtn.textContent = "Interrupt";
-    _interruptBtn.style.display = "none";
-    _interruptBtn.addEventListener("click", _onInterrupt);
-    if (_sendBtn && _sendBtn.parentElement) {
-      _sendBtn.parentElement.insertBefore(_interruptBtn, _sendBtn.nextSibling);
+    // Wire / and @ shortcut buttons.
+    var slashBtn = document.getElementById("spec-chat-slash-hint");
+    if (slashBtn) {
+      slashBtn.addEventListener("click", function () {
+        _input.value = "/";
+        _input.focus();
+        _onInputChange();
+      });
+    }
+    var atBtn = document.getElementById("spec-chat-at-hint");
+    if (atBtn) {
+      atBtn.addEventListener("click", function () {
+        _input.value += "@";
+        _input.focus();
+        _input.dispatchEvent(new Event("input"));
+      });
     }
 
-    // Create queue container (below the input area).
+    // Create interrupt button (hidden by default), placed in the send group.
+    _interruptBtn = document.createElement("button");
+    _interruptBtn.className = "spec-chat-composer__send planning-chat-interrupt-btn";
+    _interruptBtn.innerHTML = "&#x25A0;"; // stop square
+    _interruptBtn.title = "Interrupt";
+    _interruptBtn.style.display = "none";
+    _interruptBtn.addEventListener("click", _onInterrupt);
+    var sendGroup = _sendBtn ? _sendBtn.parentElement : null;
+    if (sendGroup) {
+      sendGroup.insertBefore(_interruptBtn, _sendBtn);
+    }
+
+    // Create queue container below the composer.
     _queueEl = document.createElement("div");
     _queueEl.className = "planning-chat-queue";
-    if (_input.parentElement) {
-      _input.parentElement.appendChild(_queueEl);
+    var composer = document.querySelector(".spec-chat-composer");
+    if (composer && composer.parentElement) {
+      composer.parentElement.insertBefore(_queueEl, composer.nextSibling);
     }
 
     // Track scroll position to suppress auto-scroll when user reads history.
@@ -148,21 +169,15 @@ var PlanningChat = (function () {
     }
   }
 
-  function _updateModeBtn(btn) {
+  function _updateSendHint(hintEl) {
+    if (!hintEl) return;
     var isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
     var mod = isMac ? "\u2318" : "Ctrl";
     if (_sendMode === "cmd-enter") {
-      btn.textContent = mod + "+\u21B5 Send";
-      btn.title = "Currently: " + mod + "+Enter to send. Click to switch to Enter.";
+      hintEl.textContent = mod + "+Return to send";
     } else {
-      btn.textContent = "\u21B5 Send";
-      btn.title = "Currently: Enter to send. Click to switch to " + mod + "+Enter.";
+      hintEl.textContent = "Shift+Return for new line";
     }
-  }
-
-  function _updatePlaceholder() {
-    if (!_input) return;
-    _input.placeholder = "Message...";
   }
 
   function _autoGrow() {
@@ -249,6 +264,7 @@ var PlanningChat = (function () {
   function _startStreaming() {
     _streaming = true;
     if (_interruptBtn) _interruptBtn.style.display = "";
+    if (_sendBtn) _sendBtn.style.display = "none";
 
     var bubble = _createBubble("assistant");
     _messagesEl.appendChild(bubble);
@@ -388,6 +404,7 @@ var PlanningChat = (function () {
     }
     _streaming = false;
     if (_interruptBtn) _interruptBtn.style.display = "none";
+    if (_sendBtn) _sendBtn.style.display = "";
 
     if (interrupted) {
       // Mark the last assistant bubble as interrupted.

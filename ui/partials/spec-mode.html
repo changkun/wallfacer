@@ -33,16 +33,25 @@
       <button id="spec-chat-clear" class="spec-chat-clear-btn" title="Clear conversation">Clear</button>
     </div>
     <div id="spec-chat-messages" class="spec-chat-stream__messages"></div>
-    <div class="spec-chat-stream__input">
+    <div class="spec-chat-composer">
       <textarea
         id="spec-chat-input"
-        class="spec-chat-input"
+        class="spec-chat-composer__input"
         placeholder="Message..."
         rows="1"
       ></textarea>
-      <div class="spec-chat-send-group">
-        <button id="spec-chat-send" class="spec-chat-send-btn">Send</button>
-        <button id="spec-chat-send-mode" class="spec-chat-mode-btn" title="Toggle send shortcut"></button>
+      <div class="spec-chat-composer__bar">
+        <div class="spec-chat-composer__actions">
+          <button id="spec-chat-slash-hint" class="spec-chat-composer__action" title="Slash commands">/</button>
+          <button id="spec-chat-at-hint" class="spec-chat-composer__action" title="Mention a file">@</button>
+        </div>
+        <div class="spec-chat-composer__right">
+          <span id="spec-chat-send-hint" class="spec-chat-composer__hint"></span>
+          <div class="spec-chat-send-group">
+            <button id="spec-chat-send" class="spec-chat-composer__send">&#x27A4;</button>
+            <button id="spec-chat-send-mode" class="spec-chat-composer__send-toggle" title="Toggle send shortcut">&#x25BE;</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
