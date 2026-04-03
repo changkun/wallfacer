@@ -229,19 +229,21 @@ func TestGetPlanningMessages_NilPlanner(t *testing.T) {
 	}
 }
 
-func TestSendPlanningMessage_NotRunning(t *testing.T) {
+func TestSendPlanningMessage_AutoStarts(t *testing.T) {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	h.planner = p
-	// Planner not started.
+	// Planner not started — should auto-start and return 202.
+	// The exec will fail in the background (no backend) but the
+	// HTTP response is 202 immediately.
 
 	rec := httptest.NewRecorder()
 	body := strings.NewReader(`{"message":"hello"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
 	h.SendPlanningMessage(rec, req)
 
-	if rec.Code != http.StatusConflict {
-		t.Errorf("status = %d, want %d (not running)", rec.Code, http.StatusConflict)
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("status = %d, want %d (auto-start + accepted)", rec.Code, http.StatusAccepted)
 	}
 }
 

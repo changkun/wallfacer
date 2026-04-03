@@ -95,10 +95,6 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
 		return
 	}
-	if !h.planner.IsRunning() {
-		http.Error(w, "planning sandbox not running", http.StatusConflict)
-		return
-	}
 	if h.planner.IsBusy() {
 		httpjson.Write(w, http.StatusConflict, map[string]any{
 			"error": "agent is busy",
@@ -154,18 +150,31 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		cmd = append(cmd, "--resume", sess.SessionID)
 	}
 
+	// Auto-start the planner if not already running.
+	if !h.planner.IsRunning() {
+		if err := h.planner.Start(r.Context()); err != nil {
+			http.Error(w, "failed to start planner: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	h.planner.SetBusy(true)
 	ll := h.planner.StartLiveLog()
 
 	// Run exec in background goroutine. Use a detached context because the
 	// HTTP request context is cancelled as soon as the 202 response is sent.
 	go func() {
-		defer h.planner.SetBusy(false)
-		defer h.planner.CloseLiveLog()
+		defer func() {
+			h.planner.CloseLiveLog()
+			h.planner.SetBusy(false)
+			if rec := recover(); rec != nil {
+				slog.Error("planning exec panic", "recover", rec)
+			}
+		}()
 
 		handle, err := h.planner.Exec(context.Background(), cmd)
 		if err != nil {
-			slog.Warn("planning exec failed", "error", err)
+			slog.Error("planning exec failed", "error", err)
 			return
 		}
 
