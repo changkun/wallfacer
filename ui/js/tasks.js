@@ -649,9 +649,18 @@ async function cancelTask() {
   try {
     await api(task(taskId).cancel(), { method: "POST" });
     closeModal();
+    // Keep the "cancelling…" indicator visible for at least 1.5 s after the
+    // modal closes so the user can see the board card update. The server sends
+    // the SSE "cancelled" update synchronously before the HTTP response, so by
+    // the time the modal closes the task may already be "cancelled" in tasks[].
+    // Without a minimum delay the indicator disappears before it is visible.
+    var minDisplayEnd = Date.now() + 1500;
     waitForTaskDelta(taskId).finally(function () {
-      pendingCancelTaskIds.delete(taskId);
-      scheduleRender();
+      var delay = Math.max(0, minDisplayEnd - Date.now());
+      setTimeout(function () {
+        pendingCancelTaskIds.delete(taskId);
+        scheduleRender();
+      }, delay);
     });
   } catch (e) {
     pendingCancelTaskIds.delete(taskId);

@@ -892,7 +892,6 @@ function updateCard(card, t, rank) {
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === "in_progress";
   const isPendingCancel =
-    t.status === "in_progress" &&
     typeof pendingCancelTaskIds !== "undefined" &&
     pendingCancelTaskIds.has(t.id);
   const badgeClass = isArchived
