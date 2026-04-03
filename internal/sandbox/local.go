@@ -292,17 +292,30 @@ func (h *localHandle) Stderr() io.ReadCloser {
 // the container is returned as (exitCode, nil) with state set to Stopped.
 // Only unexpected errors (e.g. wait syscall failures) return a non-nil error
 // with state set to Failed.
+//
+// If the state is already terminal (e.g. Kill() raced and won), the
+// transition is skipped to avoid a spurious stopped→stopped warning.
 func (h *localHandle) Wait() (int, error) {
 	err := h.cmd.Wait()
+	terminal := func() bool {
+		s := BackendState(h.state.Load())
+		return s == StateStopped || s == StateFailed
+	}
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			transition(&h.state, StateStopped)
+			if !terminal() {
+				transition(&h.state, StateStopped)
+			}
 			return exitErr.ExitCode(), nil
 		}
-		transition(&h.state, StateFailed)
+		if !terminal() {
+			transition(&h.state, StateFailed)
+		}
 		return -1, err
 	}
-	transition(&h.state, StateStopped)
+	if !terminal() {
+		transition(&h.state, StateStopped)
+	}
 	return 0, nil
 }
 
