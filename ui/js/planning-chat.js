@@ -2,7 +2,7 @@
 // Handles sending messages, streaming responses, rendering conversation,
 // and slash command autocomplete.
 
-/* global Routes, api, renderMarkdown, renderPrettyLogs, startStreamingFetch, escapeHtml, specModeState, withAuthToken, withBearerHeaders */
+/* global Routes, api, renderMarkdown, renderPrettyLogs, startStreamingFetch, escapeHtml, specModeState, withAuthToken, withBearerHeaders, attachMentionAutocomplete */
 
 var PlanningChat = (function () {
   "use strict";
@@ -37,6 +37,11 @@ var PlanningChat = (function () {
         var text = _input.value.trim();
         if (text) sendMessage(text);
       });
+    }
+
+    // Attach @-mention file autocomplete (reuses the task board's mention module).
+    if (typeof attachMentionAutocomplete === "function") {
+      attachMentionAutocomplete(_input);
     }
 
     // Wire clear button.
@@ -95,7 +100,8 @@ var PlanningChat = (function () {
       }
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Enter or Cmd+Enter sends; Shift+Enter inserts newline.
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
       e.preventDefault();
       var text = _input.value.trim();
       if (text) sendMessage(text);
@@ -133,8 +139,6 @@ var PlanningChat = (function () {
     }
 
     _input.value = "";
-    _input.disabled = true;
-    if (_sendBtn) _sendBtn.disabled = true;
     _closeAutocomplete();
 
     // Render user message immediately.
@@ -159,13 +163,13 @@ var PlanningChat = (function () {
 
       if (res.status === 409) {
         _appendSystemMessage("Agent is busy — try again shortly.");
-        _enableInput();
+        _input.focus();
         return;
       }
       if (!res.ok) {
         var errText = await res.text();
         _appendSystemMessage("Error: " + errText);
-        _enableInput();
+        _input.focus();
         return;
       }
 
@@ -180,24 +184,32 @@ var PlanningChat = (function () {
   function _startStreaming() {
     _streaming = true;
     if (_interruptBtn) _interruptBtn.style.display = "";
-    if (_sendBtn) _sendBtn.style.display = "none";
 
-    // Create two sections: a collapsible activity log (tool calls etc.)
-    // and the main assistant text rendered as markdown.
     var bubble = _createBubble("assistant");
     _messagesEl.appendChild(bubble);
     var contentEl = bubble.querySelector(".planning-chat-bubble__content");
+    // Show thinking indicator until first content arrives.
+    if (contentEl) {
+      contentEl.innerHTML = '<span class="planning-chat-thinking"><span class="planning-chat-thinking__dots"><span>.</span><span>.</span><span>.</span></span></span>';
+    }
+    _scrollToBottom();
     var rawBuffer = "";
     var assistantText = "";
+    var receivedContent = false;
 
     _activeStream = startStreamingFetch({
       url: Routes.planning.messageStream(),
       onChunk: function (chunk) {
         rawBuffer += chunk;
-        // Extract assistant text from NDJSON for the chat display.
         assistantText = _extractAssistantText(rawBuffer);
         if (contentEl) {
-          _renderChatResponse(contentEl, assistantText, rawBuffer);
+          // Replace thinking indicator on first real content.
+          if (!receivedContent && (assistantText || _hasToolActivity(rawBuffer))) {
+            receivedContent = true;
+          }
+          if (receivedContent) {
+            _renderChatResponse(contentEl, assistantText, rawBuffer);
+          }
         }
         _scrollToBottom();
       },
@@ -311,7 +323,6 @@ var PlanningChat = (function () {
     }
     _streaming = false;
     if (_interruptBtn) _interruptBtn.style.display = "none";
-    if (_sendBtn) _sendBtn.style.display = "";
 
     if (interrupted) {
       // Mark the last assistant bubble as interrupted.
@@ -331,12 +342,9 @@ var PlanningChat = (function () {
     _drainQueue();
   }
 
+  // no-op kept for backward compat with tests
   function _enableInput() {
-    if (_input) {
-      _input.disabled = false;
-      _input.focus();
-    }
-    if (_sendBtn) _sendBtn.disabled = false;
+    if (_input) _input.focus();
   }
 
   function _appendMessageBubble(role, content, timestamp) {

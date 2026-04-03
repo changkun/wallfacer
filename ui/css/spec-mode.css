@@ -697,6 +697,33 @@
   font-size: 12px;
 }
 
+.planning-chat-thinking {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.planning-chat-thinking__dots span {
+  animation: planning-chat-dot 1.4s infinite;
+  opacity: 0.2;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.planning-chat-thinking__dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.planning-chat-thinking__dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes planning-chat-dot {
+  0%, 60%, 100% { opacity: 0.2; }
+  30% { opacity: 1; }
+}
+
 /* Queue chips */
 .planning-chat-queue {
   display: flex;
