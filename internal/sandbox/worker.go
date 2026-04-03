@@ -158,6 +158,9 @@ type execHandle struct {
 // Kill terminates the exec process without removing the worker container.
 // The worker container stays alive for subsequent exec calls.
 func (h *execHandle) Kill() error {
+	if s := BackendState(h.state.Load()); s == StateStopped || s == StateFailed {
+		return nil
+	}
 	transition(&h.state, StateStopping)
 
 	// Kill the exec process only — not the worker container.

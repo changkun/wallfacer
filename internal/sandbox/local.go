@@ -302,6 +302,9 @@ func (h *localHandle) Wait() (int, error) {
 // then force-removes to clean up. Errors from kill/rm are logged but not
 // returned, since the goal is best-effort cleanup.
 func (h *localHandle) Kill() error {
+	if s := BackendState(h.state.Load()); s == StateStopped || s == StateFailed {
+		return nil
+	}
 	transition(&h.state, StateStopping)
 
 	if err := cmdexec.New(h.command, "kill", h.name).Run(); err != nil {

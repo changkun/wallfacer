@@ -34,6 +34,42 @@ func TestStateMachineRejectsCreatingToCreating(t *testing.T) {
 	}
 }
 
+// TestKillNoopWhenAlreadyStopped verifies that calling Kill on a handle
+// that has already reached StateStopped does not produce invalid state
+// transition warnings. This is a regression test for a bug where Kill
+// tried stopped→stopping→stopped, both of which are invalid.
+func TestKillNoopWhenAlreadyStopped(t *testing.T) {
+	h := newLocalHandle("test-kill-stopped", nil, nil, nil, "")
+	// Drive state to Stopped through valid transitions.
+	transition(&h.state, StateRunning)
+	transition(&h.state, StateStopped)
+
+	if got := h.State(); got != StateStopped {
+		t.Fatalf("State() = %v, want StateStopped", got)
+	}
+
+	// Kill on a stopped handle should be a no-op (no log warnings).
+	if err := h.Kill(); err != nil {
+		t.Fatalf("Kill() returned error: %v", err)
+	}
+	if got := h.State(); got != StateStopped {
+		t.Fatalf("after Kill(), State() = %v, want StateStopped", got)
+	}
+}
+
+// TestKillNoopWhenAlreadyFailed verifies Kill is a no-op on a failed handle.
+func TestKillNoopWhenAlreadyFailed(t *testing.T) {
+	h := newLocalHandle("test-kill-failed", nil, nil, nil, "")
+	transition(&h.state, StateFailed)
+
+	if err := h.Kill(); err != nil {
+		t.Fatalf("Kill() returned error: %v", err)
+	}
+	if got := h.State(); got != StateFailed {
+		t.Fatalf("after Kill(), State() = %v, want StateFailed", got)
+	}
+}
+
 // TestNewLocalHandleStartsCreatingAndCanTransition verifies that
 // newLocalHandle initialises the state to StateCreating and that the handle
 // can transition forward to StateRunning without a redundant Creating→Creating
