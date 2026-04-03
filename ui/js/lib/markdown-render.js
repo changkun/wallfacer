@@ -145,6 +145,7 @@ var _mdRender = (function () {
         block.innerHTML = "";
         block.appendChild(div);
         block.classList.add("mermaid-rendered");
+        _fixMermaidNodeContrast(div);
       } catch (_) {
         // Keep the source code block visible on render failure.
       }
@@ -174,10 +175,55 @@ var _mdRender = (function () {
           })(div),
         );
         pre.replaceWith(div);
+        _fixMermaidNodeContrast(div);
       } catch (_) {
         // Leave the code block as-is on render failure.
       }
     }
+  }
+
+  // --- Post-render contrast fix for mermaid nodes ---
+  //
+  // Mermaid's base theme sets nodeTextColor globally, so nodes with inline
+  // `style fill:#d4edda` (light backgrounds) inherit light gray text that's
+  // unreadable.  After rendering, scan for nodes with light fills and force
+  // dark text.
+
+  function _fixMermaidNodeContrast(container) {
+    var rects = container.querySelectorAll("svg .node rect, svg .node polygon, svg .node circle");
+    for (var i = 0; i < rects.length; i++) {
+      var shape = rects[i];
+      var fill = shape.getAttribute("style");
+      if (!fill) continue;
+      var match = fill.match(/fill:\s*(#[0-9a-fA-F]{3,8})/);
+      if (!match) continue;
+      var lum = _hexLuminance(match[1]);
+      if (lum < 0) continue; // parse failed
+      // Find the label in the same node group.
+      var node = shape.closest(".node");
+      if (!node) continue;
+      var labels = node.querySelectorAll(".nodeLabel, foreignObject span");
+      var textColor = lum > 0.5 ? "#1a1a1a" : "#f0f0f0";
+      for (var j = 0; j < labels.length; j++) {
+        labels[j].style.color = textColor;
+      }
+    }
+  }
+
+  // Parse a hex color and return relative luminance (0 = black, 1 = white).
+  // Returns -1 on parse failure.
+  function _hexLuminance(hex) {
+    hex = hex.replace("#", "");
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    if (hex.length < 6) return -1;
+    var r = parseInt(hex.substring(0, 2), 16) / 255;
+    var g = parseInt(hex.substring(2, 4), 16) / 255;
+    var b = parseInt(hex.substring(4, 6), 16) / 255;
+    // sRGB linearize then ITU-R BT.709 luminance.
+    r = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+    g = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+    b = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
   // --- Click-to-expand mermaid diagram overlay ---
