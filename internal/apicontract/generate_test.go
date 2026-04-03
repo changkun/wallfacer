@@ -1,9 +1,11 @@
 package apicontract
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -213,5 +215,97 @@ func TestRoute_FullPattern_AllRoutes(t *testing.T) {
 		if fp[0:len(r.Method)] != r.Method {
 			t.Errorf("FullPattern() %q does not start with method %q", fp, r.Method)
 		}
+	}
+}
+
+// TestKebabSlashToCamel_Empty verifies that an empty string returns empty.
+func TestKebabSlashToCamel_Empty(t *testing.T) {
+	got := kebabSlashToCamel("")
+	if got != "" {
+		t.Errorf("kebabSlashToCamel(%q) = %q, want %q", "", got, "")
+	}
+}
+
+// TestJsMethodName_ExplicitJSName verifies that Route.JSName takes precedence.
+func TestJsMethodName_ExplicitJSName(t *testing.T) {
+	r := Route{Method: "GET", Pattern: "/api/env", JSName: "get"}
+	got := jsMethodName(r, "env")
+	if got != "get" {
+		t.Errorf("jsMethodName() = %q, want %q", got, "get")
+	}
+}
+
+// TestJsMethodName_NamespaceRoot returns empty when no suffix and no JSName.
+func TestJsMethodName_NamespaceRoot(t *testing.T) {
+	r := Route{Method: "GET", Pattern: "/api/env"}
+	got := jsMethodName(r, "env")
+	if got != "" {
+		t.Errorf("jsMethodName() = %q, want %q", got, "")
+	}
+}
+
+// TestJsTaskMethodName_ExplicitJSName verifies JSName takes precedence for task routes.
+func TestJsTaskMethodName_ExplicitJSName(t *testing.T) {
+	r := Route{Method: "POST", Pattern: "/api/tasks/{id}/refine", JSName: "refine"}
+	got := jsTaskMethodName(r)
+	if got != "refine" {
+		t.Errorf("jsTaskMethodName() = %q, want %q", got, "refine")
+	}
+}
+
+// TestJsTaskMethodName_RootTaskRoute returns empty for /api/tasks/{id} without JSName.
+func TestJsTaskMethodName_RootTaskRoute(t *testing.T) {
+	r := Route{Method: "PATCH", Pattern: "/api/tasks/{id}"}
+	got := jsTaskMethodName(r)
+	if got != "" {
+		t.Errorf("jsTaskMethodName() = %q, want %q", got, "")
+	}
+}
+
+// TestNeedsQuoting_EdgeCases tests the quoting helper for identifiers.
+func TestNeedsQuoting_EdgeCases(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{"", true},
+		{"validName", false},
+		{"has-dash", true},
+		{"has space", true},
+		{"_under$core", false},
+		{"123num", false},
+	}
+	for _, tc := range cases {
+		got := needsQuoting(tc.input)
+		if got != tc.want {
+			t.Errorf("needsQuoting(%q) = %v, want %v", tc.input, got, tc.want)
+		}
+	}
+}
+
+// TestJsMethodName_PathParamSkipped verifies that path parameters like {name}
+// are stripped when deriving the JS method name.
+func TestJsMethodName_PathParamSkipped(t *testing.T) {
+	r := Route{Method: "GET", Pattern: "/api/foo/{name}/bar"}
+	got := jsMethodName(r, "foo")
+	if got != "bar" {
+		t.Errorf("jsMethodName() = %q, want %q", got, "bar")
+	}
+}
+
+// TestEmitNamespace_SkipsDuplicateAndEmpty verifies that emitNamespace skips
+// routes whose derived jsName is empty or duplicated.
+func TestEmitNamespace_SkipsDuplicateAndEmpty(t *testing.T) {
+	routes := []Route{
+		{Method: "GET", Pattern: "/api/ns/foo", Name: "A"},
+		{Method: "PUT", Pattern: "/api/ns/foo", Name: "B"}, // duplicate jsName "foo"
+		{Method: "GET", Pattern: "/api/ns", Name: "C"},     // empty jsName (namespace root)
+	}
+	var b bytes.Buffer
+	emitNamespace(&b, "ns", routes)
+	out := b.String()
+	// Should contain "foo" exactly once, and not contain an empty function name.
+	if count := strings.Count(out, "foo: function"); count != 1 {
+		t.Errorf("expected 1 'foo: function', got %d in:\n%s", count, out)
 	}
 }
