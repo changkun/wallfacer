@@ -150,10 +150,15 @@ The server's only responsibility is:
 - `DELETE /api/planning/messages` — Clear conversation history (with confirmation)
 - `GET /api/planning/commands` — List available slash commands with descriptions (for UI autocomplete)
 
-## Open Questions
+### Concurrent Access & Message Queue
 
-1. **Ideation migration path**: Should the ideation runner switch to using `Planner.Exec()` immediately, or should it fall back to ephemeral containers when the planning container is not running? The planner auto-starts on server init, so fallback may be unnecessary.
-2. **Concurrent access**: If the user sends a new message while the agent is still responding to the previous one, should the server queue it, reject it, or cancel the in-flight exec? Queuing with a depth limit of 1 seems safest.
+Claude Code's headless mode (`-p`) is single-shot: one prompt in, one response out. There is no way to inject messages into a running invocation. The design uses a client-side message queue with interrupt semantics:
+
+- While the agent is responding, the user can continue typing and submitting messages. Queued messages appear visually in the chat input area (stacked below the input box), not yet sent to the server.
+- The user can **edit** or **remove** a queued message before it is sent. Clicking a queued message opens it for inline editing; a dismiss button removes it from the queue.
+- The user can **interrupt** the current agent turn (kills the in-flight exec process). This is not a session termination — the next message still uses `--resume` with the same session ID, so the agent retains full context from all previous turns including the partial interrupted one. The interrupted response (whatever was streamed so far) is shown in the chat as a truncated message.
+- When the agent finishes responding (or is interrupted), the next queued message is sent automatically via `POST /api/planning/messages`.
+- The server processes one message at a time — the queue lives entirely in the UI. `POST /api/planning/messages` returns **409 Conflict** if an exec is already in flight, which the UI handles by keeping the message in the queue and retrying after the current response completes or is interrupted.
 
 ## Affects
 
