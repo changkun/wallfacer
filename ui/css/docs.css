@@ -30,6 +30,7 @@
   border-left: 1px solid var(--border);
   overflow-y: auto;
   padding: 6px 8px;
+  font-size: 11px;
 }
 
 /* --- Markdown body (docs viewer) --- */
