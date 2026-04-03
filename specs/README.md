@@ -32,6 +32,7 @@ Local Product                     Cloud Platform
   ○ Task Revert
   ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
   ✅ Pixel Agent Avatars
+  ○ Excalidraw Whiteboard
   ○ Spatial Canvas (vague)              ○ Information Inbox
                                     ○ Multi-Agent Consensus
                                     ○ Multi-Agent Debate
@@ -73,6 +74,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | ↳ [spec-drift-detection.md](local/spec-coordination/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
 | ↳ [spec-planning-ux.md](local/spec-coordination/spec-planning-ux.md) | Not started | Spec explorer, chat-driven iteration, dispatch workflow, progress tracking |
 | [desktop-app.md](local/desktop-app.md) | **Complete** | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
+| [excalidraw-whiteboard.md](local/excalidraw-whiteboard.md) | Not started | Excalidraw-based drawing/brainstorm whiteboard as a peer view |
 | [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
@@ -103,6 +105,7 @@ graph LR
   FE --> DA[Desktop App ✅]
   HT --> DA
 
+  EW[Excalidraw Whiteboard]
   IDF[Inline Diff Feedback]
   ORS[Oversight Risk Scoring]
   PR[Pull Request Creation]
