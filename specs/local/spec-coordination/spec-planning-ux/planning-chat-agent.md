@@ -1,6 +1,6 @@
 ---
 title: Planning Chat Agent
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox.md
@@ -12,7 +12,7 @@ affects:
   - internal/prompts/
 effort: xlarge
 created: 2026-03-30
-updated: 2026-04-03
+updated: 2026-04-04
 author: changkun
 dispatched_task_id: null
 ---
@@ -192,3 +192,51 @@ graph LR
   G --> H[UI Message Queue & Interrupt]
   C[Ideation Migration]
 ```
+
+## Outcome
+
+The planning chat agent shipped as a full conversational interface in the spec mode right pane, wrapping Claude Code's headless mode (`-p --output-format stream-json --resume`) inside the existing planning worker container. The implementation required 8 task specs, 38+ commits, and significant post-implementation bug fixing to resolve integration issues that were not foreseeable from the spec alone.
+
+### What Shipped
+
+- **8 API endpoints**: `GET/POST/DELETE /api/planning/messages`, `GET /api/planning/messages/stream`, `POST /api/planning/messages/interrupt`, `GET /api/planning/commands` (in `internal/handler/planning.go`, `internal/apicontract/routes.go`)
+- **Conversation persistence**: JSONL message log + session tracking in `~/.wallfacer/planning/<fingerprint>/` (`internal/planner/conversation.go`)
+- **Planning system prompt**: `internal/prompts/planning.tmpl` — spec-writer role with document model conventions
+- **Slash command registry**: 7 built-in commands (`/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, `/dispatch`) with embedded templates in `internal/planner/commands_templates/`
+- **Ideation migration**: `RunIdeation` refactored to route through `Planner.Exec()` with ephemeral fallback (`internal/runner/ideate.go`)
+- **Shared livelog package**: extracted `internal/pkg/livelog/` from `internal/runner/livelog.go` for cross-package streaming
+- **Frontend chat module**: `ui/js/planning-chat.js` (~600 lines) — Slack-style composer with `@` file mentions (with `specs/` priority), `/` command autocomplete, message queue with edit/remove, interrupt button, thinking animation, smart auto-scroll, send-mode toggle (Enter vs Cmd+Enter), chat pane fold/unfold (`C` key)
+- **Chat bubble CSS**: `ui/css/spec-mode.css` — user/assistant bubbles, error blocks, queue chips, composer bar, autocomplete dropdowns
+- **Tests**: 36 new backend tests (planner + handler), 8 frontend tests, all 3107 backend + 46 frontend test files passing
+
+### Design Evolution
+
+1. **Option C selected over Option B.** The spec originally explored three options for the conversation model. During refinement, Option C (conversation wrapper over container exec) was chosen because it reuses the existing planning container and Claude Code's session mechanism rather than building custom conversation infrastructure. This was further simplified to "headless Claude Code over container exec" — the server doesn't orchestrate LLM calls at all; it just pipes prompts to `claude -p` and streams the output.
+
+2. **Codex compatibility deferred.** Originally the spec covered both Claude and Codex sandboxes. During refinement, Codex support was extracted to a separate `planning-codex-compat.md` spec to keep scope manageable.
+
+3. **Stream transport changed from SSE to plain text.** The spec described SSE (`event: data`, `event: done` framing). During implementation, the stream endpoint was changed to plain text streaming (matching the existing `StreamLogs` pattern) so the frontend could reuse `startStreamingFetch` and `renderPrettyLogs` from the task board.
+
+4. **Rendering: terminal-style + markdown hybrid.** The initial implementation dumped raw NDJSON as text. This required multiple iterations: first adding NDJSON parsing, then switching to `renderPrettyLogs` for terminal-style rendering, and finally settling on a hybrid — assistant text rendered as markdown, with tool activity in a collapsible `<details>` section.
+
+5. **`buildIdeationContainerSpec` retained.** The spec said to remove it, but the ephemeral fallback path was kept for backward compatibility when no planner is configured.
+
+6. **`r.Context()` bug.** The background exec goroutine initially used the HTTP request context, which gets cancelled when the 202 response is sent. This caused the exec to fail silently, leaving the planner stuck in `busy=true`. Required `context.Background()` fix.
+
+7. **Stream race condition.** The client connects to the stream endpoint after receiving the 202 from the POST, but the exec goroutine may not have created the live log yet. Required server-side polling (up to 2s) and client-side retry to resolve.
+
+8. **Stale `--resume` session.** The `claude-config` named volume is shared across all containers (task workers, planning, refinement). When the planning container is recreated, sessions stored in `~/.claude/` may be pruned or the session ID becomes stale. The error "No conversation found with session ID" required: (a) structured error detection via NDJSON parsing, (b) automatic retry without `--resume`, and (c) conversation history prepended as context for the fresh session. This remains a known limitation — the text-based history reconstruction is lossy compared to the original session state.
+
+9. **Extensive UI polish cycle.** The initial chat UI was a bare textarea with a Send button. Multiple iterations were needed to reach a usable state: Slack-style composer box, thinking animation, smart auto-scroll, `@` mention dropdown positioning (above not below), slash command arrow-key navigation (async→sync rendering fix), unified dropdown styles, send-mode toggle, chat pane fold/unfold. Each of these surfaced only during manual testing, not from the spec.
+
+### Known Limitations
+
+- **Session persistence is fragile.** The shared `claude-config` volume means planning sessions can be invalidated by task worker container operations. A dedicated `claude-planning-config` volume would isolate planning sessions.
+- **History reconstruction is lossy.** When a session is lost and retried with `BuildHistoryContext()`, only the last 20 messages (capped at 500 chars each) are prepended. Tool call trajectories, file reads, and agent reasoning are lost. A proper fix would store complete turn NDJSON and reconstruct rich context from it.
+- **No turn output storage.** Unlike task execution (which stores `outputs/turn-NNNN.json`), the planning chat does not persist raw NDJSON per turn. This blocks faithful context reconstruction and oversight/analytics features.
+
+### Future Work
+
+- **Per-turn NDJSON storage** — save each exec's raw output to `~/.wallfacer/planning/<fp>/turns/` for faithful context reconstruction and analytics
+- **Dedicated planning volume** — `claude-planning-config` to isolate planning sessions from task workers
+- **Codex compatibility** — see `planning-codex-compat.md`
