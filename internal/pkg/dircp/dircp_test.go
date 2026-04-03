@@ -218,4 +218,3 @@ func TestCopyFileDestinationError(t *testing.T) {
 		t.Fatal("expected error when destination directory does not exist")
 	}
 }
-
