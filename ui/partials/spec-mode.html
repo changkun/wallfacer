@@ -30,10 +30,7 @@
   <div id="spec-chat-stream" class="spec-chat-stream">
     <div class="spec-chat-stream__header">
       <span class="spec-chat-stream__title">Planning Chat</span>
-      <span class="spec-chat-stream__actions">
-        <button id="spec-chat-send-mode" class="spec-chat-mode-btn" title="Toggle send shortcut"></button>
-        <button id="spec-chat-clear" class="spec-chat-clear-btn" title="Clear conversation">Clear</button>
-      </span>
+      <button id="spec-chat-clear" class="spec-chat-clear-btn" title="Clear conversation">Clear</button>
     </div>
     <div id="spec-chat-messages" class="spec-chat-stream__messages"></div>
     <div class="spec-chat-stream__input">
@@ -43,7 +40,10 @@
         placeholder="Message... (Enter to send, Shift+Enter for newline, @ for files, / for commands)"
         rows="2"
       ></textarea>
-      <button id="spec-chat-send" class="spec-chat-send-btn">Send</button>
+      <div class="spec-chat-send-group">
+        <button id="spec-chat-send" class="spec-chat-send-btn">Send</button>
+        <button id="spec-chat-send-mode" class="spec-chat-mode-btn" title="Toggle send shortcut"></button>
+      </div>
     </div>
   </div>
 </div>
