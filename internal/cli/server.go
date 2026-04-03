@@ -685,13 +685,14 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CancelIdeation":    h.CancelIdeation,
 
 		// Planning sandbox.
-		"GetPlanningStatus":     h.GetPlanningStatus,
-		"StartPlanning":         h.StartPlanning,
-		"StopPlanning":          h.StopPlanning,
+		"GetPlanningStatus":      h.GetPlanningStatus,
+		"StartPlanning":          h.StartPlanning,
+		"StopPlanning":           h.StopPlanning,
 		"GetPlanningMessages":    h.GetPlanningMessages,
 		"SendPlanningMessage":    h.SendPlanningMessage,
 		"ClearPlanningMessages":  h.ClearPlanningMessages,
 		"StreamPlanningMessages": h.StreamPlanningMessages,
+		"GetPlanningCommands":    h.GetPlanningCommands,
 
 		// Environment configuration.
 		"GetEnvConfig":    h.GetEnvConfig,

@@ -147,6 +147,10 @@ var Routes = {
     messageStream: function () {
       return "/api/planning/messages/stream";
     },
+    // GET /api/planning/commands
+    commands: function () {
+      return "/api/planning/commands";
+    },
   },
 
   env: {

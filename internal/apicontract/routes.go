@@ -240,6 +240,12 @@ var Routes = []Route{
 		Description: "Stream the agent's response tokens.",
 		Tags:        []string{"planning"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/planning/commands", Name: "GetPlanningCommands",
+		JSName:      "commands",
+		Description: "List available slash commands.",
+		Tags:        []string{"planning"},
+	},
 
 	// --- Environment configuration ---
 

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 95,
+  "route_count": 96,
   "routes": [
     {
       "method": "GET",
@@ -261,6 +261,15 @@
       "pattern": "/api/planning/messages/stream",
       "name": "StreamPlanningMessages",
       "description": "Stream the agent's response tokens.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/planning/commands",
+      "name": "GetPlanningCommands",
+      "description": "List available slash commands.",
       "tags": [
         "planning"
       ]

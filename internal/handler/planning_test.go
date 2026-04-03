@@ -374,3 +374,56 @@ func TestStreamPlanningMessages_LiveData(t *testing.T) {
 		t.Errorf("response body missing done event: %q", body)
 	}
 }
+
+// --- Commands ---
+
+func TestGetPlanningCommands(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	h.SetPlanner(p)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/planning/commands", nil)
+	h.GetPlanningCommands(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var cmds []planner.Command
+	if err := json.Unmarshal(rec.Body.Bytes(), &cmds); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if len(cmds) != 7 {
+		t.Fatalf("expected 7 commands, got %d", len(cmds))
+	}
+
+	names := make(map[string]bool)
+	for _, c := range cmds {
+		names[c.Name] = true
+		if c.Description == "" {
+			t.Errorf("command %q has empty description", c.Name)
+		}
+		if c.Usage == "" {
+			t.Errorf("command %q has empty usage", c.Name)
+		}
+	}
+	for _, want := range []string{"summarize", "break-down", "create", "status", "validate", "impact", "dispatch"} {
+		if !names[want] {
+			t.Errorf("missing command %q", want)
+		}
+	}
+}
+
+func TestGetPlanningCommands_NilRegistry(t *testing.T) {
+	h := newTestHandler(t)
+	// No planner set — commandRegistry is nil.
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/planning/commands", nil)
+	h.GetPlanningCommands(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}

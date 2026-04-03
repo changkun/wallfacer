@@ -135,10 +135,15 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build exec args.
+	// Expand slash commands before building exec args.
 	prompt := req.Message
-	if req.FocusedSpec != "" {
-		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + req.Message
+	if h.commandRegistry != nil {
+		if expanded, ok := h.commandRegistry.Expand(req.Message, req.FocusedSpec); ok {
+			prompt = expanded
+		}
+	}
+	if req.FocusedSpec != "" && !strings.HasPrefix(req.Message, "/") {
+		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + prompt
 	}
 	cmd := []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
 
@@ -266,4 +271,13 @@ func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, _ *http.Request) 
 		}
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
+}
+
+// GetPlanningCommands returns the list of available slash commands.
+func (h *Handler) GetPlanningCommands(w http.ResponseWriter, _ *http.Request) {
+	if h.commandRegistry == nil {
+		httpjson.Write(w, http.StatusOK, []any{})
+		return
+	}
+	httpjson.Write(w, http.StatusOK, h.commandRegistry.Commands())
 }

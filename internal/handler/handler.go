@@ -158,7 +158,8 @@ type Handler struct {
 	ideationTimer        *time.Timer
 	ideationExploitRatio float64 // 0.0–1.0; default 0.8 (80% exploitation)
 
-	planner *planner.Planner
+	planner         *planner.Planner
+	commandRegistry *planner.CommandRegistry
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[sandbox.Type]bool
@@ -252,6 +253,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 // Called by the server after both the handler and planner are constructed.
 func (h *Handler) SetPlanner(p *planner.Planner) {
 	h.planner = p
+	h.commandRegistry = planner.NewCommandRegistry()
 }
 
 // currentStore returns the active store, preferring the workspace manager's
