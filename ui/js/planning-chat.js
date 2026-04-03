@@ -39,6 +39,12 @@ var PlanningChat = (function () {
       });
     }
 
+    // Wire clear button.
+    var clearBtn = document.getElementById("spec-chat-clear");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", clearHistory);
+    }
+
     // Create interrupt button (hidden by default).
     _interruptBtn = document.createElement("button");
     _interruptBtn.className = "planning-chat-interrupt-btn";
@@ -250,10 +256,31 @@ var PlanningChat = (function () {
     return false;
   }
 
+  // _extractError pulls the error message from NDJSON output, if any.
+  function _extractError(raw) {
+    var lines = raw.split("\n");
+    for (var i = lines.length - 1; i >= 0; i--) {
+      var line = lines[i].trim();
+      if (!line || line[0] !== "{") continue;
+      try {
+        var obj = JSON.parse(line);
+        if (obj.type === "result" && obj.is_error && obj.result) {
+          return obj.result;
+        }
+      } catch (_) {}
+    }
+    return "";
+  }
+
   // _renderChatResponse renders the assistant text as markdown with an
-  // optional collapsible activity log showing tool calls.
+  // optional collapsible activity log showing tool calls. Errors are
+  // shown as styled error blocks.
   function _renderChatResponse(el, text, rawBuffer) {
     var html = "";
+    var errorMsg = _extractError(rawBuffer);
+    if (errorMsg) {
+      html += '<div class="planning-chat-error">' + _escapeForHtml(errorMsg) + "</div>";
+    }
     if (text) {
       html += renderMarkdown(text);
     }
@@ -265,7 +292,16 @@ var PlanningChat = (function () {
         renderPrettyLogs(rawBuffer) +
         "</div></details>";
     }
+    if (!html) {
+      html = '<span class="planning-chat-empty">No response</span>';
+    }
     el.innerHTML = html;
+  }
+
+  function _escapeForHtml(s) {
+    var el = document.createElement("span");
+    el.textContent = s;
+    return el.innerHTML;
   }
 
   function _stopStreaming(interrupted) {
@@ -537,6 +573,16 @@ var PlanningChat = (function () {
     _stopStreaming(true);
   }
 
+  async function clearHistory() {
+    try {
+      await fetch(Routes.planning.clearMessages(), {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (_) {}
+    if (_messagesEl) _messagesEl.innerHTML = "";
+  }
+
   function isStreaming() {
     return _streaming;
   }
@@ -548,6 +594,7 @@ var PlanningChat = (function () {
   return {
     init: init,
     sendMessage: sendMessage,
+    clearHistory: clearHistory,
     isStreaming: isStreaming,
     getQueue: getQueue,
   };
