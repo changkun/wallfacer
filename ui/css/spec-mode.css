@@ -199,6 +199,9 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 52em;
 }
 
 /* GitHub-style markdown rendering for spec body */

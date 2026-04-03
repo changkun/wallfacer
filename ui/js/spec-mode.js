@@ -409,6 +409,11 @@ function _buildExclusionData(pt, bodyEl, toc) {
   // TOC position relative to bodyEl's top edge (constant across scrolls).
   var tocRect = toc.getBoundingClientRect();
   var bodyRect = bodyEl.getBoundingClientRect();
+
+  // If the body content doesn't reach the TOC horizontally (e.g. max-width
+  // centres the prose with space to spare), skip exclusion entirely.
+  if (tocRect.left >= bodyRect.right) return;
+
   var tocBodyTop = tocRect.top - bodyRect.top;
   var tocBodyBottom = tocRect.bottom - bodyRect.top;
 
@@ -442,17 +447,10 @@ function _buildExclusionData(pt, bodyEl, toc) {
       }
     } else {
       // DOM measurement: temporarily apply the constraint, read height, revert.
-      if (isTable) {
-        var origMW = block.style.maxWidth;
-        block.style.maxWidth = narrowWidth + "px";
-        heightNarrow = block.getBoundingClientRect().height;
-        block.style.maxWidth = origMW;
-      } else {
-        var origMR = block.style.marginRight;
-        block.style.marginRight = tocW + "px";
-        heightNarrow = block.getBoundingClientRect().height;
-        block.style.marginRight = origMR;
-      }
+      var origMW = block.style.maxWidth;
+      block.style.maxWidth = narrowWidth + "px";
+      heightNarrow = block.getBoundingClientRect().height;
+      block.style.maxWidth = origMW;
     }
 
     items.push({
@@ -476,7 +474,6 @@ function _buildExclusionData(pt, bodyEl, toc) {
 
   _tocExclusion = {
     items: items,
-    tocWidth: tocW,
     narrowWidth: narrowWidth,
     tocBodyTop: tocBodyTop,
     tocBodyBottom: tocBodyBottom,
@@ -501,16 +498,9 @@ function _applyTocExclusion() {
     y += item.gap;
     var overlap = y + item.heightFull > tocTop && y < tocBottom;
     if (overlap) {
-      if (item.isTable) {
-        item.el.style.maxWidth = d.narrowWidth + "px";
-        item.el.style.marginRight = "";
-      } else {
-        item.el.style.marginRight = d.tocWidth + "px";
-        item.el.style.maxWidth = "";
-      }
+      item.el.style.maxWidth = d.narrowWidth + "px";
       y += item.heightNarrow;
     } else {
-      item.el.style.marginRight = "";
       item.el.style.maxWidth = "";
       y += item.heightFull;
     }
@@ -525,7 +515,6 @@ function _teardownTocExclusion() {
     }
     for (var i = 0; i < _tocExclusion.items.length; i++) {
       var el = _tocExclusion.items[i].el;
-      el.style.marginRight = "";
       el.style.maxWidth = "";
     }
   }
