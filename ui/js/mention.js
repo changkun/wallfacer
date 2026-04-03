@@ -46,7 +46,9 @@ function _mentionFilter(files, query, priorityPrefix) {
     // Lower score = higher rank.
     // Priority prefix files get a -2 bonus; basename match gets -1.
     let score = 2;
-    if (priorityPrefix && fl.startsWith(priorityPrefix.toLowerCase())) score -= 2;
+    // Check if the path contains the priority prefix anywhere (not just at start),
+    // because file paths are prefixed with the workspace basename (e.g. "repo/specs/...").
+    if (priorityPrefix && (fl.startsWith(priorityPrefix.toLowerCase()) || fl.includes("/" + priorityPrefix.toLowerCase()))) score -= 2;
     if (!lower || base.includes(lower)) score -= 1;
     scored.push({ f, score, idx: i });
   }
