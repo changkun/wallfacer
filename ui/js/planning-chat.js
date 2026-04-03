@@ -96,12 +96,12 @@ var PlanningChat = (function () {
       sendGroup.insertBefore(_interruptBtn, _sendBtn);
     }
 
-    // Create queue container below the composer.
+    // Create queue container above the composer.
     _queueEl = document.createElement("div");
     _queueEl.className = "planning-chat-queue";
     var composer = document.querySelector(".spec-chat-composer");
     if (composer && composer.parentElement) {
-      composer.parentElement.insertBefore(_queueEl, composer.nextSibling);
+      composer.parentElement.insertBefore(_queueEl, composer);
     }
 
     // Track scroll position to suppress auto-scroll when user reads history.
