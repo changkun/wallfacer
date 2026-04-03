@@ -35,8 +35,16 @@
         "</code></pre></div>"
       );
     }
-    var langClass = codeLang ? ' class="language-' + escapeHtml(codeLang) + '"' : "";
-    return "<pre><code" + langClass + ">" + _highlightCode(codeText, codeLang) + "</code></pre>\n";
+    var langClass = codeLang
+      ? ' class="language-' + escapeHtml(codeLang) + '"'
+      : "";
+    return (
+      "<pre><code" +
+      langClass +
+      ">" +
+      _highlightCode(codeText, codeLang) +
+      "</code></pre>\n"
+    );
   };
   marked.setOptions({ renderer: renderer });
 })();
