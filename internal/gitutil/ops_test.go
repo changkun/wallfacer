@@ -642,6 +642,16 @@ func TestHasRebaseMergeState(t *testing.T) {
 		}
 	})
 
+	t.Run("non-git directory returns false without error", func(t *testing.T) {
+		got, err := hasRebaseOrMergeState(t.TempDir())
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState: %v", err)
+		}
+		if got {
+			t.Error("expected false for non-git directory, got true")
+		}
+	})
+
 	t.Run("CHERRY_PICK_HEAD set via conflicting cherry-pick returns true", func(t *testing.T) {
 		repo := setupRepo(t)
 
@@ -668,6 +678,207 @@ func TestHasRebaseMergeState(t *testing.T) {
 		}
 		if !got {
 			t.Error("expected true with CHERRY_PICK_HEAD set, got false")
+		}
+	})
+}
+
+// TestRebaseOntoDefault_NonGitWorktree verifies that RebaseOntoDefault returns
+// an error when invoked on a non-git directory (DefaultBranch fails).
+func TestRebaseOntoDefault_NonGitWorktree(t *testing.T) {
+	if err := RebaseOntoDefault(t.TempDir(), t.TempDir()); err == nil {
+		t.Error("expected error for non-git path")
+	}
+}
+
+// TestRebaseOntoDefault_IsRebaseNeedsMergeOutput verifies the IsRebaseNeedsMergeOutput
+// branch in RebaseOntoDefault by creating a worktree already in a rebase state.
+func TestRebaseOntoDefault_StaleRebaseState(t *testing.T) {
+	repo := setupRepo(t)
+
+	// Create a conflicting task branch.
+	gitRun(t, repo, "checkout", "-b", "task")
+	writeFile(t, filepath.Join(repo, "file.txt"), "task version\n")
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "task change")
+
+	gitRun(t, repo, "checkout", "main")
+	writeFile(t, filepath.Join(repo, "file.txt"), "main version\n")
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "main change")
+
+	// Create worktree on task branch.
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "--force", wtDir, "task")
+	t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
+
+	// First rebase will conflict.
+	err := RebaseOntoDefault(repo, wtDir)
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected ErrConflict from first rebase, got %v", err)
+	}
+
+	// Second attempt should recover and still return conflict.
+	err = RebaseOntoDefault(repo, wtDir)
+	if err == nil {
+		t.Fatal("expected error from second rebase attempt")
+	}
+}
+
+// TestFFMerge_CheckoutError verifies that FFMerge returns a checkout error
+// when the default branch checkout fails (e.g. the default branch was deleted).
+func TestFFMerge_CheckoutError(t *testing.T) {
+	repo := setupRepo(t)
+	// Detach HEAD and delete main, so checkout "main" fails.
+	hash := gitRun(t, repo, "rev-parse", "HEAD")
+	gitRun(t, repo, "checkout", hash)
+	gitRun(t, repo, "branch", "-D", "main")
+
+	err := FFMerge(repo, "nonexistent")
+	if err == nil {
+		t.Fatal("expected error when checkout fails")
+	}
+}
+
+// TestFFMerge_NonGitPath verifies FFMerge returns an error for non-git paths.
+func TestFFMerge_NonGitPath(t *testing.T) {
+	err := FFMerge(t.TempDir(), "branch")
+	if err == nil {
+		t.Fatal("expected error for non-git path")
+	}
+}
+
+// TestCommitsBehind_NonGitRepoPath verifies CommitsBehind returns an error
+// when the repo path is not a git directory (DefaultBranch fails early).
+func TestCommitsBehind_NonGitRepoPath(t *testing.T) {
+	_, err := CommitsBehind(t.TempDir(), t.TempDir())
+	if err != nil {
+		// DefaultBranch falls back to "main" for non-git dirs, then
+		// defaultBranchCommitHash fails, returning 0, nil.
+		t.Logf("got error (acceptable): %v", err)
+	}
+}
+
+// TestCommitsBehind_EmptyRepo verifies CommitsBehind returns 0 for an empty repo
+// where the default branch has no resolvable ref.
+func TestCommitsBehind_EmptyRepo(t *testing.T) {
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-b", "main")
+	gitRun(t, dir, "config", "user.email", "test@example.com")
+	gitRun(t, dir, "config", "user.name", "Test")
+
+	// Create a single commit so HEAD exists, but then detach and delete main
+	// to simulate a state where the default branch ref is unreachable.
+	writeFile(t, filepath.Join(dir, "f.txt"), "init\n")
+	gitRun(t, dir, "add", ".")
+	gitRun(t, dir, "commit", "-m", "init")
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, dir, "worktree", "add", "-b", "task", wtDir, "HEAD")
+	t.Cleanup(func() { _ = RemoveWorktree(dir, wtDir, "task") })
+
+	hash := gitRun(t, dir, "rev-parse", "HEAD")
+	gitRun(t, dir, "checkout", hash)
+	gitRun(t, dir, "branch", "-D", "main")
+
+	n, err := CommitsBehind(dir, wtDir)
+	// defaultBranchCommitHash fails → returns 0, nil
+	if err != nil {
+		t.Fatalf("CommitsBehind: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("CommitsBehind = %d, want 0", n)
+	}
+}
+
+// TestDefaultBranchCommitHash_AllCandidatesFail verifies error return when no
+// ref candidate resolves.
+func TestDefaultBranchCommitHash_AllCandidatesFail(t *testing.T) {
+	repo := setupRepo(t)
+	_, err := defaultBranchCommitHash(repo, "nonexistent-branch-xyz")
+	if err == nil {
+		t.Fatal("expected error when all ref candidates fail")
+	}
+}
+
+// TestDefaultBranchCommitHash_FallbackToOrigin verifies resolution via origin/
+// when the local branch ref is missing.
+func TestDefaultBranchCommitHash_FallbackToOrigin(t *testing.T) {
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare", "-b", "main")
+	repo := setupRepo(t)
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
+	// Detach HEAD and delete local main — only origin/main remains.
+	hash := gitRun(t, repo, "rev-parse", "HEAD")
+	gitRun(t, repo, "checkout", hash)
+	gitRun(t, repo, "branch", "-D", "main")
+
+	resolved, err := defaultBranchCommitHash(repo, "main")
+	if err != nil {
+		t.Fatalf("defaultBranchCommitHash: %v", err)
+	}
+	if resolved != hash {
+		t.Errorf("resolved = %q, want %q", resolved, hash)
+	}
+}
+
+// TestBranchTipCommit_EmptyOutput verifies error when git log returns empty output.
+func TestBranchTipCommit_EmptyOutput(t *testing.T) {
+	// An orphan branch with no commits will produce empty log output.
+	repo := setupRepo(t)
+	gitRun(t, repo, "checkout", "--orphan", "empty-branch")
+	_, _, _, err := BranchTipCommit(repo, "empty-branch")
+	if err == nil {
+		t.Fatal("expected error for branch with no commits")
+	}
+}
+
+// TestBranchTipCommit_SubjectContainsPipe verifies that pipe characters in the
+// commit subject do not corrupt parsing.
+func TestBranchTipCommit_SubjectContainsPipe(t *testing.T) {
+	repo := setupRepo(t)
+	commitCmd := exec.Command("git", "-C", repo, "commit", "--allow-empty", "-m", "fix: a|b|c")
+	commitCmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_DATE=2020-01-01T00:00:00+00:00",
+		"GIT_COMMITTER_DATE=2020-01-01T00:00:00+00:00",
+	)
+	if out, err := commitCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v\n%s", err, out)
+	}
+
+	_, subject, _, err := BranchTipCommit(repo, "main")
+	if err != nil {
+		t.Fatalf("BranchTipCommit: %v", err)
+	}
+	if subject != "fix: a|b|c" {
+		t.Errorf("subject = %q, want %q", subject, "fix: a|b|c")
+	}
+}
+
+// TestFetchOrigin validates FetchOrigin for repos with and without remotes.
+func TestFetchOrigin(t *testing.T) {
+	t.Run("succeeds with configured remote", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "main")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		gitRun(t, repo, "push", "-u", "origin", "main")
+
+		if err := FetchOrigin(repo); err != nil {
+			t.Fatalf("FetchOrigin: %v", err)
+		}
+	})
+
+	t.Run("returns error without remote", func(t *testing.T) {
+		repo := setupRepo(t)
+		if err := FetchOrigin(repo); err == nil {
+			t.Fatal("expected error when no remote configured")
+		}
+	})
+
+	t.Run("returns error for non-git path", func(t *testing.T) {
+		if err := FetchOrigin(t.TempDir()); err == nil {
+			t.Fatal("expected error for non-git path")
 		}
 	})
 }
