@@ -222,6 +222,180 @@ describe("renderOversightPhases", () => {
 });
 
 // ---------------------------------------------------------------------------
+// renderOversightInLogs
+// ---------------------------------------------------------------------------
+describe("renderOversightInLogs", () => {
+  function makeOversightLogsContext(overrides = {}) {
+    const logsEl = { innerHTML: "" };
+    const ctx = makeContext({
+      escapeHtml: (s) =>
+        String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;"),
+      logsMode: "oversight",
+      testLogsMode: "oversight",
+      renderLogs: () => {},
+      renderTestLogs: () => {},
+      getOpenModalTaskId: () => overrides.taskId || "task-1",
+      _modalState: { seq: 1, abort: null },
+      apiGet: overrides.apiGet || (() => Promise.resolve({})),
+      cardOversightCache: { set: () => {} },
+      scheduleRender: () => {},
+      setTimeout: () => {},
+      document: {
+        getElementById: (id) => {
+          if (id === "modal-logs") return logsEl;
+          if (id === "modal-test-logs") return logsEl;
+          return null;
+        },
+      },
+      ...overrides,
+    });
+    loadScript("oversight-shared.js", ctx);
+    loadScript("modal-oversight.js", ctx);
+    return { ctx, logsEl };
+  }
+
+  it("shows loading message when oversight not yet fetched", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("Fetching oversight summary");
+  });
+
+  it("renders pending status", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    vm.runInContext('oversightData = { status: "pending" };', ctx);
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("not yet generated");
+  });
+
+  it("renders generating status", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    vm.runInContext('oversightData = { status: "generating" };', ctx);
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("Generating oversight summary");
+  });
+
+  it("renders failed status", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    vm.runInContext(
+      'oversightData = { status: "failed", error: "timeout" };',
+      ctx,
+    );
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("Oversight generation failed");
+    expect(logsEl.innerHTML).toContain("timeout");
+  });
+
+  it("renders failed status without error detail", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    vm.runInContext('oversightData = { status: "failed" };', ctx);
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("Oversight generation failed");
+  });
+
+  it("renders ready status with phases", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    vm.runInContext(
+      'oversightData = { status: "ready", phases: [{ title: "Phase 1" }] };',
+      ctx,
+    );
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("oversight-view");
+    expect(logsEl.innerHTML).toContain("Phase 1");
+  });
+
+  it("renders default case for unknown status", () => {
+    const { ctx, logsEl } = makeOversightLogsContext();
+    vm.runInContext('oversightData = { status: "unknown" };', ctx);
+    ctx.renderOversightInLogs();
+    expect(logsEl.innerHTML).toContain("Loading");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderTestOversightInTestLogs
+// ---------------------------------------------------------------------------
+describe("renderTestOversightInTestLogs", () => {
+  function makeTestOversightCtx(overrides = {}) {
+    const logsEl = { innerHTML: "" };
+    const ctx = makeContext({
+      escapeHtml: (s) =>
+        String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;"),
+      logsMode: "oversight",
+      testLogsMode: "oversight",
+      renderLogs: () => {},
+      renderTestLogs: () => {},
+      getOpenModalTaskId: () => overrides.taskId || "task-1",
+      _modalState: { seq: 1, abort: null },
+      apiGet: overrides.apiGet || (() => Promise.resolve({})),
+      setTimeout: () => {},
+      document: {
+        getElementById: (id) => {
+          if (id === "modal-test-logs") return logsEl;
+          return null;
+        },
+      },
+      ...overrides,
+    });
+    loadScript("oversight-shared.js", ctx);
+    loadScript("modal-oversight.js", ctx);
+    return { ctx, logsEl };
+  }
+
+  it("shows loading message when test oversight not fetched", () => {
+    const { ctx, logsEl } = makeTestOversightCtx();
+    ctx.renderTestOversightInTestLogs();
+    expect(logsEl.innerHTML).toContain("Fetching test oversight summary");
+  });
+
+  it("renders pending test oversight status", () => {
+    const { ctx, logsEl } = makeTestOversightCtx();
+    vm.runInContext('testOversightData = { status: "pending" };', ctx);
+    ctx.renderTestOversightInTestLogs();
+    expect(logsEl.innerHTML).toContain("Test oversight summary not yet generated");
+  });
+
+  it("renders generating test oversight status", () => {
+    const { ctx, logsEl } = makeTestOversightCtx();
+    vm.runInContext('testOversightData = { status: "generating" };', ctx);
+    ctx.renderTestOversightInTestLogs();
+    expect(logsEl.innerHTML).toContain("Generating test oversight summary");
+  });
+
+  it("renders failed test oversight with error", () => {
+    const { ctx, logsEl } = makeTestOversightCtx();
+    vm.runInContext(
+      'testOversightData = { status: "failed", error: "crash" };',
+      ctx,
+    );
+    ctx.renderTestOversightInTestLogs();
+    expect(logsEl.innerHTML).toContain("Test oversight generation failed");
+    expect(logsEl.innerHTML).toContain("crash");
+  });
+
+  it("renders ready test oversight with phases", () => {
+    const { ctx, logsEl } = makeTestOversightCtx();
+    vm.runInContext(
+      'testOversightData = { status: "ready", phases: [{ title: "Test" }] };',
+      ctx,
+    );
+    ctx.renderTestOversightInTestLogs();
+    expect(logsEl.innerHTML).toContain("oversight-view");
+    expect(logsEl.innerHTML).toContain("Test");
+  });
+
+  it("renders default case for unknown test status", () => {
+    const { ctx, logsEl } = makeTestOversightCtx();
+    vm.runInContext('testOversightData = { status: "xyz" };', ctx);
+    ctx.renderTestOversightInTestLogs();
+    expect(logsEl.innerHTML).toContain("Loading");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // State variables are initialized to null/false
 // let declarations in vm scripts are not global-object properties; we read
 // them from within the script's lexical scope using vm.runInContext.
