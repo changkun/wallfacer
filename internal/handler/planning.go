@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -156,12 +157,13 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	h.planner.SetBusy(true)
 	ll := h.planner.StartLiveLog()
 
-	// Run exec in background goroutine.
+	// Run exec in background goroutine. Use a detached context because the
+	// HTTP request context is cancelled as soon as the 202 response is sent.
 	go func() {
 		defer h.planner.SetBusy(false)
 		defer h.planner.CloseLiveLog()
 
-		handle, err := h.planner.Exec(r.Context(), cmd)
+		handle, err := h.planner.Exec(context.Background(), cmd)
 		if err != nil {
 			slog.Warn("planning exec failed", "error", err)
 			return
