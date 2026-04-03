@@ -114,19 +114,19 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 
 ### Frontend: Dispatch UI
 
-7. **Wire dispatch button** — Implement `dispatchFocusedSpec()` in `ui/js/spec-mode.js:476` to call `POST /api/specs/dispatch` with the focused spec's path. Show loading state, handle errors, and update the spec tree on success.
+8. **Wire dispatch button** — Implement `dispatchFocusedSpec()` in `ui/js/spec-mode.js:476` to call `POST /api/specs/dispatch` with the focused spec's path. Show loading state, handle errors, and update the spec tree on success.
 
-8. **Wire multi-select dispatch** — Implement `dispatchSelectedSpecs()` in `ui/js/spec-explorer.js:531` to call the batch dispatch endpoint with all selected spec paths.
+9. **Wire multi-select dispatch** — Implement `dispatchSelectedSpecs()` in `ui/js/spec-explorer.js:531` to call the batch dispatch endpoint with all selected spec paths.
 
-9. **Spec badge on task cards** — In `ui/js/render.js`, render a small badge on task cards that were dispatched from a spec. Clicking the badge navigates to spec mode with that spec focused.
+10. **Spec badge on task cards** — In `ui/js/render.js`, render a small badge on task cards that were dispatched from a spec. Clicking the badge navigates to spec mode with that spec focused.
 
-10. **"View Source Spec" link in task modal** — In `ui/js/modal-core.js`, add a link to the source spec when the task has spec metadata. Clicking navigates to spec mode.
+11. **"View Source Spec" link in task modal** — In `ui/js/modal-core.js`, add a link to the source spec when the task has spec metadata. Clicking navigates to spec mode.
 
-11. **Board highlight from spec context** — When viewing a spec in focused mode, highlight its dispatched task(s) on the board. When switching to board mode from a focused spec, scroll to / filter for the relevant tasks.
+12. **Board highlight from spec context** — When viewing a spec in focused mode, highlight its dispatched task(s) on the board. When switching to board mode from a focused spec, scroll to / filter for the relevant tasks.
 
 ### Agent Integration (Nice-to-Have)
 
-12. **Planning agent dispatch command** — Update `internal/planner/commands_templates/dispatch.tmpl` so the `/dispatch` slash command calls the atomic `POST /api/specs/dispatch` endpoint instead of manually updating frontmatter. The agent can validate prerequisites and provide feedback before triggering the API call.
+13. **Planning agent dispatch command** — Update `internal/planner/commands_templates/dispatch.tmpl` so the `/dispatch` slash command calls the atomic `POST /api/specs/dispatch` endpoint instead of manually updating frontmatter. The agent can validate prerequisites and provide feedback before triggering the API call.
 
 ## Open Questions
 
