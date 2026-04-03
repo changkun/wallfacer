@@ -14,6 +14,10 @@ function setTheme(mode) {
   document.querySelectorAll("#theme-switch button").forEach(function (btn) {
     btn.classList.toggle("active", btn.dataset.mode === mode);
   });
+  // Re-initialize mermaid with updated CSS variables so diagrams match the new theme.
+  if (typeof _mdRender !== "undefined" && _mdRender._reinitMermaidTheme) {
+    _mdRender._reinitMermaidTheme();
+  }
 }
 
 // Mark the active theme button on load
@@ -29,11 +33,15 @@ window
   .matchMedia("(prefers-color-scheme: dark)")
   .addEventListener("change", function () {
     var mode = localStorage.getItem("wallfacer-theme") || "auto";
-    if (mode === "auto")
+    if (mode === "auto") {
       document.documentElement.setAttribute(
         "data-theme",
         getResolvedTheme("auto"),
       );
+      if (typeof _mdRender !== "undefined" && _mdRender._reinitMermaidTheme) {
+        _mdRender._reinitMermaidTheme();
+      }
+    }
   });
 
 // --- Settings modal ---

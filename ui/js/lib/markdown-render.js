@@ -485,6 +485,10 @@ var _mdRender = (function () {
 
   return {
     enhanceMarkdown: enhanceMarkdown,
+    // Re-read CSS variables and re-initialize mermaid theme (called on theme switch).
+    _reinitMermaidTheme: function () {
+      if (typeof mermaid !== "undefined") _initMermaidTheme();
+    },
     // Expose for testing.
     _resolvePath: _resolvePath,
     _ensureMermaid: _ensureMermaid,
