@@ -329,7 +329,7 @@ type mockWorkerBackend struct {
 	stopCalled bool
 }
 
-func (b *mockWorkerBackend) StopTaskWorker(taskID string) { b.stopCalled = true }
+func (b *mockWorkerBackend) StopTaskWorker(_ string) { b.stopCalled = true }
 func (b *mockWorkerBackend) ShutdownWorkers()             {}
 func (b *mockWorkerBackend) WorkerStats() sandbox.WorkerStatsInfo {
 	return sandbox.WorkerStatsInfo{}
@@ -365,7 +365,7 @@ func TestPlannerLogReader_NoLiveLog(t *testing.T) {
 	}
 }
 
-func TestPlannerCloseLiveLog_NoOp(t *testing.T) {
+func TestPlannerCloseLiveLog_NoOp(_ *testing.T) {
 	p := New(Config{Command: "podman"})
 	// Should not panic.
 	p.CloseLiveLog()
