@@ -122,9 +122,9 @@ var PlanningChat = (function () {
     if (document.querySelector(".mention-dropdown")) return;
 
     // If user presses arrow key while typing a slash command but autocomplete
-    // hasn't rendered yet, trigger it synchronously.
+    // hasn't rendered yet, trigger it synchronously from cache.
     if (!_autocompleteEl && _input.value.startsWith("/") && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-      _showAutocomplete(_input.value);
+      _showAutocompleteSync(_input.value);
     }
 
     if (_autocompleteEl) {
@@ -497,8 +497,18 @@ var PlanningChat = (function () {
     }
   }
 
+  // Synchronous version for keydown handler — uses cached commands only.
+  function _showAutocompleteSync(text) {
+    if (!_commandsCache || _commandsCache.length === 0) return;
+    _renderAutocomplete(text, _commandsCache);
+  }
+
   async function _showAutocomplete(text) {
     var commands = await _fetchCommands();
+    _renderAutocomplete(text, commands);
+  }
+
+  function _renderAutocomplete(text, commands) {
     if (!commands || commands.length === 0) {
       _closeAutocomplete();
       return;
