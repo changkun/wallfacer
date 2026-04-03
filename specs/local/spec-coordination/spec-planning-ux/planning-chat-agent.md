@@ -177,7 +177,7 @@ Claude Code's headless mode (`-p`) is single-shot: one prompt in, one response o
 | [Planning System Prompt](planning-chat-agent/planning-prompt.md) | — | small | **complete** |
 | [Ideation Migration](planning-chat-agent/ideation-migration.md) | — | medium | **complete** |
 | [Message API Endpoints](planning-chat-agent/message-api.md) | conversation-store, planning-prompt | medium | **complete** |
-| [Message Stream SSE](planning-chat-agent/message-stream.md) | message-api | medium | validated |
+| [Message Stream SSE](planning-chat-agent/message-stream.md) | message-api | medium | **complete** |
 | [Slash Command Registry](planning-chat-agent/slash-command-registry.md) | message-api | medium | validated |
 | [UI Chat Send and Stream](planning-chat-agent/ui-chat-send-stream.md) | message-stream | medium | validated |
 | [UI Message Queue and Interrupt](planning-chat-agent/ui-message-queue.md) | ui-chat-send-stream | medium | validated |
