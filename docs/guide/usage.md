@@ -78,6 +78,24 @@ Deep reference for all settings and customization options.
 
 Fault isolation and self-healing automation. **Advanced only** — circuit breakers automatically pause promotion, testing, and submission when repeated failures are detected, then self-heal via exponential backoff.
 
+### 9. 📐 Spec Mode
+
+[Spec Mode](spec-mode.md)
+
+Browse and manage design specs alongside the task board.
+
+- **Essentials:** Spec explorer tree, focused spec view, dependency minimap, keyboard shortcuts
+- **Advanced:** Deep-linking via URL fragments, dispatch and break-down actions
+
+### 10. 💬 Planning Chat
+
+[Planning Chat](planning-chat.md)
+
+Conversational spec iteration with an AI planning agent.
+
+- **Essentials:** Starting a conversation, slash commands (`/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, `/dispatch`), @mentions
+- **Advanced:** Session persistence, container lifecycle, multi-workspace fingerprinting
+
 ## Common Workflows
 
 ### 🔄 Parallel feature development

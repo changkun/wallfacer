@@ -555,6 +555,12 @@ If any migration step modifies the task, the migrated version is persisted back 
 
 Migration also handles the deprecated `Model` field by moving its value to `ModelOverride`.
 
+## Spec Document Model
+
+The `internal/spec/` package provides parsing, tree building, and validation for design spec documents stored in `specs/`. Each spec file has YAML frontmatter with fields like `title`, `status`, `depends_on`, `affects`, `effort`, `created`, `updated`, `author`, and `dispatched_task_id`. The package builds a dependency tree from these specs, computes progress metrics, and supports impact analysis (which specs are affected by changes to a given package).
+
+The spec types are separate from the task data model — specs describe planned work and its dependencies, while tasks represent execution units on the board. The full spec document model is defined in `specs/local/spec-coordination/spec-document-model.md`.
+
 ## See Also
 
 - [architecture.md](architecture.md) -- System architecture overview

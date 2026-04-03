@@ -111,6 +111,24 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/{id}/refine/logs` | Stream live logs from the refinement agent |
 | `POST /api/tasks/{id}/refine/apply` | Apply the refined prompt and goal as the new task spec |
 | `POST /api/tasks/{id}/refine/dismiss` | Dismiss the refinement result without applying it |
+| **Spec tree** | |
+| `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
+| `GET /api/specs/stream` | SSE: spec tree change notifications |
+| **Planning sandbox & chat** | |
+| `GET /api/planning` | Planning sandbox status (running or not) |
+| `POST /api/planning` | Start the planning sandbox container (idempotent) |
+| `DELETE /api/planning` | Stop the planning sandbox container |
+| `GET /api/planning/messages` | Retrieve conversation history |
+| `POST /api/planning/messages` | Send user message (triggers agent execution) |
+| `DELETE /api/planning/messages` | Clear conversation history |
+| `GET /api/planning/messages/stream` | Stream agent response tokens |
+| `POST /api/planning/messages/interrupt` | Interrupt current agent turn |
+| `GET /api/planning/commands` | List available slash commands |
+| **Sandbox images** | |
+| `GET /api/images` | Check which sandbox images are cached locally |
+| `POST /api/images/pull` | Start async pull for a sandbox image |
+| `DELETE /api/images` | Remove a cached sandbox image |
+| `GET /api/images/pull/stream` | SSE: pull progress |
 
 ### Triggering Task Execution
 

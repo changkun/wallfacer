@@ -307,6 +307,11 @@ Every `internal/` package and its role in the system:
 | `sandbox` | Sandbox type enumeration (Claude vs Codex) | `Type`, `Claude`, `Codex`, `All()`, `Parse()`, `Default()` |
 | `store` | Per-task directory persistence, data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `SequencedDelta` |
 | `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support; persistent workspace group configurations | `Manager`, `Snapshot`, `Group`, `NewManager()`, `NewStatic()`, `LoadGroups()`, `SaveGroups()` |
+| `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
+| `oauth` | OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `StartFlow()`, `Provider`, `Claude`, `Codex` |
+| `planner` | Planning sandbox lifecycle, conversation store, slash command registry | `Planner`, `ConversationStore`, `CommandRegistry` |
+| `spec` | Spec document model: types, YAML frontmatter parsing, tree building, validation, progress tracking, impact analysis | `Spec`, `Tree`, `BuildTree()`, `ParseFrontmatter()`, `Validate()` |
+| `pty` | PTY relay for WebSocket terminal integration | `PTY`, `Start()` |
 
 Top-level packages:
 
@@ -335,6 +340,12 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/tail` | Tail-follow for log files | `Follow()` |
 | `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
 | `pkg/watcher` | Event-loop background watcher | `Start()` |
+| `pkg/dag` | Generic DAG operations (ReverseEdges, DetectCycles, Reachable) | `ReverseEdges()`, `DetectCycles()`, `Reachable()` |
+| `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Buffer`, `NewBuffer()`, `Reader` |
+| `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Transition()` |
+| `pkg/tree` | Generic tree data structure with `iter.Seq` walk | `Node[T]`, `Walk()` |
+| `pkg/envutil` | Environment variable parsing with defaults and validation | `String()`, `Int()`, `Bool()`, `Duration()` |
+| `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `Decode()`, `Respond()`, `Error()` |
 
 ## Handler Organisation
 
@@ -372,6 +383,12 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `diffcache.go` | LRU diff cache for task diffs | — (internal) |
 | `file_index.go` | Background file indexing for `@` mention | — (internal) |
 | `event_helpers.go` | Shared helpers for inserting task events | — (internal) |
+| `auth.go` | OAuth authentication flow (start, poll status, cancel) | `POST /api/auth/{provider}/start`, `GET /api/auth/{provider}/status`, `POST /api/auth/{provider}/cancel` |
+| `explorer.go` | File explorer: directory listing, file read/write, binary detection | `GET /api/explorer/tree`, `GET /api/explorer/file`, `PUT /api/explorer/file`, `GET /api/explorer/stream` |
+| `images.go` | Sandbox image management: status check, pull, delete | `GET /api/images`, `POST /api/images/pull`, `DELETE /api/images`, `GET /api/images/pull/stream` |
+| `planning.go` | Planning chat agent: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/planning/messages`, `GET /api/planning/messages/stream`, `POST /api/planning/messages/interrupt`, `GET /api/planning/commands` |
+| `specs.go` | Spec tree with metadata and progress | `GET /api/specs/tree`, `GET /api/specs/stream` |
+| `terminal.go` | WebSocket terminal relay for host shell and container exec | `GET /api/terminal/ws` |
 
 ## Structured Logging
 

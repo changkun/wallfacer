@@ -220,6 +220,10 @@ Automation toggles (set via `PUT /api/config`):
 | `ideation` | Enable periodic brainstorm runs |
 | `ideation_interval` | Minutes between brainstorm runs (0 = run immediately on completion) |
 
+### Planning Chat for Spec Iteration
+
+For spec-level iteration, see the Planning Chat in Spec Mode (press **S** to switch, then **C** for chat). The planning agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
+
 ---
 
 ## See Also

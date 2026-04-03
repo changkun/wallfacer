@@ -62,6 +62,39 @@ wallfacer status -watch                 # Live-updating board state
 wallfacer doctor                        # Check prerequisites and config
 ```
 
+### 📐 Spec Mode
+
+Press **S** to toggle between the Board view and Spec Mode. Spec Mode provides a three-pane layout:
+
+1. **Explorer** (left) -- a tree of all specs under `specs/`, showing status badges and track grouping
+2. **Focused View** (center) -- the rendered content of the selected spec with a dependency minimap
+3. **Chat** (right) -- the planning chat pane for conversational spec iteration
+
+Toggle individual panes: press **C** to show/hide the chat pane, **E** to show/hide the explorer. Deep-link to a specific spec via `#spec/<path>` in the URL (e.g., `#spec/specs/local/live-serve.md`).
+
+### 💬 Planning Chat
+
+The planning chat provides conversational spec iteration powered by a sandbox agent. Key behaviors:
+
+- **Auto-start** -- The planning sandbox container starts automatically on your first message. No manual setup is required.
+- **Persistence** -- Conversation history is persisted in `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace set (same fingerprinting as AGENTS.md).
+- **Session recovery** -- If the planning container is recreated (e.g., after a server restart), the conversation history is restored and the agent resumes with full context.
+
+The planning agent supports slash commands: `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`. Use `@` mentions to reference specs or tasks by name.
+
+### ⌨️ Keyboard Shortcuts
+
+| Key | Context | Action |
+|---|---|---|
+| `N` | Board | Open new task form |
+| `?` | Global | Show keyboard shortcuts help |
+| `E` | Global | Toggle file explorer |
+| `S` | Global | Toggle board/spec mode |
+| `C` | Spec mode | Toggle chat pane |
+| `D` | Spec mode | Dispatch focused spec as a task |
+| `B` | Spec mode | Break down focused spec into sub-specs |
+| `` ` `` | Global | Toggle terminal panel |
+
 ---
 
 ## 🔧 Advanced Topics

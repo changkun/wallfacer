@@ -172,7 +172,7 @@ The file explorer panel lets you browse workspace files directly in the web UI w
 
 **Resizing:** Drag the right edge of the explorer panel to adjust its width (minimum 200 px, maximum 50% of the viewport). Double-click the resize handle to reset to the default 260 px. The panel width and open/closed state persist across page reloads via localStorage.
 
-**Editing files:** In the file preview modal, click **Edit** to switch to a plain-text editor. Make your changes, then click **Save** to write the file back to the workspace, or **Discard** to revert. If you try to close the modal or discard with unsaved changes, a confirmation prompt appears. The Tab key inserts a tab character in the editor. Saving uses an atomic write (temp file + rename) so partial writes cannot corrupt the file. Files inside `.git/` directories cannot be edited, and content exceeding 2 MB is rejected.
+**Editing files:** In the file preview modal, click **Edit** to switch to a plain-text editor. Make your changes, then click **Save** to write the file back to the workspace, or **Discard** to revert. If you try to close the modal or discard with unsaved changes, a confirmation prompt appears. The Tab key inserts a tab character in the editor. Saving uses an atomic write (temp file + rename) so partial writes cannot corrupt the file. Files inside `.git/` directories cannot be edited, and content exceeding 2 MB is rejected. Saves use `PUT /api/explorer/file` with a JSON body of `{path, workspace, content}`.
 
 **Keyboard navigation:** When focused inside the tree, use arrow keys to navigate between nodes. **Right arrow** expands a collapsed directory, **Left arrow** collapses an expanded one (or moves to the parent). **Enter** toggles directories or opens file preview.
 
