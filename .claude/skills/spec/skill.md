@@ -158,7 +158,7 @@ packages. Identify:>
   - **Small/medium effort**: one file, all sections concise. Can be implemented
     directly.
   - **Large/xlarge effort**: may be a parent spec that will be broken down via
-    `/design-breakdown` or `/task-breakdown`. Focus on architecture and
+    `/wf-spec-breakdown`. Focus on architecture and
     component boundaries rather than implementation details.
 
 ## Step 5: Update specs/README.md
@@ -188,9 +188,9 @@ Report to the user:
 - Dependencies identified (both upstream and downstream impact)
 - Effort estimate and rationale
 - Suggested next steps:
-  - If large/xlarge: "Run `/design-breakdown <spec-path>` to decompose into
-    sub-design problems"
-  - If small/medium: "Run `/task-breakdown <spec-path>` to create implementable
-    tasks, or `/implement-spec <spec-path>` to implement directly"
+  - If large/xlarge: "Run `/wf-spec-breakdown <spec-path> design` to decompose
+    into sub-design problems"
+  - If small/medium: "Run `/wf-spec-breakdown <spec-path> tasks` to create
+    implementable tasks, or `/implement-spec <spec-path>` to implement directly"
   - If dependencies are incomplete: "Blocked by <spec>; implement that first
     or run `/check-impact <spec-path>` for full analysis"

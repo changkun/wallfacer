@@ -1,13 +1,13 @@
 ---
 name: review-breakdown
-description: Validate a task breakdown for correctness — check dependency ordering, task sizing, gap coverage, and boundary conflicts. Use after task-breakdown to catch issues before implementation.
+description: Validate a task breakdown for correctness — check dependency ordering, task sizing, gap coverage, and boundary conflicts. Use after wf-spec-breakdown to catch issues before implementation.
 argument-hint: <spec-file.md or task-folder/>
 allowed-tools: Read, Grep, Glob, Agent, Bash(ls *)
 ---
 
 # Review Task Breakdown
 
-Validate a task breakdown produced by `/task-breakdown` before starting
+Validate a task breakdown produced by `/wf-spec-breakdown` before starting
 implementation. Catch structural issues that would cause failures mid-execution.
 
 ## Step 0: Parse arguments
@@ -130,4 +130,4 @@ Parallelism: up to N tasks can run concurrently
 
 If issues are found, list specific remediation steps. Do NOT modify any files —
 this skill is read-only. The user decides whether to revise manually or re-run
-`/task-breakdown` with feedback.
+`/wf-spec-breakdown` with feedback.

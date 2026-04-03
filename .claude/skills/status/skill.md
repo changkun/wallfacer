@@ -68,7 +68,7 @@ For each non-complete spec:
 From the actionable specs, determine the recommended next steps:
 
 - Specs with task breakdowns ready → can start `/implement-spec`.
-- Specs without task breakdowns → need `/task-breakdown` first.
+- Specs without task breakdowns → need `/wf-spec-breakdown <spec> tasks` first.
 - Specs that need updating → suggest `/refine` first.
 
 ## Step 5: Generate report
