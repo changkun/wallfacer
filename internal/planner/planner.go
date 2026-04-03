@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -51,6 +52,7 @@ type Planner struct {
 	handle       sandbox.Handle     // non-nil when a planning invocation is active
 	active       bool               // true after Start, false after Stop
 	busy         bool               // true while a chat exec is in flight
+	liveLog      *livelog.Log       // live output buffer for the current exec (nil when idle)
 	conversation *ConversationStore // chat message persistence (nil if configDir empty)
 }
 
@@ -159,6 +161,39 @@ func (p *Planner) SetBusy(b bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.busy = b
+}
+
+// StartLiveLog creates a new live log buffer for the current exec.
+// Returns the log so the caller can tee stdout into it.
+func (p *Planner) StartLiveLog() *livelog.Log {
+	l := livelog.New()
+	p.mu.Lock()
+	p.liveLog = l
+	p.mu.Unlock()
+	return l
+}
+
+// CloseLiveLog closes and removes the current live log.
+func (p *Planner) CloseLiveLog() {
+	p.mu.Lock()
+	l := p.liveLog
+	p.liveLog = nil
+	p.mu.Unlock()
+	if l != nil {
+		l.Close()
+	}
+}
+
+// LogReader returns a reader for the current exec's live log,
+// or nil if no exec is in flight.
+func (p *Planner) LogReader() *livelog.Reader {
+	p.mu.Lock()
+	l := p.liveLog
+	p.mu.Unlock()
+	if l == nil {
+		return nil
+	}
+	return l.NewReader()
 }
 
 // UpdateWorkspaces destroys the current planning container (if any) and

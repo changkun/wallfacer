@@ -688,9 +688,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetPlanningStatus":     h.GetPlanningStatus,
 		"StartPlanning":         h.StartPlanning,
 		"StopPlanning":          h.StopPlanning,
-		"GetPlanningMessages":   h.GetPlanningMessages,
-		"SendPlanningMessage":   h.SendPlanningMessage,
-		"ClearPlanningMessages": h.ClearPlanningMessages,
+		"GetPlanningMessages":    h.GetPlanningMessages,
+		"SendPlanningMessage":    h.SendPlanningMessage,
+		"ClearPlanningMessages":  h.ClearPlanningMessages,
+		"StreamPlanningMessages": h.StreamPlanningMessages,
 
 		// Environment configuration.
 		"GetEnvConfig":    h.GetEnvConfig,

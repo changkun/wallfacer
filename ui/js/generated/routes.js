@@ -143,6 +143,10 @@ var Routes = {
     clearMessages: function () {
       return "/api/planning/messages";
     },
+    // GET /api/planning/messages/stream
+    messageStream: function () {
+      return "/api/planning/messages/stream";
+    },
   },
 
   env: {

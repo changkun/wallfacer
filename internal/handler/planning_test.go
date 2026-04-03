@@ -319,3 +319,58 @@ func TestClearPlanningMessages_NilPlanner(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
+
+// --- Stream ---
+
+func TestStreamPlanningMessages_NotBusy(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	h.planner = p
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages/stream", nil)
+	h.StreamPlanningMessages(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d (not busy)", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestStreamPlanningMessages_NilPlanner(t *testing.T) {
+	h := newTestHandler(t)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages/stream", nil)
+	h.StreamPlanningMessages(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestStreamPlanningMessages_LiveData(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	h.planner = p
+
+	// Simulate a live log with some data, then close it.
+	ll := p.StartLiveLog()
+	_, _ = ll.Write([]byte(`{"result":"hello"}`))
+	ll.Close()
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages/stream", nil)
+	h.StreamPlanningMessages(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `{"result":"hello"}`) {
+		t.Errorf("response body missing data: %q", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Errorf("response body missing done event: %q", body)
+	}
+}

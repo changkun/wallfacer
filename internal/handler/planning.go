@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/planner"
 )
@@ -147,10 +149,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.planner.SetBusy(true)
+	ll := h.planner.StartLiveLog()
 
 	// Run exec in background goroutine.
 	go func() {
 		defer h.planner.SetBusy(false)
+		defer h.planner.CloseLiveLog()
 
 		handle, err := h.planner.Exec(r.Context(), cmd)
 		if err != nil {
@@ -158,7 +162,9 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		rawStdout, _ := io.ReadAll(handle.Stdout())
+		// Tee stdout into the live log so SSE consumers can stream it.
+		tee := io.TeeReader(handle.Stdout(), ll)
+		rawStdout, _ := io.ReadAll(tee)
 		_, _ = io.ReadAll(handle.Stderr())
 		_, _ = handle.Wait()
 
@@ -185,6 +191,70 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"status": "accepted"})
+}
+
+// StreamPlanningMessages streams the current planning exec's stdout via SSE.
+// Returns 204 No Content if no exec is in flight.
+func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request) {
+	if h.planner == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	lr := h.planner.LogReader()
+	if lr == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	ch := make(chan []byte, 4)
+	go func() {
+		defer close(ch)
+		for {
+			data, err := lr.ReadChunk(r.Context())
+			if len(data) > 0 {
+				ch <- data
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case data, ok := <-ch:
+			if !ok {
+				// Exec finished — send done event.
+				_, _ = fmt.Fprintf(w, "event: done\ndata: {}\n\n")
+				flusher.Flush()
+				return
+			}
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case <-keepalive.C:
+			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		}
+	}
 }
 
 // ClearPlanningMessages clears the planning conversation history and session.

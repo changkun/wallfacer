@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 94,
+  "route_count": 95,
   "routes": [
     {
       "method": "GET",
@@ -252,6 +252,15 @@
       "pattern": "/api/planning/messages",
       "name": "ClearPlanningMessages",
       "description": "Clear conversation history.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/planning/messages/stream",
+      "name": "StreamPlanningMessages",
+      "description": "Stream the agent's response tokens.",
       "tags": [
         "planning"
       ]

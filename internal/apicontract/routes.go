@@ -234,6 +234,12 @@ var Routes = []Route{
 		Description: "Clear conversation history.",
 		Tags:        []string{"planning"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/planning/messages/stream", Name: "StreamPlanningMessages",
+		JSName:      "messageStream",
+		Description: "Stream the agent's response tokens.",
+		Tags:        []string{"planning"},
+	},
 
 	// --- Environment configuration ---
 
