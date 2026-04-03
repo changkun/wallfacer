@@ -50,7 +50,7 @@ wallfacer doctor
 Start the server:
 
 ```bash
-wallfacer run ~/projects/myapp
+wallfacer run
 ```
 
 A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
