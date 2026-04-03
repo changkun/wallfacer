@@ -43,9 +43,9 @@ The following infrastructure is already implemented:
 
 ## Design
 
-### Approach: Headless Claude/Codex over Container Exec
+### Approach: Headless Claude Code over Container Exec
 
-The planning agent is not a custom LLM orchestrator — it wraps Claude Code's (or Codex's) headless mode inside the existing planning container. The same `-p <prompt> --output-format stream-json` invocation pattern used by task execution (`internal/runner/container.go`) applies here. Multi-turn conversation uses `--resume <session-id>` to continue the same Claude Code session across user messages.
+The planning agent is not a custom LLM orchestrator — it wraps Claude Code's headless mode inside the existing planning container. The same `-p <prompt> --output-format stream-json` invocation pattern used by task execution (`internal/runner/container.go`) applies here. Multi-turn conversation uses `--resume <session-id>` to continue the same Claude Code session across user messages. Codex compatibility is out of scope — see `specs/local/spec-coordination/spec-planning-ux/planning-codex-compat.md` for a follow-up.
 
 This approach is chosen because:
 - Claude Code already handles conversation context, tool use, file reading/writing, and context window management internally — the server doesn't need to reimplement any of this
@@ -154,7 +154,6 @@ The server's only responsibility is:
 
 1. **Ideation migration path**: Should the ideation runner switch to using `Planner.Exec()` immediately, or should it fall back to ephemeral containers when the planning container is not running? The planner auto-starts on server init, so fallback may be unnecessary.
 2. **Concurrent access**: If the user sends a new message while the agent is still responding to the previous one, should the server queue it, reject it, or cancel the in-flight exec? Queuing with a depth limit of 1 seems safest.
-3. **Codex parity**: Codex's headless mode may have different flags than Claude Code's `-p --resume --output-format stream-json`. Need to verify the Codex equivalent and whether the planner needs sandbox-specific argument building (similar to how `internal/runner/container.go` already branches on sandbox type).
 
 ## Affects
 
