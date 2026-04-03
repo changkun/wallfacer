@@ -39,12 +39,17 @@ func NewCommandRegistry() *CommandRegistry {
 		name, desc, usage, tmpl string
 	}{
 		{"summarize", "Produce a structured summary of the focused spec", "/summarize [words]", "summarize.tmpl"},
-		{"break-down", "Decompose the focused spec into sub-specs or tasks", "/break-down", "breakdown.tmpl"},
 		{"create", "Create a new spec file with proper frontmatter", "/create <title>", "create.tmpl"},
-		{"status", "Update the focused spec's status", "/status <state>", "status.tmpl"},
+		{"refine", "Update the spec against the current codebase state", "/refine [feedback]", "refine.tmpl"},
 		{"validate", "Check the focused spec against document model rules", "/validate", "validate.tmpl"},
 		{"impact", "Analyze what code and specs would be affected", "/impact", "impact.tmpl"},
-		{"dispatch", "Prepare the focused spec for dispatch to the task board", "/dispatch", "dispatch.tmpl"},
+		{"status", "Update the focused spec's status", "/status <state>", "status.tmpl"},
+		{"break-down", "Decompose the focused spec into sub-specs or tasks", "/break-down [design|tasks]", "breakdown.tmpl"},
+		{"review-breakdown", "Validate a task breakdown for correctness", "/review-breakdown", "review-breakdown.tmpl"},
+		{"dispatch", "Dispatch the focused spec to the task board", "/dispatch", "dispatch.tmpl"},
+		{"review-impl", "Review implementation against the spec's criteria", "/review-impl [commit-range]", "review-impl.tmpl"},
+		{"diff", "Compare completed implementation against spec", "/diff [commit-range]", "diff.tmpl"},
+		{"wrapup", "Finalize a completed spec with outcome and status", "/wrapup", "wrapup.tmpl"},
 	}
 
 	for _, d := range defs {
