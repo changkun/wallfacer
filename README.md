@@ -1,6 +1,6 @@
 # Wallfacer
 
-> Build software with a self-operating engineering team.
+**Full autonomy when you trust it. Full control when you don't.**
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Release](https://img.shields.io/github/v/release/changkun/wallfacer?display_name=tag&logo=github)](https://github.com/changkun/wallfacer/releases)
@@ -9,9 +9,29 @@
 [![Stars](https://img.shields.io/github/stars/changkun/wallfacer?style=social)](https://github.com/changkun/wallfacer/stargazers)
 [![Last Commit](https://img.shields.io/github/last-commit/changkun/wallfacer)](https://github.com/changkun/wallfacer/commits/main)
 
-Wallfacer is a self-operating engineering platform. It orchestrates autonomous coding agents across a task board, executes them in isolated sandboxes, and gives you full oversight over every decision they make — live logs, diffs, costs, and timelines — so you stay in control while shipping at machine speed.
+Wallfacer is an autonomous engineering platform that works across multiple levels of abstraction. Start with a conversation when you're exploring an idea. Move to specs when the shape becomes clear. Track tasks when it's time to execute. Drop into code when you need precision. Agents operate at every level, and you decide how much freedom they get.
 
-![Wallfacer teaser](./assets/overview.png)
+Open source. Runs locally. No IDE lock-in. No cloud dependency. Bring your own LLM provider.
+
+![Wallfacer overview](./assets/overview.png)
+
+## Why Wallfacer
+
+Every AI coding tool today pins you to one interaction mode. Chat-based tools are fast but lose structure at scale. Spec-driven tools add discipline but slow you down on day one. Task boards help you coordinate but don't understand your architecture. Wallfacer connects all of these into a continuous workflow.
+
+**Adaptive abstraction** — Chat-centric for greenfield exploration, spec-centric for complex systems, task-centric for parallel execution, code-level for surgical edits. Move between levels as your project evolves.
+
+**Autonomy spectrum** — Run the full loop autonomously (implement, test, commit, push) or step in at any point. Dial autonomy up or down per task, per spec, per project.
+
+**Spec as intermediate representation** — Ideas don't go straight to code. They become structured specs that agents can reason about, iterate on, and implement against. Specs are versioned and reviewable.
+
+**Isolation by default** — Per-task containers and git worktrees for safe parallel execution. Multiple agents work simultaneously without stepping on each other.
+
+**Operator visibility** — Live logs, traces, timelines, diff review, and usage/cost tracking. Full audit trail from idea to deployed code.
+
+**Self-development** — Wallfacer builds Wallfacer. Most recent capabilities were developed by the system itself.
+
+**Model flexibility** — Works with Claude Code, Codex, and custom sandbox setups. Not locked to any single LLM provider.
 
 ## Quick Start
 
@@ -30,31 +50,17 @@ wallfacer doctor
 Start the server:
 
 ```bash
-wallfacer run
+wallfacer run ~/projects/myapp
 ```
 
-A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings → API Configuration**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
+A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
 
-## Why Wallfacer
+## How It Works
 
-- **Autonomous delivery loop**: backlog, refinement, implementation, testing, review, merge-ready output — end to end
-- **Self-development capability**: wallfacer runs tasks that improve wallfacer itself, creating a compounding engineering loop
-- **Isolation by default**: per-task containers and per-task git worktrees for safe parallelism across many concurrent tasks
-- **Full operator visibility**: live logs, traces, timelines, diffs, usage/cost tracking, per-turn token breakdown
-- **Integrated development environment**: built-in file explorer, host terminal, workspace management — all in the browser
-- **Model/runtime flexibility**: Claude Code, Codex, and custom sandbox setups with per-role routing
-
-## Capability Stack
-
-- **Execution engine**: isolated containers, per-task git worktrees, worker container reuse, safe parallel runs, circuit breaker, resource limits, dependency caching
-- **Autonomous loop**: prompt refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets, failure categorization
-- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search, oversight summaries
-- **Repo operations**: multi-workspace groups, branch switching, sync/rebase helpers, auto commit and push, task forking
-- **Development tools**: file explorer with editor, interactive host terminal, prompt templates, system prompt customization
-- **Flexible runtime**: Podman/Docker support, workspace-level AGENTS.md instructions, Claude + Codex backends, per-role sandbox routing
-
-For a complete walkthrough of workflows and controls, see [Usage Guide](docs/guide/usage.md).
-For implementation details and architecture, see [Technical Internals](docs/internals/internals.md).
+1. **Explore** — Describe what you want to build in chat. Wallfacer helps you shape the idea.
+2. **Specify** — The idea becomes a structured spec. Iterate on it until the design is right.
+3. **Execute** — Specs break into tasks on a board. Agents implement, test, and commit in isolated sandboxes.
+4. **Ship** — Reviewed changes merge automatically. Auto-commit, auto-push, auto-build when you're ready.
 
 ## Product Tour
 
@@ -82,13 +88,23 @@ Inspect what happened, when it happened, and why it happened before you accept a
 
 Track token usage and cost by task, activity, and turn so operations stay measurable as automation scales. Per-role breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
 
+## Capability Stack
+
+- **Execution engine**: isolated containers, per-task git worktrees, worker container reuse, safe parallel runs, circuit breaker, resource limits, dependency caching
+- **Autonomous loop**: prompt refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets, failure categorization
+- **Spec workflow**: structured design specs, five-state lifecycle, dependency DAG, recursive progress tracking, planning chat agent with slash commands
+- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search, oversight summaries
+- **Repo operations**: multi-workspace groups, branch switching, sync/rebase helpers, auto commit and push, task forking
+- **Development tools**: file explorer with editor, interactive host terminal, prompt templates, system prompt customization
+- **Flexible runtime**: Podman/Docker support, workspace-level AGENTS.md instructions, Claude + Codex backends, per-role sandbox routing
+
 ## Roadmap
 
 Development is organized into three parallel tracks with shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
 
 **Foundations** (complete) — Sandbox backend interface, storage backend interface, container reuse, file explorer, host terminal, multi-workspace groups, Windows support.
 
-**Local Product** — Desktop experience and developer workflow: epic coordination, native desktop app, file/image attachments, host mounts, file panel viewer, terminal sessions, container exec, oversight risk scoring, visual verification, live serve.
+**Local Product** — Desktop experience and developer workflow: spec coordination (document model, planning UX, drift detection), desktop app, file/image attachments, host mounts, oversight risk scoring, visual verification, live serve.
 
 **Cloud Platform** — Multi-tenant hosted service: tenant filesystem, K8s sandbox backend, cloud infrastructure, multi-tenant control plane, tenant API.
 
@@ -121,18 +137,12 @@ Development is organized into three parallel tracks with shared foundations. See
 | 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers |
 | 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
 
-## Origin Story
+## Origin
 
-Wallfacer started as a practical response to a repeated workflow: write a task prompt, run an agent, inspect output, and do it again. The bottleneck was not coding speed — it was coordination and visibility across many concurrent agent tasks. A task board became the control surface.
+Wallfacer started as a practical response to a repeated workflow: write a task prompt, run an agent, inspect output, and do it again. The bottleneck was never coding speed — it was coordination and visibility across concurrent agent tasks. A task board became the control surface. Specs became the thinking layer. Chat became the entry point. The system grew into a platform that operates at every level of engineering abstraction.
 
-The first version was a Go server with a minimal web UI. Tasks moved from backlog to in progress, executed in isolated containers, and landed in done when complete. Git worktrees provided branch-level isolation so many tasks could run in parallel without collisions.
-
-Since then, Wallfacer has evolved into a self-operating engineering platform. The execution engine gained container reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handles prompt refinement, implementation, testing, auto-retry, and autopilot promotion. A full oversight layer — live logs, timelines, traces, diffs, and per-turn cost breakdown — ensures every agent decision is auditable before results are accepted.
-
-The integrated development environment now includes a file explorer with editor, an interactive host terminal, system prompt customization, and prompt templates — all accessible from the browser. The goal is not blind autonomy; it is high-throughput engineering with clear, auditable control.
-
-Most of Wallfacer's recent capabilities were developed by Wallfacer itself, creating a compounding loop where the system continuously improves its own engineering process.
+Most of what Wallfacer is today was built by Wallfacer itself.
 
 ## License
 
-See [LICENSE](LICENSE).
+[MIT](LICENSE)
