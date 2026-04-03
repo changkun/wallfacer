@@ -1,5 +1,8 @@
 /* --- Sidebar --- */
 .app-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
   width: 200px;
   border-right: 1px solid var(--border);
   background: var(--bg-sidebar);
@@ -22,10 +25,25 @@
   display: none;
 }
 
+.sidebar-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px 12px 24px;
+}
+
 .app-sidebar.collapsed .sidebar-logo-row {
   padding: 14px 0 10px;
   justify-content: center;
   cursor: pointer;
+}
+
+.sidebar-nav-group {
+  padding: 12px 0;
+}
+
+.sidebar-nav-group--bottom {
+  padding: 0 0 16px;
 }
 
 .app-sidebar.collapsed .sidebar-nav {

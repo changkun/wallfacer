@@ -1,9 +1,6 @@
-<nav id="app-sidebar" class="app-sidebar flex flex-col flex-shrink-0">
+<nav id="app-sidebar" class="app-sidebar">
   <!-- Logo -->
-  <div
-    class="sidebar-logo-row flex items-center gap-3 pl-8 pr-4 pt-5 pb-4"
-    onclick="expandSidebar()"
-  >
+  <div class="sidebar-logo-row" onclick="expandSidebar()">
     <svg
       width="20"
       height="20"
@@ -74,7 +71,7 @@
     ><span>Search</span><kbd class="sidebar-kbd">⌘K</kbd>
   </button>
 
-  <div class="py-3">
+  <div class="sidebar-nav-group">
     <button
       id="sidebar-nav-board"
       class="sidebar-nav active"
@@ -126,10 +123,10 @@
   </div>
 
   <!-- Spacer -->
-  <div class="flex-1"></div>
+  <div style="flex: 1"></div>
 
   <!-- Bottom: Docs & Settings -->
-  <div class="pb-3">
+  <div class="sidebar-nav-group--bottom">
     <button
       id="sidebar-nav-docs"
       class="sidebar-nav"
