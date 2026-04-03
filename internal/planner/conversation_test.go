@@ -57,6 +57,34 @@ func TestConversationStore_AppendAndRead(t *testing.T) {
 	}
 }
 
+func TestConversationStore_RawOutputRoundTrip(t *testing.T) {
+	cs := newTestStore(t)
+
+	rawNDJSON := `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"}]}}
+{"type":"result","result":"done"}`
+
+	msg := Message{
+		Role:      "assistant",
+		Content:   "done",
+		Timestamp: time.Now().Truncate(time.Millisecond),
+		RawOutput: rawNDJSON,
+	}
+	if err := cs.AppendMessage(msg); err != nil {
+		t.Fatalf("AppendMessage: %v", err)
+	}
+
+	got, err := cs.Messages()
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len(Messages) = %d, want 1", len(got))
+	}
+	if got[0].RawOutput != rawNDJSON {
+		t.Errorf("RawOutput = %q, want %q", got[0].RawOutput, rawNDJSON)
+	}
+}
+
 func TestConversationStore_AppendConcurrent(t *testing.T) {
 	cs := newTestStore(t)
 
