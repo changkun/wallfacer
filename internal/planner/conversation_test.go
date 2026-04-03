@@ -3,6 +3,7 @@ package planner
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -310,5 +311,145 @@ func TestPlannerIsBusy(t *testing.T) {
 	p.SetBusy(false)
 	if p.IsBusy() {
 		t.Error("IsBusy should be false after SetBusy(false)")
+	}
+}
+
+// --- BuildHistoryContext ---
+
+func TestBuildHistoryContext_Empty(t *testing.T) {
+	cs := newTestStore(t)
+	got := cs.BuildHistoryContext()
+	if got != "" {
+		t.Errorf("expected empty string for empty store, got %q", got)
+	}
+}
+
+func TestBuildHistoryContext_WithMessages(t *testing.T) {
+	cs := newTestStore(t)
+	_ = cs.AppendMessage(Message{Role: "user", Content: "hello", Timestamp: time.Now()})
+	_ = cs.AppendMessage(Message{Role: "assistant", Content: "hi there", Timestamp: time.Now()})
+
+	got := cs.BuildHistoryContext()
+	if !strings.Contains(got, "User: hello") {
+		t.Errorf("expected user message, got %q", got)
+	}
+	if !strings.Contains(got, "Assistant: hi there") {
+		t.Errorf("expected assistant message, got %q", got)
+	}
+	if !strings.Contains(got, "[Previous conversation context") {
+		t.Errorf("expected header, got %q", got)
+	}
+}
+
+func TestBuildHistoryContext_TruncatesLongContent(t *testing.T) {
+	cs := newTestStore(t)
+	longContent := strings.Repeat("x", 600)
+	_ = cs.AppendMessage(Message{Role: "user", Content: longContent, Timestamp: time.Now()})
+
+	got := cs.BuildHistoryContext()
+	// Content should be truncated to 500 chars + "..."
+	if !strings.Contains(got, "...") {
+		t.Errorf("expected truncated content with '...', got len=%d", len(got))
+	}
+	if strings.Contains(got, strings.Repeat("x", 501)) {
+		t.Error("content should be truncated to 500 chars")
+	}
+}
+
+func TestBuildHistoryContext_CapsAt20Messages(t *testing.T) {
+	cs := newTestStore(t)
+	for i := range 25 {
+		_ = cs.AppendMessage(Message{
+			Role:      "user",
+			Content:   "msg" + string(rune('A'+i)),
+			Timestamp: time.Now(),
+		})
+	}
+
+	got := cs.BuildHistoryContext()
+	// First 5 messages (A-E) should be dropped; F onward should be present.
+	if strings.Contains(got, "msgA") {
+		t.Error("expected oldest messages to be dropped")
+	}
+}
+
+// --- IsStaleSessionError ---
+
+func TestIsStaleSessionError_True(t *testing.T) {
+	raw := `{"type":"result","is_error":true,"errors":["invalid session ID"],"result":""}`
+	if !IsStaleSessionError([]byte(raw)) {
+		t.Error("expected true for stale session error")
+	}
+}
+
+func TestIsStaleSessionError_TrueInResult(t *testing.T) {
+	raw := `{"type":"result","is_error":true,"result":"Could not find session ID abc"}`
+	if !IsStaleSessionError([]byte(raw)) {
+		t.Error("expected true for session ID in result text")
+	}
+}
+
+func TestIsStaleSessionError_False(t *testing.T) {
+	raw := `{"type":"result","is_error":true,"errors":["rate limit exceeded"]}`
+	if IsStaleSessionError([]byte(raw)) {
+		t.Error("expected false for non-session error")
+	}
+}
+
+func TestIsStaleSessionError_NotError(t *testing.T) {
+	raw := `{"type":"result","is_error":false,"result":"ok"}`
+	if IsStaleSessionError([]byte(raw)) {
+		t.Error("expected false for non-error result")
+	}
+}
+
+func TestIsStaleSessionError_Empty(t *testing.T) {
+	if IsStaleSessionError([]byte("")) {
+		t.Error("expected false for empty input")
+	}
+}
+
+// --- IsErrorResult ---
+
+func TestIsErrorResult_True(t *testing.T) {
+	raw := `{"type":"system","data":"init"}
+{"type":"result","is_error":true,"result":"something broke"}`
+	if !IsErrorResult([]byte(raw)) {
+		t.Error("expected true for error result")
+	}
+}
+
+func TestIsErrorResult_False(t *testing.T) {
+	raw := `{"type":"result","is_error":false,"result":"all good"}`
+	if IsErrorResult([]byte(raw)) {
+		t.Error("expected false for non-error result")
+	}
+}
+
+func TestIsErrorResult_NoResultLine(t *testing.T) {
+	raw := `{"type":"assistant","message":{"content":[]}}`
+	if IsErrorResult([]byte(raw)) {
+		t.Error("expected false when no result line exists")
+	}
+}
+
+func TestIsErrorResult_Empty(t *testing.T) {
+	if IsErrorResult([]byte("")) {
+		t.Error("expected false for empty input")
+	}
+}
+
+// --- LoadSession error paths ---
+
+func TestLoadSession_CorruptJSON(t *testing.T) {
+	cs := newTestStore(t)
+	// Write corrupt JSON to session file.
+	path := filepath.Join(cs.dir, sessionFile)
+	if err := os.WriteFile(path, []byte("{broken"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := cs.LoadSession()
+	if err == nil {
+		t.Error("expected error for corrupt session JSON")
 	}
 }
