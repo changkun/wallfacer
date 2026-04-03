@@ -44,8 +44,8 @@ function makeContext() {
   }
 
   const ids = [
-    "mode-tab-board",
-    "mode-tab-spec",
+    "sidebar-nav-board",
+    "sidebar-nav-spec",
     "board",
     "spec-mode-container",
     "spec-focused-title",
@@ -55,7 +55,7 @@ function makeContext() {
     "spec-summarize-btn",
   ];
   for (const id of ids) makeEl("DIV", id);
-  registry.get("mode-tab-board").classList.add("active");
+  registry.get("sidebar-nav-board").classList.add("active");
   registry.get("spec-mode-container").style.display = "none";
 
   const ctx = {

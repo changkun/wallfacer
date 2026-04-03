@@ -50,8 +50,8 @@ function makeContext(opts = {}) {
   }
 
   const ids = [
-    "mode-tab-board",
-    "mode-tab-spec",
+    "sidebar-nav-board",
+    "sidebar-nav-spec",
     "board",
     "spec-mode-container",
     "spec-focused-title",
@@ -62,7 +62,7 @@ function makeContext(opts = {}) {
     "spec-chat-input",
   ];
   for (const id of ids) makeEl("DIV", id);
-  registry.get("mode-tab-board").classList.add("active");
+  registry.get("sidebar-nav-board").classList.add("active");
   registry.get("spec-mode-container").style.display = "none";
 
   let _hash = opts.hash || "";

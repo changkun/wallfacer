@@ -50,11 +50,11 @@ function makeDom() {
 
   // Pre-create the elements spec-mode.js expects.
   const boardTab = makeEl("BUTTON");
-  boardTab.id = "mode-tab-board";
+  boardTab.id = "sidebar-nav-board";
   boardTab.classList.add("active");
 
   const specTab = makeEl("BUTTON");
-  specTab.id = "mode-tab-spec";
+  specTab.id = "sidebar-nav-spec";
 
   const board = makeEl("MAIN");
   board.id = "board";
@@ -128,13 +128,13 @@ describe("spec-mode", () => {
 
   it("switchMode updates tab active classes", () => {
     const dom = ctx.document;
-    const boardTab = dom.getElementById("mode-tab-board");
-    const specTab = dom.getElementById("mode-tab-spec");
+    const boardNav = dom.getElementById("sidebar-nav-board");
+    const specNav = dom.getElementById("sidebar-nav-spec");
 
     ctx.switchMode("spec");
 
-    expect(boardTab.classList.contains("active")).toBe(false);
-    expect(specTab.classList.contains("active")).toBe(true);
+    expect(boardNav.classList.contains("active")).toBe(false);
+    expect(specNav.classList.contains("active")).toBe(true);
   });
 
   it("switchMode toggles board and spec container visibility", () => {

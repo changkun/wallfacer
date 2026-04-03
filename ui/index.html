@@ -1,43 +1,32 @@
 {{template "initial-layout.html"}}
 
-{{template "settings-modal.html"}}
-
-{{template "instructions-editor-modal.html"}}
-
-{{template "system-prompts-modal.html"}}
-
-{{template "container-monitor-modal.html"}}
-
-{{template "usage-stats-modal.html"}}
-
-{{template "span-stats-modal.html"}}
-
-{{template "stats-modal.html"}}
-
-{{template "mobile-nav.html"}}
-
-{{template "workspace-picker.html"}}
+<div id="main-content" class="flex flex-col flex-1 min-w-0 min-h-0">
+{{template "content-header.html"}}
+{{template "command-palette.html"}}
 
 <div class="board-with-explorer">
 {{template "explorer-panel.html"}}
-
 {{template "board.html"}}
-
 {{template "spec-mode.html"}}
+{{template "docs-mode.html"}}
 </div>
 
 {{template "status-bar.html"}}
+</div>
 
-{{template "docs-modal.html"}}
-
+{{template "settings-modal.html"}}
+{{template "instructions-editor-modal.html"}}
+{{template "system-prompts-modal.html"}}
+{{template "container-monitor-modal.html"}}
+{{template "usage-stats-modal.html"}}
+{{template "span-stats-modal.html"}}
+{{template "stats-modal.html"}}
+{{template "mobile-nav.html"}}
+{{template "workspace-picker.html"}}
 {{template "keyboard-shortcuts-modal.html"}}
-
 {{template "alert-modal.html"}}
-
 {{template "confirm-modal.html"}}
-
 {{template "prompt-modal.html"}}
-
 {{template "task-detail-modal.html"}}
 
 {{template "scripts.html"}}

@@ -1,17 +1,153 @@
-/* --- Layout --- */
+/* --- Sidebar --- */
+.app-sidebar {
+  width: 200px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  --wails-draggable: drag;
+  transition:
+    width 0.18s ease,
+    padding 0.18s ease,
+    opacity 0.18s ease;
+  overflow: hidden;
+}
+
+.app-sidebar.collapsed {
+  width: 48px;
+}
+
+.app-sidebar.collapsed .sidebar-brand,
+.app-sidebar.collapsed .sidebar-collapse-btn,
+.app-sidebar.collapsed .sidebar-nav span,
+.app-sidebar.collapsed .sidebar-kbd {
+  display: none;
+}
+
+.app-sidebar.collapsed .sidebar-logo-row {
+  padding: 14px 0 10px;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.app-sidebar.collapsed .sidebar-nav {
+  padding: 7px 0;
+  justify-content: center;
+  border-left-color: transparent;
+}
+
+.app-sidebar.collapsed .sidebar-nav.active {
+  border-left-color: var(--accent);
+}
+
+/* Inset top padding for macOS traffic lights in desktop mode. */
+html.wails-desktop .app-sidebar {
+  padding-top: 32px;
+}
+
+/* Interactive elements must not be draggable. */
+.app-sidebar button,
+.app-sidebar a {
+  --wails-draggable: no-drag;
+}
+
+.sidebar-brand {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 22px;
+  background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--text);
+  background: var(--bg-input);
+}
+
+.sidebar-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 16px 7px 22px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition:
+    color 0.12s,
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.sidebar-nav:hover {
+  color: var(--text);
+  background: color-mix(in oklab, var(--bg) 50%, transparent);
+}
+
+.sidebar-nav.active {
+  color: var(--text);
+  font-weight: 600;
+  border-left-color: var(--accent);
+}
+
+.sidebar-nav svg {
+  flex-shrink: 0;
+}
+
+.sidebar-kbd {
+  margin-left: auto;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 0 12px;
+  margin-bottom: 4px;
+}
+
+/* --- Content Header --- */
 .app-header {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 24px;
+  padding: 6px 16px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
   --wails-draggable: drag;
-}
-
-/* Inset left padding for macOS traffic lights in desktop mode. */
-html.wails-desktop .app-header {
-  padding-left: 96px;
 }
 
 /* Interactive elements must not be draggable. */
@@ -22,52 +158,6 @@ html.wails-desktop .app-header {
 .app-header [role="button"],
 .app-header .workspace-group-tab {
   --wails-draggable: no-drag;
-}
-
-.app-header__primary {
-  display: contents;
-}
-
-.app-header__identity {
-  display: contents;
-}
-
-.app-header__brand {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.mode-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.mode-tab {
-  padding: 4px 10px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    color 0.12s,
-    background 0.12s;
-}
-
-.mode-tab:hover {
-  color: var(--text);
-  background: var(--bg-hover);
-}
-
-.mode-tab.active {
-  color: var(--text);
-  background: var(--bg-card);
-  border-color: var(--border);
 }
 
 .workspace-group-tabs {
@@ -208,7 +298,7 @@ html.wails-desktop .app-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 24px;
+  padding: 4px 16px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
   min-height: 0;

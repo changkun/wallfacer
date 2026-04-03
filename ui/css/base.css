@@ -3,6 +3,7 @@
 [data-theme="light"] {
   --bg: #f0ede6;
   --bg-raised: #e8e4dc;
+  --bg-sidebar: #e2ded5;
   --bg-card: #faf8f4;
   --bg-input: #e8e4dc;
   --text: #1f1d1a;
@@ -41,6 +42,7 @@
 [data-theme="dark"] {
   --bg: #1a1917;
   --bg-raised: #211f1c;
+  --bg-sidebar: #13120f;
   --bg-card: #272420;
   --bg-input: #1e1c19;
   --text: #f0ede6;

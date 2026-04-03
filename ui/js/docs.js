@@ -1,13 +1,20 @@
 // --- Documentation viewer ---
 
-var _docsCtrl = createModalController("docs-modal");
 var _docsEntries = [];
 var _docsCurrentSlug = "";
+var _docsLoaded = false;
 
-async function openDocs(slug) {
-  var modal = document.getElementById("docs-modal");
-  if (!modal) return;
-  _docsCtrl.open();
+// openDocs switches to docs mode and optionally loads a specific doc.
+function openDocs(slug) {
+  switchMode("docs");
+  if (slug) loadDoc(slug);
+}
+
+// _ensureDocsLoaded is called by _applyMode when entering docs mode.
+// It fetches the docs index on first visit and renders the default page.
+async function _ensureDocsLoaded() {
+  if (_docsLoaded) return;
+  _docsLoaded = true;
 
   if (!_docsEntries.length) {
     try {
@@ -17,26 +24,7 @@ async function openDocs(slug) {
     }
   }
   renderDocsNav();
-  // Default to the index page (usage) when no specific slug is requested.
-  var target = slug || "guide/usage";
-  if (target) loadDoc(target);
-}
-
-function closeDocs() {
-  _docsCtrl.close();
-}
-
-function toggleDocsFullscreen() {
-  var card = document.getElementById("docs-modal-card");
-  if (!card) return;
-  card.classList.toggle("docs-modal-card--fullscreen");
-  // Also remove padding from overlay when fullscreen.
-  var modal = document.getElementById("docs-modal");
-  if (modal) {
-    modal.style.padding = card.classList.contains("docs-modal-card--fullscreen")
-      ? "0"
-      : "";
-  }
+  if (!_docsCurrentSlug) loadDoc("guide/usage");
 }
 
 function renderDocsNav() {

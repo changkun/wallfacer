@@ -8,9 +8,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
 
 describe("header layout", () => {
-  it("places automation toggles inside a dropdown menu in the primary header", () => {
-    const layoutHtml = readFileSync(
-      join(repoRoot, "ui/partials/initial-layout.html"),
+  it("places automation toggles inside a dropdown menu in the content header", () => {
+    const headerHtml = readFileSync(
+      join(repoRoot, "ui/partials/content-header.html"),
       "utf8",
     );
     const automationHtml = readFileSync(
@@ -18,10 +18,18 @@ describe("header layout", () => {
       "utf8",
     );
 
-    // Layout includes the automation-menu partial via Go template
-    expect(layoutHtml).toContain('class="app-header"');
-    expect(layoutHtml).toContain('class="app-header__primary"');
-    expect(layoutHtml).toContain('{{template "automation-menu.html"}}');
+    // Content header includes the automation-menu partial via Go template
+    expect(headerHtml).toContain('class="app-header"');
+    expect(headerHtml).toContain('{{template "automation-menu.html"}}');
+
+    // Sidebar partial exists and contains navigation
+    const sidebarHtml = readFileSync(
+      join(repoRoot, "ui/partials/sidebar.html"),
+      "utf8",
+    );
+    expect(sidebarHtml).toContain('id="app-sidebar"');
+    expect(sidebarHtml).toContain('id="sidebar-nav-board"');
+    expect(sidebarHtml).toContain('id="sidebar-nav-spec"');
 
     // Automation menu partial contains the toggle controls
     expect(automationHtml).toContain('id="automation-menu-btn"');
@@ -33,21 +41,18 @@ describe("header layout", () => {
     expect(automationHtml).toContain('id="autopilot-toggle"');
     expect(automationHtml).toContain('id="autotest-toggle"');
     expect(automationHtml).toContain('id="autosubmit-toggle"');
-    expect(layoutHtml).not.toContain('class="app-header__secondary"');
   });
 
-  it("defines automation menu and toggle chip styles", () => {
+  it("defines sidebar and automation menu styles", () => {
     const css = readAllCSS(join(repoRoot, "ui/css/styles.css"));
 
+    expect(css).toContain(".app-sidebar");
+    expect(css).toContain(".sidebar-nav");
     expect(css).toContain(".automation-menu");
     expect(css).toContain(".automation-menu-wrap");
     expect(css).toContain(".automation-active-count");
     expect(css).toContain(".header-toggle-chip");
     expect(css).toContain(".header-toggle-chip__track");
-    expect(css).toContain(".app-header__primary");
-    expect(css).toContain("@media (max-width: 768px)");
     expect(css).toContain(".app-header__button-row");
-    expect(css).toContain("align-content: flex-start;");
-    expect(css).toContain("flex: 0 0 100%;");
   });
 });

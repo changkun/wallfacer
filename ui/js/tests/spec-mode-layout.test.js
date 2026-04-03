@@ -53,8 +53,8 @@ function makeContext() {
 
   // Create all elements the layout expects.
   const ids = [
-    "mode-tab-board",
-    "mode-tab-spec",
+    "sidebar-nav-board",
+    "sidebar-nav-spec",
     "board",
     "spec-mode-container",
     "spec-focused-view",
@@ -75,7 +75,7 @@ function makeContext() {
   }
 
   // Board tab starts active, spec container starts hidden.
-  registry.get("mode-tab-board").classList.add("active");
+  registry.get("sidebar-nav-board").classList.add("active");
   registry.get("spec-mode-container").style.display = "none";
 
   const ctx = {

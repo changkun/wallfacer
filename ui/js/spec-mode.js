@@ -1,8 +1,10 @@
 // --- Spec mode state and switching ---
 
-// currentMode: "board" | "spec"
-var currentMode =
-  localStorage.getItem("wallfacer-mode") === "spec" ? "spec" : "board";
+// currentMode: "board" | "spec" | "docs"
+var _validModes = { board: true, spec: true, docs: true };
+var currentMode = _validModes[localStorage.getItem("wallfacer-mode")]
+  ? localStorage.getItem("wallfacer-mode")
+  : "board";
 
 function getCurrentMode() {
   return currentMode;
@@ -18,17 +20,21 @@ function setCurrentMode(mode) {
 // idempotency check) and by DOMContentLoaded (to restore persisted mode
 // where the JS variable already matches but the DOM hasn't been touched).
 function _applyMode(mode) {
-  // Update header mode tabs.
-  var boardTab = document.getElementById("mode-tab-board");
-  var specTab = document.getElementById("mode-tab-spec");
-  if (boardTab) boardTab.classList.toggle("active", mode === "board");
-  if (specTab) specTab.classList.toggle("active", mode === "spec");
+  // Update sidebar navigation active states.
+  var boardNav = document.getElementById("sidebar-nav-board");
+  var specNav = document.getElementById("sidebar-nav-spec");
+  var docsNav = document.getElementById("sidebar-nav-docs");
+  if (boardNav) boardNav.classList.toggle("active", mode === "board");
+  if (specNav) specNav.classList.toggle("active", mode === "spec");
+  if (docsNav) docsNav.classList.toggle("active", mode === "docs");
 
   // Toggle main content areas.
   var board = document.getElementById("board");
   var specView = document.getElementById("spec-mode-container");
+  var docsView = document.getElementById("docs-mode-container");
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
+  if (docsView) docsView.style.display = mode === "docs" ? "" : "none";
 
   // Stop spec refresh poll and clear hash when leaving spec mode.
   if (mode !== "spec") {
@@ -42,24 +48,56 @@ function _applyMode(mode) {
     }
   }
 
+  // Load docs content when entering docs mode for the first time.
+  if (mode === "docs" && typeof _ensureDocsLoaded === "function") {
+    _ensureDocsLoaded();
+  }
+
   // Switch explorer root (no-op until spec-explorer is wired).
   if (typeof switchExplorerRoot === "function") {
     switchExplorerRoot(mode === "spec" ? "specs" : "workspace");
   }
 
-  // Auto-show explorer in spec mode, auto-hide in board mode.
+  // Auto-show explorer in spec mode, hide in other modes.
   var explorerPanel = document.getElementById("explorer-panel");
   if (explorerPanel) {
-    if (mode === "spec") {
-      explorerPanel.style.display = "";
-    } else {
-      explorerPanel.style.display = "none";
-    }
+    explorerPanel.style.display = mode === "spec" ? "" : "none";
+  }
+
+  // Hide workspace bar and content header in docs mode.
+  var header =
+    typeof document.querySelector === "function"
+      ? document.querySelector(".app-header")
+      : null;
+  var gitBar = document.getElementById("workspace-git-bar");
+  if (header) header.style.display = mode === "docs" ? "none" : "";
+  if (gitBar) gitBar.style.display = mode === "docs" ? "none" : "";
+}
+
+// --- Sidebar collapse/expand ---
+
+function toggleSidebar() {
+  var sidebar = document.getElementById("app-sidebar");
+  if (!sidebar) return;
+  var collapsed = sidebar.classList.toggle("collapsed");
+  localStorage.setItem("wallfacer-sidebar-collapsed", collapsed ? "1" : "");
+}
+
+function expandSidebar() {
+  var sidebar = document.getElementById("app-sidebar");
+  if (!sidebar || !sidebar.classList.contains("collapsed")) return;
+  toggleSidebar();
+}
+
+function _restoreSidebarState() {
+  if (localStorage.getItem("wallfacer-sidebar-collapsed") === "1") {
+    var sidebar = document.getElementById("app-sidebar");
+    if (sidebar) sidebar.classList.add("collapsed");
   }
 }
 
-// switchMode toggles between board and spec mode. Updates header tabs,
-// swaps main content visibility, and persists the choice.
+// switchMode toggles between board, spec, and docs modes. Updates sidebar
+// nav active states, swaps main content visibility, and persists the choice.
 function switchMode(mode) {
   if (mode === currentMode) return;
   setCurrentMode(mode);
@@ -447,7 +485,10 @@ function _tocPrepare(scrollEl, innerEl) {
       try {
         item.prepared = pt.prepare(block.textContent || "", font);
         item.lineHeight = lh;
-        item.overhead = Math.max(0, rect.height - pt.layout(item.prepared, rect.width, lh).height);
+        item.overhead = Math.max(
+          0,
+          rect.height - pt.layout(item.prepared, rect.width, lh).height,
+        );
       } catch (_e) {
         item.prepared = null;
       }
@@ -508,8 +549,12 @@ function _tocRelayout(scrollEl, innerEl, toc) {
     var item = _tocItems[i];
 
     if (item.prepared && pt) {
-      item.heightFull = pt.layout(item.prepared, fullWidth, item.lineHeight).height + item.overhead;
-      item.heightNarrow = pt.layout(item.prepared, narrowWidth, item.lineHeight).height + item.overhead;
+      item.heightFull =
+        pt.layout(item.prepared, fullWidth, item.lineHeight).height +
+        item.overhead;
+      item.heightNarrow =
+        pt.layout(item.prepared, narrowWidth, item.lineHeight).height +
+        item.overhead;
     } else {
       item.heightFull = item.el.getBoundingClientRect().height;
       var origMW = item.el.style.maxWidth;
@@ -643,7 +688,10 @@ function _initSpecChatResize() {
       var s = document.getElementById("spec-focused-body");
       var inn = document.getElementById("spec-focused-body-inner");
       var t = document.getElementById("spec-toc");
-      if (s && inn && t) { _tocRelayout(s, inn, t); _tocApply(); }
+      if (s && inn && t) {
+        _tocRelayout(s, inn, t);
+        _tocApply();
+      }
     }
 
     document.addEventListener("mousemove", onMouseMove);
@@ -656,8 +704,9 @@ function _initSpecChatResize() {
 // the DOM hasn't been updated yet — switchMode's idempotency guard
 // would skip the update.
 document.addEventListener("DOMContentLoaded", function () {
-  if (currentMode === "spec") {
-    _applyMode("spec");
+  _restoreSidebarState();
+  if (currentMode !== "board") {
+    _applyMode(currentMode);
   }
   _initSpecChatResize();
 });
