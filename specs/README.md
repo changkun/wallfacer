@@ -35,6 +35,7 @@ Local Product                     Cloud Platform
                                     ○ Multi-Agent Consensus
                                     ○ Multi-Agent Debate
                                     ○ Token & Cost Optimization
+                                    ○ Intent-Driven Commits
                                     ○ Extensible Prompts
                                     ○ Sandbox Hooks
                                     ○ Defense in Depth
@@ -183,6 +184,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
+| [intent-commits.md](shared/intent-commits.md) | Not started | Both | Every intent (task, planning chat, explorer edit) produces a git commit — enables fine-grained undo, attribution, and revert. |
 | [sandbox-hooks.md](shared/sandbox-hooks.md) | Not started | Both | Agent lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Mechanism layer for token cost optimization. |
 | [defense-in-depth.md](shared/defense-in-depth.md) | Drafted | Both | Layered oversight composition (Swiss cheese model), task-level permission modes, pre-dispatch validation, escalation cascade, unified decision audit. |
 | [agent-memory-identity.md](shared/agent-memory-identity.md) | Vague | Both | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. Foundation for intelligence system's shared world model. |
@@ -223,6 +225,7 @@ graph TB
     NSM[Native Sandbox macOS]
     NSW[Native Sandbox Windows]
     EP[Extensible Prompts]
+    IC[Intent Commits]
     TEL[Telemetry & Observability]
     INB[Information Inbox]
     MAC[Multi-Agent Consensus]
