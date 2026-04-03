@@ -21,9 +21,9 @@ func Int(key string, defaultVal int) int {
 
 // IntMin reads an integer from environment variable key with a minimum bound.
 // Returns defaultVal if absent, empty, unparseable, or below min.
-func IntMin(key string, defaultVal, min int) int {
+func IntMin(key string, defaultVal, minVal int) int {
 	n := Int(key, defaultVal)
-	if n < min {
+	if n < minVal {
 		return defaultVal
 	}
 	return n
@@ -42,9 +42,9 @@ func Duration(key string, defaultVal time.Duration) time.Duration {
 
 // DurationMin reads a time.Duration with a minimum bound.
 // Returns defaultVal if absent, empty, unparseable, or below min.
-func DurationMin(key string, defaultVal, min time.Duration) time.Duration {
+func DurationMin(key string, defaultVal, minVal time.Duration) time.Duration {
 	d := Duration(key, defaultVal)
-	if d < min {
+	if d < minVal {
 		return defaultVal
 	}
 	return d
