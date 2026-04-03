@@ -8,19 +8,13 @@ The planning chat is a conversational interface for exploring ideas with an AI a
 
 ```mermaid
 sequenceDiagram
-  participant User
-  participant Server
-  participant Agent as Claude Code
-  User->>Server: POST /api/planning/messages
-  Server->>Server: Append to messages.jsonl
-  Server-->>User: 202 Accepted
-  Server->>Agent: claude -p "message" --resume
-  User->>Server: GET /api/planning/messages/stream
-  Agent-->>Server: NDJSON stream
-  Server-->>User: Live text stream
-  Agent->>Agent: Read/write spec files
-  Agent-->>Server: Done
-  Server->>Server: Save session + assistant message
+  participant You
+  participant Agent
+  You->>Agent: Type a message
+  Agent->>Agent: Read codebase, think
+  Agent-->>You: Stream response
+  Agent->>Agent: Write/edit spec files
+  You->>Agent: Follow up or use /command
 ```
 
 ### Opening the Planning Chat
