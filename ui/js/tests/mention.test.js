@@ -255,7 +255,7 @@ describe("attachMentionAutocomplete", () => {
     // Enter without any ArrowDown should complete with the top-ranked file.
     keyHandler[0]({ key: "Enter", preventDefault: () => {} });
     await Promise.resolve();
-    expect(textarea.value).toBe("@lib/main_test.go");
+    expect(textarea.value).toBe("@lib/main_test.go ");
 
     blurHandler({ type: "blur" });
     vi.advanceTimersByTime(150);
@@ -290,6 +290,6 @@ describe("attachMentionAutocomplete", () => {
     keyHandler[0]({ key: "Tab", preventDefault: () => {} });
     await Promise.resolve();
     // Second-ranked match is the path-only match.
-    expect(textarea.value).toBe("@src/main/app.go");
+    expect(textarea.value).toBe("@src/main/app.go ");
   });
 });

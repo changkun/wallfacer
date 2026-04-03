@@ -105,7 +105,7 @@ function attachMentionAutocomplete(textarea, opts) {
     const cursorPos = textarea.selectionStart;
     const before = textarea.value.substring(0, atIdx);
     const after = textarea.value.substring(cursorPos);
-    const insert = "@" + file;
+    const insert = "@" + file + " ";
     textarea.value = before + insert + after;
     const newPos = before.length + insert.length;
     textarea.setSelectionRange(newPos, newPos);
