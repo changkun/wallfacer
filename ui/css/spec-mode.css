@@ -826,27 +826,31 @@
   font-size: 11px;
 }
 
-/* Normalize cc-result-text inside the activity log so <pre> matches
-   the surrounding tool-input spans in size and font. */
-.planning-chat-activity .cc-result-text {
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 .planning-chat-activity summary {
   cursor: pointer;
   color: var(--text-muted);
   font-size: 11px;
 }
 
+/* Timeline-style activity log — left accent border, no outer box. */
 .planning-chat-activity__log {
   max-height: 300px;
   overflow-y: auto;
   margin-top: 4px;
-  padding: 4px;
-  background: var(--bg);
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--border);
+}
+
+/* Flatten tool results inside chat activity — no indent, inline flow. */
+.planning-chat-activity .cc-tool-result {
+  padding-left: 0;
+}
+
+/* Strip <pre> box behavior so result text blends with tool calls. */
+.planning-chat-activity .cc-result-text {
+  font-size: 11px;
+  line-height: 1.5;
+  display: inline;
 }
 
 .planning-chat-empty {
