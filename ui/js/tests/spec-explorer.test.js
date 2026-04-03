@@ -73,7 +73,6 @@ function makeContext(opts = {}) {
 
   const ids = [
     "explorer-tree",
-    "spec-explorer-workspace-toggle",
     "spec-status-filter",
     "spec-dispatch-bar",
     "spec-dispatch-selected-btn",
@@ -194,19 +193,6 @@ describe("spec-explorer", () => {
 
     const treeEl = ctx.registry.get("explorer-tree");
     expect(treeEl.innerHTML).toContain("1/1");
-  });
-
-  it("switchExplorerRoot to specs shows toggle", () => {
-    ctx.switchExplorerRoot("specs");
-    const toggle = ctx.registry.get("spec-explorer-workspace-toggle");
-    expect(toggle.classList.contains("hidden")).toBe(false);
-  });
-
-  it("switchExplorerRoot to workspace hides toggle", () => {
-    ctx.switchExplorerRoot("specs");
-    ctx.switchExplorerRoot("workspace");
-    const toggle = ctx.registry.get("spec-explorer-workspace-toggle");
-    expect(toggle.classList.contains("hidden")).toBe(true);
   });
 
   it("switchExplorerRoot to workspace calls _loadExplorerRoots", () => {

@@ -68,11 +68,6 @@ function switchExplorerRoot(mode) {
 
   _stopSpecTreePoll();
 
-  // Show/hide the "Show workspace files" toggle and status filter.
-  var toggle = document.getElementById("spec-explorer-workspace-toggle");
-  if (toggle) {
-    toggle.classList.toggle("hidden", mode !== "specs");
-  }
   var filterEl = document.getElementById("spec-status-filter");
   if (filterEl) {
     filterEl.classList.toggle("hidden", mode !== "specs");
@@ -103,76 +98,6 @@ function switchExplorerRoot(mode) {
     }
     if (typeof _startExplorerRefreshPoll === "function") {
       _startExplorerRefreshPoll();
-    }
-  }
-}
-
-// toggleSpecWorkspaceFiles shows or hides workspace files below the spec tree.
-function toggleSpecWorkspaceFiles(checked) {
-  var treeEl = document.getElementById("explorer-tree");
-  if (!treeEl) return;
-
-  // Remove any existing workspace section.
-  var existing = document.getElementById("spec-workspace-files");
-  if (existing) existing.remove();
-
-  if (checked) {
-    // Add a workspace files section below the spec tree.
-    var section = document.createElement("div");
-    section.id = "spec-workspace-files";
-    section.className = "spec-workspace-files";
-    section.innerHTML =
-      '<div class="spec-workspace-files__header">Workspace Files</div>' +
-      '<div class="spec-loading">Loading files\u2026</div>';
-    treeEl.parentNode.insertBefore(section, treeEl.nextSibling);
-
-    // Load workspace root entries via the explorer tree API.
-    var workspaces =
-      typeof activeWorkspaces !== "undefined" && Array.isArray(activeWorkspaces)
-        ? activeWorkspaces
-        : [];
-    var html =
-      '<div class="spec-workspace-files__header">Workspace Files</div>';
-    var pending = workspaces.length;
-    if (pending === 0) {
-      section.innerHTML = html;
-      return;
-    }
-    for (var i = 0; i < workspaces.length; i++) {
-      (function (ws) {
-        var url =
-          Routes.explorer.tree() +
-          "?path=" +
-          encodeURIComponent(ws) +
-          "&workspace=" +
-          encodeURIComponent(ws);
-        fetch(url, { headers: withBearerHeaders() })
-          .then(function (r) {
-            return r.json();
-          })
-          .then(function (entries) {
-            for (var j = 0; j < entries.length; j++) {
-              var e = entries[j];
-              var icon = e.type === "dir" ? "\uD83D\uDCC1" : "\uD83D\uDCC4";
-              html +=
-                '<div class="spec-node" style="padding-left: 8px">' +
-                '<span class="spec-node-icon">' +
-                icon +
-                "</span> " +
-                '<span class="spec-node-title">' +
-                escapeHtml(e.name) +
-                "</span></div>";
-            }
-          })
-          .catch(function () {})
-          .finally(function () {
-            pending--;
-            if (pending <= 0) {
-              var el = document.getElementById("spec-workspace-files");
-              if (el) el.innerHTML = html;
-            }
-          });
-      })(workspaces[i]);
     }
   }
 }
