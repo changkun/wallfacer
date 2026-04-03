@@ -628,11 +628,11 @@ function _updateContextActions(taskRows, selectedTaskOverride) {
 
   if (selectedTask) {
     _commandPaletteActiveTaskId = selectedTask.id;
-    const actionRows = commandPaletteTaskActions(
-      _resolveTaskById(selectedTask.id) || selectedTask,
-    ).map(_buildActionRow);
+    const resolved = _resolveTaskById(selectedTask.id) || selectedTask;
+    const actionRows = commandPaletteTaskActions(resolved).map(_buildActionRow);
     if (actionRows.length) {
-      groups.push(_groupWithTitle("Context Actions", actionRows));
+      const taskLabel = _getTaskTitle(resolved) || _shortTaskId(resolved);
+      groups.push(_groupWithTitle("Actions \u2014 " + taskLabel, actionRows));
     }
   } else {
     _commandPaletteActiveTaskId = "";
@@ -721,18 +721,18 @@ function _searchLocal(query) {
     ];
   }
 
-  // Append context actions for selected task.
+  // Append context actions for the first task result.
   var allRows = _flattenRows(groups);
   var firstTask = allRows.find(function (r) {
     return r.type === "task";
   });
   if (firstTask) {
     _commandPaletteActiveTaskId = firstTask.id;
-    var actionRows = commandPaletteTaskActions(
-      _resolveTaskById(firstTask.id) || firstTask.taskObj,
-    ).map(_buildActionRow);
+    var resolved = _resolveTaskById(firstTask.id) || firstTask.taskObj;
+    var actionRows = commandPaletteTaskActions(resolved).map(_buildActionRow);
     if (actionRows.length) {
-      groups.push(_groupWithTitle("Context Actions", actionRows));
+      var taskLabel = firstTask.title || _shortTaskId(firstTask);
+      groups.push(_groupWithTitle("Actions \u2014 " + taskLabel, actionRows));
     }
   }
 
