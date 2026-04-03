@@ -16,35 +16,51 @@ const (
 	ioctlTIOCPTYGNAME = 0x40807453 // _IOC(IOC_OUT, 't', 83, 128) — ptsname
 )
 
+// openPtmx opens the PTY multiplexer device. Replaceable for testing.
+var openPtmx = func() (*os.File, error) {
+	return os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
+}
+
+// ioctl wraps the SYS_IOCTL syscall. Replaceable for testing.
+var ioctl = func(fd, req, arg uintptr) error {
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, req, arg)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+// openSlave opens the slave PTY device by path. Replaceable for testing.
+var openSlave = func(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_RDWR|syscall.O_NOCTTY, 0)
+}
+
 // Open allocates a new PTY pair, returning the master and slave file
 // descriptors. Uses macOS-specific ioctls (TIOCPTYGRANT, TIOCPTYUNLK,
 // TIOCPTYGNAME) to avoid cgo.
 func Open() (master, slave *os.File, err error) {
-	m, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
+	m, err := openPtmx()
 	if err != nil {
 		return nil, nil, fmt.Errorf("pty: open /dev/ptmx: %w", err)
 	}
 
 	fd := m.Fd()
 
-	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd,
-		ioctlTIOCPTYGRANT, 0); errno != 0 {
+	if err := ioctl(fd, ioctlTIOCPTYGRANT, 0); err != nil {
 		_ = m.Close()
-		return nil, nil, fmt.Errorf("pty: TIOCPTYGRANT: %w", errno)
+		return nil, nil, fmt.Errorf("pty: TIOCPTYGRANT: %w", err)
 	}
-	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd,
-		ioctlTIOCPTYUNLK, 0); errno != 0 {
+	if err := ioctl(fd, ioctlTIOCPTYUNLK, 0); err != nil {
 		_ = m.Close()
-		return nil, nil, fmt.Errorf("pty: TIOCPTYUNLK: %w", errno)
+		return nil, nil, fmt.Errorf("pty: TIOCPTYUNLK: %w", err)
 	}
 
 	// Retrieve the slave device path (e.g. /dev/ttys003) via TIOCPTYGNAME.
 	// The ioctl writes a null-terminated C string into the buffer.
 	var name [128]byte
-	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd,
-		ioctlTIOCPTYGNAME, uintptr(unsafe.Pointer(&name[0]))); errno != 0 {
+	if err := ioctl(fd, ioctlTIOCPTYGNAME, uintptr(unsafe.Pointer(&name[0]))); err != nil {
 		_ = m.Close()
-		return nil, nil, fmt.Errorf("pty: TIOCPTYGNAME: %w", errno)
+		return nil, nil, fmt.Errorf("pty: TIOCPTYGNAME: %w", err)
 	}
 
 	// Find the null terminator to extract the path string.
@@ -54,7 +70,7 @@ func Open() (master, slave *os.File, err error) {
 	}
 	slavePath := string(name[:end])
 
-	s, err := os.OpenFile(slavePath, os.O_RDWR|syscall.O_NOCTTY, 0)
+	s, err := openSlave(slavePath)
 	if err != nil {
 		_ = m.Close()
 		return nil, nil, fmt.Errorf("pty: open slave %s: %w", slavePath, err)

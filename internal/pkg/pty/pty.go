@@ -32,10 +32,14 @@ func Setsize(f *os.File, rows, cols uint16) error {
 	return nil
 }
 
+// openFunc is the PTY allocator used by StartWithSize.
+// Tests can replace it to inject errors without touching real devices.
+var openFunc = Open
+
 // StartWithSize spawns cmd attached to a new PTY with the given window size.
 // The returned file is the PTY master; the caller must close it when done.
 func StartWithSize(cmd *exec.Cmd, rows, cols uint16) (*os.File, error) {
-	master, slave, err := Open()
+	master, slave, err := openFunc()
 	if err != nil {
 		return nil, err
 	}

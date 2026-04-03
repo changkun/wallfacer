@@ -18,7 +18,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pty"
+	"changkun.de/x/wallfacer/internal/pkg/pty"
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 )
