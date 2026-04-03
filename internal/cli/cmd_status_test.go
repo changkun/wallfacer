@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -349,29 +350,54 @@ func TestFetchContainers_ServerDown(t *testing.T) {
 	}
 }
 
-// TestRunStatus_ServerUnreachable verifies that RunStatus exits gracefully
-// when the server is unreachable (non-watch mode).
-func TestRunStatus_ServerUnreachable(t *testing.T) {
-	stderr := captureStderr(func() {
-		// Use a subprocess to capture the os.Exit(1) call.
-		// Instead, just verify the render closure returns false.
-	})
-	_ = stderr
-
-	// We can verify fetchTasks fails for an unreachable address.
-	_, err := fetchTasks("http://127.0.0.1:1")
-	if err == nil {
-		t.Fatal("expected error for unreachable server")
+// TestRunStatus_SubprocessHelper is a test helper used by subprocess tests.
+func TestRunStatus_SubprocessHelper(t *testing.T) {
+	if os.Getenv("WALLFACER_STATUS_HELPER") != "1" {
+		return
+	}
+	mode := os.Getenv("WALLFACER_STATUS_MODE")
+	addr := os.Getenv("WALLFACER_STATUS_ADDR")
+	switch mode {
+	case "render":
+		RunStatus("", []string{"-addr", addr})
+	case "json":
+		RunStatus("", []string{"-addr", addr, "--json"})
 	}
 }
 
-// TestRunStatus_JsonServerUnreachable verifies that --json mode writes an error
-// message to stderr when the server is unreachable. We verify this by testing
-// the underlying fetchTasks error.
-func TestRunStatus_JsonServerUnreachable(t *testing.T) {
-	_, err := fetchTasks("http://127.0.0.1:1")
+// TestRunStatus_RenderServerDown verifies that `wallfacer status` exits with
+// a non-zero code when the server is unreachable.
+func TestRunStatus_RenderServerDown(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestRunStatus_SubprocessHelper", "-test.count=1")
+	cmd.Env = append(os.Environ(),
+		"WALLFACER_STATUS_HELPER=1",
+		"WALLFACER_STATUS_MODE=render",
+		"WALLFACER_STATUS_ADDR=http://127.0.0.1:1",
+	)
+	out, err := cmd.CombinedOutput()
 	if err == nil {
-		t.Fatal("expected connection error")
+		t.Fatal("expected non-zero exit code for unreachable server")
+	}
+	if !bytes.Contains(out, []byte("not reachable")) {
+		t.Fatalf("expected 'not reachable' in output, got: %s", out)
+	}
+}
+
+// TestRunStatus_JsonServerDown verifies that `wallfacer status --json` exits
+// with non-zero code when the server is unreachable.
+func TestRunStatus_JsonServerDown(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestRunStatus_SubprocessHelper", "-test.count=1")
+	cmd.Env = append(os.Environ(),
+		"WALLFACER_STATUS_HELPER=1",
+		"WALLFACER_STATUS_MODE=json",
+		"WALLFACER_STATUS_ADDR=http://127.0.0.1:1",
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit code for unreachable server")
+	}
+	if !bytes.Contains(out, []byte("not reachable")) {
+		t.Fatalf("expected 'not reachable' in output, got: %s", out)
 	}
 }
 
