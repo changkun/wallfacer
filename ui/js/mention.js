@@ -34,18 +34,24 @@ function _mentionGetQuery(textarea) {
   return { query, atIdx };
 }
 
-function _mentionFilter(files, query) {
-  if (!query) return files.slice(0, 20);
-  const lower = query.toLowerCase();
-  // Score: basename match ranks higher than full-path match.
+// priorityPrefix: optional path prefix (e.g. "specs/") to boost in ranking.
+function _mentionFilter(files, query, priorityPrefix) {
+  const lower = (query || "").toLowerCase();
   const scored = [];
-  for (const f of files) {
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
     const fl = f.toLowerCase();
-    if (!fl.includes(lower)) continue;
+    if (lower && !fl.includes(lower)) continue;
     const base = fl.split("/").pop();
-    scored.push({ f, score: base.includes(lower) ? 0 : 1 });
+    // Lower score = higher rank.
+    // Priority prefix files get a -2 bonus; basename match gets -1.
+    let score = 2;
+    if (priorityPrefix && fl.startsWith(priorityPrefix.toLowerCase())) score -= 2;
+    if (!lower || base.includes(lower)) score -= 1;
+    scored.push({ f, score, idx: i });
   }
-  scored.sort((a, b) => a.score - b.score);
+  // Stable sort: same score preserves original order.
+  scored.sort((a, b) => a.score - b.score || a.idx - b.idx);
   return scored.slice(0, 20).map((s) => s.f);
 }
 
@@ -53,9 +59,11 @@ function _mentionFilter(files, query) {
 // Options:
 //   position: "below" (default) — dropdown appears below the textarea
 //   position: "above" — dropdown appears above the textarea
+//   priorityPrefix: path prefix to boost in ranking (e.g. "specs/")
 function attachMentionAutocomplete(textarea, opts) {
   if (!textarea) return;
   var position = (opts && opts.position) || "below";
+  var priorityPrefix = (opts && opts.priorityPrefix) || "";
 
   let dropdown = null;
   let selectedIndex = -1;
@@ -165,7 +173,7 @@ function attachMentionAutocomplete(textarea, opts) {
     const files = await _mentionLoadFiles();
     if (gen !== renderGeneration) return; // Stale — a newer update superseded this one.
 
-    const matches = _mentionFilter(files, info.query);
+    const matches = _mentionFilter(files, info.query, priorityPrefix);
     renderItems(matches);
   }
 

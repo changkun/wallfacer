@@ -46,7 +46,7 @@ var PlanningChat = (function () {
     // Attach @-mention file autocomplete (reuses the task board's mention module).
     // Position above the input since the chat input is at the bottom of the pane.
     if (typeof attachMentionAutocomplete === "function") {
-      attachMentionAutocomplete(_input, { position: "above" });
+      attachMentionAutocomplete(_input, { position: "above", priorityPrefix: "specs/" });
     }
 
     // Wire clear button and send-mode toggle.
