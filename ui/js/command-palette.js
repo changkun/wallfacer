@@ -541,7 +541,9 @@ function _buildTaskListSections(groups) {
         "command-palette-row " +
         (row.type === "task"
           ? "command-palette-row-task"
-          : "command-palette-row-action");
+          : row.type === "spec"
+            ? "command-palette-row-spec"
+            : "command-palette-row-action");
 
       if (row.type === "task") {
         const title = row.title || "(untitled)";
@@ -570,6 +572,22 @@ function _buildTaskListSections(groups) {
           status +
           "</div>" +
           (snippet || promptSnippet);
+      } else if (row.type === "spec") {
+        const specStatus = row.status
+          ? '<span class="command-palette-task-badge">' +
+            escapeHtml(row.status) +
+            "</span>"
+          : "";
+        rowEl.innerHTML =
+          '<div class="command-palette-row-title">' +
+          escapeHtml(row.title) +
+          "</div>" +
+          '<div class="command-palette-row-meta">' +
+          '<span class="command-palette-task-id">' +
+          escapeHtml(row.hint) +
+          "</span>" +
+          specStatus +
+          "</div>";
       } else {
         rowEl.innerHTML =
           '<div class="command-palette-row-title">' +
@@ -623,15 +641,102 @@ function _updateContextActions(taskRows, selectedTaskOverride) {
   _buildTaskListSections(groups);
 }
 
+function _buildSpecRow(node) {
+  var spec = node.spec || {};
+  return {
+    type: "spec",
+    id: "spec:" + node.path,
+    specPath: node.path,
+    title: spec.title || node.path,
+    status: spec.status || "",
+    hint: node.path,
+    execute: function () {
+      if (typeof switchMode === "function") switchMode("spec");
+      if (
+        typeof focusSpec === "function" &&
+        typeof activeWorkspaces !== "undefined"
+      ) {
+        focusSpec(node.path, activeWorkspaces[0]);
+      }
+    },
+  };
+}
+
+function _localSpecRowsForQuery(query) {
+  if (
+    typeof _specTreeData === "undefined" ||
+    !_specTreeData ||
+    !_specTreeData.nodes
+  )
+    return [];
+  var q = String(query || "")
+    .trim()
+    .toLowerCase();
+  var nodes = _specTreeData.nodes;
+  var results = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i];
+    var spec = node.spec;
+    if (!spec) continue;
+    if (!q) {
+      results.push({ node: node, score: 0 });
+      continue;
+    }
+    var title = (spec.title || "").toLowerCase();
+    var path = (node.path || "").toLowerCase();
+    var score = 0;
+    if (title.includes(q)) score = title.startsWith(q) ? 3 : 2;
+    else if (path.includes(q)) score = 1;
+    if (score > 0) results.push({ node: node, score: score });
+  }
+  results.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    return (a.node.spec.title || "").localeCompare(b.node.spec.title || "");
+  });
+  return results.map(function (r) {
+    return _buildSpecRow(r.node);
+  });
+}
+
 function _searchLocal(query) {
   const taskRows = _localTaskRowsForQuery(query);
+  const specRows = _localSpecRowsForQuery(query);
   _commandPaletteTaskRows = taskRows;
   _commandPaletteActiveTaskId = "";
-  _commandPaletteActiveIndex = Math.min(
-    _commandPaletteActiveIndex,
-    taskRows.length - 1,
-  );
-  _updateContextActions(taskRows);
+  _commandPaletteActiveIndex = -1;
+
+  // Prioritize based on current view mode.
+  var inSpecMode =
+    typeof getCurrentMode === "function" && getCurrentMode() === "spec";
+  var groups;
+  if (inSpecMode) {
+    groups = [
+      _groupWithTitle("Specs", specRows),
+      _groupWithTitle("Tasks", taskRows),
+    ];
+  } else {
+    groups = [
+      _groupWithTitle("Tasks", taskRows),
+      _groupWithTitle("Specs", specRows),
+    ];
+  }
+
+  // Append context actions for selected task.
+  var allRows = _flattenRows(groups);
+  var firstTask = allRows.find(function (r) {
+    return r.type === "task";
+  });
+  if (firstTask) {
+    _commandPaletteActiveTaskId = firstTask.id;
+    var actionRows = commandPaletteTaskActions(
+      _resolveTaskById(firstTask.id) || firstTask.taskObj,
+    ).map(_buildActionRow);
+    if (actionRows.length) {
+      groups.push(_groupWithTitle("Context Actions", actionRows));
+    }
+  }
+
+  _buildTaskListSections(groups);
 }
 
 function _searchRemote(query, seq) {
