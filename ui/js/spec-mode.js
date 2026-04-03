@@ -375,6 +375,26 @@ function _buildSpecToc(bodyEl) {
 var _tocExclusionRaf = null;
 var _tocExclusionHandler = null;
 var _tocExclusion = null; // prepared data for the current spec
+var _tocResizeTimer = null;
+var _tocResizeHandler = null;
+
+function _rebuildTocExclusion() {
+  var bodyEl = document.getElementById("spec-focused-body");
+  var toc = document.getElementById("spec-toc");
+  if (!bodyEl || !toc) return;
+
+  // Clear stale constraints before remeasuring.
+  if (_tocExclusion) {
+    for (var i = 0; i < _tocExclusion.items.length; i++) {
+      _tocExclusion.items[i].el.style.maxWidth = "";
+    }
+    _tocExclusion = null;
+  }
+
+  var pt = window.pretext || null;
+  _buildExclusionData(pt, bodyEl, toc);
+  _applyTocExclusion();
+}
 
 function _setupTocExclusion() {
   var bodyEl = document.getElementById("spec-focused-body");
@@ -392,6 +412,13 @@ function _setupTocExclusion() {
     });
   };
   bodyEl.addEventListener("scroll", _tocExclusionHandler);
+
+  // Rebuild exclusion data on window resize (debounced).
+  _tocResizeHandler = function () {
+    clearTimeout(_tocResizeTimer);
+    _tocResizeTimer = setTimeout(_rebuildTocExclusion, 150);
+  };
+  window.addEventListener("resize", _tocResizeHandler);
 }
 
 function _buildExclusionData(pt, bodyEl, toc) {
@@ -524,6 +551,12 @@ function _teardownTocExclusion() {
     cancelAnimationFrame(_tocExclusionRaf);
     _tocExclusionRaf = null;
   }
+  if (_tocResizeHandler) {
+    window.removeEventListener("resize", _tocResizeHandler);
+    _tocResizeHandler = null;
+  }
+  clearTimeout(_tocResizeTimer);
+  _tocResizeTimer = null;
 }
 
 // --- Spec mode keyboard shortcut stubs ---
@@ -587,6 +620,7 @@ function _initSpecChatResize() {
         _specChatStorageKey,
         parseInt(chatPane.style.width, 10),
       );
+      _rebuildTocExclusion();
     }
 
     document.addEventListener("mousemove", onMouseMove);
