@@ -217,56 +217,61 @@
   padding: 16px;
 }
 
-/* GitHub-style markdown rendering for spec body */
-.spec-focused-view__body-inner.prose-content {
-  font-size: 15px;
+/* GitHub-style markdown rendering — reusable prose class.
+   Applied to spec body (.spec-focused-view__body-inner) and
+   chat assistant bubbles (.planning-chat-bubble--assistant). */
+.prose-content {
   line-height: 1.7;
   color: var(--text);
 }
 
-.spec-focused-view__body-inner.prose-content h1 {
+.spec-focused-view__body-inner.prose-content {
+  font-size: 15px;
+}
+
+.prose-content h1 {
   font-size: 1.75em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--border);
   margin-top: 1.5em;
 }
 
-.spec-focused-view__body-inner.prose-content h2 {
+.prose-content h2 {
   font-size: 1.35em;
   padding-bottom: 0.25em;
   border-bottom: 1px solid var(--border);
   margin-top: 1.5em;
 }
 
-.spec-focused-view__body-inner.prose-content h3 {
+.prose-content h3 {
   font-size: 1.15em;
   margin-top: 1.25em;
 }
 
-.spec-focused-view__body-inner.prose-content h4 {
+.prose-content h4 {
   font-size: 1em;
   margin-top: 1em;
 }
 
-.spec-focused-view__body-inner.prose-content p {
+.prose-content p {
   margin: 0.75em 0;
 }
 
-.spec-focused-view__body-inner.prose-content ul,
-.spec-focused-view__body-inner.prose-content ol {
+.prose-content ul,
+.prose-content ol {
   margin: 0.75em 0;
   padding-left: 2em;
 }
 
-.spec-focused-view__body-inner.prose-content li {
+.prose-content li {
   margin: 0.25em 0;
 }
 
-.spec-focused-view__body-inner.prose-content li > p {
+.prose-content li > p {
   margin: 0.25em 0;
 }
 
-.spec-focused-view__body-inner.prose-content pre {
+.prose-content pre {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -276,21 +281,21 @@
   overflow-x: auto;
 }
 
-.spec-focused-view__body-inner.prose-content code {
+.prose-content code {
   background: color-mix(in oklab, var(--bg) 70%, var(--text-muted));
   border-radius: 3px;
   padding: 2px 5px;
   font-size: 0.85em;
 }
 
-.spec-focused-view__body-inner.prose-content pre code {
+.prose-content pre code {
   background: none;
   padding: 0;
   font-size: inherit;
   border-radius: 0;
 }
 
-.spec-focused-view__body-inner.prose-content blockquote {
+.prose-content blockquote {
   border-left: 4px solid var(--accent);
   padding: 0.5em 1em;
   margin: 0.75em 0;
@@ -299,29 +304,29 @@
   border-radius: 0 4px 4px 0;
 }
 
-.spec-focused-view__body-inner.prose-content table {
+.prose-content table {
   border-collapse: collapse;
   width: 100%;
   margin: 0.75em 0;
 }
 
-.spec-focused-view__body-inner.prose-content th {
+.prose-content th {
   background: var(--bg-input);
   font-weight: 600;
 }
 
-.spec-focused-view__body-inner.prose-content th,
-.spec-focused-view__body-inner.prose-content td {
+.prose-content th,
+.prose-content td {
   border: 1px solid var(--border);
   padding: 6px 12px;
 }
 
-.spec-focused-view__body-inner.prose-content img {
+.prose-content img {
   max-width: 100%;
   border-radius: 4px;
 }
 
-.spec-focused-view__body-inner.prose-content hr {
+.prose-content hr {
   border: none;
   border-top: 2px solid var(--border);
   margin: 1.5em 0;
@@ -735,18 +740,19 @@
 
 .planning-chat-bubble--assistant .planning-chat-bubble__content {
   background: var(--bg-card);
-  padding: 8px 10px;
+  padding: 10px 14px;
   border-radius: 8px 8px 8px 2px;
   font-size: 13px;
+  line-height: 1.6;
   border: 1px solid var(--border);
   word-break: break-word;
 }
 
-.planning-chat-bubble--assistant .planning-chat-bubble__content p:first-child {
+.planning-chat-bubble--assistant .planning-chat-bubble__content > :first-child {
   margin-top: 0;
 }
 
-.planning-chat-bubble--assistant .planning-chat-bubble__content p:last-child {
+.planning-chat-bubble--assistant .planning-chat-bubble__content > :last-child {
   margin-bottom: 0;
 }
 

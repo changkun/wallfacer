@@ -482,8 +482,10 @@ var PlanningChat = (function () {
     var bubble = document.createElement("div");
     bubble.className =
       "planning-chat-bubble planning-chat-bubble--" + role;
+    var contentClass = "planning-chat-bubble__content";
+    if (role === "assistant") contentClass += " prose-content";
     bubble.innerHTML =
-      '<div class="planning-chat-bubble__content"></div>' +
+      '<div class="' + contentClass + '"></div>' +
       '<div class="planning-chat-bubble__time"></div>';
     return bubble;
   }
