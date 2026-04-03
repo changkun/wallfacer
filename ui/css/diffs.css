@@ -179,6 +179,9 @@
 .diff-card-expand button:hover {
   color: var(--text);
 }
+.diff-block .text-v-muted {
+  font-size: 9px;
+}
 
 /* --- Diff per-file (modal detail view) --- */
 .diff-file {
