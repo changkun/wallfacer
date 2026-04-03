@@ -1,6 +1,6 @@
 ---
 title: Conversation Store
-status: validated
+status: complete
 track: local
 depends_on: []
 affects:
