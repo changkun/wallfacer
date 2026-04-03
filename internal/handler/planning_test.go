@@ -397,8 +397,8 @@ func TestGetPlanningCommands(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &cmds); err != nil {
 		t.Fatalf("json decode: %v", err)
 	}
-	if len(cmds) != 7 {
-		t.Fatalf("expected 7 commands, got %d", len(cmds))
+	if len(cmds) != 12 {
+		t.Fatalf("expected 12 commands, got %d", len(cmds))
 	}
 
 	names := make(map[string]bool)
@@ -411,7 +411,10 @@ func TestGetPlanningCommands(t *testing.T) {
 			t.Errorf("command %q has empty usage", c.Name)
 		}
 	}
-	for _, want := range []string{"summarize", "break-down", "create", "status", "validate", "impact", "dispatch"} {
+	for _, want := range []string{
+		"summarize", "create", "refine", "validate", "impact", "status",
+		"break-down", "review-breakdown", "dispatch", "review-impl", "diff", "wrapup",
+	} {
 		if !names[want] {
 			t.Errorf("missing command %q", want)
 		}
