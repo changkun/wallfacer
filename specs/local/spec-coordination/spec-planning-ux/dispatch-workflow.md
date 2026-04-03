@@ -57,13 +57,34 @@ Both succeed or both fail. The UI dispatch button calls this endpoint directly. 
 
 ### Task Completion Feedback
 
-Two-layer design separating deterministic metadata updates from non-deterministic analysis:
+In practice, implementations almost never match specs exactly. Agents discover edge cases, simplify designs, add capabilities the spec didn't anticipate, or skip items that turn out to be unnecessary. This is normal — the spec is a plan, not a contract. The completion feedback system must handle divergence as the common case, not the exception.
 
-**Layer 1 — Server-side hook (deterministic).** When a task reaches `done`, the server checks if it was dispatched from a spec (via metadata linkage). If so, it updates the spec file's frontmatter: `status` → `complete`, timestamp, and any other mechanical fields. This is a reliable, instant metadata flip that requires no agent involvement.
+Three-layer design separating immediate metadata, drift assessment, and iteration:
 
-**Layer 2 — Spec-diff agent (non-deterministic).** After the server-side hook fires, an agent (the tester, oversight agent, or a specialized spec-diff agent) compares the task's actual implementation against the spec's acceptance criteria and produces a structured diff report: which items were fully satisfied, which diverged, and what was implemented but not specified. This report is appended to the spec as an `## Outcome` section or stored as a sidecar artifact. The agent can also flag specs whose implementation drifted significantly, transitioning them to `stale` instead of `complete`.
+**Layer 1 — Server-side hook (deterministic).** When a task reaches `done`, the server checks if it was dispatched from a spec (via metadata linkage). It updates the spec file's frontmatter: `status` → `done` (not `complete` — see below), `updated` timestamp, and records the task's commit range. This is a reliable, instant metadata flip that requires no agent involvement.
 
-This two-layer split ensures specs always get timely metadata updates (layer 1) while leaving room for richer, non-deterministic analysis (layer 2) that may take longer or require a running sandbox. Layer 2 is an extension point — the initial implementation can ship with layer 1 only, adding the spec-diff agent later without changing the dispatch or completion flow.
+Note: layer 1 sets `done`, not `complete`. The spec is not truly complete until layer 2 confirms the implementation satisfies the spec's intent, or the user explicitly accepts the divergence. This prevents premature `complete` status on specs whose implementations drifted significantly.
+
+**Layer 2 — Drift assessment (non-deterministic).** After the server-side hook fires, an agent compares the task's actual implementation against the spec's acceptance criteria. It produces a structured drift report:
+
+- **File-level drift**: compare spec's `affects` against files actually modified (from `git diff`). Flag unexpected files touched and expected files not touched.
+- **Semantic drift**: for each acceptance criterion or "What to do" item, classify as satisfied, diverged, not implemented, or superseded.
+- **Drift level**: minimal (>90% satisfied), moderate (70-90%), or significant (<70%).
+
+The report is appended to the spec as an `## Outcome` section. Based on drift level:
+- **Minimal**: spec transitions from `done` → `complete`. No action needed.
+- **Moderate**: spec transitions to `complete` but the Outcome section documents divergences for future reference. Propagate drift warnings to parent specs and dependents (see [spec-drift-detection.md](../../spec-drift-detection.md)).
+- **Significant**: spec transitions to `stale` instead of `complete`. The spec no longer accurately describes what was built and needs refinement before it can be considered done.
+
+**Layer 3 — Iteration loop.** When layer 2 marks a spec `stale` (or the user judges the drift unacceptable), the spec re-enters the workflow:
+
+1. `/wf-spec-refine` updates the spec to match what was actually built — removing satisfied items, updating diverged descriptions, adding unspecified work that should be documented.
+2. If remaining work exists (items not implemented or superseded), the user can `/wf-spec-dispatch` again to create a follow-up task. The new task's prompt reflects the delta between the refined spec and the current implementation.
+3. If the implementation is acceptable despite divergence, the user runs `/wf-spec-wrapup` to accept the Outcome and transition to `complete`.
+
+This loop can repeat: dispatch → implement → assess drift → refine → re-dispatch. Each iteration narrows the gap between spec and implementation. The system doesn't force convergence — the user decides when "close enough" is good enough.
+
+The three-layer split ensures specs always get timely metadata (layer 1), drift is assessed automatically when possible (layer 2), and the human stays in control of the accept/iterate decision (layer 3). Layer 2 is an extension point — the initial implementation can ship with layer 1 only, adding drift assessment later. Layer 3 requires no new infrastructure; it reuses existing `/wf-spec-refine` and `/wf-spec-dispatch`.
 
 ## Remaining Work
 
@@ -82,9 +103,14 @@ This two-layer split ensures specs always get timely metadata updates (layer 1) 
 
 4. **Spec-to-task metadata linkage** — Store the source spec path on the task so the reverse link (task → spec) works. Options: a label field on the Task model (`SpecSourcePath string`), or task metadata. This must survive task archival and soft-delete.
 
-5. **Task completion hook (layer 1)** — In `internal/store/` or `internal/runner/`, when a task transitions to `done`, check for spec linkage and update the spec file's `status` to `complete` and `updated` timestamp via `UpdateFrontmatter()`. This is the deterministic metadata flip — no agent required.
+5. **Task completion hook (layer 1)** — In `internal/store/` or `internal/runner/`, when a task transitions to `done`, check for spec linkage and update the spec file's `status` to `done` (not `complete`) and `updated` timestamp via `UpdateFrontmatter()`. Record the task's commit range in the spec frontmatter or a sidecar file so layer 2 can find the diff.
 
-6. **Spec-diff agent (layer 2, extension point)** — After the completion hook fires, optionally trigger an agent that diffs the task's implementation against the spec's acceptance criteria. The agent produces a structured report (satisfied / diverged / unspecified items) and appends an `## Outcome` section to the spec. Significant drift transitions the spec to `stale` instead of `complete`. Initial implementation can defer this — the hook in item 5 is sufficient for launch.
+6. **Drift assessment (layer 2, extension point)** — After the completion hook fires, optionally trigger a drift assessment. Two sub-steps:
+   - **File-level drift**: compare spec `affects` against `git diff` of the task's commits. Mechanical, can run server-side.
+   - **Semantic drift**: agent classifies each acceptance criterion as satisfied/diverged/not-implemented/superseded. Requires sandbox.
+   Append an `## Outcome` section to the spec. Transition: minimal drift → `complete`, moderate → `complete` with warnings propagated to parent and dependents (feeds into [spec-drift-detection.md](../../spec-drift-detection.md)), significant → `stale`. Initial implementation can defer this — the hook in item 5 is sufficient for launch; the user can run `/diff` manually.
+
+7. **Iteration support (layer 3)** — No new backend work. The iteration loop (`stale` → `/wf-spec-refine` → `/wf-spec-dispatch`) reuses existing infrastructure. The dispatch endpoint must accept re-dispatch of a spec whose `dispatched_task_id` was previously set (clear the old link, create a new task).
 
 ### Frontend: Dispatch UI
 
