@@ -1,6 +1,6 @@
 ---
 title: Message API Endpoints
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-chat-agent/conversation-store.md
