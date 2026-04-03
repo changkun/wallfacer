@@ -10,6 +10,7 @@ var _specExpandedPaths = new Set(
 );
 var _explorerRootMode = "workspace"; // "workspace" | "specs"
 var _specStatusFilter = localStorage.getItem("wallfacer-spec-filter") || "all";
+var _specTextFilter = ""; // text query from the search box
 var _selectedSpecPaths = new Set();
 var _lastCheckedSpecIndex = -1;
 
@@ -195,28 +196,45 @@ function filterSpecTree(filter) {
   renderSpecTree();
 }
 
-// _nodeMatchesFilter checks if a node or any of its descendants match
-// the current status filter. Non-leaf nodes are visible if any descendant matches.
-function _nodeMatchesFilter(node, nodesByPath) {
-  if (_specStatusFilter === "all") return true;
+// setSpecTextFilter updates the text filter and re-renders the spec tree.
+function setSpecTextFilter(query) {
+  _specTextFilter = (query || "").toLowerCase();
+  renderSpecTree();
+}
 
+// _nodeMatchesFilter checks if a node or any of its descendants match
+// the current status filter and text query. Non-leaf nodes are visible
+// if any descendant matches.
+function _nodeMatchesFilter(node, nodesByPath) {
   var spec = node.spec;
   if (!spec) return false;
 
-  var status = spec.status;
-  var match = false;
-
-  if (_specStatusFilter === "incomplete") {
-    match = status !== "complete";
-  } else {
-    match = status === _specStatusFilter;
+  // Status filter.
+  var statusMatch = true;
+  if (_specStatusFilter !== "all") {
+    if (_specStatusFilter === "incomplete") {
+      statusMatch = spec.status !== "complete";
+    } else {
+      statusMatch = spec.status === _specStatusFilter;
+    }
   }
 
+  // Text filter.
+  var textMatch = true;
+  if (_specTextFilter) {
+    var title = (spec.title || "").toLowerCase();
+    var path = (node.path || "").toLowerCase();
+    textMatch =
+      title.includes(_specTextFilter) || path.includes(_specTextFilter);
+  }
+
+  var selfMatch = statusMatch && textMatch;
+
   // Leaf nodes: match directly.
-  if (node.is_leaf) return match;
+  if (node.is_leaf) return selfMatch;
 
   // Non-leaf: visible if self matches or any descendant matches.
-  if (match) return true;
+  if (selfMatch) return true;
   var children = node.children || [];
   for (var i = 0; i < children.length; i++) {
     var child = nodesByPath[children[i]];
@@ -254,7 +272,8 @@ function renderSpecTree() {
   var html = "";
   for (var ti = 0; ti < trackOrder.length; ti++) {
     var track = trackOrder[ti];
-    var trackExpanded = _specExpandedPaths.has("__track__" + track);
+    var trackExpanded =
+      _specExpandedPaths.has("__track__" + track) || !!_specTextFilter;
     html +=
       '<div class="spec-track-header" data-track="' +
       escapeHtml(track) +
@@ -329,7 +348,7 @@ function _renderSpecNode(node, nodesByPath) {
 
   var icon = _specStatusIcons[spec.status] || "";
   var title = spec.title || node.path;
-  var isExpanded = _specExpandedPaths.has(node.path);
+  var isExpanded = _specExpandedPaths.has(node.path) || !!_specTextFilter;
   var hasChildren = node.children && node.children.length > 0;
 
   var progress = "";

@@ -135,7 +135,20 @@ function hideSearchPanel() {
         triggerServerSearch(filterQuery);
       } else {
         hideSearchPanel();
-        render();
+        // In spec mode, filter the spec explorer tree; otherwise filter tasks.
+        if (
+          typeof getCurrentMode === "function" &&
+          getCurrentMode() === "spec" &&
+          typeof setSpecTextFilter === "function"
+        ) {
+          setSpecTextFilter(filterQuery);
+        } else {
+          // Clear spec filter when switching back to board.
+          if (typeof setSpecTextFilter === "function") {
+            setSpecTextFilter("");
+          }
+          render();
+        }
       }
     });
 
@@ -157,6 +170,9 @@ function hideSearchPanel() {
         filterQuery = "";
         this.style.display = "none";
         hideSearchPanel();
+        if (typeof setSpecTextFilter === "function") {
+          setSpecTextFilter("");
+        }
         render();
         input.focus();
       });

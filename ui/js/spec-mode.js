@@ -72,6 +72,20 @@ function _applyMode(mode) {
   var gitBar = document.getElementById("workspace-git-bar");
   if (header) header.style.display = mode === "docs" ? "none" : "";
   if (gitBar) gitBar.style.display = mode === "docs" ? "none" : "";
+
+  // Update search placeholder based on mode.
+  var searchInput = document.getElementById("task-search");
+  if (searchInput) {
+    searchInput.placeholder =
+      mode === "spec"
+        ? "Filter specs\u2026"
+        : "Filter tasks\u2026 or @search server";
+  }
+
+  // Clear spec text filter when leaving spec mode.
+  if (mode !== "spec" && typeof setSpecTextFilter === "function") {
+    setSpecTextFilter("");
+  }
 }
 
 // --- Sidebar collapse/expand ---
