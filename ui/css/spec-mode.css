@@ -386,29 +386,47 @@
 
 .spec-chat-input {
   flex: 1;
-  min-height: 36px;
-  resize: vertical;
-  padding: 6px 8px;
+  min-height: 40px;
+  max-height: 200px;
+  resize: none;
+  padding: 8px 10px;
   font-size: 13px;
+  line-height: 1.5;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
+  border-radius: 8px;
+  background: var(--bg-input, var(--bg));
   color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow-y: auto;
+  transition: border-color 0.15s;
+}
+
+.spec-chat-input::placeholder {
   font-family: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 .spec-chat-input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 59, 130, 246), 0.15);
 }
 
 .spec-chat-send-btn {
-  padding: 6px 12px;
+  padding: 6px 14px;
   font-size: 12px;
-  border-radius: 4px;
+  font-weight: 500;
+  border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
   align-self: flex-end;
+  transition: opacity 0.15s;
+}
+
+.spec-chat-send-btn:hover {
+  opacity: 0.85;
 }
 
 /* Resize handle between focused view and chat */

@@ -32,6 +32,7 @@ var PlanningChat = (function () {
 
     _input.addEventListener("keydown", _onInputKeydown);
     _input.addEventListener("input", _onInputChange);
+    _input.addEventListener("input", _autoGrow);
     if (_sendBtn) {
       _sendBtn.addEventListener("click", function () {
         var text = _input.value.trim();
@@ -108,6 +109,12 @@ var PlanningChat = (function () {
     }
   }
 
+  function _autoGrow() {
+    if (!_input) return;
+    _input.style.height = "auto";
+    _input.style.height = Math.min(_input.scrollHeight, 200) + "px";
+  }
+
   function _onInputChange() {
     var val = _input.value;
     if (val.startsWith("/") && val.indexOf("\n") === -1) {
@@ -139,6 +146,7 @@ var PlanningChat = (function () {
     }
 
     _input.value = "";
+    _input.style.height = "auto";
     _closeAutocomplete();
 
     // Render user message immediately.
