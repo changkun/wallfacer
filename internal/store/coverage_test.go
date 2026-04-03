@@ -1836,9 +1836,9 @@ func TestResetTaskForRetry_PreservesRetryHistory(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry me", Timeout: 5})
 
 	// Move to failed.
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed) //nolint:errcheck
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                    //nolint:errcheck
 	s.UpdateTaskResult(bg(), task.ID, "failed result", "sess-1", "end_turn", 3) //nolint:errcheck
-	s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{CostUSD: 1.5})             //nolint:errcheck
+	s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{CostUSD: 1.5})               //nolint:errcheck
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)
@@ -1868,7 +1868,7 @@ func TestResetTaskForRetry_PreservesRetryHistory(t *testing.T) {
 func TestResetTaskForRetry_NotFreshStart(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry keep", Timeout: 5})
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed) //nolint:errcheck
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                            //nolint:errcheck
 	s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "branch-1") //nolint:errcheck
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new", false); err != nil {
@@ -1957,7 +1957,7 @@ func TestListDeletedTasks_SortsByUpdatedAtDesc(t *testing.T) {
 	task1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "del1", Timeout: 5})
 	task2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "del2", Timeout: 5})
 
-	s.DeleteTask(bg(), task1.ID, "first") //nolint:errcheck
+	s.DeleteTask(bg(), task1.ID, "first")  //nolint:errcheck
 	s.DeleteTask(bg(), task2.ID, "second") //nolint:errcheck
 
 	deleted, err := s.ListDeletedTasks(bg())
@@ -1978,7 +1978,7 @@ func TestListDeletedTasks_SortsByUpdatedAtDesc(t *testing.T) {
 func TestLoadAll_SkipsInvalidDirectories(t *testing.T) {
 	dir := t.TempDir()
 	// Create a non-UUID directory that should be skipped.
-	os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755) //nolint:errcheck
+	os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755)                             //nolint:errcheck
 	os.WriteFile(filepath.Join(dir, "not-a-uuid", "task.json"), []byte("{}"), 0644) //nolint:errcheck
 
 	s, err := NewFileStore(dir)
