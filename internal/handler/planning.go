@@ -273,6 +273,20 @@ func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, _ *http.Request) 
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
 }
 
+// InterruptPlanningMessage interrupts the current agent turn.
+// Returns 409 if no exec is in flight.
+func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, _ *http.Request) {
+	if h.planner == nil {
+		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if err := h.planner.Interrupt(); err != nil {
+		httpjson.Write(w, http.StatusConflict, map[string]any{"error": err.Error()})
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]any{"status": "interrupted"})
+}
+
 // GetPlanningCommands returns the list of available slash commands.
 func (h *Handler) GetPlanningCommands(w http.ResponseWriter, _ *http.Request) {
 	if h.commandRegistry == nil {

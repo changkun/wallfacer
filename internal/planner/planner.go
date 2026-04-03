@@ -196,6 +196,30 @@ func (p *Planner) LogReader() *livelog.Reader {
 	return l.NewReader()
 }
 
+// Interrupt kills the current exec handle and clears the busy flag,
+// but does NOT clear the session ID so --resume still works on the
+// next message. Also closes the live log so SSE consumers see EOF.
+func (p *Planner) Interrupt() error {
+	p.mu.Lock()
+	if !p.busy {
+		p.mu.Unlock()
+		return fmt.Errorf("planner: not busy")
+	}
+	h := p.handle
+	l := p.liveLog
+	p.busy = false
+	p.liveLog = nil
+	p.mu.Unlock()
+
+	if h != nil {
+		_ = h.Kill()
+	}
+	if l != nil {
+		l.Close()
+	}
+	return nil
+}
+
 // UpdateWorkspaces destroys the current planning container (if any) and
 // stores new workspace configuration. A subsequent Start+Exec will create
 // a container with the updated mounts.

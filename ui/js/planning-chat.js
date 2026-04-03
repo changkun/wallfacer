@@ -12,12 +12,16 @@ var PlanningChat = (function () {
   var _commandsCache = null;
   var _autocompleteEl = null;
   var _autocompleteIndex = -1;
+  var _queue = []; // Array of {id, text}
+  var _nextQueueId = 0;
 
   // DOM references (set in init).
   var _input = null;
   var _sendBtn = null;
+  var _interruptBtn = null;
   var _messagesEl = null;
   var _streamEl = null;
+  var _queueEl = null;
 
   function init() {
     _input = document.getElementById("spec-chat-input");
@@ -33,6 +37,23 @@ var PlanningChat = (function () {
         var text = _input.value.trim();
         if (text) sendMessage(text);
       });
+    }
+
+    // Create interrupt button (hidden by default).
+    _interruptBtn = document.createElement("button");
+    _interruptBtn.className = "planning-chat-interrupt-btn";
+    _interruptBtn.textContent = "Interrupt";
+    _interruptBtn.style.display = "none";
+    _interruptBtn.addEventListener("click", _onInterrupt);
+    if (_sendBtn && _sendBtn.parentElement) {
+      _sendBtn.parentElement.insertBefore(_interruptBtn, _sendBtn.nextSibling);
+    }
+
+    // Create queue container (below the input area).
+    _queueEl = document.createElement("div");
+    _queueEl.className = "planning-chat-queue";
+    if (_input.parentElement) {
+      _input.parentElement.appendChild(_queueEl);
     }
 
     _loadHistory();
@@ -100,7 +121,10 @@ var PlanningChat = (function () {
   }
 
   async function sendMessage(text) {
-    if (_streaming) return; // Will be replaced by queue in ui-message-queue.
+    if (_streaming) {
+      _enqueue(text);
+      return;
+    }
 
     _input.value = "";
     _input.disabled = true;
@@ -149,6 +173,8 @@ var PlanningChat = (function () {
 
   function _startStreaming() {
     _streaming = true;
+    if (_interruptBtn) _interruptBtn.style.display = "";
+    if (_sendBtn) _sendBtn.style.display = "none";
     var assistantBubble = null;
     var rawChunks = [];
 
@@ -172,21 +198,39 @@ var PlanningChat = (function () {
     };
 
     _eventSource.addEventListener("done", function () {
-      _stopStreaming();
+      _stopStreaming(false);
     });
 
     _eventSource.onerror = function () {
-      _stopStreaming();
+      _stopStreaming(false);
     };
   }
 
-  function _stopStreaming() {
+  function _stopStreaming(interrupted) {
     if (_eventSource) {
       _eventSource.close();
       _eventSource = null;
     }
     _streaming = false;
+    if (_interruptBtn) _interruptBtn.style.display = "none";
+    if (_sendBtn) _sendBtn.style.display = "";
+
+    if (interrupted) {
+      // Mark the last assistant bubble as interrupted.
+      var bubbles = _messagesEl.querySelectorAll
+        ? _messagesEl.children.filter
+          ? []
+          : []
+        : [];
+      // Simple approach: append an interrupted indicator.
+      var indicator = document.createElement("div");
+      indicator.className = "planning-chat-interrupted";
+      indicator.textContent = "interrupted";
+      _messagesEl.appendChild(indicator);
+    }
+
     _enableInput();
+    _drainQueue();
   }
 
   function _enableInput() {
@@ -336,13 +380,113 @@ var PlanningChat = (function () {
     return el.innerHTML;
   }
 
+  // --- Message queue ---
+
+  function _enqueue(text) {
+    var id = _nextQueueId++;
+    _queue.push({ id: id, text: text });
+    _renderQueue();
+  }
+
+  function _removeFromQueue(id) {
+    _queue = _queue.filter(function (item) { return item.id !== id; });
+    _renderQueue();
+  }
+
+  function _editQueueItem(id) {
+    var item = _queue.find(function (q) { return q.id === id; });
+    if (!item || !_queueEl) return;
+
+    // Find the chip element and replace with an input.
+    var chips = _queueEl.children;
+    for (var i = 0; i < chips.length; i++) {
+      if (parseInt(chips[i].dataset.queueId, 10) === id) {
+        var editInput = document.createElement("input");
+        editInput.className = "planning-chat-queue__edit";
+        editInput.value = item.text;
+        editInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            item.text = editInput.value.trim() || item.text;
+            _renderQueue();
+          }
+          if (e.key === "Escape") {
+            _renderQueue();
+          }
+        });
+        editInput.addEventListener("blur", function () {
+          item.text = editInput.value.trim() || item.text;
+          _renderQueue();
+        });
+        chips[i].innerHTML = "";
+        chips[i].appendChild(editInput);
+        editInput.focus();
+        break;
+      }
+    }
+  }
+
+  function _renderQueue() {
+    if (!_queueEl) return;
+    _queueEl.innerHTML = "";
+    _queue.forEach(function (item) {
+      var chip = document.createElement("div");
+      chip.className = "planning-chat-queue__chip";
+      chip.dataset.queueId = item.id;
+
+      var textSpan = document.createElement("span");
+      textSpan.className = "planning-chat-queue__text";
+      textSpan.textContent = item.text;
+      textSpan.addEventListener("click", function () {
+        _editQueueItem(item.id);
+      });
+      chip.appendChild(textSpan);
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "planning-chat-queue__remove";
+      removeBtn.textContent = "\u00d7"; // ×
+      removeBtn.addEventListener("click", function () {
+        _removeFromQueue(item.id);
+      });
+      chip.appendChild(removeBtn);
+
+      _queueEl.appendChild(chip);
+    });
+  }
+
+  function _drainQueue() {
+    if (_queue.length > 0 && !_streaming) {
+      var next = _queue.shift();
+      _renderQueue();
+      sendMessage(next.text);
+    }
+  }
+
+  // --- Interrupt ---
+
+  async function _onInterrupt() {
+    try {
+      await fetch(Routes.planning.interruptMessage(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (_) {
+      // Ignore errors — the stream will end regardless.
+    }
+    _stopStreaming(true);
+  }
+
   function isStreaming() {
     return _streaming;
+  }
+
+  function getQueue() {
+    return _queue.slice();
   }
 
   return {
     init: init,
     sendMessage: sendMessage,
     isStreaming: isStreaming,
+    getQueue: getQueue,
   };
 })();

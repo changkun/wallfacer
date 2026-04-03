@@ -427,3 +427,56 @@ func TestGetPlanningCommands_NilRegistry(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
+
+// --- Interrupt ---
+
+func TestInterruptPlanningMessage_NotBusy(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	h.planner = p
+	// Not busy — should return 409.
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages/interrupt", nil)
+	h.InterruptPlanningMessage(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+}
+
+func TestInterruptPlanningMessage_Busy(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	_ = p.Start(context.Background())
+	p.SetBusy(true)
+	_ = p.StartLiveLog()
+	h.planner = p
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages/interrupt", nil)
+	h.InterruptPlanningMessage(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	if p.IsBusy() {
+		t.Error("planner should not be busy after interrupt")
+	}
+	if p.LogReader() != nil {
+		t.Error("live log should be nil after interrupt")
+	}
+}
+
+func TestInterruptPlanningMessage_NilPlanner(t *testing.T) {
+	h := newTestHandler(t)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages/interrupt", nil)
+	h.InterruptPlanningMessage(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}

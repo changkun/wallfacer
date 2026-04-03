@@ -28,6 +28,7 @@ function makeEl(tag, registry) {
     disabled: false,
     value: "",
     style: {},
+    dataset: {},
     parentElement: null,
     classList: {
       add(c) { _classList.add(c); },
@@ -122,6 +123,7 @@ function makeContext() {
         sendMessage: () => "/api/planning/messages",
         messageStream: () => "/api/planning/messages/stream",
         commands: () => "/api/planning/commands",
+        interruptMessage: () => "/api/planning/messages/interrupt",
       },
     },
     api: () => Promise.resolve(apiResult),
@@ -143,10 +145,11 @@ describe("PlanningChat", () => {
     ctx = makeContext();
   });
 
-  it("module exposes init, sendMessage, isStreaming", () => {
+  it("module exposes init, sendMessage, isStreaming, getQueue", () => {
     expect(typeof ctx.PlanningChat.init).toBe("function");
     expect(typeof ctx.PlanningChat.sendMessage).toBe("function");
     expect(typeof ctx.PlanningChat.isStreaming).toBe("function");
+    expect(typeof ctx.PlanningChat.getQueue).toBe("function");
   });
 
   it("isStreaming returns false initially", () => {
@@ -206,5 +209,24 @@ describe("PlanningChat", () => {
 
     await new Promise(r => ctx.setTimeout(r, 50));
     expect(commandsFetched).toBe(true);
+  });
+
+  it("queues messages while streaming", async () => {
+    // Start a streaming session.
+    ctx.fetch = () => Promise.resolve({ status: 202, ok: true });
+    ctx.PlanningChat.init();
+    await ctx.PlanningChat.sendMessage("first");
+    // Now streaming is true — next message should be queued.
+    await ctx.PlanningChat.sendMessage("second");
+    await ctx.PlanningChat.sendMessage("third");
+    const q = ctx.PlanningChat.getQueue();
+    expect(q.length).toBe(2);
+    expect(q[0].text).toBe("second");
+    expect(q[1].text).toBe("third");
+  });
+
+  it("getQueue returns empty array initially", () => {
+    ctx.PlanningChat.init();
+    expect(ctx.PlanningChat.getQueue()).toEqual([]);
   });
 });

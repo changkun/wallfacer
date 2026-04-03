@@ -241,6 +241,12 @@ var Routes = []Route{
 		Tags:        []string{"planning"},
 	},
 	{
+		Method: http.MethodPost, Pattern: "/api/planning/messages/interrupt", Name: "InterruptPlanningMessage",
+		JSName:      "interruptMessage",
+		Description: "Interrupt the current agent turn.",
+		Tags:        []string{"planning"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/planning/commands", Name: "GetPlanningCommands",
 		JSName:      "commands",
 		Description: "List available slash commands.",

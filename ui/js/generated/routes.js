@@ -147,6 +147,10 @@ var Routes = {
     messageStream: function () {
       return "/api/planning/messages/stream";
     },
+    // POST /api/planning/messages/interrupt
+    interruptMessage: function () {
+      return "/api/planning/messages/interrupt";
+    },
     // GET /api/planning/commands
     commands: function () {
       return "/api/planning/commands";

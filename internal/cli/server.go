@@ -691,8 +691,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetPlanningMessages":    h.GetPlanningMessages,
 		"SendPlanningMessage":    h.SendPlanningMessage,
 		"ClearPlanningMessages":  h.ClearPlanningMessages,
-		"StreamPlanningMessages": h.StreamPlanningMessages,
-		"GetPlanningCommands":    h.GetPlanningCommands,
+		"StreamPlanningMessages":   h.StreamPlanningMessages,
+		"InterruptPlanningMessage": h.InterruptPlanningMessage,
+		"GetPlanningCommands":      h.GetPlanningCommands,
 
 		// Environment configuration.
 		"GetEnvConfig":    h.GetEnvConfig,
@@ -805,8 +806,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TriggerIdeation": handler.BodyLimitDefault,
 
 		// Planning sandbox.
-		"StartPlanning":       handler.BodyLimitDefault,
-		"SendPlanningMessage": handler.BodyLimitDefault,
+		"StartPlanning":            handler.BodyLimitDefault,
+		"SendPlanningMessage":      handler.BodyLimitDefault,
+		"InterruptPlanningMessage": handler.BodyLimitDefault,
 
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,
