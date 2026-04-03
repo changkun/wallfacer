@@ -197,7 +197,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		Backend:          r.SandboxBackend(),
 		Command:          cfg.ContainerCmd,
 		Image:            resolvedImage,
-		Workspaces:       workspaces,
+		Workspaces:       snapshot.Workspaces,
 		EnvFile:          cfg.EnvFile,
 		Fingerprint:      snapshot.Key,
 		InstructionsPath: snapshot.InstructionsPath,
