@@ -8,6 +8,18 @@
   min-width: 0;
 }
 
+/* Chat-only mode: no specs exist, chat takes full width */
+.spec-mode-container.spec-mode--chat-only .spec-focused-view,
+.spec-mode-container.spec-mode--chat-only .spec-chat-resize {
+  display: none;
+}
+
+.spec-mode-container.spec-mode--chat-only .spec-chat-stream {
+  width: 100%;
+  min-width: 0;
+  border-left: none;
+}
+
 /* Center pane: focused markdown view */
 .spec-focused-view {
   flex: 1;

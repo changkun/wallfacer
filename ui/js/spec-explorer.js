@@ -47,12 +47,21 @@ function loadSpecTree() {
       ) {
         renderMinimap(getFocusedSpecPath(), _specTreeData);
       }
+      // Update pane visibility based on whether specs exist.
+      var hasSpecs = data && data.nodes && data.nodes.length > 0;
+      if (typeof _updateSpecPaneVisibility === "function") {
+        _updateSpecPaneVisibility(hasSpecs);
+      }
     })
     .catch(function (err) {
       console.error("spec tree load error:", err);
       if (treeEl) {
         treeEl.innerHTML =
           '<div class="spec-loading">Failed to load specs</div>';
+      }
+      // On error, fall back to chat-only mode.
+      if (typeof _updateSpecPaneVisibility === "function") {
+        _updateSpecPaneVisibility(false);
       }
     });
 }
@@ -134,6 +143,12 @@ function _startSpecTreeStream() {
         getFocusedSpecPath()
       ) {
         renderMinimap(getFocusedSpecPath(), _specTreeData);
+      }
+      // Update pane visibility on live updates (specs may have been added/removed).
+      var hasSpecs =
+        _specTreeData && _specTreeData.nodes && _specTreeData.nodes.length > 0;
+      if (typeof _updateSpecPaneVisibility === "function") {
+        _updateSpecPaneVisibility(hasSpecs);
       }
     } catch (err) {
       console.error("spec stream parse error:", err);
