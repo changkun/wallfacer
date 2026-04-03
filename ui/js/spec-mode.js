@@ -262,7 +262,14 @@ function _loadAndRenderSpec() {
             workspace: _focusedSpecWorkspace,
           })
           .then(function () {
-            _buildSpecToc(bodyEl);
+            var scrollEl = document.getElementById("spec-focused-body");
+            var anchorEl = document.getElementById("spec-focused-view");
+            if (scrollEl && anchorEl) {
+              buildFloatingToc(bodyEl, scrollEl, anchorEl, {
+                headingSelector: "h1, h2, h3, h4",
+                idPrefix: "spec-heading",
+              });
+            }
           });
       }
 

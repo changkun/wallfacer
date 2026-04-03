@@ -221,77 +221,82 @@
 .spec-focused-view__body-inner {
   max-width: 52em;
   padding: 16px;
+  font-size: 13px;
 }
 
-/* GitHub-style markdown rendering — reusable prose class.
-   Applied to spec body (.spec-focused-view__body-inner) and
-   chat assistant bubbles (.planning-chat-bubble--assistant). */
+/* Reusable prose class — single source of truth for markdown rendering.
+   Used by spec body, docs content, and chat assistant bubbles. */
 .prose-content {
   line-height: 1.7;
   color: var(--text);
 }
 
-.spec-focused-view__body-inner.prose-content {
-  font-size: 13px;
-}
-
 .prose-content h1 {
-  font-size: 1.75em;
-  padding-bottom: 0.3em;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 16px;
   border-bottom: 1px solid var(--border);
-  margin-top: 1.5em;
+  padding-bottom: 8px;
 }
 
 .prose-content h2 {
-  font-size: 1.35em;
-  padding-bottom: 0.25em;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 24px 0 12px;
   border-bottom: 1px solid var(--border);
-  margin-top: 1.5em;
+  padding-bottom: 6px;
 }
 
 .prose-content h3 {
-  font-size: 1.15em;
-  margin-top: 1.25em;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 8px;
 }
 
 .prose-content h4 {
-  font-size: 1em;
-  margin-top: 1em;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 16px 0 6px;
 }
 
 .prose-content p {
-  margin: 0.75em 0;
+  margin: 0 0 12px;
 }
 
 .prose-content ul,
 .prose-content ol {
-  margin: 0.75em 0;
-  padding-left: 2em;
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.prose-content ul ul {
+  list-style-type: circle;
 }
 
 .prose-content li {
-  margin: 0.25em 0;
+  margin-bottom: 4px;
 }
 
 .prose-content li > p {
-  margin: 0.25em 0;
+  margin: 4px 0;
 }
 
 .prose-content pre {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 14px 16px;
-  font-size: 13px;
+  padding: 12px 16px;
+  font-size: 12px;
   line-height: 1.5;
   overflow-x: auto;
+  margin: 0 0 12px;
 }
 
 .prose-content code {
   background: color-mix(in oklab, var(--bg) 70%, var(--text-muted));
   border-radius: 3px;
   padding: 2px 5px;
-  font-size: 0.85em;
+  font-size: 0.9em;
 }
 
 .prose-content pre code {
@@ -302,9 +307,9 @@
 }
 
 .prose-content blockquote {
-  border-left: 4px solid var(--accent);
-  padding: 0.5em 1em;
-  margin: 0.75em 0;
+  border-left: 3px solid var(--accent);
+  padding: 4px 12px;
+  margin: 0 0 12px;
   color: var(--text-muted);
   background: color-mix(in oklab, var(--bg) 95%, var(--accent));
   border-radius: 0 4px 4px 0;
@@ -313,7 +318,8 @@
 .prose-content table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0.75em 0;
+  margin: 0 0 12px;
+  font-size: 12px;
 }
 
 .prose-content th {
@@ -327,6 +333,15 @@
   padding: 6px 12px;
 }
 
+.prose-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.prose-content a:hover {
+  text-decoration: underline;
+}
+
 .prose-content img {
   max-width: 100%;
   border-radius: 4px;
@@ -334,8 +349,8 @@
 
 .prose-content hr {
   border: none;
-  border-top: 2px solid var(--border);
-  margin: 1.5em 0;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
 }
 
 /* Mermaid diagram blocks */
@@ -764,27 +779,27 @@
 
 /* Scale down prose headings inside chat bubbles so they don't dominate. */
 .planning-chat-bubble--assistant .prose-content h1 {
-  font-size: 1.15em;
+  font-size: 15px;
   border-bottom: none;
-  margin-top: 0.75em;
+  margin: 8px 0 6px;
   padding-bottom: 0;
 }
 .planning-chat-bubble--assistant .prose-content h2 {
-  font-size: 1.05em;
+  font-size: 14px;
   border-bottom: none;
-  margin-top: 0.75em;
+  margin: 8px 0 6px;
   padding-bottom: 0;
 }
 .planning-chat-bubble--assistant .prose-content h3 {
-  font-size: 1em;
-  margin-top: 0.5em;
+  font-size: 13px;
+  margin: 6px 0 4px;
 }
 .planning-chat-bubble--assistant .prose-content h4 {
-  font-size: 1em;
-  margin-top: 0.5em;
+  font-size: 13px;
+  margin: 6px 0 4px;
 }
 .planning-chat-bubble--assistant .prose-content p {
-  margin: 0.5em 0;
+  margin: 0 0 8px;
 }
 
 .planning-chat-bubble__time {
@@ -846,11 +861,9 @@
   padding-left: 0;
 }
 
-/* Strip <pre> box behavior so result text blends with tool calls. */
 .planning-chat-activity .cc-result-text {
   font-size: 11px;
   line-height: 1.5;
-  display: inline;
 }
 
 .planning-chat-empty {
