@@ -229,6 +229,61 @@ func TestWrite_SlicePayload(t *testing.T) {
 	}
 }
 
+func TestDecodeOptionalBody_MaxBytesError(t *testing.T) {
+	bigBody := `{"name":"` + strings.Repeat("a", 1024) + `"}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(bigBody))
+	r.Body = http.MaxBytesReader(w, r.Body, 10)
+
+	type payload struct {
+		Name string `json:"name"`
+	}
+	v, ok := DecodeOptionalBody[payload](w, r)
+	if ok {
+		t.Fatal("expected DecodeOptionalBody to fail on oversized body")
+	}
+	if v != nil {
+		t.Fatal("expected nil on failure")
+	}
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d", w.Code)
+	}
+}
+
+func TestDecodeOptionalBody_TrailingContent(t *testing.T) {
+	body := `{"name":"alice"}{"name":"bob"}`
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	type payload struct {
+		Name string `json:"name"`
+	}
+	_, ok := DecodeOptionalBody[payload](w, r)
+	if ok {
+		t.Fatal("expected DecodeOptionalBody to reject trailing content")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestDecodeOptionalBody_UnknownFields(t *testing.T) {
+	body := `{"name":"alice","extra":"field"}`
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	type payload struct {
+		Name string `json:"name"`
+	}
+	_, ok := DecodeOptionalBody[payload](w, r)
+	if ok {
+		t.Fatal("expected DecodeOptionalBody to reject unknown fields")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestWrite_EncodingError(t *testing.T) {
 	// json.Encoder.Encode returns an error for channels.
 	w := httptest.NewRecorder()

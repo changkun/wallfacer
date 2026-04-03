@@ -180,3 +180,20 @@ func TestPipe_StartError(t *testing.T) {
 		t.Fatal("expected error for nonexistent command")
 	}
 }
+
+// TestStartReader_WithBufferSize verifies that StartReader applies custom
+// buffer size options and still delivers output correctly.
+func TestStartReader_WithBufferSize(t *testing.T) {
+	r := strings.NewReader("alpha\nbeta\n")
+	p := StartReader(io.NopCloser(r), WithBufferSize(128, 256))
+
+	var lines []string
+	for line := range p.Lines() {
+		lines = append(lines, line)
+	}
+	<-p.Done()
+
+	if len(lines) != 2 || lines[0] != "alpha" || lines[1] != "beta" {
+		t.Fatalf("expected [alpha beta], got %v", lines)
+	}
+}
