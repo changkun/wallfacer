@@ -636,12 +636,23 @@ async function cancelTask() {
   )
     return;
   const taskId = getOpenModalTaskId();
+  const btn = document.getElementById("modal-cancel-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML =
+      '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Shutting down…';
+  }
   try {
     await api(task(taskId).cancel(), { method: "POST" });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
     showAlert("Error cancelling task: " + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "Cancel task";
+    }
   }
 }
 
