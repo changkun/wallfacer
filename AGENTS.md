@@ -203,6 +203,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### Spec Tree
 - `GET /api/specs/tree` — Full spec tree with metadata, progress, and dependency edges
+- `GET /api/specs/stream` — SSE: spec tree change notifications (sends snapshot on change)
 
 ### Planning Sandbox
 - `GET /api/planning` — Get planning sandbox status (running or not)
@@ -223,6 +224,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### File Explorer
 - `GET /api/explorer/tree` — List one level of a workspace directory
+- `GET /api/explorer/stream` — SSE: file tree change notifications for workspace directories
 - `GET /api/explorer/file` — Read file contents from a workspace
 - `PUT /api/explorer/file` — Write file contents to a workspace
 
