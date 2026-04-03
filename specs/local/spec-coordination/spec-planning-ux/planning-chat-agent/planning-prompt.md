@@ -1,6 +1,6 @@
 ---
 title: Planning System Prompt
-status: validated
+status: complete
 track: local
 depends_on: []
 affects:
