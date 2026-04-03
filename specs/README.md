@@ -31,7 +31,8 @@ Local Product                     Cloud Platform
   ○ Pull Request Creation
   ○ Task Revert
   ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
-  ✅ Pixel Agent Avatars              ○ Information Inbox
+  ✅ Pixel Agent Avatars
+  ○ Spatial Canvas (vague)              ○ Information Inbox
                                     ○ Multi-Agent Consensus
                                     ○ Multi-Agent Debate
                                     ○ Token & Cost Optimization
@@ -88,6 +89,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
+| [spatial-canvas.md](local/spatial-canvas.md) | Vague | Spatial infinite-canvas view — tasks, agents, and notes as free-form nodes on a 2D plane |
 
 ### Local product dependencies
 
