@@ -20,14 +20,7 @@ Press **S** to toggle between the Board view and the Spec view. Spec mode uses a
 
 ### Spec Explorer
 
-The explorer shows all specs organized by track directory:
-
-| Track | Purpose |
-|---|---|
-| `specs/foundations/` | Completed abstraction interfaces (sandbox, storage, file explorer, terminal) |
-| `specs/local/` | Local product and UX features |
-| `specs/cloud/` | Cloud platform features (multi-tenant, K8s) |
-| `specs/shared/` | Cross-track specs (authentication, agent abstraction) |
+The explorer shows all specs organized by track — the top-level directories under `specs/`. Tracks are user-defined: create a directory under `specs/` and it becomes a track. For example, a project might organize specs as `specs/backend/`, `specs/frontend/`, `specs/infra/`.
 
 Each spec entry displays a status badge indicating its lifecycle state. Non-leaf specs (those with children) show a progress indicator reflecting how many of their leaf descendants are complete.
 
@@ -144,4 +137,4 @@ Use `#spec/<path>` in the URL to link directly to a spec. For example, `http://l
 - [The Autonomy Spectrum](autonomy-spectrum.md) -- where specs fit in the overall workflow
 - [Exploring Ideas](exploring-ideas.md) -- the planning chat for conversational exploration
 - [Board & Tasks](board-and-tasks.md) -- the task board where dispatched specs are executed
-- [Spec Mode](spec-mode.md) -- additional spec explorer and UI reference
+- [Configuration](configuration.md) -- keyboard shortcuts and settings
