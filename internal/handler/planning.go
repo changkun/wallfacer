@@ -10,6 +10,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/planner"
 )
 
@@ -220,7 +221,20 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	lr := h.planner.LogReader()
+	// Poll briefly for the live log — there's a race between the client
+	// connecting here and the exec goroutine creating the live log.
+	var lr *livelog.Reader
+	for range 20 { // up to ~2s
+		lr = h.planner.LogReader()
+		if lr != nil {
+			break
+		}
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 	if lr == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return

@@ -281,34 +281,48 @@ var PlanningChat = (function () {
     var assistantText = "";
     var receivedContent = false;
 
-    _activeStream = startStreamingFetch({
-      url: Routes.planning.messageStream(),
-      onChunk: function (chunk) {
-        rawBuffer += chunk;
-        assistantText = _extractAssistantText(rawBuffer);
-        if (contentEl) {
-          // Replace thinking indicator on first real content.
-          if (!receivedContent && (assistantText || _hasToolActivity(rawBuffer))) {
-            receivedContent = true;
+    var retried = false;
+
+    function _connectStream() {
+      _activeStream = startStreamingFetch({
+        url: Routes.planning.messageStream(),
+        onChunk: function (chunk) {
+          rawBuffer += chunk;
+          assistantText = _extractAssistantText(rawBuffer);
+          if (contentEl) {
+            if (!receivedContent && (assistantText || _hasToolActivity(rawBuffer))) {
+              receivedContent = true;
+            }
+            if (receivedContent) {
+              _renderChatResponse(contentEl, assistantText, rawBuffer);
+            }
           }
-          if (receivedContent) {
+          _scrollToBottom();
+        },
+        onDone: function (hadData) {
+          if (!hadData && !retried) {
+            // Stream returned empty (204 or exec not ready yet) — retry once.
+            retried = true;
+            setTimeout(_connectStream, 500);
+            return;
+          }
+          assistantText = _extractAssistantText(rawBuffer);
+          if (contentEl) {
             _renderChatResponse(contentEl, assistantText, rawBuffer);
           }
-        }
-        _scrollToBottom();
-      },
-      onDone: function () {
-        // Final render with complete buffer.
-        assistantText = _extractAssistantText(rawBuffer);
-        if (contentEl) {
-          _renderChatResponse(contentEl, assistantText, rawBuffer);
-        }
-        _stopStreaming(false);
-      },
-      onError: function () {
-        _stopStreaming(false);
-      },
-    });
+          _stopStreaming(false);
+        },
+        onError: function () {
+          if (!retried) {
+            retried = true;
+            setTimeout(_connectStream, 500);
+            return;
+          }
+          _stopStreaming(false);
+        },
+      });
+    }
+    _connectStream();
   }
 
   // _extractAssistantText pulls all assistant text from raw NDJSON output.
