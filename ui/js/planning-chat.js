@@ -117,9 +117,9 @@ var PlanningChat = (function () {
   }
 
   function _onInputKeydown(e) {
-    // If the @-mention dropdown is open (managed by mention.js), let it
-    // handle arrow keys, Enter, Tab, and Escape — don't intercept here.
-    if (document.querySelector(".mention-dropdown")) return;
+    // If the @-mention dropdown is open (managed by mention.js) and our own
+    // slash dropdown is not open, let mention.js handle the keys.
+    if (!_autocompleteEl && document.querySelector(".mention-dropdown")) return;
 
     // If user presses arrow key while typing a slash command but autocomplete
     // hasn't rendered yet, trigger it synchronously from cache.
@@ -525,8 +525,15 @@ var PlanningChat = (function () {
 
     if (!_autocompleteEl) {
       _autocompleteEl = document.createElement("div");
-      _autocompleteEl.className = "planning-chat-autocomplete";
-      _input.parentElement.appendChild(_autocompleteEl);
+      _autocompleteEl.className = "mention-dropdown";
+      // Position above the composer input.
+      var rect = _input.getBoundingClientRect();
+      _autocompleteEl.style.position = "fixed";
+      _autocompleteEl.style.left = rect.left + "px";
+      _autocompleteEl.style.width = Math.max(320, rect.width) + "px";
+      _autocompleteEl.style.bottom = (window.innerHeight - rect.top + 4) + "px";
+      _autocompleteEl.style.top = "auto";
+      document.body.appendChild(_autocompleteEl);
     }
 
     _autocompleteEl.innerHTML = "";
@@ -534,13 +541,15 @@ var PlanningChat = (function () {
 
     matches.forEach(function (cmd, i) {
       var item = document.createElement("div");
-      item.className = "planning-chat-autocomplete__item";
-      item.innerHTML =
-        "<strong>/" +
-        _escapeHtml(cmd.name) +
-        "</strong> <span>" +
-        _escapeHtml(cmd.description) +
-        "</span>";
+      item.className = "mention-item";
+      var nameEl = document.createElement("span");
+      nameEl.className = "mention-filename";
+      nameEl.textContent = "/" + cmd.name;
+      var descEl = document.createElement("span");
+      descEl.className = "mention-path";
+      descEl.textContent = cmd.description;
+      item.appendChild(nameEl);
+      item.appendChild(descEl);
       item.addEventListener("mousedown", function (e) {
         e.preventDefault();
         _selectAutocomplete(i);
@@ -560,7 +569,7 @@ var PlanningChat = (function () {
     var items = _autocompleteEl.children;
     for (var i = 0; i < items.length; i++) {
       items[i].classList.toggle(
-        "planning-chat-autocomplete__item--active",
+        "mention-item-selected",
         i === _autocompleteIndex,
       );
     }
@@ -575,7 +584,8 @@ var PlanningChat = (function () {
     if (!_autocompleteEl) return;
     var items = _autocompleteEl.children;
     if (index < 0 || index >= items.length) return;
-    var name = items[index].querySelector("strong").textContent;
+    var nameEl = items[index].querySelector(".mention-filename");
+    var name = nameEl ? nameEl.textContent : "";
     _input.value = name + " ";
     _input.focus();
     _closeAutocomplete();

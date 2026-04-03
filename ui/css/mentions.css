@@ -23,9 +23,14 @@
   color: var(--text);
   line-height: 1.5;
 }
-.mention-item:hover,
+.mention-item:hover {
+  background: var(--bg-raised);
+}
+
 .mention-item-selected {
   background: var(--bg-raised);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 .mention-path {
   color: var(--text-muted);
