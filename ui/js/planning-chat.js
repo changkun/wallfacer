@@ -130,16 +130,15 @@ var PlanningChat = (function () {
     if (_autocompleteEl) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        _autocompleteIndex = Math.min(
-          _autocompleteIndex + 1,
-          _autocompleteEl.children.length - 1,
-        );
+        var len = _autocompleteEl.children.length;
+        _autocompleteIndex = len > 0 ? (_autocompleteIndex + 1) % len : 0;
         _highlightAutocomplete();
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        _autocompleteIndex = Math.max(_autocompleteIndex - 1, 0);
+        var len2 = _autocompleteEl.children.length;
+        _autocompleteIndex = len2 > 0 ? (_autocompleteIndex - 1 + len2) % len2 : 0;
         _highlightAutocomplete();
         return;
       }

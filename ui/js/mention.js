@@ -198,12 +198,12 @@ function attachMentionAutocomplete(textarea, opts) {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      selectedIndex = Math.min(selectedIndex + 1, currentMatches.length - 1);
+      selectedIndex = currentMatches.length > 0 ? (selectedIndex + 1) % currentMatches.length : 0;
       renderItems(currentMatches);
       _scrollSelectedIntoView(dropdown, selectedIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      selectedIndex = Math.max(selectedIndex - 1, 0);
+      selectedIndex = currentMatches.length > 0 ? (selectedIndex - 1 + currentMatches.length) % currentMatches.length : 0;
       renderItems(currentMatches);
       _scrollSelectedIntoView(dropdown, selectedIndex);
     } else if ((e.key === "Enter" || e.key === "Tab") && selectedIndex >= 0) {
