@@ -198,62 +198,64 @@
 .spec-focused-view__body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  margin: 0 auto;
-  width: 100%;
+}
+
+.spec-focused-view__body-inner {
   max-width: 52em;
+  margin: 0 auto;
+  padding: 16px;
 }
 
 /* GitHub-style markdown rendering for spec body */
-.spec-focused-view__body.prose-content {
+.spec-focused-view__body-inner.prose-content {
   font-size: 15px;
   line-height: 1.7;
   color: var(--text);
 }
 
-.spec-focused-view__body.prose-content h1 {
+.spec-focused-view__body-inner.prose-content h1 {
   font-size: 1.75em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--border);
   margin-top: 1.5em;
 }
 
-.spec-focused-view__body.prose-content h2 {
+.spec-focused-view__body-inner.prose-content h2 {
   font-size: 1.35em;
   padding-bottom: 0.25em;
   border-bottom: 1px solid var(--border);
   margin-top: 1.5em;
 }
 
-.spec-focused-view__body.prose-content h3 {
+.spec-focused-view__body-inner.prose-content h3 {
   font-size: 1.15em;
   margin-top: 1.25em;
 }
 
-.spec-focused-view__body.prose-content h4 {
+.spec-focused-view__body-inner.prose-content h4 {
   font-size: 1em;
   margin-top: 1em;
 }
 
-.spec-focused-view__body.prose-content p {
+.spec-focused-view__body-inner.prose-content p {
   margin: 0.75em 0;
 }
 
-.spec-focused-view__body.prose-content ul,
-.spec-focused-view__body.prose-content ol {
+.spec-focused-view__body-inner.prose-content ul,
+.spec-focused-view__body-inner.prose-content ol {
   margin: 0.75em 0;
   padding-left: 2em;
 }
 
-.spec-focused-view__body.prose-content li {
+.spec-focused-view__body-inner.prose-content li {
   margin: 0.25em 0;
 }
 
-.spec-focused-view__body.prose-content li > p {
+.spec-focused-view__body-inner.prose-content li > p {
   margin: 0.25em 0;
 }
 
-.spec-focused-view__body.prose-content pre {
+.spec-focused-view__body-inner.prose-content pre {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -263,21 +265,21 @@
   overflow-x: auto;
 }
 
-.spec-focused-view__body.prose-content code {
+.spec-focused-view__body-inner.prose-content code {
   background: color-mix(in oklab, var(--bg) 70%, var(--text-muted));
   border-radius: 3px;
   padding: 2px 5px;
   font-size: 0.85em;
 }
 
-.spec-focused-view__body.prose-content pre code {
+.spec-focused-view__body-inner.prose-content pre code {
   background: none;
   padding: 0;
   font-size: inherit;
   border-radius: 0;
 }
 
-.spec-focused-view__body.prose-content blockquote {
+.spec-focused-view__body-inner.prose-content blockquote {
   border-left: 4px solid var(--accent);
   padding: 0.5em 1em;
   margin: 0.75em 0;
@@ -286,29 +288,29 @@
   border-radius: 0 4px 4px 0;
 }
 
-.spec-focused-view__body.prose-content table {
+.spec-focused-view__body-inner.prose-content table {
   border-collapse: collapse;
   width: 100%;
   margin: 0.75em 0;
 }
 
-.spec-focused-view__body.prose-content th {
+.spec-focused-view__body-inner.prose-content th {
   background: var(--bg-input);
   font-weight: 600;
 }
 
-.spec-focused-view__body.prose-content th,
-.spec-focused-view__body.prose-content td {
+.spec-focused-view__body-inner.prose-content th,
+.spec-focused-view__body-inner.prose-content td {
   border: 1px solid var(--border);
   padding: 6px 12px;
 }
 
-.spec-focused-view__body.prose-content img {
+.spec-focused-view__body-inner.prose-content img {
   max-width: 100%;
   border-radius: 4px;
 }
 
-.spec-focused-view__body.prose-content hr {
+.spec-focused-view__body-inner.prose-content hr {
   border: none;
   border-top: 2px solid var(--border);
   margin: 1.5em 0;

@@ -81,10 +81,10 @@ function focusSpec(specPath, workspace) {
 
   // Show loading state in the focused view.
   var titleEl = document.getElementById("spec-focused-title");
-  var bodyEl = document.getElementById("spec-focused-body");
+  var innerEl = document.getElementById("spec-focused-body-inner");
   if (titleEl) titleEl.textContent = specPath;
-  if (bodyEl)
-    bodyEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
+  if (innerEl)
+    innerEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
 
   _loadAndRenderSpec();
   _startSpecRefreshPoll();
@@ -137,7 +137,7 @@ function _loadAndRenderSpec() {
       var parsed = parseSpecFrontmatter(text);
       var titleEl = document.getElementById("spec-focused-title");
       var statusEl = document.getElementById("spec-focused-status");
-      var bodyEl = document.getElementById("spec-focused-body");
+      var bodyEl = document.getElementById("spec-focused-body-inner");
       var dispatchBtn = document.getElementById("spec-dispatch-btn");
 
       if (titleEl)
@@ -252,8 +252,8 @@ function _loadAndRenderSpec() {
           el.className = el.className.replace(/ spec-\S+/g, "");
         }
       }
-      var bodyEl = document.getElementById("spec-focused-body");
-      if (bodyEl) bodyEl.innerHTML = "";
+      var bodyInner = document.getElementById("spec-focused-body-inner");
+      if (bodyInner) bodyInner.innerHTML = "";
       var tocEl = document.getElementById("spec-toc");
       if (tocEl) tocEl.remove();
       var dispatchBtn = document.getElementById("spec-dispatch-btn");
@@ -366,162 +366,180 @@ function _buildSpecToc(bodyEl) {
 }
 
 // --- TOC exclusion zone (Pretext-powered) ---
-// Uses @chenglou/pretext (vendored at js/vendor/pretext.min.js) to predict
-// paragraph heights at narrowed widths without touching the DOM, then
-// simulates block layout top-down per scroll frame to determine which
-// elements overlap the TOC.
-// For tables, max-width is used instead of margin-right.
+//
+// Uses @chenglou/pretext to predict paragraph heights at any width via
+// pure arithmetic — no DOM reflow.  The workflow follows pretext's design:
+//
+//   prepare()  — one-time per spec load (expensive: measures text segments)
+//   layout()   — cheap hot path rerun on every scroll frame and resize
+//
+// For non-text blocks (tables, pre, lists, etc.) we fall back to DOM
+// measurement, but only on resize — not per scroll frame.
 
-var _tocExclusionRaf = null;
-var _tocExclusionHandler = null;
-var _tocExclusion = null; // prepared data for the current spec
-var _tocResizeTimer = null;
+var _tocItems = null; // array of per-block data, survives resize
+var _tocScrollHandler = null;
+var _tocScrollRaf = null;
 var _tocResizeHandler = null;
-
-function _rebuildTocExclusion() {
-  var bodyEl = document.getElementById("spec-focused-body");
-  var toc = document.getElementById("spec-toc");
-  if (!bodyEl || !toc) return;
-
-  // Clear stale constraints before remeasuring.
-  if (_tocExclusion) {
-    for (var i = 0; i < _tocExclusion.items.length; i++) {
-      _tocExclusion.items[i].el.style.maxWidth = "";
-    }
-    _tocExclusion = null;
-  }
-
-  var pt = window.pretext || null;
-  _buildExclusionData(pt, bodyEl, toc);
-  _applyTocExclusion();
-}
+var _tocResizeTimer = null;
+var _tocLayout = null; // width-dependent data, rebuilt on resize
 
 function _setupTocExclusion() {
-  var bodyEl = document.getElementById("spec-focused-body");
+  var scrollEl = document.getElementById("spec-focused-body");
+  var innerEl = document.getElementById("spec-focused-body-inner");
   var toc = document.getElementById("spec-toc");
-  if (!bodyEl || !toc) return;
+  if (!scrollEl || !innerEl || !toc) return;
 
-  var pt = window.pretext || null;
-  _buildExclusionData(pt, bodyEl, toc);
-  _applyTocExclusion();
-  _tocExclusionHandler = function () {
-    if (_tocExclusionRaf) return;
-    _tocExclusionRaf = requestAnimationFrame(function () {
-      _tocExclusionRaf = null;
-      _applyTocExclusion();
+  _tocPrepare(scrollEl, innerEl);
+  _tocRelayout(scrollEl, innerEl, toc);
+  _tocApply();
+
+  _tocScrollHandler = function () {
+    if (_tocScrollRaf) return;
+    _tocScrollRaf = requestAnimationFrame(function () {
+      _tocScrollRaf = null;
+      _tocApply();
     });
   };
-  bodyEl.addEventListener("scroll", _tocExclusionHandler);
+  scrollEl.addEventListener("scroll", _tocScrollHandler);
 
-  // Rebuild exclusion data on window resize (debounced).
   _tocResizeHandler = function () {
     clearTimeout(_tocResizeTimer);
-    _tocResizeTimer = setTimeout(_rebuildTocExclusion, 150);
+    _tocResizeTimer = setTimeout(function () {
+      var s = document.getElementById("spec-focused-body");
+      var inn = document.getElementById("spec-focused-body-inner");
+      var t = document.getElementById("spec-toc");
+      if (!s || !inn || !t) return;
+      _tocRelayout(s, inn, t);
+      _tocApply();
+    }, 100);
   };
   window.addEventListener("resize", _tocResizeHandler);
 }
 
-function _buildExclusionData(pt, bodyEl, toc) {
-  var blocks = bodyEl.querySelectorAll(":scope > *");
+// _tocPrepare runs once per spec load.  Calls pretext.prepare() for every
+// text block and caches the prepared handle + font metrics.  Non-text blocks
+// store a DOM reference for later measurement.
+//
+// scrollEl = outer scroll container (#spec-focused-body)
+// innerEl  = centered content wrapper (#spec-focused-body-inner)
+function _tocPrepare(scrollEl, innerEl) {
+  var pt = window.pretext || null;
+  var blocks = innerEl.querySelectorAll(":scope > *");
   if (blocks.length === 0) return;
 
-  var tocW = toc.offsetWidth + 24;
-  var bodyCS = getComputedStyle(bodyEl);
-  var padL = parseFloat(bodyCS.paddingLeft) || 0;
-  var padR = parseFloat(bodyCS.paddingRight) || 0;
-  var padT = parseFloat(bodyCS.paddingTop) || 0;
-  var fullWidth = bodyEl.clientWidth - padL - padR;
-  var narrowWidth = Math.max(fullWidth - tocW, 80);
+  var innerCS = getComputedStyle(innerEl);
+  var padT = parseFloat(innerCS.paddingTop) || 0;
+  var scrollRect = scrollEl.getBoundingClientRect();
 
-  // TOC position relative to bodyEl's top edge (constant across scrolls).
-  var tocRect = toc.getBoundingClientRect();
-  var bodyRect = bodyEl.getBoundingClientRect();
-
-  // If the body content doesn't reach the TOC horizontally (e.g. max-width
-  // centres the prose with space to spare), skip exclusion entirely.
-  if (tocRect.left >= bodyRect.right) return;
-
-  var tocBodyTop = tocRect.top - bodyRect.top;
-  var tocBodyBottom = tocRect.bottom - bodyRect.top;
-
-  // Snapshot initial element positions and compute predicted heights.
   var items = [];
   for (var i = 0; i < blocks.length; i++) {
     var block = blocks[i];
     var rect = block.getBoundingClientRect();
-    var contentY = rect.top - bodyRect.top + bodyEl.scrollTop - padT;
-    var heightFull = rect.height;
-    var isTable = block.tagName === "TABLE";
+    var contentY = rect.top - scrollRect.top + scrollEl.scrollTop - padT;
     var isText = block.tagName === "P" || /^H[1-6]$/.test(block.tagName);
-    var heightNarrow;
+    var item = { el: block, contentY: contentY };
 
     if (isText && pt) {
-      // Use Pretext: predict height at both widths, derive the non-text
-      // overhead (padding, border) from the difference.
       var cs = getComputedStyle(block);
       var font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
       var lh = parseFloat(cs.lineHeight);
       if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.7;
       try {
-        var prepared = pt.prepare(block.textContent || "", font);
-        var textHeightFull = pt.layout(prepared, fullWidth, lh).height;
-        var textHeightNarrow = pt.layout(prepared, narrowWidth, lh).height;
-        var overhead = heightFull - textHeightFull;
-        if (overhead < 0) overhead = 0;
-        heightNarrow = textHeightNarrow + overhead;
+        item.prepared = pt.prepare(block.textContent || "", font);
+        item.lineHeight = lh;
+        item.overhead = Math.max(0, rect.height - pt.layout(item.prepared, rect.width, lh).height);
       } catch (_e) {
-        heightNarrow = heightFull;
+        item.prepared = null;
       }
-    } else {
-      // DOM measurement: temporarily apply the constraint, read height, revert.
-      var origMW = block.style.maxWidth;
-      block.style.maxWidth = narrowWidth + "px";
-      heightNarrow = block.getBoundingClientRect().height;
-      block.style.maxWidth = origMW;
     }
-
-    items.push({
-      el: block,
-      contentY: contentY,
-      heightFull: heightFull,
-      heightNarrow: heightNarrow,
-      isTable: isTable,
-    });
+    items.push(item);
   }
 
-  // Derive gaps between consecutive elements from the initial layout.
+  // Record initial heights and derive inter-element gaps.
+  for (var k = 0; k < items.length; k++) {
+    items[k].heightAtSetup = items[k].el.getBoundingClientRect().height;
+  }
   for (var j = 0; j < items.length; j++) {
     if (j === 0) {
       items[j].gap = items[j].contentY;
     } else {
-      var prevEnd = items[j - 1].contentY + items[j - 1].heightFull;
-      items[j].gap = Math.max(0, items[j].contentY - prevEnd);
+      var pe = items[j - 1].contentY + items[j - 1].heightAtSetup;
+      items[j].gap = Math.max(0, items[j].contentY - pe);
     }
   }
 
-  _tocExclusion = {
-    items: items,
+  _tocItems = items;
+}
+
+// _tocRelayout recomputes width-dependent data.  For text blocks it only
+// calls pretext.layout() (pure arithmetic).  For non-text blocks it does
+// one DOM measurement.
+function _tocRelayout(scrollEl, innerEl, toc) {
+  if (!_tocItems) return;
+
+  // Clear stale constraints before measuring.
+  for (var c = 0; c < _tocItems.length; c++) {
+    _tocItems[c].el.style.maxWidth = "";
+  }
+
+  var pt = window.pretext || null;
+  var tocW = toc.offsetWidth + 24;
+  var innerCS = getComputedStyle(innerEl);
+  var padL = parseFloat(innerCS.paddingLeft) || 0;
+  var padR = parseFloat(innerCS.paddingRight) || 0;
+  var padT = parseFloat(innerCS.paddingTop) || 0;
+  var fullWidth = innerEl.clientWidth - padL - padR;
+  var narrowWidth = Math.max(fullWidth - tocW, 80);
+
+  var tocRect = toc.getBoundingClientRect();
+  var innerRect = innerEl.getBoundingClientRect();
+
+  // If the inner column doesn't reach the TOC, no exclusion needed.
+  if (tocRect.left >= innerRect.right) {
+    _tocLayout = null;
+    return;
+  }
+
+  var scrollRect = scrollEl.getBoundingClientRect();
+  var tocScrollTop = tocRect.top - scrollRect.top;
+  var tocScrollBottom = tocRect.bottom - scrollRect.top;
+
+  for (var i = 0; i < _tocItems.length; i++) {
+    var item = _tocItems[i];
+
+    if (item.prepared && pt) {
+      item.heightFull = pt.layout(item.prepared, fullWidth, item.lineHeight).height + item.overhead;
+      item.heightNarrow = pt.layout(item.prepared, narrowWidth, item.lineHeight).height + item.overhead;
+    } else {
+      item.heightFull = item.el.getBoundingClientRect().height;
+      var origMW = item.el.style.maxWidth;
+      item.el.style.maxWidth = narrowWidth + "px";
+      item.heightNarrow = item.el.getBoundingClientRect().height;
+      item.el.style.maxWidth = origMW;
+    }
+  }
+
+  _tocLayout = {
     narrowWidth: narrowWidth,
-    tocBodyTop: tocBodyTop,
-    tocBodyBottom: tocBodyBottom,
-    bodyPadTop: padT,
-    bodyEl: bodyEl,
+    tocScrollTop: tocScrollTop,
+    tocScrollBottom: tocScrollBottom,
+    innerPadTop: padT,
+    scrollEl: scrollEl,
   };
 }
 
-function _applyTocExclusion() {
-  if (!_tocExclusion) return;
-  var d = _tocExclusion;
-  var scrollTop = d.bodyEl.scrollTop;
+// _tocApply runs per scroll frame.  Pure arithmetic for pretext blocks;
+// only sets/clears max-width on DOM elements that change state.
+function _tocApply() {
+  if (!_tocLayout || !_tocItems) return;
+  var d = _tocLayout;
+  var scrollTop = d.scrollEl.scrollTop;
+  var tocTop = scrollTop + d.tocScrollTop - d.innerPadTop;
+  var tocBottom = scrollTop + d.tocScrollBottom - d.innerPadTop;
 
-  // TOC zone in content-space coordinates.
-  var tocTop = scrollTop + d.tocBodyTop - d.bodyPadTop;
-  var tocBottom = scrollTop + d.tocBodyBottom - d.bodyPadTop;
-
-  // Simulate layout top-down using pre-computed heights.
   var y = 0;
-  for (var i = 0; i < d.items.length; i++) {
-    var item = d.items[i];
+  for (var i = 0; i < _tocItems.length; i++) {
+    var item = _tocItems[i];
     y += item.gap;
     var overlap = y + item.heightFull > tocTop && y < tocBottom;
     if (overlap) {
@@ -535,21 +553,23 @@ function _applyTocExclusion() {
 }
 
 function _teardownTocExclusion() {
-  if (_tocExclusion) {
-    var bodyEl = _tocExclusion.bodyEl;
-    if (bodyEl && _tocExclusionHandler) {
-      bodyEl.removeEventListener("scroll", _tocExclusionHandler);
-    }
-    for (var i = 0; i < _tocExclusion.items.length; i++) {
-      var el = _tocExclusion.items[i].el;
-      el.style.maxWidth = "";
+  if (_tocLayout) {
+    var scrollEl = _tocLayout.scrollEl;
+    if (scrollEl && _tocScrollHandler) {
+      scrollEl.removeEventListener("scroll", _tocScrollHandler);
     }
   }
-  _tocExclusionHandler = null;
-  _tocExclusion = null;
-  if (_tocExclusionRaf) {
-    cancelAnimationFrame(_tocExclusionRaf);
-    _tocExclusionRaf = null;
+  if (_tocItems) {
+    for (var i = 0; i < _tocItems.length; i++) {
+      _tocItems[i].el.style.maxWidth = "";
+    }
+  }
+  _tocScrollHandler = null;
+  _tocItems = null;
+  _tocLayout = null;
+  if (_tocScrollRaf) {
+    cancelAnimationFrame(_tocScrollRaf);
+    _tocScrollRaf = null;
   }
   if (_tocResizeHandler) {
     window.removeEventListener("resize", _tocResizeHandler);
@@ -620,7 +640,10 @@ function _initSpecChatResize() {
         _specChatStorageKey,
         parseInt(chatPane.style.width, 10),
       );
-      _rebuildTocExclusion();
+      var s = document.getElementById("spec-focused-body");
+      var inn = document.getElementById("spec-focused-body-inner");
+      var t = document.getElementById("spec-toc");
+      if (s && inn && t) { _tocRelayout(s, inn, t); _tocApply(); }
     }
 
     document.addEventListener("mousemove", onMouseMove);
