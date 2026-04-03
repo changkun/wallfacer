@@ -237,6 +237,5 @@ The planning chat agent shipped as a full conversational interface in the spec m
 
 ### Future Work
 
-- **Per-turn NDJSON storage** — save each exec's raw output to `~/.wallfacer/planning/<fp>/turns/` for faithful context reconstruction and analytics
-- **Dedicated planning volume** — `claude-planning-config` to isolate planning sessions from task workers
+- **[Session Persistence & Recovery](planning-chat-agent/session-persistence.md)** — per-turn NDJSON storage, dedicated planning volume, structured context reconstruction from tool trajectories on session loss
 - **Codex compatibility** — see `planning-codex-compat.md`
