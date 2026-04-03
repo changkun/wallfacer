@@ -17,11 +17,11 @@ import (
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/envutil"
-	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"changkun.de/x/wallfacer/internal/pkg/syncmap"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -121,9 +121,9 @@ type Runner struct {
 	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
-	autosubmitFn           func() bool        // returns true when auto-submit is enabled
-	ideationExploitRatioFn func() float64     // returns the current exploitation ratio (0–1)
-	planner                *planner.Planner   // planning sandbox for ideation and chat; may be nil
+	autosubmitFn           func() bool      // returns true when auto-submit is enabled
+	ideationExploitRatioFn func() float64   // returns the current exploitation ratio (0–1)
+	planner                *planner.Planner // planning sandbox for ideation and chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
