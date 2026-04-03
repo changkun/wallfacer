@@ -168,3 +168,27 @@ Claude Code's headless mode (`-p`) is single-shot: one prompt in, one response o
 - `internal/runner/` — ideation refactored to use `Planner.Exec()` instead of ephemeral containers
 - `ui/js/` — chat stream component (message input, response rendering, live file change indicators)
 - `~/.wallfacer/planning/` — conversation persistence storage
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Conversation Store](planning-chat-agent/conversation-store.md) | — | medium | validated |
+| [Planning System Prompt](planning-chat-agent/planning-prompt.md) | — | small | validated |
+| [Ideation Migration](planning-chat-agent/ideation-migration.md) | — | medium | validated |
+| [Message API Endpoints](planning-chat-agent/message-api.md) | conversation-store, planning-prompt | medium | validated |
+| [Message Stream SSE](planning-chat-agent/message-stream.md) | message-api | medium | validated |
+| [Slash Command Registry](planning-chat-agent/slash-command-registry.md) | message-api | medium | validated |
+| [UI Chat Send and Stream](planning-chat-agent/ui-chat-send-stream.md) | message-stream | medium | validated |
+| [UI Message Queue and Interrupt](planning-chat-agent/ui-message-queue.md) | ui-chat-send-stream | medium | validated |
+
+```mermaid
+graph LR
+  A[Conversation Store] --> D[Message API]
+  B[Planning Prompt] --> D
+  D --> E[Message Stream SSE]
+  D --> F[Slash Command Registry]
+  E --> G[UI Chat Send & Stream]
+  G --> H[UI Message Queue & Interrupt]
+  C[Ideation Migration]
+```
