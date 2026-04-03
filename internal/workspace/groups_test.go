@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -327,5 +328,72 @@ func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {
 	}
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 group after no-op upsert, got %d", len(groups))
+	}
+}
+
+// TestLoadGroups_ReadError verifies that a non-ErrNotExist read error is returned.
+func TestLoadGroups_ReadError(t *testing.T) {
+	configDir := t.TempDir()
+	// Place a directory where the file is expected, causing a read error.
+	if err := os.MkdirAll(groupsFilePath(configDir), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	_, err := LoadGroups(configDir)
+	if err == nil {
+		t.Fatal("expected error when groups file is a directory")
+	}
+}
+
+// TestLoadGroups_InvalidJSON verifies that malformed JSON returns an error.
+func TestLoadGroups_InvalidJSON(t *testing.T) {
+	configDir := t.TempDir()
+	if err := os.WriteFile(groupsFilePath(configDir), []byte("not json"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_, err := LoadGroups(configDir)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+// TestSaveGroups_MkdirAllError verifies that SaveGroups returns an error
+// when the parent directory cannot be created.
+func TestSaveGroups_MkdirAllError(t *testing.T) {
+	// Use a path where a regular file blocks directory creation.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write blocker: %v", err)
+	}
+	// configDir is blocker/sub — MkdirAll will fail because blocker is a file.
+	configDir := filepath.Join(blocker, "sub")
+	err := SaveGroups(configDir, []Group{{Workspaces: []string{"/a"}}})
+	if err == nil {
+		t.Fatal("expected error when parent dir cannot be created")
+	}
+}
+
+// TestUpsertGroup_LoadError verifies that UpsertGroup propagates LoadGroups errors.
+func TestUpsertGroup_LoadError(t *testing.T) {
+	configDir := t.TempDir()
+	// Place invalid JSON so LoadGroups fails.
+	if err := os.WriteFile(groupsFilePath(configDir), []byte("bad"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	err := UpsertGroup(configDir, []string{t.TempDir()})
+	if err == nil {
+		t.Fatal("expected error when LoadGroups fails")
+	}
+}
+
+// TestNormalizeGroupPaths_DeduplicatesPaths verifies that duplicate paths
+// are collapsed to a single entry.
+func TestNormalizeGroupPaths_DeduplicatesPaths(t *testing.T) {
+	ws := t.TempDir()
+	result := normalizeGroupPaths([]string{ws, ws, ws})
+	if len(result) != 1 {
+		t.Fatalf("expected 1 path after dedup, got %d", len(result))
+	}
+	if result[0] != ws {
+		t.Fatalf("expected %q, got %q", ws, result[0])
 	}
 }

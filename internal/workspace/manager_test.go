@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -931,5 +932,208 @@ func TestSwitchKeepsStoreForWaitingTasks(t *testing.T) {
 	}
 	if _, ok := m.StoreForKey(snapA.Key); !ok {
 		t.Fatal("expected group A to remain in activeGroups")
+	}
+}
+
+// TestSwitchKeepsStoreForInProgressTasks verifies that switching away from a
+// group with in-progress tasks (detected by storeHasActiveTasks) keeps its
+// store open even when taskCount is 0.
+func TestSwitchKeepsStoreForInProgressTasks(t *testing.T) {
+	m, _ := newTestManager(t)
+	wsA := t.TempDir()
+	snapA, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch to A: %v", err)
+	}
+	storeA := snapA.Store
+
+	// Create a task and move it to in_progress.
+	ctx := context.Background()
+	task, err := storeA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := storeA.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	// Switch to B — A should stay open because of in-progress task.
+	wsB := t.TempDir()
+	if _, err := m.Switch([]string{wsB}); err != nil {
+		t.Fatalf("Switch to B: %v", err)
+	}
+
+	if storeA.IsClosed() {
+		t.Fatal("expected group A store to remain open (has in-progress task)")
+	}
+	if _, ok := m.StoreForKey(snapA.Key); !ok {
+		t.Fatal("expected group A to remain in activeGroups")
+	}
+}
+
+// TestSwitchKeepsStoreForCommittingTasks verifies that storeHasActiveTasks
+// detects committing tasks.
+func TestSwitchKeepsStoreForCommittingTasks(t *testing.T) {
+	m, _ := newTestManager(t)
+	wsA := t.TempDir()
+	snapA, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch to A: %v", err)
+	}
+	storeA := snapA.Store
+
+	ctx := context.Background()
+	task, err := storeA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	// Transition path: backlog → in_progress → waiting → committing
+	if err := storeA.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus to InProgress: %v", err)
+	}
+	if err := storeA.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("UpdateTaskStatus to Waiting: %v", err)
+	}
+	if err := storeA.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
+		t.Fatalf("UpdateTaskStatus to Committing: %v", err)
+	}
+
+	wsB := t.TempDir()
+	if _, err := m.Switch([]string{wsB}); err != nil {
+		t.Fatalf("Switch to B: %v", err)
+	}
+
+	if storeA.IsClosed() {
+		t.Fatal("expected group A store to remain open (has committing task)")
+	}
+}
+
+// TestStoreHasActiveTasks_NilStore verifies the nil guard in storeHasActiveTasks.
+func TestStoreHasActiveTasks_NilStore(t *testing.T) {
+	if storeHasActiveTasks(nil) {
+		t.Fatal("expected false for nil store")
+	}
+}
+
+// TestValidate_NotCleanPath verifies that unclean paths are rejected.
+func TestValidate_NotCleanPath(t *testing.T) {
+	ws := t.TempDir()
+	unclean := ws + "/."
+	_, err := validate([]string{unclean})
+	if err == nil {
+		t.Fatal("expected error for unclean path")
+	}
+}
+
+// TestValidate_FileNotDir verifies that a file path (not a directory) is rejected.
+func TestValidate_FileNotDir(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "file.txt")
+	if err := os.WriteFile(f, nil, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_, err := validate([]string{f})
+	if err == nil {
+		t.Fatal("expected error for file path (not directory)")
+	}
+}
+
+// TestNewManager_SwitchError verifies that NewManager returns an error when
+// the initial Switch fails (e.g., invalid workspace path).
+func TestNewManager_SwitchError(t *testing.T) {
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	_, err := NewManager(configDir, dataDir, envFile, []string{"/nonexistent/path"})
+	if err == nil {
+		t.Fatal("expected NewManager to fail with invalid initial workspace")
+	}
+}
+
+// TestValidate_WhitespaceOnlyPathSkipped verifies that whitespace-only paths
+// are silently skipped during validation.
+func TestValidate_WhitespaceOnlyPathSkipped(t *testing.T) {
+	ws := t.TempDir()
+	result, err := validate([]string{"  ", ws, "\t"})
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if len(result) != 1 || result[0] != ws {
+		t.Fatalf("expected [%q], got %v", ws, result)
+	}
+}
+
+// TestSwitch_NilNewStoreFallback verifies that Switch falls back to
+// store.NewFileStore when the newStore field is nil.
+func TestSwitch_NilNewStoreFallback(t *testing.T) {
+	m, _ := newTestManager(t)
+	m.newStore = nil // clear the factory
+
+	ws := t.TempDir()
+	snap, err := m.Switch([]string{ws})
+	if err != nil {
+		t.Fatalf("Switch with nil newStore: %v", err)
+	}
+	if snap.Store == nil {
+		t.Fatal("expected store after Switch with nil newStore fallback")
+	}
+}
+
+// TestSwitch_UpsertGroupError verifies that Switch returns an error and
+// cleans up the candidate store when UpsertGroup fails.
+func TestSwitch_UpsertGroupError(t *testing.T) {
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	m, err := NewManager(configDir, dataDir, envFile, nil)
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	origSnap := m.Snapshot()
+
+	// Block UpsertGroup by making workspace-groups.json unreadable (a directory).
+	if err := os.MkdirAll(groupsFilePath(configDir), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	ws := t.TempDir()
+	_, err = m.Switch([]string{ws})
+	if err == nil {
+		t.Fatal("expected Switch to fail when UpsertGroup fails")
+	}
+
+	snap := m.Snapshot()
+	if snap.Generation != origSnap.Generation {
+		t.Errorf("generation changed after UpsertGroup failure: before=%d after=%d",
+			origSnap.Generation, snap.Generation)
+	}
+}
+
+// TestSwitch_StoreCreationError verifies that Switch returns an error and
+// does not mutate the manager when the store factory fails.
+func TestSwitch_StoreCreationError(t *testing.T) {
+	m, _ := newTestManager(t)
+	origSnap := m.Snapshot()
+
+	m.newStore = func(_ string) (*store.Store, error) {
+		return nil, errors.New("synthetic store error")
+	}
+
+	ws := t.TempDir()
+	_, err := m.Switch([]string{ws})
+	if err == nil {
+		t.Fatal("expected error when store creation fails")
+	}
+
+	snap := m.Snapshot()
+	if snap.Generation != origSnap.Generation {
+		t.Errorf("generation changed after failed store creation: before=%d after=%d",
+			origSnap.Generation, snap.Generation)
 	}
 }
