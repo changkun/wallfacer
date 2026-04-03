@@ -267,12 +267,6 @@ func TestRunStatus(t *testing.T) {
 	}
 }
 
-// errorReader is an io.ReadCloser that always returns an error on Read.
-type errorReader struct{}
-
-func (errorReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
-func (errorReader) Close() error             { return nil }
-
 // TestFetchTasks_ReadBodyError verifies that fetchTasks returns an error when
 // the response body cannot be read.
 func TestFetchTasks_ReadBodyError(t *testing.T) {
@@ -351,7 +345,7 @@ func TestFetchContainers_ServerDown(t *testing.T) {
 }
 
 // TestRunStatus_SubprocessHelper is a test helper used by subprocess tests.
-func TestRunStatus_SubprocessHelper(t *testing.T) {
+func TestRunStatus_SubprocessHelper(_ *testing.T) {
 	if os.Getenv("WALLFACER_STATUS_HELPER") != "1" {
 		return
 	}

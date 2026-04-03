@@ -219,6 +219,51 @@ func TestRunDoctor_ConfigDirIsFile(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_MalformedEnvLine verifies that doctor ignores env file lines
+// without an = separator.
+func TestRunDoctor_MalformedEnvLine(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	content := "ANTHROPIC_API_KEY=sk-ant-test\nmalformed-line-no-equals\n"
+	if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	out := captureStdout(func() {
+		RunDoctor(configDir)
+	})
+
+	if !strings.Contains(out, "[ok] ANTHROPIC_API_KEY is set") {
+		t.Errorf("expected credential ok despite malformed line, got:\n%s", out)
+	}
+}
+
+// TestRunDoctor_SandboxImageCached verifies that doctor reports a cached
+// sandbox image when the runtime responds that it exists.
+func TestRunDoctor_SandboxImageCached(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	fakeRuntime := filepath.Join(t.TempDir(), "podman")
+	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\nif [ \"$1\" = \"images\" ] && [ \"$2\" = \"-q\" ]; then echo \"abc123\"; exit 0; fi\nexit 0\n"
+	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	t.Setenv("CONTAINER_CMD", fakeRuntime)
+
+	out := captureStdout(func() {
+		RunDoctor(configDir)
+	})
+
+	if !strings.Contains(out, "[ok] Claude sandbox image") {
+		t.Errorf("expected cached sandbox image ok, got:\n%s", out)
+	}
+}
+
 // TestRunDoctor_GitCheck verifies that doctor detects git on the system PATH
 // (expected to be present in CI and development environments).
 func TestRunDoctor_GitCheck(t *testing.T) {

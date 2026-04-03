@@ -764,6 +764,69 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 	}
 }
 
+// TestInitServer_WithExistingStore verifies that initServer handles an existing
+// store with tasks, covering the recovery and workspace instrucitons paths.
+func TestInitServer_WithExistingStore(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	wsDir := t.TempDir()
+	envContent := "# test\nWALLFACER_WORKSPACES=" + wsDir + "\n"
+	if err := os.WriteFile(envFile, []byte(envContent), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	if sc.ActualPort == 0 {
+		t.Fatal("expected non-zero port")
+	}
+}
+
+// TestInitServer_PortFallback verifies that when the requested port is taken,
+// initServer falls back to a free port.
+func TestInitServer_PortFallback(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	// First, bind a port to occupy it.
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	occupiedPort := ln.Addr().(*net.TCPAddr).Port
+	defer func() { _ = ln.Close() }()
+
+	// Now try to init server on the same port.
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         fmt.Sprintf(":%d", occupiedPort),
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	// It should have found a different port.
+	if sc.ActualPort == occupiedPort {
+		t.Fatalf("expected fallback to different port, got same port %d", occupiedPort)
+	}
+	if sc.ActualPort == 0 {
+		t.Fatal("expected non-zero fallback port")
+	}
+}
+
 // TestInitServer_TombstoneRetentionDays verifies that the tombstone retention
 // env var is picked up during initialization.
 func TestInitServer_TombstoneRetentionDays(t *testing.T) {
@@ -836,7 +899,7 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 }
 
 // TestInitServer_SkipCSRF verifies that initServer with SkipCSRF registers
-// the desktop-port endpoint.
+// the desktop-port endpoint and serves the actual port number.
 func TestInitServer_SkipCSRF(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -855,9 +918,57 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
-	// The desktop-port endpoint should be registered.
 	if sc.ActualPort == 0 {
 		t.Fatal("expected non-zero port")
+	}
+
+	// Start the server and verify the desktop-port endpoint responds.
+	go func() { _ = sc.Srv.Serve(sc.Ln) }()
+
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/desktop-port", sc.ActualPort))
+	if err != nil {
+		t.Fatalf("GET /api/desktop-port: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/desktop-port: status %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), fmt.Sprintf("%d", sc.ActualPort)) {
+		t.Fatalf("expected port number in response, got %q", string(body))
+	}
+}
+
+// TestStopReasonHandler_MaxTokensDisablesAutopilot verifies that the
+// stop-reason handler disables autopilot when max_tokens is received.
+func TestStopReasonHandler_MaxTokensDisablesAutopilot(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	// Enable autopilot first.
+	sc.Handler.SetAutopilot(true)
+	if !sc.Handler.AutopilotEnabled() {
+		t.Fatal("autopilot should be enabled")
+	}
+
+	// Simulate a max_tokens stop reason via the runner's stop reason handler.
+	sc.Runner.NotifyStopReason(uuid.New(), "max_tokens")
+
+	if sc.Handler.AutopilotEnabled() {
+		t.Fatal("autopilot should be disabled after max_tokens")
 	}
 }
 

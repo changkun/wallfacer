@@ -164,7 +164,7 @@ func TestCallbackServer_FixedPort(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixedPort := ln.Addr().(*net.TCPAddr).Port
-	ln.Close()
+	_ = ln.Close()
 
 	srv, err := NewCallbackServer(ctx, fixedPort, "")
 	if err != nil {
@@ -186,7 +186,7 @@ func TestCallbackServer_BindFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	port := ln.Addr().(*net.TCPAddr).Port
 
 	_, err = NewCallbackServer(ctx, port, "")

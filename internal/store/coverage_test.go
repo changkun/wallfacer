@@ -1512,12 +1512,10 @@ func TestUpdateTaskBacklog_FreshStartAndMount(t *testing.T) {
 func TestListArchivedTasksPage_AfterCursor(t *testing.T) {
 	s := newTestStore(t)
 
-	var ids []uuid.UUID
 	for range 4 {
 		task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 5})
 		s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone) //nolint:errcheck
 		s.SetTaskArchived(bg(), task.ID, true)                 //nolint:errcheck
-		ids = append(ids, task.ID)
 	}
 
 	// Get the last page first.
