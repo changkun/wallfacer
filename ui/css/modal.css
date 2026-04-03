@@ -57,6 +57,9 @@
   display: flex;
   flex-direction: column;
 }
+.modal-wide #modal-right.hidden {
+  display: none;
+}
 .modal-wide #modal-backlog-right.hidden {
   display: none;
 }
