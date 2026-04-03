@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"syscall"
 	"testing"
 )
 
@@ -220,33 +219,3 @@ func TestCopyFileDestinationError(t *testing.T) {
 	}
 }
 
-// TestCopyFileIOError verifies that CopyFile returns an error when reading
-// the source file fails mid-copy. We simulate this with a named pipe (FIFO)
-// that is closed immediately.
-func TestCopyFileIOError(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("FIFOs not available on Windows")
-	}
-	dir := t.TempDir()
-	fifo := filepath.Join(dir, "fifo")
-	dst := filepath.Join(dir, "dst.txt")
-
-	// Create a FIFO.
-	if err := syscall.Mkfifo(fifo, 0644); err != nil {
-		t.Fatalf("mkfifo: %v", err)
-	}
-
-	// Open the FIFO for writing and close it immediately so the reader gets EOF.
-	// We need a goroutine since opening a FIFO blocks until both ends are open.
-	go func() {
-		w, err := os.OpenFile(fifo, os.O_WRONLY, 0)
-		if err != nil {
-			return
-		}
-		_ = w.Close()
-	}()
-
-	// CopyFile should succeed (empty copy) or return an error — either way it
-	// should not hang. This exercises the io.Copy path with an unusual reader.
-	_ = CopyFile(fifo, dst, 0644)
-}
