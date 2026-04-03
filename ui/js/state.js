@@ -1,5 +1,9 @@
 // --- Global state ---
 let tasks = [];
+// Set of task IDs for which a cancel request has been sent but the SSE update
+// confirming the status change has not yet arrived. Used to show a "cancelling"
+// indicator on kanban cards while the container is shutting down.
+let pendingCancelTaskIds = new Set();
 let logsAbort = null;
 let rawLogBuffer = "";
 // logsMode: 'pretty' | 'raw' | 'oversight'

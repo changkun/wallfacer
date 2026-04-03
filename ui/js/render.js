@@ -870,6 +870,8 @@ function _cardFingerprint(t, rank) {
     t.max_input_tokens || 0,
     t.scheduled_at || "",
     t.failure_category || "",
+    typeof pendingCancelTaskIds !== "undefined" &&
+      pendingCancelTaskIds.has(t.id),
   ].join("\x00");
 }
 
@@ -889,20 +891,28 @@ function updateCard(card, t, rank) {
   const isIdeaAgent = t.kind === "idea-agent";
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === "in_progress";
+  const isPendingCancel =
+    t.status === "in_progress" &&
+    typeof pendingCancelTaskIds !== "undefined" &&
+    pendingCancelTaskIds.has(t.id);
   const badgeClass = isArchived
     ? "badge-archived"
     : isTestRun
       ? "badge-testing"
-      : `badge-${t.status}`;
+      : isPendingCancel
+        ? "badge-cancelling"
+        : `badge-${t.status}`;
   const statusLabel = isArchived
     ? "archived"
     : isTestRun
       ? "testing"
-      : t.status === "in_progress"
-        ? "in progress"
-        : t.status === "committing"
-          ? "committing"
-          : t.status;
+      : isPendingCancel
+        ? "cancelling\u2026"
+        : t.status === "in_progress"
+          ? "in progress"
+          : t.status === "committing"
+            ? "committing"
+            : t.status;
   if (isIdeaAgent) {
     card.classList.add("card-idea-agent");
   } else {
@@ -924,6 +934,12 @@ function updateCard(card, t, rank) {
     card.classList.add("card-cancelled-done");
   } else {
     card.classList.remove("card-cancelled-done");
+  }
+  // In-progress tasks with a pending cancel get an orange left border to signal shutdown.
+  if (isPendingCancel) {
+    card.classList.add("card-cancelling");
+  } else {
+    card.classList.remove("card-cancelling");
   }
   const displayRank = rank !== undefined ? rank + 1 : t.position + 1;
   const priorityBadge =

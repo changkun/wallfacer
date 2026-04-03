@@ -642,11 +642,20 @@ async function cancelTask() {
     btn.innerHTML =
       '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Shutting down…';
   }
+  // Show a "cancelling…" indicator on the board card immediately, before the
+  // SSE update arrives confirming the status change.
+  pendingCancelTaskIds.add(taskId);
+  scheduleRender();
   try {
     await api(task(taskId).cancel(), { method: "POST" });
     closeModal();
-    waitForTaskDelta(taskId);
+    waitForTaskDelta(taskId).finally(function () {
+      pendingCancelTaskIds.delete(taskId);
+      scheduleRender();
+    });
   } catch (e) {
+    pendingCancelTaskIds.delete(taskId);
+    scheduleRender();
     showAlert("Error cancelling task: " + e.message);
   } finally {
     if (btn) {

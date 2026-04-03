@@ -40,6 +40,10 @@
   background: #e8ddf5;
   color: #5a3d8a;
 }
+.badge-cancelling {
+  background: #fde8d8;
+  color: #8b3a08;
+}
 .badge-priority {
   background: linear-gradient(180deg, #d7e2f7 0%, #bfd0eb 100%);
   color: #26355a;
@@ -151,6 +155,10 @@
 [data-theme="dark"] .badge-cancelled {
   background: #2a1e3d;
   color: #a07ad4;
+}
+[data-theme="dark"] .badge-cancelling {
+  background: #3d1a08;
+  color: #e0824a;
 }
 [data-theme="dark"] .badge-priority {
   background: #1e2535;

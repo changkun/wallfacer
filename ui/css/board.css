@@ -163,6 +163,15 @@
 [data-theme="dark"] .card-cancelled-done {
   border-left-color: #a07ad4;
 }
+
+/* --- In-progress tasks with a pending cancel request --- */
+.card-cancelling {
+  border-left: 3px solid #d4621a;
+  opacity: 0.8;
+}
+[data-theme="dark"] .card-cancelling {
+  border-left-color: #e0824a;
+}
 .card-error-reason {
   margin-top: 6px;
   padding: 4px 6px;
