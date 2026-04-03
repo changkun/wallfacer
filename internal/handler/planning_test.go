@@ -372,8 +372,9 @@ func TestStreamPlanningMessages_LiveData(t *testing.T) {
 	if !strings.Contains(body, `{"result":"hello"}`) {
 		t.Errorf("response body missing data: %q", body)
 	}
-	if !strings.Contains(body, "event: done") {
-		t.Errorf("response body missing done event: %q", body)
+	// Plain text stream (no SSE framing).
+	if strings.Contains(body, "event:") {
+		t.Errorf("should not contain SSE framing: %q", body)
 	}
 }
 

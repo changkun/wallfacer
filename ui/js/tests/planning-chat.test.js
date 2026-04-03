@@ -111,12 +111,16 @@ function makeContext() {
     Promise,
     JSON,
     Event: class Event { constructor(type) { this.type = type; } },
-    EventSource: class EventSource {
-      constructor() { this.onmessage = null; this.onerror = null; }
-      addEventListener() {}
-      close() {}
-    },
     fetch: () => Promise.resolve(fetchResult),
+    startStreamingFetch: (opts) => {
+      // Don't auto-complete — tests control completion explicitly.
+      ctx._lastStreamOpts = opts;
+      return { abort: () => { if (opts.onDone) opts.onDone(false); } };
+    },
+    renderPrettyLogs: (raw) => "<pre>" + raw + "</pre>",
+    escapeHtml: (s) => s,
+    withAuthToken: (url) => url,
+    withBearerHeaders: () => ({}),
     Routes: {
       planning: {
         messages: () => "/api/planning/messages",
