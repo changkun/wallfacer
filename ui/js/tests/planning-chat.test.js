@@ -23,26 +23,58 @@ function makeEl(tag, registry) {
 
   const el = {
     tagName: tag,
-    get id() { return _id; },
-    set id(v) { _id = v; if (v) registry.set(v, el); },
+    get id() {
+      return _id;
+    },
+    set id(v) {
+      _id = v;
+      if (v) registry.set(v, el);
+    },
     disabled: false,
     value: "",
     style: {},
     dataset: {},
     parentElement: null,
     classList: {
-      add(c) { _classList.add(c); },
-      remove(c) { _classList.delete(c); },
-      toggle(c, force) { if (force) _classList.add(c); else _classList.delete(c); },
-      contains(c) { return _classList.has(c); },
+      add(c) {
+        _classList.add(c);
+      },
+      remove(c) {
+        _classList.delete(c);
+      },
+      toggle(c, force) {
+        if (force) _classList.add(c);
+        else _classList.delete(c);
+      },
+      contains(c) {
+        return _classList.has(c);
+      },
     },
-    get className() { return [..._classList].join(" "); },
-    set className(v) { _classList.clear(); v.split(/\s+/).filter(Boolean).forEach(c => _classList.add(c)); },
-    get innerHTML() { return _innerHTML; },
-    set innerHTML(v) { _innerHTML = v; },
-    get textContent() { return _textContent; },
-    set textContent(v) { _textContent = v; _innerHTML = v; },
-    get children() { return _children; },
+    get className() {
+      return [..._classList].join(" ");
+    },
+    set className(v) {
+      _classList.clear();
+      v.split(/\s+/)
+        .filter(Boolean)
+        .forEach((c) => _classList.add(c));
+    },
+    get innerHTML() {
+      return _innerHTML;
+    },
+    set innerHTML(v) {
+      _innerHTML = v;
+    },
+    get textContent() {
+      return _textContent;
+    },
+    set textContent(v) {
+      _textContent = v;
+      _innerHTML = v;
+    },
+    get children() {
+      return _children;
+    },
     appendChild(child) {
       child.parentElement = el;
       _children.push(child);
@@ -60,12 +92,13 @@ function makeEl(tag, registry) {
     },
     dispatchEvent(e) {
       const fns = _listeners[e.type] || [];
-      fns.forEach(fn => fn(e));
+      fns.forEach((fn) => fn(e));
     },
     querySelector(sel) {
       // Very basic: match class selector against children.
       for (const child of _children) {
-        if (sel.startsWith(".") && child.classList.contains(sel.slice(1))) return child;
+        if (sel.startsWith(".") && child.classList.contains(sel.slice(1)))
+          return child;
         const found = child.querySelector ? child.querySelector(sel) : null;
         if (found) return found;
       }
@@ -74,7 +107,8 @@ function makeEl(tag, registry) {
     querySelectorAll(sel) {
       const result = [];
       for (const child of _children) {
-        if (sel.startsWith(".") && child.classList.contains(sel.slice(1))) result.push(child);
+        if (sel.startsWith(".") && child.classList.contains(sel.slice(1)))
+          result.push(child);
       }
       return result;
     },
@@ -86,8 +120,14 @@ function makeEl(tag, registry) {
 function makeContext() {
   const registry = new Map();
   const ids = [
-    "spec-chat-stream", "spec-chat-messages", "spec-chat-input", "spec-chat-send",
-    "spec-chat-send-mode", "spec-chat-send-hint", "spec-chat-slash-hint", "spec-chat-at-hint",
+    "spec-chat-stream",
+    "spec-chat-messages",
+    "spec-chat-input",
+    "spec-chat-send",
+    "spec-chat-send-mode",
+    "spec-chat-send-hint",
+    "spec-chat-slash-hint",
+    "spec-chat-at-hint",
   ];
   for (const id of ids) {
     const el = makeEl("DIV", registry);
@@ -105,13 +145,22 @@ function makeContext() {
   const streamEl = registry.get("spec-chat-stream");
   composer.parentElement = streamEl;
 
-  let fetchResult = { status: 200, ok: true, json: () => Promise.resolve([]), text: () => Promise.resolve("") };
+  let fetchResult = {
+    status: 200,
+    ok: true,
+    json: () => Promise.resolve([]),
+    text: () => Promise.resolve(""),
+  };
   let apiResult = [];
 
   const ctx = {
     document: {
-      getElementById(id) { return registry.get(id) || null; },
-      createElement(tag) { return makeEl(tag, registry); },
+      getElementById(id) {
+        return registry.get(id) || null;
+      },
+      createElement(tag) {
+        return makeEl(tag, registry);
+      },
       addEventListener() {},
       querySelector(sel) {
         if (sel === ".spec-chat-composer") return composer;
@@ -122,9 +171,15 @@ function makeContext() {
     navigator: { platform: "MacIntel" },
     localStorage: {
       _data: {},
-      getItem(k) { return this._data[k] || null; },
-      setItem(k, v) { this._data[k] = v; },
-      removeItem(k) { delete this._data[k]; },
+      getItem(k) {
+        return this._data[k] || null;
+      },
+      setItem(k, v) {
+        this._data[k] = v;
+      },
+      removeItem(k) {
+        delete this._data[k];
+      },
     },
     console,
     setTimeout,
@@ -133,12 +188,20 @@ function makeContext() {
     clearInterval: () => {},
     Promise,
     JSON,
-    Event: class Event { constructor(type) { this.type = type; } },
+    Event: class Event {
+      constructor(type) {
+        this.type = type;
+      }
+    },
     fetch: () => Promise.resolve(fetchResult),
     startStreamingFetch: (opts) => {
       // Don't auto-complete — tests control completion explicitly.
       ctx._lastStreamOpts = opts;
-      return { abort: () => { if (opts.onDone) opts.onDone(false); } };
+      return {
+        abort: () => {
+          if (opts.onDone) opts.onDone(false);
+        },
+      };
     },
     renderPrettyLogs: (raw) => "<pre>" + raw + "</pre>",
     escapeHtml: (s) => s,
@@ -156,8 +219,13 @@ function makeContext() {
     api: () => Promise.resolve(apiResult),
     renderMarkdown: (text) => "<p>" + text + "</p>",
     specModeState: { focusedSpecPath: "" },
-    _setFetchResult(r) { fetchResult = r; },
-    _setApiResult(r) { apiResult = r; ctx.api = () => Promise.resolve(r); },
+    _setFetchResult(r) {
+      fetchResult = r;
+    },
+    _setApiResult(r) {
+      apiResult = r;
+      ctx.api = () => Promise.resolve(r);
+    },
   };
 
   vm.createContext(ctx);
@@ -185,9 +253,12 @@ describe("PlanningChat", () => {
 
   it("init loads history via api call", async () => {
     let apiCalled = false;
-    ctx.api = () => { apiCalled = true; return Promise.resolve([]); };
+    ctx.api = () => {
+      apiCalled = true;
+      return Promise.resolve([]);
+    };
     ctx.PlanningChat.init();
-    await new Promise(r => ctx.setTimeout(r, 10));
+    await new Promise((r) => ctx.setTimeout(r, 10));
     expect(apiCalled).toBe(true);
   });
 
@@ -197,7 +268,11 @@ describe("PlanningChat", () => {
       if (opts && opts.method === "POST") {
         postBody = JSON.parse(opts.body);
       }
-      return Promise.resolve({ status: 202, ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({
+        status: 202,
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
     };
     ctx.PlanningChat.init();
     await ctx.PlanningChat.sendMessage("hello world");
@@ -212,7 +287,11 @@ describe("PlanningChat", () => {
       if (opts && opts.method === "POST") {
         postBody = JSON.parse(opts.body);
       }
-      return Promise.resolve({ status: 202, ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({
+        status: 202,
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
     };
     ctx.PlanningChat.init();
     await ctx.PlanningChat.sendMessage("summarize");
@@ -224,7 +303,11 @@ describe("PlanningChat", () => {
     ctx.api = (url) => {
       if (url.includes("commands")) commandsFetched = true;
       return Promise.resolve([
-        { name: "summarize", description: "Summarize spec", usage: "/summarize [words]" },
+        {
+          name: "summarize",
+          description: "Summarize spec",
+          usage: "/summarize [words]",
+        },
       ]);
     };
     ctx.PlanningChat.init();
@@ -234,7 +317,7 @@ describe("PlanningChat", () => {
     input.value = "/sum";
     input.dispatchEvent(new ctx.Event("input"));
 
-    await new Promise(r => ctx.setTimeout(r, 50));
+    await new Promise((r) => ctx.setTimeout(r, 50));
     expect(commandsFetched).toBe(true);
   });
 

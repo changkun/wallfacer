@@ -131,7 +131,6 @@ async function loadDoc(slug) {
   }
 }
 
-
 // Append previous/next navigation bar for ordered docs (guide or internals).
 function _appendDocNav(container, currentSlug) {
   // Determine the category of the current slug.

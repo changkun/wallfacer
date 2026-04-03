@@ -45,7 +45,10 @@ var PlanningChat = (function () {
 
     // Attach @-mention file autocomplete.
     if (typeof attachMentionAutocomplete === "function") {
-      attachMentionAutocomplete(_input, { position: "above", priorityPrefix: "specs/" });
+      attachMentionAutocomplete(_input, {
+        position: "above",
+        priorityPrefix: "specs/",
+      });
     }
 
     // Wire clear button.
@@ -86,7 +89,8 @@ var PlanningChat = (function () {
 
     // Create interrupt button (hidden by default), placed in the send group.
     _interruptBtn = document.createElement("button");
-    _interruptBtn.className = "spec-chat-composer__send planning-chat-interrupt-btn";
+    _interruptBtn.className =
+      "spec-chat-composer__send planning-chat-interrupt-btn";
     _interruptBtn.innerHTML = "&#x25A0;"; // stop square
     _interruptBtn.title = "Interrupt";
     _interruptBtn.style.display = "none";
@@ -108,7 +112,9 @@ var PlanningChat = (function () {
     // The scrollable element is _messagesEl, not the outer _streamEl container.
     if (_messagesEl) {
       _messagesEl.addEventListener("scroll", function () {
-        _userScrolledUp = _messagesEl.scrollTop + _messagesEl.clientHeight < _messagesEl.scrollHeight - 40;
+        _userScrolledUp =
+          _messagesEl.scrollTop + _messagesEl.clientHeight <
+          _messagesEl.scrollHeight - 40;
       });
     }
 
@@ -123,7 +129,11 @@ var PlanningChat = (function () {
 
     // If user presses arrow key while typing a slash command but autocomplete
     // hasn't rendered yet, trigger it synchronously from cache.
-    if (!_autocompleteEl && _input.value.startsWith("/") && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    if (
+      !_autocompleteEl &&
+      _input.value.startsWith("/") &&
+      (e.key === "ArrowDown" || e.key === "ArrowUp")
+    ) {
       _showAutocompleteSync(_input.value);
     }
 
@@ -138,7 +148,8 @@ var PlanningChat = (function () {
       if (e.key === "ArrowUp") {
         e.preventDefault();
         var len2 = _autocompleteEl.children.length;
-        _autocompleteIndex = len2 > 0 ? (_autocompleteIndex - 1 + len2) % len2 : 0;
+        _autocompleteIndex =
+          len2 > 0 ? (_autocompleteIndex - 1 + len2) % len2 : 0;
         _highlightAutocomplete();
         return;
       }
@@ -174,7 +185,8 @@ var PlanningChat = (function () {
 
   function _updateSendHint(hintEl) {
     if (!hintEl) return;
-    var isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+    var isMac =
+      typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
     var mod = isMac ? "\u2318" : "Ctrl";
     if (_sendMode === "cmd-enter") {
       hintEl.textContent = mod + "+Return to send";
@@ -274,7 +286,8 @@ var PlanningChat = (function () {
     var contentEl = bubble.querySelector(".planning-chat-bubble__content");
     // Show thinking indicator until first content arrives.
     if (contentEl) {
-      contentEl.innerHTML = '<span class="planning-chat-thinking"><span class="planning-chat-thinking__dots"><span>.</span><span>.</span><span>.</span></span></span>';
+      contentEl.innerHTML =
+        '<span class="planning-chat-thinking"><span class="planning-chat-thinking__dots"><span>.</span><span>.</span><span>.</span></span></span>';
     }
     _scrollToBottom();
     var rawBuffer = "";
@@ -290,7 +303,10 @@ var PlanningChat = (function () {
           rawBuffer += chunk;
           assistantText = _extractAssistantText(rawBuffer);
           if (contentEl) {
-            if (!receivedContent && (assistantText || _hasToolActivity(rawBuffer))) {
+            if (
+              !receivedContent &&
+              (assistantText || _hasToolActivity(rawBuffer))
+            ) {
               receivedContent = true;
             }
             if (receivedContent) {
@@ -391,7 +407,10 @@ var PlanningChat = (function () {
     var html = "";
     var errorMsg = _extractError(rawBuffer);
     if (errorMsg) {
-      html += '<div class="planning-chat-error">' + _escapeForHtml(errorMsg) + "</div>";
+      html +=
+        '<div class="planning-chat-error">' +
+        _escapeForHtml(errorMsg) +
+        "</div>";
     }
     if (text) {
       html += renderMarkdown(text);
@@ -400,7 +419,9 @@ var PlanningChat = (function () {
     if (_hasToolActivity(rawBuffer) && typeof renderPrettyLogs === "function") {
       var openAttr = streaming ? " open" : "";
       html +=
-        '<details class="planning-chat-activity"' + openAttr + '><summary>Agent activity</summary>' +
+        '<details class="planning-chat-activity"' +
+        openAttr +
+        "><summary>Agent activity</summary>" +
         '<div class="planning-chat-activity__log">' +
         renderPrettyLogs(rawBuffer) +
         "</div></details>";
@@ -480,12 +501,13 @@ var PlanningChat = (function () {
 
   function _createBubble(role) {
     var bubble = document.createElement("div");
-    bubble.className =
-      "planning-chat-bubble planning-chat-bubble--" + role;
+    bubble.className = "planning-chat-bubble planning-chat-bubble--" + role;
     var contentClass = "planning-chat-bubble__content";
     if (role === "assistant") contentClass += " prose-content";
     bubble.innerHTML =
-      '<div class="' + contentClass + '"></div>' +
+      '<div class="' +
+      contentClass +
+      '"></div>' +
       '<div class="planning-chat-bubble__time"></div>';
     return bubble;
   }
@@ -556,7 +578,7 @@ var PlanningChat = (function () {
       _autocompleteEl.style.position = "fixed";
       _autocompleteEl.style.left = rect.left + "px";
       _autocompleteEl.style.width = Math.max(320, rect.width) + "px";
-      _autocompleteEl.style.bottom = (window.innerHeight - rect.top + 4) + "px";
+      _autocompleteEl.style.bottom = window.innerHeight - rect.top + 4 + "px";
       _autocompleteEl.style.top = "auto";
       document.body.appendChild(_autocompleteEl);
     }
@@ -599,8 +621,11 @@ var PlanningChat = (function () {
       );
     }
     // Scroll active item into view.
-    if (_autocompleteIndex >= 0 && items[_autocompleteIndex] &&
-        typeof items[_autocompleteIndex].scrollIntoView === "function") {
+    if (
+      _autocompleteIndex >= 0 &&
+      items[_autocompleteIndex] &&
+      typeof items[_autocompleteIndex].scrollIntoView === "function"
+    ) {
       items[_autocompleteIndex].scrollIntoView({ block: "nearest" });
     }
   }
@@ -639,12 +664,16 @@ var PlanningChat = (function () {
   }
 
   function _removeFromQueue(id) {
-    _queue = _queue.filter(function (item) { return item.id !== id; });
+    _queue = _queue.filter(function (item) {
+      return item.id !== id;
+    });
     _renderQueue();
   }
 
   function _editQueueItem(id) {
-    var item = _queue.find(function (q) { return q.id === id; });
+    var item = _queue.find(function (q) {
+      return q.id === id;
+    });
     if (!item || !_queueEl) return;
 
     // Find the chip element and replace with an input.

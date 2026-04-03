@@ -48,7 +48,12 @@ function _mentionFilter(files, query, priorityPrefix) {
     let score = 2;
     // Check if the path contains the priority prefix anywhere (not just at start),
     // because file paths are prefixed with the workspace basename (e.g. "repo/specs/...").
-    if (priorityPrefix && (fl.startsWith(priorityPrefix.toLowerCase()) || fl.includes("/" + priorityPrefix.toLowerCase()))) score -= 2;
+    if (
+      priorityPrefix &&
+      (fl.startsWith(priorityPrefix.toLowerCase()) ||
+        fl.includes("/" + priorityPrefix.toLowerCase()))
+    )
+      score -= 2;
     if (!lower || base.includes(lower)) score -= 1;
     scored.push({ f, score, idx: i });
   }
@@ -121,7 +126,7 @@ function attachMentionAutocomplete(textarea, opts) {
     dropdown.style.left = rect.left + "px";
     dropdown.style.width = Math.max(320, rect.width) + "px";
     if (position === "above") {
-      dropdown.style.bottom = (window.innerHeight - rect.top + 4) + "px";
+      dropdown.style.bottom = window.innerHeight - rect.top + 4 + "px";
       dropdown.style.top = "auto";
     } else {
       dropdown.style.top = rect.bottom + 4 + "px";
@@ -200,12 +205,18 @@ function attachMentionAutocomplete(textarea, opts) {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      selectedIndex = currentMatches.length > 0 ? (selectedIndex + 1) % currentMatches.length : 0;
+      selectedIndex =
+        currentMatches.length > 0
+          ? (selectedIndex + 1) % currentMatches.length
+          : 0;
       renderItems(currentMatches);
       _scrollSelectedIntoView(dropdown, selectedIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      selectedIndex = currentMatches.length > 0 ? (selectedIndex - 1 + currentMatches.length) % currentMatches.length : 0;
+      selectedIndex =
+        currentMatches.length > 0
+          ? (selectedIndex - 1 + currentMatches.length) % currentMatches.length
+          : 0;
       renderItems(currentMatches);
       _scrollSelectedIntoView(dropdown, selectedIndex);
     } else if ((e.key === "Enter" || e.key === "Tab") && selectedIndex >= 0) {

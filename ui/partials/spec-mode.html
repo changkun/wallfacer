@@ -31,8 +31,20 @@
     <div class="spec-chat-stream__header">
       <span class="spec-chat-stream__title">Planning Chat</span>
       <span class="spec-chat-stream__header-actions">
-        <button id="spec-chat-clear" class="spec-chat-clear-btn" title="Clear conversation">Clear</button>
-        <button class="spec-chat-fold-btn" onclick="toggleSpecChat()" title="Hide chat (C)">&#x2715;</button>
+        <button
+          id="spec-chat-clear"
+          class="spec-chat-clear-btn"
+          title="Clear conversation"
+        >
+          Clear
+        </button>
+        <button
+          class="spec-chat-fold-btn"
+          onclick="toggleSpecChat()"
+          title="Hide chat (C)"
+        >
+          &#x2715;
+        </button>
       </span>
     </div>
     <div id="spec-chat-messages" class="spec-chat-stream__messages"></div>
@@ -45,14 +57,37 @@
       ></textarea>
       <div class="spec-chat-composer__bar">
         <div class="spec-chat-composer__actions">
-          <button id="spec-chat-slash-hint" class="spec-chat-composer__action" title="Slash commands">/</button>
-          <button id="spec-chat-at-hint" class="spec-chat-composer__action" title="Mention a file">@</button>
+          <button
+            id="spec-chat-slash-hint"
+            class="spec-chat-composer__action"
+            title="Slash commands"
+          >
+            /
+          </button>
+          <button
+            id="spec-chat-at-hint"
+            class="spec-chat-composer__action"
+            title="Mention a file"
+          >
+            @
+          </button>
         </div>
         <div class="spec-chat-composer__right">
-          <span id="spec-chat-send-hint" class="spec-chat-composer__hint"></span>
+          <span
+            id="spec-chat-send-hint"
+            class="spec-chat-composer__hint"
+          ></span>
           <div class="spec-chat-send-group">
-            <button id="spec-chat-send" class="spec-chat-composer__send">&#x27A4;</button>
-            <button id="spec-chat-send-mode" class="spec-chat-composer__send-toggle" title="Toggle send shortcut">&#x25BE;</button>
+            <button id="spec-chat-send" class="spec-chat-composer__send">
+              &#x27A4;
+            </button>
+            <button
+              id="spec-chat-send-mode"
+              class="spec-chat-composer__send-toggle"
+              title="Toggle send shortcut"
+            >
+              &#x25BE;
+            </button>
           </div>
         </div>
       </div>
