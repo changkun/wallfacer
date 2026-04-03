@@ -454,3 +454,28 @@ func TestTestVerification_NoCriteria(t *testing.T) {
 		t.Error("TestVerification without criteria returned empty string")
 	}
 }
+
+// TestRenderPlanning verifies that the planning template renders without error
+// and contains key phrases.
+func TestRenderPlanning(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.Planning()
+	if strings.TrimSpace(got) == "" {
+		t.Error("Planning returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("Planning returned unreplaced template syntax: %q", got)
+	}
+	for _, phrase := range []string{"spec", "planning", "specs/"} {
+		if !strings.Contains(strings.ToLower(got), phrase) {
+			t.Errorf("Planning output missing expected phrase %q", phrase)
+		}
+	}
+}
+
+func TestPackageLevelPlanning_NonEmpty(t *testing.T) {
+	got := prompts.Planning()
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.Planning() returned empty string")
+	}
+}

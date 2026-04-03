@@ -80,6 +80,7 @@ var embeddedToAPI = map[string]string{
 	"conflict.tmpl":     "conflict_resolution",
 	"test.tmpl":         "test_verification",
 	"instructions.tmpl": "instructions",
+	"planning.tmpl":     "planning",
 }
 
 // apiToEmbedded maps user-facing API names to embedded template file names.
@@ -92,6 +93,7 @@ var apiToEmbedded = map[string]string{
 	"conflict_resolution": "conflict.tmpl",
 	"test_verification":   "test.tmpl",
 	"instructions":        "instructions.tmpl",
+	"planning":            "planning.tmpl",
 }
 
 // knownNames is the ordered list of all user-facing template API names.
@@ -104,6 +106,7 @@ var knownNames = []string{
 	"conflict_resolution",
 	"test_verification",
 	"instructions",
+	"planning",
 }
 
 // Manager manages the eight built-in prompt templates with optional
@@ -278,6 +281,8 @@ func mockContextFor(apiName string) (interface{}, bool) {
 			Workspaces:          []InstructionsWorkspace{{Name: "example-repo"}},
 			RepoInstructionRefs: []InstructionsRepoRef{{Workspace: "example-repo", Filename: "AGENTS.md"}},
 		}, true
+	case "planning":
+		return nil, true
 	default:
 		return nil, false
 	}
@@ -455,6 +460,9 @@ func (m *Manager) TestVerification(d TestData) string { return m.render("test.tm
 // Instructions renders the workspace instructions (AGENTS.md) content.
 func (m *Manager) Instructions(d InstructionsData) string { return m.render("instructions.tmpl", d) }
 
+// Planning renders the planning agent system prompt.
+func (m *Manager) Planning() string { return m.render("planning.tmpl", nil) }
+
 // --- Package-level functions (delegate to Default for backward compatibility) ---
 
 // Refinement renders the spec-writing agent prompt.
@@ -481,3 +489,6 @@ func TestVerification(d TestData) string { return Default.TestVerification(d) }
 
 // Instructions renders the workspace instructions (AGENTS.md) content.
 func Instructions(d InstructionsData) string { return Default.Instructions(d) }
+
+// Planning renders the planning agent system prompt.
+func Planning() string { return Default.Planning() }
