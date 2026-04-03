@@ -504,7 +504,6 @@
   margin-left: auto;
 }
 
-
 /* ===== Spec Minimap ===== */
 
 .spec-minimap {
@@ -553,4 +552,3 @@
 .spec-minimap__resize:hover {
   background: var(--accent);
 }
-
