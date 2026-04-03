@@ -64,23 +64,11 @@ wallfacer doctor                        # Check prerequisites and config
 
 ### 📐 Spec Mode
 
-Press **S** to toggle between the Board view and Spec Mode. Spec Mode provides a three-pane layout:
-
-1. **Explorer** (left) -- a tree of all specs under `specs/`, showing status badges and track grouping
-2. **Focused View** (center) -- the rendered content of the selected spec with a dependency minimap
-3. **Chat** (right) -- the planning chat pane for conversational spec iteration
-
-Toggle individual panes: press **C** to show/hide the chat pane, **E** to show/hide the explorer. Deep-link to a specific spec via `#spec/<path>` in the URL (e.g., `#spec/specs/local/live-serve.md`).
+See [Designing Specs](designing-specs.md) for the full spec mode guide.
 
 ### 💬 Planning Chat
 
-The planning chat provides conversational spec iteration powered by a sandbox agent. Key behaviors:
-
-- **Auto-start** -- The planning sandbox container starts automatically on your first message. No manual setup is required.
-- **Persistence** -- Conversation history is persisted in `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace set (same fingerprinting as AGENTS.md).
-- **Session recovery** -- If the planning container is recreated (e.g., after a server restart), the conversation history is restored and the agent resumes with full context.
-
-The planning agent supports slash commands: `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`. Use `@` mentions to reference specs or tasks by name.
+See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
 
 ### ⌨️ Keyboard Shortcuts
 

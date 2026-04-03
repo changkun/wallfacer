@@ -117,13 +117,14 @@ Development is organized into three parallel tracks with shared foundations. See
 | # | Guide | Topics |
 |---|-------|--------|
 | 1 | [Getting Started](docs/guide/getting-started.md) | Installation, credentials, first run |
-| 2 | [Board & Tasks](docs/guide/board-and-tasks.md) | Kanban board, task lifecycle, dependencies, search |
-| 3 | [Workspaces & Git](docs/guide/workspaces.md) | Workspace management, git integration, branches |
-| 4 | [Automation](docs/guide/automation.md) | Autopilot, auto-test, auto-submit, auto-retry |
-| 5 | [Refinement & Ideation](docs/guide/refinement-and-ideation.md) | Prompt refinement, brainstorm agent |
-| 6 | [Oversight & Analytics](docs/guide/oversight-and-analytics.md) | Oversight summaries, costs, timeline |
-| 7 | [Configuration](docs/guide/configuration.md) | Settings, env vars, sandboxes, CLI |
-| 8 | [Circuit Breakers](docs/guide/circuit-breakers.md) | Fault isolation, self-healing automation |
+| 2 | [The Autonomy Spectrum](docs/guide/autonomy-spectrum.md) | Mental model: chat, spec, task, code |
+| 3 | [Exploring Ideas](docs/guide/exploring-ideas.md) | Planning chat, slash commands, @mentions |
+| 4 | [Designing Specs](docs/guide/designing-specs.md) | Spec mode, focused view, dependency minimap |
+| 5 | [Executing Tasks](docs/guide/board-and-tasks.md) | Task board, lifecycle, dependencies, search |
+| 6 | [Automation & Control](docs/guide/automation.md) | Autopilot, auto-test, auto-retry, circuit breakers |
+| 7 | [Oversight & Analytics](docs/guide/oversight-and-analytics.md) | Oversight summaries, costs, timeline, logs |
+| 8 | [Workspaces & Git](docs/guide/workspaces.md) | Workspace management, git integration, branches |
+| 9 | [Configuration](docs/guide/configuration.md) | Settings, env vars, sandboxes, CLI, shortcuts |
 
 **[Technical Internals](docs/internals/internals.md)** — start here for implementation details and architecture.
 

@@ -1,0 +1,124 @@
+# Designing Specs
+
+Specs are structured design documents that bridge ideas and executable tasks. Each spec is a markdown file with YAML frontmatter that tracks lifecycle state, dependencies, affected code paths, and effort estimates. Specs live in `specs/` and are organized by track.
+
+---
+
+## Essentials
+
+### What is a Spec?
+
+A spec describes a piece of work at the design level. Unlike a task prompt (which tells an agent what to implement), a spec captures the why, the constraints, the dependencies, and the acceptance criteria. Specs can be high-level (describing an entire feature) or leaf-level (describing a single implementable unit ready for dispatch).
+
+### Spec Mode
+
+Press **S** to toggle between the Board view and the Spec view. Spec mode uses a three-pane layout:
+
+- **Left pane** -- spec explorer (file tree)
+- **Center pane** -- focused spec view (rendered content)
+- **Right pane** -- planning chat (toggleable with **C**)
+
+### Spec Explorer
+
+The explorer shows all specs organized by track directory:
+
+| Track | Purpose |
+|---|---|
+| `specs/foundations/` | Completed abstraction interfaces (sandbox, storage, file explorer, terminal) |
+| `specs/local/` | Local product and UX features |
+| `specs/cloud/` | Cloud platform features (multi-tenant, K8s) |
+| `specs/shared/` | Cross-track specs (authentication, agent abstraction) |
+
+Each spec entry displays a status badge indicating its lifecycle state. Non-leaf specs (those with children) show a progress indicator reflecting how many of their leaf descendants are complete.
+
+Click a folder to expand or collapse it. Click a spec file to focus it in the center pane.
+
+### Focused View
+
+Clicking a spec in the explorer opens it in the center pane. The content is rendered as formatted markdown with:
+
+- Syntax-highlighted code blocks
+- Mermaid diagram rendering
+- Table of contents navigation
+- YAML frontmatter displayed as a structured header
+
+### Breaking Down Specs
+
+Large specs can be decomposed into smaller child specs. Press **B** or use `/break-down` in the planning chat. The agent analyzes the parent spec and creates child specs in a subdirectory named after the parent file. Each child gets its own frontmatter, dependencies, and acceptance criteria.
+
+### Dispatching to the Board
+
+When a leaf spec is validated and ready for implementation, press **D** or use `/dispatch` in the chat. This creates a task on the kanban board with the spec's content as the prompt. The spec's `dispatched_task_id` field is updated to link back to the created task.
+
+---
+
+## Advanced Topics
+
+### Spec Frontmatter
+
+Every spec requires valid YAML frontmatter. The required fields are:
+
+```yaml
+---
+title: Human-readable title
+status: drafted          # vague | drafted | validated | complete | stale
+depends_on:              # list of spec paths this one requires
+  - specs/shared/agent-abstraction.md
+affects:                 # packages and files this spec will modify
+  - internal/runner/
+effort: large            # small | medium | large | xlarge
+created: 2026-04-01      # ISO date
+updated: 2026-04-01      # ISO date, must be >= created
+author: changkun
+dispatched_task_id: null  # null or UUID (leaf specs only)
+---
+```
+
+The spec document model (`specs/local/spec-coordination/spec-document-model.md`) defines the full schema and validation rules.
+
+### Dependency DAG
+
+Specs declare dependencies via the `depends_on` field, which lists paths to prerequisite specs. The resulting dependency graph must be a directed acyclic graph (DAG) -- circular dependencies are rejected.
+
+The minimap at the bottom of the explorer visualizes the DAG, showing which specs block others and where the critical path lies.
+
+### Status Lifecycle
+
+Specs progress through a defined lifecycle:
+
+| Status | Meaning |
+|---|---|
+| `vague` | Initial idea, not yet fleshed out |
+| `drafted` | Written up with structure, but not yet reviewed or validated |
+| `validated` | Reviewed, dependencies checked, ready for implementation or dispatch |
+| `complete` | Fully implemented and verified |
+| `stale` | Overtaken by events or no longer relevant |
+
+Any status can transition to `stale`. Leaf specs should reach `validated` before being dispatched to the task board.
+
+### Progress Tracking
+
+Non-leaf specs aggregate progress from their entire subtree. A spec with six leaf descendants, four of which are complete, displays "4/6 leaves done". This recursive rollup gives you a quick read on how much of a large feature is finished without opening each child.
+
+### Deep Linking
+
+Use `#spec/<path>` in the URL to link directly to a spec. For example, `http://localhost:8080/#spec/specs/local/live-serve.md` opens the app in spec mode with that file focused.
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| **S** | Toggle between Board and Spec mode |
+| **E** | Toggle the spec explorer pane |
+| **C** | Toggle the planning chat pane |
+| **D** | Dispatch the focused spec to the task board |
+| **B** | Break down the focused spec into children |
+
+---
+
+## See Also
+
+- [The Autonomy Spectrum](autonomy-spectrum.md) -- where specs fit in the overall workflow
+- [Exploring Ideas](exploring-ideas.md) -- the planning chat for conversational exploration
+- [Board & Tasks](board-and-tasks.md) -- the task board where dispatched specs are executed
+- [Spec Mode](spec-mode.md) -- additional spec explorer and UI reference
