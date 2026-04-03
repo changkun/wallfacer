@@ -83,6 +83,15 @@ var PlanningChat = (function () {
       _input.parentElement.appendChild(_queueEl);
     }
 
+    // Track scroll position to suppress auto-scroll when user reads history.
+    if (_streamEl) {
+      _streamEl.addEventListener("scroll", function () {
+        var el = _streamEl;
+        // Consider "at bottom" if within 40px of the end.
+        _userScrolledUp = el.scrollTop + el.clientHeight < el.scrollHeight - 40;
+      });
+    }
+
     _loadHistory();
     _fetchCommands(); // pre-fetch so autocomplete is instant
   }
@@ -197,9 +206,10 @@ var PlanningChat = (function () {
     _input.style.height = "auto";
     _closeAutocomplete();
 
-    // Render user message immediately.
+    // Render user message immediately and force-scroll to show it.
     _appendMessageBubble("user", text, new Date().toISOString());
-    _scrollToBottom();
+    _userScrolledUp = false;
+    _scrollToBottom(true);
 
     // Get focused spec from spec mode state.
     var focusedSpec = "";
@@ -444,8 +454,13 @@ var PlanningChat = (function () {
     _scrollToBottom();
   }
 
-  function _scrollToBottom() {
-    if (_streamEl) {
+  // _userScrolledUp is true when the user has manually scrolled away from
+  // the bottom. Auto-scroll is suppressed until they scroll back down.
+  var _userScrolledUp = false;
+
+  function _scrollToBottom(force) {
+    if (!_streamEl) return;
+    if (force || !_userScrolledUp) {
       _streamEl.scrollTop = _streamEl.scrollHeight;
     }
   }
