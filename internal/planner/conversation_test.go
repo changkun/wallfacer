@@ -453,3 +453,68 @@ func TestLoadSession_CorruptJSON(t *testing.T) {
 		t.Error("expected error for corrupt session JSON")
 	}
 }
+
+func TestLoadSession_ReadError(t *testing.T) {
+	cs := newTestStore(t)
+	// Make the session file a directory to trigger a read error.
+	path := filepath.Join(cs.dir, sessionFile)
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := cs.LoadSession()
+	if err == nil {
+		t.Error("expected error when session file is a directory")
+	}
+}
+
+func TestNewConversationStore_MkdirError(t *testing.T) {
+	// Use a file path as the config dir to trigger MkdirAll failure.
+	tmpFile := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(tmpFile, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := NewConversationStore(tmpFile, "fp")
+	if err == nil {
+		t.Error("expected error when config dir path is a file")
+	}
+}
+
+func TestMessages_OpenError(t *testing.T) {
+	cs := newTestStore(t)
+	// Make the messages file a directory to trigger open error.
+	path := filepath.Join(cs.dir, messagesFile)
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := cs.Messages()
+	if err == nil {
+		t.Error("expected error when messages file is a directory")
+	}
+}
+
+func TestAppendMessage_OpenError(t *testing.T) {
+	cs := newTestStore(t)
+	// Make the messages file a directory to trigger open error.
+	path := filepath.Join(cs.dir, messagesFile)
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := cs.AppendMessage(Message{Role: "user", Content: "test", Timestamp: time.Now()})
+	if err == nil {
+		t.Error("expected error when messages file is a directory")
+	}
+}
+
+func TestClear_RemoveError(t *testing.T) {
+	cs := newTestStore(t)
+	// Create a subdirectory named as the messages file to trigger Remove error.
+	path := filepath.Join(cs.dir, messagesFile)
+	subDir := filepath.Join(path, "subfile")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := cs.Clear()
+	if err == nil {
+		t.Error("expected error when messages file is a non-empty directory")
+	}
+}
