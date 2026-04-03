@@ -365,18 +365,24 @@ function _buildSpecToc(bodyEl) {
   _setupTocExclusion();
 }
 
-// --- TOC exclusion zone ---
-// Dynamically sets margin-right on body block elements that vertically
-// overlap the TOC so text reflows around it as the user scrolls.
+// --- TOC exclusion zone (Pretext-powered) ---
+// Uses @chenglou/pretext (vendored at js/vendor/pretext.min.js) to predict
+// paragraph heights at narrowed widths without touching the DOM, then
+// simulates block layout top-down per scroll frame to determine which
+// elements overlap the TOC.
+// For tables, max-width is used instead of margin-right.
 
 var _tocExclusionRaf = null;
 var _tocExclusionHandler = null;
+var _tocExclusion = null; // prepared data for the current spec
 
 function _setupTocExclusion() {
   var bodyEl = document.getElementById("spec-focused-body");
-  if (!bodyEl) return;
+  var toc = document.getElementById("spec-toc");
+  if (!bodyEl || !toc) return;
 
-  // Run once immediately, then on every scroll.
+  var pt = window.pretext || null;
+  _buildExclusionData(pt, bodyEl, toc);
   _applyTocExclusion();
   _tocExclusionHandler = function () {
     if (_tocExclusionRaf) return;
@@ -388,44 +394,146 @@ function _setupTocExclusion() {
   bodyEl.addEventListener("scroll", _tocExclusionHandler);
 }
 
-function _teardownTocExclusion() {
-  var bodyEl = document.getElementById("spec-focused-body");
-  if (bodyEl && _tocExclusionHandler) {
-    bodyEl.removeEventListener("scroll", _tocExclusionHandler);
+function _buildExclusionData(pt, bodyEl, toc) {
+  var blocks = bodyEl.querySelectorAll(":scope > *");
+  if (blocks.length === 0) return;
+
+  var tocW = toc.offsetWidth + 24;
+  var bodyCS = getComputedStyle(bodyEl);
+  var padL = parseFloat(bodyCS.paddingLeft) || 0;
+  var padR = parseFloat(bodyCS.paddingRight) || 0;
+  var padT = parseFloat(bodyCS.paddingTop) || 0;
+  var fullWidth = bodyEl.clientWidth - padL - padR;
+  var narrowWidth = Math.max(fullWidth - tocW, 80);
+
+  // TOC position relative to bodyEl's top edge (constant across scrolls).
+  var tocRect = toc.getBoundingClientRect();
+  var bodyRect = bodyEl.getBoundingClientRect();
+  var tocBodyTop = tocRect.top - bodyRect.top;
+  var tocBodyBottom = tocRect.bottom - bodyRect.top;
+
+  // Snapshot initial element positions and compute predicted heights.
+  var items = [];
+  for (var i = 0; i < blocks.length; i++) {
+    var block = blocks[i];
+    var rect = block.getBoundingClientRect();
+    var contentY = rect.top - bodyRect.top + bodyEl.scrollTop - padT;
+    var heightFull = rect.height;
+    var isTable = block.tagName === "TABLE";
+    var isText = block.tagName === "P" || /^H[1-6]$/.test(block.tagName);
+    var heightNarrow;
+
+    if (isText && pt) {
+      // Use Pretext: predict height at both widths, derive the non-text
+      // overhead (padding, border) from the difference.
+      var cs = getComputedStyle(block);
+      var font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+      var lh = parseFloat(cs.lineHeight);
+      if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.7;
+      try {
+        var prepared = pt.prepare(block.textContent || "", font);
+        var textHeightFull = pt.layout(prepared, fullWidth, lh).height;
+        var textHeightNarrow = pt.layout(prepared, narrowWidth, lh).height;
+        var overhead = heightFull - textHeightFull;
+        if (overhead < 0) overhead = 0;
+        heightNarrow = textHeightNarrow + overhead;
+      } catch (_e) {
+        heightNarrow = heightFull;
+      }
+    } else {
+      // DOM measurement: temporarily apply the constraint, read height, revert.
+      if (isTable) {
+        var origMW = block.style.maxWidth;
+        block.style.maxWidth = narrowWidth + "px";
+        heightNarrow = block.getBoundingClientRect().height;
+        block.style.maxWidth = origMW;
+      } else {
+        var origMR = block.style.marginRight;
+        block.style.marginRight = tocW + "px";
+        heightNarrow = block.getBoundingClientRect().height;
+        block.style.marginRight = origMR;
+      }
+    }
+
+    items.push({
+      el: block,
+      contentY: contentY,
+      heightFull: heightFull,
+      heightNarrow: heightNarrow,
+      isTable: isTable,
+    });
   }
-  _tocExclusionHandler = null;
-  if (_tocExclusionRaf) {
-    cancelAnimationFrame(_tocExclusionRaf);
-    _tocExclusionRaf = null;
+
+  // Derive gaps between consecutive elements from the initial layout.
+  for (var j = 0; j < items.length; j++) {
+    if (j === 0) {
+      items[j].gap = items[j].contentY;
+    } else {
+      var prevEnd = items[j - 1].contentY + items[j - 1].heightFull;
+      items[j].gap = Math.max(0, items[j].contentY - prevEnd);
+    }
   }
-  // Clear any residual margins.
-  if (bodyEl) {
-    var blocks = bodyEl.querySelectorAll(":scope > *");
-    for (var i = 0; i < blocks.length; i++) {
-      blocks[i].style.marginRight = "";
+
+  _tocExclusion = {
+    items: items,
+    tocWidth: tocW,
+    narrowWidth: narrowWidth,
+    tocBodyTop: tocBodyTop,
+    tocBodyBottom: tocBodyBottom,
+    bodyPadTop: padT,
+    bodyEl: bodyEl,
+  };
+}
+
+function _applyTocExclusion() {
+  if (!_tocExclusion) return;
+  var d = _tocExclusion;
+  var scrollTop = d.bodyEl.scrollTop;
+
+  // TOC zone in content-space coordinates.
+  var tocTop = scrollTop + d.tocBodyTop - d.bodyPadTop;
+  var tocBottom = scrollTop + d.tocBodyBottom - d.bodyPadTop;
+
+  // Simulate layout top-down using pre-computed heights.
+  var y = 0;
+  for (var i = 0; i < d.items.length; i++) {
+    var item = d.items[i];
+    y += item.gap;
+    var overlap = y + item.heightFull > tocTop && y < tocBottom;
+    if (overlap) {
+      if (item.isTable) {
+        item.el.style.maxWidth = d.narrowWidth + "px";
+        item.el.style.marginRight = "";
+      } else {
+        item.el.style.marginRight = d.tocWidth + "px";
+        item.el.style.maxWidth = "";
+      }
+      y += item.heightNarrow;
+    } else {
+      item.el.style.marginRight = "";
+      item.el.style.maxWidth = "";
+      y += item.heightFull;
     }
   }
 }
 
-function _applyTocExclusion() {
-  var toc = document.getElementById("spec-toc");
-  var bodyEl = document.getElementById("spec-focused-body");
-  if (!toc || !bodyEl) return;
-
-  var tocRect = toc.getBoundingClientRect();
-  // If TOC is hidden (e.g. too few headings), clear everything.
-  if (tocRect.width === 0) return;
-
-  var exclusion = toc.offsetWidth + 24; // TOC width + gutter
-  var blocks = bodyEl.querySelectorAll(":scope > *");
-  for (var i = 0; i < blocks.length; i++) {
-    var block = blocks[i];
-    var r = block.getBoundingClientRect();
-    if (r.bottom > tocRect.top && r.top < tocRect.bottom) {
-      block.style.marginRight = exclusion + "px";
-    } else {
-      block.style.marginRight = "";
+function _teardownTocExclusion() {
+  if (_tocExclusion) {
+    var bodyEl = _tocExclusion.bodyEl;
+    if (bodyEl && _tocExclusionHandler) {
+      bodyEl.removeEventListener("scroll", _tocExclusionHandler);
     }
+    for (var i = 0; i < _tocExclusion.items.length; i++) {
+      var el = _tocExclusion.items[i].el;
+      el.style.marginRight = "";
+      el.style.maxWidth = "";
+    }
+  }
+  _tocExclusionHandler = null;
+  _tocExclusion = null;
+  if (_tocExclusionRaf) {
+    cancelAnimationFrame(_tocExclusionRaf);
+    _tocExclusionRaf = null;
   }
 }
 
