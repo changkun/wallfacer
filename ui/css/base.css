@@ -80,12 +80,12 @@
 }
 
 ::selection {
-  background: rgba(217, 119, 87, 0.35);
-  color: #1f1d1a;
+  background: rgba(80, 130, 190, 0.3);
+  color: inherit;
 }
 [data-theme="dark"] ::selection {
-  background: rgba(217, 119, 87, 0.4);
-  color: #f0ede6;
+  background: rgba(100, 160, 220, 0.35);
+  color: inherit;
 }
 
 /* --- Custom scrollbars --- */
