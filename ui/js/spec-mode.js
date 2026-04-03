@@ -238,11 +238,19 @@ function _loadAndRenderSpec() {
       _focusedSpecPath = null;
       _focusedSpecWorkspace = null;
       _focusedSpecContent = null;
-      var ids = ["spec-focused-title", "spec-focused-status", "spec-focused-kind",
-        "spec-focused-effort", "spec-focused-meta"];
+      var ids = [
+        "spec-focused-title",
+        "spec-focused-status",
+        "spec-focused-kind",
+        "spec-focused-effort",
+        "spec-focused-meta",
+      ];
       for (var i = 0; i < ids.length; i++) {
         var el = document.getElementById(ids[i]);
-        if (el) { el.textContent = ""; el.className = el.className.replace(/ spec-\S+/g, ""); }
+        if (el) {
+          el.textContent = "";
+          el.className = el.className.replace(/ spec-\S+/g, "");
+        }
       }
       var bodyEl = document.getElementById("spec-focused-body");
       if (bodyEl) bodyEl.innerHTML = "";
@@ -296,10 +304,13 @@ function parseSpecFrontmatter(text) {
 
 // _buildSpecToc extracts headings from the rendered markdown body and
 // builds a floating table of contents in the top-right of the focused view.
+// A scroll-driven exclusion zone dynamically adds margin-right to body
+// elements that overlap the TOC so text reflows around it on scroll.
 function _buildSpecToc(bodyEl) {
-  // Remove existing TOC.
+  // Remove existing TOC and detach previous scroll listener.
   var existing = document.getElementById("spec-toc");
   if (existing) existing.remove();
+  _teardownTocExclusion();
 
   var headings = bodyEl.querySelectorAll("h1, h2, h3, h4");
   if (!headings || headings.length < 2) return;
@@ -348,6 +359,73 @@ function _buildSpecToc(bodyEl) {
     focusedView.appendChild(toc);
   } else {
     bodyEl.appendChild(toc);
+  }
+
+  // Start exclusion-zone tracking.
+  _setupTocExclusion();
+}
+
+// --- TOC exclusion zone ---
+// Dynamically sets margin-right on body block elements that vertically
+// overlap the TOC so text reflows around it as the user scrolls.
+
+var _tocExclusionRaf = null;
+var _tocExclusionHandler = null;
+
+function _setupTocExclusion() {
+  var bodyEl = document.getElementById("spec-focused-body");
+  if (!bodyEl) return;
+
+  // Run once immediately, then on every scroll.
+  _applyTocExclusion();
+  _tocExclusionHandler = function () {
+    if (_tocExclusionRaf) return;
+    _tocExclusionRaf = requestAnimationFrame(function () {
+      _tocExclusionRaf = null;
+      _applyTocExclusion();
+    });
+  };
+  bodyEl.addEventListener("scroll", _tocExclusionHandler);
+}
+
+function _teardownTocExclusion() {
+  var bodyEl = document.getElementById("spec-focused-body");
+  if (bodyEl && _tocExclusionHandler) {
+    bodyEl.removeEventListener("scroll", _tocExclusionHandler);
+  }
+  _tocExclusionHandler = null;
+  if (_tocExclusionRaf) {
+    cancelAnimationFrame(_tocExclusionRaf);
+    _tocExclusionRaf = null;
+  }
+  // Clear any residual margins.
+  if (bodyEl) {
+    var blocks = bodyEl.querySelectorAll(":scope > *");
+    for (var i = 0; i < blocks.length; i++) {
+      blocks[i].style.marginRight = "";
+    }
+  }
+}
+
+function _applyTocExclusion() {
+  var toc = document.getElementById("spec-toc");
+  var bodyEl = document.getElementById("spec-focused-body");
+  if (!toc || !bodyEl) return;
+
+  var tocRect = toc.getBoundingClientRect();
+  // If TOC is hidden (e.g. too few headings), clear everything.
+  if (tocRect.width === 0) return;
+
+  var exclusion = toc.offsetWidth + 24; // TOC width + gutter
+  var blocks = bodyEl.querySelectorAll(":scope > *");
+  for (var i = 0; i < blocks.length; i++) {
+    var block = blocks[i];
+    var r = block.getBoundingClientRect();
+    if (r.bottom > tocRect.top && r.top < tocRect.bottom) {
+      block.style.marginRight = exclusion + "px";
+    } else {
+      block.style.marginRight = "";
+    }
   }
 }
 

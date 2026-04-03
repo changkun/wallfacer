@@ -107,7 +107,7 @@
   color: #721c24;
 }
 
-/* Table of contents */
+/* Table of contents — absolutely positioned; JS exclusion keeps text clear */
 .spec-toc {
   position: absolute;
   top: 72px;
