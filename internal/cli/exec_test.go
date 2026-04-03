@@ -278,3 +278,92 @@ func TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest(t *testing.T) 
 		t.Fatalf("expected converted digest image, got %q", got)
 	}
 }
+
+// TestResolveSandboxImageForExec_EmptyImage verifies that an empty image
+// returns wallfacer-codex:latest for Codex sandbox.
+func TestResolveSandboxImageForExec_EmptyImage(t *testing.T) {
+	got := resolveSandboxImageForExec("", "codex")
+	if got != "wallfacer-codex:latest" {
+		t.Fatalf("expected wallfacer-codex:latest, got %q", got)
+	}
+}
+
+// TestResolveSandboxImageForExec_AlreadyCodex verifies that an image already
+// containing "wallfacer-codex" is returned unchanged.
+func TestResolveSandboxImageForExec_AlreadyCodex(t *testing.T) {
+	got := resolveSandboxImageForExec("ghcr.io/acme/wallfacer-codex:v1", "codex")
+	if got != "ghcr.io/acme/wallfacer-codex:v1" {
+		t.Fatalf("expected unchanged image, got %q", got)
+	}
+}
+
+// TestResolveSandboxImageForExec_ClaudeReturnsUnchanged verifies that Claude
+// sandbox type returns the image unchanged regardless of content.
+func TestResolveSandboxImageForExec_ClaudeReturnsUnchanged(t *testing.T) {
+	got := resolveSandboxImageForExec("wallfacer:v2", "claude")
+	if got != "wallfacer:v2" {
+		t.Fatalf("expected unchanged for claude, got %q", got)
+	}
+}
+
+// TestResolveSandboxImageForExec_WhitespaceImage verifies whitespace trimming.
+func TestResolveSandboxImageForExec_WhitespaceImage(t *testing.T) {
+	got := resolveSandboxImageForExec("  wallfacer:latest  ", "codex")
+	if got != "wallfacer-codex:latest" {
+		t.Fatalf("expected trimmed and rewritten image, got %q", got)
+	}
+}
+
+// TestParseExecConfig_MissingPrefix verifies that no positional args in task
+// mode returns an error.
+func TestParseExecConfig_MissingPrefix(t *testing.T) {
+	_, err := parseExecConfig(nil, []string{"bash"})
+	if err == nil {
+		t.Fatal("expected error for missing prefix")
+	}
+	if !strings.Contains(err.Error(), "missing task-id-prefix") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestParseExecConfig_PrefixTooShort verifies that a prefix shorter than 8
+// characters is rejected.
+func TestParseExecConfig_PrefixTooShort(t *testing.T) {
+	_, err := parseExecConfig([]string{"abc"}, []string{"bash"})
+	if err == nil {
+		t.Fatal("expected error for short prefix")
+	}
+	if !strings.Contains(err.Error(), "at least 8 characters") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestParseExecConfig_SandboxMissingValue verifies that --sandbox without a
+// value returns an error.
+func TestParseExecConfig_SandboxMissingValue(t *testing.T) {
+	_, err := parseExecConfig([]string{"--sandbox"}, []string{"bash"})
+	if err == nil {
+		t.Fatal("expected error for missing sandbox value")
+	}
+	if !strings.Contains(err.Error(), "missing sandbox value") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestBuildSandboxExecArgs_NoEnvFile verifies that sandbox exec args omit the
+// --env-file flag when the env file does not exist.
+func TestBuildSandboxExecArgs_NoEnvFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Chdir(tmp)
+
+	args, err := buildSandboxExecArgs("/usr/bin/podman", tmp, "claude", []string{"bash"})
+	if err != nil {
+		t.Fatalf("buildSandboxExecArgs: %v", err)
+	}
+
+	got := strings.Join(args, " ")
+	if strings.Contains(got, "--env-file") {
+		t.Fatalf("expected no --env-file when file missing, got %q", got)
+	}
+}

@@ -196,6 +196,67 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	}
 }
 
+// TestDefaultSandboxImage_WithVersion verifies that when Version is set the
+// image reference includes the version tag instead of :latest.
+func TestDefaultSandboxImage_WithVersion(t *testing.T) {
+	old := Version
+	Version = "1.2.3"
+	defer func() { Version = old }()
+
+	got := defaultSandboxImage()
+	if got != sandboxImageBase+":1.2.3" {
+		t.Fatalf("expected image tag :1.2.3, got %q", got)
+	}
+}
+
+// TestDefaultSandboxImage_DevBuild verifies that the dev build (empty Version)
+// returns :latest.
+func TestDefaultSandboxImage_DevBuild(t *testing.T) {
+	old := Version
+	Version = ""
+	defer func() { Version = old }()
+
+	got := defaultSandboxImage()
+	if got != sandboxImageBase+":latest" {
+		t.Fatalf("expected :latest, got %q", got)
+	}
+}
+
+// TestDetectContainerRuntime_EnvOverride verifies that CONTAINER_CMD env var
+// overrides all other detection logic.
+func TestDetectContainerRuntime_EnvOverride(t *testing.T) {
+	t.Setenv("CONTAINER_CMD", "/custom/runtime")
+	got := detectContainerRuntime()
+	if got != "/custom/runtime" {
+		t.Fatalf("expected /custom/runtime, got %q", got)
+	}
+}
+
+// TestDetectContainerRuntime_EnvOverrideTrimmed verifies whitespace is trimmed
+// from the CONTAINER_CMD override.
+func TestDetectContainerRuntime_EnvOverrideTrimmed(t *testing.T) {
+	t.Setenv("CONTAINER_CMD", "  /custom/runtime  ")
+	got := detectContainerRuntime()
+	if got != "/custom/runtime" {
+		t.Fatalf("expected trimmed path, got %q", got)
+	}
+}
+
+// TestPrintUsage_IncludesVersion verifies that PrintUsage includes the version
+// string when Version is set.
+func TestPrintUsage_IncludesVersion(t *testing.T) {
+	old := Version
+	Version = "2.0.0"
+	defer func() { Version = old }()
+
+	out := captureStderr(func() {
+		PrintUsage()
+	})
+	if !strings.Contains(out, "wallfacer 2.0.0") {
+		t.Fatalf("expected version in usage, got: %s", out)
+	}
+}
+
 // TestRunStatusJsonOutput verifies that `wallfacer status --json` outputs the
 // raw JSON response from the server without any formatting.
 func TestRunStatusJsonOutput(t *testing.T) {

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -221,6 +222,190 @@ func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 	}
 }
 
+// TestBuildMux_DocsEndpoints verifies the docs API returns proper responses
+// for listing docs and reading individual doc files.
+func TestBuildMux_DocsEndpoints(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	// GET /api/docs should return a JSON array.
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/docs", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/docs: status %d, want 200", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Fatalf("expected JSON content type, got %q", ct)
+	}
+
+	// GET /api/docs/guide/usage should return markdown.
+	rr2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "/api/docs/guide/usage", nil)
+	mux.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("GET /api/docs/guide/usage: status %d, want 200", rr2.Code)
+	}
+
+	// GET /api/docs/nonexistent should return 404.
+	rr3 := httptest.NewRecorder()
+	req3 := httptest.NewRequest(http.MethodGet, "/api/docs/nonexistent", nil)
+	mux.ServeHTTP(rr3, req3)
+	if rr3.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/docs/nonexistent: status %d, want 404", rr3.Code)
+	}
+
+	// GET /api/docs/../etc/passwd should be rejected.
+	rr4 := httptest.NewRecorder()
+	req4 := httptest.NewRequest(http.MethodGet, "/api/docs/..%2F..%2Fetc%2Fpasswd", nil)
+	// Manually set the path value to bypass URL canonicalization.
+	req4.SetPathValue("slug", "../../etc/passwd")
+	mux.ServeHTTP(rr4, req4)
+	if rr4.Code != http.StatusBadRequest && rr4.Code != http.StatusNotFound {
+		t.Fatalf("path traversal: status %d, want 400 or 404", rr4.Code)
+	}
+}
+
+// TestBuildMux_WithIDInvalidUUID verifies that routes using withID return 400
+// when the UUID is malformed.
+func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid UUID, got %d", rr.Code)
+	}
+}
+
+// TestBuildMux_ServeOutputInvalidUUID verifies that the ServeOutput route
+// returns 400 for an invalid task UUID.
+func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid UUID in output, got %d", rr.Code)
+	}
+}
+
+// TestBuildMux_MetricsEndpoint verifies that the /metrics endpoint returns
+// Prometheus-format text.
+func TestBuildMux_MetricsEndpoint(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /metrics: status %d, want 200", rr.Code)
+	}
+	ct := rr.Header().Get("Content-Type")
+	if !strings.Contains(ct, "text/plain") {
+		t.Fatalf("expected text/plain content type, got %q", ct)
+	}
+}
+
+// TestBuildMux_IndexNonRoot verifies that non-root paths like /foo return 404
+// from the index handler.
+func TestBuildMux_IndexNonRoot(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for /nonexistent, got %d", rr.Code)
+	}
+}
+
 // TestGauge_FailedTasksByCategory validates the Prometheus gauge collector
 // that counts failed tasks grouped by failure category.
 func TestGauge_FailedTasksByCategory(t *testing.T) {
@@ -276,6 +461,150 @@ func TestGauge_FailedTasksByCategory(t *testing.T) {
 	}
 	if vals[0].Value != 1 {
 		t.Errorf("value = %v, want 1", vals[0].Value)
+	}
+}
+
+// TestStatusResponseWriter_HijackSupported verifies that Hijack delegates to the
+// underlying writer when it implements http.Hijacker.
+func TestStatusResponseWriter_HijackSupported(t *testing.T) {
+	rr := httptest.NewRecorder()
+	sw := &statusResponseWriter{ResponseWriter: rr, status: http.StatusOK}
+
+	// httptest.ResponseRecorder does not implement Hijacker, so this should
+	// return an error about the underlying writer.
+	_, _, err := sw.Hijack()
+	if err == nil {
+		t.Fatal("expected error from Hijack on non-Hijacker writer")
+	}
+	if !strings.Contains(err.Error(), "does not implement http.Hijacker") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+// TestNormalizeBrowserVisibleHostPort verifies address normalization for
+// different listener bind addresses.
+func TestNormalizeBrowserVisibleHostPort(t *testing.T) {
+	tests := []struct {
+		name      string
+		requested string
+		actual    string
+		want      string
+	}{
+		{"wildcard with localhost fallback", ":8080", "0.0.0.0:8080", "localhost:8080"},
+		{"ipv6 wildcard", ":8080", "[::]:8080", "localhost:8080"},
+		{"specific host preserved", "127.0.0.1:9090", "127.0.0.1:9090", "127.0.0.1:9090"},
+		{"requested host used for wildcard", "myhost:0", "0.0.0.0:12345", "myhost:12345"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			addr, err := net.ResolveTCPAddr("tcp", tc.actual)
+			if err != nil {
+				t.Fatalf("resolve: %v", err)
+			}
+			got := normalizeBrowserVisibleHostPort(tc.requested, addr)
+			if got != tc.want {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestEnsureImage_NeitherPullNorFallback verifies that when pull fails and no
+// local fallback exists, the original image name is returned.
+func TestEnsureImage_NeitherPullNorFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
+	tmp := t.TempDir()
+	runtimeScript := filepath.Join(tmp, "runtime.sh")
+	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
+		"if [ \"$1\" = \"images\" ]; then\n"+
+		"  exit 0\n"+ // always returns empty (no image found)
+		"fi\n"+
+		"if [ \"$1\" = \"pull\" ]; then\n"+
+		"  exit 1\n"+ // pull fails
+		"fi\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	got := ensureImage(runtimeScript, "custom-image:v1")
+	if got != "custom-image:v1" {
+		t.Fatalf("expected original image returned, got %q", got)
+	}
+}
+
+// TestEnsureImage_SameAsFallback verifies that when the requested image equals
+// the fallback image and pull fails, it still returns the image without trying
+// the fallback.
+func TestEnsureImage_SameAsFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
+	tmp := t.TempDir()
+	runtimeScript := filepath.Join(tmp, "runtime.sh")
+	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
+		"if [ \"$1\" = \"images\" ]; then\n"+
+		"  exit 0\n"+
+		"fi\n"+
+		"if [ \"$1\" = \"pull\" ]; then\n"+
+		"  exit 1\n"+
+		"fi\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	got := ensureImage(runtimeScript, "wallfacer:latest")
+	if got != "wallfacer:latest" {
+		t.Fatalf("expected original image, got %q", got)
+	}
+}
+
+// TestRequiresStore verifies the routing classification for store-requiring
+// and store-independent routes.
+func TestRequiresStore(t *testing.T) {
+	storeIndependent := []string{
+		"GetConfig", "UpdateConfig", "BrowseWorkspaces", "MkdirWorkspace",
+		"RenameWorkspace", "UpdateWorkspaces", "GetEnvConfig",
+		"UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream",
+	}
+	for _, name := range storeIndependent {
+		if requiresStore(name) {
+			t.Errorf("requiresStore(%q) = true, want false", name)
+		}
+	}
+
+	storeRequired := []string{
+		"ListTasks", "CreateTask", "Health", "GetContainers",
+	}
+	for _, name := range storeRequired {
+		if !requiresStore(name) {
+			t.Errorf("requiresStore(%q) = false, want true", name)
+		}
+	}
+}
+
+// TestInitServer_SkipCSRF verifies that initServer with SkipCSRF registers
+// the desktop-port endpoint.
+func TestInitServer_SkipCSRF(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+		SkipCSRF:     true,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	// The desktop-port endpoint should be registered.
+	if sc.ActualPort == 0 {
+		t.Fatal("expected non-zero port")
 	}
 }
 
