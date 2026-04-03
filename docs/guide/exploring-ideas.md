@@ -31,17 +31,22 @@ Responses stream in real-time. Assistant text is rendered as markdown with synta
 
 ### Slash Commands
 
-Type `/` to see an autocomplete menu of built-in commands. Seven commands are available:
+Type `/` to see an autocomplete menu of built-in commands. Commands cover the full spec lifecycle:
 
 | Command | Description |
 |---|---|
-| `/summarize [words]` | Summarize the currently focused spec, optionally limited to a word count |
-| `/break-down` | Decompose the focused spec into sub-specs or dispatchable tasks |
+| `/summarize [words]` | Summarize the focused spec, optionally limited to a word count |
 | `/create <title>` | Create a new spec file with the given title |
-| `/status <state>` | Update the focused spec's lifecycle status |
+| `/refine [feedback]` | Update the focused spec against the current codebase state |
 | `/validate` | Check the focused spec against document model rules |
-| `/impact` | Analyze which code and specs would be affected by the focused spec |
-| `/dispatch` | Prepare the focused spec for dispatch to the task board |
+| `/impact` | Analyze which code and specs would be affected |
+| `/status <state>` | Update the focused spec's lifecycle status |
+| `/break-down [design\|tasks]` | Decompose the focused spec into sub-specs or dispatchable tasks |
+| `/review-breakdown` | Validate a task breakdown for dependency ordering, sizing, and coverage |
+| `/dispatch` | Dispatch the focused spec to the task board |
+| `/review-impl [range]` | Review implementation against the spec's acceptance criteria |
+| `/diff [range]` | Compare completed implementation against spec (drift analysis) |
+| `/wrapup` | Finalize a completed spec with outcome and status updates |
 
 ### @mentions
 
@@ -82,7 +87,7 @@ The preference is persisted in localStorage and remembered across sessions.
 
 ### Focused Spec Context
 
-When a spec is selected in the explorer (left pane), the agent automatically receives its file path as context. Slash commands like `/summarize`, `/break-down`, `/validate`, and `/dispatch` operate on the focused spec. To change the target, click a different spec in the explorer before issuing the command.
+When a spec is selected in the explorer (left pane), the agent automatically receives its file path as context. All slash commands operate on the focused spec. To change the target, click a different spec in the explorer before issuing the command.
 
 ---
 

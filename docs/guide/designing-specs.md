@@ -35,9 +35,21 @@ Clicking a spec in the explorer opens it in the center pane. The content is rend
 - Table of contents navigation
 - YAML frontmatter displayed as a structured header
 
+### Spec Workflow
+
+Specs follow a structured lifecycle driven by slash commands in the planning chat. Each command maps to a step in the workflow:
+
+```
+/create → /refine → /validate → /impact → /break-down → /review-breakdown → /dispatch → /review-impl → /diff → /wrapup
+```
+
+You don't need to follow every step linearly. Small specs can skip from `/create` to `/dispatch`. Large specs may cycle through `/refine` and `/break-down` multiple times. Use `/status` at any point to check progress across all specs.
+
 ### Breaking Down Specs
 
 Large specs can be decomposed into smaller child specs. Press **B** or use `/break-down` in the planning chat. The agent analyzes the parent spec and creates child specs in a subdirectory named after the parent file. Each child gets its own frontmatter, dependencies, and acceptance criteria.
+
+The agent automatically determines the breakdown mode from the spec's lifecycle state: **design mode** (creates sub-design specs with Options and Open Questions) for `vague` or `drafted` specs, or **tasks mode** (creates implementation-ready leaf specs with Goal, What to do, Tests, Boundaries) for `validated` specs. Override with `/break-down design` or `/break-down tasks`.
 
 ```
 specs/
@@ -115,6 +127,16 @@ Any status can transition to `stale`. Leaf specs should reach `validated` before
 ### Progress Tracking
 
 Non-leaf specs aggregate progress from their entire subtree. A spec with six leaf descendants, four of which are complete, displays "4/6 leaves done". This recursive rollup gives you a quick read on how much of a large feature is finished without opening each child.
+
+### Reviewing and Completing
+
+After a breakdown, use `/review-breakdown` to validate the task structure before dispatching. The agent checks dependency correctness, task sizing, spec coverage, boundary conflicts, and test completeness.
+
+After implementation, use `/review-impl` to compare the actual code changes against the spec's acceptance criteria. The agent produces a structured report: which criteria were met, which were missed, and whether there were unintended changes.
+
+For dispatched tasks, use `/diff` after the task completes to produce a drift analysis. This compares the implementation against the spec and classifies each item as satisfied, diverged, not implemented, or superseded. The agent appends an `## Outcome` section to the spec documenting what shipped and how it differed from the plan.
+
+Use `/wrapup` to finalize a completed spec. The agent verifies all leaf children are complete, runs tests, writes the outcome summary, updates `specs/README.md`, and flags downstream specs that are now unblocked.
 
 ### Deep Linking
 
