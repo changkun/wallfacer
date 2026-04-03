@@ -4,28 +4,25 @@
 // Mermaid blocks are rendered as placeholder divs and processed after insertion.
 (function () {
   if (typeof marked === "undefined") return;
-  marked.setOptions({
-    highlight: function (code, lang) {
-      if (lang === "mermaid") return code; // handled in post-processing
-      if (typeof hljs !== "undefined" && lang && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(code, { language: lang }).value;
-        } catch (_) {}
-      }
-      if (typeof hljs !== "undefined") {
-        try {
-          return hljs.highlightAuto(code).value;
-        } catch (_) {}
-      }
-      return code;
-    },
-  });
 
-  // Custom renderer: mermaid code blocks become divs for post-processing.
+  function _highlightCode(code, lang) {
+    if (typeof hljs === "undefined") return escapeHtml(code);
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value;
+      } catch (_) {}
+    }
+    try {
+      return hljs.highlightAuto(code).value;
+    } catch (_) {}
+    return escapeHtml(code);
+  }
+
+  // Custom renderer: apply highlight.js to code blocks (marked v9+ removed
+  // the highlight option from setOptions) and render mermaid as placeholders.
   var renderer = new marked.Renderer();
-  var origCode = renderer.code.bind(renderer);
   renderer.code = function (code, lang) {
-    // marked v14+ passes {text, lang} object; v12 passes (code, lang).
+    // marked v14+ passes {text, lang} object; v9 passes (code, lang).
     var codeText = typeof code === "object" ? code.text : code;
     var codeLang = typeof code === "object" ? code.lang : lang;
     if (codeLang === "mermaid") {
@@ -38,7 +35,8 @@
         "</code></pre></div>"
       );
     }
-    return origCode(code, lang);
+    var langClass = codeLang ? ' class="language-' + escapeHtml(codeLang) + '"' : "";
+    return "<pre><code" + langClass + ">" + _highlightCode(codeText, codeLang) + "</code></pre>\n";
   };
   marked.setOptions({ renderer: renderer });
 })();
