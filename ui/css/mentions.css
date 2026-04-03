@@ -15,7 +15,9 @@
   display: flex;
   align-items: baseline;
   gap: 4px;
-  padding: 5px 12px;
+  padding: 5px 8px;
+  margin: 0 4px;
+  border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -29,8 +31,7 @@
 
 .mention-item-selected {
   background: var(--bg-raised);
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .mention-path {
   color: var(--text-muted);
