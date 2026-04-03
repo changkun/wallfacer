@@ -194,6 +194,39 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		// If the error is a stale session, clear session (not history) and retry
+		// with conversation history prepended to give the agent prior context.
+		if planner.IsErrorResult(rawStdout) && planner.IsStaleSessionError(rawStdout) {
+			slog.Warn("planning: stale session, retrying with history context")
+			_ = cs.SaveSession(planner.SessionInfo{}) // clear session ID only
+			historyCtx := cs.BuildHistoryContext()
+			retryPrompt := prompt
+			if historyCtx != "" {
+				retryPrompt = historyCtx + retryPrompt
+			}
+			ll2 := h.planner.StartLiveLog()
+			retryCmd := []string{"-p", retryPrompt, "--verbose", "--output-format", "stream-json"}
+			retryHandle, retryErr := h.planner.Exec(context.Background(), retryCmd)
+			if retryErr != nil {
+				slog.Error("planning retry exec failed", "error", retryErr)
+				return
+			}
+			retryTee := io.TeeReader(retryHandle.Stdout(), ll2)
+			rawStdout, _ = io.ReadAll(retryTee)
+			_, _ = io.ReadAll(retryHandle.Stderr())
+			_, _ = retryHandle.Wait()
+			h.planner.CloseLiveLog()
+
+			sessionID = planner.ExtractSessionID(rawStdout)
+			if sessionID != "" {
+				_ = cs.SaveSession(planner.SessionInfo{
+					SessionID:   sessionID,
+					LastActive:  time.Now().UTC(),
+					FocusedSpec: req.FocusedSpec,
+				})
+			}
+		}
+
 		// Parse response text and append assistant message (skip errors).
 		if !planner.IsErrorResult(rawStdout) {
 			resultText := planner.ExtractResultText(rawStdout)

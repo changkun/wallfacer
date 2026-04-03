@@ -151,6 +151,38 @@ func (s *ConversationStore) LoadSession() (SessionInfo, error) {
 	return info, nil
 }
 
+// BuildHistoryContext creates a text summary of prior conversation messages
+// that can be prepended to a prompt when starting a fresh session (e.g. after
+// a stale session is cleared). Returns empty string if no history exists.
+func (s *ConversationStore) BuildHistoryContext() string {
+	msgs, err := s.Messages()
+	if err != nil || len(msgs) == 0 {
+		return ""
+	}
+
+	// Cap to last 20 messages to avoid blowing the context window.
+	if len(msgs) > 20 {
+		msgs = msgs[len(msgs)-20:]
+	}
+
+	var b strings.Builder
+	b.WriteString("[Previous conversation context — session was reset]\n\n")
+	for _, m := range msgs {
+		if m.Role == "user" {
+			b.WriteString("User: ")
+		} else {
+			b.WriteString("Assistant: ")
+		}
+		content := m.Content
+		if len(content) > 500 {
+			content = content[:500] + "..."
+		}
+		b.WriteString(content)
+		b.WriteString("\n\n")
+	}
+	return b.String()
+}
+
 // ExtractSessionID scans NDJSON output for the first session_id or thread_id
 // field. Returns empty string if not found.
 func ExtractSessionID(raw []byte) string {
@@ -222,6 +254,38 @@ func ExtractResultText(raw []byte) string {
 		}
 	}
 	return text.String()
+}
+
+// IsStaleSessionError checks if the NDJSON error result indicates a missing
+// or expired session by inspecting the structured error fields.
+func IsStaleSessionError(raw []byte) bool {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			Type    string   `json:"type"`
+			IsError bool     `json:"is_error"`
+			Subtype string   `json:"subtype"`
+			Errors  []string `json:"errors"`
+			Result  string   `json:"result"`
+		}
+		if json.Unmarshal([]byte(line), &obj) != nil || obj.Type != "result" || !obj.IsError {
+			continue
+		}
+		// Check errors array and result text for session-related failures.
+		for _, e := range obj.Errors {
+			if strings.Contains(e, "session ID") || strings.Contains(e, "session") {
+				return true
+			}
+		}
+		if strings.Contains(obj.Result, "session ID") {
+			return true
+		}
+	}
+	return false
 }
 
 // IsErrorResult checks if the NDJSON output contains an error result.
