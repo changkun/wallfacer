@@ -13,7 +13,8 @@ Wallfacer is an autonomous engineering platform that works across multiple level
 
 Open source. Runs locally. No IDE lock-in. No cloud dependency. Bring your own LLM provider.
 
-![Wallfacer overview](./assets/overview.png)
+![Wallfacer overview](./assets/overview-kanban.png)
+![Wallfacer overview](./assets/overview-spec.png)
 
 ## Why Wallfacer
 
@@ -64,20 +65,21 @@ A browser window opens automatically. Add your Claude credential (OAuth token vi
 
 ## Product Tour
 
-### Mission Control Board
+### Task Board — Managed Execution
 
-![Wallfacer board overview](./assets/overview.png)
+![Wallfacer board overview](./assets/overview-kanban.png)
 
-Coordinate many agent tasks in one place, move cards across the lifecycle, and keep execution throughput high without losing control. Batch-create tasks with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens.
+Coordinate many agent tasks on a kanban board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs in an isolated container with its own git worktree.
 
-### Oversight That Is Actually Actionable
+### Spec Mode — Structured Design
 
-**Execution oversight**
+![Wallfacer spec mode](./assets/overview-spec.png)
+
+Design before you build. The three-pane spec view gives you an explorer tree (left), focused markdown view (center), and planning chat (right). Break large ideas into structured specs, validate dependencies, and dispatch leaf specs to the task board when the design is right.
+
+### Oversight — Actionable Audit Trail
 
 ![Oversight view 1](./assets/oversight1.png)
-
-**Timeline and phase detail**
-
 ![Oversight view 2](./assets/oversight2.png)
 
 Inspect what happened, when it happened, and why it happened before you accept any automated output. Every task produces a structured event timeline, diff against the default branch, and AI-generated oversight summary.
