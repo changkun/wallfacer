@@ -99,7 +99,27 @@ function renderPrettyLogs(rawBuffer) {
 
     if (evt.type === "assistant" && evt.message && evt.message.content) {
       for (const block of evt.message.content) {
-        if (block.type === "text" && block.text) {
+        if (block.type === "thinking" && block.thinking) {
+          const thinkLines = block.thinking.split("\n");
+          if (thinkLines.length > 5) {
+            const preview = thinkLines
+              .slice(0, 3)
+              .map((l) => escapeHtml(l))
+              .join("\n");
+            const rest = thinkLines
+              .slice(3)
+              .map((l) => escapeHtml(l))
+              .join("\n");
+            const remaining = thinkLines.length - 3;
+            blocks.push(
+              `<div class="cc-block cc-thinking"><span class="cc-marker cc-marker-thinking">&#x1F4AD;</span> <span class="cc-thinking-text">${preview}</span><details class="cc-expand"><summary class="cc-expand-toggle">+${remaining} lines</summary><span class="cc-thinking-text">${rest}</span></details></div>`,
+            );
+          } else {
+            blocks.push(
+              `<div class="cc-block cc-thinking"><span class="cc-marker cc-marker-thinking">&#x1F4AD;</span> <span class="cc-thinking-text">${escapeHtml(block.thinking)}</span></div>`,
+            );
+          }
+        } else if (block.type === "text" && block.text) {
           blocks.push(
             `<div class="cc-block cc-text"><span class="cc-marker">&#x23FA;</span> ${escapeHtml(block.text)}</div>`,
           );

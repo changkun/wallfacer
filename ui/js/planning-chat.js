@@ -363,7 +363,7 @@ var PlanningChat = (function () {
     return text;
   }
 
-  // _hasToolActivity checks if the NDJSON contains tool calls.
+  // _hasToolActivity checks if the NDJSON contains tool calls or thinking.
   function _hasToolActivity(raw) {
     var lines = raw.split("\n");
     for (var i = 0; i < lines.length; i++) {
@@ -373,7 +373,8 @@ var PlanningChat = (function () {
         var obj = JSON.parse(line);
         if (obj.type === "assistant" && obj.message && obj.message.content) {
           for (var j = 0; j < obj.message.content.length; j++) {
-            if (obj.message.content[j].type === "tool_use") return true;
+            var t = obj.message.content[j].type;
+            if (t === "tool_use" || t === "thinking") return true;
           }
         }
         if (obj.type === "user") return true; // tool results

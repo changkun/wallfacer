@@ -426,6 +426,47 @@ describe("renderPrettyLogs", () => {
     expect(result).toContain("\u2026"); // ellipsis
   });
 
+  it("renders assistant thinking blocks", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "thinking", thinking: "Let me analyze this..." }],
+      },
+    });
+    const result = ctx.renderPrettyLogs(line);
+    expect(result).toContain("cc-thinking");
+    expect(result).toContain("Let me analyze this...");
+  });
+
+  it("collapses long thinking blocks (>5 lines) with expandable details", () => {
+    const longThinking = Array.from(
+      { length: 10 },
+      (_, i) => `thought ${i}`,
+    ).join("\n");
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "thinking", thinking: longThinking }],
+      },
+    });
+    const result = ctx.renderPrettyLogs(line);
+    expect(result).toContain("cc-thinking");
+    expect(result).toContain("cc-expand");
+    expect(result).toContain("+7 lines");
+  });
+
+  it("renders short thinking blocks without details element", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "thinking", thinking: "short thought" }],
+      },
+    });
+    const result = ctx.renderPrettyLogs(line);
+    expect(result).toContain("cc-thinking");
+    expect(result).not.toContain("<details");
+  });
+
   it("renders codex agent_message item as assistant text", () => {
     const line = JSON.stringify({
       type: "item.completed",

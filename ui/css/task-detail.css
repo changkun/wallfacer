@@ -260,6 +260,21 @@
 .cc-marker-result {
   color: #3fb950;
 }
+.cc-thinking {
+  color: #9faab5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 2px solid #6e7681;
+  padding-left: 8px;
+  font-style: italic;
+}
+.cc-marker-thinking {
+  color: #9faab5;
+  margin-right: 6px;
+}
+.cc-thinking-text {
+  color: inherit;
+}
 .cc-text {
   color: #cdd1d6;
   white-space: pre-wrap;
