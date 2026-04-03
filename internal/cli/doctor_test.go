@@ -238,6 +238,70 @@ func TestRunDoctor_MalformedEnvLine(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_SandboxImageFallback verifies that doctor reports the fallback
+// image when the primary image is not cached but the fallback is.
+func TestRunDoctor_SandboxImageFallback(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	fakeRuntime := filepath.Join(t.TempDir(), "podman")
+	// Responds with version, returns found only for wallfacer:latest (the fallback).
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\n" +
+		"if [ \"$1\" = \"images\" ] && [ \"$3\" = \"wallfacer:latest\" ]; then echo \"abc123\"; exit 0; fi\n" +
+		"if [ \"$1\" = \"images\" ]; then echo \"\"; exit 0; fi\n" +
+		"exit 0\n"
+	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	t.Setenv("CONTAINER_CMD", fakeRuntime)
+	// Use a non-fallback image so the fallback path triggers.
+	t.Setenv("SANDBOX_IMAGE", "ghcr.io/changkun/wallfacer:v99")
+
+	out := captureStdout(func() {
+		RunDoctor(configDir)
+	})
+
+	if !strings.Contains(out, "not cached (fallback") {
+		t.Errorf("expected fallback image message, got:\n%s", out)
+	}
+}
+
+// TestRunDoctor_VersionTaggedCodex verifies that when Version is set, the
+// codex sandbox image uses the version tag.
+func TestRunDoctor_VersionTaggedCodex(t *testing.T) {
+	old := Version
+	Version = "1.0.0"
+	defer func() { Version = old }()
+
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	fakeRuntime := filepath.Join(t.TempDir(), "podman")
+	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\nif [ \"$1\" = \"images\" ]; then echo \"\"; exit 0; fi\nexit 0\n"
+	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	t.Setenv("CONTAINER_CMD", fakeRuntime)
+
+	out := captureStdout(func() {
+		RunDoctor(configDir)
+	})
+
+	// Should use version tag for codex image check.
+	if !strings.Contains(out, "Codex sandbox image not cached") {
+		t.Errorf("expected codex image not cached message, got:\n%s", out)
+	}
+}
+
 // TestRunDoctor_SandboxImageCached verifies that doctor reports a cached
 // sandbox image when the runtime responds that it exists.
 func TestRunDoctor_SandboxImageCached(t *testing.T) {

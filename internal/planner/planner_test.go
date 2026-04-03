@@ -306,8 +306,8 @@ func (h *mockHandle) State() sandbox.BackendState { return sandbox.StateRunning 
 func (h *mockHandle) Stdout() io.ReadCloser       { return io.NopCloser(strings.NewReader("")) }
 func (h *mockHandle) Stderr() io.ReadCloser       { return io.NopCloser(strings.NewReader("")) }
 func (h *mockHandle) Wait() (int, error)          { return 0, nil }
-func (h *mockHandle) Kill() error                  { return nil }
-func (h *mockHandle) Name() string                 { return "mock" }
+func (h *mockHandle) Kill() error                 { return nil }
+func (h *mockHandle) Name() string                { return "mock" }
 
 type mockBackend struct {
 	launchErr error
@@ -330,7 +330,7 @@ type mockWorkerBackend struct {
 }
 
 func (b *mockWorkerBackend) StopTaskWorker(_ string) { b.stopCalled = true }
-func (b *mockWorkerBackend) ShutdownWorkers()             {}
+func (b *mockWorkerBackend) ShutdownWorkers()        {}
 func (b *mockWorkerBackend) WorkerStats() sandbox.WorkerStatsInfo {
 	return sandbox.WorkerStatsInfo{}
 }
