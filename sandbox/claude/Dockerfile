@@ -87,8 +87,7 @@ ENV PATH=$PATH:/home/${USERNAME}/go/bin
 RUN npm install -g @anthropic-ai/claude-code
 
 # --- RTK (token-optimized CLI proxy) ---
-RUN curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh && \
-    rtk init --global
+RUN curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
 
 # --- Entrypoint ---
 COPY --chown=${USERNAME}:${USERNAME} entrypoint.sh /usr/local/bin/entrypoint.sh
