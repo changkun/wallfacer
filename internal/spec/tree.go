@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -104,6 +105,10 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 		if info, statErr := os.Stat(childDir); statErr == nil && info.IsDir() {
 			childErrs := scanDir(tree, childDir, specsDir, &relPath)
 			errs = append(errs, childErrs...)
+
+			// Reorder children based on the order they appear as
+			// markdown links in the parent spec's body.
+			reorderChildren(tree, relPath, s.Body)
 		}
 	}
 
@@ -122,4 +127,50 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 	}
 
 	return errs
+}
+
+// mdLinkRe matches markdown links with .md targets: [text](path.md)
+var mdLinkRe = regexp.MustCompile(`\[[^\]]*\]\(([^)]+\.md)\)`)
+
+// reorderChildren reorders a parent node's children to match the order
+// child specs appear as markdown links in the parent's body. Children
+// not referenced in the body keep their existing (alphabetical) order
+// and are appended after the referenced ones.
+func reorderChildren(tree *Tree, parentKey, body string) {
+	parent, ok := tree.NodeAt(parentKey)
+	if !ok || len(parent.Children) <= 1 {
+		return
+	}
+
+	matches := mdLinkRe.FindAllStringSubmatch(body, -1)
+	if len(matches) == 0 {
+		return
+	}
+
+	// Resolve link targets relative to the parent spec's directory
+	// to obtain tree keys.
+	parentDir := filepath.Dir(parentKey)
+	childByKey := make(map[string]*Node, len(parent.Children))
+	for _, child := range parent.Children {
+		childByKey[child.Key] = child
+	}
+
+	seen := make(map[string]bool)
+	ordered := make([]*Node, 0, len(parent.Children))
+	for _, m := range matches {
+		resolved := filepath.ToSlash(filepath.Join(parentDir, m[1]))
+		if child, ok := childByKey[resolved]; ok && !seen[resolved] {
+			ordered = append(ordered, child)
+			seen[resolved] = true
+		}
+	}
+
+	// Append unreferenced children in their original order.
+	for _, child := range parent.Children {
+		if !seen[child.Key] {
+			ordered = append(ordered, child)
+		}
+	}
+
+	parent.Children = ordered
 }
