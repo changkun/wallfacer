@@ -3,6 +3,7 @@ package spec
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -302,13 +303,15 @@ func TestUpdateFrontmatter_AtomicWrite(t *testing.T) {
 		}
 	}
 
-	// Verify file permissions are preserved.
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("Stat: %v", err)
-	}
-	if info.Mode().Perm() != 0644 {
-		t.Errorf("file permissions = %o, want 0644", info.Mode().Perm())
+	// Verify file permissions are preserved (skip on Windows where Unix perms are not supported).
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("Stat: %v", err)
+		}
+		if info.Mode().Perm() != 0644 {
+			t.Errorf("file permissions = %o, want 0644", info.Mode().Perm())
+		}
 	}
 }
 
@@ -360,6 +363,9 @@ author: changkun
 }
 
 func TestUpdateFrontmatter_PreservesFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix file permissions not supported on Windows")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "perms.md")
 	if err := os.WriteFile(path, []byte(validSpec), 0600); err != nil {
