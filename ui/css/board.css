@@ -326,3 +326,15 @@
     animation: none;
   }
 }
+/* Highlight animation for task cards navigated from spec mode. */
+.card-highlight {
+  animation: card-glow 2s ease-out;
+}
+@keyframes card-glow {
+  0% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.6);
+  }
+  100% {
+    box-shadow: none;
+  }
+}

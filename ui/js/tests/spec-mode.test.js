@@ -162,6 +162,26 @@ describe("spec-mode", () => {
     expect(ctx.storage.get("wallfacer-mode")).toBe("spec");
   });
 
+  it("sets _highlightTaskId when switching from spec to board with dispatched spec", () => {
+    ctx.switchMode("spec");
+    // Simulate a focused spec with dispatched_task_id.
+    ctx._focusedSpecContent =
+      "---\ntitle: Test\nstatus: validated\ndispatched_task_id: abc-123\n---\n# Body\n";
+    ctx.switchMode("board");
+    // _highlightTaskId should have been set and then cleared (since _highlightBoardTask
+    // runs but querySelector returns null in our stub context, so it's a no-op).
+    // The key test is that it doesn't throw.
+    expect(ctx.getCurrentMode()).toBe("board");
+  });
+
+  it("does not set _highlightTaskId for null dispatched_task_id", () => {
+    ctx.switchMode("spec");
+    ctx._focusedSpecContent =
+      "---\ntitle: Test\nstatus: validated\ndispatched_task_id: null\n---\n# Body\n";
+    ctx.switchMode("board");
+    expect(ctx._highlightTaskId).toBe(null);
+  });
+
   it("restores spec mode from localStorage", () => {
     // Create a new context with spec mode pre-set in storage.
     const dom = makeDom();

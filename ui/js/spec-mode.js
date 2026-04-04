@@ -112,12 +112,53 @@ function _restoreSidebarState() {
   }
 }
 
+// _highlightTaskId holds a task ID to scroll to and highlight after
+// switching to board mode from a focused spec. Cleared after use.
+var _highlightTaskId = null;
+
 // switchMode toggles between board, spec, and docs modes. Updates sidebar
 // nav active states, swaps main content visibility, and persists the choice.
 function switchMode(mode) {
   if (mode === currentMode) return;
+
+  // When leaving spec mode for board mode, capture the dispatched task ID
+  // so we can highlight it on the board.
+  if (currentMode === "spec" && mode === "board" && _focusedSpecContent) {
+    var parsed = parseSpecFrontmatter(_focusedSpecContent);
+    var dtid = parsed.frontmatter.dispatched_task_id;
+    if (dtid && dtid !== "null") {
+      _highlightTaskId = dtid;
+    }
+  }
+
   setCurrentMode(mode);
   _applyMode(mode);
+
+  // After switching to board, highlight the task card from the focused spec.
+  if (mode === "board" && _highlightTaskId) {
+    _highlightBoardTask(_highlightTaskId);
+    _highlightTaskId = null;
+  }
+}
+
+// _highlightBoardTask finds a task card on the board and scrolls to it
+// with a brief highlight animation.
+function _highlightBoardTask(taskId) {
+  var card =
+    typeof document.querySelector === "function"
+      ? document.querySelector('.card[data-task-id="' + taskId + '"]')
+      : null;
+  if (!card) return;
+
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("card-highlight");
+  card.addEventListener(
+    "animationend",
+    function () {
+      card.classList.remove("card-highlight");
+    },
+    { once: true },
+  );
 }
 
 // --- Focused spec view ---
