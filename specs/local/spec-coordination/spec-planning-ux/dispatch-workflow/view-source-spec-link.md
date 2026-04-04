@@ -1,6 +1,6 @@
 ---
 title: View Source Spec Link in Task Modal
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
 affects:
