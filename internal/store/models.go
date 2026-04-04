@@ -311,6 +311,11 @@ type Task struct {
 	// tasks auto-created by the brainstorm agent).
 	Tags []string `json:"tags,omitempty"`
 
+	// SpecSourcePath is the relative path of the spec file this task was
+	// dispatched from (e.g. "specs/local/foo.md"). Empty for tasks created
+	// directly on the board. Enables reverse navigation from task → spec.
+	SpecSourcePath string `json:"spec_source_path,omitempty"`
+
 	// ExecutionPrompt overrides Prompt when the sandbox agent is invoked.
 	// When set, the runner passes ExecutionPrompt to the container instead of
 	// Prompt, keeping Prompt as the short human-readable card label (typically

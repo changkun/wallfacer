@@ -6,7 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1872,5 +1872,75 @@ func TestUpdateTaskEnvironment_NotFound(t *testing.T) {
 	err := s.UpdateTaskEnvironment(bg(), uuid.New(), ExecutionEnvironment{})
 	if err == nil {
 		t.Error("expected error for unknown task ID")
+	}
+}
+
+func TestTaskSpecSourcePath_Persists(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := NewFileStore(dir)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
+		Prompt:         "from spec",
+		Timeout:        5,
+		SpecSourcePath: "specs/local/foo.md",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if task.SpecSourcePath != "specs/local/foo.md" {
+		t.Errorf("SpecSourcePath = %q, want %q", task.SpecSourcePath, "specs/local/foo.md")
+	}
+
+	// Reload from disk.
+	s2, _ := NewFileStore(dir)
+	got, err := s2.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after reload: %v", err)
+	}
+	if got.SpecSourcePath != "specs/local/foo.md" {
+		t.Errorf("reloaded SpecSourcePath = %q, want %q", got.SpecSourcePath, "specs/local/foo.md")
+	}
+}
+
+func TestTaskSpecSourcePath_EmptyByDefault(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
+		Prompt:  "no spec",
+		Timeout: 5,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if task.SpecSourcePath != "" {
+		t.Errorf("SpecSourcePath = %q, want empty", task.SpecSourcePath)
+	}
+}
+
+func TestTaskSpecSourcePath_InTaskJSON(t *testing.T) {
+	task := Task{
+		Prompt:         "test",
+		SpecSourcePath: "specs/local/bar.md",
+	}
+	data, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var got Task
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got.SpecSourcePath != "specs/local/bar.md" {
+		t.Errorf("round-trip SpecSourcePath = %q, want %q", got.SpecSourcePath, "specs/local/bar.md")
+	}
+}
+
+func TestTaskSpecSourcePath_OmittedFromJSONWhenEmpty(t *testing.T) {
+	task := Task{Prompt: "test"}
+	data, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(data), "spec_source_path") {
+		t.Error("spec_source_path should be omitted from JSON when empty")
 	}
 }

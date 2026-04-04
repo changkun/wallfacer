@@ -42,6 +42,7 @@ type TaskCreateOptions struct {
 	MaxInputTokens     int
 	ScheduledAt        *time.Time
 	DependsOn          []string
+	SpecSourcePath     string
 	ModelOverride      string
 	CustomPassPatterns []string
 	CustomFailPatterns []string
@@ -101,6 +102,8 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	if len(opts.DependsOn) > 0 {
 		task.DependsOn = append([]string(nil), opts.DependsOn...)
 	}
+
+	task.SpecSourcePath = opts.SpecSourcePath
 
 	// Sandbox.
 	if opts.Sandbox != "" {

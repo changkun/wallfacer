@@ -226,6 +226,7 @@ type batchTaskInput struct {
 	Kind              store.TaskKind                         `json:"kind"`
 	MountWorktrees    bool                                   `json:"mount_worktrees"`
 	DependsOnRefs     []string                               `json:"depends_on_refs"`
+	SpecSourcePath    string                                 `json:"spec_source_path"`
 }
 
 type batchCreateRequest struct {
@@ -489,6 +490,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			Sandbox:           t.Sandbox,
 			SandboxByActivity: t.SandboxByActivity,
 			DependsOn:         depStrs,
+			SpecSourcePath:    t.SpecSourcePath,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
