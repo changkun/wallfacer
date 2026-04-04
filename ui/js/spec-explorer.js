@@ -393,11 +393,19 @@ function _renderSpecNode(node, nodesByPath) {
   // Checkbox for validated leaf specs (multi-select dispatch).
   if (spec.status === "validated") {
     var checked = _selectedSpecPaths.has(node.path) ? " checked" : "";
+    var unmetDeps = _unmetDependencies(spec);
+    var disabled = unmetDeps.length > 0 ? " disabled" : "";
+    var tooltip =
+      unmetDeps.length > 0
+        ? ' title="Blocked by: ' + escapeHtml(unmetDeps.join(", ")) + '"'
+        : "";
     html +=
       '<input type="checkbox" class="spec-select-checkbox" data-spec-select="' +
       escapeHtml(node.path) +
       '"' +
       checked +
+      disabled +
+      tooltip +
       "> ";
   }
 
@@ -469,6 +477,33 @@ function _onSpecToggleClick(e) {
   renderSpecTree();
 }
 
+// _unmetDependencies returns a list of dependency paths from spec.depends_on
+// that are not yet complete. Returns an empty array if all deps are met.
+function _unmetDependencies(spec) {
+  if (
+    !spec.depends_on ||
+    spec.depends_on.length === 0 ||
+    !_specTreeData ||
+    !_specTreeData.nodes
+  )
+    return [];
+  var nodesByPath = {};
+  for (var i = 0; i < _specTreeData.nodes.length; i++) {
+    nodesByPath[_specTreeData.nodes[i].path] = _specTreeData.nodes[i];
+  }
+  var unmet = [];
+  for (var j = 0; j < spec.depends_on.length; j++) {
+    var depPath = spec.depends_on[j];
+    var depNode = nodesByPath[depPath];
+    if (!depNode || !depNode.spec || depNode.spec.status !== "complete") {
+      // Show the title if available, otherwise the path.
+      var label = depNode && depNode.spec ? depNode.spec.title : depPath;
+      unmet.push(label);
+    }
+  }
+  return unmet;
+}
+
 // --- Multi-select dispatch ---
 
 function _onSpecCheckboxChange(e) {
@@ -531,64 +566,68 @@ function _updateDispatchSelectedButton() {
 function dispatchSelectedSpecs() {
   var paths = Array.from(_selectedSpecPaths);
   if (paths.length === 0) return;
-  if (!confirm("Dispatch " + paths.length + " specs to the task board?"))
-    return;
 
-  var btn = document.getElementById("spec-dispatch-selected-btn");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Dispatching\u2026";
-  }
+  showConfirm("Dispatch " + paths.length + " specs to the task board?").then(
+    function (confirmed) {
+      if (!confirmed) return;
 
-  api(Routes.specs.dispatch(), {
-    method: "POST",
-    body: JSON.stringify({ paths: paths, run: false }),
-  })
-    .then(function (resp) {
-      var dispatched = (resp && resp.dispatched) || [];
-      var errors = (resp && resp.errors) || [];
-
-      // Clear selection and uncheck all checkboxes.
-      _selectedSpecPaths.clear();
-      var checkboxes = document.querySelectorAll
-        ? document.querySelectorAll(".spec-select-checkbox")
-        : [];
-      for (var i = 0; i < checkboxes.length; i++) {
-        checkboxes[i].checked = false;
-      }
-      _updateDispatchSelectedButton();
-
-      if (errors.length > 0 && dispatched.length > 0) {
-        alert(
-          "Dispatched " +
-            dispatched.length +
-            " specs. " +
-            errors.length +
-            " failed:\n" +
-            errors
-              .map(function (e) {
-                return e.spec_path + ": " + e.error;
-              })
-              .join("\n"),
-        );
-      } else if (errors.length > 0) {
-        alert(
-          "Dispatch failed:\n" +
-            errors
-              .map(function (e) {
-                return e.spec_path + ": " + e.error;
-              })
-              .join("\n"),
-        );
-      }
-    })
-    .catch(function (err) {
-      alert("Dispatch failed: " + err.message);
-    })
-    .finally(function () {
+      var btn = document.getElementById("spec-dispatch-selected-btn");
       if (btn) {
-        btn.disabled = false;
-        btn.textContent = "Dispatch Selected (0)";
+        btn.disabled = true;
+        btn.textContent = "Dispatching\u2026";
       }
-    });
+
+      api(Routes.specs.dispatch(), {
+        method: "POST",
+        body: JSON.stringify({ paths: paths, run: false }),
+      })
+        .then(function (resp) {
+          var dispatched = (resp && resp.dispatched) || [];
+          var errors = (resp && resp.errors) || [];
+
+          // Clear selection and uncheck all checkboxes.
+          _selectedSpecPaths.clear();
+          var checkboxes = document.querySelectorAll
+            ? document.querySelectorAll(".spec-select-checkbox")
+            : [];
+          for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = false;
+          }
+          _updateDispatchSelectedButton();
+
+          if (errors.length > 0 && dispatched.length > 0) {
+            showAlert(
+              "Dispatched " +
+                dispatched.length +
+                " specs. " +
+                errors.length +
+                " failed:\n" +
+                errors
+                  .map(function (e) {
+                    return e.spec_path + ": " + e.error;
+                  })
+                  .join("\n"),
+            );
+          } else if (errors.length > 0) {
+            showAlert(
+              "Dispatch failed:\n" +
+                errors
+                  .map(function (e) {
+                    return e.spec_path + ": " + e.error;
+                  })
+                  .join("\n"),
+            );
+          }
+        })
+        .catch(function (err) {
+          showAlert("Dispatch failed: " + err.message);
+        })
+        .finally(function () {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Dispatch Selected (0)";
+          }
+        });
+    },
+  );
 }
