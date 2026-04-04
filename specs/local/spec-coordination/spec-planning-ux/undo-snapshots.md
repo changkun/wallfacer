@@ -119,9 +119,9 @@ overflow.
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Post-exec planning commit](undo-snapshots/post-exec-commit.md) | — | small | pending |
-| [Undo API endpoint](undo-snapshots/undo-api.md) | post-exec-commit | small | pending |
-| [UI undo button](undo-snapshots/undo-ui.md) | undo-api | small | pending |
+| [Post-exec planning commit](undo-snapshots/post-exec-commit.md) | — | small | validated |
+| [Undo API endpoint](undo-snapshots/undo-api.md) | post-exec-commit | small | validated |
+| [UI undo button](undo-snapshots/undo-ui.md) | undo-api | small | validated |
 
 ```mermaid
 graph LR
