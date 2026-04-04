@@ -28,6 +28,14 @@ func Copy(src, dst string) error {
 	return CopyGo(src, dst)
 }
 
+// Hooks for testing; production code leaves these at their defaults.
+var (
+	relPath   = filepath.Rel
+	readLink  = os.Readlink
+	entryInfo = func(d fs.DirEntry) (fs.FileInfo, error) { return d.Info() }
+	ioCopy    = io.Copy
+)
+
 // CopyGo is a pure-Go recursive directory copy. It walks src and recreates
 // the directory tree under dst, copying regular files and symlinks.
 func CopyGo(src, dst string) error {
@@ -35,7 +43,7 @@ func CopyGo(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(src, path)
+		rel, err := relPath(src, path)
 		if err != nil {
 			return err
 		}
@@ -47,13 +55,13 @@ func CopyGo(src, dst string) error {
 			return os.MkdirAll(target, 0755)
 		}
 		if d.Type()&fs.ModeSymlink != 0 {
-			link, err := os.Readlink(path)
+			link, err := readLink(path)
 			if err != nil {
 				return err
 			}
 			return os.Symlink(link, target)
 		}
-		info, err := d.Info()
+		info, err := entryInfo(d)
 		if err != nil {
 			return err
 		}
@@ -74,7 +82,7 @@ func CopyFile(src, dst string, mode fs.FileMode) error {
 		return err
 	}
 	defer func() { _ = out.Close() }()
-	if _, err := io.Copy(out, in); err != nil {
+	if _, err := ioCopy(out, in); err != nil {
 		return err
 	}
 	return out.Close()

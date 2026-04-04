@@ -1,11 +1,21 @@
 package dircp
 
 import (
+	"errors"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
+
+func swapHook[T any](t *testing.T, ptr *T, val T) {
+	t.Helper()
+	orig := *ptr
+	*ptr = val
+	t.Cleanup(func() { *ptr = orig })
+}
 
 // TestCopyDirectoryTree verifies that Copy replicates a directory tree
 // including nested subdirectories and files.
@@ -216,5 +226,75 @@ func TestCopyFileDestinationError(t *testing.T) {
 	dst := filepath.Join(t.TempDir(), "nodir", "dst.txt")
 	if err := CopyFile(src, dst, 0644); err == nil {
 		t.Fatal("expected error when destination directory does not exist")
+	}
+}
+
+// TestCopyFile_CopyError verifies that CopyFile returns an error when
+// io.Copy fails during the file copy.
+func TestCopyFile_CopyError(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.txt")
+	if err := os.WriteFile(src, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, "dst.txt")
+	injected := errors.New("injected copy error")
+	swapHook(t, &ioCopy, func(_ io.Writer, _ io.Reader) (int64, error) {
+		return 0, injected
+	})
+
+	if err := CopyFile(src, dst, 0644); !errors.Is(err, injected) {
+		t.Fatalf("expected injected copy error, got %v", err)
+	}
+}
+
+// TestCopyGo_RelPathError verifies that CopyGo returns an error when
+// filepath.Rel fails (defensive branch).
+func TestCopyGo_RelPathError(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, "f.txt"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	injected := errors.New("injected rel error")
+	swapHook(t, &relPath, func(_, _ string) (string, error) { return "", injected })
+
+	if err := CopyGo(src, dst); !errors.Is(err, injected) {
+		t.Fatalf("expected injected rel error, got %v", err)
+	}
+}
+
+// TestCopyGo_ReadlinkError verifies that CopyGo returns an error when
+// os.Readlink fails on a symlink entry.
+func TestCopyGo_ReadlinkError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks require special permissions on Windows")
+	}
+	src := t.TempDir()
+	dst := t.TempDir()
+	if err := os.Symlink("target", filepath.Join(src, "link")); err != nil {
+		t.Fatal(err)
+	}
+	injected := errors.New("injected readlink error")
+	swapHook(t, &readLink, func(_ string) (string, error) { return "", injected })
+
+	if err := CopyGo(src, dst); !errors.Is(err, injected) {
+		t.Fatalf("expected injected readlink error, got %v", err)
+	}
+}
+
+// TestCopyGo_EntryInfoError verifies that CopyGo returns an error when
+// DirEntry.Info fails on a regular file entry.
+func TestCopyGo_EntryInfoError(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, "f.txt"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	injected := errors.New("injected info error")
+	swapHook(t, &entryInfo, func(_ fs.DirEntry) (fs.FileInfo, error) { return nil, injected })
+
+	if err := CopyGo(src, dst); !errors.Is(err, injected) {
+		t.Fatalf("expected injected info error, got %v", err)
 	}
 }
