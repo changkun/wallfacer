@@ -4,11 +4,13 @@ status: drafted
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
-  - internal/handler/
+  - internal/handler/planning.go
+  - internal/planner/
+  - internal/apicontract/routes.go
   - ui/js/
 effort: medium
 created: 2026-03-30
-updated: 2026-04-03
+updated: 2026-04-04
 author: changkun
 dispatched_task_id: null
 ---
@@ -17,118 +19,123 @@ dispatched_task_id: null
 
 ## Current Gap
 
-Currently, when the planning chat agent writes spec files (via `h.planner.Exec` in
+When the planning chat agent writes spec files (via `h.planner.Exec` in
 `internal/handler/planning.go`), those changes are left as uncommitted working tree
 modifications. No commits happen, no snapshots are taken, and no undo stack is
 maintained. After the exec goroutine saves the session ID and appends the assistant
 message to the conversation log, the workspace filesystem is silently mutated with no
-recovery path. This spec addresses that gap.
+recovery path.
 
-## Design Problem
+## Current State
 
-How should per-round snapshots be captured and restored to support undo in the planning
-session? The parent spec decides that each chat round (one user message that triggers
-file writes) creates an implicit snapshot, and undo reverts all writes from that round
-as one unit. The design must define the snapshot mechanism, storage format, undo stack
-management, and the UI interaction for triggering undo.
+The following infrastructure already exists:
 
-Key constraints:
-- Snapshots must be lightweight — planning sessions may produce 50+ rounds
-- Only files the agent actually modified are snapshotted (not the full workspace)
-- Snapshots must be per-round, not per-file — a single undo reverts all writes from one agent response
-- The undo stack persists with the planning session (survives close/reopen)
-- Multiple undos walk back through the stack in reverse order
-- Undo must handle file creation (undo = delete the file) and file deletion (undo = restore the file)
+- **Git utilities**: `internal/gitutil/` has `StashIfDirty()`, `StashPop()`, and
+  `cmdexec.Git()` covers all git operations needed for committing and resetting
+- **Planning exec flow**: `internal/handler/planning.go` runs `planner.Exec()` in a
+  background goroutine and appends the result to the conversation log — the natural
+  injection point for a post-exec commit step
+- **Result extraction**: `conversation.go`'s `ExtractResultText()` extracts the agent's
+  response summary from NDJSON — suitable as the commit message body
+- **Spec write detection**: `git status --porcelain specs/` detects whether the agent
+  made any file writes, so no-op rounds produce no commit
+- **Dispatch integration**: `internal/handler/specs_dispatch.go` has `UndispatchSpecs`
+  — needed for dispatch-aware undo
 
-## Context
+## Decision: Git Commit-Based Snapshots
 
-The planning sandbox operates directly on the workspace filesystem. The agent reads specs,
-writes modified specs, creates new spec files, and potentially deletes specs during
-breakdown operations. All writes are confined to `specs/`.
+Each planning round that writes spec files is immediately followed by a
+`git add specs/ && git commit` in each workspace. The commit message prefix
+`plan: round N — <summary>` identifies planning commits unambiguously in the git log.
+Undo walks the log backwards, finds the last planning commit, and runs
+`git reset --hard HEAD~1`.
 
-Git is available in the workspace. The spec files are version-controlled. Git commits
-serve as both the snapshot mechanism and the natural undo unit.
+**Why git commits:**
+- No separate snapshot storage — the working branch is already a git repo
+- `git reset --hard` atomically handles file creation, modification, and deletion
+- `git log` provides a human-readable audit trail of all planning changes
+- Planning commits integrate with the existing push/merge pipeline without
+  special-casing
+- Rounds with no file writes produce no commit; the undo stack only covers rounds that
+  actually changed something
 
-The existing task system doesn't have undo — tasks are fire-and-forget. The planning
-session is the first interactive editing workflow where undo matters.
+**Round numbering.** Count existing planning commits in the log
+(`git log --format=%s --grep="^plan: round"`) and increment by one. This is cheap,
+robust across session restarts, and monotonically increasing even after undo operations.
 
-## Decision
+**Undo mechanics:**
+1. Find the last planning commit: `git log --format="%H %s" --grep="^plan: round" -1`
+2. Stash any user edits made after that commit: `gitutil.StashIfDirty()`
+3. Reset: `git reset --hard HEAD~1`
+4. Pop stash if one was created: `gitutil.StashPop()`
+5. If the reverted commit dispatched a spec (added a `dispatched_task_id` line to
+   frontmatter), call `UndispatchSpecs` for the affected task IDs
 
-**Option B is chosen: git commit-based snapshots.**
+**Concurrent edits.** If the user hand-edited a spec between the planning commit and the
+undo request, `StashIfDirty()` preserves those edits. The stash pop restores them on top
+of the reverted tree. If pop produces a conflict, the endpoint returns an error with the
+conflicting paths; the working tree is left with the reverted spec and the stash intact
+for manual resolution.
 
-Each agent response that writes files is followed immediately by a `git add specs/ &&
-git commit` on the current working branch. The commit message encodes the round number
-and a short summary (e.g. `plan: round 12 — refine auth spec`). This commit is both
-the snapshot and the undo unit — no separate snapshot storage is needed.
+**Dispatch-aware undo.** After `git reset --hard HEAD~1`, inspect the reverted diff
+(`git diff HEAD HEAD@{1} -- specs/`) for `dispatched_task_id:` lines that were added.
+For each task UUID found, call `UndispatchSpecs` — this cancels the kanban task and
+clears the frontmatter link atomically from the user's perspective.
 
-Undo is implemented as `git revert HEAD` (or `git reset --soft HEAD~1` if the branch is
-local-only and no push has occurred). The undo target is the last planning commit, which
-the server identifies by inspecting the reflog or commit message prefix (`plan: round`).
+**No practical stack limit.** Planning commits accumulate in the git log; all of them
+are undoable. The server walks the log on each undo request — no in-memory stack to
+overflow.
 
-Rationale for choosing Option B:
-- The working branch is already a git repo; no external storage is required.
-- `git reset` cleanly handles file creation, modification, and deletion in one operation.
-- The full history of planning changes is inspectable via `git log` and `git diff`.
-- Commit messages give a human-readable audit trail of what each round changed.
-- Round commits integrate naturally into the existing commit pipeline used by the task
-  runner, so the planning branch can be pushed or merged without special-casing.
-- No manifest or per-file tracking is needed: git tracks the complete working tree delta.
+## Remaining Work
 
-## Options
+1. **Post-exec commit** — In `internal/handler/planning.go`, after `planner.Exec()`
+   returns without error, check `git status --porcelain specs/` in each workspace. If
+   dirty, derive round N (count planning commits + 1), extract the summary from
+   `conversation.ExtractResultText()`, and run:
+   ```
+   git add specs/
+   git commit -m "plan: round N — <summary>"
+   ```
+   using `cmdexec.Git()`. Skip entirely if no writes occurred.
 
-The following options were considered. Option B was selected (see Decision above).
+2. **Undo endpoint** — Add `POST /api/planning/undo` to `internal/handler/planning.go`.
+   The handler:
+   - Finds the latest planning commit via `git log`; returns 409 if none exists
+   - Calls `gitutil.StashIfDirty()` on the workspace
+   - Runs `git reset --hard HEAD~1`
+   - Calls `gitutil.StashPop()` if a stash was created; on pop conflict, returns 409
+     with conflicting paths and leaves stash intact
+   - Inspects the reverted diff for dispatched task IDs; calls `UndispatchSpecs` for
+     each
+   - Returns `{round: N, summary: "...", files_reverted: [...]}`
+   - Register route in `internal/apicontract/routes.go`
 
-**Option A — Git stash-based snapshots.** Before each agent round, `git stash push -- specs/`
-captures the current state. Undo pops the stash. The stash stack maps to the undo stack.
+3. **UI undo button** — In the planning chat UI (`ui/js/`), add a single "Undo last
+   round" button in the chat header (not per-message). The button is disabled when no
+   planning commits exist. On click, call `POST /api/planning/undo` and refresh both
+   the spec tree and the chat message state.
 
-- Pro: Uses existing git infrastructure. Stashes are lightweight, composable, and persist
-  across sessions. `git stash pop` is atomic. The user can also access stashes via git CLI
-  for advanced recovery.
-- Con: Git stash operates on the entire working tree diff, not just the files the agent
-  will modify. If the user has unstaged changes outside `specs/`, stash captures those
-  too (or needs `--keep-index` gymnastics). Stash doesn't track file creations cleanly
-  (new untracked files need `--include-untracked`).
+## Task Breakdown
 
-**Option B — Git commit-based snapshots. (CHOSEN)** After each agent round that writes
-files, create a commit on the working branch with a `plan: round N` prefix. Undo resets
-to the previous commit. Each commit is the snapshot for that round.
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Post-exec planning commit](undo-snapshots/post-exec-commit.md) | — | small | pending |
+| [Undo API endpoint](undo-snapshots/undo-api.md) | post-exec-commit | small | pending |
+| [UI undo button](undo-snapshots/undo-ui.md) | undo-api | small | pending |
 
-- Pro: Full git history of planning changes. Each snapshot is a proper commit with a
-  message. Reset is clean. Works correctly with file creation and deletion. Easy to
-  inspect (`git log --oneline`). No side branch required.
-- Con: Creates many small commits. Must identify and filter planning commits from
-  non-planning commits when walking the undo stack.
+```mermaid
+graph LR
+  A[Post-exec commit] --> B[Undo API endpoint]
+  B --> C[UI undo button]
+```
 
-**Option C — File-copy snapshots.** Before each agent round, copy the affected files to a
-snapshot directory (`~/.wallfacer/snapshots/<fingerprint>/<round>/`). Each snapshot
-directory contains the pre-modification versions of files the agent will modify. Undo
-copies files back from the snapshot directory.
-
-- Pro: Simple, no git dependency for the snapshot mechanism. Fine-grained (only affected
-  files, not the whole `specs/` tree). Storage location is outside the repo (no git noise).
-- Con: Must track file creation/deletion explicitly (snapshot needs a manifest of
-  operations). More disk I/O. Must handle the case where a file was created by the agent
-  (undo = delete) vs. modified (undo = restore previous content).
-
-## Open Questions
-
-1. How does undo interact with concurrent edits? If the user edits a spec file between
-   round N and undo of round N, the working tree has diverged from the commit. Should
-   undo warn the user if the working tree is dirty relative to the planning commit being
-   reverted?
-2. Should undo be available only in the UI (undo button per agent response), or also as
-   a chat command ("undo the last change")?
-3. How does undo interact with dispatch? If the agent dispatched a spec (creating a
-   kanban task + updating `dispatched_task_id`) and the user undoes that round, the spec
-   file reverts but the kanban task persists. Should the undo operation also cancel the
-   dispatched task, or is that a separate manual step?
-4. What happens when the undo stack limit is reached (e.g., 50 rounds)? Oldest planning
-   commits are retained in the git log but flagged as no longer undoable? Or is there no
-   practical limit given that git history is append-only?
+**Deferred:** Redo (forward stack), multi-workspace undo, and drift assessment are out
+of scope. The three tasks above are sufficient for a complete undo workflow.
 
 ## Affects
 
-- `internal/handler/planning.go` — after exec completes successfully, run `git add specs/ && git commit` before appending the assistant message to the conversation log
-- `internal/planner/` — may need a helper to run git commands in the workspace and to walk the commit log to find the undo target
-- `ui/js/` — undo button per agent response in the chat stream, undo stack status indicator
-- Spec file system — restore operations are delegated to `git reset` rather than custom file I/O
+- `internal/handler/planning.go` — post-exec `git add specs/ && git commit`; new
+  `POST /api/planning/undo` handler
+- `internal/apicontract/routes.go` — register `/api/planning/undo`
+- `internal/planner/` — optional git helper for round number derivation
+- `ui/js/` — undo button in the planning chat header
