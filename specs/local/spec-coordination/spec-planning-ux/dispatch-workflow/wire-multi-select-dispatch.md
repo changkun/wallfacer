@@ -1,6 +1,6 @@
 ---
 title: Wire Multi-Select Dispatch in Spec Explorer
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/dispatch-api.md
 affects:
