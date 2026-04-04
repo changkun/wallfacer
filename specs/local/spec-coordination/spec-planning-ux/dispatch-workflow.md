@@ -1,6 +1,6 @@
 ---
 title: Dispatch & Board Integration
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
 affects:
@@ -127,6 +127,32 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 ### Agent Integration (Nice-to-Have)
 
 13. **Planning agent dispatch command** — Update `internal/planner/commands_templates/dispatch.tmpl` so the `/dispatch` slash command calls the atomic `POST /api/specs/dispatch` endpoint instead of manually updating frontmatter. The agent can validate prerequisites and provide feedback before triggering the API call.
+
+## Outcome
+
+The dispatch & board integration is fully implemented with layer 1 completion feedback. Validated leaf specs can be dispatched as kanban tasks via the UI or batch API, with bidirectional navigation (task → spec badge, spec → board highlight) and automatic spec status updates on task completion.
+
+### What Shipped
+
+- **2 API endpoints**: `POST /api/specs/dispatch` (atomic batch dispatch with dependency wiring, rollback on failure) and `POST /api/specs/undispatch` (cancel task, clear linkage, return to validated) in `internal/handler/specs_dispatch.go`
+- **Spec frontmatter writer**: `spec.UpdateFrontmatter()` in `internal/spec/write.go` — updates individual YAML fields via `yaml.Node` without disturbing markdown body, atomic writes
+- **Task model field**: `SpecSourcePath string` on `Task` for reverse linkage (task → spec)
+- **Leaf detection**: `spec.IsLeafPath()` in `internal/spec/leaf.go` — filesystem-based check for child specs
+- **Completion hook**: `Store.OnDone` callback fires when tasks reach `done`, updates spec status to `complete` via `SpecCompletionHook`
+- **Frontend**: dispatch button (single + multi-select), spec badge on task cards (purple, clickable), "View Source Spec" link in task modal, board highlight with indigo glow animation on mode switch
+- **Tests**: 13 backend tests for UpdateFrontmatter, 4 for IsLeafPath, 9 for dispatch handler, 4 for undispatch, 4 for completion hook, 4 for SpecSourcePath persistence; 5+6 frontend tests for dispatch buttons, 3 for spec badge, 2 for modal link, 2 for board highlight
+
+### Design Evolution
+
+1. **Leaf-only dispatch enforced**: The original spec said "any validated spec is dispatchable — both design specs (non-leaf) and implementation specs (leaf)." This was implemented initially but reverted after discovering it broke progress tracking, drift propagation, and impact analysis — all of which assume leaf-level dispatch granularity. The `checkDispatchConsistency` validation rule was restored.
+
+2. **Simplified topological sort**: The spec suggested reusing Kahn's algorithm from the batch task API. Since dependencies are resolved via pre-assigned UUIDs before creation, sequential creation produces correct results without topological sorting.
+
+3. **Callback pattern for completion hook**: The spec suggested adding `specRootDirs []string` to the Store. The implementation uses a `Store.OnDone func(Task)` callback set by the server layer, keeping the store decoupled from workspace and spec packages.
+
+4. **Layer 1 sets `complete` directly**: The spec called for an intermediate `done` status with layer 2 confirming `complete`. Since drift assessment (layer 2) is deferred, the hook sets `complete` directly. When layer 2 is implemented, this will be updated to use an intermediate status.
+
+5. **`ValidateSpec` signature change**: Removing then re-adding `checkDispatchConsistency` caused the `isLeaf` parameter to be temporarily removed and then restored on `ValidateSpec`.
 
 ## Open Questions
 
