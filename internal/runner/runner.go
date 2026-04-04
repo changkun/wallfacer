@@ -298,6 +298,14 @@ func (r *Runner) Shutdown() {
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
+	// Bail out if shutdown has already been initiated. This prevents a race
+	// where backgroundWg.Add (inside Go) runs concurrently with
+	// backgroundWg.Wait in Shutdown — sync.WaitGroup forbids that when the
+	// counter is zero.
+	if r.shutdownCtx.Err() != nil {
+		return
+	}
+
 	// Capture the current workspace key at dispatch time so the task uses the
 	// correct store even if the user switches workspaces during execution.
 	wsKey := r.currentWSKey()

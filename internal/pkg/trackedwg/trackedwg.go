@@ -13,22 +13,29 @@ import (
 type WaitGroup struct {
 	mu      sync.Mutex
 	pending map[string]int
+	closed  bool // set by Wait; prevents Add after Wait to avoid sync.WaitGroup race
 	wg      sync.WaitGroup
 }
 
 // Add increments the wait group counter and records label as pending.
 // Add must be called before the goroutine that will call Done is started.
-func (w *WaitGroup) Add(label string) {
+// Returns false if Wait has already been called (the add is silently dropped
+// to avoid a sync.WaitGroup race between Add and Wait at counter zero).
+func (w *WaitGroup) Add(label string) bool {
 	w.mu.Lock()
+	if w.closed {
+		w.mu.Unlock()
+		return false
+	}
 	if w.pending == nil {
 		w.pending = make(map[string]int) // lazy init to support zero-value usage
 	}
 	w.pending[label]++
-	w.mu.Unlock()
-	// wg.Add must happen after recording the label so that Pending is always
-	// consistent: if a caller checks Pending after Add returns, the label is
-	// guaranteed to be visible.
+	// wg.Add inside the lock so it cannot race with Wait (which also acquires
+	// the lock to set closed before calling wg.Wait).
 	w.wg.Add(1)
+	w.mu.Unlock()
+	return true
 }
 
 // Done decrements the wait group counter and removes label from pending.
@@ -46,16 +53,24 @@ func (w *WaitGroup) Done(label string) {
 
 // Go launches fn in a background goroutine tracked under label.
 // It is shorthand for Add(label) followed by a goroutine that defers Done(label).
-func (w *WaitGroup) Go(label string, fn func()) {
-	w.Add(label)
+// If Wait has already been called, fn is not executed and Go returns false.
+func (w *WaitGroup) Go(label string, fn func()) bool {
+	if !w.Add(label) {
+		return false
+	}
 	go func() {
 		defer w.Done(label)
 		fn()
 	}()
+	return true
 }
 
-// Wait blocks until all tracked goroutines have called Done.
+// Wait blocks until all tracked goroutines have called Done. After Wait is
+// called, subsequent Add calls are silently dropped.
 func (w *WaitGroup) Wait() {
+	w.mu.Lock()
+	w.closed = true
+	w.mu.Unlock()
 	w.wg.Wait()
 }
 

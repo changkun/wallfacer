@@ -189,3 +189,20 @@ func TestWaitGroup_AddOrdering(t *testing.T) {
 		t.Fatalf("expected empty Pending after Wait, got %v", p)
 	}
 }
+
+// TestWaitGroup_AddAfterWaitRejected verifies that Add and Go return false
+// after Wait has been called, preventing the sync.WaitGroup Add/Wait race.
+func TestWaitGroup_AddAfterWaitRejected(t *testing.T) {
+	var wg WaitGroup
+	wg.Wait() // nothing pending, returns immediately and sets closed
+
+	if wg.Add("late") {
+		t.Fatal("Add after Wait should return false")
+	}
+	if wg.Go("late", func() { t.Fatal("should not run") }) {
+		t.Fatal("Go after Wait should return false")
+	}
+	if p := wg.Pending(); len(p) != 0 {
+		t.Fatalf("expected empty Pending, got %v", p)
+	}
+}
