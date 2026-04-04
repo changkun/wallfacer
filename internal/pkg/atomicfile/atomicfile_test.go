@@ -118,7 +118,7 @@ func TestWrite_WriteError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.txt")
 	injected := errors.New("injected write error")
-	swapHook(t, &writeFile, func(f *os.File, data []byte) (int, error) {
+	swapHook(t, &writeFile, func(_ *os.File, _ []byte) (int, error) {
 		return 0, injected
 	})
 
