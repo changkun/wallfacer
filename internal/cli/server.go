@@ -682,8 +682,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateWorkspaces": h.UpdateWorkspaces,
 
 		// Spec tree.
-		"GetSpecTree":    h.GetSpecTree,
-		"SpecTreeStream": h.SpecTreeStream,
+		"GetSpecTree":     h.GetSpecTree,
+		"SpecTreeStream":  h.SpecTreeStream,
+		"DispatchSpecs":   h.DispatchSpecs,
+		"UndispatchSpecs": h.UndispatchSpecs,
 
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
