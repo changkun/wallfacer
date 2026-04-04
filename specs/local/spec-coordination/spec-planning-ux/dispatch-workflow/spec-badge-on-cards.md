@@ -1,6 +1,6 @@
 ---
 title: Spec Badge on Task Cards
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
 affects:

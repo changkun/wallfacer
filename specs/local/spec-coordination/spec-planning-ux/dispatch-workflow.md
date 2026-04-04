@@ -147,7 +147,7 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 | [Task completion hook](dispatch-workflow/task-completion-hook.md) | spec-frontmatter-writer, task-spec-source-field | small | validated |
 | [Wire dispatch button](dispatch-workflow/wire-dispatch-button.md) | dispatch-api | small | **complete** |
 | [Wire multi-select dispatch](dispatch-workflow/wire-multi-select-dispatch.md) | dispatch-api | small | **complete** |
-| [Spec badge on cards](dispatch-workflow/spec-badge-on-cards.md) | task-spec-source-field | small | validated |
+| [Spec badge on cards](dispatch-workflow/spec-badge-on-cards.md) | task-spec-source-field | small | **complete** |
 | [View source spec link](dispatch-workflow/view-source-spec-link.md) | task-spec-source-field | small | validated |
 | [Board highlight from spec](dispatch-workflow/board-highlight-from-spec.md) | spec-badge-on-cards | small | validated |
 
