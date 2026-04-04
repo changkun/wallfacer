@@ -348,10 +348,7 @@ describe("commandPaletteSearchTasks sort order", () => {
 
   it("uses global tasks when sourceTasks is not provided", () => {
     const ctx = setupCommandPaletteContext();
-    vm.runInContext(
-      'tasks = [{ id: "g1", title: "global task" }]',
-      ctx,
-    );
+    vm.runInContext('tasks = [{ id: "g1", title: "global task" }]', ctx);
     const result = ctx.commandPaletteSearchTasks("global");
     expect(result.length).toBe(1);
     expect(result[0].id).toBe("g1");
@@ -802,8 +799,20 @@ describe("keyboard navigation edge cases", () => {
       {
         title: "Tasks",
         rows: [
-          { type: "task", id: "1", title: "A", taskObj: { id: "1" }, execute: () => {} },
-          { type: "task", id: "2", title: "B", taskObj: { id: "2" }, execute: () => {} },
+          {
+            type: "task",
+            id: "1",
+            title: "A",
+            taskObj: { id: "1" },
+            execute: () => {},
+          },
+          {
+            type: "task",
+            id: "2",
+            title: "B",
+            taskObj: { id: "2" },
+            execute: () => {},
+          },
         ],
       },
     ]);
@@ -832,7 +841,13 @@ describe("keyboard navigation edge cases", () => {
       {
         title: "Tasks",
         rows: [
-          { type: "task", id: "1", title: "A", taskObj: { id: "1" }, execute: () => {} },
+          {
+            type: "task",
+            id: "1",
+            title: "A",
+            taskObj: { id: "1" },
+            execute: () => {},
+          },
         ],
       },
     ]);
@@ -849,8 +864,20 @@ describe("keyboard navigation edge cases", () => {
       {
         title: "Tasks",
         rows: [
-          { type: "task", id: "1", title: "A", taskObj: { id: "1" }, execute: () => {} },
-          { type: "task", id: "2", title: "B", taskObj: { id: "2" }, execute: () => {} },
+          {
+            type: "task",
+            id: "1",
+            title: "A",
+            taskObj: { id: "1" },
+            execute: () => {},
+          },
+          {
+            type: "task",
+            id: "2",
+            title: "B",
+            taskObj: { id: "2" },
+            execute: () => {},
+          },
         ],
       },
     ]);
@@ -873,7 +900,13 @@ describe("executeCommandPaletteActiveRow", () => {
       {
         title: "Tasks",
         rows: [
-          { type: "task", id: "1", title: "A", taskObj: { id: "1" }, execute: executeFn },
+          {
+            type: "task",
+            id: "1",
+            title: "A",
+            taskObj: { id: "1" },
+            execute: executeFn,
+          },
         ],
       },
     ]);
@@ -1033,7 +1066,13 @@ describe("commandPaletteHandleGlobalKey", () => {
       {
         title: "Tasks",
         rows: [
-          { type: "task", id: "1", title: "A", taskObj: { id: "1" }, execute: executeFn },
+          {
+            type: "task",
+            id: "1",
+            title: "A",
+            taskObj: { id: "1" },
+            execute: executeFn,
+          },
         ],
       },
     ]);
