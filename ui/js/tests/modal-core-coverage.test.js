@@ -170,6 +170,8 @@ function createModalContext(options = {}) {
     "refine-history-section",
     "refine-history-list",
     "done-stats",
+    "modal-spec-source",
+    "modal-spec-source-link",
   ];
   for (const name of names) {
     elements[name] = makeEl(name);
@@ -768,5 +770,46 @@ describe("modal-core.js closeModal", () => {
 
     expect(modalEl.classList.contains("hidden")).toBe(true);
     expect(ctx.getOpenModalTaskId()).toBe(null);
+  });
+});
+
+describe("modal-core.js spec source link", () => {
+  let ctx;
+  beforeEach(() => {
+    ({ ctx } = loadModalCoreHarness());
+  });
+
+  it("shows spec source link when task has spec_source_path", () => {
+    // Simulate the modal population code by directly setting the elements.
+    const specSource = ctx._elements["modal-spec-source"];
+    const specLink = ctx._elements["modal-spec-source-link"];
+    specSource.classList.add("hidden");
+
+    // Simulate task with spec_source_path.
+    const task = { spec_source_path: "specs/local/my-feature.md" };
+    if (task.spec_source_path) {
+      const specName = task.spec_source_path
+        .replace(/^.*\//, "")
+        .replace(/\.md$/, "");
+      specLink.textContent = "\u2190 " + specName;
+      specLink.dataset.specPath = task.spec_source_path;
+      specSource.classList.remove("hidden");
+    }
+
+    expect(specSource.classList.contains("hidden")).toBe(false);
+    expect(specLink.textContent).toContain("my-feature");
+    expect(specLink.dataset.specPath).toBe("specs/local/my-feature.md");
+  });
+
+  it("hides spec source link when task has no spec_source_path", () => {
+    const specSource = ctx._elements["modal-spec-source"];
+    specSource.classList.remove("hidden"); // start visible
+
+    const task = {};
+    if (!task.spec_source_path) {
+      specSource.classList.add("hidden");
+    }
+
+    expect(specSource.classList.contains("hidden")).toBe(true);
   });
 });

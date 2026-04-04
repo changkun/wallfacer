@@ -365,6 +365,37 @@ async function openModal(id) {
   ).toLocaleString();
   document.getElementById("modal-id").textContent = `ID: ${task.id}`;
 
+  // Show/hide spec source link.
+  const specSourceEl = document.getElementById("modal-spec-source");
+  const specSourceLink = document.getElementById("modal-spec-source-link");
+  if (specSourceEl && specSourceLink) {
+    if (task.spec_source_path) {
+      const specName = task.spec_source_path
+        .replace(/^.*\//, "")
+        .replace(/\.md$/, "");
+      specSourceLink.textContent = "\u2190 " + specName;
+      specSourceLink.title = "View source spec: " + task.spec_source_path;
+      specSourceLink.dataset.specPath = task.spec_source_path;
+      specSourceLink.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+        if (typeof switchMode === "function") switchMode("spec");
+        if (
+          typeof focusSpec === "function" &&
+          typeof activeWorkspaces !== "undefined" &&
+          activeWorkspaces &&
+          activeWorkspaces.length > 0
+        ) {
+          focusSpec(task.spec_source_path, activeWorkspaces[0]);
+        }
+      };
+      specSourceEl.classList.remove("hidden");
+    } else {
+      specSourceEl.classList.add("hidden");
+    }
+  }
+
   const titleEl = document.getElementById("modal-title");
   if (titleEl) {
     if (task.title) {
