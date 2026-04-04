@@ -88,7 +88,7 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 	for _, base := range bases {
 		mdPath := mdFiles[base]
 		relPath, _ := filepath.Rel(specsDir, mdPath)
-		relPath = filepath.ToSlash(relPath)
+		relPath = "specs/" + filepath.ToSlash(relPath)
 
 		s, parseErr := ParseFile(mdPath)
 		if parseErr != nil {
