@@ -26,7 +26,7 @@ Implement `POST /api/specs/dispatch` — the atomic dispatch endpoint that creat
 
 1. **Add route** in `internal/apicontract/routes.go`: define `DispatchSpecs` route as `POST /api/specs/dispatch` in the specs section.
 
-2. **Update dispatch validation** in `internal/spec/validate.go`: remove or relax the `checkDispatchConsistency` rule (line 105-111) that currently prevents non-leaf specs from having `dispatched_task_id`. The dispatch-workflow spec explicitly allows dispatching both leaf and non-leaf specs. Instead, the dispatch handler will validate that the spec status is `validated`.
+2. **Enforce leaf-only dispatch** in the handler: validate that each spec is a leaf (no child specs in a corresponding subdirectory) before dispatching. The `checkDispatchConsistency` rule in `internal/spec/validate.go` enforces this at the validation level; the handler adds a filesystem check via `spec.IsLeafPath()`.
 
 3. **Create handler** in `internal/handler/specs_dispatch.go` (new file):
 
@@ -89,6 +89,6 @@ Implement `POST /api/specs/dispatch` — the atomic dispatch endpoint that creat
 
 ## Implementation notes
 
-- **ValidateSpec signature change**: Removing `checkDispatchConsistency` made the `isLeaf` parameter unused. Rather than leaving dead code, the `isLeaf` parameter was removed from `ValidateSpec(s *Spec, repoRoot string, isLeaf bool)` → `ValidateSpec(s *Spec, repoRoot string)`. All callers updated.
+- **Leaf-only dispatch enforced**: The handler checks `spec.IsLeafPath()` (filesystem-based leaf detection) and rejects non-leaf specs. The `checkDispatchConsistency` validation rule and `isLeaf` parameter on `ValidateSpec` were temporarily removed but have been restored — non-leaf dispatch broke progress tracking, drift propagation, and impact analysis.
 - **Simplified topological sort**: The spec suggested Kahn's algorithm for batch ordering, but since dependencies are resolved via pre-assigned UUIDs (not creation order), sequential creation works correctly without topological sort. The pre-assigned UUIDs ensure cross-batch references are valid regardless of creation order.
 - **Partial success not supported**: The spec's response format shows both `dispatched` and `errors` suggesting partial success. The implementation returns all-or-nothing for task creation (any creation failure rolls back), but validation errors are collected per-spec before creation begins. A batch with some invalid specs and some valid specs will only dispatch the valid ones.
