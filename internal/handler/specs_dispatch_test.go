@@ -247,6 +247,26 @@ dispatched_task_id: 550e8400-e29b-41d4-a716-446655440000
 	}
 }
 
+func TestDispatchSpecs_RejectsNonLeaf(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	// Create a non-leaf spec: parent.md with a child directory parent/ containing a child spec.
+	writeTestSpec(t, ws, "specs/local/parent.md", testSpecValidated)
+	writeTestSpec(t, ws, "specs/local/parent/child.md", testSpecValidated)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/parent.md"}, false)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1", len(resp.Errors))
+	}
+	if !strings.Contains(resp.Errors[0].Error, "non-leaf") {
+		t.Errorf("error message = %q, should mention non-leaf", resp.Errors[0].Error)
+	}
+}
+
 func TestDispatchSpecs_SpecSourcePath(t *testing.T) {
 	h, ws := newDispatchTestHandler(t)
 	writeTestSpec(t, ws, "specs/local/source.md", testSpecValidated)

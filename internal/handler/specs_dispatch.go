@@ -91,6 +91,11 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		if !spec.IsLeafPath(absPath) {
+			errs = append(errs, dispatchError{relPath, "non-leaf specs cannot be dispatched (break down into child specs first)"})
+			continue
+		}
+
 		batchPaths[relPath] = len(resolved)
 		resolved = append(resolved, resolvedSpec{
 			spec:    s,

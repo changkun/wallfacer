@@ -29,13 +29,15 @@ type Result struct {
 
 // ValidateSpec runs all per-spec validation rules and returns all violations.
 // The repoRoot is used to resolve depends_on and affects paths on disk.
-func ValidateSpec(s *Spec, repoRoot string) []Result {
+// isLeaf indicates whether the spec has no children in the tree.
+func ValidateSpec(s *Spec, repoRoot string, isLeaf bool) []Result {
 	var results []Result
 
 	results = append(results, checkRequiredFields(s)...)
 	results = append(results, checkValidEnums(s)...)
 	results = append(results, checkDateOrdering(s)...)
 	results = append(results, checkNoSelfDependency(s)...)
+	results = append(results, checkDispatchConsistency(s, isLeaf)...)
 	results = append(results, checkDependsOnExist(s, repoRoot)...)
 	results = append(results, checkAffectsExist(s, repoRoot)...)
 	results = append(results, checkBodyNotEmpty(s)...)
@@ -100,6 +102,14 @@ func checkNoSelfDependency(s *Spec) []Result {
 	return nil
 }
 
+func checkDispatchConsistency(s *Spec, isLeaf bool) []Result {
+	if !isLeaf && s.DispatchedTaskID != nil {
+		return []Result{{s.Path, SeverityError, "dispatch-consistency",
+			"non-leaf spec must not have dispatched_task_id"}}
+	}
+	return nil
+}
+
 func checkDependsOnExist(s *Spec, repoRoot string) []Result {
 	if repoRoot == "" {
 		return nil
@@ -137,7 +147,7 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 	// Per-spec validation for each node.
 	for _, node := range tree.All {
 		if node.Value != nil {
-			results = append(results, ValidateSpec(node.Value, repoRoot)...)
+			results = append(results, ValidateSpec(node.Value, repoRoot, node.IsLeaf)...)
 		}
 	}
 

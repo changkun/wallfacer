@@ -314,10 +314,22 @@ function _loadAndRenderSpec() {
           });
       }
 
-      // Show dispatch button for any validated spec (design or implementation).
+      // Show dispatch button only for validated leaf specs (implementation specs).
+      // Non-leaf (design) specs must be broken down first.
       if (dispatchBtn) {
         var isValidated = parsed.frontmatter.status === "validated";
-        dispatchBtn.classList.toggle("hidden", !isValidated);
+        var specIsLeaf = true;
+        if (
+          typeof _specTreeData !== "undefined" &&
+          _specTreeData &&
+          _specTreeData.nodes
+        ) {
+          var tn = _specTreeData.nodes.find(function (n) {
+            return n.path === _focusedSpecPath;
+          });
+          if (tn) specIsLeaf = tn.is_leaf;
+        }
+        dispatchBtn.classList.toggle("hidden", !(isValidated && specIsLeaf));
       }
 
       // Show breakdown button for validated specs that could be decomposed.
