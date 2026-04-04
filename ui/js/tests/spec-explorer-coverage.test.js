@@ -165,6 +165,9 @@ function makeContext(opts = {}) {
     console,
     parseInt,
     String,
+    showConfirm: opts.showConfirm || (() => Promise.resolve(true)),
+    showAlert: opts.showAlert || (() => {}),
+    Promise,
     registry,
     storage,
   };

@@ -129,6 +129,9 @@ function makeContext(opts = {}) {
     history: { replaceState: () => {} },
     confirm: vi.fn(() => confirmResult),
     alert: vi.fn(),
+    showConfirm: vi.fn(() => Promise.resolve(confirmResult)),
+    showAlert: vi.fn(),
+    Promise,
     console,
     storage,
     fetchCalls,
@@ -146,7 +149,7 @@ describe("dispatchFocusedSpec", () => {
     const ctx = makeContext();
     // _focusedSpecPath is null by default.
     ctx.dispatchFocusedSpec();
-    expect(ctx.confirm).not.toHaveBeenCalled();
+    expect(ctx.showConfirm).not.toHaveBeenCalled();
     expect(ctx.api).not.toHaveBeenCalled();
   });
 
@@ -155,7 +158,10 @@ describe("dispatchFocusedSpec", () => {
     // Set a focused spec path.
     ctx._focusedSpecPath = "specs/local/test.md";
     ctx.dispatchFocusedSpec();
-    expect(ctx.confirm).toHaveBeenCalledWith(
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(ctx.showConfirm).toHaveBeenCalledWith(
       "Dispatch this spec to the task board?",
     );
     expect(ctx.api).not.toHaveBeenCalled();
@@ -171,6 +177,8 @@ describe("dispatchFocusedSpec", () => {
     ctx._focusedSpecPath = "specs/local/test.md";
     ctx.dispatchFocusedSpec();
 
+    await new Promise((r) => setTimeout(r, 10));
+
     expect(ctx.api).toHaveBeenCalledWith("/api/specs/dispatch", {
       method: "POST",
       body: JSON.stringify({ paths: ["specs/local/test.md"], run: false }),
@@ -182,14 +190,11 @@ describe("dispatchFocusedSpec", () => {
     ctx._focusedSpecPath = "specs/local/test.md";
     ctx.dispatchFocusedSpec();
 
-    const btn = ctx.document.getElementById("spec-dispatch-btn");
-    expect(btn.disabled).toBe(true);
-    expect(btn.textContent).toContain("Dispatching");
-
-    // Wait for the promise to resolve.
+    // Wait for showConfirm + API to resolve.
     await new Promise((r) => setTimeout(r, 10));
 
     // Button should be re-enabled and hidden after success.
+    const btn = ctx.document.getElementById("spec-dispatch-btn");
     expect(btn.disabled).toBe(false);
     expect(btn.classList.contains("hidden")).toBe(true);
   });
@@ -202,7 +207,7 @@ describe("dispatchFocusedSpec", () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(ctx.alert).toHaveBeenCalledWith(
+    expect(ctx.showAlert).toHaveBeenCalledWith(
       "Dispatch failed: validation failed",
     );
     // Button should be re-enabled after error.

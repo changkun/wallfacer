@@ -248,6 +248,9 @@ function makeContext(overrides = {}) {
     JSON,
     encodeURIComponent,
     Error,
+    showConfirm: overrides.showConfirm || (() => Promise.resolve(true)),
+    showAlert: overrides.showAlert || (() => {}),
+    Promise,
   };
 
   vm.createContext(ctx);

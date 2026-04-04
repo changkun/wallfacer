@@ -95,6 +95,9 @@ function makeContext(opts = {}) {
   const confirmResult =
     opts.confirmResult !== undefined ? opts.confirmResult : true;
 
+  const showConfirmFn = vi.fn(() => Promise.resolve(confirmResult));
+  const showAlertFn = vi.fn();
+
   const ctx = {
     document: {
       getElementById(id) {
@@ -142,6 +145,9 @@ function makeContext(opts = {}) {
     clearInterval: () => {},
     confirm: vi.fn(() => confirmResult),
     alert: vi.fn(),
+    showConfirm: showConfirmFn,
+    showAlert: showAlertFn,
+    Promise,
     Math,
     JSON,
     Array,
@@ -159,15 +165,18 @@ describe("dispatchSelectedSpecs", () => {
   it("does nothing when no specs are selected", () => {
     const ctx = makeContext();
     ctx.dispatchSelectedSpecs();
-    expect(ctx.confirm).not.toHaveBeenCalled();
+    expect(ctx.showConfirm).not.toHaveBeenCalled();
     expect(ctx.api).not.toHaveBeenCalled();
   });
 
-  it("does nothing when user cancels confirmation", () => {
+  it("does nothing when user cancels confirmation", async () => {
     const ctx = makeContext({ confirmResult: false });
     ctx._selectedSpecPaths.add("specs/local/a.md");
     ctx.dispatchSelectedSpecs();
-    expect(ctx.confirm).toHaveBeenCalledWith(
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(ctx.showConfirm).toHaveBeenCalledWith(
       "Dispatch 1 specs to the task board?",
     );
     expect(ctx.api).not.toHaveBeenCalled();
@@ -186,6 +195,8 @@ describe("dispatchSelectedSpecs", () => {
     ctx._selectedSpecPaths.add("specs/local/a.md");
     ctx._selectedSpecPaths.add("specs/local/b.md");
     ctx.dispatchSelectedSpecs();
+
+    await new Promise((r) => setTimeout(r, 10));
 
     expect(ctx.api).toHaveBeenCalledWith("/api/specs/dispatch", {
       method: "POST",
@@ -222,7 +233,9 @@ describe("dispatchSelectedSpecs", () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(ctx.alert).toHaveBeenCalledWith("Dispatch failed: server error");
+    expect(ctx.showAlert).toHaveBeenCalledWith(
+      "Dispatch failed: server error",
+    );
   });
 
   it("shows partial success details", async () => {
@@ -238,8 +251,8 @@ describe("dispatchSelectedSpecs", () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(ctx.alert).toHaveBeenCalled();
-    const msg = ctx.alert.mock.calls[0][0];
+    expect(ctx.showAlert).toHaveBeenCalled();
+    const msg = ctx.showAlert.mock.calls[0][0];
     expect(msg).toContain("Dispatched 1");
     expect(msg).toContain("1 failed");
     expect(msg).toContain("not validated");

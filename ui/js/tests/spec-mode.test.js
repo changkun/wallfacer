@@ -98,6 +98,9 @@ function makeContext() {
     location: { hash: "", pathname: "/" },
     history: { replaceState: () => {} },
     console,
+    showConfirm: () => Promise.resolve(true),
+    showAlert: () => {},
+    Promise,
     storage,
   };
   vm.createContext(ctx);
@@ -205,6 +208,9 @@ describe("spec-mode", () => {
       location: { hash: "", pathname: "/" },
       history: { replaceState: () => {} },
       console,
+      showConfirm: () => Promise.resolve(true),
+      showAlert: () => {},
+      Promise,
       storage,
     };
     vm.createContext(ctx2);

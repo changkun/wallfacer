@@ -102,6 +102,9 @@ function makeContext() {
     location: { hash: "", pathname: "/" },
     history: { replaceState: () => {} },
     console,
+    showConfirm: () => Promise.resolve(true),
+    showAlert: () => {},
+    Promise,
     registry,
   };
   vm.createContext(ctx);

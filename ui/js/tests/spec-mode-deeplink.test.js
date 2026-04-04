@@ -112,6 +112,9 @@ function makeContext(opts = {}) {
     setInterval: () => 42,
     clearInterval: () => {},
     console,
+    showConfirm: () => Promise.resolve(true),
+    showAlert: () => {},
+    Promise,
     registry,
     replaceStateCalls,
   };
