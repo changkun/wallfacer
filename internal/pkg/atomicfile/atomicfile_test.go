@@ -2,11 +2,23 @@ package atomicfile
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 )
+
+// swapHook replaces a package-level function variable for the duration of a
+// test and restores it on cleanup. Returns a pointer so the caller can
+// replace the value inline.
+func swapHook[T any](t *testing.T, ptr *T, val T) {
+	t.Helper()
+	orig := *ptr
+	*ptr = val
+	t.Cleanup(func() { *ptr = orig })
+}
 
 // TestWrite_Success validates the happy path: data is written to the target
 // path and the temporary file is cleaned up afterward.
@@ -97,6 +109,105 @@ func TestWrite_Overwrite(t *testing.T) {
 	got, _ := os.ReadFile(path)
 	if string(got) != "second" {
 		t.Fatalf("got %q, want %q", got, "second")
+	}
+}
+
+// TestWrite_WriteError verifies that a write error is returned and the
+// temp file is cleaned up.
+func TestWrite_WriteError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	injected := errors.New("injected write error")
+	swapHook(t, &writeFile, func(f *os.File, data []byte) (int, error) {
+		return 0, injected
+	})
+
+	err := Write(path, []byte("data"), 0644)
+	if !errors.Is(err, injected) {
+		t.Fatalf("expected injected write error, got %v", err)
+	}
+	// Target must not exist.
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("target file should not exist after write error")
+	}
+	// No leftover temp files.
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Fatalf("temp file %q was not cleaned up", e.Name())
+		}
+	}
+}
+
+// TestWrite_CloseError verifies that a close error is returned and the
+// temp file is cleaned up.
+func TestWrite_CloseError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	injected := errors.New("injected close error")
+	swapHook(t, &closeFile, func(f *os.File) error {
+		_ = f.Close() // actually close the fd to avoid leaks
+		return injected
+	})
+
+	err := Write(path, []byte("data"), 0644)
+	if !errors.Is(err, injected) {
+		t.Fatalf("expected injected close error, got %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("target file should not exist after close error")
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Fatalf("temp file %q was not cleaned up", e.Name())
+		}
+	}
+}
+
+// TestWrite_ChmodError verifies that a chmod error is returned and the
+// temp file is cleaned up.
+func TestWrite_ChmodError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	injected := errors.New("injected chmod error")
+	swapHook(t, &chmodPath, func(string, os.FileMode) error { return injected })
+
+	err := Write(path, []byte("data"), 0644)
+	if !errors.Is(err, injected) {
+		t.Fatalf("expected injected chmod error, got %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("target file should not exist after chmod error")
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Fatalf("temp file %q was not cleaned up", e.Name())
+		}
+	}
+}
+
+// TestWrite_RenameError verifies that a rename error is returned and the
+// temp file is cleaned up.
+func TestWrite_RenameError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	injected := errors.New("injected rename error")
+	swapHook(t, &renamePath, func(string, string) error { return injected })
+
+	err := Write(path, []byte("data"), 0644)
+	if !errors.Is(err, injected) {
+		t.Fatalf("expected injected rename error, got %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("target file should not exist after rename error")
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Fatalf("temp file %q was not cleaned up", e.Name())
+		}
 	}
 }
 

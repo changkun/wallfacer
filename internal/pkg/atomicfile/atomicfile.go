@@ -8,6 +8,14 @@ import (
 	"path/filepath"
 )
 
+// Hooks for testing; production code leaves these at their defaults.
+var (
+	writeFile  = func(f *os.File, data []byte) (int, error) { return f.Write(data) }
+	closeFile  = func(f *os.File) error { return f.Close() }
+	chmodPath  = os.Chmod
+	renamePath = os.Rename
+)
+
 // Write atomically writes data to path by first writing to a temporary
 // file in the same directory and then renaming it to the target path.
 // On POSIX systems the rename is atomic, so readers never see a
@@ -24,8 +32,8 @@ func Write(path string, data []byte, perm os.FileMode) error {
 
 	// Write and close are separate steps; check both errors independently
 	// since Close can flush buffered data and fail on its own.
-	_, writeErr := f.Write(data)
-	closeErr := f.Close()
+	_, writeErr := writeFile(f, data)
+	closeErr := closeFile(f)
 	if writeErr != nil {
 		_ = os.Remove(tmp)
 		return writeErr
@@ -36,11 +44,11 @@ func Write(path string, data []byte, perm os.FileMode) error {
 	}
 	// Set permissions before rename so the target is never visible with
 	// the wrong mode (CreateTemp uses 0600 by default).
-	if err := os.Chmod(tmp, perm); err != nil {
+	if err := chmodPath(tmp, perm); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := renamePath(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
