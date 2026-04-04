@@ -58,27 +58,27 @@ dispatched_task_id: null
 	// Find parent and child.
 	var parent, child *NodeResponse
 	for i := range resp.Nodes {
-		if resp.Nodes[i].Path == "local/foo.md" {
+		if resp.Nodes[i].Path == "specs/local/foo.md" {
 			parent = &resp.Nodes[i]
 		}
-		if resp.Nodes[i].Path == "local/foo/bar.md" {
+		if resp.Nodes[i].Path == "specs/local/foo/bar.md" {
 			child = &resp.Nodes[i]
 		}
 	}
 
 	if parent == nil {
-		t.Fatal("missing parent node local/foo.md")
+		t.Fatal("missing parent node specs/local/foo.md")
 	}
 	if child == nil {
-		t.Fatal("missing child node local/foo/bar.md")
+		t.Fatal("missing child node specs/local/foo/bar.md")
 	}
 
 	// Parent should not be a leaf and should have bar as child.
 	if parent.IsLeaf {
 		t.Error("parent should not be a leaf")
 	}
-	if len(parent.Children) != 1 || parent.Children[0] != "local/foo/bar.md" {
-		t.Errorf("parent children = %v, want [local/foo/bar.md]", parent.Children)
+	if len(parent.Children) != 1 || parent.Children[0] != "specs/local/foo/bar.md" {
+		t.Errorf("parent children = %v, want [specs/local/foo/bar.md]", parent.Children)
 	}
 
 	// Child should be a leaf.
@@ -90,7 +90,7 @@ dispatched_task_id: null
 	}
 
 	// Progress for parent.
-	p, ok := resp.Progress["local/foo.md"]
+	p, ok := resp.Progress["specs/local/foo.md"]
 	if !ok {
 		t.Fatal("missing progress for parent")
 	}

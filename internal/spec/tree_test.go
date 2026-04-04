@@ -65,7 +65,7 @@ func TestBuildTree_ParentWithChildren(t *testing.T) {
 		t.Fatalf("unexpected errors: %v", tree.Errs)
 	}
 
-	parent, ok := tree.NodeAt("local/foo.md")
+	parent, ok := tree.NodeAt("specs/local/foo.md")
 	if !ok {
 		t.Fatal("parent not found")
 	}
@@ -99,7 +99,7 @@ func TestBuildTree_DeepNesting(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	c, ok := tree.NodeAt("foundations/a/b/c.md")
+	c, ok := tree.NodeAt("specs/foundations/a/b/c.md")
 	if !ok {
 		t.Fatal("deep node not found")
 	}
@@ -153,17 +153,17 @@ func TestBuildTree_LeafDetection(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	parent, _ := tree.NodeAt("local/parent.md")
+	parent, _ := tree.NodeAt("specs/local/parent.md")
 	if parent.IsLeaf {
 		t.Error("parent should not be leaf")
 	}
 
-	child, _ := tree.NodeAt("local/parent/child.md")
+	child, _ := tree.NodeAt("specs/local/parent/child.md")
 	if !child.IsLeaf {
 		t.Error("child should be leaf")
 	}
 
-	standalone, _ := tree.NodeAt("local/standalone.md")
+	standalone, _ := tree.NodeAt("specs/local/standalone.md")
 	if !standalone.IsLeaf {
 		t.Error("standalone should be leaf")
 	}
@@ -180,7 +180,7 @@ func TestBuildTree_AllIndex(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	paths := []string{"local/a.md", "local/a/b.md", "foundations/c.md"}
+	paths := []string{"specs/local/a.md", "specs/local/a/b.md", "specs/foundations/c.md"}
 	for _, p := range paths {
 		if _, ok := tree.NodeAt(p); !ok {
 			t.Errorf("missing from All index: %s", p)
@@ -226,7 +226,7 @@ func TestBuildTree_OrphanDirectory(t *testing.T) {
 	}
 
 	// Child should still be parsed and present.
-	child, ok := tree.NodeAt("local/orphan/child.md")
+	child, ok := tree.NodeAt("specs/local/orphan/child.md")
 	if !ok {
 		t.Fatal("orphan child not found in tree")
 	}
@@ -248,7 +248,7 @@ func TestBuildTree_EmptySubdirectory(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	node, ok := tree.NodeAt("local/spec.md")
+	node, ok := tree.NodeAt("specs/local/spec.md")
 	if !ok {
 		t.Fatal("spec not found")
 	}
@@ -290,7 +290,7 @@ func TestBuildTree_ChildOrderFromParentBody(t *testing.T) {
 		t.Fatalf("unexpected errors: %v", tree.Errs)
 	}
 
-	parent, ok := tree.NodeAt("local/parent.md")
+	parent, ok := tree.NodeAt("specs/local/parent.md")
 	if !ok {
 		t.Fatal("parent not found")
 	}
@@ -301,9 +301,9 @@ func TestBuildTree_ChildOrderFromParentBody(t *testing.T) {
 	// Without the fix, alphabetical order would be: alpha, bravo, charlie.
 	// With the fix, order follows the parent body links: charlie, alpha, bravo.
 	wantOrder := []string{
-		"local/parent/charlie.md",
-		"local/parent/alpha.md",
-		"local/parent/bravo.md",
+		"specs/local/parent/charlie.md",
+		"specs/local/parent/alpha.md",
+		"specs/local/parent/bravo.md",
 	}
 	for i, child := range parent.Children {
 		if child.Key != wantOrder[i] {
@@ -327,11 +327,11 @@ func TestBuildTree_ChildOrderPartialLinks(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	parent, _ := tree.NodeAt("local/parent.md")
+	parent, _ := tree.NodeAt("specs/local/parent.md")
 	wantOrder := []string{
-		"local/parent/bravo.md",   // referenced first
-		"local/parent/alpha.md",   // unreferenced, alphabetical
-		"local/parent/charlie.md", // unreferenced, alphabetical
+		"specs/local/parent/bravo.md",   // referenced first
+		"specs/local/parent/alpha.md",   // unreferenced, alphabetical
+		"specs/local/parent/charlie.md", // unreferenced, alphabetical
 	}
 	for i, child := range parent.Children {
 		if child.Key != wantOrder[i] {

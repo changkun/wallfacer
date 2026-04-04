@@ -185,21 +185,23 @@ func checkOrphanDirectories(tree *Tree, repoRoot string) []Result {
 	}
 
 	var results []Result
-	specsDir := filepath.Join(repoRoot, "specs")
 
 	// Walk all nodes and check if their parent directory has a matching .md.
+	// Paths have the form "specs/track/name.md" (root) or
+	// "specs/track/parent/child.md" (nested). Only nested paths can be orphans.
 	for path := range tree.All {
 		parts := strings.Split(filepath.ToSlash(path), "/")
-		if len(parts) < 3 {
-			// track/name.md — root level, no orphan possible.
+		if len(parts) < 4 {
+			// specs/track/name.md — root level, no orphan possible.
 			continue
 		}
-		// For track/parent/child.md, check that track/parent.md exists in tree.
+		// For specs/track/parent/child.md, check that specs/track/parent.md exists.
 		parentDir := strings.Join(parts[:len(parts)-1], "/")
 		parentMD := parentDir + ".md"
 		if _, ok := tree.All[parentMD]; !ok {
 			// Check the filesystem too — maybe the .md failed to parse.
-			fullParentMD := filepath.Join(specsDir, filepath.FromSlash(parentMD))
+			// parentMD already starts with "specs/", so join with repoRoot.
+			fullParentMD := filepath.Join(repoRoot, filepath.FromSlash(parentMD))
 			if _, err := os.Stat(fullParentMD); err != nil {
 				results = append(results, Result{
 					Path:     path,
