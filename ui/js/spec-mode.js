@@ -471,9 +471,39 @@ function _showSpecReadme() {
 // No-op until spec explorer is wired.
 function openSelectedSpec() {}
 
-// dispatchFocusedSpec dispatches the focused leaf spec as a kanban task.
-// No-op stub — wired by dispatch-workflow spec.
-function dispatchFocusedSpec() {}
+// dispatchFocusedSpec dispatches the focused spec as a kanban task via the
+// dispatch API. Shows a confirmation prompt, loading state, and refreshes
+// the spec view on success.
+function dispatchFocusedSpec() {
+  if (!_focusedSpecPath) return;
+  if (!confirm("Dispatch this spec to the task board?")) return;
+
+  var btn = document.getElementById("spec-dispatch-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Dispatching\u2026";
+  }
+
+  api(Routes.specs.dispatch(), {
+    method: "POST",
+    body: JSON.stringify({ paths: [_focusedSpecPath], run: false }),
+  })
+    .then(function () {
+      // Hide the dispatch button (spec is no longer validated after dispatch).
+      if (btn) btn.classList.add("hidden");
+      // Refresh the focused spec view to reflect the new dispatched_task_id.
+      _loadAndRenderSpec();
+    })
+    .catch(function (err) {
+      alert("Dispatch failed: " + err.message);
+    })
+    .finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Dispatch";
+      }
+    });
+}
 
 // breakDownFocusedSpec sends the /break-down slash command via the planning chat.
 function breakDownFocusedSpec() {
