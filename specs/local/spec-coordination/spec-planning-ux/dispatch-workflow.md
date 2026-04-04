@@ -140,7 +140,7 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Spec frontmatter writer](dispatch-workflow/spec-frontmatter-writer.md) | — | small | validated |
+| [Spec frontmatter writer](dispatch-workflow/spec-frontmatter-writer.md) | — | small | **complete** |
 | [Task spec source field](dispatch-workflow/task-spec-source-field.md) | — | small | validated |
 | [Dispatch API endpoint](dispatch-workflow/dispatch-api.md) | spec-frontmatter-writer, task-spec-source-field | medium | validated |
 | [Undispatch API endpoint](dispatch-workflow/undispatch-api.md) | dispatch-api | small | validated |

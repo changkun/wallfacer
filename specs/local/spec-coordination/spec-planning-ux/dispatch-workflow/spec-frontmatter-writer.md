@@ -1,6 +1,6 @@
 ---
 title: Spec Frontmatter Writer
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/spec/
