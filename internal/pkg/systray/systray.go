@@ -34,14 +34,29 @@ var (
 	tappedMu sync.Mutex // guards onTapped
 )
 
+// Hooks for native platform calls; tests swap these to avoid cgo/GUI dependencies.
+var (
+	callNativeStart        = func() { nativeStart() }
+	callNativeEnd          = func() { nativeEnd() }
+	callNativeSetIcon      = func(d []byte, t bool) { nativeSetIcon(d, t) }
+	callNativeSetTooltip   = func(s string) { nativeSetTooltip(s) }
+	callNativeAddMenuItem  = func(id uint32, title, tooltip string, ck, ch bool) { nativeAddMenuItem(id, title, tooltip, ck, ch) }
+	callNativeAddSeparator = func(id uint32) { nativeAddSeparator(id) }
+	callNativeSetItemTitle = func(id uint32, t string) { nativeSetItemTitle(id, t) }
+	callNativeSetEnabled   = func(id uint32, e bool) { nativeSetItemEnabled(id, e) }
+	callNativeSetChecked   = func(id uint32, c bool) { nativeSetItemChecked(id, c) }
+	callNativeQuit         = func() { nativeQuit() }
+	callNativeSetOnTapped  = func(e bool) { nativeSetOnTapped(e) }
+)
+
 // RunWithExternalLoop initializes the system tray for use with an external
 // event loop (e.g., Wails). It returns start and end functions. Call start()
 // to create the tray icon and trigger onReady. Call end() to tear down.
 func RunWithExternalLoop(onReady, onExit func()) (start, end func()) {
 	readyCb = onReady
 	exitCb = onExit
-	return nativeStart, func() {
-		nativeEnd()
+	return func() { callNativeStart() }, func() {
+		callNativeEnd()
 		if exitCb != nil {
 			exitCb()
 		}
@@ -50,18 +65,18 @@ func RunWithExternalLoop(onReady, onExit func()) (start, end func()) {
 
 // SetIcon sets the tray icon from raw image bytes (PNG or ICO).
 func SetIcon(iconBytes []byte) {
-	nativeSetIcon(iconBytes, false)
+	callNativeSetIcon(iconBytes, false)
 }
 
 // SetTemplateIcon sets a macOS template icon that adapts to the menu bar
 // appearance. On other platforms this behaves the same as SetIcon.
 func SetTemplateIcon(templateIconBytes, _ []byte) {
-	nativeSetIcon(templateIconBytes, true)
+	callNativeSetIcon(templateIconBytes, true)
 }
 
 // SetTooltip sets the tray icon tooltip text.
 func SetTooltip(tooltip string) {
-	nativeSetTooltip(tooltip)
+	callNativeSetTooltip(tooltip)
 }
 
 // SetOnTapped sets a callback for left-click on the tray icon.
@@ -70,7 +85,7 @@ func SetOnTapped(fn func()) {
 	tappedMu.Lock()
 	onTapped = fn
 	tappedMu.Unlock()
-	nativeSetOnTapped(fn != nil)
+	callNativeSetOnTapped(fn != nil)
 }
 
 // AddMenuItem adds a regular menu item and returns it.
@@ -86,12 +101,12 @@ func AddMenuItemCheckbox(title, tooltip string, checked bool) *MenuItem {
 // AddSeparator adds a visual separator line to the menu.
 func AddSeparator() {
 	id := nextID.Add(1)
-	nativeAddSeparator(id)
+	callNativeAddSeparator(id)
 }
 
 // Quit signals the system tray to shut down and remove its icon.
 func Quit() {
-	nativeQuit()
+	callNativeQuit()
 }
 
 func addItem(title, tooltip string, checkable, checked bool) *MenuItem {
@@ -108,7 +123,7 @@ func addItem(title, tooltip string, checkable, checked bool) *MenuItem {
 	menuItems[id] = item
 	menuItemsLock.Unlock()
 
-	nativeAddMenuItem(id, title, tooltip, checkable, checked)
+	callNativeAddMenuItem(id, title, tooltip, checkable, checked)
 	return item
 }
 
@@ -117,7 +132,7 @@ func (item *MenuItem) SetTitle(title string) {
 	item.mu.Lock()
 	item.title = title
 	item.mu.Unlock()
-	nativeSetItemTitle(item.id, title)
+	callNativeSetItemTitle(item.id, title)
 }
 
 // Disable grays out the menu item so it cannot be clicked.
@@ -125,7 +140,7 @@ func (item *MenuItem) Disable() {
 	item.mu.Lock()
 	item.disabled = true
 	item.mu.Unlock()
-	nativeSetItemEnabled(item.id, false)
+	callNativeSetEnabled(item.id, false)
 }
 
 // Enable makes the menu item clickable.
@@ -133,7 +148,7 @@ func (item *MenuItem) Enable() {
 	item.mu.Lock()
 	item.disabled = false
 	item.mu.Unlock()
-	nativeSetItemEnabled(item.id, true)
+	callNativeSetEnabled(item.id, true)
 }
 
 // Check marks the menu item as checked.
@@ -141,7 +156,7 @@ func (item *MenuItem) Check() {
 	item.mu.Lock()
 	item.checked = true
 	item.mu.Unlock()
-	nativeSetItemChecked(item.id, true)
+	callNativeSetChecked(item.id, true)
 }
 
 // Uncheck removes the check mark from the menu item.
@@ -149,7 +164,7 @@ func (item *MenuItem) Uncheck() {
 	item.mu.Lock()
 	item.checked = false
 	item.mu.Unlock()
-	nativeSetItemChecked(item.id, false)
+	callNativeSetChecked(item.id, false)
 }
 
 // Checked returns whether the menu item is currently checked.
