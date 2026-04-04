@@ -327,3 +327,13 @@
   background: #1a2d42;
   color: #6da0dc;
 }
+.badge-spec {
+  background: #ede5f7;
+  color: #5a3d8a;
+  border-left-color: #5a3d8a40;
+}
+[data-theme="dark"] .badge-spec {
+  background: #2a1f3d;
+  color: #b89ee0;
+  border-left-color: #b89ee040;
+}

@@ -869,6 +869,7 @@ function _cardFingerprint(t, rank) {
     (t.usage && t.usage.cost_usd) || 0,
     t.max_input_tokens || 0,
     t.scheduled_at || "",
+    t.spec_source_path || "",
     t.failure_category || "",
     typeof pendingCancelTaskIds !== "undefined" &&
       pendingCancelTaskIds.has(t.id),
@@ -946,6 +947,9 @@ function updateCard(card, t, rank) {
       ? `<span class="badge badge-priority" title="Priority #${displayRank}">#${displayRank}</span>`
       : "";
   const depsBadge = renderDependencyBadge(t);
+  const specBadge = t.spec_source_path
+    ? `<span class="badge badge-spec" data-spec-path="${escapeHtml(t.spec_source_path)}" title="From spec: ${escapeHtml(t.spec_source_path)}">${escapeHtml(t.spec_source_path.replace(/^.*\//, "").replace(/\.md$/, ""))}</span>`
+    : "";
   const scheduledBadge =
     t.status === "backlog" &&
     t.scheduled_at &&
@@ -1005,6 +1009,7 @@ function updateCard(card, t, rank) {
       <div class="flex items-center gap-1.5">
         ${priorityBadge}
         ${depsBadge}
+        ${specBadge}
         ${scheduledBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ""}
@@ -1088,6 +1093,26 @@ function updateCard(card, t, rank) {
     }
     ${buildCardActions(t)}
   `;
+
+  // Spec badge click handler — navigate to spec mode.
+  if (t.spec_source_path) {
+    const specBadgeEl = card.querySelector(".badge-spec");
+    if (specBadgeEl) {
+      specBadgeEl.style.cursor = "pointer";
+      specBadgeEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (typeof switchMode === "function") switchMode("spec");
+        if (
+          typeof focusSpec === "function" &&
+          typeof activeWorkspaces !== "undefined" &&
+          activeWorkspaces &&
+          activeWorkspaces.length > 0
+        ) {
+          focusSpec(t.spec_source_path, activeWorkspaces[0]);
+        }
+      });
+    }
+  }
 
   // Fork ancestry badge — rendered after innerHTML is set.
   if (t.forked_from) {

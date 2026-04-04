@@ -59,6 +59,8 @@ function createContext(options = {}) {
         className: "",
         style: {},
         dataset: {},
+        _attrs: {},
+        tabIndex: 0,
         classList: {
           _c: new Set(),
           add(c) {
@@ -80,9 +82,20 @@ function createContext(options = {}) {
                 : this._c.add(c);
           },
         },
-        appendChild: () => {},
-        querySelectorAll: () => [],
-        querySelector: () => null,
+        appendChild() {},
+        addEventListener() {},
+        setAttribute(k, v) {
+          this._attrs[k] = v;
+        },
+        getAttribute(k) {
+          return this._attrs[k] || null;
+        },
+        querySelectorAll() {
+          return [];
+        },
+        querySelector() {
+          return null;
+        },
       }),
       querySelectorAll: () => [],
       addEventListener: () => {},
@@ -702,5 +715,66 @@ describe("render.js _cachedMarkdown", () => {
     expect(result).toBe("hello");
     // Second call should return the same cached result
     expect(ctx._cachedMarkdown("hello")).toBe("hello");
+  });
+});
+
+describe("render.js spec badge on cards", () => {
+  let ctx;
+  beforeEach(() => {
+    ({ ctx } = loadRenderHarness());
+  });
+
+  it("_cardFingerprint includes spec_source_path", () => {
+    const taskA = {
+      id: "aaa",
+      status: "backlog",
+      prompt: "p",
+      timeout: 5,
+      position: 0,
+      spec_source_path: "specs/local/foo.md",
+    };
+    const taskB = {
+      id: "aaa",
+      status: "backlog",
+      prompt: "p",
+      timeout: 5,
+      position: 0,
+      spec_source_path: "",
+    };
+    const fpA = ctx._cardFingerprint(taskA, 0);
+    const fpB = ctx._cardFingerprint(taskB, 0);
+    expect(fpA).not.toBe(fpB);
+    expect(fpA).toContain("specs/local/foo.md");
+  });
+
+  it("createCard renders badge-spec when spec_source_path is set", () => {
+    ctx.tasks = [
+      {
+        id: "spec-task-1",
+        status: "backlog",
+        prompt: "do something",
+        timeout: 5,
+        position: 0,
+        spec_source_path: "specs/local/my-feature.md",
+      },
+    ];
+    const card = ctx.createCard(ctx.tasks[0], 0);
+    expect(card.innerHTML).toContain("badge-spec");
+    expect(card.innerHTML).toContain("my-feature");
+    expect(card.innerHTML).toContain("data-spec-path");
+  });
+
+  it("createCard does not render badge-spec when spec_source_path is empty", () => {
+    ctx.tasks = [
+      {
+        id: "plain-task-1",
+        status: "backlog",
+        prompt: "do something",
+        timeout: 5,
+        position: 0,
+      },
+    ];
+    const card = ctx.createCard(ctx.tasks[0], 0);
+    expect(card.innerHTML).not.toContain("badge-spec");
   });
 });
