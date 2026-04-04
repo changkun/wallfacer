@@ -37,7 +37,6 @@ func ValidateSpec(s *Spec, repoRoot string, isLeaf bool) []Result {
 	results = append(results, checkValidEnums(s)...)
 	results = append(results, checkDateOrdering(s)...)
 	results = append(results, checkNoSelfDependency(s)...)
-	results = append(results, checkDispatchConsistency(s, isLeaf)...)
 	results = append(results, checkDependsOnExist(s, repoRoot)...)
 	results = append(results, checkAffectsExist(s, repoRoot)...)
 	results = append(results, checkBodyNotEmpty(s)...)
@@ -98,14 +97,6 @@ func checkNoSelfDependency(s *Spec) []Result {
 			return []Result{{s.Path, SeverityError, "no-self-dependency",
 				"spec depends on itself"}}
 		}
-	}
-	return nil
-}
-
-func checkDispatchConsistency(s *Spec, isLeaf bool) []Result {
-	if !isLeaf && s.DispatchedTaskID != nil {
-		return []Result{{s.Path, SeverityError, "dispatch-consistency",
-			"non-leaf spec must not have dispatched_task_id"}}
 	}
 	return nil
 }

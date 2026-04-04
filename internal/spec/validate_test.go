@@ -109,8 +109,8 @@ func TestValidateSpec_NonLeafWithDispatch(t *testing.T) {
 	id := "550e8400-e29b-41d4-a716-446655440000"
 	s.DispatchedTaskID = &id
 	results := ValidateSpec(s, "", false) // non-leaf
-	if !hasRule(results, "dispatch-consistency", SeverityError) {
-		t.Error("expected dispatch-consistency error for non-leaf with dispatch ID")
+	if hasRule(results, "dispatch-consistency", SeverityError) {
+		t.Error("non-leaf spec with dispatch ID should be allowed (dispatch-consistency removed)")
 	}
 }
 
