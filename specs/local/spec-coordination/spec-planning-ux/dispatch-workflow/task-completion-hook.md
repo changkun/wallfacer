@@ -1,6 +1,6 @@
 ---
 title: Task Completion Hook for Spec Status
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/spec-frontmatter-writer.md
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
@@ -50,3 +50,8 @@ Note: The parent spec's three-layer design calls for an intermediate `done` stat
 - Do NOT modify the task state machine
 - Do NOT trigger any agent or sandbox execution
 - Do NOT block task completion on spec update failures
+
+## Implementation notes
+
+- **Callback pattern instead of store field**: The spec suggested adding `specRootDirs []string` to the Store. Instead, the implementation uses a `Store.OnDone func(Task)` callback set by the server layer. This keeps the store decoupled from workspace and spec packages — the store doesn't import `internal/spec` at all. The callback receives a deep-cloned task and runs in a goroutine outside the store lock.
+- **Exported `CurrentWorkspaces`**: Added `Handler.CurrentWorkspaces()` as an exported wrapper around the existing `currentWorkspaces()` so the server layer can pass it to the hook closure. The closure calls it on each invocation to get the current workspace list (workspaces can change at runtime).
