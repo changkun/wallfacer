@@ -120,6 +120,10 @@ var Routes = {
     dispatch: function () {
       return "/api/specs/dispatch";
     },
+    // POST /api/specs/undispatch
+    undispatch: function () {
+      return "/api/specs/undispatch";
+    },
   },
 
   planning: {

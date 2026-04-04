@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 98,
+  "route_count": 99,
   "routes": [
     {
       "method": "GET",
@@ -207,6 +207,15 @@
       "pattern": "/api/specs/dispatch",
       "name": "DispatchSpecs",
       "description": "Dispatch validated specs to create kanban tasks atomically.",
+      "tags": [
+        "specs"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/specs/undispatch",
+      "name": "UndispatchSpecs",
+      "description": "Cancel dispatched tasks and clear spec dispatch linkage.",
       "tags": [
         "specs"
       ]

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/spec"
+	"github.com/google/uuid"
 )
 
 const testSpecValidated = `---
@@ -315,5 +316,154 @@ func TestDispatchSpecs_Tags(t *testing.T) {
 	}
 	if !foundSpecDispatched {
 		t.Errorf("tags = %v, should contain 'spec-dispatched'", tasks[0].Tags)
+	}
+}
+
+// --- Undispatch tests ---
+
+type undispatchResponse struct {
+	Undispatched []undispatchResult `json:"undispatched"`
+	Errors       []dispatchError    `json:"errors"`
+}
+
+func doUndispatch(t *testing.T, h *Handler, paths []string) (*httptest.ResponseRecorder, undispatchResponse) {
+	t.Helper()
+	body := map[string]any{"paths": paths}
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/specs/undispatch", strings.NewReader(string(data)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UndispatchSpecs(w, req)
+	var resp undispatchResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	return w, resp
+}
+
+func TestUndispatchSpecs_CancelsBacklogTask(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/cancel.md", testSpecValidated)
+
+	// First dispatch.
+	dw, dresp := doDispatch(t, h, []string{"specs/local/cancel.md"}, false)
+	if dw.Code != http.StatusCreated {
+		t.Fatalf("dispatch failed: %d %s", dw.Code, dw.Body.String())
+	}
+
+	// Task should be in backlog.
+	taskID := dresp.Dispatched[0].TaskID
+
+	// Now undispatch.
+	uw, uresp := doUndispatch(t, h, []string{"specs/local/cancel.md"})
+	if uw.Code != http.StatusOK {
+		t.Fatalf("undispatch status = %d, want %d; body: %s", uw.Code, http.StatusOK, uw.Body.String())
+	}
+	if len(uresp.Undispatched) != 1 {
+		t.Fatalf("undispatched count = %d, want 1", len(uresp.Undispatched))
+	}
+	if uresp.Undispatched[0].TaskID != taskID {
+		t.Errorf("task_id = %q, want %q", uresp.Undispatched[0].TaskID, taskID)
+	}
+
+	// Task should be cancelled.
+	task, err := h.store.GetTask(context.Background(), uuid.MustParse(taskID))
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if task.Status != "cancelled" {
+		t.Errorf("task status = %q, want %q", task.Status, "cancelled")
+	}
+
+	// Spec should have dispatched_task_id cleared.
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/cancel.md"))
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	if s.DispatchedTaskID != nil {
+		t.Errorf("dispatched_task_id = %v, want nil", s.DispatchedTaskID)
+	}
+}
+
+func TestUndispatchSpecs_DoneTask(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/done.md", testSpecValidated)
+
+	// Dispatch, then force task to done.
+	dw, dresp := doDispatch(t, h, []string{"specs/local/done.md"}, false)
+	if dw.Code != http.StatusCreated {
+		t.Fatalf("dispatch failed: %d %s", dw.Code, dw.Body.String())
+	}
+	taskID := uuid.MustParse(dresp.Dispatched[0].TaskID)
+	_ = h.store.ForceUpdateTaskStatus(context.Background(), taskID, "done")
+
+	// Undispatch — should clear spec but NOT cancel task.
+	uw, uresp := doUndispatch(t, h, []string{"specs/local/done.md"})
+	if uw.Code != http.StatusOK {
+		t.Fatalf("undispatch status = %d, want %d; body: %s", uw.Code, http.StatusOK, uw.Body.String())
+	}
+	if len(uresp.Undispatched) != 1 {
+		t.Fatalf("undispatched count = %d, want 1", len(uresp.Undispatched))
+	}
+
+	// Task should still be done.
+	task, err := h.store.GetTask(context.Background(), taskID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if task.Status != "done" {
+		t.Errorf("task status = %q, want %q (should not be cancelled)", task.Status, "done")
+	}
+
+	// Spec frontmatter should be cleared.
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/done.md"))
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	if s.DispatchedTaskID != nil {
+		t.Errorf("dispatched_task_id = %v, want nil", s.DispatchedTaskID)
+	}
+}
+
+func TestUndispatchSpecs_NotDispatched(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/notdispatched.md", testSpecValidated)
+
+	uw, uresp := doUndispatch(t, h, []string{"specs/local/notdispatched.md"})
+	if uw.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", uw.Code, http.StatusBadRequest, uw.Body.String())
+	}
+	if len(uresp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1", len(uresp.Errors))
+	}
+	if !strings.Contains(uresp.Errors[0].Error, "not dispatched") {
+		t.Errorf("error = %q, should mention not dispatched", uresp.Errors[0].Error)
+	}
+}
+
+func TestUndispatchSpecs_SpecReturnsToValidated(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/revalidate.md", testSpecValidated)
+
+	// Dispatch first.
+	dw, _ := doDispatch(t, h, []string{"specs/local/revalidate.md"}, false)
+	if dw.Code != http.StatusCreated {
+		t.Fatalf("dispatch failed: %d %s", dw.Code, dw.Body.String())
+	}
+
+	// Verify spec status changed (dispatch doesn't change status, but dispatched_task_id is set).
+	// Now undispatch.
+	uw, _ := doUndispatch(t, h, []string{"specs/local/revalidate.md"})
+	if uw.Code != http.StatusOK {
+		t.Fatalf("undispatch status = %d, want %d; body: %s", uw.Code, http.StatusOK, uw.Body.String())
+	}
+
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/revalidate.md"))
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	if s.Status != spec.StatusValidated {
+		t.Errorf("status = %q, want %q", s.Status, spec.StatusValidated)
+	}
+	if s.DispatchedTaskID != nil {
+		t.Errorf("dispatched_task_id = %v, want nil", s.DispatchedTaskID)
 	}
 }

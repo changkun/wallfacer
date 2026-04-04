@@ -222,6 +222,108 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type undispatchRequest struct {
+	Paths []string `json:"paths"`
+}
+
+type undispatchResult struct {
+	SpecPath string `json:"spec_path"`
+	TaskID   string `json:"task_id"`
+}
+
+// UndispatchSpecs cancels the kanban tasks linked to dispatched specs and
+// clears each spec's dispatched_task_id, returning the spec to validated status.
+func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
+	req, ok := httpjson.DecodeBody[undispatchRequest](w, r)
+	if !ok {
+		return
+	}
+
+	if len(req.Paths) == 0 {
+		http.Error(w, "paths must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	var results []undispatchResult
+	var errs []dispatchError
+
+	for _, relPath := range req.Paths {
+		absPath := findSpecFile(workspaces, relPath)
+		if absPath == "" {
+			errs = append(errs, dispatchError{relPath, "spec file not found in any workspace"})
+			continue
+		}
+
+		s, err := spec.ParseFile(absPath)
+		if err != nil {
+			errs = append(errs, dispatchError{relPath, fmt.Sprintf("parse error: %v", err)})
+			continue
+		}
+
+		if s.DispatchedTaskID == nil {
+			errs = append(errs, dispatchError{relPath, "spec is not dispatched (dispatched_task_id is null)"})
+			continue
+		}
+
+		taskIDStr := *s.DispatchedTaskID
+		taskID, err := uuid.Parse(taskIDStr)
+		if err != nil {
+			errs = append(errs, dispatchError{relPath, fmt.Sprintf("invalid dispatched_task_id: %v", err)})
+			continue
+		}
+
+		// Cancel the task if it's in a cancellable state.
+		task, err := h.store.GetTask(r.Context(), taskID)
+		if err == nil {
+			// Task exists — cancel if not already done/cancelled.
+			switch task.Status {
+			case store.TaskStatusDone, store.TaskStatusCancelled:
+				// Already terminal — skip cancellation.
+			default:
+				_ = h.store.CancelTask(r.Context(), taskID)
+				h.insertEventOrLog(r.Context(), taskID, store.EventTypeStateChange,
+					store.NewStateChangeData(task.Status, store.TaskStatusCancelled, store.TriggerUser, nil))
+			}
+		}
+		// If task not found, still clear the spec linkage.
+
+		// Clear the spec's dispatch linkage.
+		err = spec.UpdateFrontmatter(absPath, map[string]any{
+			"dispatched_task_id": nil,
+			"status":             string(spec.StatusValidated),
+			"updated":            time.Now(),
+		})
+		if err != nil {
+			errs = append(errs, dispatchError{relPath, fmt.Sprintf("update frontmatter: %v", err)})
+			continue
+		}
+
+		results = append(results, undispatchResult{
+			SpecPath: relPath,
+			TaskID:   taskIDStr,
+		})
+	}
+
+	if len(results) == 0 && len(errs) > 0 {
+		httpjson.Write(w, http.StatusBadRequest, map[string]any{
+			"undispatched": []undispatchResult{},
+			"errors":       errs,
+		})
+		return
+	}
+
+	httpjson.Write(w, http.StatusOK, map[string]any{
+		"undispatched": results,
+		"errors":       errs,
+	})
+}
+
 // findSpecFile locates a spec file across workspaces. The relPath is relative
 // to the workspace root (e.g. "specs/local/foo.md"). Returns the absolute
 // path if found, or empty string if not found.

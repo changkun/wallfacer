@@ -197,6 +197,11 @@ var Routes = []Route{
 		Description: "Dispatch validated specs to create kanban tasks atomically.",
 		Tags:        []string{"specs"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/specs/undispatch", Name: "UndispatchSpecs",
+		Description: "Cancel dispatched tasks and clear spec dispatch linkage.",
+		Tags:        []string{"specs"},
+	},
 
 	// --- Planning sandbox ---
 
