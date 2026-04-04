@@ -116,6 +116,10 @@ var Routes = {
     stream: function () {
       return "/api/specs/stream";
     },
+    // POST /api/specs/dispatch
+    dispatch: function () {
+      return "/api/specs/dispatch";
+    },
   },
 
   planning: {

@@ -577,7 +577,7 @@ func TestExplorerStream_SendsRefreshOnChange(t *testing.T) {
 	// Use a short-lived context so the SSE handler exits quickly.
 	ctx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/explorer/stream", nil).WithContext(ctx)
-	w := httptest.NewRecorder()
+	w := newSyncResponseWriter()
 
 	done := make(chan struct{})
 	go func() {
@@ -595,7 +595,7 @@ func TestExplorerStream_SendsRefreshOnChange(t *testing.T) {
 			t.Fatal("timed out waiting for connected event")
 		default:
 		}
-		if strings.Contains(w.Body.String(), "event: connected") {
+		if strings.Contains(w.bodyString(), "event: connected") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -618,7 +618,7 @@ func TestExplorerStream_SendsRefreshOnChange(t *testing.T) {
 			t.Fatal("timed out waiting for refresh event")
 		default:
 		}
-		if strings.Contains(w.Body.String(), "event: refresh") {
+		if strings.Contains(w.bodyString(), "event: refresh") {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -628,7 +628,7 @@ func TestExplorerStream_SendsRefreshOnChange(t *testing.T) {
 	<-done
 
 	// Verify the refresh event contains workspace info.
-	body := w.Body.String()
+	body := w.bodyString()
 	scanner := bufio.NewScanner(strings.NewReader(body))
 	for scanner.Scan() {
 		line := scanner.Text()

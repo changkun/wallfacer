@@ -1,0 +1,319 @@
+package handler
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"changkun.de/x/wallfacer/internal/spec"
+)
+
+const testSpecValidated = `---
+title: Test Spec
+status: validated
+depends_on: []
+affects:
+  - internal/test/
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+dispatched_task_id: null
+---
+
+# Test Spec
+
+Implement something useful.
+`
+
+const testSpecDrafted = `---
+title: Drafted Spec
+status: drafted
+depends_on: []
+affects: []
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+dispatched_task_id: null
+---
+
+# Drafted Spec
+
+Not ready yet.
+`
+
+func writeTestSpec(t *testing.T, ws, relPath, content string) {
+	t.Helper()
+	abs := filepath.Join(ws, relPath)
+	if err := os.MkdirAll(filepath.Dir(abs), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(abs, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newDispatchTestHandler(t *testing.T) (*Handler, string) {
+	t.Helper()
+	h, ws := newTestHandlerWithWorkspaces(t)
+	return h, ws
+}
+
+type dispatchResponse struct {
+	Dispatched []dispatchResult `json:"dispatched"`
+	Errors     []dispatchError  `json:"errors"`
+}
+
+func doDispatch(t *testing.T, h *Handler, paths []string, run bool) (*httptest.ResponseRecorder, dispatchResponse) {
+	t.Helper()
+	body := map[string]any{"paths": paths, "run": run}
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/specs/dispatch", strings.NewReader(string(data)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.DispatchSpecs(w, req)
+	var resp dispatchResponse
+	if w.Code == http.StatusCreated {
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	}
+	return w, resp
+}
+
+func TestDispatchSpecs_SingleSpec(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/test.md", testSpecValidated)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/test.md"}, false)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if len(resp.Dispatched) != 1 {
+		t.Fatalf("dispatched count = %d, want 1", len(resp.Dispatched))
+	}
+	if resp.Dispatched[0].SpecPath != "specs/local/test.md" {
+		t.Errorf("spec_path = %q, want %q", resp.Dispatched[0].SpecPath, "specs/local/test.md")
+	}
+	if resp.Dispatched[0].TaskID == "" {
+		t.Error("task_id is empty")
+	}
+
+	// Verify task was created with correct prompt.
+	tasks, _ := h.store.ListTasks(context.Background(), false)
+	if len(tasks) != 1 {
+		t.Fatalf("task count = %d, want 1", len(tasks))
+	}
+	if !strings.Contains(tasks[0].Prompt, "Implement something useful.") {
+		t.Errorf("task prompt = %q, should contain spec body", tasks[0].Prompt)
+	}
+
+	// Verify dispatched_task_id was written back to spec file.
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/test.md"))
+	if err != nil {
+		t.Fatalf("parse spec after dispatch: %v", err)
+	}
+	if s.DispatchedTaskID == nil {
+		t.Fatal("dispatched_task_id is nil after dispatch")
+	}
+	if *s.DispatchedTaskID != resp.Dispatched[0].TaskID {
+		t.Errorf("dispatched_task_id = %q, want %q", *s.DispatchedTaskID, resp.Dispatched[0].TaskID)
+	}
+}
+
+func TestDispatchSpecs_BatchWithDependencies(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+
+	specA := `---
+title: Spec A
+status: validated
+depends_on: []
+affects: []
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+dispatched_task_id: null
+---
+
+# Spec A
+
+Foundation work.
+`
+	specB := `---
+title: Spec B
+status: validated
+depends_on:
+  - specs/local/a.md
+affects: []
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+dispatched_task_id: null
+---
+
+# Spec B
+
+Depends on A.
+`
+	writeTestSpec(t, ws, "specs/local/a.md", specA)
+	writeTestSpec(t, ws, "specs/local/b.md", specB)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/a.md", "specs/local/b.md"}, false)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if len(resp.Dispatched) != 2 {
+		t.Fatalf("dispatched count = %d, want 2", len(resp.Dispatched))
+	}
+
+	// Find task B and verify it depends on task A.
+	taskAID := resp.Dispatched[0].TaskID
+	tasks, _ := h.store.ListTasks(context.Background(), false)
+	var taskB *struct {
+		DependsOn []string
+	}
+	for _, task := range tasks {
+		if task.ID.String() == resp.Dispatched[1].TaskID {
+			taskB = &struct{ DependsOn []string }{DependsOn: task.DependsOn}
+			break
+		}
+	}
+	if taskB == nil {
+		t.Fatal("task B not found")
+	}
+	if len(taskB.DependsOn) != 1 || taskB.DependsOn[0] != taskAID {
+		t.Errorf("task B depends_on = %v, want [%s]", taskB.DependsOn, taskAID)
+	}
+}
+
+func TestDispatchSpecs_RejectsNonValidated(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/draft.md", testSpecDrafted)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/draft.md"}, false)
+
+	// Should return 400 because all specs failed validation.
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1", len(resp.Errors))
+	}
+	if !strings.Contains(resp.Errors[0].Error, "drafted") {
+		t.Errorf("error message = %q, should mention status", resp.Errors[0].Error)
+	}
+}
+
+func TestDispatchSpecs_RejectsAlreadyDispatched(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+
+	alreadyDispatched := `---
+title: Already Dispatched
+status: validated
+depends_on: []
+affects: []
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+dispatched_task_id: 550e8400-e29b-41d4-a716-446655440000
+---
+
+# Already Dispatched
+`
+	writeTestSpec(t, ws, "specs/local/dispatched.md", alreadyDispatched)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/dispatched.md"}, false)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1", len(resp.Errors))
+	}
+	if !strings.Contains(resp.Errors[0].Error, "already dispatched") {
+		t.Errorf("error message = %q, should mention already dispatched", resp.Errors[0].Error)
+	}
+}
+
+func TestDispatchSpecs_SpecSourcePath(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/source.md", testSpecValidated)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/source.md"}, false)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+
+	tasks, _ := h.store.ListTasks(context.Background(), false)
+	if len(tasks) != 1 {
+		t.Fatalf("task count = %d, want 1", len(tasks))
+	}
+	if tasks[0].SpecSourcePath != "specs/local/source.md" {
+		t.Errorf("SpecSourcePath = %q, want %q", tasks[0].SpecSourcePath, "specs/local/source.md")
+	}
+	_ = resp
+}
+
+func TestDispatchSpecs_EmptyPaths(t *testing.T) {
+	h, _ := newDispatchTestHandler(t)
+
+	w, _ := doDispatch(t, h, []string{}, false)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestDispatchSpecs_SpecNotFound(t *testing.T) {
+	h, _ := newDispatchTestHandler(t)
+
+	w, resp := doDispatch(t, h, []string{"specs/nonexistent.md"}, false)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1", len(resp.Errors))
+	}
+	if !strings.Contains(resp.Errors[0].Error, "not found") {
+		t.Errorf("error message = %q, should mention not found", resp.Errors[0].Error)
+	}
+}
+
+func TestDispatchSpecs_Tags(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/tagged.md", testSpecValidated)
+
+	w, _ := doDispatch(t, h, []string{"specs/local/tagged.md"}, false)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+
+	tasks, _ := h.store.ListTasks(context.Background(), false)
+	if len(tasks) != 1 {
+		t.Fatalf("task count = %d, want 1", len(tasks))
+	}
+	foundSpecDispatched := false
+	for _, tag := range tasks[0].Tags {
+		if tag == "spec-dispatched" {
+			foundSpecDispatched = true
+		}
+	}
+	if !foundSpecDispatched {
+		t.Errorf("tags = %v, should contain 'spec-dispatched'", tasks[0].Tags)
+	}
+}

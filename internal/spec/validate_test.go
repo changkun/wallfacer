@@ -41,7 +41,7 @@ func countRule(results []Result, rule string) int {
 
 func TestValidateSpec_Valid(t *testing.T) {
 	s := newTestSpec("local/test.md")
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if len(results) != 0 {
 		t.Errorf("expected no results, got %d: %v", len(results), results)
 	}
@@ -50,7 +50,7 @@ func TestValidateSpec_Valid(t *testing.T) {
 func TestValidateSpec_MissingTitle(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Title = ""
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if !hasRule(results, "required-fields", SeverityError) {
 		t.Error("expected required-fields error for missing title")
 	}
@@ -61,7 +61,7 @@ func TestValidateSpec_MissingMultipleFields(t *testing.T) {
 	s.Title = ""
 	s.Author = ""
 	s.Effort = ""
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	n := countRule(results, "required-fields")
 	if n != 3 {
 		t.Errorf("expected 3 required-fields errors, got %d", n)
@@ -71,7 +71,7 @@ func TestValidateSpec_MissingMultipleFields(t *testing.T) {
 func TestValidateSpec_InvalidStatus(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Status = "bogus"
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if !hasRule(results, "valid-status", SeverityError) {
 		t.Error("expected valid-status error")
 	}
@@ -80,7 +80,7 @@ func TestValidateSpec_InvalidStatus(t *testing.T) {
 func TestValidateSpec_InvalidEffort(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Effort = "bogus"
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if !hasRule(results, "valid-effort", SeverityError) {
 		t.Error("expected valid-effort error")
 	}
@@ -89,7 +89,7 @@ func TestValidateSpec_InvalidEffort(t *testing.T) {
 func TestValidateSpec_DateOrdering(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Updated = Date{time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)}
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if !hasRule(results, "date-ordering", SeverityError) {
 		t.Error("expected date-ordering error")
 	}
@@ -98,29 +98,19 @@ func TestValidateSpec_DateOrdering(t *testing.T) {
 func TestValidateSpec_SelfDependency(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.DependsOn = []string{"local/test.md"}
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if !hasRule(results, "no-self-dependency", SeverityError) {
 		t.Error("expected no-self-dependency error")
 	}
 }
 
-func TestValidateSpec_NonLeafWithDispatch(t *testing.T) {
+func TestValidateSpec_DispatchIDAllowed(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	id := "550e8400-e29b-41d4-a716-446655440000"
 	s.DispatchedTaskID = &id
-	results := ValidateSpec(s, "", false) // non-leaf
+	results := ValidateSpec(s, "")
 	if hasRule(results, "dispatch-consistency", SeverityError) {
-		t.Error("non-leaf spec with dispatch ID should be allowed (dispatch-consistency removed)")
-	}
-}
-
-func TestValidateSpec_LeafWithDispatch(t *testing.T) {
-	s := newTestSpec("local/test.md")
-	id := "550e8400-e29b-41d4-a716-446655440000"
-	s.DispatchedTaskID = &id
-	results := ValidateSpec(s, "", true) // leaf
-	if hasRule(results, "dispatch-consistency", SeverityError) {
-		t.Error("leaf spec with dispatch ID should not trigger error")
+		t.Error("spec with dispatch ID should be allowed (dispatch-consistency removed)")
 	}
 }
 
@@ -128,7 +118,7 @@ func TestValidateSpec_DependsOnMissing(t *testing.T) {
 	repoRoot := t.TempDir()
 	s := newTestSpec("local/test.md")
 	s.DependsOn = []string{"specs/nonexistent.md"}
-	results := ValidateSpec(s, repoRoot, true)
+	results := ValidateSpec(s, repoRoot)
 	if !hasRule(results, "depends-on-exist", SeverityError) {
 		t.Error("expected depends-on-exist error")
 	}
@@ -146,7 +136,7 @@ func TestValidateSpec_DependsOnExists(t *testing.T) {
 
 	s := newTestSpec("local/test.md")
 	s.DependsOn = []string{"specs/dep.md"}
-	results := ValidateSpec(s, repoRoot, true)
+	results := ValidateSpec(s, repoRoot)
 	if hasRule(results, "depends-on-exist", SeverityError) {
 		t.Error("existing dependency should not trigger error")
 	}
@@ -156,7 +146,7 @@ func TestValidateSpec_AffectsMissing(t *testing.T) {
 	repoRoot := t.TempDir()
 	s := newTestSpec("local/test.md")
 	s.Affects = []string{"internal/nonexistent/"}
-	results := ValidateSpec(s, repoRoot, true)
+	results := ValidateSpec(s, repoRoot)
 	if !hasRule(results, "affects-exist", SeverityWarning) {
 		t.Error("expected affects-exist warning")
 	}
@@ -170,7 +160,7 @@ func TestValidateSpec_EmptyBodyWarning(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Status = StatusDrafted
 	s.Body = ""
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if !hasRule(results, "body-not-empty", SeverityWarning) {
 		t.Error("expected body-not-empty warning for drafted spec")
 	}
@@ -180,7 +170,7 @@ func TestValidateSpec_VagueEmptyBody(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Status = StatusVague
 	s.Body = ""
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 	if hasRule(results, "body-not-empty", SeverityWarning) {
 		t.Error("vague spec with empty body should not trigger warning")
 	}
@@ -195,7 +185,7 @@ func TestValidateSpec_AllRulesRun(t *testing.T) {
 		Path:   "local/test.md",
 		Body:   "",
 	}
-	results := ValidateSpec(s, "", true)
+	results := ValidateSpec(s, "")
 
 	// Should have at least: required-fields (title, created, updated, author),
 	// valid-status, valid-effort.

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 97,
+  "route_count": 98,
   "routes": [
     {
       "method": "GET",
@@ -200,6 +200,15 @@
       "tags": [
         "specs",
         "sse"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/specs/dispatch",
+      "name": "DispatchSpecs",
+      "description": "Dispatch validated specs to create kanban tasks atomically.",
+      "tags": [
+        "specs"
       ]
     },
     {

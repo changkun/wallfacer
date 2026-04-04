@@ -192,6 +192,11 @@ var Routes = []Route{
 		Description: "SSE stream of spec tree change notifications.",
 		Tags:        []string{"specs", "sse"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/specs/dispatch", Name: "DispatchSpecs",
+		Description: "Dispatch validated specs to create kanban tasks atomically.",
+		Tags:        []string{"specs"},
+	},
 
 	// --- Planning sandbox ---
 

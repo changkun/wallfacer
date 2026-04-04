@@ -16,7 +16,7 @@ func TestSpecTreeStream_SendsInitialSnapshot(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/specs/stream", nil).WithContext(ctx)
-	w := httptest.NewRecorder()
+	w := newSyncResponseWriter()
 
 	done := make(chan struct{})
 	go func() {
@@ -34,7 +34,7 @@ func TestSpecTreeStream_SendsInitialSnapshot(t *testing.T) {
 			t.Fatal("timed out waiting for snapshot event")
 		default:
 		}
-		if strings.Contains(w.Body.String(), "event: snapshot") {
+		if strings.Contains(w.bodyString(), "event: snapshot") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -50,7 +50,7 @@ func TestSpecTreeStream_SendsSnapshotOnChange(t *testing.T) {
 	// No specs dir initially — tree is empty.
 	ctx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/specs/stream", nil).WithContext(ctx)
-	w := httptest.NewRecorder()
+	w := newSyncResponseWriter()
 
 	done := make(chan struct{})
 	go func() {
@@ -68,13 +68,13 @@ func TestSpecTreeStream_SendsSnapshotOnChange(t *testing.T) {
 			t.Fatal("timed out waiting for initial snapshot")
 		default:
 		}
-		if strings.Contains(w.Body.String(), "event: snapshot") {
+		if strings.Contains(w.bodyString(), "event: snapshot") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	initialCount := strings.Count(w.Body.String(), "event: snapshot")
+	initialCount := strings.Count(w.bodyString(), "event: snapshot")
 
 	// Create a specs directory with a file to trigger a change in the tree data.
 	specsDir := filepath.Join(ws, "specs")
@@ -105,7 +105,7 @@ func TestSpecTreeStream_SendsSnapshotOnChange(t *testing.T) {
 			return
 		default:
 		}
-		if strings.Count(w.Body.String(), "event: snapshot") > initialCount {
+		if strings.Count(w.bodyString(), "event: snapshot") > initialCount {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)

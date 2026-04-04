@@ -29,8 +29,7 @@ type Result struct {
 
 // ValidateSpec runs all per-spec validation rules and returns all violations.
 // The repoRoot is used to resolve depends_on and affects paths on disk.
-// isLeaf indicates whether the spec has no children in the tree.
-func ValidateSpec(s *Spec, repoRoot string, isLeaf bool) []Result {
+func ValidateSpec(s *Spec, repoRoot string) []Result {
 	var results []Result
 
 	results = append(results, checkRequiredFields(s)...)
@@ -138,7 +137,7 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 	// Per-spec validation for each node.
 	for _, node := range tree.All {
 		if node.Value != nil {
-			results = append(results, ValidateSpec(node.Value, repoRoot, node.IsLeaf)...)
+			results = append(results, ValidateSpec(node.Value, repoRoot)...)
 		}
 	}
 

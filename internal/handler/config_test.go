@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +20,40 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 )
+
+// syncResponseWriter wraps httptest.ResponseRecorder with a mutex so that
+// concurrent writes (from an SSE handler goroutine) and reads (from the test
+// goroutine polling for events) do not race on the underlying bytes.Buffer.
+type syncResponseWriter struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+	rec *httptest.ResponseRecorder
+}
+
+func newSyncResponseWriter() *syncResponseWriter {
+	w := &syncResponseWriter{rec: httptest.NewRecorder()}
+	// Replace the recorder's body so Header()/WriteHeader() still work,
+	// but all Write calls go through our mutex-protected buffer.
+	w.rec.Body = &w.buf
+	return w
+}
+
+func (w *syncResponseWriter) Header() http.Header  { return w.rec.Header() }
+func (w *syncResponseWriter) WriteHeader(code int) { w.rec.WriteHeader(code) }
+func (w *syncResponseWriter) Flush()               {} // no-op; satisfies http.Flusher
+
+func (w *syncResponseWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.rec.Write(p)
+}
+
+// bodyString returns the accumulated response body in a thread-safe manner.
+func (w *syncResponseWriter) bodyString() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
+}
 
 // newTestHandlerWithWorkspaces creates a Handler with real workspace directories
 // and an env file, so config/git/files endpoints can function.
