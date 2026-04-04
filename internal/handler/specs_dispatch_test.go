@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/spec"
+	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -485,5 +486,56 @@ func TestUndispatchSpecs_SpecReturnsToValidated(t *testing.T) {
 	}
 	if s.DispatchedTaskID != nil {
 		t.Errorf("dispatched_task_id = %v, want nil", s.DispatchedTaskID)
+	}
+}
+
+// --- SpecCompletionHook tests ---
+
+func TestCompletionHook_UpdatesSpecStatus(t *testing.T) {
+	_, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/hooktest.md", testSpecValidated)
+
+	hook := SpecCompletionHook(func() []string { return []string{ws} })
+	hook(store.Task{
+		SpecSourcePath: "specs/local/hooktest.md",
+	})
+
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/hooktest.md"))
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	if s.Status != spec.StatusComplete {
+		t.Errorf("status = %q, want %q", s.Status, spec.StatusComplete)
+	}
+}
+
+func TestCompletionHook_NoSpecPath(t *testing.T) {
+	hook := SpecCompletionHook(func() []string { return []string{t.TempDir()} })
+	hook(store.Task{}) // no-op, no crash
+}
+
+func TestCompletionHook_SpecFileNotFound(t *testing.T) {
+	hook := SpecCompletionHook(func() []string { return []string{t.TempDir()} })
+	hook(store.Task{
+		SpecSourcePath: "specs/nonexistent.md",
+	}) // logs warning, no crash
+}
+
+func TestCompletionHook_AlreadyComplete(t *testing.T) {
+	_, ws := newDispatchTestHandler(t)
+	completeSpec := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
+	writeTestSpec(t, ws, "specs/local/already.md", completeSpec)
+
+	hook := SpecCompletionHook(func() []string { return []string{ws} })
+	hook(store.Task{
+		SpecSourcePath: "specs/local/already.md",
+	})
+
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/already.md"))
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	if s.Status != spec.StatusComplete {
+		t.Errorf("status = %q, want %q", s.Status, spec.StatusComplete)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/spec"
 	"changkun.de/x/wallfacer/internal/store"
@@ -327,6 +328,36 @@ func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		"undispatched": results,
 		"errors":       errs,
 	})
+}
+
+// SpecCompletionHook returns a callback suitable for store.OnDone that updates
+// the source spec's status to "complete" when a dispatched task finishes.
+// workspaceFn is called each time to get the current workspace list (workspaces
+// can change at runtime via the Settings UI).
+func SpecCompletionHook(workspaceFn func() []string) func(store.Task) {
+	return func(task store.Task) {
+		if task.SpecSourcePath == "" {
+			return
+		}
+		workspaces := workspaceFn()
+		absPath := findSpecFile(workspaces, task.SpecSourcePath)
+		if absPath == "" {
+			logger.Store.Warn("spec completion hook: spec file not found",
+				"task", task.ID, "spec", task.SpecSourcePath)
+			return
+		}
+		err := spec.UpdateFrontmatter(absPath, map[string]any{
+			"status":  string(spec.StatusComplete),
+			"updated": time.Now(),
+		})
+		if err != nil {
+			logger.Store.Error("spec completion hook: failed to update frontmatter",
+				"task", task.ID, "spec", task.SpecSourcePath, "error", err)
+			return
+		}
+		logger.Store.Info("spec completion hook: marked spec complete",
+			"task", task.ID, "spec", task.SpecSourcePath)
+	}
 }
 
 // findSpecFile locates a spec file across workspaces. The relPath is relative

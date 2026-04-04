@@ -294,6 +294,13 @@ func (h *Handler) currentWorkspaces() []string {
 	return slices.Clone(ws)
 }
 
+// CurrentWorkspaces returns the active workspace paths. Exported so that
+// cross-package hooks (e.g., the spec completion callback) can resolve
+// workspace-relative paths at call time.
+func (h *Handler) CurrentWorkspaces() []string {
+	return h.currentWorkspaces()
+}
+
 // currentInstructionsPath returns the filesystem path to the active
 // workspace AGENTS.md, or "" if no workspace manager is available.
 func (h *Handler) currentInstructionsPath() string {

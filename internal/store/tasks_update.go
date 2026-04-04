@@ -36,6 +36,10 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	}
 	if status == TaskStatusDone {
 		s.buildAndSaveSummary(*t)
+		if s.OnDone != nil {
+			taskCopy := deepCloneTask(t)
+			go s.OnDone(taskCopy)
+		}
 	}
 	// Search index not updated: status is not a search-indexed field
 	// (title, prompt, tags, oversight).
@@ -126,6 +130,10 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	}
 	if status == TaskStatusDone {
 		s.buildAndSaveSummary(*t)
+		if s.OnDone != nil {
+			taskCopy := deepCloneTask(t)
+			go s.OnDone(taskCopy)
+		}
 	}
 	// Search index not updated: status is not a search-indexed field
 	// (title, prompt, tags, oversight).

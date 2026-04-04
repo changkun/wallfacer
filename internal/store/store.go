@@ -89,6 +89,12 @@ type Store struct {
 	// This avoids reading potentially large trace files for completed
 	// tasks that are unlikely to be queried during normal operation.
 	eventsLoaded map[uuid.UUID]bool
+
+	// OnDone is an optional callback invoked after a task transitions to
+	// TaskStatusDone. It runs outside the store lock in a fire-and-forget
+	// goroutine so it must not access store internals. The Task is a
+	// deep copy; mutations have no effect on store state.
+	OnDone func(Task)
 }
 
 // NewStore creates a Store backed by the given StorageBackend, loading all

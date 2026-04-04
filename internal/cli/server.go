@@ -181,6 +181,10 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	go r.StartWorktreeHealthWatcher(ctx)
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
+	// When a dispatched task completes, update the source spec to "complete".
+	if s != nil {
+		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces)
+	}
 	// Safety valve: disable autopilot if any task hits the max_tokens limit,
 	// which indicates context window exhaustion — continuing blindly would
 	// waste budget without progress.
