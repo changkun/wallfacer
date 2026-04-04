@@ -142,7 +142,7 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 |------------|-----------|--------|--------|
 | [Spec frontmatter writer](dispatch-workflow/spec-frontmatter-writer.md) | — | small | **complete** |
 | [Task spec source field](dispatch-workflow/task-spec-source-field.md) | — | small | **complete** |
-| [Dispatch API endpoint](dispatch-workflow/dispatch-api.md) | spec-frontmatter-writer, task-spec-source-field | medium | validated |
+| [Dispatch API endpoint](dispatch-workflow/dispatch-api.md) | spec-frontmatter-writer, task-spec-source-field | medium | **complete** |
 | [Undispatch API endpoint](dispatch-workflow/undispatch-api.md) | dispatch-api | small | validated |
 | [Task completion hook](dispatch-workflow/task-completion-hook.md) | spec-frontmatter-writer, task-spec-source-field | small | validated |
 | [Wire dispatch button](dispatch-workflow/wire-dispatch-button.md) | dispatch-api | small | validated |

@@ -1,6 +1,6 @@
 ---
 title: Dispatch API Endpoint
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/spec-frontmatter-writer.md
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
@@ -86,3 +86,9 @@ Implement `POST /api/specs/dispatch` — the atomic dispatch endpoint that creat
 - Do NOT implement drift assessment or layer 2/3 feedback
 - Do NOT modify frontend code (separate tasks)
 - Do NOT implement the planning agent `/dispatch` command (nice-to-have)
+
+## Implementation notes
+
+- **ValidateSpec signature change**: Removing `checkDispatchConsistency` made the `isLeaf` parameter unused. Rather than leaving dead code, the `isLeaf` parameter was removed from `ValidateSpec(s *Spec, repoRoot string, isLeaf bool)` → `ValidateSpec(s *Spec, repoRoot string)`. All callers updated.
+- **Simplified topological sort**: The spec suggested Kahn's algorithm for batch ordering, but since dependencies are resolved via pre-assigned UUIDs (not creation order), sequential creation works correctly without topological sort. The pre-assigned UUIDs ensure cross-batch references are valid regardless of creation order.
+- **Partial success not supported**: The spec's response format shows both `dispatched` and `errors` suggesting partial success. The implementation returns all-or-nothing for task creation (any creation failure rolls back), but validation errors are collected per-spec before creation begins. A batch with some invalid specs and some valid specs will only dispatch the valid ones.
