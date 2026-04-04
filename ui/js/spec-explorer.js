@@ -526,9 +526,69 @@ function _updateDispatchSelectedButton() {
   }
 }
 
-// dispatchSelectedSpecs is a stub — actual dispatch logic is wired by
-// the dispatch-workflow spec.
+// dispatchSelectedSpecs dispatches all selected specs to the task board
+// via the batch dispatch API. Clears selection on success.
 function dispatchSelectedSpecs() {
   var paths = Array.from(_selectedSpecPaths);
-  console.log("dispatch selected specs:", paths);
+  if (paths.length === 0) return;
+  if (!confirm("Dispatch " + paths.length + " specs to the task board?"))
+    return;
+
+  var btn = document.getElementById("spec-dispatch-selected-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Dispatching\u2026";
+  }
+
+  api(Routes.specs.dispatch(), {
+    method: "POST",
+    body: JSON.stringify({ paths: paths, run: false }),
+  })
+    .then(function (resp) {
+      var dispatched = (resp && resp.dispatched) || [];
+      var errors = (resp && resp.errors) || [];
+
+      // Clear selection and uncheck all checkboxes.
+      _selectedSpecPaths.clear();
+      var checkboxes = document.querySelectorAll
+        ? document.querySelectorAll(".spec-select-checkbox")
+        : [];
+      for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = false;
+      }
+      _updateDispatchSelectedButton();
+
+      if (errors.length > 0 && dispatched.length > 0) {
+        alert(
+          "Dispatched " +
+            dispatched.length +
+            " specs. " +
+            errors.length +
+            " failed:\n" +
+            errors
+              .map(function (e) {
+                return e.spec_path + ": " + e.error;
+              })
+              .join("\n"),
+        );
+      } else if (errors.length > 0) {
+        alert(
+          "Dispatch failed:\n" +
+            errors
+              .map(function (e) {
+                return e.spec_path + ": " + e.error;
+              })
+              .join("\n"),
+        );
+      }
+    })
+    .catch(function (err) {
+      alert("Dispatch failed: " + err.message);
+    })
+    .finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Dispatch Selected (0)";
+      }
+    });
 }

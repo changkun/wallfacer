@@ -100,8 +100,17 @@ function makeContext(opts = {}) {
       },
     },
     fetch: opts.fetch || (() => Promise.reject(new Error("stubbed"))),
-    Routes: { specs: { tree: () => "/api/specs/tree" } },
+    Routes: {
+      specs: {
+        tree: () => "/api/specs/tree",
+        dispatch: () => "/api/specs/dispatch",
+      },
+    },
     withBearerHeaders: () => ({}),
+    withAuthHeaders: (h) => h || {},
+    api: () => Promise.resolve({ dispatched: [], errors: [] }),
+    confirm: () => true,
+    alert: () => {},
     escapeHtml: (s) => String(s).replace(/</g, "&lt;").replace(/>/g, "&gt;"),
     focusSpec: opts.focusSpec || (() => {}),
     getFocusedSpecPath: () => null,
