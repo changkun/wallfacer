@@ -1,6 +1,6 @@
 ---
 title: Task Spec Source Field
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/store/models.go
