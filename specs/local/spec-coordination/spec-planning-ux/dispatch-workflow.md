@@ -136,6 +136,39 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 4. When dispatching a design spec (non-leaf), should the task prompt include instructions to run `/wf-spec-breakdown` as part of execution? Or should the prompt simply be the spec body and let the agent decide how to approach it?
 5. Should dispatching a non-leaf spec that already has children warn the user? (The children represent an existing breakdown — dispatching the parent as a single task may conflict with or duplicate the children's work.)
 
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Spec frontmatter writer](dispatch-workflow/spec-frontmatter-writer.md) | — | small | validated |
+| [Task spec source field](dispatch-workflow/task-spec-source-field.md) | — | small | validated |
+| [Dispatch API endpoint](dispatch-workflow/dispatch-api.md) | spec-frontmatter-writer, task-spec-source-field | medium | validated |
+| [Undispatch API endpoint](dispatch-workflow/undispatch-api.md) | dispatch-api | small | validated |
+| [Task completion hook](dispatch-workflow/task-completion-hook.md) | spec-frontmatter-writer, task-spec-source-field | small | validated |
+| [Wire dispatch button](dispatch-workflow/wire-dispatch-button.md) | dispatch-api | small | validated |
+| [Wire multi-select dispatch](dispatch-workflow/wire-multi-select-dispatch.md) | dispatch-api | small | validated |
+| [Spec badge on cards](dispatch-workflow/spec-badge-on-cards.md) | task-spec-source-field | small | validated |
+| [View source spec link](dispatch-workflow/view-source-spec-link.md) | task-spec-source-field | small | validated |
+| [Board highlight from spec](dispatch-workflow/board-highlight-from-spec.md) | spec-badge-on-cards | small | validated |
+
+```mermaid
+graph LR
+  A[Spec frontmatter writer] --> C[Dispatch API]
+  B[Task spec source field] --> C
+  B --> E[Task completion hook]
+  A --> E
+  C --> D[Undispatch API]
+  C --> F[Wire dispatch button]
+  C --> G[Wire multi-select dispatch]
+  B --> H[Spec badge on cards]
+  B --> I[View source spec link]
+  H --> J[Board highlight from spec]
+```
+
+**Parallelism:** Tasks A and B have no dependencies and can run in parallel. After they complete, C, E, H, and I can all run in parallel. After C completes, D, F, and G can run in parallel.
+
+**Deferred items:** Drift assessment (layer 2, item 6 in Remaining Work), iteration support (layer 3, item 7), and planning agent dispatch command (item 13) are not included in this breakdown. Layer 2 is an explicit extension point. Layer 3 reuses existing infrastructure. The agent command is nice-to-have.
+
 ## Affects
 
 - `internal/apicontract/routes.go` — new dispatch/undispatch routes
