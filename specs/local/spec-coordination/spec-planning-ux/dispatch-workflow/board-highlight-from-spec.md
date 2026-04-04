@@ -1,6 +1,6 @@
 ---
 title: Board Highlight from Spec Context
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/dispatch-workflow/spec-badge-on-cards.md
 affects:
