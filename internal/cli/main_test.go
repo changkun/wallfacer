@@ -210,16 +210,26 @@ func TestDefaultSandboxImage_WithVersion(t *testing.T) {
 }
 
 // TestDefaultSandboxImage_DevBuild verifies that the dev build (empty Version)
-// returns :latest.
+// either resolves to the latest release tag or falls back to :latest.
 func TestDefaultSandboxImage_DevBuild(t *testing.T) {
 	old := Version
 	Version = ""
 	defer func() { Version = old }()
 
 	got := defaultSandboxImage()
-	if got != sandboxImageBase+":latest" {
-		t.Fatalf("expected :latest, got %q", got)
+	// Dev build queries GitHub API for the latest tag; if the query succeeds
+	// we get e.g. ":v0.0.4", otherwise ":latest" as fallback.
+	if got == sandboxImageBase+":latest" {
+		return // fallback path — OK
 	}
+	if !strings.HasPrefix(got, sandboxImageBase+":") {
+		t.Fatalf("unexpected image base, got %q", got)
+	}
+	tag := strings.TrimPrefix(got, sandboxImageBase+":")
+	if tag == "" || tag == "latest" {
+		t.Fatalf("expected a resolved tag or :latest, got %q", got)
+	}
+	// Resolved a real tag (e.g. "v0.0.4") — valid.
 }
 
 func TestCodexImageFromClaude(t *testing.T) {

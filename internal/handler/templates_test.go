@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestListTemplates_MissingFile returns an empty JSON array and status 200
@@ -207,6 +208,10 @@ func TestListTemplates_SortedByCreatedAtDesc(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("create %s: expected 201, got %d", name, w.Code)
 		}
+		// Ensure distinct CreatedAt timestamps on platforms with coarse
+		// time resolution (e.g. Windows where time.Now may have ~15ms
+		// granularity).
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/templates", nil)
