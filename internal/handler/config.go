@@ -232,7 +232,33 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		sandbox.Codex:  true,
 	}
 	sandboxReasons := map[string]string{}
+
+	// Gate sandboxes on image availability first, then credential checks.
+	// Skip when no container runtime is configured (e.g. unit tests).
+	if h.runner != nil && h.runner.Command() != "" {
+		cmd := h.runner.Command()
+		claudeImage := h.runner.SandboxImage()
+		codexImage := testCodexImage(claudeImage)
+		for _, sbox := range sandboxes {
+			var image string
+			if sbox == sandbox.Codex {
+				image = codexImage
+			} else {
+				image = claudeImage
+			}
+			status := h.inspectImage(cmd, sbox, image)
+			if !status.Cached {
+				sandboxUsable[sbox] = false
+				sandboxReasons[string(sbox)] = string(sbox) + " unavailable: sandbox image not cached. Pull it from Settings → Sandbox Images."
+			}
+		}
+	}
+
+	// Credential checks (only for sandboxes that passed the image check).
 	for _, sbox := range sandboxes {
+		if !sandboxUsable[sbox] {
+			continue
+		}
 		ok, reason := h.sandboxUsable(sbox)
 		sandboxUsable[sbox] = ok
 		if reason != "" {

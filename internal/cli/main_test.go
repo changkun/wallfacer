@@ -222,6 +222,27 @@ func TestDefaultSandboxImage_DevBuild(t *testing.T) {
 	}
 }
 
+func TestCodexImageFromClaude(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"sandbox-claude:latest", "sandbox-codex:latest"},
+		{"ghcr.io/latere-ai/sandbox-claude:v0.0.1", "ghcr.io/latere-ai/sandbox-codex:v0.0.1"},
+		{"ghcr.io/latere-ai/sandbox-claude:latest@sha256:abc", "ghcr.io/latere-ai/sandbox-codex:latest@sha256:abc"},
+		{"sandbox-codex:latest", "sandbox-codex:latest"},      // already codex
+		{"custom-image:latest", "custom-image:latest"},        // unrelated
+		{"", "sandbox-codex:latest"},                          // empty
+		{"  sandbox-claude:latest  ", "sandbox-codex:latest"}, // whitespace
+	}
+	for _, tt := range tests {
+		got := codexImageFromClaude(tt.input)
+		if got != tt.want {
+			t.Errorf("codexImageFromClaude(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 // TestDetectContainerRuntime_EnvOverride verifies that CONTAINER_CMD env var
 // overrides all other detection logic.
 func TestDetectContainerRuntime_EnvOverride(t *testing.T) {

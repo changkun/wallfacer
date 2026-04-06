@@ -34,6 +34,40 @@ func defaultSandboxImage() string {
 // remote registry image cannot be pulled (e.g. no network, auth failure).
 const fallbackSandboxImage = "sandbox-claude:latest"
 
+// codexImageFromClaude derives the codex sandbox image name from the claude
+// base image by replacing "sandbox-claude" with "sandbox-codex" in the
+// repository name, preserving registry prefix, tag, and digest.
+func codexImageFromClaude(baseImage string) string {
+	baseImage = strings.TrimSpace(baseImage)
+	if baseImage == "" {
+		return "sandbox-codex:latest"
+	}
+	if strings.Contains(strings.ToLower(baseImage), "sandbox-codex") {
+		return baseImage
+	}
+	registry := baseImage
+	digest := ""
+	if at := strings.Index(registry, "@"); at != -1 {
+		digest = registry[at:]
+		registry = registry[:at]
+	}
+	tag := ""
+	if at := strings.LastIndex(registry, ":"); at != -1 {
+		tag = registry[at:]
+		registry = registry[:at]
+	}
+	prefix := ""
+	repoName := registry
+	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
+		prefix = repoName[:idx+1]
+		repoName = repoName[idx+1:]
+	}
+	if repoName != "sandbox-claude" {
+		return baseImage
+	}
+	return prefix + "sandbox-codex" + tag + digest
+}
+
 // ConfigDir returns the default wallfacer configuration directory.
 func ConfigDir() string {
 	home, err := os.UserHomeDir()

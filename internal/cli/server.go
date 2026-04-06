@@ -133,6 +133,10 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	}
 
 	resolvedImage := ensureImage(cfg.ContainerCmd, cfg.SandboxImage)
+	codexImage := codexImageFromClaude(resolvedImage)
+	if codexImage != resolvedImage {
+		ensureImage(cfg.ContainerCmd, codexImage)
+	}
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
