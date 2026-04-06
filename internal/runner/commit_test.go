@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -618,6 +619,105 @@ func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
 		if _, err := os.Stat(p); err == nil {
 			t.Errorf("expected %s to be removed from worktree; file still exists", f)
 		}
+	}
+}
+
+// TestHostStageAndCommitCleansUpNonEmptyInstructionsFiles verifies that
+// non-empty CLAUDE.md files injected by the container mount are removed
+// before staging when the file is not tracked by the original repo.
+// This is a regression test for a bug where mounted instructions with
+// content survived the empty-only cleanup and got committed.
+func TestHostStageAndCommitCleansUpNonEmptyInstructionsFiles(t *testing.T) {
+	repo := setupTestRepo(t)
+	worktreesDir := t.TempDir()
+	s, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	runner := NewRunner(s, RunnerConfig{
+		Command:      "echo",
+		SandboxImage: "test:latest",
+		Workspaces:   []string{repo},
+		WorktreesDir: worktreesDir,
+	})
+	t.Cleanup(func() { runner.Shutdown() })
+
+	taskID := uuid.New()
+	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
+
+	wt := worktreePaths[repo]
+
+	// Simulate non-empty instructions files left behind by the mount.
+	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
+		if err := os.WriteFile(filepath.Join(wt, f), []byte("# Workspace instructions\nDo the thing.\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, _ = runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "test cleanup")
+
+	// Non-empty untracked instructions files must be removed.
+	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
+		p := filepath.Join(wt, f)
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("expected untracked %s to be removed from worktree; file still exists", f)
+		}
+	}
+}
+
+// TestHostStageAndCommitPreservesTrackedInstructionsFiles verifies that
+// a CLAUDE.md already tracked by the repo is NOT removed during cleanup.
+func TestHostStageAndCommitPreservesTrackedInstructionsFiles(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Add a CLAUDE.md to the repo so it's tracked.
+	claudePath := filepath.Join(repo, "CLAUDE.md")
+	if err := os.WriteFile(claudePath, []byte("# Project instructions\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git", "-C", repo, "add", "CLAUDE.md")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, out)
+	}
+	cmd = exec.Command("git", "-C", repo, "commit", "-m", "add CLAUDE.md")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, out)
+	}
+
+	worktreesDir := t.TempDir()
+	s, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	runner := NewRunner(s, RunnerConfig{
+		Command:      "echo",
+		SandboxImage: "test:latest",
+		Workspaces:   []string{repo},
+		WorktreesDir: worktreesDir,
+	})
+	t.Cleanup(func() { runner.Shutdown() })
+
+	taskID := uuid.New()
+	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
+
+	wt := worktreePaths[repo]
+
+	_, _ = runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "test preserve")
+
+	// Tracked CLAUDE.md must still exist.
+	p := filepath.Join(wt, "CLAUDE.md")
+	if _, err := os.Stat(p); err != nil {
+		t.Errorf("expected tracked CLAUDE.md to be preserved, but it was removed")
 	}
 }
 
