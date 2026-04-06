@@ -2,12 +2,15 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
 )
@@ -21,17 +24,45 @@ var Version = ""
 const sandboxImageBase = "ghcr.io/latere-ai/sandbox-claude"
 
 // defaultSandboxImage returns the tagged sandbox image reference.
-// Release builds (version set via ldflags) pull the matching version tag;
-// dev builds fall back to :latest.
+// Release builds (version set via ldflags) use the matching version tag.
+// Dev builds query the GitHub API for the latest release of latere-ai/images
+// and use that tag. Falls back to :latest only if the query fails.
 func defaultSandboxImage() string {
 	if Version != "" {
 		return sandboxImageBase + ":v" + Version
 	}
+	if tag := resolveLatestImageTag(); tag != "" {
+		logger.Main.Info("resolved latest sandbox image tag", "tag", tag)
+		return sandboxImageBase + ":" + tag
+	}
 	return sandboxImageBase + ":latest"
+}
+
+// resolveLatestImageTag queries the GitHub API for the latest release tag
+// of the latere-ai/images repository. Returns the tag name (e.g. "v0.0.3")
+// or empty string on failure.
+func resolveLatestImageTag() string {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/latere-ai/images/releases/latest")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return ""
+	}
+	return release.TagName
 }
 
 // fallbackSandboxImage is the locally-built image name used when the
 // remote registry image cannot be pulled (e.g. no network, auth failure).
+// This intentionally uses :latest as a last-resort local fallback.
 const fallbackSandboxImage = "sandbox-claude:latest"
 
 // codexImageFromClaude derives the codex sandbox image name from the claude

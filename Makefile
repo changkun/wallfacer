@@ -1,9 +1,11 @@
 SHELL            := /bin/bash
 PODMAN           := /opt/podman/bin/podman
-IMAGE            := sandbox-claude:latest
-GHCR_IMAGE       := ghcr.io/latere-ai/sandbox-claude:latest
-CODEX_IMAGE      := sandbox-codex:latest
-GHCR_CODEX_IMAGE := ghcr.io/latere-ai/sandbox-codex:latest
+# Resolve the latest release tag from latere-ai/images; fall back to "latest".
+SANDBOX_TAG      := $(shell curl -sf https://api.github.com/repos/latere-ai/images/releases/latest | jq -r '.tag_name // empty' 2>/dev/null || echo latest)
+IMAGE            := sandbox-claude:$(SANDBOX_TAG)
+GHCR_IMAGE       := ghcr.io/latere-ai/sandbox-claude:$(SANDBOX_TAG)
+CODEX_IMAGE      := sandbox-codex:$(SANDBOX_TAG)
+GHCR_CODEX_IMAGE := ghcr.io/latere-ai/sandbox-codex:$(SANDBOX_TAG)
 NAME             := wallfacer
 
 # Load .env if it exists
