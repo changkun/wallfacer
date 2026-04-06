@@ -105,7 +105,7 @@ func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runne
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsPath,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -223,7 +223,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws},
 	})
@@ -263,7 +263,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws1, ws2},
 	})
@@ -312,7 +312,7 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsFile,
 		CodexAuthPath:    codexAuthDir,
 	})
@@ -339,7 +339,7 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsFile,
 	})
 	t.Cleanup(func() { runner.Shutdown() })
@@ -347,7 +347,7 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 
 	found := false
 	for _, a := range args {
-		if a == "wallfacer-codex:latest" {
+		if a == "sandbox-codex:latest" {
 			found = true
 			break
 		}
@@ -416,7 +416,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws},
 	})
@@ -429,7 +429,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 		if strings.Contains(a, "CLAUDE.md") {
 			claudeMDIdx = i
 		}
-		if a == "wallfacer:latest" {
+		if a == "sandbox-claude:latest" {
 			imageIdx = i
 		}
 	}
@@ -516,7 +516,7 @@ func TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate(t *testing.T) {
 	// Start with ws1 only.
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws1},
 	})

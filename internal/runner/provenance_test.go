@@ -19,7 +19,7 @@ func TestCaptureExecutionEnvironment_ModelFromEnvconfig(t *testing.T) {
 
 	r := NewRunner(nil, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -46,7 +46,7 @@ func TestCaptureExecutionEnvironment_InstructionsHash(t *testing.T) {
 
 	r := NewRunner(nil, RunnerConfig{
 		Command:          "echo",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: instrFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -65,7 +65,7 @@ func TestCaptureExecutionEnvironment_InstructionsHash(t *testing.T) {
 func TestCaptureExecutionEnvironment_MissingInstructions(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{
 		Command:          "echo",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		InstructionsPath: "/nonexistent/path/CLAUDE.md",
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -84,7 +84,7 @@ func TestCaptureExecutionEnvironment_ContainerDigestEmpty(t *testing.T) {
 	// Using a command that will fail for an image that doesn't exist.
 	r := NewRunner(nil, RunnerConfig{
 		Command:      "false", // always exits non-zero
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
@@ -101,15 +101,15 @@ func TestCaptureExecutionEnvironment_ContainerDigestEmpty(t *testing.T) {
 func TestCaptureExecutionEnvironment_ContainerImage(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{}
 	env := r.captureExecutionEnvironment(task)
 
-	if env.ContainerImage != "wallfacer:latest" {
-		t.Errorf("ContainerImage = %q, want %q", env.ContainerImage, "wallfacer:latest")
+	if env.ContainerImage != "sandbox-claude:latest" {
+		t.Errorf("ContainerImage = %q, want %q", env.ContainerImage, "sandbox-claude:latest")
 	}
 }
 
@@ -118,7 +118,7 @@ func TestCaptureExecutionEnvironment_ContainerImage(t *testing.T) {
 func TestCaptureExecutionEnvironment_Sandbox(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
@@ -145,7 +145,7 @@ func TestCaptureExecutionEnvironment_TaskModelOverride(t *testing.T) {
 
 	r := NewRunner(nil, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })

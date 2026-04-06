@@ -147,9 +147,9 @@ func RunDoctor(configDir string) {
 
 		codexTag := ":latest"
 		if Version != "" {
-			codexTag = ":" + Version
+			codexTag = ":v" + Version
 		}
-		codexImage := envOrDefault("CODEX_SANDBOX_IMAGE", "ghcr.io/changkun/wallfacer-codex"+codexTag)
+		codexImage := envOrDefault("CODEX_SANDBOX_IMAGE", "ghcr.io/latere-ai/sandbox-codex"+codexTag)
 		if imageExists(runtimePath, codexImage) {
 			fmt.Printf("[ok] Codex sandbox image: %s\n", codexImage)
 		} else {

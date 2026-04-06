@@ -18,21 +18,21 @@ import (
 var Version = ""
 
 // sandboxImageBase is the registry path for the published sandbox image.
-const sandboxImageBase = "ghcr.io/changkun/wallfacer"
+const sandboxImageBase = "ghcr.io/latere-ai/sandbox-claude"
 
 // defaultSandboxImage returns the tagged sandbox image reference.
 // Release builds (version set via ldflags) pull the matching version tag;
 // dev builds fall back to :latest.
 func defaultSandboxImage() string {
 	if Version != "" {
-		return sandboxImageBase + ":" + Version
+		return sandboxImageBase + ":v" + Version
 	}
 	return sandboxImageBase + ":latest"
 }
 
 // fallbackSandboxImage is the locally-built image name used when the
 // remote registry image cannot be pulled (e.g. no network, auth failure).
-const fallbackSandboxImage = "wallfacer:latest"
+const fallbackSandboxImage = "sandbox-claude:latest"
 
 // ConfigDir returns the default wallfacer configuration directory.
 func ConfigDir() string {

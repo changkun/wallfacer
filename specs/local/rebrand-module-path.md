@@ -24,7 +24,7 @@ Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere
 | Area | Current | Target |
 |------|---------|--------|
 | Go module path | `changkun.de/x/wallfacer` | `latere.ai/wallfacer` |
-| Container images | `ghcr.io/changkun/wallfacer` | TBD (`ghcr.io/latere-ai/wallfacer`?) |
+| Container images | `ghcr.io/changkun/wallfacer` | `ghcr.io/latere-ai/sandbox-claude` / `ghcr.io/latere-ai/sandbox-codex` (done, moved to `github.com/latere-ai/images`) |
 | macOS bundle ID | `ai.latere.wallfacer` | Already correct (set in desktop-app task-08) |
 | Import statements | ~200 files | Bulk rename |
 | CI ldflags | Makefile, release-binary.yml | Update module prefix |
@@ -41,6 +41,6 @@ Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere
 
 ## Open Questions
 
-- Target container registry org (keep `ghcr.io/changkun` or move to `ghcr.io/latere-ai`?)
+- ~~Target container registry org~~ — resolved: moved to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex`
 - Whether to set up a vanity import server at `latere.ai/wallfacer` (like `golang.org/x/` style)
 - Timing relative to other work (standalone migration or bundled with a release)

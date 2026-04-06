@@ -368,17 +368,17 @@ func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []s
 
 // sandboxImageForSandbox derives the container image name for the given sandbox type.
 // For Claude it returns the configured sandboxImage as-is. For Codex it rewrites
-// "wallfacer" → "wallfacer-codex" in the image name (preserving registry, tag, and digest).
+// "sandbox-claude" → "sandbox-codex" in the image name (preserving registry, tag, and digest).
 func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
 	if sb != sandbox.Codex {
 		return strings.TrimSpace(r.sandboxImage)
 	}
 	baseImage := strings.TrimSpace(r.sandboxImage)
 	if baseImage == "" {
-		return "wallfacer-codex:latest"
+		return "sandbox-codex:latest"
 	}
 	low := strings.ToLower(baseImage)
-	if strings.Contains(low, "wallfacer-codex") {
+	if strings.Contains(low, "sandbox-codex") {
 		return baseImage
 	}
 	registry := baseImage
@@ -398,10 +398,10 @@ func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
 		prefix = repoName[:idx+1]
 		repoName = repoName[idx+1:]
 	}
-	if repoName != "wallfacer" {
+	if repoName != "sandbox-claude" {
 		return baseImage
 	}
-	return prefix + "wallfacer-codex" + tag + digest
+	return prefix + "sandbox-codex" + tag + digest
 }
 
 // sandboxForTask returns the resolved sandbox type for the task's implementation activity.

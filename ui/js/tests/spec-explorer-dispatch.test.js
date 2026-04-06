@@ -233,9 +233,7 @@ describe("dispatchSelectedSpecs", () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(ctx.showAlert).toHaveBeenCalledWith(
-      "Dispatch failed: server error",
-    );
+    expect(ctx.showAlert).toHaveBeenCalledWith("Dispatch failed: server error");
   });
 
   it("shows partial success details", async () => {

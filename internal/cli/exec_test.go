@@ -71,12 +71,12 @@ func TestParseExecConfig_SandboxRejectsInvalidRuntime(t *testing.T) {
 	}
 }
 
-// TestResolveSandboxImageForExec_CodexFromWallfacer verifies that "wallfacer:latest"
-// is rewritten to "wallfacer-codex:latest" for the Codex sandbox.
+// TestResolveSandboxImageForExec_CodexFromWallfacer verifies that "sandbox-claude:latest"
+// is rewritten to "sandbox-codex:latest" for the Codex sandbox.
 func TestResolveSandboxImageForExec_CodexFromWallfacer(t *testing.T) {
-	got := resolveSandboxImageForExec("wallfacer:latest", "codex")
-	if got != "wallfacer-codex:latest" {
-		t.Fatalf("expected wallfacer-codex:latest, got %q", got)
+	got := resolveSandboxImageForExec("sandbox-claude:latest", "codex")
+	if got != "sandbox-codex:latest" {
+		t.Fatalf("expected sandbox-codex:latest, got %q", got)
 	}
 }
 
@@ -270,29 +270,29 @@ func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
 }
 
 // TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest verifies that
-// both the tag and digest portions are preserved when rewriting a wallfacer
-// image to wallfacer-codex.
+// both the tag and digest portions are preserved when rewriting a sandbox-claude
+// image to sandbox-codex.
 func TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest(t *testing.T) {
-	got := resolveSandboxImageForExec("ghcr.io/acme/wallfacer:latest@sha256:12345", "codex")
-	if got != "ghcr.io/acme/wallfacer-codex:latest@sha256:12345" {
+	got := resolveSandboxImageForExec("ghcr.io/acme/sandbox-claude:latest@sha256:12345", "codex")
+	if got != "ghcr.io/acme/sandbox-codex:latest@sha256:12345" {
 		t.Fatalf("expected converted digest image, got %q", got)
 	}
 }
 
 // TestResolveSandboxImageForExec_EmptyImage verifies that an empty image
-// returns wallfacer-codex:latest for Codex sandbox.
+// returns sandbox-codex:latest for Codex sandbox.
 func TestResolveSandboxImageForExec_EmptyImage(t *testing.T) {
 	got := resolveSandboxImageForExec("", "codex")
-	if got != "wallfacer-codex:latest" {
-		t.Fatalf("expected wallfacer-codex:latest, got %q", got)
+	if got != "sandbox-codex:latest" {
+		t.Fatalf("expected sandbox-codex:latest, got %q", got)
 	}
 }
 
 // TestResolveSandboxImageForExec_AlreadyCodex verifies that an image already
-// containing "wallfacer-codex" is returned unchanged.
+// containing "sandbox-codex" is returned unchanged.
 func TestResolveSandboxImageForExec_AlreadyCodex(t *testing.T) {
-	got := resolveSandboxImageForExec("ghcr.io/acme/wallfacer-codex:v1", "codex")
-	if got != "ghcr.io/acme/wallfacer-codex:v1" {
+	got := resolveSandboxImageForExec("ghcr.io/acme/sandbox-codex:v1", "codex")
+	if got != "ghcr.io/acme/sandbox-codex:v1" {
 		t.Fatalf("expected unchanged image, got %q", got)
 	}
 }
@@ -308,8 +308,8 @@ func TestResolveSandboxImageForExec_ClaudeReturnsUnchanged(t *testing.T) {
 
 // TestResolveSandboxImageForExec_WhitespaceImage verifies whitespace trimming.
 func TestResolveSandboxImageForExec_WhitespaceImage(t *testing.T) {
-	got := resolveSandboxImageForExec("  wallfacer:latest  ", "codex")
-	if got != "wallfacer-codex:latest" {
+	got := resolveSandboxImageForExec("  sandbox-claude:latest  ", "codex")
+	if got != "sandbox-codex:latest" {
 		t.Fatalf("expected trimmed and rewritten image, got %q", got)
 	}
 }

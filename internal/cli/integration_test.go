@@ -43,7 +43,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 	mock := &runner.MockRunner{
 		EnvFilePath: envPath,
 		Cmd:         "true",
-		Image:       "wallfacer:latest",
+		Image:       "sandbox-claude:latest",
 		WtDir:       filepath.Join(workdir, "wt"),
 	}
 

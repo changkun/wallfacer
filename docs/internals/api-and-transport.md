@@ -347,8 +347,8 @@ The `containerJSON` struct uses `json.RawMessage` for `Names` and `any` for `Cre
 `ensureImage()` in `server.go` runs at startup:
 
 1. **Check local**: `<runtime> images -q <image>` — if output is non-empty, the image exists locally and is used as-is.
-2. **Pull from registry**: `<runtime> pull <image>` — streams stdout/stderr to the terminal. The default image is `ghcr.io/changkun/wallfacer:latest`.
-3. **Fallback to local**: If the pull fails and the requested image differs from `wallfacer:latest`, check whether `wallfacer:latest` exists locally. If so, use it instead.
+2. **Pull from registry**: `<runtime> pull <image>` — streams stdout/stderr to the terminal. The default image is `ghcr.io/latere-ai/sandbox-claude:latest`.
+3. **Fallback to local**: If the pull fails and the requested image differs from `sandbox-claude:latest`, check whether `sandbox-claude:latest` exists locally. If so, use it instead.
 4. **No image**: If neither the remote nor local fallback is available, the server starts anyway but warns that tasks may fail.
 
 ### Container Labels

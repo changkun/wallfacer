@@ -321,7 +321,7 @@ func TestContainerSpecFullArgs(t *testing.T) {
 	spec := sandbox.ContainerSpec{
 		Runtime: "/opt/podman/bin/podman",
 		Name:    "wallfacer-task-abc12345",
-		Image:   "wallfacer:latest",
+		Image:   "sandbox-claude:latest",
 		Labels: map[string]string{
 			"wallfacer.task.id":     "abc12345-1111-2222-3333-444444444444",
 			"wallfacer.task.prompt": "fix the bug",
@@ -356,7 +356,7 @@ func TestContainerSpecFullArgs(t *testing.T) {
 		"--mount", "type=bind,src=/repos/myproject,dst=/workspace/myproject,z",
 		"--mount", "type=bind,src=/instructions/CLAUDE.md,dst=/workspace/CLAUDE.md,z,readonly",
 		"-w", "/workspace/myproject",
-		"wallfacer:latest",
+		"sandbox-claude:latest",
 		"-p", "fix the bug", "--verbose", "--output-format", "stream-json",
 	}
 

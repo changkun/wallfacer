@@ -58,7 +58,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 		{
 			name: "claude, no envfile, no model",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest"}
 			},
 			model:   "",
 			sandbox: "claude",
@@ -66,13 +66,13 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 				{"--name", "c-test"},
 				{"-v", "claude-config:/home/claude/.claude"},
 			},
-			wantArgs:    []string{"wallfacer:latest"},
+			wantArgs:    []string{"sandbox-claude:latest"},
 			wantNotArgs: []string{"--env-file", "CLAUDE_CODE_MODEL", "/home/codex"},
 		},
 		{
 			name: "claude, with envfile and model",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest", EnvFile: "/home/user/.env"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest", EnvFile: "/home/user/.env"}
 			},
 			model:   "claude-opus-4-6",
 			sandbox: "claude",
@@ -81,20 +81,20 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 				{"-e", "CLAUDE_CODE_MODEL=claude-opus-4-6"},
 				{"-v", "claude-config:/home/claude/.claude"},
 			},
-			wantArgs:    []string{"wallfacer:latest"},
+			wantArgs:    []string{"sandbox-claude:latest"},
 			wantNotArgs: []string{"/home/codex"},
 		},
 		{
 			name: "codex sandbox, no auth path configured",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest"}
 			},
 			model:   "",
 			sandbox: "codex",
 			wantPairs: []pair{
 				{"-v", "claude-config:/home/claude/.claude"},
 			},
-			wantArgs:    []string{"wallfacer-codex:latest"},
+			wantArgs:    []string{"sandbox-codex:latest"},
 			wantNotArgs: []string{"/home/codex"},
 		},
 		{
@@ -105,7 +105,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte(`{}`), 0600); err != nil {
 					t.Fatal(err)
 				}
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest", CodexAuthPath: dir}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest", CodexAuthPath: dir}
 			},
 			model:   "codex-model",
 			sandbox: "codex",
@@ -113,29 +113,29 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 				{"-v", "claude-config:/home/claude/.claude"},
 				{"-e", "CLAUDE_CODE_MODEL=codex-model"},
 			},
-			wantArgs: []string{"wallfacer-codex:latest", "dst=/home/codex/.codex," + expectedBuildROSuffix()},
+			wantArgs: []string{"sandbox-codex:latest", "dst=/home/codex/.codex," + expectedBuildROSuffix()},
 		},
 		{
 			name: "codex sandbox, auth path does not exist",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest", CodexAuthPath: "/nonexistent/path/to/codex"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest", CodexAuthPath: "/nonexistent/path/to/codex"}
 			},
 			model:       "",
 			sandbox:     "codex",
-			wantArgs:    []string{"wallfacer-codex:latest"},
+			wantArgs:    []string{"sandbox-codex:latest"},
 			wantNotArgs: []string{"/home/codex"},
 		},
 		{
-			name:     "codex sandbox, empty sandbox image falls back to wallfacer-codex:latest",
+			name:     "codex sandbox, empty sandbox image falls back to sandbox-codex:latest",
 			cfgFn:    func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: ""} },
 			model:    "",
 			sandbox:  "codex",
-			wantArgs: []string{"wallfacer-codex:latest"},
+			wantArgs: []string{"sandbox-codex:latest"},
 		},
 		{
 			name: "network is always host",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest"}
 			},
 			model:   "",
 			sandbox: "claude",
@@ -182,7 +182,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 // TestBuildBaseContainerSpecClaudeVsCodexImageDiffers verifies that the claude
 // and codex sandboxes resolve to different images from the same base image.
 func TestBuildBaseContainerSpecClaudeVsCodexImageDiffers(t *testing.T) {
-	r := newRunnerForArgTest(t, RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"})
+	r := newRunnerForArgTest(t, RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest"})
 
 	claudeSpec := r.buildBaseContainerSpec("c-test", "", "claude")
 	codexSpec := r.buildBaseContainerSpec("c-test", "", "codex")
@@ -190,13 +190,13 @@ func TestBuildBaseContainerSpecClaudeVsCodexImageDiffers(t *testing.T) {
 	claudeArgs := claudeSpec.Build()
 	codexArgs := codexSpec.Build()
 
-	if !argsContainSubstring(claudeArgs, "wallfacer:latest") {
-		t.Errorf("claude spec: expected wallfacer:latest; args: %v", claudeArgs)
+	if !argsContainSubstring(claudeArgs, "sandbox-claude:latest") {
+		t.Errorf("claude spec: expected sandbox-claude:latest; args: %v", claudeArgs)
 	}
-	if !argsContainSubstring(codexArgs, "wallfacer-codex:latest") {
-		t.Errorf("codex spec: expected wallfacer-codex:latest; args: %v", codexArgs)
+	if !argsContainSubstring(codexArgs, "sandbox-codex:latest") {
+		t.Errorf("codex spec: expected sandbox-codex:latest; args: %v", codexArgs)
 	}
-	if argsContainSubstring(claudeArgs, "wallfacer-codex") {
+	if argsContainSubstring(claudeArgs, "sandbox-codex") {
 		t.Errorf("claude spec should not reference wallfacer-codex; args: %v", claudeArgs)
 	}
 }
@@ -211,7 +211,7 @@ func TestBuildBaseContainerSpecVolumeOrder(t *testing.T) {
 	}
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:       "podman",
-		SandboxImage:  "wallfacer:latest",
+		SandboxImage:  "sandbox-claude:latest",
 		CodexAuthPath: codexDir,
 	})
 
@@ -241,7 +241,7 @@ func TestBuildBaseContainerSpecVolumeOrder(t *testing.T) {
 // TestBuildBaseContainerSpecRuntimeNotInBuild verifies that Runtime is used
 // for exec.Command but does not appear in the Build() arg slice.
 func TestBuildBaseContainerSpecRuntimeNotInBuild(t *testing.T) {
-	r := newRunnerForArgTest(t, RunnerConfig{Command: "/opt/podman/bin/podman", SandboxImage: "wallfacer:latest"})
+	r := newRunnerForArgTest(t, RunnerConfig{Command: "/opt/podman/bin/podman", SandboxImage: "sandbox-claude:latest"})
 	spec := r.buildBaseContainerSpec("c-test", "", "claude")
 	args := spec.Build()
 
@@ -275,7 +275,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				ws := t.TempDir()
 				return RunnerConfig{
 					Command:      "podman",
-					SandboxImage: "wallfacer:latest",
+					SandboxImage: "sandbox-claude:latest",
 					Workspaces:   []string{ws},
 				}
 			},
@@ -299,7 +299,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 				return RunnerConfig{
 					Command:      "podman",
-					SandboxImage: "wallfacer:latest",
+					SandboxImage: "sandbox-claude:latest",
 					Workspaces:   []string{ws1, ws2},
 				}
 			},
@@ -317,7 +317,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 				return RunnerConfig{
 					Command:          "podman",
-					SandboxImage:     "wallfacer:latest",
+					SandboxImage:     "sandbox-claude:latest",
 					InstructionsPath: instrPath,
 				}
 			},
@@ -333,7 +333,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 				return RunnerConfig{
 					Command:          "podman",
-					SandboxImage:     "wallfacer:latest",
+					SandboxImage:     "sandbox-claude:latest",
 					InstructionsPath: instrPath,
 				}
 			},
@@ -345,7 +345,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{
 					Command:          "podman",
-					SandboxImage:     "wallfacer:latest",
+					SandboxImage:     "sandbox-claude:latest",
 					InstructionsPath: "/nonexistent/CLAUDE.md",
 				}
 			},
@@ -357,7 +357,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{
 					Command:      "podman",
-					SandboxImage: "wallfacer:latest",
+					SandboxImage: "sandbox-claude:latest",
 				}
 			},
 			sandbox:     "claude",
@@ -366,7 +366,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 		{
 			name: "prompt is passed after image in Cmd",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest"}
 			},
 			sandbox: "claude",
 			wantPairs: []pair{
@@ -376,10 +376,10 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 		{
 			name: "claude and codex produce different images",
 			cfgFn: func(_ *testing.T) RunnerConfig {
-				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+				return RunnerConfig{Command: "podman", SandboxImage: "sandbox-claude:latest"}
 			},
 			sandbox:  "codex",
-			wantArgs: []string{"wallfacer-codex:latest"},
+			wantArgs: []string{"sandbox-codex:latest"},
 		},
 	}
 
@@ -420,7 +420,7 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		Workspaces:   []string{ws},
 	})
 	args := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
@@ -461,7 +461,7 @@ func TestBuildIdeationContainerArgsSingleWorkspaceInstructionsInsideRepo(t *test
 
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "wallfacer:latest",
+		SandboxImage:     "sandbox-claude:latest",
 		Workspaces:       []string{ws},
 		InstructionsPath: instrPath,
 	})
@@ -486,17 +486,17 @@ func TestBuildIdeationContainerArgsSingleWorkspaceInstructionsInsideRepo(t *test
 func TestBuildIdeationContainerArgsClaudeVsCodex(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 	})
 
 	claudeArgs := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
 	codexArgs := r.buildIdeationContainerArgs("ideate-test", "prompt", "codex")
 
-	if !argsContainSubstring(claudeArgs, "wallfacer:latest") {
-		t.Errorf("claude ideation: expected wallfacer:latest; args: %v", claudeArgs)
+	if !argsContainSubstring(claudeArgs, "sandbox-claude:latest") {
+		t.Errorf("claude ideation: expected sandbox-claude:latest; args: %v", claudeArgs)
 	}
-	if !argsContainSubstring(codexArgs, "wallfacer-codex:latest") {
-		t.Errorf("codex ideation: expected wallfacer-codex:latest; args: %v", codexArgs)
+	if !argsContainSubstring(codexArgs, "sandbox-codex:latest") {
+		t.Errorf("codex ideation: expected sandbox-codex:latest; args: %v", codexArgs)
 	}
 
 	// Both should include --network=host.
@@ -794,7 +794,7 @@ func TestAppendInstructionsMountReadOnly(t *testing.T) {
 func TestCommitStyleInvocation(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      "/home/.env",
 	})
 
@@ -829,7 +829,7 @@ func TestCommitStyleInvocation(t *testing.T) {
 	// Image appears before -p.
 	imageIdx, promptIdx := -1, -1
 	for i, a := range args {
-		if a == "wallfacer:latest" {
+		if a == "sandbox-claude:latest" {
 			imageIdx = i
 		}
 		if a == "-p" {
@@ -850,7 +850,7 @@ func TestCommitStyleInvocation(t *testing.T) {
 func TestTitleStyleInvocation(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 	})
 
 	model := "claude-haiku-4-5"
@@ -862,7 +862,7 @@ func TestTitleStyleInvocation(t *testing.T) {
 	// -p must appear after the image.
 	imageIdx, promptIdx := -1, -1
 	for i, a := range args {
-		if a == "wallfacer:latest" {
+		if a == "sandbox-claude:latest" {
 			imageIdx = i
 		}
 		if a == "-p" {
@@ -981,7 +981,7 @@ func TestContainerSpecResourceFlagsBeforeExtraFlags(t *testing.T) {
 func TestBuildBaseContainerSpecPropagatesResourceLimits(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:         "podman",
-		SandboxImage:    "wallfacer:latest",
+		SandboxImage:    "sandbox-claude:latest",
 		ContainerCPUs:   "1.5",
 		ContainerMemory: "2g",
 	})
@@ -1002,7 +1002,7 @@ func TestBuildBaseContainerSpecPropagatesResourceLimits(t *testing.T) {
 func TestBuildBaseContainerSpecNoResourceLimitsWhenEmpty(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 	})
 
 	spec := r.buildBaseContainerSpec("c-test", "", "claude")
@@ -1030,7 +1030,7 @@ func TestBuildBaseContainerSpecResourceLimitsFromEnvFile(t *testing.T) {
 
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envPath,
 		// ContainerCPUs and ContainerMemory intentionally left empty to test env-file fallback.
 	})
@@ -1053,7 +1053,7 @@ func TestBuildBaseContainerSpecResourceLimitsFromEnvFile(t *testing.T) {
 func TestBuildBaseContainerSpecParityWithBuildContainerArgsForSandbox(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      "/home/.env",
 	})
 	model := "claude-opus-4-6"
@@ -1139,8 +1139,8 @@ func TestExecutorRunArgsClaudeSandbox(t *testing.T) {
 }
 
 // TestExecutorRunArgsCodexSandbox verifies that when the task sandbox is set to
-// "codex", the args forwarded to executor.RunArgs reference the wallfacer-codex
-// image (derived from the base wallfacer image name).
+// "codex", the args forwarded to executor.RunArgs reference the sandbox-codex
+// image (derived from the base sandbox-claude image name).
 func TestExecutorRunArgsCodexSandbox(t *testing.T) {
 	repo := setupTestRepo(t)
 	mock := &MockSandboxBackend{
@@ -1149,8 +1149,8 @@ func TestExecutorRunArgsCodexSandbox(t *testing.T) {
 		},
 	}
 	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
-	// Use a wallfacer-named image so sandboxImageForSandbox derives the codex variant.
-	r.sandboxImage = "wallfacer:latest"
+	// Use a sandbox-claude image so sandboxImageForSandbox derives the codex variant.
+	r.sandboxImage = "sandbox-claude:latest"
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "executor args codex test", Timeout: 5})
@@ -1171,10 +1171,10 @@ func TestExecutorRunArgsCodexSandbox(t *testing.T) {
 		t.Fatal("expected at least one RunArgs call")
 	}
 
-	// sandboxImageForSandbox("codex") with base image "wallfacer:latest" produces
-	// "wallfacer-codex:latest".
-	if !argsContainSubstring(calls[0].Args, "wallfacer-codex") {
-		t.Errorf("expected wallfacer-codex image in args; args: %v", calls[0].Args)
+	// sandboxImageForSandbox("codex") with base image "sandbox-claude:latest" produces
+	// "sandbox-codex:latest".
+	if !argsContainSubstring(calls[0].Args, "sandbox-codex") {
+		t.Errorf("expected sandbox-codex image in args; args: %v", calls[0].Args)
 	}
 }
 

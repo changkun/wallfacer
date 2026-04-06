@@ -118,8 +118,8 @@ See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
 
 Wallfacer supports two sandbox types:
 
-- **Claude** -- runs Claude Code CLI inside an Ubuntu-based container (`wallfacer:latest`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **Codex** -- runs OpenAI Codex CLI inside a companion image (`wallfacer-codex:latest`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **Claude** -- runs Claude Code CLI inside an Ubuntu-based container (`sandbox-claude:latest`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **Codex** -- runs OpenAI Codex CLI inside a companion image (`sandbox-codex:latest`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 
 Each task can be assigned a specific sandbox type when created or edited. The task-level sandbox selection overrides the global default for that task's implementation run.
 
@@ -327,7 +327,7 @@ wallfacer run [flags] [workspace...]
 | `-addr` | `ADDR` | `:8080` | Listen address |
 | `-data` | `DATA_DIR` | `~/.wallfacer/data` | Task data directory |
 | `-container` | `CONTAINER_CMD` | auto-detected | Container runtime command (`podman` or `docker`) |
-| `-image` | `SANDBOX_IMAGE` | `ghcr.io/changkun/wallfacer:latest` | Sandbox image name |
+| `-image` | `SANDBOX_IMAGE` | `ghcr.io/latere-ai/sandbox-claude:latest` | Sandbox image name |
 | `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
 | `-no-browser` | -- | `false` | Skip auto-opening the browser |
 | `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |

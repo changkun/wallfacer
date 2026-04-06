@@ -27,7 +27,7 @@ printf '%s\n' "$@" > "` + argsPath + `"
 		t.Fatalf("write fake claude: %v", err)
 	}
 
-	cmd := exec.Command("/bin/bash", filepath.Join(repoRoot(t), "sandbox/claude/entrypoint.sh"), "-p", "test prompt")
+	cmd := exec.Command("/bin/bash", filepath.Join("testdata", "entrypoints", "claude.sh"), "-p", "test prompt")
 	cmd.Env = append(os.Environ(), "PATH="+tempDir+":"+os.Getenv("PATH"))
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("run entrypoint: %v", err)
@@ -59,7 +59,7 @@ printf '%s\n' "$@" > "` + argsPath + `"
 		t.Fatalf("write fake claude: %v", err)
 	}
 
-	cmd := exec.Command("/bin/bash", filepath.Join(repoRoot(t), "sandbox/claude/entrypoint.sh"), "-p", "test prompt")
+	cmd := exec.Command("/bin/bash", filepath.Join("testdata", "entrypoints", "claude.sh"), "-p", "test prompt")
 	cmd.Env = append(os.Environ(),
 		"PATH="+tempDir+":"+os.Getenv("PATH"),
 		"WALLFACER_SANDBOX_FAST=false",

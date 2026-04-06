@@ -202,25 +202,25 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 }
 
 // resolveSandboxImageForExec derives the correct container image for the given
-// sandbox type. For Codex, it rewrites "wallfacer" image names to
-// "wallfacer-codex" while preserving the registry prefix, tag, and digest.
-// Non-wallfacer images and Claude sandboxes are returned unchanged.
+// sandbox type. For Codex, it rewrites "sandbox-claude" image names to
+// "sandbox-codex" while preserving the registry prefix, tag, and digest.
+// Non-sandbox-claude images and Claude sandboxes are returned unchanged.
 func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 	baseImage = strings.TrimSpace(baseImage)
 	if sb != sandbox.Codex {
 		return baseImage
 	}
 	if baseImage == "" {
-		return "wallfacer-codex:latest"
+		return "sandbox-codex:latest"
 	}
 	low := strings.ToLower(baseImage)
-	if strings.Contains(low, "wallfacer-codex") {
+	if strings.Contains(low, "sandbox-codex") {
 		return baseImage
 	}
 
 	// Decompose the image reference into components:
-	//   [registry/prefix/]wallfacer[:tag][@digest]
-	// so we can swap "wallfacer" for "wallfacer-codex" while keeping everything else.
+	//   [registry/prefix/]sandbox-claude[:tag][@digest]
+	// so we can swap "sandbox-claude" for "sandbox-codex" while keeping everything else.
 	registry := baseImage
 	digest := ""
 	if at := strings.Index(registry, "@"); at != -1 {
@@ -238,10 +238,10 @@ func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 		prefix = repoName[:idx+1]
 		repoName = repoName[idx+1:]
 	}
-	if repoName != "wallfacer" {
-		return baseImage // not a wallfacer image; return as-is
+	if repoName != "sandbox-claude" {
+		return baseImage // not a sandbox-claude image; return as-is
 	}
-	return prefix + "wallfacer-codex" + tag + digest
+	return prefix + "sandbox-codex" + tag + digest
 }
 
 // resolveContainerByPrefix searches the newline-separated output of

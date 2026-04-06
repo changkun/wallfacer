@@ -1,19 +1,19 @@
 SHELL            := /bin/bash
 PODMAN           := /opt/podman/bin/podman
-IMAGE            := wallfacer:latest
-GHCR_IMAGE       := ghcr.io/changkun/wallfacer:latest
-CODEX_IMAGE      := wallfacer-codex:latest
-GHCR_CODEX_IMAGE := ghcr.io/changkun/wallfacer-codex:latest
+IMAGE            := sandbox-claude:latest
+GHCR_IMAGE       := ghcr.io/latere-ai/sandbox-claude:latest
+CODEX_IMAGE      := sandbox-codex:latest
+GHCR_CODEX_IMAGE := ghcr.io/latere-ai/sandbox-codex:latest
 NAME             := wallfacer
 
 # Load .env if it exists
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend commit-seq push-once release-notes release
+.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend commit-seq push-once release-notes release
 
-# Build the wallfacer binary and both sandbox images.
-build: build-binary build-claude build-codex
+# Build the wallfacer binary and pull sandbox images.
+build: build-binary pull-images
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -48,14 +48,13 @@ build-desktop-windows:
 build-desktop-linux:
 	go tool wails build -tags desktop -skipbindings -s -platform linux/amd64
 
-# Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
-# name so that 'wallfacer run' finds it under the default image reference.
-build-claude:
-	$(PODMAN) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/claude/Dockerfile sandbox/claude/
-
-# Build the OpenAI Codex sandbox image.
-build-codex:
-	$(PODMAN) build -t $(CODEX_IMAGE) -t $(GHCR_CODEX_IMAGE) -f sandbox/codex/Dockerfile sandbox/codex/
+# Pull sandbox images from GHCR and tag locally.
+# Images are maintained in https://github.com/latere-ai/images
+pull-images:
+	$(PODMAN) pull $(GHCR_IMAGE)
+	$(PODMAN) tag $(GHCR_IMAGE) $(IMAGE)
+	$(PODMAN) pull $(GHCR_CODEX_IMAGE)
+	$(PODMAN) tag $(GHCR_CODEX_IMAGE) $(CODEX_IMAGE)
 
 # Build and run the Go server natively
 server:

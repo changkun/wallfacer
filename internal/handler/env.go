@@ -21,7 +21,7 @@ import (
 
 // fallbackCodexSandboxImage is used when the base Claude image is empty or
 // unrecognised, ensuring Codex always has a usable image name.
-const fallbackCodexSandboxImage = "wallfacer-codex:latest"
+const fallbackCodexSandboxImage = "sandbox-codex:latest"
 
 // privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
 // ranges, loopback (IPv4 and IPv6), and link-local ranges. Populated once at
@@ -407,7 +407,7 @@ func sandboxImageForTest(sb sandbox.Type, baseImage string) string {
 }
 
 // testCodexImage derives the Codex sandbox image name from the Claude base
-// image by replacing the repository name "wallfacer" with "wallfacer-codex"
+// image by replacing the repository name "sandbox-claude" with "sandbox-codex"
 // while preserving registry, tag, and digest components.
 func testCodexImage(baseImage string) string {
 	baseImage = strings.TrimSpace(baseImage)
@@ -416,7 +416,7 @@ func testCodexImage(baseImage string) string {
 	}
 
 	low := strings.ToLower(baseImage)
-	if strings.Contains(low, "wallfacer-codex") {
+	if strings.Contains(low, "sandbox-codex") {
 		return baseImage
 	}
 
@@ -441,11 +441,11 @@ func testCodexImage(baseImage string) string {
 		repoName = repoName[idx+1:]
 	}
 
-	if repoName != "wallfacer" {
+	if repoName != "sandbox-claude" {
 		return baseImage
 	}
 
-	return prefix + "wallfacer-codex" + tag + digest
+	return prefix + "sandbox-codex" + tag + digest
 }
 
 // UpdateEnvConfig writes changes to the env file.

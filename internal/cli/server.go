@@ -998,7 +998,7 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 
 // ensureImage checks whether the sandbox image is present locally and pulls it
 // from the registry if it is not.  When the pull fails and a local fallback
-// image (wallfacer:latest) is available, that image is used instead.
+// image (sandbox-claude:latest) is available, that image is used instead.
 // Returns the image reference that should actually be used.
 func ensureImage(containerCmd, image string) string {
 	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()

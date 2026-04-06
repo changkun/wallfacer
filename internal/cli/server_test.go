@@ -35,7 +35,7 @@ func TestInitServer(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -179,7 +179,7 @@ func TestEnsureImage_ReturnsExistingOrPulledImage(t *testing.T) {
 	runtimeScript := filepath.Join(tmp, "runtime.sh")
 	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
 		"if [ \"$1\" = \"images\" ]; then\n"+
-		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"wallfacer:latest\" ]; then\n"+
+		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"sandbox-claude:latest\" ]; then\n"+
 		"    echo found\n"+
 		"  fi\n"+
 		"  exit 0\n"+
@@ -189,14 +189,14 @@ func TestEnsureImage_ReturnsExistingOrPulledImage(t *testing.T) {
 		t.Fatalf("write runtime script: %v", err)
 	}
 
-	got := ensureImage(runtimeScript, "wallfacer:latest")
-	if got != "wallfacer:latest" {
+	got := ensureImage(runtimeScript, "sandbox-claude:latest")
+	if got != "sandbox-claude:latest" {
 		t.Fatalf("expected requested image, got %q", got)
 	}
 }
 
 // TestEnsureImage_UsesFallbackWhenPullFails verifies that ensureImage falls
-// back to wallfacer:latest when the requested image is not cached and the
+// back to sandbox-claude:latest when the requested image is not cached and the
 // pull fails.
 func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -206,7 +206,7 @@ func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 	runtimeScript := filepath.Join(tmp, "runtime.sh")
 	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
 		"if [ \"$1\" = \"images\" ]; then\n"+
-		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"wallfacer:latest\" ]; then\n"+
+		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"sandbox-claude:latest\" ]; then\n"+
 		"    echo found\n"+
 		"  elif [ \"$2\" = \"-q\" ] && [ \"$3\" = \"wallfacer-missing:latest\" ]; then\n"+
 		"    :\n"+
@@ -219,7 +219,7 @@ func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 	}
 
 	got := ensureImage(runtimeScript, "wallfacer-missing:latest")
-	if got != "wallfacer:latest" {
+	if got != "sandbox-claude:latest" {
 		t.Fatalf("expected fallback image, got %q", got)
 	}
 }
@@ -689,8 +689,8 @@ func TestEnsureImage_SameAsFallback(t *testing.T) {
 		t.Fatalf("write script: %v", err)
 	}
 
-	got := ensureImage(runtimeScript, "wallfacer:latest")
-	if got != "wallfacer:latest" {
+	got := ensureImage(runtimeScript, "sandbox-claude:latest")
+	if got != "sandbox-claude:latest" {
 		t.Fatalf("expected original image, got %q", got)
 	}
 }
@@ -733,7 +733,7 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -780,7 +780,7 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -813,7 +813,7 @@ func TestInitServer_PortFallback(t *testing.T) {
 		Addr:         fmt.Sprintf(":%d", occupiedPort),
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -842,7 +842,7 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -866,7 +866,7 @@ func TestShutdown_WithPlannerRunning(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 
@@ -888,7 +888,7 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t))
 
@@ -912,7 +912,7 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
 		ContainerCmd: "true",
-		SandboxImage: "wallfacer:latest",
+		SandboxImage: "sandbox-claude:latest",
 		EnvFile:      envFile,
 		SkipCSRF:     true,
 	}, testFS(t), testFS(t))

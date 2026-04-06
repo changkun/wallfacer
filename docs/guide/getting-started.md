@@ -28,7 +28,7 @@ On startup, Wallfacer restores the most recently used workspace group from your 
 
 On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
-The sandbox image (`ghcr.io/changkun/wallfacer:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB).
+The sandbox image (`ghcr.io/latere-ai/sandbox-claude:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB).
 
 ## Step 3 — Configure Your Credential
 

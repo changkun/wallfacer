@@ -204,8 +204,8 @@ func TestDefaultSandboxImage_WithVersion(t *testing.T) {
 	defer func() { Version = old }()
 
 	got := defaultSandboxImage()
-	if got != sandboxImageBase+":1.2.3" {
-		t.Fatalf("expected image tag :1.2.3, got %q", got)
+	if got != sandboxImageBase+":v1.2.3" {
+		t.Fatalf("expected image tag :v1.2.3, got %q", got)
 	}
 }
 

@@ -132,8 +132,8 @@ This is handled by `appendInstructionsMount()` in `container.go`, which selects 
 
 The `internal/sandbox` package defines two sandbox types as `Type` constants:
 
-- **`Claude`** (`"claude"`) — Runs Claude Code in a container built from the `wallfacer` image. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **`Codex`** (`"codex"`) — Runs OpenAI Codex CLI in a container built from the `wallfacer-codex` image. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **`Claude`** (`"claude"`) — Runs Claude Code in a container built from the `sandbox-claude` image. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **`Codex`** (`"codex"`) — Runs OpenAI Codex CLI in a container built from the `sandbox-codex` image. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 
 `sandbox.Default(value)` returns the parsed type or falls back to `Claude` for unknown values.
 
@@ -165,8 +165,8 @@ Two additional activities (`test`, `oversight-test`) are usage-attribution-only 
 
 `Runner.sandboxImageForSandbox()` selects the container image:
 
-- For **Claude**: uses the configured `--image` flag value (default: `ghcr.io/changkun/wallfacer:latest`).
-- For **Codex**: derives the image by replacing `wallfacer` with `wallfacer-codex` in the image name, preserving the registry prefix and tag/digest. Falls back to `wallfacer-codex:latest` if the base image is empty.
+- For **Claude**: uses the configured `--image` flag value (default: `ghcr.io/latere-ai/sandbox-claude:latest`).
+- For **Codex**: derives the image by replacing `sandbox-claude` with `sandbox-codex` in the image name, preserving the registry prefix and tag/digest. Falls back to `sandbox-codex:latest` if the base image is empty.
 
 ### 🧠 Model selection
 

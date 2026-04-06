@@ -530,37 +530,37 @@ function openSelectedSpec() {}
 function dispatchFocusedSpec() {
   if (!_focusedSpecPath) return;
 
-  showConfirm("Dispatch this spec to the task board?").then(function (
-    confirmed,
-  ) {
-    if (!confirmed) return;
+  showConfirm("Dispatch this spec to the task board?").then(
+    function (confirmed) {
+      if (!confirmed) return;
 
-    var btn = document.getElementById("spec-dispatch-btn");
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = "Dispatching\u2026";
-    }
+      var btn = document.getElementById("spec-dispatch-btn");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Dispatching\u2026";
+      }
 
-    api(Routes.specs.dispatch(), {
-      method: "POST",
-      body: JSON.stringify({ paths: [_focusedSpecPath], run: false }),
-    })
-      .then(function () {
-        // Hide the dispatch button (spec is no longer validated after dispatch).
-        if (btn) btn.classList.add("hidden");
-        // Refresh the focused spec view to reflect the new dispatched_task_id.
-        _loadAndRenderSpec();
+      api(Routes.specs.dispatch(), {
+        method: "POST",
+        body: JSON.stringify({ paths: [_focusedSpecPath], run: false }),
       })
-      .catch(function (err) {
-        showAlert("Dispatch failed: " + err.message);
-      })
-      .finally(function () {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = "Dispatch";
-        }
-      });
-  });
+        .then(function () {
+          // Hide the dispatch button (spec is no longer validated after dispatch).
+          if (btn) btn.classList.add("hidden");
+          // Refresh the focused spec view to reflect the new dispatched_task_id.
+          _loadAndRenderSpec();
+        })
+        .catch(function (err) {
+          showAlert("Dispatch failed: " + err.message);
+        })
+        .finally(function () {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Dispatch";
+          }
+        });
+    },
+  );
 }
 
 // breakDownFocusedSpec sends the /break-down slash command via the planning chat.

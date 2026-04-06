@@ -20,14 +20,13 @@ cd wallfacer
 go build -o wallfacer .
 ```
 
-Build sandbox images locally (optional — auto-pulled from ghcr.io at runtime):
+Pull sandbox images (optional — auto-pulled from ghcr.io at runtime):
 
 ```bash
-make build-claude   # Claude Code sandbox image
-make build-codex    # OpenAI Codex sandbox image
+make pull-images    # Pull Claude and Codex sandbox images
 ```
 
-`make build` builds the binary and both sandbox images in one step. Building images locally is only necessary when modifying the Dockerfiles in `sandbox/`; for normal development the server pulls `ghcr.io/changkun/wallfacer:latest` automatically on first task run.
+`make build` builds the binary and pulls both sandbox images in one step. Sandbox images are maintained in a separate repository (`github.com/latere-ai/images`); for normal development the server pulls `ghcr.io/latere-ai/sandbox-claude:latest` automatically on first task run.
 
 ## Configure Credentials
 
@@ -57,10 +56,9 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 
 | Target | Description |
 |---|---|
-| `make build` | Build binary + both sandbox images |
+| `make build` | Build binary + pull both sandbox images |
 | `make build-binary` | Build just the Go binary (accepts optional `VERSION=`) |
-| `make build-claude` | Build Claude Code sandbox image |
-| `make build-codex` | Build OpenAI Codex sandbox image |
+| `make pull-images` | Pull Claude and Codex sandbox images |
 | `make server` | Build and run the server |
 | `make shell` | Open a bash shell in a sandbox container |
 | `make clean` | Remove all sandbox images |
@@ -73,10 +71,10 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 ## Sandbox Images
 
 ```bash
-podman images wallfacer   # or: docker images wallfacer
+podman images sandbox-claude   # or: docker images sandbox-claude
 ```
 
-The Dockerfiles (`sandbox/claude/Dockerfile`, `sandbox/codex/Dockerfile`) build Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/changkun/wallfacer` and `ghcr.io/changkun/wallfacer-codex` on version tags via GitHub Actions.
+The sandbox images are maintained in a separate repository (`github.com/latere-ai/images`). They are Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex` on version tags via GitHub Actions.
 
 ## Release Workflow
 
@@ -85,10 +83,10 @@ Releases are triggered by pushing a version tag (`v*`). Three GitHub Actions wor
 | Workflow | Artifact | Registry |
 |---|---|---|
 | `release-binary.yml` | `wallfacer-{linux,darwin}-{amd64,arm64}` binaries | GitHub Release assets |
-| `release-claude.yml` | Claude Code sandbox image | `ghcr.io/changkun/wallfacer` |
-| `release-codex.yml` | Codex sandbox image | `ghcr.io/changkun/wallfacer-codex` |
+| `release-claude.yml` | Claude Code sandbox image | `ghcr.io/latere-ai/sandbox-claude` |
+| `release-codex.yml` | Codex sandbox image | `ghcr.io/latere-ai/sandbox-codex` |
 
-**Version embedding.** Release binaries are built with `-ldflags "-X main.version=X.Y.Z"`. This makes the binary pull the sandbox image tagged with the matching version (e.g. `ghcr.io/changkun/wallfacer:0.0.6`) instead of `:latest`. Dev builds without a version set fall back to `:latest`.
+**Version embedding.** Release binaries are built with `-ldflags "-X main.version=X.Y.Z"`. This makes the binary pull the sandbox image tagged with the matching version (e.g. `ghcr.io/latere-ai/sandbox-claude:0.0.6`) instead of `:latest`. Dev builds without a version set fall back to `:latest`.
 
 **Image tagging.** Each release produces three image tags: `<version>` (e.g. `0.0.6`), `<major>.<minor>` (e.g. `0.0`), and `latest`.
 
