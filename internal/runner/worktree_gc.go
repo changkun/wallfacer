@@ -102,7 +102,9 @@ func (r *Runner) RestoreMissingTaskWorktrees(ctx context.Context, tasks []store.
 // since the two have distinct concerns (GC removes orphans; health watcher
 // restores missing paths for live tasks).
 func (r *Runner) StartWorktreeHealthWatcher(ctx context.Context) {
-	r.backgroundWg.Add("worktree-health")
+	if !r.backgroundWg.Add("worktree-health") {
+		return
+	}
 	defer r.backgroundWg.Done("worktree-health")
 
 	runScan := func() {
@@ -244,7 +246,9 @@ func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID
 // periodic interval. interval defaults to 24h; override with
 // WALLFACER_WORKTREE_GC_INTERVAL (e.g. "6h", "30m").
 func (r *Runner) StartWorktreeGC(ctx context.Context) {
-	r.backgroundWg.Add("worktree-gc")
+	if !r.backgroundWg.Add("worktree-gc") {
+		return
+	}
 	defer r.backgroundWg.Done("worktree-gc")
 
 	interval := envutil.Duration("WALLFACER_WORKTREE_GC_INTERVAL", constants.DefaultWorktreeGCInterval)

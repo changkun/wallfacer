@@ -190,6 +190,24 @@ func TestWaitGroup_AddOrdering(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_AddAfterWait_CallerChecksReturn verifies that callers who
+// check the return value of Add after Wait can safely skip Done, avoiding
+// the nil-map panic seen in CI when StartWorktreeGC called Add (rejected)
+// then deferred Done on a never-initialized pending map.
+func TestWaitGroup_AddAfterWait_CallerChecksReturn(t *testing.T) {
+	var wg WaitGroup
+	wg.Wait() // sets closed, pending map stays nil
+
+	// Simulate the fixed pattern: Add returns false, caller returns early.
+	if wg.Add("orphan") {
+		t.Fatal("Add after Wait should return false")
+	}
+	// No Done call — the caller should have returned early.
+	if p := wg.Pending(); len(p) != 0 {
+		t.Fatalf("expected empty Pending, got %v", p)
+	}
+}
+
 // TestWaitGroup_AddAfterWaitRejected verifies that Add and Go return false
 // after Wait has been called, preventing the sync.WaitGroup Add/Wait race.
 func TestWaitGroup_AddAfterWaitRejected(t *testing.T) {

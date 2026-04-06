@@ -43,9 +43,11 @@ func (w *WaitGroup) Add(label string) bool {
 // drops to zero, the entry is deleted to keep Pending output clean.
 func (w *WaitGroup) Done(label string) {
 	w.mu.Lock()
-	w.pending[label]--
-	if w.pending[label] <= 0 {
-		delete(w.pending, label)
+	if w.pending != nil {
+		w.pending[label]--
+		if w.pending[label] <= 0 {
+			delete(w.pending, label)
+		}
 	}
 	w.mu.Unlock()
 	w.wg.Done()
