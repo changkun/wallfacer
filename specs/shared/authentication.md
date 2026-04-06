@@ -57,11 +57,15 @@ Browser -> Wallfacer -> redirect to auth.latere.ai/authorize
 
 ### Client Registration
 
-Wallfacer registers as a **confidential** oauth_client with the auth
-service:
+For the latere.ai cloud deployment, wallfacer registers as a
+**confidential** oauth_client with the auth service:
 - `client_type`: confidential
 - `redirect_uris`: `["https://wallfacer.latere.ai/auth/callback"]`
 - `allowed_scopes`: `["openid", "email", "profile"]`
+
+For self-hosted deployments using a third-party OIDC provider, the
+operator registers wallfacer with their own IdP using their deployment's
+callback URL (e.g. `https://wallfacer.mycompany.com/auth/callback`).
 
 ### Authentication Flow
 
@@ -116,11 +120,12 @@ is propagated into task execution or container environments.
 
 ### Authorization
 
-Wallfacer resolves permissions via the auth service's `/tokeninfo`
-endpoint, cached for the token's remaining lifetime. For most routes,
+Wallfacer checks permissions directly from the JWT token claims. Scopes
+and roles are included in the access token by default. For most routes,
 a simple "is authenticated" check suffices. Admin-only routes (e.g.
-instance management) check for the appropriate role via the cached
-tokeninfo response.
+instance management) check for the appropriate role from the token's
+`roles` claim. The `/tokeninfo` endpoint is available for checks that
+need team-level context beyond what the JWT carries.
 
 ### Data Model Changes
 
@@ -162,20 +167,39 @@ scoped to the target org.
 
 ---
 
-## Compatibility with Standalone Mode
+## Deployment Modes
 
-The `WALLFACER_SERVER_API_KEY` mechanism continues to work for self-hosted
-deployments where the auth service is not available.
+Auth is opt-in. When `WALLFACER_AUTH_ISSUER_URL` is unset, wallfacer
+operates exactly as it does today with no auth code paths activated.
 
 | Configuration | Behavior |
 |---------------|----------|
 | No auth service + no API key | Server is open (current default) |
 | API key only | Current behavior, unchanged |
-| Auth service configured | Login via auth service, full identity |
-| Auth service + API key | Auth service for browser; API key for CLI/scripts |
+| Auth service configured | Login via OIDC provider, full identity |
+| Auth service + API key | OIDC for browser; API key for CLI/scripts |
 
-When the auth service is not configured, wallfacer operates exactly as
-it does today.
+### OIDC Provider Flexibility
+
+Wallfacer is a standard OIDC Relying Party. The issuer URL determines
+which provider it talks to:
+
+| Deployment | `WALLFACER_AUTH_ISSUER_URL` | Notes |
+|---|---|---|
+| Latere cloud | `https://auth.latere.ai` | Full latere.ai identity, org/team RBAC |
+| Self-hosted with own IdP | `https://keycloak.example.com/realms/dev` | Any OIDC-compliant provider works |
+| Self-hosted with Entra ID | `https://login.microsoftonline.com/{tenant}/v2.0` | Enterprise SSO |
+| Local development | (unset) | No auth, open access |
+
+When using a third-party OIDC provider instead of `auth.latere.ai`,
+wallfacer gets identity (`sub`, `email`) but not latere-specific claims
+(`org_id`, `scopes`, `roles`, `principal_type`). In this mode, wallfacer
+treats the authenticated user as a single-tenant owner with full access.
+Org-scoped RBAC is only available with the latere.ai auth service.
+
+The `redirect_uri` is derived from wallfacer's own public URL. Each
+deployment registers its callback URL with whichever OIDC provider it
+uses.
 
 ---
 
@@ -183,9 +207,10 @@ it does today.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `WALLFACER_AUTH_ISSUER_URL` | Auth service issuer URL | (unset = auth disabled) |
+| `WALLFACER_AUTH_ISSUER_URL` | OIDC issuer URL | (unset = auth disabled) |
 | `WALLFACER_AUTH_CLIENT_ID` | OAuth client ID | (required if issuer set) |
 | `WALLFACER_AUTH_CLIENT_SECRET` | OAuth client secret | (required if issuer set) |
+| `WALLFACER_AUTH_REDIRECT_URL` | OAuth callback URL | (auto-derived from server's public URL if unset) |
 | `WALLFACER_SERVER_API_KEY` | Static API key for standalone mode | (unset = disabled) |
 
 When `WALLFACER_AUTH_ISSUER_URL` is set, wallfacer fetches the OIDC
