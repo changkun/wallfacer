@@ -74,7 +74,18 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 podman images sandbox-claude   # or: docker images sandbox-claude
 ```
 
-The sandbox images are maintained in a separate repository (`github.com/latere-ai/images`). They are Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex` on version tags via GitHub Actions.
+The sandbox images are maintained in a separate repository ([github.com/latere-ai/images](https://github.com/latere-ai/images)). They are Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex` on version tags via GitHub Actions.
+
+To build sandbox images locally (e.g. for customization or offline use):
+
+```bash
+git clone https://github.com/latere-ai/images.git
+cd images
+make                   # Build both sandbox-claude and sandbox-codex
+make RUNTIME=docker    # Use Docker instead of Podman
+```
+
+Local builds are tagged as `sandbox-claude:latest` and `sandbox-codex:latest`, which wallfacer picks up automatically as the fallback when the GHCR image is unavailable.
 
 ## Release Workflow
 
@@ -86,9 +97,9 @@ Releases are triggered by pushing a version tag (`v*`). Three GitHub Actions wor
 | `release-claude.yml` | Claude Code sandbox image | `ghcr.io/latere-ai/sandbox-claude` |
 | `release-codex.yml` | Codex sandbox image | `ghcr.io/latere-ai/sandbox-codex` |
 
-**Version embedding.** Release binaries are built with `-ldflags "-X main.version=X.Y.Z"`. This makes the binary pull the sandbox image tagged with the matching version (e.g. `ghcr.io/latere-ai/sandbox-claude:0.0.6`) instead of `:latest`. Dev builds without a version set fall back to `:latest`.
+**Version embedding.** Release binaries are built with `-ldflags "-X main.version=X.Y.Z"`. This makes the binary pull the sandbox image tagged with the matching version (e.g. `ghcr.io/latere-ai/sandbox-claude:v0.0.6`) instead of `:latest`. Dev builds without a version set fall back to `:latest`.
 
-**Image tagging.** Each release produces three image tags: `<version>` (e.g. `0.0.6`), `<major>.<minor>` (e.g. `0.0`), and `latest`.
+**Image tagging.** Each release produces three image tags: `v<version>` (e.g. `v0.0.6`), `v<major>.<minor>` (e.g. `v0.0`), and `latest`.
 
 **Creating a release:**
 

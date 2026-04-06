@@ -28,7 +28,7 @@ On startup, Wallfacer restores the most recently used workspace group from your 
 
 On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
-The sandbox image (`ghcr.io/latere-ai/sandbox-claude:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB).
+The sandbox image (`ghcr.io/latere-ai/sandbox-claude:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB). To build sandbox images locally instead, see [Building sandbox images from source](#building-sandbox-images-from-source) below.
 
 ## Step 3 — Configure Your Credential
 
@@ -127,6 +127,19 @@ Windows users can also run Wallfacer inside WSL2 with the same experience as nat
 6. Keep workspace repos on the WSL2 filesystem for best performance
 
 The container runtime override `CONTAINER_CMD` works on all platforms if the auto-detection picks the wrong binary.
+
+## Building Sandbox Images from Source
+
+Sandbox images are pulled automatically from `ghcr.io/latere-ai/`. If you need to customize them or build offline, clone the images repository and build locally:
+
+```bash
+git clone https://github.com/latere-ai/images.git
+cd images
+make                   # Build both sandbox-claude and sandbox-codex
+make RUNTIME=docker    # Use Docker instead of Podman
+```
+
+The local build tags the images as `sandbox-claude:latest` and `sandbox-codex:latest`, which Wallfacer finds automatically. See the [images repository](https://github.com/latere-ai/images) for details on what's bundled and the entrypoint contract.
 
 ## Next Steps
 
