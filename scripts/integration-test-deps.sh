@@ -144,8 +144,26 @@ task_h_id=$(echo "$batch_resp" | jq -r '.ref_to_id.h')
 section "execute"
 
 # Autopilot auto-promotes task a (no dependencies) and then the rest
-# as dependencies resolve. No manual intervention needed.
-step "waiting for autopilot to pick up tasks (timeout: ${TIMEOUT}s)"
+# as dependencies resolve. The auto-promoter ticks every 60s
+# (constants.AutoPromoteInterval), so allow up to 90s for the first
+# task to leave backlog.
+step "waiting for autopilot to pick up task a (promote interval: 60s)"
+ap_elapsed=0
+while [ "$ap_elapsed" -lt 90 ]; do
+    task_a_status=$(api GET "/api/tasks" | jq -r --arg id "$task_a_id" '.[] | select(.id == $id) | .status')
+    if [ "$task_a_status" != "backlog" ]; then
+        break
+    fi
+    sleep 5
+    ap_elapsed=$((ap_elapsed + 5))
+done
+if [ "$task_a_status" = "backlog" ]; then
+    fail "autopilot did not promote task a within 90s"
+else
+    pass "task a promoted to $task_a_status"
+fi
+
+step "waiting for all 8 tasks to finish (timeout: ${TIMEOUT}s)"
 if wait_all_done; then
     pass "all tasks reached terminal state"
 else
