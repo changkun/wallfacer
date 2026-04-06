@@ -46,7 +46,7 @@ and wallfacer receives a JWT that identifies the user and their org context.
 ```
 Browser -> Wallfacer -> redirect to auth.latere.ai/authorize
                               |
-                    User authenticates (Google, X, email, etc.)
+                    User authenticates (Google, GitHub, X, email, etc.)
                               |
                     Redirect back to Wallfacer /auth/callback
                               |
@@ -74,7 +74,7 @@ Standard OAuth 2.0 Authorization Code flow with PKCE:
 1. User visits wallfacer, has no session
 2. Wallfacer redirects to `auth.latere.ai/authorize` with `client_id`,
    `redirect_uri`, `code_challenge`, `state`
-3. User authenticates at the auth service (provider choice is handled there)
+3. User authenticates at the auth service (Google, GitHub, X, email; provider choice is handled there)
 4. Auth service redirects back to `/auth/callback` with authorization code
 5. Wallfacer exchanges code for tokens via `POST auth.latere.ai/token`
 6. Wallfacer stores the access token and refresh token in a server-side
@@ -129,23 +129,26 @@ need team-level context beyond what the JWT carries.
 
 ### Data Model Changes
 
-Wallfacer keys all user-specific and tenant-specific data on the auth
-service's identifiers:
+Wallfacer keys user-specific data on `principal_id` (from JWT `sub`)
+for ownership and attribution. For cloud multi-tenant deployments,
+`org_id` (from JWT `org_id`) is used for tenant isolation.
 
 ```go
 type Workspace struct {
     ID          string    // workspace UUID
-    OrgID       string    // from JWT org_id, tenant isolation
+    OrgID       *string   // from JWT org_id, nullable (only set in multi-tenant mode)
     CreatedBy   string    // from JWT sub, principal_id
     Name        string
     // ...
 }
 ```
 
-All queries filter by `org_id`. Ownership and attribution use
-`principal_id` (from `sub`). Wallfacer never stores user profiles
-locally; display info (name, avatar) is fetched from `/userinfo` and
-cached with a short TTL.
+In multi-tenant mode (latere.ai cloud), queries filter by `org_id`
+for tenant isolation. In standalone mode (self-hosted, third-party
+OIDC, or no auth), `org_id` is null and queries filter by
+`principal_id` only. Wallfacer never stores user profiles locally;
+display info (name, avatar) is fetched from `/userinfo` and cached
+with a short TTL.
 
 ### User Profile Resolution
 
@@ -193,9 +196,10 @@ which provider it talks to:
 
 When using a third-party OIDC provider instead of `auth.latere.ai`,
 wallfacer gets identity (`sub`, `email`) but not latere-specific claims
-(`org_id`, `scopes`, `roles`, `principal_type`). In this mode, wallfacer
-treats the authenticated user as a single-tenant owner with full access.
-Org-scoped RBAC is only available with the latere.ai auth service.
+(`org_id`, `scopes`, `roles`, `principal_type`). In this mode, `org_id`
+is null, there is no tenant isolation, and the authenticated user has
+full access to their own data. Org-scoped RBAC is only available with
+the latere.ai auth service.
 
 The `redirect_uri` is derived from wallfacer's own public URL. Each
 deployment registers its callback URL with whichever OIDC provider it
