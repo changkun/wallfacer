@@ -59,6 +59,9 @@ make test-backend   # Run Go unit tests (go test ./...)
 make test-frontend  # Run frontend JS unit tests (cd ui && npx vitest@2 run)
 make ui-css         # Regenerate Tailwind CSS from UI sources
 make api-contract   # Regenerate API route artifacts from apicontract/routes.go
+make e2e-lifecycle              # E2E: task lifecycle for both sandboxes (requires running server)
+make e2e-lifecycle SANDBOX=claude  # E2E: task lifecycle for Claude only
+make e2e-dependency-dag WORKSPACE=/path/to/repo  # E2E: dependency DAG with conflict resolution
 ```
 
 CLI usage (after `go build -o wallfacer .`):
@@ -342,6 +345,91 @@ Optional variables (also in `.env`):
 - Sandbox routing: `WALLFACER_DEFAULT_SANDBOX`, `WALLFACER_SANDBOX_IMPLEMENTATION`, `WALLFACER_SANDBOX_TESTING`, `WALLFACER_SANDBOX_REFINEMENT`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_OVERSIGHT`, `WALLFACER_SANDBOX_COMMIT_MESSAGE`, `WALLFACER_SANDBOX_IDEA_AGENT`
 
 All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
+
+## End-to-end integration tests
+
+Two E2E test scripts in `scripts/` exercise the full task lifecycle against a running wallfacer server with real sandbox containers. Use these to verify that task execution, commit pipelines, conflict resolution, and automation work correctly after making changes.
+
+### e2e-lifecycle (task lifecycle)
+
+Tests the basic create-run-archive lifecycle for Claude and Codex sandboxes. Each sandbox gets a "who are you?" task that must complete without errors.
+
+```bash
+# Requires a running wallfacer server with valid credentials.
+wallfacer run &
+
+# Test both sandboxes:
+make e2e-lifecycle
+
+# Test one sandbox:
+make e2e-lifecycle SANDBOX=claude
+make e2e-lifecycle SANDBOX=codex
+
+# Custom server URL:
+WALLFACER_URL=http://localhost:9090 sh scripts/e2e-lifecycle.sh
+```
+
+**What it checks:**
+- Task creation with sandbox selection (Claude/Codex)
+- Task execution (backlog -> in_progress -> done)
+- Task result contains a response
+- Commit pipeline (waiting -> committing -> done)
+- Archive and container cleanup
+
+**Expected output:** 30 checks pass (10 per sandbox + preflight + smoke tests if ENV_FILE is set).
+
+### e2e-dependency-dag (parallel tasks with conflicts)
+
+Tests a fan-out/fan-in dependency DAG with 8 tasks that modify the same file in parallel, exercising autopilot promotion, conflict resolution, and autosync.
+
+Task graph:
+```
+a: create test.md
+b,c,d,e,f,g: update test.md (all depend on a, run in parallel)
+h: delete test.md (depends on b,c,d,e,f,g)
+```
+
+```bash
+# Requires a running wallfacer server.
+wallfacer run &
+
+# Create a fresh git repo as workspace:
+WORKSPACE=$(mktemp -d)
+git -C "$WORKSPACE" init -b main
+git -C "$WORKSPACE" commit --allow-empty -m "init"
+
+# Run the test:
+make e2e-dependency-dag WORKSPACE="$WORKSPACE"
+```
+
+**What it checks:**
+- Batch task creation with dependency wiring (8 tasks, DAG edges)
+- Autopilot promotion respects dependencies (waits for AutoPromoteInterval, 60s)
+- Max parallel tasks honored (configured to 3)
+- Conflict resolution during rebase (tasks b-g all modify test.md)
+- Autosync rebases worktrees onto latest default branch
+- Autosubmit commits and merges without manual intervention
+- Each task produces at least one commit
+- test.md is deleted at the end (task h ran last)
+- Archive all tasks, verify containers are cleaned up
+- Reports commit order for inspection
+
+**Expected output:** all checks pass, 9+ commits (1 init + 8 tasks), commit history printed oldest-first.
+
+**Environment variables:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WALLFACER_URL` | `http://localhost:8080` | Server URL |
+| `WALLFACER_SERVER_API_KEY` | (empty) | Bearer token if server has auth enabled |
+| `WALLFACER_TEST_TIMEOUT` | `300` | Seconds to wait for all tasks to complete |
+
+### When to run E2E tests
+
+- After changes to `internal/runner/` (task execution, commit pipeline, conflict resolution)
+- After changes to `internal/handler/tasks*.go` or `internal/handler/execute.go` (task API, automation)
+- After changes to `internal/gitutil/` (worktree, rebase, merge operations)
+- After sandbox image updates (new versions of sandbox-claude or sandbox-codex)
+- Before releases to verify end-to-end correctness
 
 ## Implementation checklist
 

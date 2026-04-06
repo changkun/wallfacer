@@ -12,7 +12,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend commit-seq push-once release-notes release
+.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Build the wallfacer binary and pull sandbox images.
 build: build-binary pull-images
@@ -145,6 +145,24 @@ test-backend:
 # Run frontend JavaScript unit tests
 test-frontend:
 	cd ui && npx --yes vitest@2 run
+
+# End-to-end: task lifecycle (create, run, archive) for both Claude and Codex sandboxes.
+# Requires a running wallfacer server with valid credentials.
+# Usage: make e2e-lifecycle [SANDBOX=claude|codex]
+SANDBOX ?=
+e2e-lifecycle:
+	sh scripts/e2e-lifecycle.sh $(SANDBOX)
+
+# End-to-end: dependency DAG (8 tasks with fan-out/fan-in, conflict resolution, autopilot).
+# Requires a running wallfacer server. Pass WORKSPACE= pointing at a fresh git repo.
+# Usage:
+#   WORKSPACE=$$(mktemp -d) && git -C $$WORKSPACE init -b main && git -C $$WORKSPACE commit --allow-empty -m init
+#   make e2e-dependency-dag WORKSPACE=$$WORKSPACE
+e2e-dependency-dag:
+ifndef WORKSPACE
+	$(error WORKSPACE is required. Create a fresh git repo and pass its path.)
+endif
+	sh scripts/e2e-dependency-dag.sh $(WORKSPACE)
 
 # Remove sandbox images
 clean:
