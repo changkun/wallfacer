@@ -143,10 +143,16 @@ task_h_id=$(echo "$batch_resp" | jq -r '.ref_to_id.h')
 # --- Execute ---
 section "execute"
 
-# Start task a. Autopilot promotes b-g when a completes, then h when b-g complete.
-step "starting task a (autopilot handles the rest)"
-api PATCH "/api/tasks/$task_a_id" -d '{"status":"in_progress"}' >/dev/null
-pass "task a in_progress"
+# Autopilot auto-promotes task a (no dependencies) and then the rest as
+# dependencies resolve. If autopilot hasn't picked it up yet, start it manually.
+step "ensuring task a is running"
+task_a_status=$(api GET "/api/tasks" | jq -r --arg id "$task_a_id" '.[] | select(.id == $id) | .status')
+if [ "$task_a_status" = "backlog" ]; then
+    api PATCH "/api/tasks/$task_a_id" -d '{"status":"in_progress"}' >/dev/null
+    pass "task a started manually"
+else
+    pass "task a already $task_a_status (autopilot)"
+fi
 
 step "waiting for all 8 tasks to finish (timeout: ${TIMEOUT}s)"
 if wait_all_done; then
