@@ -1,11 +1,11 @@
 ---
 title: Authentication & Identity
 status: drafted
-depends_on: []
+depends_on: [latere.ai/auth]
 affects: [internal/auth/, internal/handler/, ui/]
-effort: large
+effort: small
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-06
 author: changkun
 dispatched_task_id: null
 ---
@@ -14,250 +14,257 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer's only access control is a shared bearer token (`WALLFACER_SERVER_API_KEY`). There is no concept of user identity — every request is anonymous once the token matches. This blocks two things:
+Wallfacer's only access control is a shared bearer token (`WALLFACER_SERVER_API_KEY`). There is no concept of user identity. Every request is anonymous once the token matches. This blocks two things:
 
-1. **Cloud multi-tenant:** The control plane needs to map authenticated users to per-user instances. The control plane assumes auth exists but doesn't specify how it works.
-2. **Single-host access control:** Even a personal VPS deployment benefits from real login (OAuth) over a manually-rotated static token. Teams sharing a single instance today have zero auditability.
-
-Authentication is a prerequisite for multi-tenant, not part of it. It is also independently useful: a single-user deployment can adopt OAuth login without any multi-tenant infrastructure.
-
----
+1. **Cloud multi-tenant:** The control plane needs to map authenticated users to per-user instances.
+2. **Single-host access control:** Even a personal VPS deployment benefits from real login over a manually-rotated static token.
 
 ## Scope
 
-This spec covers identity and session management. It does **not** cover:
-- Instance provisioning or traffic routing (multi-tenant spec)
-- Role-based access control beyond admin/member distinction
-- Fine-grained per-workspace permissions (future spec if needed)
+Authentication and identity are now handled by the centralized
+**latere.ai auth service** (`auth.latere.ai`). This spec covers only
+wallfacer's integration as an OIDC Relying Party.
+
+This spec does **not** cover:
+- OAuth provider integration (handled by the auth service)
+- User model or storage (handled by the auth service)
+- User management CRUD (handled by the auth service)
+- Session management internals (handled by the auth service)
+- Role-based access control definitions (handled by the auth service)
+- Login UI with provider buttons (handled by the auth service)
 
 ---
 
 ## Design
 
+### Overview
+
+Wallfacer registers as an `oauth_client` with the latere.ai auth service
+and delegates all authentication to it. Users log in at `auth.latere.ai`,
+and wallfacer receives a JWT that identifies the user and their org context.
+
+```
+Browser -> Wallfacer -> redirect to auth.latere.ai/authorize
+                              |
+                    User authenticates (Google, X, email, etc.)
+                              |
+                    Redirect back to Wallfacer /auth/callback
+                              |
+                    Exchange code for tokens (access + refresh + ID)
+                              |
+                    Store tokens in session cookie -> redirect to /
+```
+
+### Client Registration
+
+Wallfacer registers as a **confidential** oauth_client with the auth
+service:
+- `client_type`: confidential
+- `redirect_uris`: `["https://wallfacer.latere.ai/auth/callback"]`
+- `allowed_scopes`: `["openid", "email", "profile"]`
+
 ### Authentication Flow
 
-```
-Browser → /auth/login → redirect to OAuth provider
-                              ↓
-                    Provider callback → /auth/callback
-                              ↓
-                    Validate ID token / exchange code
-                              ↓
-                    Create or update user record
-                              ↓
-                    Issue session cookie → redirect to /
-```
+Standard OAuth 2.0 Authorization Code flow with PKCE:
 
-All subsequent requests carry the session cookie. The auth middleware validates the session before dispatching to handlers.
+1. User visits wallfacer, has no session
+2. Wallfacer redirects to `auth.latere.ai/authorize` with `client_id`,
+   `redirect_uri`, `code_challenge`, `state`
+3. User authenticates at the auth service (provider choice is handled there)
+4. Auth service redirects back to `/auth/callback` with authorization code
+5. Wallfacer exchanges code for tokens via `POST auth.latere.ai/token`
+6. Wallfacer stores the access token and refresh token in a server-side
+   session, sets a session cookie
 
-### Provider Support
+### Token Handling
 
-Support multiple OAuth2/OIDC providers through a unified interface:
+- **Access token**: JWT from the auth service. Contains `sub`
+  (principal_id), `org_id`, `principal_type`. Short-lived (15 min).
+- **Refresh token**: stored server-side, used to obtain new access tokens
+  when they expire.
+- **Session cookie**: `HttpOnly`, `Secure`, `SameSite=Lax`. Maps to the
+  server-side session containing the tokens.
 
-| Provider | Protocol | Notes |
-|----------|----------|-------|
-| **GitHub** | OAuth2 | Most common for dev tools; use GitHub App or OAuth App |
-| **Google** | OIDC | Standard OpenID Connect; ID token contains email + sub |
-| **Generic OIDC** | OIDC Discovery | Any provider with `/.well-known/openid-configuration` |
+### JWT Validation
 
-Only one provider needs to be configured for the server to start with auth enabled. Multiple providers can be configured simultaneously (login page shows all).
+For API requests, wallfacer validates the JWT locally:
 
-### Session Management
+1. Fetch JWKS from `auth.latere.ai/.well-known/jwks.json` (cached, 1h TTL)
+2. Verify signature, `exp`, `iss`, `aud`
+3. Extract `sub` (principal_id) and `org_id`
 
-**Cookie-based sessions** with server-side state:
+No round-trip to the auth service on every request.
 
-- Session ID in `HttpOnly`, `Secure`, `SameSite=Lax` cookie
-- Server stores session → user mapping (in-memory map + optional persistent backing)
-- Session expiry: configurable, default 7 days
-- Idle timeout: configurable, default 24 hours of no requests
-- Explicit logout (`POST /auth/logout`) clears cookie and server-side session
-- Token refresh: for OIDC providers, refresh tokens are stored server-side and used to extend sessions transparently
-
-**Why not JWT-only?** Stateless JWTs cannot be revoked without a blocklist (which reintroduces server state). Cookie + server session is simpler, revocable, and familiar.
-
-### User Identity Model
-
-```go
-// internal/auth/user.go
-
-type User struct {
-    ID         string    // UUID
-    Provider   string    // "github", "google", "oidc"
-    ProviderID string    // external user ID from the provider
-    Email      string    // from ID token or userinfo endpoint
-    Name       string    // display name
-    AvatarURL  string    // profile picture URL
-    Role       Role      // admin or member
-    CreatedAt  time.Time
-    LastLogin  time.Time
-}
-
-type Role string
-
-const (
-    RoleAdmin  Role = "admin"
-    RoleMember Role = "member"
-)
-```
-
-**Storage:** Users and sessions are stored via the existing `StorageBackend` interface. For filesystem backend, this is a JSON file in the data directory. For cloud deployments, PostgreSQL or equivalent.
-
-**First user is admin.** The first user to log in becomes admin. Subsequent users are members. Admins can promote/demote via API.
-
-### Middleware Integration
+### Middleware
 
 ```go
 // internal/auth/middleware.go
 
-func RequireAuth(next http.Handler) http.Handler
-func RequireAdmin(next http.Handler) http.Handler
-func OptionalAuth(next http.Handler) http.Handler
+func RequireAuth(next http.Handler) http.Handler   // 401 if no valid session/token
+func RequireAdmin(next http.Handler) http.Handler  // 403 if not admin (via /tokeninfo)
+func OptionalAuth(next http.Handler) http.Handler  // sets user in context if present
 ```
-
-- `RequireAuth`: Returns 401 if no valid session. Sets user in request context.
-- `RequireAdmin`: Returns 403 if authenticated user is not admin.
-- `OptionalAuth`: Sets user in context if session exists, proceeds regardless.
 
 **Context propagation:**
 
 ```go
-func UserFromContext(ctx context.Context) (*User, bool)
+func PrincipalFromContext(ctx context.Context) (principalID, orgID string, ok bool)
 ```
 
-Handlers access the authenticated user via context. No user identity is propagated into task execution or container environments — tasks remain user-agnostic at the runner level.
+Handlers access the authenticated principal via context. No user identity
+is propagated into task execution or container environments.
 
-### Compatibility with Existing Auth
+### Authorization
 
-The current `WALLFACER_SERVER_API_KEY` mechanism continues to work:
+Wallfacer resolves permissions via the auth service's `/tokeninfo`
+endpoint, cached for the token's remaining lifetime. For most routes,
+a simple "is authenticated" check suffices. Admin-only routes (e.g.
+instance management) check for the appropriate role via the cached
+tokeninfo response.
+
+### Data Model Changes
+
+Wallfacer keys all user-specific and tenant-specific data on the auth
+service's identifiers:
+
+```go
+type Workspace struct {
+    ID          string    // workspace UUID
+    OrgID       string    // from JWT org_id, tenant isolation
+    CreatedBy   string    // from JWT sub, principal_id
+    Name        string
+    // ...
+}
+```
+
+All queries filter by `org_id`. Ownership and attribution use
+`principal_id` (from `sub`). Wallfacer never stores user profiles
+locally; display info (name, avatar) is fetched from `/userinfo` and
+cached with a short TTL.
+
+### User Profile Resolution
+
+When wallfacer needs to display user info (e.g. "workspace created by
+Alice"):
+
+```
+GET auth.latere.ai/userinfo
+Authorization: Bearer <token>
+```
+
+Cached locally for 5-15 minutes.
+
+### Org Switching
+
+If a user belongs to multiple orgs, wallfacer triggers a token refresh
+with a new `org_id` parameter. The auth service issues a new access token
+scoped to the target org.
+
+---
+
+## Compatibility with Standalone Mode
+
+The `WALLFACER_SERVER_API_KEY` mechanism continues to work for self-hosted
+deployments where the auth service is not available.
 
 | Configuration | Behavior |
 |---------------|----------|
-| No OAuth + no API key | Server is open (current default) |
+| No auth service + no API key | Server is open (current default) |
 | API key only | Current behavior, unchanged |
-| OAuth only | Login required, API key ignored |
-| OAuth + API key | OAuth for browser sessions; API key for programmatic access (CLI, scripts) |
+| Auth service configured | Login via auth service, full identity |
+| Auth service + API key | Auth service for browser; API key for CLI/scripts |
 
-When OAuth is enabled, the `WALLFACER_SERVER_API_KEY` serves as a service account token for non-browser clients (CI, CLI tools, the future control plane). Requests with a valid `Authorization: Bearer <api-key>` header bypass OAuth and are treated as admin.
-
-### Multi-Tenant Integration
-
-When deployed behind the multi-tenant control plane:
-
-- The control plane handles authentication itself and sets `X-Forwarded-User` / `X-Forwarded-Email` headers
-- Wallfacer trusts these headers when configured with `WALLFACER_TRUSTED_PROXY` (comma-separated CIDRs)
-- In this mode, wallfacer skips its own OAuth flow and creates/updates user records from forwarded headers
-- This avoids double-login (control plane + instance)
+When the auth service is not configured, wallfacer operates exactly as
+it does today.
 
 ---
 
 ## Configuration
 
-New environment variables (all in `~/.wallfacer/.env`):
-
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `WALLFACER_AUTH_PROVIDER` | Comma-separated list: `github`, `google`, `oidc` | (unset = auth disabled) |
-| `WALLFACER_AUTH_SESSION_TTL` | Session lifetime | `168h` (7 days) |
-| `WALLFACER_AUTH_SESSION_IDLE` | Idle timeout before session expires | `24h` |
-| `WALLFACER_AUTH_ALLOWED_EMAILS` | Comma-separated allow-list of email addresses or domains (e.g., `*@example.com`) | (unset = any authenticated user) |
-| `WALLFACER_TRUSTED_PROXY` | CIDRs to trust for `X-Forwarded-User` | (unset = disabled) |
+| `WALLFACER_AUTH_ISSUER_URL` | Auth service issuer URL | (unset = auth disabled) |
+| `WALLFACER_AUTH_CLIENT_ID` | OAuth client ID | (required if issuer set) |
+| `WALLFACER_AUTH_CLIENT_SECRET` | OAuth client secret | (required if issuer set) |
+| `WALLFACER_SERVER_API_KEY` | Static API key for standalone mode | (unset = disabled) |
 
-**Per-provider variables:**
-
-| Variable | Provider | Description |
-|----------|----------|-------------|
-| `WALLFACER_GITHUB_CLIENT_ID` | GitHub | OAuth App client ID |
-| `WALLFACER_GITHUB_CLIENT_SECRET` | GitHub | OAuth App client secret |
-| `WALLFACER_GOOGLE_CLIENT_ID` | Google | OAuth 2.0 client ID |
-| `WALLFACER_GOOGLE_CLIENT_SECRET` | Google | OAuth 2.0 client secret |
-| `WALLFACER_OIDC_ISSUER_URL` | Generic OIDC | Issuer URL (must serve `/.well-known/openid-configuration`) |
-| `WALLFACER_OIDC_CLIENT_ID` | Generic OIDC | Client ID |
-| `WALLFACER_OIDC_CLIENT_SECRET` | Generic OIDC | Client secret |
+When `WALLFACER_AUTH_ISSUER_URL` is set, wallfacer fetches the OIDC
+discovery document and configures itself automatically (authorization
+endpoint, token endpoint, JWKS URI).
 
 ---
 
 ## API Routes
 
-### Auth Endpoints (unauthenticated)
+### Auth Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/auth/login` | Show login page (lists enabled providers) |
-| `GET` | `/auth/login/{provider}` | Initiate OAuth flow for provider |
-| `GET` | `/auth/callback/{provider}` | OAuth callback; creates session, redirects to `/` |
+| `GET` | `/auth/login` | Redirect to auth service |
+| `GET` | `/auth/callback` | Handle auth service callback, create session |
 | `POST` | `/auth/logout` | Destroy session, clear cookie |
 
-### User Management (authenticated)
+### Authenticated Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/auth/me` | Current user profile |
-| `GET` | `/api/auth/users` | List all users (admin only) |
-| `PATCH` | `/api/auth/users/{id}` | Update user role (admin only) |
-| `DELETE` | `/api/auth/users/{id}` | Remove user (admin only) |
+| `GET` | `/api/auth/me` | Current principal info (from cached /userinfo) |
 
-### Session Management
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/auth/sessions` | List active sessions for current user |
-| `DELETE` | `/api/auth/sessions/{id}` | Revoke a specific session |
+User management (list users, change roles, remove users) is handled
+entirely by the auth service's admin API, not by wallfacer.
 
 ---
 
 ## UI Changes
 
-### Login Page
+### Login
 
-When auth is enabled and the user has no valid session, all routes redirect to `/auth/login`. The login page shows:
-
-- Wallfacer logo and name
-- One button per configured provider ("Sign in with GitHub", "Sign in with Google", etc.)
-- No username/password form (OAuth only)
+When auth is configured and the user has no valid session, all routes
+redirect to `/auth/login`, which immediately redirects to the auth
+service. The auth service presents the login UI (provider selection,
+email code, etc.).
 
 ### Authenticated UI
 
-- **Header:** Show user avatar + name in the top bar; dropdown with "Sign out"
-- **Settings → Users** (admin only): List users, change roles, remove users
-- **Settings → Sessions:** List own active sessions, revoke individual sessions
+- **Header:** Show user avatar + name (from cached /userinfo); dropdown
+  with "Sign out"
+- No user management UI in wallfacer. Users and roles are managed via
+  the auth service.
 
 ### Unauthenticated Fallback
 
-When auth is not configured, the UI behaves exactly as today — no login page, no user avatar, no user management.
-
----
-
-## Security Considerations
-
-- **CSRF protection:** All state-changing endpoints require the session cookie (SameSite=Lax blocks cross-origin POST). OAuth state parameter prevents login CSRF.
-- **Session fixation:** New session ID generated on every login, never reuse pre-auth session IDs.
-- **Secret storage:** Client secrets stored in `.env`, never logged or exposed via API. Refresh tokens encrypted at rest.
-- **Email allow-list:** Optional `WALLFACER_AUTH_ALLOWED_EMAILS` restricts who can log in. Supports domain wildcards (`*@company.com`).
-- **Open redirect:** Callback handler validates redirect URLs against the server's own origin.
+When auth is not configured, the UI behaves exactly as today.
 
 ---
 
 ## Implementation Order
 
-1. **Auth package scaffold** — `internal/auth/`: User model, session store (in-memory), middleware, context helpers
-2. **GitHub OAuth provider** — Most common; proves the pattern end-to-end
-3. **Session management** — Cookie handling, expiry, idle timeout, logout
-4. **Login UI** — Login page, header integration, redirect-on-401
-5. **User management API** — CRUD, role assignment, admin bootstrap
-6. **Google OIDC provider** — Second provider validates the multi-provider abstraction
-7. **Generic OIDC provider** — Covers corporate IdPs (Okta, Auth0, Keycloak, etc.)
-8. **Trusted proxy mode** — `X-Forwarded-User` support for multi-tenant control plane integration
-9. **Email allow-list** — Domain/address filtering
+1. **OIDC client integration** - Add `coreos/go-oidc` dependency, implement
+   login redirect, callback handler, token exchange
+2. **JWT middleware** - Validate tokens via JWKS, extract principal_id and
+   org_id, set in request context
+3. **Data model migration** - Add `org_id` and `principal_id` (created_by)
+   columns to workspace/task tables, add org_id filtering
+4. **UI integration** - Login redirect, header with user info, sign-out
 
 ### Dependencies
 
-- **Storage Backend Interface:** User and session persistence uses `StorageBackend`. Filesystem backend is sufficient for single-host; cloud backends needed for multi-tenant.
-- **Multi-Tenant:** Consumes this spec's trusted proxy mode. Multi-tenant does not need to implement its own auth — it delegates to this.
+- **latere.ai auth service**: must be deployed and accessible. Wallfacer
+  must be registered as an oauth_client before auth can be enabled.
 
-### What Multi-Tenant No Longer Needs to Cover
+### What Moved to the Auth Service
 
-With this spec implemented, Multi-tenant can remove:
-- Section "1. Authentication Gateway" (fully covered here)
-- The `users` table from "Data Model Changes" (moved here)
-- OAuth/OIDC library selection (decided here)
-- Session management design (decided here)
+The following items from the original spec are now handled by the
+latere.ai auth service and removed from wallfacer's scope:
+
+- OAuth provider integration (GitHub, Google, Generic OIDC)
+- User model and storage (User struct, StorageBackend persistence)
+- Session store implementation (in-memory map, expiry, idle timeout)
+- User management API (`/api/auth/users/*`)
+- Session management API (`/api/auth/sessions/*`)
+- Login UI with provider buttons
+- First-user-is-admin bootstrap
+- Trusted proxy mode (`X-Forwarded-User`)
+- Email allow-list
+- CSRF/session fixation handling (handled by auth service)
+- Refresh token encryption (handled by auth service)
