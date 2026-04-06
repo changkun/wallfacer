@@ -15,6 +15,9 @@
 #
 set -euo pipefail
 
+# Bypass RTK filtering so curl returns raw JSON.
+export RTK_DISABLED=1
+
 BASE_URL="${WALLFACER_URL:-http://localhost:8080}"
 API_KEY="${WALLFACER_SERVER_API_KEY:-}"
 TIMEOUT="${WALLFACER_TEST_TIMEOUT:-120}"  # seconds to wait for task completion

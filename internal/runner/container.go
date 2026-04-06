@@ -135,6 +135,9 @@ func (r *Runner) buildContainerSpecForSandbox(
 			// the main repo's .git/worktrees/<name>/ using an absolute host
 			// path. Mount the main repo's .git directory at the same host
 			// path inside the container so git operations work correctly.
+			// On macOS, /var is a symlink to /private/var, so git may store
+			// the resolved path in the worktree's .git file. Mount at both
+			// the original and resolved paths to handle this.
 			if _, isWorktree := worktreeOverrides[ws]; isWorktree {
 				gitDir := filepath.Join(ws, ".git")
 				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
@@ -143,6 +146,15 @@ func (r *Runner) buildContainerSpecForSandbox(
 						Container: gitDir,
 						Options:   mountOpts("z"),
 					})
+					// Also mount at the symlink-resolved path if it differs
+					// (e.g. macOS /var -> /private/var).
+					if resolved, err := filepath.EvalSymlinks(gitDir); err == nil && resolved != gitDir {
+						spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+							Host:      gitDir,
+							Container: resolved,
+							Options:   mountOpts("z"),
+						})
+					}
 				}
 			}
 		}
