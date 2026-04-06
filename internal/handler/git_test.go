@@ -231,6 +231,45 @@ func TestTaskDiffIncludesUntrackedFiles(t *testing.T) {
 	}
 }
 
+// TestTaskDiffUntrackedFileSeparation verifies that each file in the diff
+// starts on its own line, even when a tracked diff is followed by untracked
+// file diffs. This is a regression test: cmdexec.Output() trims trailing
+// newlines, so naive concatenation would glue "diff --git" headers together
+// and break per-file splitting in the frontend.
+func TestTaskDiffUntrackedFileSeparation(t *testing.T) {
+	repo := setupRepo(t)
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-sep", wtDir, "HEAD")
+
+	// Modify a tracked file.
+	_ = os.WriteFile(filepath.Join(wtDir, "init.txt"), []byte("modified\n"), 0644)
+	// Add two untracked files.
+	_ = os.WriteFile(filepath.Join(wtDir, "untracked-a.txt"), []byte("aaa\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "untracked-b.txt"), []byte("bbb\n"), 0644)
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task-sep")
+
+	resp := callTaskDiff(t, h, task.ID)
+
+	// Every "diff --git" header must appear at the start of a line.
+	for i, line := range strings.Split(resp.Diff, "\n") {
+		if idx := strings.Index(line, "diff --git"); idx > 0 {
+			t.Errorf("line %d: 'diff --git' not at start of line (offset %d): %s", i, idx, line)
+		}
+	}
+
+	// All three files must appear as separate diff sections.
+	for _, name := range []string{"init.txt", "untracked-a.txt", "untracked-b.txt"} {
+		if !strings.Contains(resp.Diff, name) {
+			t.Errorf("expected diff to contain %s", name)
+		}
+	}
+}
+
 func TestTaskDiffEmptyWhenNoChanges(t *testing.T) {
 	repo := setupRepo(t)
 	h := newTestHandler(t)

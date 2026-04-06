@@ -122,6 +122,20 @@ describe("parseDiffByFile", () => {
     expect(files[0].content).toContain("foo.js");
   });
 
+  it("splits concatenated diffs where headers are on their own lines", () => {
+    // Regression: if backend joins trimmed diffs without newlines, the second
+    // "diff --git" header would be mid-line and not detected as a file boundary.
+    const tracked =
+      "diff --git a/tracked.go b/tracked.go\nindex 0..1 100644\n--- a/tracked.go\n+++ b/tracked.go\n@@ -1 +1 @@\n-old\n+new";
+    const untracked =
+      "diff --git a/untracked.go b/untracked.go\nnew file mode 100644\n--- /dev/null\n+++ b/untracked.go\n@@ -0,0 +1 @@\n+content";
+    const combined = tracked + "\n" + untracked;
+    const files = ctx.parseDiffByFile(combined);
+    expect(files.length).toBe(2);
+    expect(files[0].filename).toBe("tracked.go");
+    expect(files[1].filename).toBe("untracked.go");
+  });
+
   it("ignores blocks that lack a diff --git header", () => {
     const noDiff = "just some text\nno diff header here\n";
     const files = ctx.parseDiffByFile(noDiff);

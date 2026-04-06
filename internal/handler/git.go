@@ -333,6 +333,88 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, map[string]string{"output": out})
 }
 
+// diffWithUntracked computes a git diff against baseRef and appends diffs for
+// untracked files. The optional excludes are passed as pathspec negations to
+// both git-diff and ls-files (e.g. ":!AGENTS.md"). Output is newline-separated
+// so each file's "diff --git" header starts on its own line.
+func diffWithUntracked(ctx context.Context, worktreePath, baseRef string, excludes ...string) string {
+	args := append([]string{"diff", baseRef, "--", "."}, excludes...)
+	out, _ := cmdexec.Git(worktreePath, args...).WithContext(ctx).Output()
+
+	lsArgs := append([]string{"ls-files", "--others", "--exclude-standard", "--", "."}, excludes...)
+	untrackedRaw, err := cmdexec.Git(worktreePath, lsArgs...).WithContext(ctx).Output()
+	if err == nil {
+		for file := range strings.SplitSeq(untrackedRaw, "\n") {
+			if file == "" {
+				continue
+			}
+			fd, _ := cmdexec.Git(worktreePath,
+				"diff", "--no-index", "/dev/null", file).WithContext(ctx).Output()
+			if fd != "" {
+				if out != "" {
+					out += "\n"
+				}
+				out += fd
+			}
+		}
+	}
+	return out
+}
+
+// diffFromStoredRefs reconstructs a diff from stored commit hashes or branch
+// names when the worktree directory no longer exists (cleaned up after done/cancel).
+// Priority: base..commit hash > git show commit > merge-base..branch > default..branch.
+func diffFromStoredRefs(ctx context.Context, repoPath string, task *store.Task) string {
+	commitHash := task.CommitHashes[repoPath]
+	if commitHash != "" {
+		if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
+			out, gitErr := cmdexec.Git(repoPath, "diff", baseHash, commitHash).WithContext(ctx).Output()
+			if gitErr != nil {
+				logger.Git.Debug("git diff base..commit failed", "repo", repoPath, "error", gitErr)
+			}
+			return out
+		}
+		out, gitErr := cmdexec.Git(repoPath, "show", commitHash).WithContext(ctx).Output()
+		if gitErr != nil {
+			logger.Git.Debug("git show commit failed", "repo", repoPath, "error", gitErr)
+		}
+		return out
+	}
+	if task.BranchName == "" {
+		return ""
+	}
+	defBranch, err := gitutil.DefaultBranch(repoPath)
+	if err != nil {
+		return ""
+	}
+	// Use merge-base so we only see changes introduced on the task
+	// branch, not the inverse of commits that advanced main.
+	if base, mbErr := gitutil.MergeBase(repoPath, defBranch, task.BranchName); mbErr == nil {
+		out, gitErr := cmdexec.Git(repoPath, "diff", base, task.BranchName).WithContext(ctx).Output()
+		if gitErr != nil {
+			logger.Git.Debug("git diff merge-base..branch failed", "repo", repoPath, "error", gitErr)
+		}
+		return out
+	}
+	out, gitErr := cmdexec.Git(repoPath, "diff", defBranch+".."+task.BranchName).WithContext(ctx).Output()
+	if gitErr != nil {
+		logger.Git.Debug("git diff default..branch failed", "repo", repoPath, "error", gitErr)
+	}
+	return out
+}
+
+// appendWorkspaceDiff appends a diff section to the combined builder, prepending
+// a workspace separator line when there are multiple workspaces.
+func appendWorkspaceDiff(combined *strings.Builder, multiWS bool, repoPath, diff string) {
+	if diff == "" {
+		return
+	}
+	if multiWS {
+		fmt.Fprintf(combined, "=== %s ===\n", filepath.Base(repoPath))
+	}
+	combined.WriteString(diff)
+}
+
 // TaskDiff returns the git diff for a task's worktrees versus the default branch.
 // Responses are cached: terminal tasks (done/cancelled/archived) are cached
 // indefinitely; active tasks are cached for constants.DiffCacheTTL (10 s). ETag and
@@ -368,6 +450,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 
+	multiWS := len(task.WorktreePaths) > 1
 	var combined strings.Builder
 	behindCounts := make(map[string]int)
 
@@ -376,31 +459,11 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 			// Non-git workspace: try live snapshot first, then stored diff.
 			if _, statErr := os.Stat(worktreePath); statErr == nil && gitutil.IsGitRepo(worktreePath) {
 				// Active task: compute diff from snapshot (initial commit → HEAD).
-				out, _ := cmdexec.Git(worktreePath, "diff", "HEAD~1").WithContext(r.Context()).Output()
-				// Include untracked files (same pattern as regular worktrees below).
-				if untrackedRaw, err := cmdexec.Git(worktreePath,
-					"ls-files", "--others", "--exclude-standard").WithContext(r.Context()).Output(); err == nil {
-					for file := range strings.SplitSeq(untrackedRaw, "\n") {
-						if file == "" {
-							continue
-						}
-						fd, _ := cmdexec.Git(worktreePath,
-							"diff", "--no-index", "/dev/null", file).WithContext(r.Context()).Output()
-						out += fd
-					}
-				}
-				if len(out) > 0 {
-					if len(task.WorktreePaths) > 1 {
-						fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
-					}
-					combined.WriteString(out)
-				}
+				out := diffWithUntracked(r.Context(), worktreePath, "HEAD~1")
+				appendWorkspaceDiff(&combined, multiWS, repoPath, out)
 			} else if task.SnapshotDiffs[repoPath] != "" {
 				// Terminal task: use stored diff captured at commit time.
-				if len(task.WorktreePaths) > 1 {
-					fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
-				}
-				combined.WriteString(task.SnapshotDiffs[repoPath])
+				appendWorkspaceDiff(&combined, multiWS, repoPath, task.SnapshotDiffs[repoPath])
 			}
 			continue
 		}
@@ -408,47 +471,8 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		// fall back to stored commit hashes or branch names to reconstruct the diff.
 		// Priority: base..commit hash > git show commit > merge-base..branch > default..branch.
 		if _, statErr := os.Stat(worktreePath); statErr != nil {
-			commitHash := task.CommitHashes[repoPath]
-			var out string
-			if commitHash != "" {
-				if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
-					var gitErr error
-					out, gitErr = cmdexec.Git(repoPath, "diff", baseHash, commitHash).WithContext(r.Context()).Output()
-					if gitErr != nil {
-						logger.Git.Debug("git diff base..commit failed", "repo", repoPath, "error", gitErr)
-					}
-				} else {
-					var gitErr error
-					out, gitErr = cmdexec.Git(repoPath, "show", commitHash).WithContext(r.Context()).Output()
-					if gitErr != nil {
-						logger.Git.Debug("git show commit failed", "repo", repoPath, "error", gitErr)
-					}
-				}
-			} else if task.BranchName != "" {
-				if defBranch, err := gitutil.DefaultBranch(repoPath); err == nil {
-					// Use merge-base so we only see changes introduced on the task
-					// branch, not the inverse of commits that advanced main.
-					if base, mbErr := gitutil.MergeBase(repoPath, defBranch, task.BranchName); mbErr == nil {
-						var gitErr error
-						out, gitErr = cmdexec.Git(repoPath, "diff", base, task.BranchName).WithContext(r.Context()).Output()
-						if gitErr != nil {
-							logger.Git.Debug("git diff merge-base..branch failed", "repo", repoPath, "error", gitErr)
-						}
-					} else {
-						var gitErr error
-						out, gitErr = cmdexec.Git(repoPath, "diff", defBranch+".."+task.BranchName).WithContext(r.Context()).Output()
-						if gitErr != nil {
-							logger.Git.Debug("git diff default..branch failed", "repo", repoPath, "error", gitErr)
-						}
-					}
-				}
-			}
-			if len(out) > 0 {
-				if len(task.WorktreePaths) > 1 {
-					fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
-				}
-				combined.WriteString(out)
-			}
+			out := diffFromStoredRefs(r.Context(), repoPath, task)
+			appendWorkspaceDiff(&combined, multiWS, repoPath, out)
 			continue
 		}
 
@@ -467,32 +491,9 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		// Podman leaves empty mount-point files in the worktree when a file
 		// is bind-mounted into a directory that is itself a bind mount; these
 		// are not real changes and should not appear in task diffs.
-		out, diffErr := cmdexec.Git(worktreePath, "diff", base,
-			"--", ".", ":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename).WithContext(r.Context()).Output()
-		if diffErr != nil {
-			logger.Git.Debug("git diff base failed", "worktree", worktreePath, "error", diffErr)
-		}
-
-		// Include untracked files via --no-index diffs.
-		if untrackedRaw, err := cmdexec.Git(worktreePath,
-			"ls-files", "--others", "--exclude-standard",
-			"--", ".", ":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename).WithContext(r.Context()).Output(); err == nil {
-			for file := range strings.SplitSeq(untrackedRaw, "\n") {
-				if file == "" {
-					continue
-				}
-				fd, _ := cmdexec.Git(worktreePath,
-					"diff", "--no-index", "/dev/null", file).WithContext(r.Context()).Output()
-				out += fd
-			}
-		}
-
-		if len(out) > 0 {
-			if len(task.WorktreePaths) > 1 {
-				fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
-			}
-			combined.WriteString(out)
-		}
+		out := diffWithUntracked(r.Context(), worktreePath, base,
+			":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename)
+		appendWorkspaceDiff(&combined, multiWS, repoPath, out)
 		if n, err := gitutil.CommitsBehind(repoPath, worktreePath); err == nil && n > 0 {
 			behindCounts[filepath.Base(repoPath)] = n
 		}
