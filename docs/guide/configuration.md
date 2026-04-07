@@ -213,6 +213,26 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 | `WALLFACER_TASK_WORKERS` | `true` | Enable per-task worker containers for container reuse. Each task gets a long-lived container that is reused across agent invocations (implementation turns, title, oversight, commit message). Set to `false` to always use ephemeral containers. |
 | `WALLFACER_DEPENDENCY_CACHES` | `false` | Mount named volumes for dependency caches (`~/.npm`, `~/.cache/pip`, `~/.cargo/registry`, `~/.cache/go-build`) that persist across container restarts. Scoped per workspace group. |
 
+#### Container Proxy (opt-in)
+
+If your network requires a proxy for containers to reach external APIs (for example, using Clash or another local proxy on macOS), configure these variables so that sandbox containers can route traffic through the proxy. **Leave all fields empty if no proxy is needed** — most users do not need this.
+
+On **macOS with Podman**, containers cannot use the host's loopback address (`127.0.0.1`). Instead, use `host.containers.internal` to refer to the host machine from inside a container. For example, if your proxy runs on `127.0.0.1:7897`, configure:
+
+```env
+HTTP_PROXY=http://host.containers.internal:7897
+HTTPS_PROXY=http://host.containers.internal:7897
+ALL_PROXY=http://host.containers.internal:7897
+NO_PROXY=127.0.0.1,localhost,host.containers.internal
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `HTTP_PROXY` | (empty) | HTTP proxy URL for container outbound requests |
+| `HTTPS_PROXY` | (empty) | HTTPS proxy URL for container outbound requests |
+| `ALL_PROXY` | (empty) | Catch-all proxy URL (used when protocol-specific proxy is not set) |
+| `NO_PROXY` | (empty) | Comma-separated list of hosts/domains that should bypass the proxy |
+
 #### Automation
 
 | Variable | Default | Description |

@@ -806,3 +806,117 @@ func TestParseTerminalEnabledFalse(t *testing.T) {
 		t.Error("TerminalEnabled = true; want false when explicitly set to false")
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Container Proxy
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestParseProxyFields verifies that proxy environment variables are parsed correctly.
+func TestParseProxyFields(t *testing.T) {
+	content := `HTTP_PROXY=http://host.containers.internal:7897
+HTTPS_PROXY=http://host.containers.internal:7897
+ALL_PROXY=http://host.containers.internal:7897
+NO_PROXY=127.0.0.1,localhost,host.containers.internal
+`
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.HTTPProxy != "http://host.containers.internal:7897" {
+		t.Errorf("HTTPProxy = %q; want http://host.containers.internal:7897", cfg.HTTPProxy)
+	}
+	if cfg.HTTPSProxy != "http://host.containers.internal:7897" {
+		t.Errorf("HTTPSProxy = %q; want http://host.containers.internal:7897", cfg.HTTPSProxy)
+	}
+	if cfg.AllProxy != "http://host.containers.internal:7897" {
+		t.Errorf("AllProxy = %q; want http://host.containers.internal:7897", cfg.AllProxy)
+	}
+	if cfg.NoProxy != "127.0.0.1,localhost,host.containers.internal" {
+		t.Errorf("NoProxy = %q; want 127.0.0.1,localhost,host.containers.internal", cfg.NoProxy)
+	}
+}
+
+// TestParseProxyFieldsAbsent verifies that proxy fields default to empty when absent.
+func TestParseProxyFieldsAbsent(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.HTTPProxy != "" {
+		t.Errorf("HTTPProxy = %q; want empty when absent", cfg.HTTPProxy)
+	}
+	if cfg.HTTPSProxy != "" {
+		t.Errorf("HTTPSProxy = %q; want empty when absent", cfg.HTTPSProxy)
+	}
+	if cfg.AllProxy != "" {
+		t.Errorf("AllProxy = %q; want empty when absent", cfg.AllProxy)
+	}
+	if cfg.NoProxy != "" {
+		t.Errorf("NoProxy = %q; want empty when absent", cfg.NoProxy)
+	}
+}
+
+// TestUpdateProxyFields verifies that proxy fields can be set and cleared via Update.
+func TestUpdateProxyFields(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+
+	httpProxy := "http://proxy:8080"
+	httpsProxy := "http://proxy:8080"
+	allProxy := "socks5://proxy:1080"
+	noProxy := "localhost,127.0.0.1"
+	if err := envconfig.Update(path, envconfig.Updates{
+		HTTPProxy:  &httpProxy,
+		HTTPSProxy: &httpsProxy,
+		AllProxy:   &allProxy,
+		NoProxy:    &noProxy,
+	}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse after update: %v", err)
+	}
+	if cfg.HTTPProxy != httpProxy {
+		t.Errorf("HTTPProxy = %q; want %q", cfg.HTTPProxy, httpProxy)
+	}
+	if cfg.HTTPSProxy != httpsProxy {
+		t.Errorf("HTTPSProxy = %q; want %q", cfg.HTTPSProxy, httpsProxy)
+	}
+	if cfg.AllProxy != allProxy {
+		t.Errorf("AllProxy = %q; want %q", cfg.AllProxy, allProxy)
+	}
+	if cfg.NoProxy != noProxy {
+		t.Errorf("NoProxy = %q; want %q", cfg.NoProxy, noProxy)
+	}
+
+	// Clear proxy fields.
+	empty := ""
+	if err := envconfig.Update(path, envconfig.Updates{
+		HTTPProxy:  &empty,
+		HTTPSProxy: &empty,
+		AllProxy:   &empty,
+		NoProxy:    &empty,
+	}); err != nil {
+		t.Fatalf("Update (clear): %v", err)
+	}
+
+	cfg, err = envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse after clear: %v", err)
+	}
+	if cfg.HTTPProxy != "" {
+		t.Errorf("HTTPProxy = %q; want empty after clear", cfg.HTTPProxy)
+	}
+	if cfg.HTTPSProxy != "" {
+		t.Errorf("HTTPSProxy = %q; want empty after clear", cfg.HTTPSProxy)
+	}
+	if cfg.AllProxy != "" {
+		t.Errorf("AllProxy = %q; want empty after clear", cfg.AllProxy)
+	}
+	if cfg.NoProxy != "" {
+		t.Errorf("NoProxy = %q; want empty after clear", cfg.NoProxy)
+	}
+}

@@ -699,6 +699,118 @@
           </div>
         </div>
       </div>
+
+      <div
+        style="
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px;
+        "
+      >
+        <label
+          style="
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+          "
+          >Container Proxy (opt-in)</label
+        >
+        <div
+          style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px"
+        >
+          Configure if your network requires a proxy for containers to reach
+          external APIs. On macOS with Podman, use
+          <code style="font-family: monospace"
+            >http://host.containers.internal:&lt;port&gt;</code
+          >
+          instead of <code style="font-family: monospace">127.0.0.1</code>.
+          Leave all fields empty if no proxy is needed.
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div>
+            <label
+              style="
+                display: block;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 4px;
+              "
+              >HTTP_PROXY</label
+            >
+            <input
+              id="env-http-proxy"
+              type="text"
+              class="field"
+              style="font-family: monospace; font-size: 12px"
+              placeholder="e.g. http://host.containers.internal:7897"
+              autocomplete="off"
+            />
+          </div>
+          <div>
+            <label
+              style="
+                display: block;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 4px;
+              "
+              >HTTPS_PROXY</label
+            >
+            <input
+              id="env-https-proxy"
+              type="text"
+              class="field"
+              style="font-family: monospace; font-size: 12px"
+              placeholder="e.g. http://host.containers.internal:7897"
+              autocomplete="off"
+            />
+          </div>
+          <div>
+            <label
+              style="
+                display: block;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 4px;
+              "
+              >ALL_PROXY</label
+            >
+            <input
+              id="env-all-proxy"
+              type="text"
+              class="field"
+              style="font-family: monospace; font-size: 12px"
+              placeholder="e.g. http://host.containers.internal:7897"
+              autocomplete="off"
+            />
+          </div>
+          <div>
+            <label
+              style="
+                display: block;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 4px;
+              "
+              >NO_PROXY</label
+            >
+            <input
+              id="env-no-proxy"
+              type="text"
+              class="field"
+              style="font-family: monospace; font-size: 12px"
+              placeholder="e.g. 127.0.0.1,localhost,host.containers.internal"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+      </div>
     </div>
 
     <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px">

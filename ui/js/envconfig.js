@@ -203,6 +203,18 @@ function buildSaveEnvPayload() {
   const containerMemory = document.getElementById("env-container-memory")
     ? document.getElementById("env-container-memory").value.trim()
     : "";
+  const httpProxy = document.getElementById("env-http-proxy")
+    ? document.getElementById("env-http-proxy").value.trim()
+    : "";
+  const httpsProxy = document.getElementById("env-https-proxy")
+    ? document.getElementById("env-https-proxy").value.trim()
+    : "";
+  const allProxy = document.getElementById("env-all-proxy")
+    ? document.getElementById("env-all-proxy").value.trim()
+    : "";
+  const noProxy = document.getElementById("env-no-proxy")
+    ? document.getElementById("env-no-proxy").value.trim()
+    : "";
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
   if (apiKeyRaw) body.api_key = apiKeyRaw;
@@ -218,6 +230,10 @@ function buildSaveEnvPayload() {
   body.sandbox_fast = sandboxFastEl ? !!sandboxFastEl.checked : true;
   body.container_cpus = containerCPUs; // empty = clear
   body.container_memory = containerMemory; // empty = clear
+  body.http_proxy = httpProxy; // empty = clear
+  body.https_proxy = httpsProxy; // empty = clear
+  body.all_proxy = allProxy; // empty = clear
+  body.no_proxy = noProxy; // empty = clear
   return body;
 }
 
@@ -368,6 +384,18 @@ async function loadEnvConfig() {
   safeSetValue("env-container-memory", (el) => {
     el.value = "";
   });
+  safeSetValue("env-http-proxy", (el) => {
+    el.value = "";
+  });
+  safeSetValue("env-https-proxy", (el) => {
+    el.value = "";
+  });
+  safeSetValue("env-all-proxy", (el) => {
+    el.value = "";
+  });
+  safeSetValue("env-no-proxy", (el) => {
+    el.value = "";
+  });
   safeSetValue("env-config-status", (el) => {
     el.textContent = "";
   });
@@ -440,6 +468,18 @@ async function loadEnvConfig() {
   });
   safeSetValue("env-container-memory", (el) => {
     el.value = cfg.container_memory || "";
+  });
+  safeSetValue("env-http-proxy", (el) => {
+    el.value = cfg.http_proxy || "";
+  });
+  safeSetValue("env-https-proxy", (el) => {
+    el.value = cfg.https_proxy || "";
+  });
+  safeSetValue("env-all-proxy", (el) => {
+    el.value = cfg.all_proxy || "";
+  });
+  safeSetValue("env-no-proxy", (el) => {
+    el.value = cfg.no_proxy || "";
   });
   safeSetValue("env-config-status", (el) => {
     if (el.textContent === "Failed to load configuration.") return;

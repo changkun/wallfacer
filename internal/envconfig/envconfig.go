@@ -54,6 +54,13 @@ type Config struct {
 	DependencyCaches bool   // WALLFACER_DEPENDENCY_CACHES ("true"/"false"), defaults to false
 	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
+	// Container proxy configuration (opt-in; empty = no proxy).
+	// These are passed through to containers via --env-file.
+	HTTPProxy  string // HTTP_PROXY
+	HTTPSProxy string // HTTPS_PROXY
+	AllProxy   string // ALL_PROXY
+	NoProxy    string // NO_PROXY
+
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
 
@@ -94,6 +101,10 @@ var knownKeys = []string{
 	"WALLFACER_TASK_WORKERS",
 	"WALLFACER_DEPENDENCY_CACHES",
 	"WALLFACER_TERMINAL_ENABLED",
+	"HTTP_PROXY",
+	"HTTPS_PROXY",
+	"ALL_PROXY",
+	"NO_PROXY",
 	"WALLFACER_WORKSPACES",
 }
 
@@ -190,6 +201,14 @@ func Parse(path string) (Config, error) {
 			cfg.DependencyCaches = v == "true"
 		case "WALLFACER_TERMINAL_ENABLED":
 			cfg.TerminalEnabled = v != "false"
+		case "HTTP_PROXY":
+			cfg.HTTPProxy = v
+		case "HTTPS_PROXY":
+			cfg.HTTPSProxy = v
+		case "ALL_PROXY":
+			cfg.AllProxy = v
+		case "NO_PROXY":
+			cfg.NoProxy = v
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}
@@ -350,6 +369,10 @@ type Updates struct {
 	ContainerCPUs        *string
 	ContainerMemory      *string
 	TerminalEnabled      *string
+	HTTPProxy            *string
+	HTTPSProxy           *string
+	AllProxy             *string
+	NoProxy              *string
 	Workspaces           *string
 }
 
@@ -379,6 +402,10 @@ func Update(path string, u Updates) error {
 		"WALLFACER_CONTAINER_CPUS":          u.ContainerCPUs,
 		"WALLFACER_CONTAINER_MEMORY":        u.ContainerMemory,
 		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
+		"HTTP_PROXY":                        u.HTTPProxy,
+		"HTTPS_PROXY":                       u.HTTPSProxy,
+		"ALL_PROXY":                         u.AllProxy,
+		"NO_PROXY":                          u.NoProxy,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)

@@ -121,6 +121,10 @@ type envConfigResponse struct {
 	ContainerNetwork     string                                 `json:"container_network"`
 	ContainerCPUs        string                                 `json:"container_cpus"`
 	ContainerMemory      string                                 `json:"container_memory"`
+	HTTPProxy            string                                 `json:"http_proxy"`
+	HTTPSProxy           string                                 `json:"https_proxy"`
+	AllProxy             string                                 `json:"all_proxy"`
+	NoProxy              string                                 `json:"no_proxy"`
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
@@ -200,6 +204,10 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		ContainerNetwork:     cfg.ContainerNetwork,
 		ContainerCPUs:        cfg.ContainerCPUs,
 		ContainerMemory:      cfg.ContainerMemory,
+		HTTPProxy:            cfg.HTTPProxy,
+		HTTPSProxy:           cfg.HTTPSProxy,
+		AllProxy:             cfg.AllProxy,
+		NoProxy:              cfg.NoProxy,
 	})
 }
 
@@ -481,6 +489,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerCPUs        *string                                `json:"container_cpus"`
 		ContainerMemory      *string                                `json:"container_memory"`
 		TerminalEnabled      *bool                                  `json:"terminal_enabled"`
+		HTTPProxy            *string                                `json:"http_proxy"`
+		HTTPSProxy           *string                                `json:"https_proxy"`
+		AllProxy             *string                                `json:"all_proxy"`
+		NoProxy              *string                                `json:"no_proxy"`
 	}](w, r)
 	if !ok {
 		return
@@ -620,6 +632,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerCPUs:        req.ContainerCPUs,
 		ContainerMemory:      req.ContainerMemory,
 		TerminalEnabled:      terminalEnabled,
+		HTTPProxy:            req.HTTPProxy,
+		HTTPSProxy:           req.HTTPSProxy,
+		AllProxy:             req.AllProxy,
+		NoProxy:              req.NoProxy,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return

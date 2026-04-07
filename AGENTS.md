@@ -335,6 +335,10 @@ Optional variables (also in `.env`):
 - `WALLFACER_TASK_WORKERS` — enable per-task worker containers for container reuse (`true`/`false`, default: `true`)
 - `WALLFACER_DEPENDENCY_CACHES` — mount named volumes for dependency caches (npm, pip, cargo, go-build) that persist across container restarts (`true`/`false`, default: `false`)
 - `WALLFACER_TERMINAL_ENABLED` — enable integrated host terminal (`true`/`false`, default `true`)
+- `HTTP_PROXY` — HTTP proxy URL for container outbound requests (opt-in; empty = no proxy)
+- `HTTPS_PROXY` — HTTPS proxy URL for container outbound requests (opt-in; empty = no proxy)
+- `ALL_PROXY` — catch-all proxy URL for container outbound requests (opt-in; empty = no proxy)
+- `NO_PROXY` — comma-separated hosts that bypass the proxy (opt-in; empty = no proxy)
 - `WALLFACER_WORKSPACES` — workspace paths (OS path-list separated)
 - `WALLFACER_ARCHIVED_TASKS_PER_PAGE` — pagination size for archived tasks
 - `WALLFACER_TOMBSTONE_RETENTION_DAYS` — days to retain soft-deleted task data (default: 7)

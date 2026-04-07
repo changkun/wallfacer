@@ -715,6 +715,10 @@ describe("showEnvConfigEditor", () => {
         ["env-codex-test-status", makeInput("")],
         ["env-container-cpus", makeInput("")],
         ["env-container-memory", makeInput("")],
+        ["env-http-proxy", makeInput("")],
+        ["env-https-proxy", makeInput("")],
+        ["env-all-proxy", makeInput("")],
+        ["env-no-proxy", makeInput("")],
       ],
       api,
       applySandboxByActivity: () => {},
@@ -1058,5 +1062,72 @@ describe("buildSaveEnvPayload with container resources", () => {
     const body = ctx.buildSaveEnvPayload();
     expect(body.container_cpus).toBe("2.0");
     expect(body.container_memory).toBe("4g");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSaveEnvPayload — container proxy fields
+// ---------------------------------------------------------------------------
+describe("buildSaveEnvPayload with container proxy", () => {
+  it("includes proxy fields when set", () => {
+    const ctx = makeContext({
+      elements: [
+        ["env-oauth-token", makeInput("")],
+        ["env-api-key", makeInput("")],
+        ["env-claude-base-url", makeInput("")],
+        ["env-openai-api-key", makeInput("")],
+        ["env-openai-base-url", makeInput("")],
+        ["env-default-model", makeInput("")],
+        ["env-title-model", makeInput("")],
+        ["env-codex-default-model", makeInput("")],
+        ["env-codex-title-model", makeInput("")],
+        ["env-default-sandbox", makeInput("")],
+        ["env-sandbox-fast", makeCheckbox(true)],
+        ["env-container-cpus", makeInput("")],
+        ["env-container-memory", makeInput("")],
+        ["env-http-proxy", makeInput("http://host.containers.internal:7897")],
+        ["env-https-proxy", makeInput("http://host.containers.internal:7897")],
+        ["env-all-proxy", makeInput("http://host.containers.internal:7897")],
+        ["env-no-proxy", makeInput("127.0.0.1,localhost")],
+      ],
+    });
+    loadScript(ctx, "envconfig.js");
+
+    const body = ctx.buildSaveEnvPayload();
+    expect(body.http_proxy).toBe("http://host.containers.internal:7897");
+    expect(body.https_proxy).toBe("http://host.containers.internal:7897");
+    expect(body.all_proxy).toBe("http://host.containers.internal:7897");
+    expect(body.no_proxy).toBe("127.0.0.1,localhost");
+  });
+
+  it("sends empty strings when proxy fields are empty", () => {
+    const ctx = makeContext({
+      elements: [
+        ["env-oauth-token", makeInput("")],
+        ["env-api-key", makeInput("")],
+        ["env-claude-base-url", makeInput("")],
+        ["env-openai-api-key", makeInput("")],
+        ["env-openai-base-url", makeInput("")],
+        ["env-default-model", makeInput("")],
+        ["env-title-model", makeInput("")],
+        ["env-codex-default-model", makeInput("")],
+        ["env-codex-title-model", makeInput("")],
+        ["env-default-sandbox", makeInput("")],
+        ["env-sandbox-fast", makeCheckbox(true)],
+        ["env-container-cpus", makeInput("")],
+        ["env-container-memory", makeInput("")],
+        ["env-http-proxy", makeInput("")],
+        ["env-https-proxy", makeInput("")],
+        ["env-all-proxy", makeInput("")],
+        ["env-no-proxy", makeInput("")],
+      ],
+    });
+    loadScript(ctx, "envconfig.js");
+
+    const body = ctx.buildSaveEnvPayload();
+    expect(body.http_proxy).toBe("");
+    expect(body.https_proxy).toBe("");
+    expect(body.all_proxy).toBe("");
+    expect(body.no_proxy).toBe("");
   });
 });
