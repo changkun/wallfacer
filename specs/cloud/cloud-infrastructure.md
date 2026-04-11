@@ -34,9 +34,12 @@ The latere.ai terraform provisions (all in DigitalOcean, `fra1` region):
 | DNS | DigitalOcean DNS for `latere.ai` | Free |
 | Observability | ClickHouse + OTEL Collector + Grafana (in-cluster) | $0 (runs on existing node) |
 | Container registry | ghcr.io (GitHub Container Registry) | Free tier |
+| File storage service | fs.latere.ai (cold: Spaces/S3, hot: local disk) | Included |
+
+fs.latere.ai is the platform's **user data plane** — a two-tier file storage and workspace service. Cold tier persists files durably in S3; hot tier stages files onto compute nodes for fast I/O. Its Workspace API (`POST /workspaces`, `DELETE /workspaces/{id}`) provides sandboxes with locked, mounted working copies. Wallfacer integrates as a consumer of this API for per-tenant repo storage and sandbox file mounts.
 
 **What latere.ai does NOT currently have:**
-- **Managed PostgreSQL** — needed if wallfacer uses the database storage backend (see Decision Point below)
+- **fs.latere.ai Phase 5 (Workspace API)** — wallfacer needs the workspace endpoints for staging repos to the hot tier before sandbox execution; this API is spec'd but implementation is in progress
 - **RBAC for Job creation** — wallfacer's K8s sandbox backend needs a ServiceAccount with permission to create/watch/delete Jobs and Pods
 - **Dedicated node pool for sandbox pods** — sandbox containers (Claude, Codex) are resource-heavy; running them on the same node as the control plane risks resource contention
 
@@ -49,9 +52,9 @@ The "two layers" model remains correct, but with a key clarification: latere.ai 
 │  Application Layer (wallfacer's K8s manifests)       │
 │                                                      │
 │  wallfacer Deployment ──▶ K8s API (sandbox Jobs)     │
+│                       ──▶ fs.latere.ai (file storage)│
 │                       ──▶ PG or filesystem (tasks)   │
 │                       ──▶ S3 API (blobs)             │
-│                       ──▶ PVC (task data)            │
 │                                                      │
 │  Lives in: wallfacer repo (deploy/)                  │
 └──────────────────────────────┬───────────────────────┘
@@ -86,9 +89,17 @@ The "two layers" model remains correct, but with a key clarification: latere.ai 
 
 ## Decision Point: Storage Backend
 
-Wallfacer's `StorageBackend` interface supports multiple implementations. The choice affects what infrastructure is needed:
+Wallfacer has two storage concerns with different strategies:
 
-### Option A: Filesystem on PVC (start here)
+### Repo / workspace files → fs.latere.ai
+
+Per-tenant repositories, worktrees, and workspace config are managed by fs.latere.ai. Wallfacer's `RepoProvisioner` clones repos onto the hot tier via the Workspace API; sandbox Jobs mount the hot tier path. This replaces the local filesystem's absolute-path workspace model. See `specs/cloud/tenant-filesystem.md` for the full integration design.
+
+### Task metadata and blobs → StorageBackend
+
+Wallfacer's `StorageBackend` interface handles task state, events, and output blobs. Two options:
+
+**Option A: Filesystem on PVC (start here)**
 
 Use `FilesystemBackend` (already implemented) with a PersistentVolumeClaim. Task data lives on a DO Volume mounted into the wallfacer pod.
 
@@ -96,7 +107,7 @@ Use `FilesystemBackend` (already implemented) with a PersistentVolumeClaim. Task
 - **Cons:** Single-pod constraint (ReadWriteOnce volume), no SQL queries across tasks, backup requires volume snapshots
 - **Infrastructure needed:** One PVC (`do-block-storage` StorageClass, ~$0.10/GB/mo)
 
-### Option B: PostgreSQL + S3
+**Option B: PostgreSQL + S3**
 
 Use `DatabaseBackend` (spec'd, not yet implemented) for task metadata and `ObjectStorageBackend` for blobs.
 
@@ -106,7 +117,7 @@ Use `DatabaseBackend` (spec'd, not yet implemented) for task metadata and `Objec
   - Managed DO PostgreSQL (`db-s-1vcpu-1gb`, ~$15/mo) — or in-cluster via CloudNativePG operator
   - Spaces bucket access (already exists: `latere-storage`, or a dedicated bucket)
 
-**Recommendation:** Start with Option A. It requires no new infrastructure and no new backend implementation. Transition to Option B when multi-instance or horizontal scaling is needed.
+**Recommendation:** Start with Option A for task metadata. Repo/workspace files go through fs.latere.ai regardless. Transition task storage to Option B when multi-instance scaling is needed.
 
 ---
 
@@ -197,6 +208,7 @@ Environment variables injected via K8s Secret:
 - `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` — LLM credentials
 - `OPENAI_API_KEY` — for Codex sandbox (optional)
 - `WALLFACER_SERVER_API_KEY` — server auth
+- `FS_LATERE_AI_URL` + `FS_LATERE_AI_TOKEN` — fs.latere.ai endpoint and JWT for Workspace API
 - `DATABASE_URL` — if using PG backend (Option B)
 
 ### 6. Sandbox Image Availability
