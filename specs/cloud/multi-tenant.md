@@ -165,7 +165,7 @@ Minimal changes to the wallfacer server itself:
 | Report health | `GET /api/debug/health` | Already exists; control plane polls this |
 | Graceful hibernate | `internal/cli/server.go` | New signal handler that flushes state and exits cleanly |
 | Cloud storage backend | `internal/store/` | See `foundations/storage-backends.md` |
-| fs.latere.ai integration | `internal/tenant/` | See `cloud/tenant-filesystem.md` — workspace lifecycle, config persistence |
+| fs.latere.ai integration | `internal/repo/` | See `cloud/tenant-filesystem.md` — workspace lifecycle, config persistence |
 | Remote sandbox executor | `internal/runner/executor.go` | See `foundations/sandbox-backends.md` |
 
 ---

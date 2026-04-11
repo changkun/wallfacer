@@ -16,7 +16,7 @@ Foundations (complete)
 
 Local Product                     Cloud Platform
   ◐ Spec Coordination               ○ Cloud Deployment (overview)
-  ✅ Desktop App                     ○ Tenant Filesystem
+  ✅ Desktop App                     ○ Tenant Filesystem (→ fs.latere.ai)
   ○ File/Image Attachments          ○ K8s Sandbox Backend
   ○ Host Mounts                     ○ Cloud Infrastructure
   ○ File Panel Viewer
@@ -259,6 +259,10 @@ graph TB
     PA[Pixel Agents ✅]
   end
 
+  subgraph External [External Dependencies]
+    FS[fs.latere.ai]
+  end
+
   subgraph Cloud [Cloud Platform]
     TFS[Tenant FS]
     K8S[K8s Sandbox]
@@ -276,6 +280,9 @@ graph TB
   FE --> DA
   HT --> DA
   HT --> TS --> CE
+
+  %% External → Cloud
+  FS --> TFS
 
   %% Foundations → Cloud
   SBI --> TFS
@@ -318,8 +325,8 @@ graph TB
 - Oversight, visual verification, live serve are independent — start anytime.
 
 **Within cloud platform:**
-- Tenant filesystem first — repos and worktrees need a cloud home before K8s can mount them.
-- K8s sandbox consumes the tenant volume layout.
+- Tenant filesystem first — integrates with fs.latere.ai for config persistence and hot tier workspace allocation. Prerequisite: fs.latere.ai Phase 5 (Workspace API).
+- K8s sandbox consumes the hot tier workspace layout from tenant FS.
 - Cloud storage (PG, S3) can run in parallel with tenant FS / K8s sandbox.
 - Cloud infrastructure (IaC) is a leaf — provisions managed services.
 - Multi-tenant is the capstone wiring everything together. Tenant API comes after.

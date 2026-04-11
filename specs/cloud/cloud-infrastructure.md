@@ -289,6 +289,6 @@ Tasks 1 and 2 are independent and can proceed in parallel.
 This spec has been rewritten to reflect latere.ai's real infrastructure. The other cloud track specs (`cloud-backends.md`, `tenant-filesystem.md`, `k8s-sandbox.md`, `multi-tenant.md`, `tenant-api.md`) still assume a greenfield, multi-cloud architecture and will need similar alignment. Key shifts:
 
 - **cloud-backends.md**: The "VPS mode" is effectively what we have now (single K8s node). No separate VPS provisioner needed.
-- **tenant-filesystem.md**: Tenant PVC layout should align with the PVC structure defined here.
-- **k8s-sandbox.md**: RBAC and namespace assumptions should match the latere.ai cluster setup.
+- **tenant-filesystem.md**: Integrates with fs.latere.ai for per-tenant storage (cold tier for config persistence, hot tier for runtime workspace). No standalone tenant PVC needed — fs.latere.ai owns storage allocation.
+- **k8s-sandbox.md**: RBAC and namespace assumptions should match the latere.ai cluster setup. Volume mounts point at fs.latere.ai hot tier paths instead of standalone PVCs.
 - **multi-tenant.md**: Control plane runs in the same cluster, not a separate provisioning system.

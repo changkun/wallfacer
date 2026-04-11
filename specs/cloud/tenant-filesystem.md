@@ -236,7 +236,7 @@ Worktree creation logic (`internal/runner/worktree.go`) is unchanged — it call
 
 **Server ↔ sandbox pod access:**
 
-The fs.latere.ai hot tier is a local directory on the compute node. Both the wallfacer server pod and sandbox pods are scheduled on the same node and mount the same hot path. The K8s sandbox backend mounts worktree subdirectories into sandbox pods:
+The fs.latere.ai hot tier is a local directory on the compute node. Three pods must co-locate on the same node: the fs.latere.ai workspace pod (manages the hot tier), the wallfacer server pod, and sandbox pods. If fs.latere.ai runs as a DaemonSet (one per node), this simplifies to a 2-way constraint (wallfacer + sandbox pods). The K8s sandbox backend mounts worktree subdirectories into sandbox pods:
 
 ```
 # Local (current)
