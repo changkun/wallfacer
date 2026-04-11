@@ -288,6 +288,52 @@ latere.ai auth continue using the API key mechanism.
 
 ---
 
+## Remote Control (placeholder)
+
+When a locally-running wallfacer is signed in to latere.ai, the local
+instance is **linked** to the user's latere.ai account. This creates
+the foundation for remote control: the latere.ai web UI (or mobile
+client) can observe and operate a user's local wallfacer instances
+without the user having to expose their machine to the public internet.
+
+This is **not a paid-features gate** — there are no paid features yet.
+It is a placeholder for a capability the auth integration enables:
+identity on both ends of the wire, so a latere.ai control plane can
+reach the right local instance.
+
+### What "linking" means
+
+- The local wallfacer, on successful login, records the user's
+  `principal_id` from the JWT.
+- The local instance registers itself with latere.ai as a reachable
+  target for this principal (mechanism TBD — likely a long-lived
+  outbound connection or periodic heartbeat to avoid requiring any
+  inbound network path on the user's machine).
+- latere.ai maintains a registry of `principal_id → [local instances]`
+  so a request made in the web UI can be routed to the intended
+  instance.
+
+### What this is **not** (yet)
+
+- Not a feature-entitlements system. Signed-in users get the same
+  wallfacer features as anonymous users; the only difference is
+  attribution (`created_by` on tasks/workspaces) and the ability to
+  be reached remotely.
+- Not a session sync mechanism. Local task data stays local unless
+  the user explicitly opts into cloud-backed storage.
+- Not a billing hook. No usage metering is wired through the auth
+  check today.
+
+### Implementation is deferred
+
+The wire protocol, registration flow, and latere.ai-side registry are
+all out of scope for this spec. The auth spec only needs to guarantee
+that when sign-in happens, wallfacer has the identity info it would
+need to register later. Everything else is a follow-up spec once the
+remote-control feature is scoped.
+
+---
+
 ## Configuration
 
 | Variable | Description | Default |

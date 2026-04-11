@@ -17,7 +17,23 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer is a single-user, single-process server. Multiple users cannot share a wallfacer instance — the server has no concept of user identity, and all state (tasks, worktrees, automation loops) is process-global. Cloud deployment for teams requires each user to get their own isolated wallfacer instance.
+Wallfacer is a single-user, single-process server. Multiple users cannot share a wallfacer instance — the server has no concept of user identity, and all state (tasks, worktrees, automation loops) is process-global. To offer wallfacer as a hosted service (so users don't have to install and run it themselves), each user needs their own isolated wallfacer instance on latere.ai's infrastructure.
+
+## Deployment Modes
+
+Authentication (see `specs/shared/authentication.md`) is opt-in at every mode. The deployment question is **where wallfacer runs** and **who manages its lifecycle**:
+
+| Mode | Runs on | Auth | Managed by |
+|------|---------|------|------------|
+| **Local anonymous** | User's machine | None | User |
+| **Local authenticated** | User's machine | Sign in to latere.ai | User (locally), but linked to latere.ai account for remote control |
+| **Cloud hosted** | latere.ai K8s cluster | Required | latere.ai control plane |
+
+Only **cloud hosted** requires the control plane, instance provisioner, traffic router, and hibernation logic described in this spec. The other two modes use the wallfacer binary as-is.
+
+**Local authenticated** is architecturally the same as local anonymous — it's just wallfacer with `AUTH_URL` set. The only addition is that the local instance can register itself with latere.ai as a remote-control target (see auth spec's "Remote Control" section). No spec changes in this track are needed to support it.
+
+This spec covers **cloud hosted mode only**.
 
 ## Architecture: Control Plane + Per-User Instances
 
@@ -50,6 +66,10 @@ The alternative — making the single wallfacer server handle multiple users —
 - User identity propagation through every handler, runner, and store method
 
 This is a near-complete rewrite of the server. The per-instance model avoids all of this by keeping the existing single-user architecture intact and pushing multi-tenancy to the infrastructure layer.
+
+### Relationship to the remote-control placeholder
+
+The remote-control mechanism in `specs/shared/authentication.md` and the cloud-hosted control plane in this spec can share the same latere.ai-side routing logic: in both cases, a request arriving at the latere.ai web UI must be routed to "the wallfacer instance for this user." The difference is only where that instance lives (user's machine vs. latere.ai cluster). When both are eventually implemented, the routing layer is shared.
 
 ---
 
