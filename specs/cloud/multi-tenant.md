@@ -8,7 +8,7 @@ depends_on:
 affects: [internal/handler/, internal/runner/, internal/store/]
 effort: xlarge
 created: 2026-03-23
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -34,7 +34,7 @@ Browser ──HTTPS──▶ Control Plane (auth + routing)
 
 Each instance is a full wallfacer process with its own:
 - In-memory store (`internal/store.Store`)
-- Workspace directories (cloned from user's repos)
+- Workspace directories (cloned from user's repos via fs.latere.ai hot tier)
 - Automation loops (auto-promote, auto-retry, etc.)
 - Container execution (via sandbox executor — see `foundations/sandbox-backends.md`)
 - Data directory (backed by cloud storage — see `foundations/storage-backends.md`)
@@ -112,16 +112,12 @@ Routes authenticated requests to the correct wallfacer instance.
 
 ### 4. Workspace Provisioner
 
-Each instance needs workspace repos on its local filesystem (or mounted volume). This requires:
+Each instance needs workspace repos available for task execution. This integrates with fs.latere.ai and the tenant filesystem's repo provisioner:
 
-- **Initial clone:** When an instance is first created for a user, clone their configured repos
-- **Incremental sync:** On wake-from-hibernate, `git fetch` to pick up new commits
-- **Credential forwarding:** SSH keys or HTTPS tokens for private repos
-
-**Options:**
-- Pre-clone repos to a shared NFS/EFS volume; mount per-instance (fast start, shared storage)
-- Clone on provision (slower start, per-instance storage, simpler isolation)
-- Use git bundles or shallow clones for faster initial provisioning
+- **On provision (login):** Create an fs.latere.ai workspace (config staged from cold tier to hot tier). Clone user's configured repos into the hot path using `RepoProvisioner` with `--filter=blob:none` partial clones.
+- **On wake (from hibernate):** Create a new fs.latere.ai workspace (config re-staged from cold tier). Re-clone repos into the hot path — repos are treated as ephemeral runtime state, not persisted across hibernation.
+- **On hibernate:** Sync config changes to cold tier (`POST /workspaces/{id}/sync`), then destroy the workspace (`DELETE /workspaces/{id}`). Task data is already in cloud storage (PG + S3).
+- **Credential forwarding:** SSH keys or HTTPS tokens injected as K8s Secrets, mounted into the server pod. Managed by the control plane, never stored on the hot tier or cold store.
 
 ---
 
@@ -169,6 +165,7 @@ Minimal changes to the wallfacer server itself:
 | Report health | `GET /api/debug/health` | Already exists; control plane polls this |
 | Graceful hibernate | `internal/cli/server.go` | New signal handler that flushes state and exits cleanly |
 | Cloud storage backend | `internal/store/` | See `foundations/storage-backends.md` |
+| fs.latere.ai integration | `internal/tenant/` | See `cloud/tenant-filesystem.md` — workspace lifecycle, config persistence |
 | Remote sandbox executor | `internal/runner/executor.go` | See `foundations/sandbox-backends.md` |
 
 ---
@@ -180,9 +177,11 @@ Minimal changes to the wallfacer server itself:
 To save resources, idle instances should hibernate (stop the process, persist state to disk/cloud storage). On wake:
 
 1. Control plane detects incoming request for hibernated instance
-2. Provision new instance with same data directory
-3. Wallfacer loads state from cloud storage (see `foundations/storage-backends.md`)
-4. Route traffic to new instance
+2. Provision new instance pod
+3. Wallfacer creates a new fs.latere.ai workspace (config re-staged from cold tier)
+4. Repo provisioner re-clones repos into the hot path
+5. Wallfacer loads task data from cloud storage (see `foundations/storage-backends.md`)
+6. Route traffic to new instance
 
 **Idle detection:** No HTTP requests for N minutes (configurable). The control plane tracks `last_active` per instance.
 
@@ -213,5 +212,7 @@ To save resources, idle instances should hibernate (stop the process, persist st
 
 ### Dependencies on Other Epics
 
-- **Cloud Data Storage** (`foundations/storage-backends.md`): Required for hibernate/wake — instance state must survive process restarts. Without cloud storage, instances lose all task data on restart.
+- **Cloud Data Storage** (`foundations/storage-backends.md`): Required for hibernate/wake — task data must survive process restarts. Without cloud storage, instances lose all task data on restart.
 - **Sandbox Executor** (`foundations/sandbox-backends.md`): Required if instances should not run containers locally. Without it, each instance needs a local container runtime (Docker socket mount), which works but limits density.
+- **Tenant Filesystem** (`cloud/tenant-filesystem.md`): Provides fs.latere.ai integration — config persistence via cold tier, runtime workspace via hot tier, repo provisioner for git operations.
+- **fs.latere.ai** (external): The platform data plane. Provides per-user file storage and workspace hot tier allocation.

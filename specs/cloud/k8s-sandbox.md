@@ -7,7 +7,7 @@ depends_on:
 affects: [internal/sandbox/]
 effort: xlarge
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -27,9 +27,9 @@ The `sandbox.Backend` interface (sandbox backends) already abstracts container l
 ```go
 // K8sBackend implements sandbox.Backend using Kubernetes Jobs.
 type K8sBackend struct {
-    client    kubernetes.Interface
-    namespace string              // per-tenant or shared namespace
-    pvcName   string              // tenant volume PVC name (from tenant filesystem)
+    client       kubernetes.Interface
+    namespace    string // per-tenant or shared namespace
+    hotPathRoot  string // fs.latere.ai workspace hot path (from tenant filesystem)
 }
 ```
 
@@ -48,19 +48,21 @@ type K8sBackend struct {
 
 ### Volume Mount Assembly
 
-The tenant filesystem (tenant filesystem) provides repos and worktrees on a PVC. The K8s backend translates `ContainerSpec.Volumes` into PVC subPath mounts:
+The tenant filesystem (tenant filesystem) provides repos and worktrees on the fs.latere.ai hot tier. The K8s backend translates `ContainerSpec.Volumes` into host path mounts pointing at the hot tier:
 
 ```go
 // Local backend (current):
 //   VolumeMount{Host: "/home/user/.wallfacer/worktrees/<task>/project-a", Container: "/workspace/project-a"}
 //
-// K8s backend:
-//   volumeMount{name: "tenant-vol", subPath: "worktrees/<task>/project-a", mountPath: "/workspace/project-a"}
+// K8s backend (via fs.latere.ai hot path):
+//   VolumeMount{Host: "/hot/<workspace-id>/worktrees/<task>/project-a", Container: "/workspace/project-a"}
 ```
 
-The backend needs to know the tenant volume's mount point to strip host-path prefixes and convert to PVC subPaths. This mapping comes from `K8sBackend` configuration, not from the `ContainerSpec` itself.
+The backend needs to know the fs.latere.ai workspace hot path root to translate host-path prefixes. This comes from `K8sBackend.hotPathRoot`, set at instance startup when the fs.latere.ai workspace is created.
 
-Other mounts (instructions file, board context, sibling worktrees) follow the same pattern — all are subpaths of the tenant PVC.
+Other mounts (instructions file, board context, sibling worktrees) follow the same pattern — all are subdirectories of the hot tier workspace.
+
+Since the hot tier is local disk on the compute node, both the wallfacer server pod and sandbox pods must be scheduled on the same node. This is the same node-affinity constraint as the original PVC design, but managed by fs.latere.ai rather than a standalone PVC.
 
 ### Handle Implementation
 
@@ -113,11 +115,11 @@ Optional: per-tenant resource quotas via K8s `ResourceQuota` objects (multi-tena
 
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
-| 1 | Implement `K8sBackend.Launch()` — Job creation with PVC mounts | Tenant FS | Large |
+| 1 | Implement `K8sBackend.Launch()` — Job creation with hot tier mounts | Tenant FS | Large |
 | 2 | Implement `k8sHandle` — Wait, Stop, State via pod watch | 1 | Medium |
 | 3 | Implement `k8sHandle.Logs()` — streaming pod logs | 2 | Small |
 | 4 | Implement `k8sHandle.Exec()` — exec into running pod | 2 | Medium |
-| 5 | Volume mount translation — host paths to PVC subPaths | Tenant FS | Medium |
+| 5 | Volume mount translation — host paths to fs.latere.ai hot tier paths | Tenant FS | Medium |
 | 6 | Network policy support — apply deny-all for `Network: "none"` | 1 | Small |
 | 7 | Image management API — adapt `GET /api/images` for K8s | 1 | Small |
 | 8 | Add `k8s` as `WALLFACER_SANDBOX_BACKEND` value; config wiring | 1 | Small |
@@ -130,11 +132,11 @@ Optional: per-tenant resource quotas via K8s `ResourceQuota` objects (multi-tena
 ## Dependencies
 
 - **Sandbox Backend Interface** — complete. Implements `sandbox.Backend` and `sandbox.Handle`.
-- **Tenant Filesystem** — provides the PVC layout (repos, worktrees, config) that this backend mounts into pods.
+- **Tenant Filesystem** — provides the fs.latere.ai hot tier layout (repos, worktrees, config) that this backend mounts into pods.
 
 ## What depends on this
 
-- **Multi-Tenant** — the control plane configures `K8sBackend` per tenant (namespace, PVC name, resource quotas).
+- **Multi-Tenant** — the control plane configures `K8sBackend` per tenant (namespace, hot path root, resource quotas).
 
 ## Deferred: Remote Docker Backend
 

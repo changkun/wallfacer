@@ -136,9 +136,9 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [cloud-backends.md](cloud/cloud-backends.md) | Not started | Overview: VPS recipe, per-user instance architecture, sub-milestone index |
-| [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | Per-tenant persistent volume, repo provisioner, workspace group cloud mapping |
-| [k8s-sandbox.md](cloud/k8s-sandbox.md) | Not started | `K8sBackend` — K8s Jobs with PVC mounts, pod log streaming, exec |
-| [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | Per-provider IaC modules (DO, AWS, GCP, Alibaba, self-hosted) |
+| [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | fs.latere.ai integration, repo provisioner, workspace group cloud mapping |
+| [k8s-sandbox.md](cloud/k8s-sandbox.md) | Not started | `K8sBackend` — K8s Jobs with fs.latere.ai hot tier mounts, pod log streaming, exec |
+| [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
 | [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle |
 | [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
 
@@ -146,7 +146,8 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 
 ```mermaid
 graph LR
-  SBI[Sandbox Interface ✅] --> TFS[Tenant FS]
+  FS[fs.latere.ai ext] --> TFS[Tenant FS]
+  SBI[Sandbox Interface ✅] --> TFS
   STI[Storage Interface ✅] --> TFS
   TFS --> K8S[K8s Sandbox]
   STI --> CS[Cloud Storage]
@@ -158,6 +159,7 @@ graph LR
 
   style SBI fill:#d4edda,stroke:#28a745
   style STI fill:#d4edda,stroke:#28a745
+  style FS fill:#e8daef,stroke:#8e44ad
 ```
 
 ### Scaling strategy
@@ -165,7 +167,7 @@ graph LR
 Two modes, no intermediate step:
 
 1. **VPS (today):** Single VM, single user, filesystem storage, local containers.
-2. **K8s (when scaling):** Managed K8s. Each tenant gets a wallfacer pod + PVC. Task containers dispatch as K8s Jobs.
+2. **K8s (when scaling):** Managed K8s. Each tenant gets a wallfacer pod + fs.latere.ai workspace. Task containers dispatch as K8s Jobs mounting the hot tier.
 
 Why no VM-per-tenant intermediate? The wallfacer binary is identical in both modes. Building a VM provisioner then replacing it with K8s is wasted work. See [cloud-backends.md](cloud/cloud-backends.md) for cost estimates.
 

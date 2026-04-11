@@ -5,7 +5,7 @@ depends_on: []
 affects: [deploy/]
 effort: large
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -51,7 +51,7 @@ When the business grows beyond a single user, deploy directly to K8s. Each tenan
    ┌────────▼────────┐   ┌────────▼────────┐   ┌────────▼────────┐
    │  Tenant A Pod    │   │  Tenant B Pod    │   │  Tenant C Pod    │
    │  wallfacer :8080 │   │  wallfacer :8080 │   │  wallfacer :8080 │
-   │  + tenant PVC    │   │  + tenant PVC    │   │  + tenant PVC    │
+   │  + fs.latere.ai  │   │  + fs.latere.ai  │   │  + fs.latere.ai  │
    └────────┬────────┘   └────────┬────────┘   └────────┬────────┘
             │                      │                      │
             └──────────────────────┼──────────────────────┘
@@ -68,8 +68,8 @@ Per instance, the layers connect as:
 | Layer | Component | Storage |
 |-------|-----------|---------|
 | **Task data** (metadata, events, blobs) | `StorageBackend` | PostgreSQL + S3 |
-| **Filesystem** (repos, worktrees, config) | Tenant volume | PVC per tenant |
-| **Sandbox execution** | `K8sBackend` | K8s Jobs mounting tenant PVC |
+| **Filesystem** (repos, worktrees, config) | fs.latere.ai | Cold tier (S3) + hot tier (local disk) |
+| **Sandbox execution** | `K8sBackend` | K8s Jobs mounting fs.latere.ai hot path |
 | **Identity & lifecycle** | Control plane | Control plane DB |
 
 **Why skip VM-per-tenant?** The wallfacer binary doesn't change between modes — the same code runs on a VM or in a K8s pod. A VM-per-tenant intermediate step would require building a VM provisioner in the control plane, then throwing it away when migrating to K8s. Going straight to K8s avoids that wasted work. On DigitalOcean, DOKS control plane is free, so the cost premium over VPS is ~$32/mo (managed PG + Spaces + LB) — worth it to avoid a migration.
@@ -89,18 +89,21 @@ Per instance, the layers connect as:
 
 | Sub-milestone | Spec | Delivers |
 |---------------|------|----------|
-| **Tenant Filesystem** | [tenant-filesystem.md](tenant-filesystem.md) | Per-tenant PVC, repo provisioner, workspace group cloud mapping, config persistence across hibernate/wake |
-| **K8s Sandbox Backend** | [k8s-sandbox.md](k8s-sandbox.md) | `K8sBackend` implementing `sandbox.Backend` — dispatches containers as K8s Jobs with PVC mounts |
+| **Tenant Filesystem** | [tenant-filesystem.md](tenant-filesystem.md) | fs.latere.ai integration, repo provisioner, workspace group cloud mapping, config persistence via Files API |
+| **K8s Sandbox Backend** | [k8s-sandbox.md](k8s-sandbox.md) | `K8sBackend` implementing `sandbox.Backend` — dispatches containers as K8s Jobs with hot tier mounts |
 | **Cloud Infrastructure** | [cloud-infrastructure.md](cloud-infrastructure.md) | Per-provider IaC modules (DO first, then AWS/GCP/Alibaba/self-hosted) |
 | **Cloud Storage** | [storage-backends.md](../foundations/storage-backends.md) (tasks 4–8) | PostgreSQL + S3 backends for task data, composite backend, migration tool |
 
 ```
-                     Tenant Filesystem
-                    (repos, PVC, config)
-                            │
-                            ▼
+               fs.latere.ai (external)
+                    │
+                    ▼
+                Tenant Filesystem
+             (repos, config, hot tier)
+                    │
+                    ▼
 Sandbox Interface ──────▶ K8s Sandbox ──────▶ Multi-Tenant
-                    (Jobs, PVC mounts)              ▲
+                  (Jobs, hot tier mounts)          ▲
                                                     │
 Storage Interface ──────▶ Cloud Storage (PG, S3) ──────────────┤
                     (PG, S3, migration)             │
