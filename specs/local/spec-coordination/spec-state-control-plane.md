@@ -115,9 +115,15 @@ All priorities below obey these rules.
 itself already runs; extract the set of modified spec paths from
 `git diff --name-only HEAD^ HEAD`.
 
-**Action:** for each spec the round modified, compute its reverse-dependency
-set (`dag.ReverseEdges(Adjacency(tree))`) and transition every non-archived
-dependent toward `stale`. `Adjacency` already omits archived sources/sinks.
+**Action:** for each spec the round modified, compute its impact set via
+both channels of the propagation algorithm (see *Stale Propagation
+Algorithm* below) and transition every member to `stale`:
+- **Channel 1 — `depends_on` reverse traversal** (`dag.ReverseEdges`)
+- **Channel 2 — `affects` overlap** (`AffectsImpactFromSpec` — no code
+  diff is available here because the planning round commits to `specs/`
+  only, so we fall back to the source spec's declared affects)
+
+`Adjacency` and the affects index both omit archived specs already.
 
 **Drift assessment on chat edits.** The chat edit is a design change on
 the upstream spec; dependents may or may not still hold. In the absence of
@@ -232,9 +238,15 @@ a background goroutine when a dispatched task reaches `done`.
    - **Significant drift** (<70% satisfied) → `validated → stale`
      directly. Task can be re-dispatched after `/wf-spec-refine`.
 
-4. **Fan out.** For moderate/significant drift, transition every
-   non-archived dependent to `stale` using the same shared helper as
-   Priority 1.
+4. **Fan out.** For moderate/significant drift, transition impacted
+   specs to `stale` using `FanOutStale` from the propagation algorithm.
+   Both channels run here:
+   - **Channel 1 — `depends_on` reverse traversal.**
+   - **Channel 2 — `affects` overlap using the task's actual diff**
+     (`AffectsImpactFromDiff`): for every file in the task's
+     `git diff --name-only`, find every non-archived spec whose `affects`
+     contains that file. This is more precise than channel 2 in P1 — we
+     use the actual changes, not the declared affects.
 
 5. **Commit.** Stage the modified spec(s) and commit with subject
    `<path>: mark complete` or `<path>: mark stale (drift: <level>)`. Git
@@ -415,6 +427,272 @@ receive propagation.
 
 ---
 
+## Stale Propagation Algorithm
+
+Staleness propagates through **two complementary channels**. Both run on
+every fan-out event; results are unioned and deduplicated before applying
+transitions.
+
+### Channel 1 — Explicit dependency (`depends_on`)
+
+Author intent: "my design hinges on yours." When a spec's state changes
+materially, every live spec that transitively depends on it needs review.
+
+Already solved by `internal/spec/impact.go`:
+
+- `Adjacency(tree)` — forward adjacency (spec → its `depends_on` targets),
+  with archived specs pruned as both sources and sinks.
+- `dag.ReverseEdges(Adjacency(tree))` — the reverse index (spec → specs
+  that depend on it).
+
+**Query:** given the source `sourcePath`, return
+`reverse[sourcePath]` minus archived specs. O(1) per lookup after the
+reverse index is built; reverse-index build is O(S·A) where S = specs and
+A = avg `depends_on` count.
+
+### Channel 2 — Implicit code coupling (`affects`)
+
+Physical reality: "we both touch this file; your change could invalidate
+my assumptions." `depends_on` is manually declared and therefore often
+incomplete; the `affects` overlap catches couplings the authors forgot to
+encode.
+
+#### 2a. Normalization
+
+`affects` entries can be files (`internal/runner/execute.go`) or
+directories (`internal/sandbox/`). Normalize before comparison:
+
+```
+normalize(e) = strings.TrimRight(filepath.ToSlash(e), "/")
+```
+
+So `internal/sandbox/` and `internal/sandbox` collapse to the same key.
+
+#### 2b. Containment (the only interesting case)
+
+Two entries overlap if they point at the same file or one contains the
+other. Let `a` and `b` be normalized entries. Define:
+
+```
+contains(dir, path) = (dir == path) || strings.HasPrefix(path, dir + "/")
+overlaps(a, b)      = contains(a, b) || contains(b, a)
+```
+
+Examples:
+- `internal/sandbox/` overlaps with `internal/sandbox/backend.go` (dir
+  contains file).
+- `internal/sandbox/local/` overlaps with `internal/sandbox/` (nested
+  dir contained by outer).
+- `internal/sandbox/backend.go` does **not** overlap with
+  `internal/sandbox/handle.go` (sibling files in the same dir).
+- `internal/` overlaps with `internal/sandbox/` (broad dir swallows
+  everything — handled via the "too-broad" policy in §2e below).
+
+#### 2c. Indexes
+
+Two passes over the tree (skipping archived specs):
+
+```
+# Forward: spec → affects entries (already in frontmatter; just a view)
+specToAffects: map[SpecPath] []normalizedEntry
+
+# Reverse: affects entry → specs that declared it
+affectsToSpecs: map[normalizedEntry] Set[SpecPath]
+```
+
+Build: O(S · A) where A = avg affects count. Recomputed on every tree
+load; not cached — cheaper than staleness-checking the cache.
+
+**Containment matters for queries**, so `affectsToSpecs` keyed on exact
+strings is not sufficient by itself. Two strategies:
+
+- **Linear scan (ship-now, good at current scale).** Keep
+  `affectsToSpecs` for exact matches. For containment queries, iterate
+  `affectsToSpecs.keys()` and apply `overlaps(query, key)`. At 215 specs
+  and ~3 affects per spec (~650 entries), each query is ~650 prefix
+  comparisons — sub-millisecond.
+- **Path trie (defer until it matters).** Insert every normalized entry
+  into a trie keyed by path components (`internal → spec → validate.go`).
+  For a query `q`:
+  1. Walk the trie to the node for `q`, collecting specs at every visited
+     node (those are ancestor directories of `q` that contain it).
+  2. Then walk the entire subtree under `q`, collecting specs at every
+     descendant node (those are files/dirs `q` contains).
+  Query cost: O(D + |results|) where D = path depth.
+
+Ship the linear scan. Upgrade to the trie only when profiling shows the
+scan dominates a fan-out.
+
+#### 2d. Impact query — two entry points
+
+The fan-out event determines which query runs.
+
+**Entry A — "a code change happened"** (used by P3 task-done):
+
+The task's actual diff gives us changed files directly. For each changed
+file, find every spec whose `affects` contains it.
+
+```
+func AffectsImpactFromDiff(tree *Tree, changedFiles []string, sourcePath string) []string:
+    out = Set{}
+    for f in changedFiles:
+        fn = normalize(f)
+        for entry, specs in affectsToSpecs(tree):
+            if contains(entry, fn):
+                for s in specs:
+                    if s == sourcePath: continue
+                    if tree.At(s).Status == StatusArchived: continue
+                    out.add(s)
+    return sorted(out)
+```
+
+This is the **precise** path: it uses the actual files modified, not the
+declared affects of the source spec. A task that was supposed to touch
+`runner.go` but actually also touched `container.go` correctly impacts
+every spec that covers either file.
+
+**Entry B — "a spec's intent changed, no code diff"** (used by P1 chat
+edits, when a planning round modifies only `specs/` paths):
+
+No code diff available; fall back to the source spec's declared affects.
+
+```
+func AffectsImpactFromSpec(tree *Tree, sourcePath string) []string:
+    source = tree.At(sourcePath)
+    if source == nil || source.Status == StatusArchived: return []
+    out = Set{}
+    for e in source.Affects:
+        en = normalize(e)
+        for entry, specs in affectsToSpecs(tree):
+            if overlaps(en, entry):
+                for s in specs:
+                    if s == sourcePath: continue
+                    if tree.At(s).Status == StatusArchived: continue
+                    out.add(s)
+    return sorted(out)
+```
+
+Note the use of `overlaps` (symmetric) rather than `contains` —
+directory/file relationships can go either way when matching spec-vs-spec.
+
+#### 2e. "Too broad" affects
+
+A spec that lists `internal/` would impact every spec under `internal/`.
+Legitimate in rare cases (an umbrella refactor); usually a smell.
+
+**Policy:**
+- No hard cap — the algorithm treats broad entries correctly.
+- Validator warning (`affects-too-broad`) when a spec's affects entry
+  matches >20 other specs. Lives with the existing affects-exist rule in
+  `validate.go`. Advisory only.
+- Runtime: log when a single fan-out impacts >20 specs, so operators can
+  spot accidental mass-staleness.
+
+### Channel 3 — Filesystem ancestors (already built-in)
+
+Upward tree propagation on drift badges (P3): covered by the existing
+`spec-document-model/progress-tracking.md` walker — no new algorithm
+needed. Propagation stops at the first archived ancestor.
+
+### Unified fan-out
+
+P1 and P3 both call the same helper; the difference is which impact
+functions they invoke:
+
+```
+func FanOutStale(tree *Tree, impacted []string) []string:
+    applied = []
+    for path in sorted(impacted):
+        node = tree.At(path)
+        if node == nil || node.Value == nil:            continue
+        if node.Value.Status == StatusArchived:         continue
+        if StatusMachine.Validate(
+               node.Value.Status, StatusStale) != nil:  continue  # same-to-same, illegal
+        UpdateFrontmatter(node.absPath, {status: stale, updated: now})
+        applied.append(path)
+    return applied
+```
+
+P1 (chat edit on `sourcePath`, only spec files touched):
+
+```
+impacted = DependsOnImpact(tree, sourcePath)
+         ∪ AffectsImpactFromSpec(tree, sourcePath)
+FanOutStale(tree, impacted)
+```
+
+P3 (task done on `sourcePath`, task diff = `changedFiles`):
+
+```
+impacted = DependsOnImpact(tree, sourcePath)
+         ∪ AffectsImpactFromDiff(tree, changedFiles, sourcePath)
+FanOutStale(tree, impacted)
+```
+
+### Idempotency and convergence
+
+- `FanOutStale` only writes when the transition is legal. Already-stale
+  and archived specs are silently skipped — same-to-same rejected by
+  `StatusMachine.Validate`.
+- Status-only writes (the stale transitions themselves) do **not** touch
+  code, so they don't trigger further `affects`-based fan-out. There is
+  no cascade risk.
+- `depends_on` propagation is **single-hop per event**: we mark direct
+  dependents stale. If B depends on A, and C depends on B, then:
+  - Task done on A → B stale (direct dependent of A).
+  - C stays as-is — B became stale via a status write, not an event.
+  - When B is refined and re-dispatched, C will be flagged at B's
+    completion.
+  Multi-hop propagation would cascade too aggressively ("everyone
+  downstream is stale"); rely on the explicit chain of events instead.
+
+### Complexity summary
+
+| Step | Cost | Notes |
+|---|---|---|
+| Build `Adjacency` reverse index | O(S · A_dep) | S = specs, A_dep = avg `depends_on` count |
+| Build `affectsToSpecs` | O(S · A_aff) | A_aff = avg `affects` count |
+| `DependsOnImpact` | O(\|out\|) | reverse map lookup |
+| `AffectsImpactFromDiff`, linear scan | O(F · E) | F = changed files, E = total affects entries |
+| `AffectsImpactFromSpec`, linear scan | O(A_src · E) | A_src = source spec's affects count |
+| `FanOutStale` | O(\|impacted\| · I/O) | one `UpdateFrontmatter` call per spec |
+
+At current scale (S ≈ 215, E ≈ 650, F ≈ 20 for a typical task), a P3
+fan-out runs in single-digit milliseconds outside the I/O. Upgrade to a
+trie only when the scan becomes a hotspot.
+
+### Edge cases worth calling out
+
+1. **Sibling files never overlap.** `execute.go` and `container.go` in
+   the same directory do not trigger mutual staleness — good. The
+   umbrella directory, if any spec declares it, does.
+2. **Diamond overlap.** A, B, C all declare the same file in affects.
+   Task done on A marks B and C stale. Task done on B later marks C
+   stale again (already stale — no-op). No cycles because `StatusMachine`
+   rejects same-to-same.
+3. **Non-existent files in `affects`.** Allowed — the spec may describe
+   future code. The affects-exist warning already flags these, but the
+   propagation algorithm still works: containment doesn't care if the
+   path exists.
+4. **Trailing-slash inconsistency.** `normalize` handles it.
+5. **Case sensitivity.** Match case-sensitively. The repo is
+   case-sensitive (Linux + macOS with CI) so this is correct. Document
+   it; no special handling.
+6. **Renames.** If a task renames `foo.go` → `bar.go`, both appear in
+   the diff (`--name-only` includes both sides of renames when using
+   `-M`). Every spec touching either pre- or post-rename file is
+   impacted.
+7. **Deletions.** A deleted file's spec coverage is still meaningful —
+   the deletion is a change. Deletions appear in `--name-only` the same
+   way.
+8. **Empty `affects`.** Source spec with empty affects → channel 2 yields
+   nothing; only channel 1 runs. Fine.
+9. **Self-impact.** `sourcePath` is always excluded from the result set
+   (explicit skip). The source spec's own status is handled by the
+   triggering event (P3's `complete`/`stale` verdict), not by fan-out.
+
+---
+
 ## The `affects` Field
 
 The `affects` field maps specs to code — the edge drift uses to connect
@@ -485,7 +763,9 @@ Priority 5 reuses the same badge.
 | `internal/apicontract/routes.go` | P4 | Route entry for `POST /api/specs/validate` |
 | `internal/handler/explorer.go` | P3 | Propagate drift indicators to non-archived ancestors in tree response |
 | `internal/handler/tasks.go` | P5 | Workspace-load periodic scan hook |
-| Shared fan-out helper | P1, P3 | `FanOutStale(tree, completedPath) error` in `internal/spec/` |
+| `internal/spec/impact.go` | P1, P3 | Extend with `BuildAffectsIndex(tree)`, `AffectsImpactFromDiff(tree, files, source)`, `AffectsImpactFromSpec(tree, source)`; add the `normalize`/`overlaps`/`contains` helpers |
+| Shared fan-out helper | P1, P3 | `FanOutStale(tree, impacted)` in `internal/spec/` — idempotent, skip archived and illegal transitions |
+| `internal/spec/validate.go` | Channel 2 | New advisory rule `affects-too-broad` (fires when a single affects entry matches >20 other specs) |
 | `ui/partials/spec-mode.html` | P4 | Validate button in the focused-view toolbar |
 | `ui/js/spec-explorer.js` | P3, P5 | Render drift indicators (reuses `stale` icon); suppress for archived |
 | `ui/js/spec-mode.js` | P3, P4 | Inline drift warning in focused view with "Refine" / "Accept" (P3); Validate button wiring (P4) |
