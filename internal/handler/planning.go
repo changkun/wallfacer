@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,10 +13,53 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/planner"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/spec"
 	"changkun.de/x/wallfacer/internal/store"
 )
+
+// selectPlanningSystemPrompt returns the planning-agent prompt prefix
+// appropriate for the current workspace state: the "empty" variant when
+// no non-archived parseable specs exist across any mounted workspace,
+// the "nonempty" variant otherwise. Evaluated per-turn (not cached)
+// so archiving or unarchiving a spec takes effect on the very next
+// message.
+//
+// Archived specs do not count toward the non-empty condition: a repo
+// where every spec has been archived still reads as "empty" from the
+// agent's perspective, keeping the `/spec-new` encouragement active.
+// Unparseable spec files (broken frontmatter) are silently dropped by
+// BuildTree and therefore also don't count, which matches the
+// chat-first-mode spec's definition of an "effectively empty" tree.
+func selectPlanningSystemPrompt(workspaces []string) string {
+	activeCount := 0
+	for _, ws := range workspaces {
+		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
+		if err != nil {
+			continue // no specs/ directory — treat as empty
+		}
+		for _, node := range tree.All {
+			if node.Value == nil {
+				continue
+			}
+			if node.Value.Status == spec.StatusArchived {
+				continue
+			}
+			activeCount++
+			if activeCount > 0 {
+				break
+			}
+		}
+		if activeCount > 0 {
+			break
+		}
+	}
+	if activeCount == 0 {
+		return prompts.PlanningSystemEmpty()
+	}
+	return prompts.PlanningSystemNonempty()
+}
 
 // archivedSpecGuard returns a system-prompt prefix to prepend when the focused
 // spec is archived, instructing the chat agent to refuse writes. Returns the
@@ -180,6 +224,13 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.FocusedSpec != "" && !strings.HasPrefix(req.Message, "/") {
 		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + prompt
+	}
+	// Prepend the planning-agent system prompt chosen per-turn based on
+	// whether the spec tree is effectively empty (no non-archived
+	// specs). Comes before archivedSpecGuard so a focused-archived-spec
+	// warning sits closest to the user prompt.
+	if prefix := selectPlanningSystemPrompt(h.currentWorkspaces()); prefix != "" {
+		prompt = prefix + "\n\n" + prompt
 	}
 	if guard := archivedSpecGuard(h.currentWorkspaces(), req.FocusedSpec); guard != "" {
 		prompt = guard + prompt
