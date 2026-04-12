@@ -1,6 +1,6 @@
 ---
 title: Spec Archival
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-document-model.md
   - specs/local/spec-coordination/spec-planning-ux/spec-explorer.md
@@ -9,11 +9,16 @@ depends_on:
 affects:
   - internal/spec/
   - internal/handler/specs.go
-  - internal/handler/explorer.go
+  - internal/handler/planning.go
   - ui/js/spec-mode.js
   - ui/js/spec-explorer.js
+  - ui/js/spec-minimap.js
   - ui/css/spec-mode.css
+  - ui/partials/spec-mode.html
+  - ui/partials/explorer-panel.html
   - specs/README.md
+  - .claude/skills/wf-spec-validate/skill.md
+  - .claude/skills/wf-spec-status/skill.md
 effort: medium
 created: 2026-04-12
 updated: 2026-04-12
@@ -206,6 +211,137 @@ Archival and unarchival are status transitions that should be undoable. Note: [s
 - Archived specs do not count toward a track's in-progress / complete progress totals.
 
 If a CLI regeneration tool is later added (per the Open Question in `spec-planning-ux.md` about entry-point staleness), it should respect the same defaults: archived is hidden unless explicitly requested.
+
+---
+
+## Outcome
+
+Archival is shipped end-to-end: a sixth `archived` lifecycle state lives in the
+state machine, every read-side subsystem (validation, impact, progress,
+dispatch, chat agent) treats archived specs as below-glass, and the focused
+view + explorer UI let users archive/unarchive with a banner, cascading
+subtree behaviour, and git-backed undo. The existing user has already
+archived 8 completed top-level specs using the shipped UI.
+
+### What Shipped
+
+- **`internal/spec/`**: `StatusArchived` constant; four new state-machine
+  edges (`drafted|complete|stale → archived`, `archived → drafted`);
+  `ValidStatuses()` returns 6 values.
+- **`internal/spec/validate.go`**: `body-not-empty` and `affects-exist` skip
+  archived; `status-consistency` and `stale-propagation` skip archived
+  non-leaves and archived sinks; new `checkArchivedDependencies` emits a
+  `dependency-is-archived` advisory.
+- **`internal/spec/impact.go`**: `Adjacency` prunes archived sources/sinks;
+  `ComputeImpact` returns empty `Impact` for archived targets;
+  `collectLeafPaths` prunes archived subtrees; `UnblockedSpecs` skips
+  archived candidates; `allDepsComplete` counts archived deps as satisfied.
+- **`internal/spec/progress.go`**: `NodeProgress` excludes archived leaves
+  and masks archived subtrees.
+- **`internal/handler/specs.go`**: two new HTTP endpoints —
+  `POST /api/specs/archive` (cascades over the subtree, commits with subject
+  `<path>: archive (1 + N descendants)`), `POST /api/specs/unarchive`
+  (finds the archive commit via `git log --grep` and runs `git revert`;
+  falls back to single-spec `archived → drafted` when no commit is found).
+- **`internal/handler/specs_dispatch.go`**: archived specs rejected with
+  "unarchive the spec first"; archived `depends_on` targets skipped (no
+  blocker edge on the resulting kanban task).
+- **`internal/handler/planning.go`**: `archivedSpecGuard()` prepends a
+  "do not modify archived spec" instruction to the planning chat prompt
+  when the focused spec is archived.
+- **Frontend (`ui/js/spec-mode.js`, `ui/js/spec-explorer.js`,
+  `ui/js/spec-minimap.js`, `ui/css/spec-mode.css` and partials)**:
+  - Explorer: status icon (📦), `_showArchived` localStorage toggle,
+    "Show archived" checkbox in the header, muted `spec-node--archived`
+    rendering, force-collapse on reveal, `incomplete` filter excludes
+    archived, `archived` option in the status filter dropdown.
+  - Minimap: archived neighbours hidden unless opted in; archived nodes
+    rendered with dashed outline; edges touching archived nodes dashed.
+  - Focused view: archived banner, Archive/Unarchive toolbar buttons
+    with lifecycle-aware visibility, non-leaf confirmation dialog,
+    stacked bottom-right toasts with per-toast Undo + × close.
+- **Skills & README**: `wf-spec-validate` and `wf-spec-status` list
+  `archived` and document skip conditions; `specs/README.md` six-state
+  lifecycle reference; `spec-document-model/*` subtree refreshed additively.
+
+### Tests
+
+- Backend: 128→136 `internal/spec/` tests (+8 archived: lifecycle,
+  validation, impact, progress); new handler tests for
+  `TestArchiveSpec_*`, `TestUnarchiveSpec_*`, `TestArchiveSpec_CascadeAndRevert`,
+  `TestArchivedSpecGuard`, `TestDispatch_Archived*`.
+- Frontend: new vitest suites `spec-mode-archive.test.js` (9 cases),
+  `spec-archived-banner-css.test.js` (2 cases); archived-specific tests
+  added to `spec-explorer.test.js` and `spec-minimap.test.js`.
+
+### Design Evolution
+
+1. **Unarchive via `git revert`, not `pre_archive_status` frontmatter field.**
+   The spec left open how to restore pre-archive statuses after cascading
+   archival. User proposal: since archive already commits, unarchive can
+   locate that commit and revert it. Implemented in
+   `internal/handler/specs.go` (commits `687ff93`, `9d7e566`): archive
+   emits a commit with subject prefix `<path>: archive`; unarchive greps
+   the log, runs `git revert --no-edit`, and falls back to single-spec
+   `archived → drafted` when no matching commit exists (spec was archived
+   by hand). Lossless, needs no extra frontmatter field.
+
+2. **Cascading archive, non-cascading initial design.** The spec's
+   Open Question #4 tentatively preferred non-cascading archival — hide
+   descendants via below-glass masking, not by changing their status.
+   User judged this counterintuitive: clicking Archive on a parent should
+   archive the whole subtree visually AND in status. Archive now walks
+   the companion directory and sets every descendant's status to
+   `archived` in one commit; unarchive reverses the whole cascade.
+
+3. **Archive/unarchive auto-commits to git.** The spec didn't require
+   commits; dispatch and other frontmatter mutations don't commit. User
+   pointed out that clicking Archive otherwise leaves the working tree
+   dirty. `commitSpecChanges()` / `commitSpecTransition()` wrap every
+   status write in a git add + commit (non-fatal on non-git workspaces).
+   Commit `687ff93`.
+
+4. **Chat agent guard lives in `internal/handler/planning.go`, not
+   `internal/planner/spec.go`.** The spec listed `internal/planner/spec.go`
+   as the affects path, but that file is the container-spec builder and
+   has nothing to do with prompt assembly. Prompt assembly happens in
+   the handler's `SendPlanningMessage`; `archivedSpecGuard()` prepends the
+   read-only instruction there. Commit `9214aaf`.
+
+5. **Stacking toast notifications.** The spec's "Undo" section prescribed
+   a single dismissable toast. User wanted multiple archive actions to
+   stack rather than overwrite each other, each with its own Undo + close.
+   `_showArchiveToast()` now creates a new DOM element per call and
+   appends to a fixed-position `.spec-archive-toasts` container. Commit
+   `687ff93`.
+
+6. **README auto-landing view had leaking affordances (bug fix).**
+   When no spec is focused, `_showSpecReadme()` renders `specs/README.md`
+   as the default content. It cleared the header metadata but not the
+   new Archive/Unarchive buttons or archived banner, so stale UI state
+   from a previously-focused archived spec "stuck" to the README view.
+   Fix in commit `9798a96`; regression test in `04daf70`.
+
+7. **Archived banner CSS specificity bug (bug fix).**
+   `.spec-archived-banner { display: flex; }` had the same specificity as
+   the global `.hidden { display: none; }` utility and loaded later — the
+   utility class was effectively a no-op. Added a higher-specificity
+   `.spec-archived-banner.hidden { display: none; }` override. Fix +
+   regression test in commit `0c69faca`.
+
+8. **Additional scope expansion (documentation).** Implementation touched
+   two files not listed in `affects`: `ui/js/spec-minimap.js` (archived
+   nodes + dashed edges, per spec item 8 of explorer-ux.md) and
+   `ui/partials/spec-mode.html` + `ui/partials/explorer-panel.html`
+   (banner, toolbar buttons, toast container, "Show archived" checkbox).
+   Affects list updated in this wrap-up commit.
+
+9. **Deferred items.** Open Question #2 (auto-archival on long inactivity),
+   Open Question #3 (archived spec resurfacing via "see also"), the
+   "spec explorer context menu" affordance (focused-view-ux.md item 4.2),
+   and the "archive/unarchive chat slash commands" (item 4.3) are out of
+   scope — the toolbar button + bulk-dispatch workflow cover the primary
+   cases. Add as follow-ups if usage shows they're needed.
 
 ---
 
