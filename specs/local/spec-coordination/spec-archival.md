@@ -105,11 +105,12 @@ Cross-spec rules (see `spec-document-model/cross-spec-validation.md`):
 
 ## Impact Analysis
 
-In `internal/spec/impact.go`:
+In `internal/spec/impact.go` (current functions: `Adjacency`, `ComputeImpact`, `UnblockedSpecs`, `allDepsComplete`):
 
-- `BuildReverseIndex` skips archived specs both as sources (no outbound edges contributed) and as sinks (no entry created in the reverse map). Effectively: archived specs are invisible to the reverse index.
-- `ComputeImpact(tree, specPath)` on an archived spec returns an empty `Impact` (no direct, no transitive). Documented explicitly: archival is the signal that nothing further should compute from this spec.
-- `UnblockedSpecs(tree, completedPath)` does not surface archived candidates. Archiving does **not** unblock downstream work — if you want to unblock, use `complete`.
+- **`Adjacency(tree)`** builds the forward dependency map; when constructing it, skip archived specs as both sources (their `depends_on` edges contribute nothing) and targets (no entry is created for them). Effectively: archived specs are invisible to any reverse traversal built on top of this map.
+- **`ComputeImpact(tree, specPath)`** on an archived spec returns an empty `Impact` (no direct, no transitive). Documented explicitly: archival is the signal that nothing further should compute from this spec.
+- **`UnblockedSpecs(tree, completedPath)`** does not surface archived candidates. Archiving does **not** unblock downstream work — if you want to unblock, use `complete`.
+- **`allDepsComplete`** helper: treat an archived dependency as already satisfied (same semantics as `complete`) so that live specs depending on an archived spec are not held back.
 - Non-leaf impact expansion (a non-leaf's impact includes dependents of its leaves): an archived non-leaf prunes its entire subtree from this expansion.
 
 The underlying principle: archival means "this node is not in the live graph." Any query that walks the graph treats archived nodes as absent.
@@ -192,7 +193,7 @@ Extends [spec-planning-ux.md](spec-planning-ux.md) and [spec-planning-ux/plannin
 
 ## Undo & Snapshots
 
-Archival and unarchival are status transitions captured in the normal undo stack (see [spec-planning-ux/undo-snapshots.md](spec-planning-ux/undo-snapshots.md)). Each transition is one undoable unit; multi-spec archival (via multi-select) is one round. No special casing beyond what the existing stack already handles for status changes.
+Archival and unarchival are status transitions that should be undoable. Note: [spec-planning-ux/undo-snapshots.md](spec-planning-ux/undo-snapshots.md) covers planning-round snapshots (spec file writes during chat iterations) — not lifecycle state transitions — so there is no existing undo mechanism to hook into. This feature requires a separate lightweight undo entry for lifecycle transitions: each archive/unarchive is one undoable unit; multi-spec archival (via multi-select) is one round. The implementation should decide whether to extend the existing snapshot store or introduce a separate transition log.
 
 ---
 
@@ -234,7 +235,7 @@ When this spec is later dispatched as an implementation task, the following must
 - Validation (`internal/spec/validate.go`) skips archived specs according to the rules in the **Validation Behaviour** section; unit tests cover each skip.
 - Impact analysis (`internal/spec/impact.go`) returns empty impact for archived specs and prunes archived dependents from every query; unit tests cover reverse-index, `ComputeImpact`, and `UnblockedSpecs`.
 - Progress tracking (`internal/spec/progress.go`) excludes archived leaves and archived subtrees from aggregation; unit tests cover both cases.
-- Drift detection (`internal/runner/drift.go` and periodic scanner) skips archived specs and stops upward propagation at archived ancestors.
+- Drift detection (future `internal/runner/drift.go`, per spec-drift-detection.md) skips archived specs and stops upward propagation at archived ancestors. This acceptance criterion is jointly owned with spec-drift-detection; it is satisfied when that spec ships.
 - Dispatch handler refuses archival specs and treats archived `depends_on` targets as satisfied.
 - Explorer UI has a "Show archived" toggle; archived specs are hidden by default and rendered muted when visible.
 - Focused view renders archived specs read-only with an Unarchive action.
