@@ -1,16 +1,20 @@
 ---
 title: Guided path from Plan to Board — toast, badge, empty-board hint
-status: validated
+status: complete
 depends_on: []
 affects:
-  - ui/js/tasks.js
+  - ui/js/dispatch-toast.js
+  - ui/js/sidebar-badge.js
   - ui/js/spec-mode.js
+  - ui/js/api.js
+  - ui/js/render.js
   - ui/partials/sidebar.html
   - ui/partials/board.html
-  - ui/css/
+  - ui/partials/scripts.html
+  - ui/css/board.css
 effort: medium
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -73,3 +77,11 @@ Three affordances that bridge users from Plan to Board at the right moment: (1) 
 - **Do NOT** show the unread dot on nav buttons other than Board. This is a Plan → Board bridge, not a general notification system.
 - **Do NOT** persist the "seen" set across reloads. A reload resets to "all existing tasks are seen" (avoids a stale dot showing on every cold open).
 - **Do NOT** use the dispatch toast for any other purpose. If future flows want a toast, they add their own — this is not a general toast framework.
+
+## Implementation notes
+
+- The toast module landed as `ui/js/dispatch-toast.js` (standalone) rather than being embedded in `ui/js/tasks.js`. The dispatch flow lives in `spec-mode.js` (`dispatchFocusedSpec`), so the toast is invoked from there, not `tasks.js`. The spec listed `tasks.js` in `affects` because it assumed dispatch ran there; the actual wire-up touches `spec-mode.js` and `api.js` instead.
+- The unread-dot logic landed as `ui/js/sidebar-badge.js` (small dedicated module) with `initBoardUnreadSeen` / `noteBoardNewTask` / `clearBoardUnreadDot` entry points. `api.js` seeds it from the first task snapshot and raises the dot on `reduced.previousTask === null` inside `_handleTaskUpdated`. `switchMode` in `spec-mode.js` clears it whenever Board is entered.
+- `scripts.html` was updated to load `sidebar-badge.js` + `dispatch-toast.js` before `spec-mode.js` so their helpers are resolvable. This file was not listed in the spec's `affects` but is required for the wiring.
+- The `[Plan]` link in the empty-Board hint uses `switchMode('spec', { persist: true })` — treated as an explicit user action equivalent to the sidebar nav button, so the saved preference updates. The spec did not explicitly state persistence behaviour for this link; this matches the default-mode-resolution spec's "explicit choice" semantics.
+- All three affordances share animations with `@media (prefers-reduced-motion: reduce)` fallbacks, even though the spec did not require them — keeps parity with the existing `badge-pulse` / `card-highlight` rules already in `board.css`.
