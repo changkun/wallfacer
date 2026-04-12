@@ -1,6 +1,6 @@
 ---
 title: "Worker Lifecycle Stats in Settings Panel"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/container-reuse/task-07-lifecycle-metrics.md
 affects:
@@ -8,10 +8,11 @@ affects:
   - ui/js/status-bar.js
 effort: small
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 10: Worker Lifecycle Stats in Settings Panel
 

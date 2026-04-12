@@ -1,16 +1,17 @@
 ---
 title: "Named Volume Caches for Dependencies"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/container-reuse/task-03-launch-routing.md
 affects:
   - internal/sandbox/spec.go
 effort: medium
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 9: Named Volume Caches for Dependencies (Optional)
 

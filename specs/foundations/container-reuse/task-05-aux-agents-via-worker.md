@@ -1,16 +1,17 @@
 ---
 title: "Verify Auxiliary Agents Through Per-Task Worker"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/container-reuse/task-03-launch-routing.md
 affects:
   - internal/runner/container.go
 effort: small
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 5: Verify Auxiliary Agents Through Per-Task Worker
 

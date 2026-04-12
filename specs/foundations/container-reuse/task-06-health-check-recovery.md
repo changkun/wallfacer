@@ -1,6 +1,6 @@
 ---
 title: "Health Check and Graceful Fallback"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/container-reuse/task-03-launch-routing.md
 affects:
@@ -8,10 +8,11 @@ affects:
   - internal/sandbox/local.go
 effort: medium
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 6: Health Check and Graceful Fallback
 

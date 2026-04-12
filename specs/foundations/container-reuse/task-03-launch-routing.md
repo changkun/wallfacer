@@ -1,6 +1,6 @@
 ---
 title: "Wire LocalBackend.Launch() to Route Through Per-Task Workers"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/container-reuse/task-01-task-worker-type.md
   - specs/foundations/container-reuse/task-02-create-args-from-spec.md
@@ -8,10 +8,11 @@ affects:
   - internal/sandbox/local.go
 effort: medium
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 3: Wire LocalBackend.Launch() to Route Through Per-Task Workers
 
