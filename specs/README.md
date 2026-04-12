@@ -10,7 +10,7 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 5 done, 1 in progress, 18 pending
+Local Product — 5 done, 1 in progress, 19 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
@@ -22,6 +22,7 @@ Local Product — 5 done, 1 in progress, 18 pending
   ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
   ○ TypeScript Migration           ○ Typed DOM Hooks
   ○ Rebrand Module Path            ○ Spatial Canvas
+  ○ Scoped Command Registry
   ○ Data Boundary Enforcement
 
 Cloud Platform — 0/8
@@ -73,6 +74,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 | [spatial-canvas.md](local/spatial-canvas.md) | Vague | Spatial infinite-canvas view — tasks, agents, and notes as free-form nodes on a 2D plane |
 | [data-boundary-enforcement.md](local/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets |
+| [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the planning-only slash command registry to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting). Task board and other UI surfaces can then trigger their own `/` commands via the shared autocomplete widget. |
 
 ### Local product dependencies
 
