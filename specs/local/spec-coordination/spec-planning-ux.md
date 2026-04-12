@@ -228,7 +228,7 @@ specs/
     📝 spec-coordination.md             0/3
       ✔ spec-document-model.md
       📝 spec-planning-ux.md
-      💭 spec-drift-detection.md
+      💭 spec-state-control-plane.md
 ```
 
 Non-leaf specs show `done/total` counts that recursively aggregate all leaves in their subtree. `sandbox-backends.md` shows 6/6 (all leaves), and `runner-migration.md` shows 3/3 (its own leaves). Status icons reflect the spec's own status, not children.

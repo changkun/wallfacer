@@ -149,4 +149,4 @@ Add to `progress_test.go`:
 - Do NOT change the `Impact` or `Progress` types
 - Do NOT change `TreeProgress` logic beyond what `NodeProgress` already handles
 - Do NOT touch `validate.go`, handlers, or UI code
-- Do NOT implement drift detection skip (that is future work in spec-drift-detection.md)
+- Do NOT implement drift detection skip (that is future work in spec-state-control-plane.md)

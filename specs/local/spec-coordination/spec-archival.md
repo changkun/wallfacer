@@ -30,7 +30,7 @@ dispatched_task_id: null
 
 Extends [spec-document-model.md](spec-document-model.md) with a sixth status — `archived` — and updates the coordination subsystems (validation, impact, progress, drift, planning UX) to treat archived specs as "below glass": locked, hidden by default, and excluded from every propagation rule the live graph uses.
 
-**Peer, not parent, of [spec-drift-detection.md](spec-drift-detection.md).** This spec does not `depends_on` drift detection: the interaction goes the other way — archival defines rules that the drift implementation must honour (skip archived specs, stop upward propagation at archived ancestors). Both specs extend the document model; the drift spec cross-references this one for the skip conditions, and that cross-reference is enough without a DAG edge. Shipping order between the two is free.
+**Peer, not parent, of [spec-state-control-plane.md](spec-state-control-plane.md).** This spec does not `depends_on` drift detection: the interaction goes the other way — archival defines rules that the drift implementation must honour (skip archived specs, stop upward propagation at archived ancestors). Both specs extend the document model; the drift spec cross-references this one for the skip conditions, and that cross-reference is enough without a DAG edge. Shipping order between the two is free.
 
 ---
 
@@ -136,7 +136,7 @@ Resurrection re-includes the spec in progress on the next read (aggregation is c
 
 ## Drift Detection
 
-Interactions with [spec-drift-detection.md](spec-drift-detection.md):
+Interactions with [spec-state-control-plane.md](spec-state-control-plane.md):
 
 - **Periodic staleness scan** (`affects` vs `git log --since updated`) skips archived specs entirely.
 - **Post-task drift check** — if a dispatched leaf lands in an archived subtree (which should not normally happen, since archived specs are not dispatchable, but guard against race conditions): drift is recorded on the leaf itself but does not propagate upward past the archived ancestor.
@@ -371,7 +371,7 @@ When this spec is later dispatched as an implementation task, the following must
 - Validation (`internal/spec/validate.go`) skips archived specs according to the rules in the **Validation Behaviour** section; unit tests cover each skip.
 - Impact analysis (`internal/spec/impact.go`) returns empty impact for archived specs and prunes archived dependents from every query; unit tests cover reverse-index, `ComputeImpact`, and `UnblockedSpecs`.
 - Progress tracking (`internal/spec/progress.go`) excludes archived leaves and archived subtrees from aggregation; unit tests cover both cases.
-- Drift detection (future `internal/runner/drift.go`, per spec-drift-detection.md) skips archived specs and stops upward propagation at archived ancestors. This acceptance criterion is jointly owned with spec-drift-detection; it is satisfied when that spec ships.
+- Drift detection (future `internal/runner/drift.go`, per spec-state-control-plane.md) skips archived specs and stops upward propagation at archived ancestors. This acceptance criterion is jointly owned with spec-state-control-plane; it is satisfied when that spec ships.
 - Dispatch handler refuses archival specs and treats archived `depends_on` targets as satisfied.
 - Explorer UI has a "Show archived" toggle; archived specs are hidden by default and rendered muted when visible.
 - Focused view renders archived specs read-only with an Unarchive action.

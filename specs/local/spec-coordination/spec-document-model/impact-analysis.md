@@ -69,6 +69,6 @@ Implement reverse dependency computation and impact analysis. Given a spec, answ
 ## Boundaries
 
 - Do NOT implement event-driven notifications (e.g., "notify when spec completes").
-- Do NOT implement the `affects`-based file-level impact detection (that's in spec-drift-detection).
+- Do NOT implement the `affects`-based file-level impact detection (that's in spec-state-control-plane).
 - Do NOT store the reverse index — compute it fresh each time.
 - Do NOT modify SpecTree or SpecNode types.

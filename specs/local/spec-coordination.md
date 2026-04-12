@@ -110,7 +110,7 @@ The kanban board stays flat — it shows dispatched leaf specs as tasks. All str
 | Spec | Focus |
 |------|-------|
 | [spec-document-model.md](spec-coordination/spec-document-model.md) | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
-| [spec-drift-detection.md](spec-coordination/spec-drift-detection.md) | Drift detection and propagation through the spec tree |
+| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan |
 | [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
 | [spec-archival.md](spec-coordination/spec-archival.md) | Archived status — hide finished or abandoned specs from the live graph, explorer, drift checks, and impact queries |
 

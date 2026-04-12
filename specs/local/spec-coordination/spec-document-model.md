@@ -246,7 +246,7 @@ When leaf specs are dispatched, `depends_on` becomes `DependsOn` on the kanban b
 ### Propagation
 
 - **Upward through the tree** (children → parent): When children complete, the parent's progress updates. If implementation diverges from the parent's design, the parent should be updated.
-- **Downward through the tree** (parent → children): If a parent spec is modified, its children may be invalidated. See [spec-drift-detection.md](spec-drift-detection.md).
+- **Downward through the tree** (parent → children): If a parent spec is modified, its children may be invalidated. See [spec-state-control-plane.md](spec-state-control-plane.md).
 - **Along DAG edges** (dependency → dependent): If a completed dependency drifts, specs that depend on it get warnings. This follows `depends_on` edges regardless of tree position.
 
 ### Impact Analysis (Reverse Dependencies)
@@ -275,7 +275,7 @@ Impact of local-backend.md:
 | Spec reaches `complete` | Show dependents that are now unblocked (ready to dispatch or break down) |
 | Spec moves to `stale` | Warn all transitive dependents — their assumptions may be invalid |
 | Spec design changes (edited while `validated`) | Flag direct dependents for review; they may need updating |
-| `affects` files modified outside spec work | See [spec-drift-detection.md](spec-drift-detection.md) for file-level impact |
+| `affects` files modified outside spec work | See [spec-state-control-plane.md](spec-state-control-plane.md) for file-level impact |
 
 **Impact scope for non-leaf specs:** When a non-leaf spec changes, the impact includes both (a) specs that `depends_on` it directly, and (b) specs that depend on any leaf in its subtree, since the non-leaf's design governs its children's implementation.
 

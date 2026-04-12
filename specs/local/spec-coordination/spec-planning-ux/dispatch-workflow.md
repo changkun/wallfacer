@@ -73,7 +73,7 @@ Note: layer 1 sets `done`, not `complete`. The spec is not truly complete until 
 
 The report is appended to the spec as an `## Outcome` section. Based on drift level:
 - **Minimal**: spec transitions from `done` → `complete`. No action needed.
-- **Moderate**: spec transitions to `complete` but the Outcome section documents divergences for future reference. Propagate drift warnings to parent specs and dependents (see [spec-drift-detection.md](../../spec-drift-detection.md)).
+- **Moderate**: spec transitions to `complete` but the Outcome section documents divergences for future reference. Propagate drift warnings to parent specs and dependents (see [spec-state-control-plane.md](../../spec-state-control-plane.md)).
 - **Significant**: spec transitions to `stale` instead of `complete`. The spec no longer accurately describes what was built and needs refinement before it can be considered done.
 
 **Layer 3 — Iteration loop.** When layer 2 marks a spec `stale` (or the user judges the drift unacceptable), the spec re-enters the workflow:
@@ -108,7 +108,7 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 6. **Drift assessment (layer 2, extension point)** — After the completion hook fires, optionally trigger a drift assessment. Two sub-steps:
    - **File-level drift**: compare spec `affects` against `git diff` of the task's commits. Mechanical, can run server-side.
    - **Semantic drift**: agent classifies each acceptance criterion as satisfied/diverged/not-implemented/superseded. Requires sandbox.
-   Append an `## Outcome` section to the spec. Transition: minimal drift → `complete`, moderate → `complete` with warnings propagated to parent and dependents (feeds into [spec-drift-detection.md](../../spec-drift-detection.md)), significant → `stale`. Initial implementation can defer this — the hook in item 5 is sufficient for launch; the user can run `/diff` manually.
+   Append an `## Outcome` section to the spec. Transition: minimal drift → `complete`, moderate → `complete` with warnings propagated to parent and dependents (feeds into [spec-state-control-plane.md](../../spec-state-control-plane.md)), significant → `stale`. Initial implementation can defer this — the hook in item 5 is sufficient for launch; the user can run `/diff` manually.
 
 7. **Iteration support (layer 3)** — No new backend work. The iteration loop (`stale` → `/wf-spec-refine` → `/wf-spec-dispatch`) reuses existing infrastructure. The dispatch endpoint must accept re-dispatch of a spec whose `dispatched_task_id` was previously set (clear the old link, create a new task).
 
