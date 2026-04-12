@@ -138,6 +138,11 @@
   font-size: 0.875rem;
 }
 
+/* Override loaded-later display:flex so the .hidden utility still hides the banner. */
+.spec-archived-banner.hidden {
+  display: none;
+}
+
 .spec-archived-banner__text {
   flex: 1;
 }
