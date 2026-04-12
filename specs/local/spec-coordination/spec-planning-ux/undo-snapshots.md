@@ -1,16 +1,20 @@
 ---
 title: Undo & Snapshot System
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
   - internal/handler/planning.go
-  - internal/planner/
+  - internal/handler/planning_git.go
+  - internal/handler/planning_undo.go
+  - internal/planner/conversation.go
   - internal/apicontract/routes.go
-  - ui/js/
+  - internal/cli/server.go
+  - ui/js/planning-chat.js
+  - ui/css/spec-mode.css
 effort: medium
 created: 2026-03-30
-updated: 2026-04-04
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -121,7 +125,7 @@ overflow.
 |------------|-----------|--------|--------|
 | [Post-exec planning commit](undo-snapshots/post-exec-commit.md) | — | small | complete |
 | [Undo API endpoint](undo-snapshots/undo-api.md) | post-exec-commit | small | complete |
-| [UI undo button](undo-snapshots/undo-ui.md) | undo-api | small | validated |
+| [UI undo button](undo-snapshots/undo-ui.md) | undo-api | small | complete |
 
 ```mermaid
 graph LR

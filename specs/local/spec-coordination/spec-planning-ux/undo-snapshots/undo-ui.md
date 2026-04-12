@@ -1,12 +1,15 @@
 ---
 title: UI Per-Message Undo
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/undo-snapshots/undo-api.md
 affects:
-  - ui/partials/spec-mode.html
   - ui/js/planning-chat.js
   - ui/css/spec-mode.css
+  - ui/js/tests/planning-chat.test.js
+  - internal/planner/conversation.go
+  - internal/handler/planning.go
+  - internal/handler/planning_git.go
 effort: small
 created: 2026-04-04
 updated: 2026-04-12
@@ -252,19 +255,69 @@ Flag for reviewer before this spec returns to `validated`:
    should we focus it automatically so a second undo is one keystroke
    away? Accessibility tradeoff — easy to add, easy to remove.
 
-## Implementation notes (for when this reaches `validated`)
+## Implementation notes
 
-- The existing assistant-bubble rendering path is in `ui/js/planning-chat.js`
-  around line 534 (the class `planning-chat-bubble--assistant` is built
-  there). Do **not** change the class names; add the action row alongside
-  the existing `planning-chat-bubble__content` / `planning-chat-bubble__time`
-  structure.
-- The partial `ui/partials/spec-mode.html` does not need bubble-level
-  markup — bubbles are built in JS. Only `ui/css/spec-mode.css` and
-  `ui/js/planning-chat.js` should change in the UI layer.
-- If Option A is chosen for round attribution, the server change is one
-  additional field on `planner.Message`, one extra `git log --grep='^plan:
-  round' | wc -l` inside `SendPlanningMessage` (reusing
-  `commitPlanningRound`'s numbering logic — consider extracting
-  `currentRoundNumber(ctx, ws)` into `planning_git.go` so both paths share
-  the implementation), and zero UI changes beyond reading the new field.
+Implementation landed in three commits (`b2e8424` server, `82edcdc` UI, plus this
+spec wrap-up). Deviations from the spec, in the order they came up:
+
+- **Round-number plumbing via changed signature, not a new helper.** The spec
+  suggested extracting a shared `currentRoundNumber(ctx, ws)` helper. Instead,
+  `commitPlanningRound` itself now returns `(int, error)` — the round number
+  was already computed internally; returning it is cheaper than a second
+  `git log` pass. Callers use `n, err := commitPlanningRound(...)`; zero means
+  no commit was made (clean tree or git-status failure).
+- **Multi-workspace round attribution uses max, not a per-workspace record.**
+  `SendPlanningMessage` iterates `h.currentWorkspaces()` and attaches
+  `max(round)` across all successful commits to the assistant `Message`. The
+  UI only needs a single "is this bubble associated with a planning commit,
+  and what label to show" signal; recording per-workspace rounds would add
+  schema churn with no UI benefit at this scale. Documented on the struct
+  field.
+- **History refetch after streaming.** The spec didn't prescribe how the
+  streamed assistant bubble (created before the round is known) picks up
+  its `plan_round`. Simplest approach: call `_loadHistory()` at the end of
+  `_stopStreaming(interrupted=false)`. The entire chat re-renders from
+  server-authoritative data; the visual flicker is imperceptible because
+  the content matches. Interrupted streams skip the refetch (no committed
+  round to attribute).
+- **Undo button wiring lives in JS, not HTML.** The spec mentioned
+  `ui/partials/spec-mode.html` in `affects`, but the partial doesn't
+  render per-bubble markup — bubbles are built in `_createBubble` /
+  `_appendMessageBubble`. The only HTML-side change would have been the
+  now-rejected header Undo button. `affects` updated accordingly:
+  `ui/js/planning-chat.js` + `ui/css/spec-mode.css` cover the whole UI
+  layer.
+- **Helper split.** Added three small private helpers alongside
+  `_appendMessageBubble`:
+  `_applyTimestamp` (extracted from the duplicated timestamp-rendering path
+  in both `_appendMessageBubble` and `_appendMessageBubbleWithActivity`),
+  `_attachUndoIfRound` (decorates an assistant bubble with its round
+  attribute + undo button), and `_updateUndoButtonStates` (promotes the
+  latest-round bubble's button to enabled, demotes the rest). Keeping the
+  helpers explicit kept `_appendMessageBubble*` readable.
+- **Error-branch text.** Two 409 paths get targeted copy — `⚠ Can't undo:
+  you have unrelated commits since the last planning round` and `⚠ Undo
+  partially applied: git reset succeeded but your working-tree edits
+  couldn't be reapplied cleanly. Your changes are preserved in the stash —
+  run `git stash list` to recover` — matched against the server error
+  string (`indexOf("not at HEAD")`, `indexOf("stash pop conflict")`) rather
+  than HTTP status alone, since both are 409s. Matches the server's
+  response shape exactly.
+- **Test-harness extension instead of new file.** The new tests live in
+  `ui/js/tests/planning-chat.test.js` alongside the existing 8. The
+  harness's `makeEl` stub was extended with `setAttribute`, `getAttribute`,
+  `hasAttribute`, `removeAttribute`, a proper `remove()` that unlinks from
+  the parent's child list, a `click()` helper that dispatches the click
+  listener list, and a `querySelectorAll` that understands the
+  `.class[attr]` compound selector needed for
+  `.planning-chat-bubble--assistant[data-round]`. No existing test depended
+  on the previous stub's limitations, so the extensions are
+  backward-compatible.
+- **Open Questions resolved (tentative answers adopted).** Q1 targeted
+  undo: deferred (button disabled on non-HEAD rounds with explanatory
+  tooltip). Q2 round attribution: Option A (server-side `PlanRound` on
+  `Message`). Q3 system-bubble persistence: client-side only, not written
+  to the conversation store. Q4 reverted-bubble styling: `opacity 0.5 +
+  line-through` on the content element only (kept actions unaffected).
+  Q5 auto-focus after undo: not implemented — leave the focus on the
+  current cursor position.
