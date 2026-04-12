@@ -1,6 +1,6 @@
 ---
 title: "Archival: Explorer tree — Show archived toggle and muted rendering"
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-archival/core-model.md
 affects:
@@ -162,3 +162,14 @@ Manual verification steps (no automated JS tests currently exist for this module
 - Do NOT change the explorer's progress computation — archived exclusion is handled
   server-side in `progress.go` (task `impact-progress.md`)
 - The "Show archived" toggle does NOT affect the focused spec view rendering
+
+## Implementation notes
+
+- Spec `affects` listed only `ui/js/spec-explorer.js` and `ui/css/spec-mode.css`, but the
+  dependency minimap work in item 8 lives in `ui/js/spec-minimap.js`. That file was
+  touched for archived neighbor hiding, dashed-node rendering, and dashed-edge rendering.
+- The "Show archived" checkbox lives in `ui/partials/explorer-panel.html` (not listed in
+  `affects`) because the existing filter dropdown markup is also in that partial.
+- Vitest unit tests were added for both explorer and minimap archived behaviour
+  (`ui/js/tests/spec-explorer.test.js`, `ui/js/tests/spec-minimap.test.js`); the spec
+  only called for manual verification.
