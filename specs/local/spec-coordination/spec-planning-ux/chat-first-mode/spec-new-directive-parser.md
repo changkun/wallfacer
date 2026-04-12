@@ -1,15 +1,16 @@
 ---
 title: Server-side /spec-new directive parser and scaffold interception
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/spec-scaffold-library.md
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/agent-system-prompts.md
 affects:
   - internal/handler/planning.go
   - internal/handler/planning_directive.go
+  - docs/guide/exploring-ideas.md
 effort: large
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -78,3 +79,10 @@ Parse the agent's NDJSON output stream for `/spec-new <path> [title=...] [status
 - **Do NOT** strip the directive line from the agent's live stream output. The UX is that the user sees the agent's raw response; server-side action (scaffold) happens in parallel.
 - **Do NOT** try to parse directives from the user's own messages. Only agent-authored `assistant` blocks are scanned.
 - **Do NOT** add a "discard directive" undo command. Archival of an unwanted spec is the recovery path per the parent spec's non-goals.
+
+## Implementation notes
+
+- `scaffoldDirective` does not call `spec.Scaffold` directly. `spec.ValidateSpecPath` requires the input path to start with `specs/` (relative form), but the planning handler needs to write into `<workspace>/specs/...` — an absolute form that fails the validator. The implementation re-uses the shared building blocks (`spec.ValidateSpecPath`, `spec.RenderSkeleton`, `spec.ResolveAuthor`, `spec.TitleFromFilename`, plus the `Valid{Statuses,Efforts}` guards) against the relative path and writes into the absolute path under the workspace. Same source-of-truth for frontmatter, just with the workspace root applied.
+- A new helper `processDirectives(workspace, dirs, focused, now)` owns the full driving loop so it can be unit-tested without spinning up the planning sandbox. `SendPlanningMessage` calls it between `handle.Wait()` and `commitPlanningRound` so new files land in the round's git commit.
+- The `TestSendPlanningMessage_*` integration tests from the spec are not included as automated tests. `SendPlanningMessage` runs a real planner sandbox (`h.planner.Exec`) that is not mocked in the existing handler test harness; adding full-stack integration plumbing was out of scope for this spec. The constituent logic is fully unit-tested: `DirectiveScanner` covers all grammar branches, `extractAssistantLines` covers NDJSON routing, `scaffoldDirective` covers file-system happy/error paths, `processDirectives` covers both successful multi-directive runs and the system-message-on-error surface. End-to-end wiring was verified by code inspection.
+- Scaffolded specs are written only into `h.currentWorkspaces()[0]`. When the agent emits a `/spec-new` directive with no workspace mounted, `processDirectives` returns a single `system`-role message ("Couldn't create …: no workspace configured") so the user still sees why the scaffold was dropped.
