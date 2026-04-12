@@ -158,7 +158,7 @@ override per-request via the period picker in the stats modal.
 | [Capture planning round usage](progress-cost-tracking/capture-planning-round-usage.md) | planning-usage-store | medium | **complete** |
 | [Planning section in /api/stats](progress-cost-tracking/stats-planning-section.md) | planning-usage-store | medium | **complete** |
 | [Merge planning into /api/usage BySubAgent](progress-cost-tracking/usage-planning-merge.md) | planning-usage-store | small | **complete** |
-| [WALLFACER_PLANNING_WINDOW_DAYS config knob](progress-cost-tracking/planning-window-config.md) | — | small | validated |
+| [WALLFACER_PLANNING_WINDOW_DAYS config knob](progress-cost-tracking/planning-window-config.md) | — | small | **complete** |
 | [Planning block in modal-stats.js](progress-cost-tracking/modal-stats-planning-block.md) | stats-planning-section, planning-window-config | medium | validated |
 | [Planning tile in usage-stats.js](progress-cost-tracking/usage-stats-planning-tile.md) | usage-planning-merge, planning-window-config | small | validated |
 

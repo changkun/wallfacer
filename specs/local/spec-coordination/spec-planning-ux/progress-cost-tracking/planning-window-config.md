@@ -1,6 +1,6 @@
 ---
 title: WALLFACER_PLANNING_WINDOW_DAYS Config Knob
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/envconfig/envconfig.go
