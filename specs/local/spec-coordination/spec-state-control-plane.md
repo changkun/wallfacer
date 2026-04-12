@@ -433,6 +433,20 @@ Staleness propagates through **two complementary channels**. Both run on
 every fan-out event; results are unioned and deduplicated before applying
 transitions.
 
+### Overview
+
+```mermaid
+flowchart LR
+  E[Event<br/>P1: chat edit · P3: task done] --> Ch1[Channel 1<br/>depends_on reverse]
+  E --> Ch2[Channel 2<br/>affects overlap]
+  Ch1 --> U["∪ union + dedup<br/>(exclude source, archived)"]
+  Ch2 --> U
+  U --> FO[FanOutStale]
+  FO --> W1[spec w → stale]
+  FO --> W2[spec x → stale]
+  FO --> W3[spec y → stale]
+```
+
 ### Channel 1 — Explicit dependency (`depends_on`)
 
 Author intent: "my design hinges on yours." When a spec's state changes
@@ -449,6 +463,23 @@ Already solved by `internal/spec/impact.go`:
 `reverse[sourcePath]` minus archived specs. O(1) per lookup after the
 reverse index is built; reverse-index build is O(S·A) where S = specs and
 A = avg `depends_on` count.
+
+```mermaid
+flowchart LR
+  A["A (event source)<br/>→ complete"]
+  B["B<br/>→ stale"]
+  C["C<br/>unchanged this event"]
+  D["D<br/>→ stale"]
+  B -- depends_on --> A
+  D -- depends_on --> A
+  C -- depends_on --> B
+```
+
+Single-hop rule: the event marks **direct** dependents of A (B and D)
+stale. C, a transitive dependent via B, is **not** touched in this event
+— it will be flagged when B itself completes later. Relying on the
+explicit chain of events beats cascading everyone downstream on every
+event.
 
 ### Channel 2 — Implicit code coupling (`affects`)
 
@@ -487,6 +518,24 @@ Examples:
   `internal/sandbox/handle.go` (sibling files in the same dir).
 - `internal/` overlaps with `internal/sandbox/` (broad dir swallows
   everything — handled via the "too-broad" policy in §2e below).
+
+```mermaid
+flowchart TD
+  internal["internal/"]
+  sandbox["internal/sandbox/"]
+  local["internal/sandbox/local/"]
+  backend["internal/sandbox/backend.go"]
+  handle["internal/sandbox/handle.go"]
+  internal --- sandbox
+  sandbox --- local
+  sandbox --- backend
+  sandbox --- handle
+  backend -. sibling: no overlap .- handle
+```
+
+Parent-child edges above are the "contains" relation; two entries
+overlap iff either is an ancestor of the other along this tree. Siblings
+(`backend.go` vs `handle.go`) are **not** overlapping.
 
 #### 2c. Indexes
 
@@ -551,6 +600,34 @@ declared affects of the source spec. A task that was supposed to touch
 `runner.go` but actually also touched `container.go` correctly impacts
 every spec that covers either file.
 
+```mermaid
+flowchart LR
+  subgraph diff["task diff (git diff --name-only)"]
+    f1["internal/runner/execute.go"]
+    f2["internal/runner/container.go"]
+  end
+  subgraph idx["affectsToSpecs (reverse index)"]
+    e1["internal/runner/"] --> sA["Spec A"]
+    e1 --> sD["Spec D"]
+    e2["internal/runner/execute.go"] --> sB["Spec B"]
+    e3["internal/runner/container.go"] --> sC["Spec C"]
+    e4["internal/sandbox/"] --> sE["Spec E"]
+  end
+  f1 -- "contains?" --> e1
+  f1 -- "==" --> e2
+  f2 -- "contains?" --> e1
+  f2 -- "==" --> e3
+  subgraph impacted["impacted = {A, B, C, D} − source"]
+  end
+  sA --> impacted
+  sB --> impacted
+  sC --> impacted
+  sD --> impacted
+```
+
+Spec E is untouched (its `internal/sandbox/` entry does not contain any
+file in the diff). The source spec is excluded before fan-out.
+
 **Entry B — "a spec's intent changed, no code diff"** (used by P1 chat
 edits, when a planning round modifies only `specs/` paths):
 
@@ -587,6 +664,34 @@ Legitimate in rare cases (an umbrella refactor); usually a smell.
   `validate.go`. Advisory only.
 - Runtime: log when a single fan-out impacts >20 specs, so operators can
   spot accidental mass-staleness.
+
+### Archived pruning in both channels
+
+```mermaid
+flowchart LR
+  A["A<br/>complete (event source)"]
+  B["B<br/>validated → stale"]
+  X["X<br/>archived (skipped)"]
+  Y["Y<br/>validated<br/>(depends on X, not A)"]
+  Z["Z<br/>validated → stale"]
+  B -- depends_on --> A
+  X -- depends_on --> A
+  Y -- depends_on --> X
+  Z -- depends_on --> A
+```
+
+`Adjacency` prunes archived nodes as both sources and sinks before the
+reverse traversal runs, so:
+- X (archived, direct dependent of A) is **skipped** — no transition
+  written.
+- Y (depends on archived X, not on A directly) is **invisible to this
+  event** — the X→A edge was pruned, so Y is not in A's reverse set.
+- B and Z — live direct dependents of A — are correctly impacted.
+
+The same pruning applies to channel 2: `affectsToSpecs` is built from
+non-archived specs only, so an archived spec's `affects` entries
+contribute nothing to lookups and the spec itself cannot be returned as
+impacted.
 
 ### Channel 3 — Filesystem ancestors (already built-in)
 
