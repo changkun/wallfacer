@@ -1,12 +1,13 @@
 ---
 title: Post-Exec Planning Commit
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/handler/planning.go
+  - internal/handler/planning_git.go
 effort: small
 created: 2026-04-04
-updated: 2026-04-04
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -94,3 +95,35 @@ distinct, undoable git commit.
 - Do NOT touch the conversation log (`store.AppendMessage`) ordering
 - Do NOT commit files outside `specs/` even if other files are dirty
 - Do NOT change any session ID save or extraction logic
+
+## Implementation notes
+
+- **Helper lives in `internal/handler/planning_git.go`** (new file) rather than
+  appending to `planning.go`. Keeps `planning.go`'s HTTP handlers in one
+  place; matches the repo convention of splitting git-touching helpers out
+  (`git.go`, `diffcache.go`). The spec explicitly allowed either location.
+- **Workspace list uses `h.currentWorkspaces()`**, not `h.cfg.Workspaces`.
+  The `Handler` struct has no `cfg` field — the active workspace paths are
+  exposed through the `currentWorkspaces()` accessor, which takes
+  `h.snapshotMu.RLock` and returns a clone. The spec's pseudo-code was
+  approximate on this point.
+- **Round counter**: simplified the spec's two-step pseudo-code (a `strings.Count`
+  line immediately overwritten by a `strings.Split` line) to a single form —
+  `n := 1; if logOut != "" { n = len(strings.Split(logOut, "\n")) + 1 }`.
+  Same semantics, no dead code.
+- **`git status` errors are swallowed** (return nil) as the spec prescribed.
+  This matches best-effort semantics: a missing git repo or transient git
+  failure should not stop the planning pipeline.
+- **`git add` / `git commit` errors are returned** wrapped with `fmt.Errorf`,
+  so the caller in `SendPlanningMessage` can `slog.Warn` with context.
+  Failures never bubble up to the HTTP response.
+- **Summary truncation constant** extracted as `commitPlanningRoundSummaryMax`
+  (`= 80`) so the test can assert on it by name.
+- **Commit context**: used `context.Background()` for the git operations
+  rather than the exec goroutine's context (itself already detached from the
+  HTTP request). Matches what the spec's pseudo-code implied.
+- **Tests**: the four table-stakes cases from the spec — dirty specs,
+  clean tree no-op, round numbering across three rounds, and 80-char
+  summary truncation — all live in `planning_git_test.go` with a local
+  `initPlanningTestRepo` helper that disables GPG signing to keep CI
+  hermetic.
