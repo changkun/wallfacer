@@ -1,6 +1,6 @@
 ---
 title: Planning Section in /api/stats
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
 affects:
@@ -92,3 +92,26 @@ Extend `internal/handler/stats_test.go`:
 - Do not render anything in the UI; that's the modal-stats task.
 - Do not introduce a new env var for the cutoff; reuse the existing
   `?days=` mechanism.
+
+## Implementation notes
+
+- **`?days=N` is a new parameter on `/api/stats`**, not a pre-existing
+  one. The spec said "reuse the existing `?days=` query param (if any)",
+  but `/api/stats` did not accept any time-window param; only
+  `/api/usage` did. The implementation adds `?days=N` to `/api/stats`
+  and scopes it to the planning aggregation only. Execution buckets
+  (`ByWorkspace`, `ByActivity`, etc.) deliberately ignore it to satisfy
+  the additive-only boundary.
+- **Aggregation lives in a separate function.** `aggregatePlanningStats`
+  is a sibling to `aggregateStats`, not an inline extension. Keeping the
+  two separate meant `aggregateStats`'s signature and behavior are
+  unchanged, which was the simplest way to honor "execution buckets are
+  not touched" at the test level (`TestGetStats_ExecutionUnchangedByPlanning`
+  JSON-compares the two response shapes).
+- **Active-group resolution is single-group.** `internal/workspace.Manager`
+  exposes exactly one current group, so the handler passes
+  `h.currentWorkspaces()` and marks only its key as "active." Past
+  groups still on disk surface with `Label == key` and `Paths == nil`
+  as specified.
+- **Sibling doc updates**: added a `?days=N` note to the
+  `/api/stats` row in `CLAUDE.md` and `docs/internals/api-and-transport.md`.
