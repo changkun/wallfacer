@@ -27,7 +27,11 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "q must be at least 2 characters", http.StatusBadRequest)
 		return
 	}
-	results, err := h.store.SearchTasks(r.Context(), q)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	results, err := s.SearchTasks(r.Context(), q)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -43,7 +47,11 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 // full task.json, making it efficient for cost dashboards and analytics.
 // Tasks that completed before summary.json was introduced are omitted.
 func (h *Handler) ListSummaries(w http.ResponseWriter, _ *http.Request) {
-	summaries, err := h.store.ListSummaries()
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	summaries, err := s.ListSummaries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -56,6 +64,12 @@ func (h *Handler) ListSummaries(w http.ResponseWriter, _ *http.Request) {
 
 // ListTasks returns all tasks, optionally including archived ones.
 func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
+	// Capture the store once so all operations below are scoped to the same
+	// workspace group, regardless of concurrent workspace switches.
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
 	includeArchived := r.URL.Query().Get("include_archived") == "true"
 	pageSizeRaw := strings.TrimSpace(r.URL.Query().Get("archived_page_size"))
 	if pageSizeRaw != "" {
@@ -94,7 +108,7 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			}
 			afterID = &parsed
 		}
-		page, total, hasMoreBefore, hasMoreAfter, err := h.store.ListArchivedTasksPage(r.Context(), pageSize, beforeID, afterID)
+		page, total, hasMoreBefore, hasMoreAfter, err := s.ListArchivedTasksPage(r.Context(), pageSize, beforeID, afterID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -119,7 +133,7 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		httpjson.Write(w, http.StatusOK, resp)
 		return
 	}
-	tasks, err := h.store.ListTasks(r.Context(), includeArchived)
+	tasks, err := s.ListTasks(r.Context(), includeArchived)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -128,8 +142,8 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		tasks = []store.Task{}
 	}
 	if q := r.URL.Query().Get("failure_category"); q != "" {
-		category, ok := store.ParseFailureCategory(q)
-		if !ok {
+		category, ok2 := store.ParseFailureCategory(q)
+		if !ok2 {
 			http.Error(w, "invalid failure_category", http.StatusBadRequest)
 			return
 		}
@@ -183,8 +197,12 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	s, ok2 := h.requireStore(w)
+	if !ok2 {
+		return
+	}
 
-	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+	task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 		Prompt:             req.Prompt,
 		Goal:               req.Goal,
 		Timeout:            req.Timeout,
@@ -252,6 +270,13 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Tasks) > 50 {
 		http.Error(w, "tasks must not exceed 50 items", http.StatusBadRequest)
+		return
+	}
+
+	// Capture the store once so all validation and persistence use the same
+	// workspace group, regardless of concurrent workspace switches.
+	s, ok2 := h.requireStore(w)
+	if !ok2 {
 		return
 	}
 
@@ -399,7 +424,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			}
 			// External UUID — verify it exists.
 			depID, _ := uuid.Parse(dep) // already confirmed parseable in step 4
-			if _, err := h.store.GetTask(r.Context(), depID); err != nil {
+			if _, err := s.GetTask(r.Context(), depID); err != nil {
 				ref := t.Ref
 				if ref == "" {
 					ref = fmt.Sprintf("<index %d>", i)
@@ -418,7 +443,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	//    Note: existing tasks cannot reference the freshly pre-assigned UUIDs, so
 	//    cycles through external deps are mathematically impossible here; this
 	//    check is defence-in-depth and guards against any future store changes.
-	allTasks, _ := h.store.ListTasks(r.Context(), true)
+	allTasks, _ := s.ListTasks(r.Context(), true)
 	combinedAdj := make(map[uuid.UUID][]uuid.UUID, len(allTasks)+n)
 	for _, t := range allTasks {
 		for _, depStr := range t.DependsOn {
@@ -480,7 +505,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+		task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 			ID:                preAssignedIDs[idx],
 			Prompt:            t.Prompt,
 			Timeout:           t.Timeout,
@@ -512,7 +537,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	// Return tasks in input order.
 	finalTasks := make([]store.Task, n)
 	for i := range req.Tasks {
-		updated, err := h.store.GetTask(r.Context(), preAssignedIDs[i])
+		updated, err := s.GetTask(r.Context(), preAssignedIDs[i])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -559,7 +584,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok2 := h.requireStore(w)
+	if !ok2 {
+		return
+	}
+
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -583,18 +613,18 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Goal, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
+		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Goal, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if req.Sandbox != nil {
-			if err := h.store.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {
+			if err := s.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}
 		if req.Model != nil {
-			if err := h.store.UpdateTaskModelOverride(r.Context(), id, *req.Model); err != nil {
+			if err := s.UpdateTaskModelOverride(r.Context(), id, *req.Model); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -608,7 +638,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			if failP == nil {
 				failP = task.CustomFailPatterns
 			}
-			if err := h.store.UpdateTaskCustomPatterns(r.Context(), id, passP, failP); err != nil {
+			if err := s.UpdateTaskCustomPatterns(r.Context(), id, passP, failP); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -631,7 +661,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				scheduledAt = &t
 			}
 		}
-		if err := h.store.UpdateTaskScheduledAt(r.Context(), id, scheduledAt); err != nil {
+		if err := s.UpdateTaskScheduledAt(r.Context(), id, scheduledAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -639,14 +669,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	// Allow raising budget limits for waiting tasks (so users can continue a paused task).
 	if task.Status == store.TaskStatusWaiting && (req.MaxCostUSD != nil || req.MaxInputTokens != nil) {
-		if err := h.store.UpdateTaskBudget(r.Context(), id, req.MaxCostUSD, req.MaxInputTokens); err != nil {
+		if err := s.UpdateTaskBudget(r.Context(), id, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if req.Position != nil {
-		if err := h.store.UpdateTaskPosition(r.Context(), id, *req.Position); err != nil {
+		if err := s.UpdateTaskPosition(r.Context(), id, *req.Position); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -664,14 +694,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, "task cannot depend on itself", http.StatusBadRequest)
 				return
 			}
-			if _, err := h.store.GetTask(r.Context(), depID); err != nil {
+			if _, err := s.GetTask(r.Context(), depID); err != nil {
 				http.Error(w, fmt.Sprintf("dependency task not found: %s", depStr), http.StatusBadRequest)
 				return
 			}
 			parsedDeps = append(parsedDeps, depID)
 		}
 		// Cycle detection using full graph including archived tasks.
-		allTasks, _ := h.store.ListTasks(r.Context(), true)
+		allTasks, _ := s.ListTasks(r.Context(), true)
 		for _, depID := range parsedDeps {
 			if taskReachable(allTasks, depID, id) {
 				http.Error(w, fmt.Sprintf("dependency on %s would create a cycle", depID), http.StatusBadRequest)
@@ -682,14 +712,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		for i, d := range parsedDeps {
 			strs[i] = d.String()
 		}
-		if err := h.store.UpdateTaskDependsOn(r.Context(), id, strs); err != nil {
+		if err := s.UpdateTaskDependsOn(r.Context(), id, strs); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if req.Tags != nil {
-		if err := h.store.UpdateTaskTags(r.Context(), id, *req.Tags); err != nil {
+		if err := s.UpdateTaskTags(r.Context(), id, *req.Tags); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -716,7 +746,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			if freshStart && len(task.WorktreePaths) > 0 {
 				h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
 			}
-			if err := h.store.ResetTaskForRetry(r.Context(), id, newPrompt, freshStart); err != nil {
+			if err := s.ResetTaskForRetry(r.Context(), id, newPrompt, freshStart); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -724,7 +754,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				store.NewStateChangeData(oldStatus, store.TaskStatusBacklog, store.TriggerUser, nil))
 			h.diffCache.invalidate(id)
 
-			updated, err := h.store.GetTask(r.Context(), id)
+			updated, err := s.GetTask(r.Context(), id)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -745,7 +775,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				sessionID = *task.SessionID
 			}
 			h.runner.RunBackground(id, task.Prompt, sessionID, false)
-			updated, err := h.store.GetTask(r.Context(), id)
+			updated, err := s.GetTask(r.Context(), id)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -764,7 +794,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 				store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 			h.diffCache.invalidate(id)
-			updated, err := h.store.GetTask(r.Context(), id)
+			updated, err := s.GetTask(r.Context(), id)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -773,7 +803,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			return
 		}
 
-		if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
+		if err := s.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
 			if errors.Is(err, statemachine.ErrInvalidTransition) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			} else {
@@ -794,7 +824,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 	}
 
-	updated, err := h.store.GetTask(r.Context(), id)
+	updated, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -812,10 +842,14 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if !ok {
 		return
 	}
-	if task, err := h.store.GetTask(r.Context(), id); err == nil && len(task.WorktreePaths) > 0 {
+	s, ok2 := h.requireStore(w)
+	if !ok2 {
+		return
+	}
+	if task, err := s.GetTask(r.Context(), id); err == nil && len(task.WorktreePaths) > 0 {
 		h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
 	}
-	if err := h.store.DeleteTask(r.Context(), id, req.Reason); err != nil {
+	if err := s.DeleteTask(r.Context(), id, req.Reason); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -824,7 +858,11 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 // ListDeletedTasks returns all soft-deleted (tombstoned) tasks.
 func (h *Handler) ListDeletedTasks(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.store.ListDeletedTasks(r.Context())
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	tasks, err := s.ListDeletedTasks(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -837,7 +875,11 @@ func (h *Handler) ListDeletedTasks(w http.ResponseWriter, r *http.Request) {
 
 // RestoreTask removes the tombstone from a soft-deleted task, making it active again.
 func (h *Handler) RestoreTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	if err := h.store.RestoreTask(r.Context(), id); err != nil {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	if err := s.RestoreTask(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

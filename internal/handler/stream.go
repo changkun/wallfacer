@@ -41,6 +41,15 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Capture the store once so that all operations in this handler (subscribe,
+	// delta replay, snapshot) use the same workspace store. Without this, a
+	// workspace switch mid-handler could cause Subscribe to attach to workspace A
+	// while ListTasksAndSeq reads from workspace B, leaking cross-group tasks.
+	s, ok2 := h.requireStore(w)
+	if !ok2 {
+		return
+	}
+
 	includeArchived := r.URL.Query().Get("include_archived") == "true"
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -49,8 +58,8 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Subscribe BEFORE reading any state so we cannot miss events between the
 	// snapshot/replay phase and the live loop.
-	subID, ch := h.store.Subscribe()
-	defer h.store.Unsubscribe(subID)
+	subID, ch := s.Subscribe()
+	defer s.Unsubscribe(subID)
 
 	// replayUpTo is the highest sequence number already written to the client.
 	// Live channel items with Seq <= replayUpTo are skipped to avoid duplicates.
@@ -65,7 +74,7 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	didReplay := false
 	if lastEventIDStr != "" {
 		if seq, err := strconv.ParseInt(lastEventIDStr, 10, 64); err == nil {
-			deltas, tooOld := h.store.DeltasSince(seq)
+			deltas, tooOld := s.DeltasSince(seq)
 			if !tooOld {
 				// Replay missed deltas; the client already has a consistent
 				// base state so no snapshot is required.
@@ -91,7 +100,7 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 		// Send the initial full snapshot so the client can bootstrap its local
 		// state. ListTasksAndSeq reads both the task list and the current
 		// sequence under the same read lock to guarantee consistency.
-		tasks, currentSeq, err := h.store.ListTasksAndSeq(r.Context(), includeArchived)
+		tasks, currentSeq, err := s.ListTasksAndSeq(r.Context(), includeArchived)
 		if err != nil {
 			return
 		}
