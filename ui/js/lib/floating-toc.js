@@ -205,7 +205,7 @@
         var cs = getComputedStyle(block);
         var font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
         var lh = parseFloat(cs.lineHeight);
-        if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.7;
+        if (Number.isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.7;
         try {
           item.prepared = pt.prepare(block.textContent || "", font);
           item.lineHeight = lh;

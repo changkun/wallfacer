@@ -152,7 +152,7 @@
     // negative getTime() value, so we treat any ms < 0 (or NaN) as invalid.
     var rawStarts = phases.map(function (p) {
       var ms = p.timestamp ? new Date(p.timestamp).getTime() : NaN;
-      return !isNaN(ms) && ms >= 0 ? ms : null;
+      return !Number.isNaN(ms) && ms >= 0 ? ms : null;
     });
 
     var validCount = rawStarts.filter(function (ms) {
@@ -173,7 +173,7 @@
           break;
         }
       }
-      if (isNaN(endMs)) endMs = globalEndMs;
+      if (Number.isNaN(endMs)) endMs = globalEndMs;
       if (startMs < globalStartMs) startMs = globalStartMs;
       if (endMs > globalEndMs) endMs = globalEndMs;
       if (startMs >= endMs) continue;
@@ -444,9 +444,9 @@
 
       // Build time axis ticks
       var axisHtml = "";
+      var tickFractions = [0, 0.25, 0.5, 0.75, 1];
       if (timeMap.compressed) {
         // Compressed mode: tick labels show real elapsed time at each visual position
-        var tickFractions = [0, 0.25, 0.5, 0.75, 1];
         axisHtml = tickFractions
           .map(function (f) {
             var pct = (f * 100).toFixed(2);
@@ -500,7 +500,6 @@
         });
       } else {
         // Linear mode (unchanged)
-        var tickFractions = [0, 0.25, 0.5, 0.75, 1];
         axisHtml = tickFractions
           .map(function (f) {
             var pct = (f * 100).toFixed(2);

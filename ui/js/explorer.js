@@ -244,11 +244,11 @@ function _expandNode(node) {
         for (var j = 0; j < node.children.length; j++) {
           oldByPath[node.children[j].path] = node.children[j];
         }
-        for (var j = 0; j < newChildren.length; j++) {
-          var prev = oldByPath[newChildren[j].path];
+        for (var k = 0; k < newChildren.length; k++) {
+          var prev = oldByPath[newChildren[k].path];
           if (prev && prev.expanded) {
-            newChildren[j].expanded = true;
-            newChildren[j].children = prev.children;
+            newChildren[k].expanded = true;
+            newChildren[k].children = prev.children;
           }
         }
       }

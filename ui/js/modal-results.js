@@ -150,7 +150,7 @@ function _attachTimelineTips(container) {
 function _spanIsOpen(span) {
   if (!span.ended_at) return true;
   var ms = new Date(span.ended_at).getTime();
-  return isNaN(ms) || ms <= 0; // pre-epoch = Go zero time (0001-01-01)
+  return Number.isNaN(ms) || ms <= 0; // pre-epoch = Go zero time (0001-01-01)
 }
 
 // Build the HTML for the Gantt chart from a spans array.

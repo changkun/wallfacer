@@ -517,7 +517,12 @@ var PlanningChat = (function () {
 
   // _appendMessageBubbleWithActivity renders an assistant bubble with
   // the collapsible agent activity section restored from raw NDJSON output.
-  function _appendMessageBubbleWithActivity(content, rawOutput, timestamp, planRound) {
+  function _appendMessageBubbleWithActivity(
+    content,
+    rawOutput,
+    timestamp,
+    planRound,
+  ) {
     var bubble = _createBubble("assistant");
     var contentEl = bubble.querySelector(".planning-chat-bubble__content");
     if (contentEl) {
@@ -582,13 +587,13 @@ var PlanningChat = (function () {
     );
     var latestRound = -1;
     for (var i = 0; i < bubbles.length; i++) {
-      var n = parseInt(bubbles[i].getAttribute("data-round"), 10);
-      if (!isNaN(n) && n > latestRound) latestRound = n;
+      var n = Number.parseInt(bubbles[i].getAttribute("data-round"), 10);
+      if (!Number.isNaN(n) && n > latestRound) latestRound = n;
     }
     bubbles.forEach(function (b) {
       var btn = b.querySelector(".planning-chat-bubble__undo");
       if (!btn) return;
-      var n = parseInt(b.getAttribute("data-round"), 10);
+      var n = Number.parseInt(b.getAttribute("data-round"), 10);
       if (n === latestRound) {
         btn.disabled = false;
         btn.title = "Undo round " + n;
@@ -648,8 +653,7 @@ var PlanningChat = (function () {
     var summary = body && body.summary ? body.summary : "";
     var files = body && body.files_reverted ? body.files_reverted : [];
     var el = document.createElement("div");
-    el.className =
-      "planning-chat-system planning-chat-system--undo";
+    el.className = "planning-chat-system planning-chat-system--undo";
     var text = "↺ Undid round " + round;
     if (summary) text += " — " + summary;
     el.textContent = text;

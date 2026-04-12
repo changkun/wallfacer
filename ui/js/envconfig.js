@@ -20,7 +20,7 @@ async function saveMaxParallel() {
   const input = document.getElementById("max-parallel-input");
   const statusEl = document.getElementById("max-parallel-status");
   let value = parseInt(input.value, 10);
-  if (isNaN(value) || value < 1) value = 1;
+  if (Number.isNaN(value) || value < 1) value = 1;
   if (value > 20) value = 20;
   input.value = value;
 
@@ -57,7 +57,7 @@ async function saveOversightInterval() {
   const input = document.getElementById("oversight-interval-input");
   const statusEl = document.getElementById("oversight-interval-status");
   let value = parseInt(input.value, 10);
-  if (isNaN(value) || value < 0) value = 0;
+  if (Number.isNaN(value) || value < 0) value = 0;
   if (value > 120) value = 120;
   input.value = value;
   statusEl.textContent = "Saving…";
@@ -93,7 +93,7 @@ async function saveArchivedTasksPerPage() {
   const input = document.getElementById("archived-page-size-input");
   const statusEl = document.getElementById("archived-page-size-status");
   let value = parseInt(input.value, 10);
-  if (isNaN(value) || value < 1) value = 1;
+  if (Number.isNaN(value) || value < 1) value = 1;
   if (value > 200) value = 200;
   input.value = value;
 
@@ -147,7 +147,7 @@ async function saveAutoPush() {
   if (thresholdRow) thresholdRow.style.display = enabled ? "flex" : "none";
 
   let threshold = parseInt(thresholdInput ? thresholdInput.value : "1", 10);
-  if (isNaN(threshold) || threshold < 1) threshold = 1;
+  if (Number.isNaN(threshold) || threshold < 1) threshold = 1;
   if (thresholdInput) thresholdInput.value = threshold;
 
   statusEl.textContent = "Saving…";

@@ -62,7 +62,6 @@ function createContext(options = {}) {
     },
     tasks: [],
     archivedTasks: [],
-    activeWorkspaces: ["/workspace/test"],
     showArchived: false,
     backlogSortMode: "manual",
     filterQuery: "",

@@ -78,7 +78,6 @@ function makeContext(overrides = {}) {
       removeEventListener: vi.fn(),
       body: { style: { userSelect: "", cursor: "" } },
     },
-    localStorage: localStorageObj,
     getComputedStyle: () => ({ getPropertyValue: () => "" }),
     ...overrides,
     // Re-assign localStorage after spread to prevent overrides from clobbering it

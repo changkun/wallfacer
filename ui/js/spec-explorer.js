@@ -254,12 +254,12 @@ function renderSpecTree() {
 
   for (var j = 0; j < nodes.length; j++) {
     if (nodes[j].depth === 0) {
-      var track = (nodes[j].spec && nodes[j].spec.track) || "other";
-      if (!trackGroups[track]) {
-        trackGroups[track] = [];
-        trackOrder.push(track);
+      var trackName = (nodes[j].spec && nodes[j].spec.track) || "other";
+      if (!trackGroups[trackName]) {
+        trackGroups[trackName] = [];
+        trackOrder.push(trackName);
       }
-      trackGroups[track].push(nodes[j]);
+      trackGroups[trackName].push(nodes[j]);
     }
   }
 

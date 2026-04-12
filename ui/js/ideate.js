@@ -95,7 +95,7 @@ function updateNextRunDisplay() {
   }
 
   const nextRun = new Date(ideationNextRun);
-  if (isNaN(nextRun.getTime())) {
+  if (Number.isNaN(nextRun.getTime())) {
     el.style.display = "none";
     return;
   }
