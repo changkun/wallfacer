@@ -129,6 +129,9 @@ func checkAffectsExist(s *Spec, repoRoot string) []Result {
 	if repoRoot == "" {
 		return nil
 	}
+	if s.Status == StatusArchived {
+		return nil
+	}
 	var results []Result
 	for _, path := range s.Affects {
 		full := filepath.Join(repoRoot, path)
@@ -156,6 +159,7 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 	results = append(results, checkOrphanDirectories(tree, repoRoot)...)
 	results = append(results, checkStatusConsistency(tree)...)
 	results = append(results, checkStalePropagation(tree)...)
+	results = append(results, checkArchivedDependencies(tree)...)
 	results = append(results, checkUniqueDispatches(tree)...)
 
 	return results
@@ -216,6 +220,8 @@ func checkOrphanDirectories(tree *Tree, repoRoot string) []Result {
 }
 
 // checkStatusConsistency warns when a complete non-leaf has incomplete leaves.
+// Archived leaves and archived subtrees are treated as below glass and do not
+// count as incomplete.
 func checkStatusConsistency(tree *Tree) []Result {
 	var results []Result
 	for _, node := range tree.All {
@@ -235,6 +241,11 @@ func checkStatusConsistency(tree *Tree) []Result {
 }
 
 func hasIncompleteLeaf(node *Node) bool {
+	// Archived subtrees are below glass: neither the archived node itself nor
+	// anything beneath it is considered incomplete.
+	if node.Value != nil && node.Value.Status == StatusArchived {
+		return false
+	}
 	if node.IsLeaf {
 		return node.Value != nil && node.Value.Status != StatusComplete
 	}
@@ -247,6 +258,7 @@ func hasIncompleteLeaf(node *Node) bool {
 }
 
 // checkStalePropagation warns when a stale spec has validated dependents.
+// Archived dependents are silent — they are outside the live graph.
 func checkStalePropagation(tree *Tree) []Result {
 	reverse := dag.ReverseEdges(Adjacency(tree))
 
@@ -260,6 +272,9 @@ func checkStalePropagation(tree *Tree) []Result {
 			if !ok || depNode.Value == nil {
 				continue
 			}
+			if depNode.Value.Status == StatusArchived {
+				continue
+			}
 			if depNode.Value.Status == StatusValidated {
 				results = append(results, Result{
 					Path:     dependent,
@@ -268,6 +283,36 @@ func checkStalePropagation(tree *Tree) []Result {
 					Message:  fmt.Sprintf("depends on stale spec %q — review needed", path),
 				})
 			}
+		}
+	}
+	return results
+}
+
+// checkArchivedDependencies emits a soft note when a live spec depends on an
+// archived one. Advisory only — the edge can stay but likely should be removed
+// or documented.
+func checkArchivedDependencies(tree *Tree) []Result {
+	var results []Result
+	for path, node := range tree.All {
+		if node.Value == nil || node.Value.Status == StatusArchived {
+			continue
+		}
+		for _, dep := range node.Value.DependsOn {
+			depNode, ok := tree.All[dep]
+			if !ok || depNode.Value == nil {
+				continue
+			}
+			if depNode.Value.Status != StatusArchived {
+				continue
+			}
+			results = append(results, Result{
+				Path:     path,
+				Severity: SeverityWarning,
+				Rule:     "dependency-is-archived",
+				Message: fmt.Sprintf(
+					"depends on archived spec %q — consider removing the edge or documenting why it still matters",
+					dep),
+			})
 		}
 	}
 	return results
@@ -297,7 +342,7 @@ func checkUniqueDispatches(tree *Tree) []Result {
 }
 
 func checkBodyNotEmpty(s *Spec) []Result {
-	if s.Status == StatusVague || s.Status == "" {
+	if s.Status == StatusVague || s.Status == StatusArchived || s.Status == "" {
 		return nil
 	}
 	if strings.TrimSpace(s.Body) == "" {

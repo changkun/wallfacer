@@ -186,6 +186,36 @@ func TestValidateSpec_VagueEmptyBody(t *testing.T) {
 	}
 }
 
+func TestValidateSpec_ArchivedBodyEmpty(t *testing.T) {
+	s := newTestSpec("local/test.md")
+	s.Status = StatusArchived
+	s.Body = ""
+	results := ValidateSpec(s, "", true)
+	if hasRule(results, "body-not-empty", SeverityWarning) {
+		t.Error("archived spec with empty body should not trigger warning")
+	}
+}
+
+func TestValidateSpec_ArchivedAffectsMissing(t *testing.T) {
+	repoRoot := t.TempDir()
+	s := newTestSpec("local/test.md")
+	s.Status = StatusArchived
+	s.Affects = []string{"internal/nonexistent/"}
+	results := ValidateSpec(s, repoRoot, true)
+	if hasRule(results, "affects-exist", SeverityWarning) {
+		t.Error("archived spec with missing affects should not trigger warning")
+	}
+}
+
+func TestValidateSpec_ArchivedStatusValid(t *testing.T) {
+	s := newTestSpec("local/test.md")
+	s.Status = StatusArchived
+	results := ValidateSpec(s, "", true)
+	if hasRule(results, "valid-status", SeverityError) {
+		t.Error("archived should be a valid status")
+	}
+}
+
 func TestValidateSpec_AllRulesRun(t *testing.T) {
 	s := &Spec{
 		Title:  "",

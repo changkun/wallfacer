@@ -241,6 +241,78 @@ func TestValidateTree_NullDispatchesOK(t *testing.T) {
 	}
 }
 
+func TestValidateTree_ArchivedNonLeafIncompleteChildren(t *testing.T) {
+	parent := baseSpec()
+	parent.Status = StatusArchived
+	child := baseSpec()
+	child.Status = StatusValidated // incomplete by live-graph reckoning
+
+	tree := buildTestTree(map[string]*Spec{
+		"local/parent.md":       parent,
+		"local/parent/child.md": child,
+	})
+	results := ValidateTree(tree, "")
+
+	if hasRule(results, "status-consistency", SeverityWarning) {
+		t.Error("archived non-leaf should be exempt from status-consistency check")
+	}
+}
+
+func TestValidateTree_ArchivedDependencyNoStalePropagation(t *testing.T) {
+	dep := baseSpec()
+	dep.Status = StatusStale
+	dependent := baseSpec()
+	dependent.Status = StatusArchived
+	dependent.DependsOn = []string{"local/dep.md"}
+
+	tree := buildTestTree(map[string]*Spec{
+		"local/dep.md":       dep,
+		"local/dependent.md": dependent,
+	})
+	results := ValidateTree(tree, "")
+
+	if hasRule(results, "stale-propagation", SeverityWarning) {
+		t.Error("archived dependent should not trigger stale-propagation")
+	}
+}
+
+func TestValidateTree_LiveSpecDependsOnArchived(t *testing.T) {
+	archived := baseSpec()
+	archived.Status = StatusArchived
+	live := baseSpec()
+	live.Status = StatusValidated
+	live.DependsOn = []string{"local/archived.md"}
+
+	tree := buildTestTree(map[string]*Spec{
+		"local/archived.md": archived,
+		"local/live.md":     live,
+	})
+	results := ValidateTree(tree, "")
+
+	if !hasRule(results, "dependency-is-archived", SeverityWarning) {
+		t.Error("expected dependency-is-archived warning for live spec depending on archived")
+	}
+	if hasRule(results, "dependency-is-archived", SeverityError) {
+		t.Error("dependency-is-archived should be warning, not error")
+	}
+}
+
+func TestValidateTree_ArchivedSpecDependsOnMissing(t *testing.T) {
+	repoRoot := t.TempDir()
+	s := baseSpec()
+	s.Status = StatusArchived
+	s.DependsOn = []string{"specs/nonexistent.md"}
+
+	tree := buildTestTree(map[string]*Spec{
+		"local/archived.md": s,
+	})
+	results := ValidateTree(tree, repoRoot)
+
+	if !hasRule(results, "depends-on-exist", SeverityError) {
+		t.Error("structural depends-on-exist should still fire for archived specs")
+	}
+}
+
 func TestValidateTree_IncludesPerSpecErrors(t *testing.T) {
 	s := baseSpec()
 	s.Title = "" // per-spec required-fields error
