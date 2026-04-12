@@ -7,7 +7,7 @@ affects:
   - internal/spec/
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -36,7 +36,9 @@ Implement recursive progress aggregation for non-leaf specs. A non-leaf spec's p
 
    - `NodeProgress(node *SpecNode) Progress` — recursively computes progress for a node:
      - If leaf: `Progress{Complete: 1, Total: 1}` if status is `complete`, else `Progress{Complete: 0, Total: 1}`.
-     - If non-leaf: sum the progress of all children.
+     - If leaf and `archived`: `Progress{Complete: 0, Total: 0}` — excluded from both done and total counts. Archived leaves vanish from aggregation rather than counting as done-but-archived.
+     - If non-leaf and `archived`: return `Progress{Complete: 0, Total: 0}` immediately — the entire subtree is masked. Ancestors aggregate nothing from an archived branch.
+     - If non-leaf (not archived): sum the progress of all children.
 
    - `TreeProgress(tree *SpecTree) map[string]Progress` — returns progress for every non-leaf node, keyed by relative path.
 
@@ -51,6 +53,9 @@ Implement recursive progress aggregation for non-leaf specs. A non-leaf spec's p
 - `TestProgress_Fraction`: Verify float division and zero-total handling.
 - `TestProgress_String`: Verify `"2/3 leaves done"` format.
 - `TestTreeProgress_FullTree`: Build a multi-level tree and verify progress map contains entries for all non-leaf nodes with correct counts.
+- `TestNodeProgress_Leaf_Archived`: Archived leaf returns `{0, 0}` — excluded from aggregation.
+- `TestNodeProgress_NonLeaf_Archived`: Archived non-leaf returns `{0, 0}` regardless of subtree content.
+- `TestNodeProgress_MixedArchived`: Parent with one complete leaf, one archived leaf, one incomplete leaf — progress is `{1, 2}` (archived excluded).
 
 ## Boundaries
 

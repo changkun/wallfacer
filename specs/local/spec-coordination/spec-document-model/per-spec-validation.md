@@ -8,7 +8,7 @@ affects:
   - internal/spec/
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -42,7 +42,7 @@ Implement per-spec validation rules that check structural correctness of individ
    | Rule | Severity | Check |
    |------|----------|-------|
    | `required-fields` | error | `title`, `status`, `track`, `effort`, `created`, `updated`, `author` must be non-empty |
-   | `valid-status` | error | `status` is one of the 5 valid values |
+   | `valid-status` | error | `status` is one of the 6 valid values (including `archived`) |
    | `valid-track` | error | `track` is one of the 4 valid values |
    | `valid-effort` | error | `effort` is one of the 4 valid values |
    | `track-matches-path` | error | `track` matches the spec's filesystem location (`specs/<track>/...`) |
@@ -51,8 +51,8 @@ Implement per-spec validation rules that check structural correctness of individ
    | `no-self-dependency` | error | spec's own path does not appear in `depends_on` |
    | `dispatch-consistency` | error | non-leaf specs must have nil `dispatched_task_id`; leaf specs may have nil or valid UUID |
    | `depends-on-exist` | error | every path in `depends_on` resolves to an existing file (relative to repo root) |
-   | `affects-exist` | warning | every path in `affects` resolves to an existing file or directory |
-   | `body-not-empty` | warning | specs beyond `vague` status should have non-empty body |
+   | `affects-exist` | warning | every path in `affects` resolves to an existing file or directory; suppressed for `archived` specs — deleted paths are not actionable |
+   | `body-not-empty` | warning | specs beyond `vague` status should have non-empty body; suppressed for `archived` specs — a stub with only frontmatter is valid |
 
 3. The `dispatch-consistency` rule needs to know if a spec is a leaf. Pass this as a parameter: `ValidateSpec(spec *Spec, repoRoot string, isLeaf bool) []ValidationResult`.
 
@@ -74,6 +74,8 @@ Implement per-spec validation rules that check structural correctness of individ
 - `TestValidateSpec_EmptyBodyWarning`: Spec with `drafted` status and empty body triggers warning.
 - `TestValidateSpec_VagueEmptyBody`: Spec with `vague` status and empty body — no warning.
 - `TestValidateSpec_AllRulesRun`: Spec with multiple issues — verify all relevant rules fire, not just the first.
+- `TestValidateSpec_ArchivedBodyEmpty`: Archived spec with empty body — no `body-not-empty` warning.
+- `TestValidateSpec_ArchivedAffectsMissing`: Archived spec with non-existent `affects` path — no warning.
 
 Use `t.TempDir()` to create test file structures for `depends_on`/`affects` existence checks.
 

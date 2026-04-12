@@ -7,7 +7,7 @@ affects:
   - internal/spec/
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -30,15 +30,16 @@ Implement reverse dependency computation and impact analysis. Given a spec, answ
      }
      ```
 
-   - `BuildReverseIndex(tree *SpecTree) map[string][]string` — inverts all `depends_on` edges. For each spec A that has `depends_on: [B, C]`, add A to the reverse list of B and C. Returns a map from spec path to list of direct dependents.
+   - `BuildReverseIndex(tree *SpecTree) map[string][]string` — inverts all `depends_on` edges. For each spec A that has `depends_on: [B, C]`, add A to the reverse list of B and C. Returns a map from spec path to list of direct dependents. Archived specs are skipped as both sources (their `depends_on` edges contribute nothing) and targets (no entry is created for them) — they are invisible to any reverse traversal.
 
    - `ComputeImpact(tree *SpecTree, specPath string) (*Impact, error)` — computes direct and transitive impact of a spec:
      1. Build reverse index.
      2. Direct: specs in the reverse index for `specPath`.
      3. Transitive: BFS/DFS from direct dependents through the reverse index. Exclude the direct set from the transitive set.
-     4. For non-leaf specs: also include specs that depend on any leaf in the subtree (the non-leaf's design governs its children).
+     4. For non-leaf specs: also include specs that depend on any leaf in the subtree (the non-leaf's design governs its children). An archived non-leaf prunes its entire subtree from this expansion.
+     5. If `specPath` refers to an archived spec, return an empty `Impact` immediately — archival signals nothing should compute from this spec.
 
-   - `UnblockedSpecs(tree *SpecTree, completedPath string) []*SpecNode` — given a spec that just reached `complete`, find all specs whose `depends_on` are now fully satisfied (all dependencies are `complete`). Useful for surfacing what's newly ready to dispatch.
+   - `UnblockedSpecs(tree *SpecTree, completedPath string) []*SpecNode` — given a spec that just reached `complete`, find all specs whose `depends_on` are now fully satisfied (all dependencies are `complete`). Useful for surfacing what's newly ready to dispatch. Does not surface archived candidates — archival does not unblock downstream work. Archived dependencies are treated as already satisfied (same semantics as `complete`) so live specs depending on archived specs are not held back.
 
 2. The reverse index and impact queries should handle:
    - Cross-tree dependencies (specs depending on specs in different tracks).
@@ -61,6 +62,9 @@ Implement reverse dependency computation and impact analysis. Given a spec, answ
 - `TestUnblockedSpecs_Simple`: B depends on A. A completes -> B is unblocked.
 - `TestUnblockedSpecs_MultiDep`: C depends on A and B. Only A completes -> C not unblocked. Both complete -> C unblocked.
 - `TestUnblockedSpecs_AlreadyComplete`: Already-complete specs are not returned as unblocked.
+- `TestComputeImpact_ArchivedSpec`: Computing impact of an archived spec returns empty Impact.
+- `TestBuildReverseIndex_SkipsArchived`: Archived specs are not included as sources or targets in the reverse index.
+- `TestUnblockedSpecs_ArchivedDepSatisfied`: Spec with one archived dependency and one complete dependency — treated as unblocked (archived dep counts as satisfied).
 
 ## Boundaries
 

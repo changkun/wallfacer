@@ -8,7 +8,7 @@ affects:
   - internal/spec/
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -32,9 +32,10 @@ Implement tree-wide validation rules that require the full spec tree context: DA
    | `dag-acyclic` | error | The `depends_on` graph has no cycles. On violation, report the full cycle path (e.g., "A -> B -> C -> A"). Use topological sort or DFS with coloring. |
    | `no-orphan-directories` | warning | A `<name>/` subdirectory should have a corresponding `<name>.md` parent spec |
    | `no-orphan-specs` | warning | A `<name>.md` with a `<name>/` subdirectory should have at least one child spec in it |
-   | `status-consistency` | warning | A `complete` non-leaf spec should not have incomplete leaves in its subtree |
-   | `stale-propagation` | warning | If a spec is `stale`, dependents that are still `validated` should be flagged |
+   | `status-consistency` | warning | A `complete` non-leaf spec should not have incomplete leaves in its subtree; skipped for `archived` non-leaf specs — their subtree is below glass regardless of leaf states |
+   | `stale-propagation` | warning | If a spec is `stale`, dependents that are still `validated` should be flagged; does not fire for `archived` dependencies — emits a `dependency-is-archived` advisory note instead |
    | `track-consistency` | warning | All specs in `specs/<track>/` should have `track: <track>` in frontmatter |
+   | `dependency-is-archived` | warning | A live spec whose `depends_on` includes an `archived` spec — advisory only; suggests removing the edge or documenting why it still matters |
    | `unique-dispatches` | error | No two specs share the same `dispatched_task_id` (ignoring nulls) |
 
 3. For DAG cycle detection, implement a DFS-based approach:
@@ -59,6 +60,9 @@ Implement tree-wide validation rules that require the full spec tree context: DA
 - `TestValidateTree_NullDispatchesOK`: Multiple specs with null dispatch IDs — no error.
 - `TestValidateTree_IncludesPerSpecErrors`: Individual spec errors also appear in tree validation results.
 - `TestValidateTree_EmptyTree`: Empty tree returns no errors.
+- `TestValidateTree_ArchivedNonLeafStatusConsistency`: Archived non-leaf with incomplete leaves — no status-consistency warning.
+- `TestValidateTree_ArchivedDependencyStale`: Stale spec with `validated` dependent — stale-propagation warning; but if the stale dep is archived, no warning fires.
+- `TestValidateTree_DependencyIsArchived`: Live validated spec depending on archived spec — `dependency-is-archived` advisory warning.
 
 Use `t.TempDir()` to build complete test directory structures with multiple spec files.
 

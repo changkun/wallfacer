@@ -7,7 +7,7 @@ affects:
   - internal/spec/
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -25,16 +25,17 @@ Implement status transition validation for specs, enforcing the lifecycle state 
    ```go
    var allowedTransitions = map[SpecStatus][]SpecStatus{
        StatusVague:     {StatusDrafted},
-       StatusDrafted:   {StatusValidated, StatusStale},
+       StatusDrafted:   {StatusValidated, StatusStale, StatusArchived},
        StatusValidated: {StatusComplete, StatusStale},
-       StatusComplete:  {StatusStale},
-       StatusStale:     {StatusDrafted, StatusValidated},
+       StatusComplete:  {StatusStale, StatusArchived},
+       StatusStale:     {StatusDrafted, StatusValidated, StatusArchived},
+       StatusArchived:  {StatusDrafted},
    }
    ```
 
 2. Implement `ValidateTransition(from, to SpecStatus) error` — returns nil if the transition is allowed, a descriptive error otherwise. Use a sentinel error `ErrInvalidTransition` for wrapping.
 
-3. Implement `ValidStatuses() []SpecStatus` — returns all valid status values (useful for validation).
+3. Implement `ValidStatuses() []SpecStatus` — returns all valid status values (useful for validation). Includes `StatusArchived` as the sixth state.
 
 4. Implement `ValidTracks() []SpecTrack` and `ValidEfforts() []SpecEffort` — returns all valid enum values.
 
@@ -44,7 +45,7 @@ Implement status transition validation for specs, enforcing the lifecycle state 
 - `TestValidateTransition_AllInvalid`: Table-driven test covering disallowed transitions (e.g., `vague` -> `complete`, `complete` -> `drafted`).
 - `TestValidateTransition_SameStatus`: Same-to-same transitions should be rejected.
 - `TestValidateTransition_ErrorWrapping`: Verify returned error wraps `ErrInvalidTransition`.
-- `TestValidStatuses`: Verify all 5 statuses returned.
+- `TestValidStatuses`: Verify all 6 statuses returned (including `archived`).
 - `TestValidTracks`: Verify all 4 tracks returned.
 - `TestValidEfforts`: Verify all 4 effort levels returned.
 

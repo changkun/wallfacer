@@ -10,7 +10,7 @@ affects:
   - internal/pkg/statemachine/
 effort: large
 created: 2026-03-29
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -28,7 +28,7 @@ Every spec document carries structured frontmatter:
 ```yaml
 ---
 title: Sandbox Backends
-status: validated          # vague | drafted | validated | complete | stale
+status: validated          # vague | drafted | validated | complete | stale | archived
 depends_on:                # specs this one requires (DAG edges — can point anywhere)
   - specs/foundations/storage-backends.md
 affects:                   # packages and files this spec describes
@@ -106,14 +106,14 @@ A spec validator checks structural correctness of spec documents. It runs on ind
 | Rule | Severity | Description |
 |------|----------|-------------|
 | **Required fields** | error | `title`, `status`, `effort`, `created`, `updated`, `author` must be present |
-| **Valid status** | error | `status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale` |
+| **Valid status** | error | `status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale`, `archived` |
 | **Valid effort** | error | `effort` must be one of: `small`, `medium`, `large`, `xlarge` |
 | **Date format** | error | `created` and `updated` must be valid ISO dates; `updated` ≥ `created` |
 | **Dispatch consistency** | error | Non-leaf specs must have `dispatched_task_id: null`. Leaf specs may have null or a valid UUID |
 | **`depends_on` targets exist** | error | Every path in `depends_on` must resolve to an existing spec file |
-| **`affects` paths exist** | warning | Every path in `affects` should resolve to an existing file or directory in the codebase. Warning (not error) because code may not exist yet for `vague`/`drafted` specs |
+| **`affects` paths exist** | warning | Every path in `affects` should resolve to an existing file or directory in the codebase. Warning (not error) because code may not exist yet for `vague`/`drafted` specs. Suppressed for `archived` specs — deleted paths are not actionable |
 | **No self-dependency** | error | A spec cannot appear in its own `depends_on` |
-| **Body not empty** | warning | Specs beyond `vague` status should have meaningful content below the frontmatter |
+| **Body not empty** | warning | Specs beyond `vague` status should have meaningful content below the frontmatter. Suppressed for `archived` specs — a stub with only frontmatter is valid |
 
 ### Cross-Spec Validation (Tree-Wide)
 
@@ -122,8 +122,8 @@ A spec validator checks structural correctness of spec documents. It runs on ind
 | **DAG is acyclic** | error | The `depends_on` graph must have no cycles. Report the full cycle path on violation |
 | **No orphan directories** | warning | A `<name>/` subdirectory should have a corresponding `<name>.md` parent spec |
 | **No orphan specs** | warning | A `<name>.md` file with a `<name>/` subdirectory should have at least one child spec in it |
-| **Status consistency** | warning | A `complete` non-leaf spec should not have incomplete leaves in its subtree |
-| **Stale propagation** | warning | If a spec is `stale`, dependents that are still `validated` should be flagged for review |
+| **Status consistency** | warning | A `complete` non-leaf spec should not have incomplete leaves in its subtree. Skipped for `archived` non-leaf specs — their subtree is below glass regardless of leaf states |
+| **Stale propagation** | warning | If a spec is `stale`, dependents that are still `validated` should be flagged for review. Does not fire for `archived` dependencies — emits a `dependency-is-archived` advisory note instead |
 | **Unique dispatches** | error | No two specs may share the same `dispatched_task_id` |
 
 ### When to Run
@@ -146,15 +146,23 @@ vague ──▶ drafted ──▶ validated ──▶ complete
             │          │    │          │
             ▼          ▼    │          ▼
           stale      stale  └───── stale
+            │                         │
+            ├─────────────────────────┤
+            ▼                         ▼
+                    archived
+                       │
+                       ▼
+                    drafted   (resurrect — only valid exit)
 ```
 
 | State | Meaning | Transitions |
 |-------|---------|-------------|
 | **vague** | Initial idea. Problem statement exists but design is incomplete. | → `drafted` (design details added) |
-| **drafted** | Enough detail for review. May have open questions. | → `validated` (reviewed and approved) · → `stale` (superseded) |
+| **drafted** | Enough detail for review. May have open questions. | → `validated` (reviewed and approved) · → `stale` (superseded) · → `archived` (abandoned early draft) |
 | **validated** | Reviewed, approved, ready to break down or dispatch. | → `complete` (all work done) · → `stale` (invalidated) |
-| **complete** | All children done (non-leaf) or task done (leaf). Spec updated to reflect reality. | → `stale` (if later work modifies what this spec describes) |
-| **stale** | Spec no longer matches reality. Needs human review. | → `drafted` (refreshed) · → `validated` (re-validated) |
+| **complete** | All children done (non-leaf) or task done (leaf). Spec updated to reflect reality. | → `stale` (if later work modifies what this spec describes) · → `archived` (retire finished spec from live graph) |
+| **stale** | Spec no longer matches reality. Needs human review. | → `drafted` (refreshed) · → `validated` (re-validated) · → `archived` (acknowledge drift without fixing) |
+| **archived** | Retired from the live graph. Read-only, hidden by default, excluded from progress/impact/drift/dispatch. | → `drafted` (resurrect — only valid inbound transition) |
 
 ### Lifecycle Rules
 
@@ -292,7 +300,7 @@ The regime is not a system mode — it's an emergent property of how the human a
 
 ## Outcome
 
-The spec document model is fully implemented as `internal/spec/`, providing types, parsing, tree building, validation, progress tracking, and impact analysis for spec documents. During implementation, three generic data structure packages were extracted to `internal/pkg/` and adopted by existing code (store, sandbox).
+The spec document model is fully implemented as `internal/spec/`, providing types, parsing, tree building, validation, progress tracking, and impact analysis for spec documents. The lifecycle has been extended from five to six states with the addition of `archived` (see spec-archival.md). During implementation, three generic data structure packages were extracted to `internal/pkg/` and adopted by existing code (store, sandbox).
 
 ### What Shipped
 

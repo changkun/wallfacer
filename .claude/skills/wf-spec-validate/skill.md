@@ -39,7 +39,7 @@ For each spec, check these rules. Classify each finding as `error` or
 be present in the frontmatter. Report each missing field.
 
 ### Valid status (error)
-`status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale`.
+`status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale`, `archived`.
 
 ### Valid track (error)
 `track` must match the spec's filesystem location. A spec at
@@ -67,11 +67,12 @@ A spec must not appear in its own `depends_on` list.
 ### `affects` paths exist (warning)
 Every path in `affects` should resolve to an existing file or directory in the
 codebase. Only a warning because code may not exist yet for `vague`/`drafted`
-specs.
+specs. Suppressed for `archived` specs — deleted paths are not actionable.
 
 ### Body not empty (warning)
 Specs with status beyond `vague` should have meaningful content below the
-frontmatter (more than just a title heading).
+frontmatter (more than just a title heading). Suppressed for `archived` specs —
+a stub with only frontmatter is valid.
 
 ## Step 3: Cross-spec validation (tree-wide)
 
@@ -92,16 +93,24 @@ child spec inside that directory.
 ### Status consistency (warning)
 A `complete` non-leaf spec should not have incomplete leaves in its subtree.
 Check recursively: if any leaf in the subtree has a status other than
-`complete`, warn.
+`complete`, warn. Skipped when the non-leaf is `archived` — the subtree is
+considered below glass regardless of leaf states.
 
 ### Stale propagation (warning)
 If a spec is `stale`, check all specs that list it in their `depends_on`.
 Those that are still `validated` should be flagged for review — their
-assumptions about the stale spec may no longer hold.
+assumptions about the stale spec may no longer hold. Does not fire for
+`archived` dependencies — a validated spec depending on an archived spec
+receives a `dependency-is-archived` advisory note instead (see below).
 
 ### Track consistency (warning)
 All specs under `specs/<track>/` (at any depth) should have `track: <track>`
 in their frontmatter.
+
+### dependency-is-archived (warning)
+A live spec whose `depends_on` includes an archived spec. Advisory only —
+recommend removing the edge or documenting why it still matters. Does not
+count as a stale-propagation warning.
 
 ### Unique dispatches (error)
 No two specs may share the same non-null `dispatched_task_id` value. Collect

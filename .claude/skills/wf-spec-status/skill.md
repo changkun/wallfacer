@@ -34,11 +34,16 @@ For each spec file, use the frontmatter `status` field as the primary source of
 truth:
 
 1. **Read the `status` from frontmatter**: `vague`, `drafted`, `validated`,
-   `complete`, or `stale`.
+   `complete`, `stale`, or `archived`. An `archived` spec is retired from the
+   live graph — read-only, hidden by default, and excluded from progress,
+   impact, drift, and dispatch.
 2. **For non-leaf specs** (those with a child directory), compute progress by
    recursively counting leaf specs in the subtree:
    - Count leaves with `status: complete` vs total leaves.
    - Report progress as `N/M leaves done (X%)`.
+   - Archived leaves contribute 0 to both `done` and `total`.
+   - An archived non-leaf masks its entire subtree from progress — ancestors
+     aggregate nothing from an archived branch.
 3. **For leaf specs**, check `dispatched_task_id` to see if the spec has been
    dispatched to the kanban board. If dispatched, cross-reference the task
    status if possible.
@@ -57,7 +62,8 @@ For each non-complete spec:
    only when its status is `complete`.
 3. Flag specs that are **actionable** — `status` is `validated`, all
    `depends_on` entries are `complete`, and the spec is a leaf (or has a child
-   breakdown ready).
+   breakdown ready). `archived` specs are never actionable — do not count them
+   in blocked or unblocked totals.
 4. Flag specs that are **blocked** — at least one `depends_on` entry is not
    `complete`.
 5. Flag specs that are **stale** — their `status` is `stale` and they need
@@ -121,6 +127,9 @@ state within each track:
 
 ### Stale (needs review)
 - <spec-name> — <reason for staleness or last updated date>
+
+### Archived (hidden by default)
+- <spec-name> — retired from the live graph; resurrect via `archived → drafted` transition
 
 ### Recommended Next Steps
 1. <most impactful actionable item>
