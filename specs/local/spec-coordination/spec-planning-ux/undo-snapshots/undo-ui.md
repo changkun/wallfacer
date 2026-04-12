@@ -1,126 +1,270 @@
 ---
-title: UI Undo Button
-status: validated
+title: UI Per-Message Undo
+status: drafted
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/undo-snapshots/undo-api.md
 affects:
   - ui/partials/spec-mode.html
   - ui/js/planning-chat.js
+  - ui/css/spec-mode.css
 effort: small
 created: 2026-04-04
-updated: 2026-04-04
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
 
-# UI Undo Button
+# UI Per-Message Undo
 
 ## Goal
 
-Add a single "Undo" button to the planning chat header in `ui/partials/spec-mode.html`
-that calls `POST /api/planning/undo`, removes the last message pair from the DOM, and
-refreshes the spec tree. The button is disabled when no undoable rounds exist.
+Every assistant message in the planning chat that is associated with a
+`plan: round N` commit gets a **tiny inline undo button**. The chat stream is
+append-only: clicking undo does **not** remove any existing bubbles — instead,
+a new system-style bubble is appended to the end of the stream announcing what
+was undone, so the history of "what the agent did, and what I reverted" stays
+visible and self-describing.
+
+This replaces the previous single-button-in-header design. The new affordance
+is a per-message action, matching how modern chat UIs (Slack, Discord) expose
+message-level operations.
+
+## UX Principles
+
+1. **Per-message affordance.** Each assistant bubble that triggered a commit
+   renders a small `⟲` icon button in its action row (top-right of the
+   bubble, similar to copy/retry affordances in other chat UIs). Not a giant
+   button — unobtrusive, discoverable on hover.
+2. **Append-only stream.** Bubbles are never removed from the DOM. Undo
+   appends; it does not delete. Users can scroll back and see everything the
+   agent did, including things that were later reverted.
+3. **Self-narrating undo.** Each successful undo appends a system bubble like
+   *"↶ Undid round 3 — drafted foo spec. Reverted: specs/foo.md"*, formatted
+   as a distinct role (`system` or similar) so it's visually clear these
+   aren't agent outputs.
+4. **Reverted bubbles are visually dimmed.** The original assistant bubble
+   whose commit was reverted stays in place but gets a `--reverted` modifier
+   class (strikethrough title, reduced opacity, small "reverted in round
+   ↓system-N" caption). This makes the stream self-documenting without
+   requiring the user to reconstruct the timeline.
 
 ## What to do
 
-1. **Add the button to `ui/partials/spec-mode.html`** in the `spec-chat-stream__header`
-   div, before the Close button:
+### 1. Remove the header Undo button (from the earlier design)
 
-   ```html
-   <div class="spec-chat-stream__header">
-     <span>Planning Chat</span>
-     <button id="spec-chat-undo" title="Undo last planning round" disabled>Undo</button>
-     <button id="spec-chat-clear">Clear</button>
-     <button onclick="toggleSpecChat()">✕</button>
-   </div>
-   ```
+The previous spec placed a single `#spec-chat-undo` in
+`.spec-chat-stream__header`. Do **not** add that button; the header stays at
+its current state (Clear + Close only, per `ui/partials/spec-mode.html`).
 
-2. **Wire the button in `ui/js/planning-chat.js`**:
+### 2. Per-bubble undo button
 
-   a. In `init()`, add alongside existing button refs:
-   ```js
-   this._undoBtn = document.getElementById('spec-chat-undo');
-   this._undoBtn.addEventListener('click', () => this._onUndo());
-   ```
+In `ui/js/planning-chat.js`, extend the assistant bubble rendering (around
+line 534, where `planning-chat-bubble--assistant` is built) to include an
+action row with an undo button:
 
-   b. Add `_updateUndoBtn()` — enables button when the message list has at least one
-   assistant message, disables otherwise:
-   ```js
-   _updateUndoBtn() {
-     if (!this._undoBtn) return;
-     const hasRounds = this._messagesEl.querySelectorAll(
-       '.bubble--assistant').length > 0;
-     this._undoBtn.disabled = !hasRounds || this._streaming;
-   }
-   ```
+```html
+<div class="planning-chat-bubble planning-chat-bubble--assistant"
+     data-round="3">
+  <div class="planning-chat-bubble__content">…</div>
+  <div class="planning-chat-bubble__actions">
+    <button class="planning-chat-bubble__undo"
+            title="Undo this round"
+            aria-label="Undo round 3">⟲</button>
+  </div>
+  <div class="planning-chat-bubble__time">…</div>
+</div>
+```
 
-   c. Call `_updateUndoBtn()` at the end of:
-   - `_loadHistory()` — after messages are rendered
-   - `_appendMessageBubble()` / `_appendMessageBubbleWithActivity()` — after appending
-   - `_stopStreaming()` — after streaming ends
-   - After `clearHistory()` resolves
+- Add the button to **every** assistant bubble that has an associated planning
+  round (see §3 for how the UI learns that).
+- Assistant bubbles from rounds with no writes (no planning commit) do **not**
+  get the button.
+- Only the most recent planning-round bubble has the button enabled; older
+  bubbles render it disabled with `title="Only the most recent round can be
+  undone"` (see §4 for the reasoning).
+- CSS lives in `ui/css/spec-mode.css` — small icon-sized button, appears on
+  bubble hover, fades when disabled.
 
-   d. In `_startStreaming()`, also call `_updateUndoBtn()` to disable during streaming
-   (identical to how the send button is disabled).
+### 3. Round attribution per message
 
-   e. Add `async _onUndo()`:
-   ```js
-   async _onUndo() {
-     this._undoBtn.disabled = true;
-     this._undoBtn.textContent = 'Undoing…';
-     try {
-       const res = await fetch('/api/planning/undo', { method: 'POST' });
-       if (!res.ok) {
-         const body = await res.json().catch(() => ({}));
-         this._showError(body.error || 'Undo failed');
-         return;
-       }
-       // Remove the last user+assistant message pair from the DOM
-       const bubbles = this._messagesEl.querySelectorAll('.bubble');
-       // Walk backwards: remove the last assistant bubble and its preceding user bubble
-       for (let i = bubbles.length - 1; i >= 0; i--) {
-         const b = bubbles[i];
-         b.remove();
-         if (b.classList.contains('bubble--user')) break;
-       }
-       // Refresh spec tree so frontmatter changes are reflected
-       if (typeof reloadSpecTree === 'function') reloadSpecTree();
-     } catch (e) {
-       this._showError('Undo failed: ' + e.message);
-     } finally {
-       this._undoBtn.textContent = 'Undo';
-       this._updateUndoBtn();
-     }
-   }
-   ```
+The UI needs to know which assistant bubble corresponds to which
+`plan: round N` commit. Two viable sources of truth — pick one:
 
-   f. Add `_showError(msg)` if not already present — inserts a temporary error notice
-   into the messages area that auto-dismisses after 4 seconds.
+- **Option A: server attaches round metadata to the message record.** Extend
+  `planner.Message` with an optional `plan_round int` field. In
+  `internal/handler/planning.go`, after `commitPlanningRound` succeeds,
+  capture the round number (derivable with the same `git log --grep='^plan: round'`
+  count the commit helper already does) and set it on the assistant
+  `Message` before `cs.AppendMessage(...)`. `GetPlanningMessages` returns it
+  verbatim. The UI renders the undo button only when `plan_round > 0`.
+- **Option B: UI infers round from the message history.** The UI queries
+  `GET /api/planning/commits` (a new read-only endpoint that returns the
+  list of `{round, summary, commit_hash, timestamp}` tuples) and matches by
+  timestamp / ordering. Heavier client-side logic and one extra endpoint.
 
-3. **Keyboard shortcut** — in `ui/js/events.js`, add `u` key in spec mode to trigger
-   `PlanningChat.undo()` (expose `_onUndo` as a public `undo()` method). This mirrors
-   how `c` toggles chat and `d` dispatches.
+**Prefer Option A.** Keeps attribution authoritative on the server; the UI
+just reads a scalar. Adds ~5 lines in `planning.go` and one field to the
+persisted message record. The schema addition is backward-compatible because
+it's an optional int field that defaults to zero for pre-existing messages.
+
+### 4. Which bubbles' buttons are enabled
+
+The existing `POST /api/planning/undo` only reverts the planning commit at
+HEAD (with a safety check refusing the reset when it isn't). That means, at
+any moment, only **one** round — the latest — is actually revertible without
+destroying intermediate history.
+
+- UI reflects this by enabling the undo button only on the latest-round
+  bubble (the one whose `data-round` value is the max among all visible
+  assistant bubbles). All other round-bearing bubbles render the button
+  disabled with the tooltip above.
+- When a new planning commit lands (server appends a new assistant bubble),
+  the UI re-computes which bubble is latest: move the enabled state to the
+  new bubble, demote the previous one to disabled.
+- When an undo succeeds, the reverted bubble gets the `--reverted` class
+  *and* loses its undo button entirely (that round no longer exists). The
+  previous round's bubble (if any) becomes the new enabled candidate and
+  regains its button — since after `git reset --hard HEAD~1`, *its* commit
+  is now at HEAD.
+
+This model keeps the affordance per-message without requiring the
+complexity of a targeted-undo server endpoint. The Open Questions section
+below notes when we might want to extend the server.
+
+### 5. Appended system bubble on undo
+
+On a successful `POST /api/planning/undo` response, append a new bubble with a
+new role class `planning-chat-bubble--system` (or equivalent) to the end of
+the stream. The content is rendered inline — not a modal:
+
+```
+↶ Undid round 3 — drafted foo spec
+  Reverted files:
+  • specs/foo.md
+  • specs/bar.md
+```
+
+- Use the `round`, `summary`, and `files_reverted` fields from the undo
+  response.
+- Do **not** persist the undo announcement to the server conversation store
+  in this iteration — it's a client-side visual marker derived from the
+  response. (If persistence is later deemed useful for cross-session
+  visibility, it belongs in a follow-up spec.)
+- The previous "original" bubble gains the `--reverted` class so the user
+  can immediately see which agent turn's work is no longer on disk.
+
+### 6. Error handling
+
+- On 409 with `error: "no planning commits to undo"` — silently disable the
+  button (the UI shouldn't have offered it; this is a defensive catch).
+- On 409 with `error: "latest planning commit is not at HEAD ..."` — append
+  a system bubble:
+  *"⚠ Can't undo: you have unrelated commits since the last planning round.
+  Resolve manually before using undo."*
+- On 409 with `error: "stash pop conflict after undo; stash retained ..."` —
+  append:
+  *"⚠ Undo partially applied: git reset succeeded but your working-tree
+  edits couldn't be reapplied cleanly. Your changes are preserved in the
+  stash — run `git stash list` to recover."*
+- On 5xx or network failure — append a transient error bubble, re-enable
+  the originating button after 4 seconds.
+
+### 7. Remove the keyboard shortcut
+
+The earlier design suggested binding `u` to trigger undo in spec mode. With
+the per-message affordance, this is ambiguous (undo which message?). Skip
+the keyboard shortcut — users click the button on the target bubble. If a
+shortcut is later desired, "latest round only" semantics can be revisited.
 
 ## Tests
 
-- `test_undo_button_disabled_on_empty_history` — init chat with no messages, verify
-  `#spec-chat-undo` has `disabled` attribute
-- `test_undo_button_enabled_after_message_append` — append an assistant bubble, verify
-  button is enabled
-- `test_undo_button_disabled_during_streaming` — call `_startStreaming()`, verify button
-  is disabled; call `_stopStreaming()`, verify re-enabled
-- `test_undo_removes_last_message_pair` — stub `fetch` to return 200, call `_onUndo()`,
-  verify the last user+assistant bubble pair is removed from DOM
-- `test_undo_shows_error_on_conflict` — stub `fetch` to return 409
-  `{"error":"no planning commits to undo"}`, verify error notice appears and button
-  state is restored
+Frontend (vitest under `ui/js/__tests__/`):
+
+- `test_undo_button_not_rendered_on_user_bubble` — user messages never show
+  the button.
+- `test_undo_button_not_rendered_on_roundless_assistant_bubble` — assistant
+  bubbles with no `plan_round` metadata (no writes) show no button.
+- `test_undo_button_enabled_on_latest_round_only` — with three round-bearing
+  assistant bubbles in the stream, exactly one (the latest) has the button
+  enabled; the other two are disabled with the correct tooltip.
+- `test_undo_button_promotes_after_append` — simulate a new assistant bubble
+  arriving; the previously-latest bubble's button becomes disabled, the new
+  bubble's becomes enabled.
+- `test_undo_success_dims_original_appends_system_bubble` — stub `fetch` to
+  return 200 with `{round: 3, summary: "drafted foo", files_reverted: […], workspace: "/ws"}`,
+  click the button, verify (a) the originating bubble gains the `--reverted`
+  class, (b) a new system bubble with the expected text is appended, (c) no
+  existing bubbles are removed.
+- `test_undo_conflict_not_at_head_appends_warning_bubble` — stub 409 with the
+  not-at-HEAD error, verify warning bubble is appended and the originating
+  button is re-enabled.
+- `test_undo_stash_conflict_appends_stash_warning` — similar for the stash
+  pop conflict branch.
+- `test_undo_network_error_transient_notice` — stub `fetch` to reject,
+  verify a transient system bubble appears and the button is re-enabled
+  after the retry window.
+
+Backend (only if Option A in §3 is taken):
+
+- `TestSendPlanningMessage_AttachesPlanRound` — mock the planner to write a
+  spec file and return a summary; verify the assistant message written to
+  the conversation store has `plan_round = N` where N matches the newly-
+  created planning commit's count.
 
 ## Boundaries
 
-- Do NOT add per-message undo buttons — one global button in the header only
-- Do NOT implement redo
-- Do NOT remove messages from the server-side conversation store (the undo button
-  only updates the DOM; the server conversation log is NOT purged)
-- Do NOT change the behavior of the Clear, Send, or Interrupt buttons
-- The `reloadSpecTree()` call is best-effort — if the function is not available in the
-  current scope, skip it silently
+- Do **not** remove any existing bubbles from the DOM — the chat is an
+  append-only log.
+- Do **not** add a global header Undo button.
+- Do **not** modify the existing Clear / Send / Interrupt / @ / / buttons.
+- Do **not** purge server-side messages on undo (the undo is a git operation,
+  not a conversation-log operation).
+- `reloadSpecTree()` may be called best-effort after a successful undo to
+  refresh the explorer; if the function isn't in scope, skip silently.
+- Per-round targeted undo (revert a middle round while preserving later
+  ones) is out of scope here; see the open question below.
+
+## Open Questions
+
+Flag for reviewer before this spec returns to `validated`:
+
+1. **Targeted undo for non-HEAD rounds.** The UX shows a disabled button on
+   older round-bearing bubbles with a tooltip. Is that the right behaviour,
+   or should clicking an older bubble trigger a `git revert <commit>` that
+   creates a new reversing commit (potentially conflicting with later
+   rounds)? Tentative: stick with "latest only" until we see real demand —
+   the append-only history already gives the user a clear recovery path
+   (click undo repeatedly to walk backward round by round).
+2. **Round attribution storage.** §3 recommends Option A (server attaches
+   `plan_round` to the message). Confirm this is acceptable — adds one
+   optional int to the persisted message schema and ~5 lines in the handler.
+3. **System-bubble persistence.** Should the "↶ Undid round N" announcements
+   be written to the server conversation store so they survive page
+   reloads and cross-session visibility? Current spec says no (client-side
+   only); persisting them would require a small server change and a new
+   message role. Tentative: defer to a follow-up.
+4. **Reverted-bubble styling.** Strikethrough + dim is the sketch; may want
+   a subtler treatment (thin caption only, no opacity change) if reverted
+   bubbles turn out to be too visually intrusive. Design-call, not
+   architectural.
+5. **Focus on the newly-enabled button after undo.** When undo succeeds
+   and the previous bubble's button becomes the new "latest enabled",
+   should we focus it automatically so a second undo is one keystroke
+   away? Accessibility tradeoff — easy to add, easy to remove.
+
+## Implementation notes (for when this reaches `validated`)
+
+- The existing assistant-bubble rendering path is in `ui/js/planning-chat.js`
+  around line 534 (the class `planning-chat-bubble--assistant` is built
+  there). Do **not** change the class names; add the action row alongside
+  the existing `planning-chat-bubble__content` / `planning-chat-bubble__time`
+  structure.
+- The partial `ui/partials/spec-mode.html` does not need bubble-level
+  markup — bubbles are built in JS. Only `ui/css/spec-mode.css` and
+  `ui/js/planning-chat.js` should change in the UI layer.
+- If Option A is chosen for round attribution, the server change is one
+  additional field on `planner.Message`, one extra `git log --grep='^plan:
+  round' | wc -l` inside `SendPlanningMessage` (reusing
+  `commitPlanningRound`'s numbering logic — consider extracting
+  `currentRoundNumber(ctx, ws)` into `planning_git.go` so both paths share
+  the implementation), and zero UI changes beyond reading the new field.
