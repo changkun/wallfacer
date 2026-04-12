@@ -120,6 +120,7 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "  run          start the task board server\n")
 	fmt.Fprintf(os.Stderr, "  desktop      launch the native desktop app (requires -tags desktop build)\n")
 	fmt.Fprintf(os.Stderr, "  status       print running board state to terminal\n")
+	fmt.Fprintf(os.Stderr, "  spec         spec document tools (validate, ...)\n")
 	fmt.Fprintf(os.Stderr, "  doctor       check prerequisites and configuration\n")
 	fmt.Fprintf(os.Stderr, "  exec         open a shell in a running task container\n")
 	fmt.Fprintf(os.Stderr, "\nThe exec subcommand attaches to a task container by its task UUID prefix:\n")

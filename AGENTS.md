@@ -75,6 +75,9 @@ wallfacer status                             # Print board state to terminal
 wallfacer status -watch                      # Live-updating board state
 wallfacer exec <task-id-prefix>              # Attach to running task container
 wallfacer exec --sandbox claude              # Open shell in a new sandbox
+wallfacer spec validate                      # Validate the entire specs/ tree
+wallfacer spec validate specs/local/foo.md   # Validate specific files only
+wallfacer spec validate -json                # Emit JSON for scripting / CI
 ```
 
 The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.

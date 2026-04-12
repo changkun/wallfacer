@@ -55,6 +55,8 @@ func main() {
 		}
 	case "status":
 		cli.RunStatus(configDir, args)
+	case "spec":
+		cli.RunSpec(configDir, args)
 	case "-help", "--help", "-h":
 		cli.PrintUsage()
 	default:
