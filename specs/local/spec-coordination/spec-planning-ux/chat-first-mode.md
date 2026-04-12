@@ -641,7 +641,7 @@ Accept both `#spec/<path>` and `#plan/<path>` in the hash router (`ui/js/hash-de
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
 | [Spec scaffold library](chat-first-mode/spec-scaffold-library.md) | — | medium | **complete** |
-| [Spec tree index endpoint](chat-first-mode/spec-tree-index-endpoint.md) | — | medium | validated |
+| [Spec tree index endpoint](chat-first-mode/spec-tree-index-endpoint.md) | — | medium | **complete** |
 | [Rename Specs → Plan](chat-first-mode/rename-specs-to-plan.md) | — | small | validated |
 | [Agent system prompts](chat-first-mode/agent-system-prompts.md) | — | small | validated |
 | [Default mode resolution](chat-first-mode/default-mode-resolution.md) | — | small | validated |

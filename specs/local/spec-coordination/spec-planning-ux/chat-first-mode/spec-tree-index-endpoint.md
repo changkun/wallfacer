@@ -1,11 +1,12 @@
 ---
 title: Add index field to spec tree endpoint for specs/README.md
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/handler/
   - internal/spec/
   - internal/apicontract/
+  - ui/js/spec-explorer.js
 effort: medium
 created: 2026-04-12
 updated: 2026-04-12
@@ -63,3 +64,15 @@ Make `specs/README.md` visible to the UI as a first-class entry alongside the sp
 - **Do NOT** render the pinned Roadmap entry in the explorer — that's the next task (`explorer-roadmap-entry.md`).
 - **Do NOT** add a writable endpoint for `specs/README.md`. Users edit it via the file explorer or agent tools; this spec only exposes read access through the tree endpoint.
 - **Do NOT** merge indexes from multiple workspaces — first-wins is explicit per the parent spec's non-goals.
+
+## Implementation notes
+
+1. **Response shape kept field-additive.** The spec text said *"change the response body from the current `tree` array to `{tree, index}`"* — but the existing JSON is already `{nodes, progress}`, not a bare `tree` array. Rather than rename `nodes` → `tree` (which would break every frontend consumer of `data.nodes`), the `Index` field was added alongside the existing fields as an `omitempty` pointer. Old consumers that only read `data.nodes` continue working unchanged; new consumers that want the roadmap read `data.index`. This deviation has zero user-visible effect and avoids a breaking-change refactor in dependent UI code.
+
+2. **Shared `collectSpecTree` helper.** `GetSpecTree` and `SpecTreeStream` previously duplicated the per-workspace tree merge. This implementation factored both into a single `h.collectSpecTree()` method so the roadmap index is populated identically on both surfaces (REST fetch and SSE poller). The SSE detects roadmap changes naturally: the poller already compares serialized JSON snapshots, so any `Modified` timestamp change on the index field fires a new event without needing a dedicated file watcher.
+
+3. **Title scan capped at 200 lines.** `ResolveIndex` bails out with the fallback title (`"Roadmap"`) if the README's first H1 sits past line 200. Pathological cases (giant READMEs with very late H1s) take the fallback rather than a full-file read on every tree fetch.
+
+4. **Public accessor `getSpecIndex()` on frontend.** The spec said "plumb the data into module-scope state." Added a tiny accessor function rather than re-rendering through the existing state-exposure patterns because downstream tasks (`explorer-roadmap-entry`, `layout-state-machine`) benefit from a stable API surface rather than reaching into `_specTreeData.index` directly.
+
+5. **Tree endpoint JS route wiring unchanged.** The spec noted updating `ui/js/generated/routes.js` via `make api-contract`. No regeneration needed — the route's URL pattern and method are identical; only the response schema changed, and the schema isn't codegen-tracked.
