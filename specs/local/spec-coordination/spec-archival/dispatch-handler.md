@@ -1,6 +1,6 @@
 ---
 title: "Archival: Dispatch handler guards"
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-archival/core-model.md
 affects:
