@@ -6,6 +6,7 @@ depends_on:
 affects:
   - internal/planner/planner.go
   - internal/planner/spec.go
+  - internal/cli/server.go
 effort: small
 created: 2026-04-03
 updated: 2026-04-12
@@ -40,54 +41,60 @@ is already in place and does **not** need to change:
 
 ## Design Problem
 
-The planner's `Start()` / `Exec()` path calls
-`p.buildContainerSpec(containerName, sandbox.Claude)` unconditionally
-(`planner.go` line 137). `buildContainerSpec` already accepts `sandbox.Type`
-and handles AGENTS.md mounting, image rewriting, and entrypoint selection
-correctly — the hard-code is the only gap.
+The planner's `Exec()` path calls `p.buildContainerSpec(containerName, sandbox.Claude)`
+unconditionally (`planner.go:137`). `buildContainerSpec` already accepts
+`sandbox.Type` and handles AGENTS.md mounting, image rewriting, and entrypoint
+selection correctly — the hard-code is the only gap.
 
 Two concrete changes are needed:
 
 1. **`planner.Config` needs a `Sandbox sandbox.Type` field** so callers can
    configure the planning sandbox the same way task activities are configured.
-   The runner sets its sandbox via `envconfig` fields
-   (`WALLFACER_SANDBOX_IMPLEMENTATION`, etc.); the planner needs an equivalent.
+   The runner sets its sandbox via `envconfig` fields; the planner needs an
+   equivalent.
 
 2. **Codex auth mount in the planning container spec** — the task runner
-   applies `appendCodexAuthMount()` in `container.go` (lines 280-292) when
+   applies `appendCodexAuthMount()` in `container.go:280-292` when
    `sb == sandbox.Codex`. The planner's `spec.go` does not. When the planning
-   sandbox is Codex, it must also mount `~/.codex/auth.json` →
-   `/home/codex/.codex` (read-only) so the Codex CLI can authenticate.
-   The host path is resolved via `hostCodexAuthPath()` in `runner.go` (lines
-   708-724) — the planner will need access to the same path, either via its
-   `Config` or by reusing the helper.
+   sandbox is Codex, it must also mount `~/.codex` → `/home/codex/.codex`
+   (read-only) so the Codex CLI can authenticate. The host path is resolved via
+   `hostCodexAuthPath()` in `runner.go:708-724` — the planner will need access
+   via its `Config`.
 
 ## Remaining Work
 
-1. **Add `Sandbox sandbox.Type` to `planner.Config`** (`internal/planner/planner.go`).
-   Default to `sandbox.Claude` when the field is zero-value so existing callers
-   are unaffected. Pass the configured value to `buildContainerSpec` instead of
-   the hard-coded `sandbox.Claude`.
+1. **Add `Sandbox sandbox.Type` and `CodexAuthPath string` to `planner.Config`**
+   (`internal/planner/planner.go`). The `Config` struct (lines 24-36) currently
+   has no sandbox field; `New()` does not store one. Default `Sandbox` to
+   `sandbox.Claude` when zero-value so existing callers are unaffected. Store
+   the field on `Planner` and pass it to `buildContainerSpec` at line 137
+   instead of the hard-coded `sandbox.Claude`.
 
 2. **Add Codex auth mount to planning spec** (`internal/planner/spec.go`).
-   Mirror the runner's `appendCodexAuthMount()` pattern: when `sb == sandbox.Codex`
-   and the host auth path resolves to a valid directory (contains `auth.json`),
-   append a read-only bind mount of `~/.codex` to `/home/codex/.codex`. The
-   host path should be passed through `planner.Config` (e.g., `CodexAuthPath string`)
-   so the planner stays decoupled from the runner.
+   `appendInstructionsMount()` (lines 87-109) already branches on `sandbox.Type`
+   for CLAUDE.md vs AGENTS.md — add a new `appendCodexAuthMount()` alongside
+   it. When `sb == sandbox.Codex` and `CodexAuthPath` is non-empty and resolves
+   to a directory containing `auth.json`, append a read-only bind mount of that
+   path to `/home/codex/.codex`. Call it from `buildPlannerContainerSpec` after
+   `appendInstructionsMount`.
 
-3. **Wire sandbox selection at call site** (`internal/handler/planning.go` or
-   wherever `planner.New(cfg)` is constructed). Read the desired sandbox for
-   planning from envconfig — either a new `WALLFACER_SANDBOX_PLANNING` variable
-   or reuse `DefaultSandbox`. Pass it as `cfg.Sandbox` when constructing the
-   planner.
+3. **Wire sandbox selection at call site** (`internal/cli/server.go`).
+   The planner is constructed in `server.go` with `planner.New(planner.Config{...})`.
+   `codexAuthPath` is already computed (lines 140-143) and `envCfg` already
+   carries sandbox configuration — both just need to be forwarded to
+   `planner.Config`. Read the planning sandbox from `envCfg` (reuse
+   `DefaultSandbox` or add `WALLFACER_SANDBOX_PLANNING` if independent
+   control is needed); pass `Sandbox` and `CodexAuthPath` fields.
 
-4. **Tests** — add a test asserting that when `planner.Config.Sandbox = sandbox.Codex`
-   the resulting container spec uses the Codex image, mounts `AGENTS.md`, and
-   includes the Codex auth bind mount. Follow the pattern in
-   `internal/runner/container_spec_test.go`.
+4. **Tests** — add `TestBuildContainerSpec_Codex` to
+   `internal/planner/planner_test.go` asserting that when
+   `Config.Sandbox = sandbox.Codex` the resulting spec uses the Codex image,
+   mounts `AGENTS.md` (not `CLAUDE.md`), and includes the Codex auth bind mount.
+   `TestAppendInstructionsMount_Codex` (lines 460-480) already tests the
+   instructions branching — extend that pattern for the full spec.
 
 ## Affects
 
-- `internal/planner/planner.go` — add `Sandbox sandbox.Type` (and `CodexAuthPath string`) to `Config`; replace hard-coded `sandbox.Claude` in `buildContainerSpec` call
-- `internal/planner/spec.go` — add `appendCodexAuthMount` equivalent when `sb == sandbox.Codex`
+- `internal/planner/planner.go` — add `Sandbox sandbox.Type` and `CodexAuthPath string` to `Config` and `Planner`; replace hard-coded `sandbox.Claude` at line 137
+- `internal/planner/spec.go` — add `appendCodexAuthMount` equivalent called from `buildPlannerContainerSpec`
+- `internal/cli/server.go` — forward `codexAuthPath` and sandbox selection to `planner.Config`
