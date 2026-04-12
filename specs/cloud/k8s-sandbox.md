@@ -94,7 +94,7 @@ type k8sHandle struct {
 | `"slirp4netns"` | Not applicable; map to default cluster networking |
 | (empty/default) | Default cluster networking; egress allowed |
 
-For multi-tenant (multi-tenant), per-tenant NetworkPolicies restrict cross-tenant traffic. This is a multi-tenant concern — this spec just ensures the backend can apply pod-level network restrictions.
+For multi-tenant deployments, NetworkPolicy is only the L3/L4 baseline. The richer allow+deny + observability model lives in [sandbox-isolation.md](sandbox-isolation.md) (egress proxy, action log, per-tenant policy). This spec's responsibility is limited to applying pod-level network restrictions that the isolation layer can build on.
 
 ### Image Management
 

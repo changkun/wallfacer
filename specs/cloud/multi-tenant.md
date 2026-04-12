@@ -221,47 +221,63 @@ To save resources, idle instances should hibernate (stop the process, persist st
 
 ---
 
-## Integration Boundary: What Cloud-Hosted Mode Does NOT Manage
+## Sandbox Model: Policy-Controlled Agent Runtime
 
-**Decision (2026-03-28):** Cloud-hosted wallfacer is a task runner, not a cloud workstation. It manages LLM API keys and git credentials — nothing else. External service integrations (GitHub API, Slack, Google, etc.) are not per-tenant concerns in cloud-hosted mode.
+**Design (2026-04-12, refining the 2026-03-28 scoping decision).** Cloud-hosted mode is the multi-tenant surface, and that is where this design matters — the local backend already works and stays unchanged. The extra complexity below exists because multi-tenancy makes every agent action a potential blast-radius concern.
 
-### Why not per-tenant external credentials?
+### The primitive
 
-Locally, wallfacer benefits from the user's existing tool credentials (`gh`, `gcloud`, Slack MCP, etc.) for free — they're already on the machine. Moving to cloud creates pressure to replicate this, but every approach has fundamental problems:
+The sandbox is a **stateless, policy-controlled runtime for autonomous agents**.
+
+- **Full OS runtime.** The sandbox image is a real OS base (Debian/Ubuntu) with the agent harness pre-installed and package managers available (`apt`, `pip`, `npm`, `cargo`, etc.). The agent can install tools, compile code, run test suites — anything a developer would do on a workstation.
+- **Harness lives in the sandbox.** Different harnesses (Claude Code, Codex, future agents) ship as separate sandbox images. Wallfacer selects the image per task; the harness binary is not pulled from fs.latere.ai.
+- **Files are selected and mounted from fs.latere.ai.** The control plane tells fs.latere.ai which files this task needs (repo, worktree, config), fs.latere.ai stages them to the hot tier, and the sandbox mounts that hot-tier path. The sandbox's local filesystem outside the mount is ephemeral; it is destroyed when the task ends.
+- **Autonomous agent.** The agent makes its own decisions about what tools to install and what commands to run. No pre-declaration or approval loop.
+- **Policy-controlled action space.** The sandbox runtime monitors the agent's actions — network egress, filesystem writes, process execution — and evaluates them against a policy. Actions that would cross a forbidden boundary are blocked; everything is logged. See [sandbox-isolation.md](sandbox-isolation.md) for the policy engine design.
+- **Full network observability.** Network policy is a mixed allow+deny list (allow known destinations: LLM API, package registries, git hosts; deny known-bad: private IPs, SSRF targets; log everything). The activity log is available to the user and the control plane.
+
+### Why this works without being a "cloud workstation"
+
+The earlier framing said "wallfacer is a task runner, not a cloud workstation" and rejected per-tenant credential wallets because every approach leaks secrets on breach:
 
 | Approach | Problem |
 |----------|---------|
-| **VM per tenant** (full user environment) | You're building a cloud workstation (Gitpod/Codespaces). One VM compromise leaks all tenant credentials. Control plane breach = access to every tenant's secrets. You inherit patching, hardening, and monitoring N internet-facing VMs. |
-| **K8s + credential injectors** | Combinatorial explosion of tool-specific formats (`~/.config/gh/`, `~/.aws/`, `.npmrc`, etc.). OAuth tools need browser flows that don't work in pods. Token refresh/rotation becomes your problem. |
-| **K8s + MCP as auth boundary** | Every external service needs a custom MCP wrapper. Agents must use MCP tools instead of native CLIs they already know. You're building an integration platform. |
+| **VM per tenant** (full user environment) | One VM compromise leaks every credential. You inherit patching, hardening, and monitoring N internet-facing VMs. |
+| **K8s + credential injectors** | Combinatorial tool-format explosion (`~/.config/gh/`, `~/.aws/`, `.npmrc`…); OAuth flows don't work in headless pods; you own token rotation. |
+| **K8s + MCP as auth boundary** | Every external service needs a custom MCP wrapper; you're building an integration platform. |
 
-All three turn wallfacer into a credential management platform, which is a different product.
+The stateless + policy-controlled model gives the agent *workstation-level capability* (install tools, run anything) without the *workstation-level liability* (ambient credentials to exfiltrate, persistent state to poison):
 
-### Why it's not needed
+| Threat | Cloud workstation | Policy-controlled sandbox |
+|--------|------------------|---------------------------|
+| Agent exfiltrates tokens | Tokens in `~/.config`, `~/.aws/`, etc. leak silently | No ambient tokens; network log captures any attempt |
+| Agent writes outside task scope | Full workstation; hard to bound | FS writes outside the fs.latere.ai mount are blocked |
+| Compromised sandbox persists | State on the workstation survives | Sandbox destroyed after each task; state in fs.latere.ai |
+| Cross-tenant access | Shared credentials, shared paths | Per-task mount; per-tenant policy enforcement |
 
-Tracing the idea → implementation → serve pipeline, the only credentials the sandbox agent genuinely needs are:
+### What credentials the sandbox still gets
 
-1. **LLM API key** — already handled (`.env`)
-2. **Git read/write** — already handled (per-tenant SSH keys / HTTPS tokens)
+The sandbox receives exactly two credential types, injected per task:
 
-Everything else separates cleanly into concerns *outside* the sandbox:
+1. **LLM API key** — so the agent can think
+2. **Git read/write** — so it can clone, commit, push
+
+Everything around the agent runs outside the sandbox as control-plane concerns, with **one shared credential each** rather than N per-tenant credentials:
 
 | Need | Who handles it | How |
 |------|---------------|-----|
-| **Create PR from completed task** | CI/CD or control plane webhook | Wallfacer pushes branch → GitHub Action or control plane API call creates PR. One GitHub App token in the control plane, not per-tenant. |
-| **Notify user (Slack, email)** | Control plane | One bot/webhook token, shared. Not a sandbox concern. |
-| **Run CI checks** | GitHub Actions / external CI | Triggered by push, not by wallfacer. |
-| **Application secrets (DB, APIs)** | `serve.env` (live-serve spec) | Secrets for the *built app*, not for the agent. Already designed. |
-| **Deploy** | CD pipeline or live-serve (live-serve spec) | Separate from task execution. |
-
-The integrations feel essential locally because they're interleaved with the dev workflow. In an automated pipeline, they separate into "what the agent needs" (LLM + git) and "what happens around the agent" (CI/CD, notifications, deployment), which are better handled by dedicated systems.
+| **Create PR from completed task** | Control plane webhook | Wallfacer pushes branch → control plane creates PR with one GitHub App token |
+| **Notify user (Slack, email)** | Control plane | One bot/webhook token, shared |
+| **Run CI checks** | GitHub Actions / external CI | Triggered by push, not by wallfacer |
+| **Application secrets (DB, APIs)** | `serve.env` (live-serve spec) | Secrets for the *built app*, not the agent |
+| **Deploy** | CD pipeline or live-serve | Separate from task execution |
 
 ### Implications
 
-- **Local modes** (anonymous or authenticated) remain the power-user environment with full host credential access. This is a feature, not a limitation — local mode is strictly more capable for integration-heavy workflows.
-- **Cloud-hosted mode** is scoped to: receive task → execute in sandbox (LLM + git) → push result. The surrounding pipeline (PR creation, CI, notifications, deployment) connects via webhooks and the control plane, not per-tenant credentials in sandboxes.
-- **No VM-per-tenant mode.** The flexibility gain doesn't justify the security liability and operational burden. K8s remains the only multi-tenant target.
-- **Control plane integrations** (one GitHub App, one Slack bot, one notification webhook) are in scope for cloud-hosted mode, but these are control-plane-level credentials, not per-tenant secrets.
+- **Local modes** (anonymous or authenticated) stay the power-user environment with full host credential access. Local mode is intentionally more capable than cloud-hosted mode, because local users have implicit authority over their own machine. The policy engine is a cloud-hosted-mode concern and is not imposed on local.
+- **Cloud-hosted mode** runs autonomous agents in monitored sandboxes. The agent can do workstation-scale work; the policy engine is what makes that safe across tenants.
+- **No VM-per-tenant mode.** The stateless-sandbox model subsumes its flexibility without the operational and security cost.
+- **Control plane integrations** (one GitHub App, one Slack bot, one notification webhook) are in scope for cloud-hosted mode — control-plane-level credentials, not per-tenant secrets.
 
 ---
 

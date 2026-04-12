@@ -137,8 +137,9 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 |------|--------|----------|
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | fs.latere.ai integration, repo provisioner, workspace group cloud mapping |
 | [k8s-sandbox.md](cloud/k8s-sandbox.md) | Not started | `K8sBackend` — K8s Jobs with fs.latere.ai hot tier mounts, pod log streaming, exec |
+| [sandbox-isolation.md](cloud/sandbox-isolation.md) | Not started | Policy engine — network allow/deny + observability, FS isolation, action log |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
-| [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle |
+| [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning, policy-controlled sandbox model |
 | [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
 
 ### Cloud platform dependencies
@@ -150,7 +151,9 @@ graph LR
   STI[Storage Interface ✅] --> TFS
   TFS --> K8S[K8s Sandbox]
   STI --> CS[Cloud Storage]
+  K8S --> ISO[Sandbox Isolation]
   K8S --> MT[Multi-Tenant]
+  ISO --> MT
   CS --> MT
   AUTH[Authentication] --> MT
   CI[Cloud Infrastructure] --> MT
