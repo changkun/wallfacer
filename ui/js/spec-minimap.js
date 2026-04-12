@@ -130,8 +130,7 @@ function renderMinimap(specPath, treeData) {
   var focusedY = (totalH - nodeH) / 2;
   _drawMinimapNode(svg, svgNS, focused, col1x, focusedY, nodeW, nodeH, true);
 
-  var focusedArchived =
-    focused.spec && focused.spec.status === "archived";
+  var focusedArchived = focused.spec && focused.spec.status === "archived";
 
   // Upstream nodes (left column).
   for (var u = 0; u < upCount; u++) {

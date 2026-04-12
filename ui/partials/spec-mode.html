@@ -13,6 +13,22 @@
         Summarize
       </button>
       <button
+        id="spec-archive-btn"
+        class="spec-btn spec-btn--secondary hidden"
+        onclick="archiveFocusedSpec()"
+        title="Archive this spec (hide from live graph)"
+      >
+        Archive
+      </button>
+      <button
+        id="spec-unarchive-btn"
+        class="spec-btn spec-btn--secondary hidden"
+        onclick="unarchiveFocusedSpec()"
+        title="Unarchive this spec (return to drafted)"
+      >
+        Unarchive
+      </button>
+      <button
         id="spec-chat-toggle-btn"
         class="spec-chat-toggle-btn"
         type="button"
@@ -24,11 +40,55 @@
       </button>
     </div>
     <div id="spec-focused-meta" class="spec-focused-view__meta"></div>
+    <div
+      id="spec-archived-banner"
+      class="spec-archived-banner hidden"
+      role="status"
+    >
+      <span class="spec-archived-banner__icon" aria-hidden="true"
+        >&#x2298;</span
+      >
+      <span class="spec-archived-banner__text">
+        Archived &mdash; read-only. Hidden from the live graph and drift checks.
+      </span>
+      <button
+        id="spec-archived-banner-unarchive"
+        class="spec-btn spec-btn--secondary"
+        onclick="unarchiveFocusedSpec()"
+      >
+        Unarchive
+      </button>
+    </div>
     <div id="spec-focused-body" class="spec-focused-view__body">
       <div
         id="spec-focused-body-inner"
         class="spec-focused-view__body-inner prose-content"
       ></div>
+    </div>
+    <div
+      id="spec-archive-toast"
+      class="spec-archive-toast hidden"
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        id="spec-archive-toast-text"
+        class="spec-archive-toast__text"
+      ></span>
+      <button
+        id="spec-archive-toast-undo"
+        class="spec-btn spec-btn--secondary"
+        onclick="undoArchiveAction()"
+      >
+        Undo
+      </button>
+      <button
+        class="spec-archive-toast__close"
+        onclick="dismissArchiveToast()"
+        aria-label="Dismiss"
+      >
+        &#x2715;
+      </button>
     </div>
   </div>
   <div

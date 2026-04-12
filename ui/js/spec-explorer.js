@@ -227,7 +227,11 @@ function _forceCollapseArchived() {
   var nodes = _specTreeData.nodes;
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
-    if (n.spec && n.spec.status === "archived" && _specExpandedPaths.has(n.path)) {
+    if (
+      n.spec &&
+      n.spec.status === "archived" &&
+      _specExpandedPaths.has(n.path)
+    ) {
       _specExpandedPaths.delete(n.path);
       changed = true;
     }

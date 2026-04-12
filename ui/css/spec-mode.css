@@ -125,6 +125,46 @@
   color: #6c757d;
 }
 
+.spec-archived-banner {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-left: 4px solid #6c757d;
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem 16px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+.spec-archived-banner__text {
+  flex: 1;
+}
+
+.spec-archive-toast {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, #dee2e6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.spec-archive-toast__close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-muted, #6c757d);
+}
+
 /* Table of contents — absolutely positioned; JS exclusion keeps text clear */
 .spec-toc {
   position: absolute;

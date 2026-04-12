@@ -276,7 +276,9 @@ describe("renderMinimap", () => {
     ctx._showArchived = true;
     ctx.renderMinimap("focus.md", { nodes: withArchived, progress: {} });
     const rects = ctx.svgEl._children.filter((c) => c.tagName === "rect");
-    const archRect = rects.find((r) => r._attrs["data-spec-path"] === "arch.md");
+    const archRect = rects.find(
+      (r) => r._attrs["data-spec-path"] === "arch.md",
+    );
     expect(archRect).toBeTruthy();
     expect(archRect._attrs["class"]).toBe("spec-minimap__node--archived");
     const lines = ctx.svgEl._children.filter((c) => c.tagName === "line");

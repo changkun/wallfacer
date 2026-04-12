@@ -318,6 +318,14 @@ function _loadAndRenderSpec() {
           });
       }
 
+      var isArchived = parsed.frontmatter.status === "archived";
+
+      // Archived banner at the top of the body (read-only signal).
+      var bannerEl = document.getElementById("spec-archived-banner");
+      if (bannerEl) {
+        bannerEl.classList.toggle("hidden", !isArchived);
+      }
+
       // Show dispatch button only for validated leaf specs (implementation specs).
       // Non-leaf (design) specs must be broken down first.
       if (dispatchBtn) {
@@ -333,7 +341,10 @@ function _loadAndRenderSpec() {
           });
           if (tn) specIsLeaf = tn.is_leaf;
         }
-        dispatchBtn.classList.toggle("hidden", !(isValidated && specIsLeaf));
+        dispatchBtn.classList.toggle(
+          "hidden",
+          !(isValidated && specIsLeaf) || isArchived,
+        );
       }
 
       // Show breakdown button for validated specs that could be decomposed.
@@ -343,10 +354,27 @@ function _loadAndRenderSpec() {
           parsed.frontmatter.status === "validated" ||
           parsed.frontmatter.status === "drafted";
         breakdownBtn.textContent = "Break Down";
-        breakdownBtn.classList.toggle("hidden", !canBreakdown);
+        breakdownBtn.classList.toggle("hidden", !canBreakdown || isArchived);
         breakdownBtn.onclick = function () {
           breakDownFocusedSpec();
         };
+      }
+
+      // Archive button: visible for drafted/complete/stale (status machine
+      // allows those three transitions into archived).
+      var archiveBtn = document.getElementById("spec-archive-btn");
+      if (archiveBtn) {
+        var canArchive =
+          parsed.frontmatter.status === "drafted" ||
+          parsed.frontmatter.status === "complete" ||
+          parsed.frontmatter.status === "stale";
+        archiveBtn.classList.toggle("hidden", !canArchive);
+      }
+
+      // Unarchive button: visible only for archived specs.
+      var unarchiveBtn = document.getElementById("spec-unarchive-btn");
+      if (unarchiveBtn) {
+        unarchiveBtn.classList.toggle("hidden", !isArchived);
       }
     })
     .catch(function (err) {
@@ -377,6 +405,12 @@ function _loadAndRenderSpec() {
       if (dispatchBtn) dispatchBtn.classList.add("hidden");
       var breakdownBtn = document.getElementById("spec-summarize-btn");
       if (breakdownBtn) breakdownBtn.classList.add("hidden");
+      var archiveBtn = document.getElementById("spec-archive-btn");
+      if (archiveBtn) archiveBtn.classList.add("hidden");
+      var unarchiveBtn = document.getElementById("spec-unarchive-btn");
+      if (unarchiveBtn) unarchiveBtn.classList.add("hidden");
+      var archivedBanner = document.getElementById("spec-archived-banner");
+      if (archivedBanner) archivedBanner.classList.add("hidden");
       if (location.hash && location.hash.indexOf("#spec/") === 0) {
         history.replaceState(null, "", location.pathname);
       }
@@ -572,6 +606,157 @@ function breakDownFocusedSpec() {
   if (typeof PlanningChat !== "undefined") {
     PlanningChat.sendMessage("/break-down");
   }
+}
+
+// --- Archive / unarchive focused spec ---
+
+// _lastArchiveAction stores the most recent archive/unarchive so the Undo
+// button in the toast can reverse it. Shape: {action, path, prevStatus}.
+var _lastArchiveAction = null;
+var _archiveToastTimer = null;
+
+function _focusedSpecHasChildren() {
+  if (!_focusedSpecPath) return false;
+  if (
+    typeof _specTreeData === "undefined" ||
+    !_specTreeData ||
+    !_specTreeData.nodes
+  ) {
+    return false;
+  }
+  var node = _specTreeData.nodes.find(function (n) {
+    return n.path === _focusedSpecPath;
+  });
+  return !!(node && !node.is_leaf && node.children && node.children.length > 0);
+}
+
+function _focusedSpecChildCount() {
+  if (!_focusedSpecPath) return 0;
+  if (
+    typeof _specTreeData === "undefined" ||
+    !_specTreeData ||
+    !_specTreeData.nodes
+  ) {
+    return 0;
+  }
+  var node = _specTreeData.nodes.find(function (n) {
+    return n.path === _focusedSpecPath;
+  });
+  if (!node || node.is_leaf) return 0;
+  // Count all descendants (transitive) in the tree.
+  var count = 0;
+  var queue = (node.children || []).slice();
+  while (queue.length > 0) {
+    var path = queue.shift();
+    count++;
+    var child = _specTreeData.nodes.find(function (n) {
+      return n.path === path;
+    });
+    if (child && child.children) {
+      for (var i = 0; i < child.children.length; i++) {
+        queue.push(child.children[i]);
+      }
+    }
+  }
+  return count;
+}
+
+function archiveFocusedSpec() {
+  if (!_focusedSpecPath) return;
+  var prevStatus = null;
+  if (_focusedSpecContent) {
+    var parsed = parseSpecFrontmatter(_focusedSpecContent);
+    prevStatus = parsed.frontmatter.status || null;
+  }
+  var proceed = Promise.resolve(true);
+  if (_focusedSpecHasChildren()) {
+    var n = _focusedSpecChildCount();
+    proceed = showConfirm(
+      "Archiving will hide " + n + " descendant spec(s). Continue?",
+    );
+  }
+  proceed.then(function (ok) {
+    if (!ok) return;
+    _callArchiveEndpoint("/api/specs/archive", _focusedSpecPath).then(
+      function (res) {
+        if (!res.ok) return;
+        _lastArchiveAction = {
+          action: "archive",
+          path: _focusedSpecPath,
+          prevStatus: prevStatus,
+        };
+        _showArchiveToast("Spec archived.");
+        _loadAndRenderSpec();
+      },
+    );
+  });
+}
+
+function unarchiveFocusedSpec() {
+  if (!_focusedSpecPath) return;
+  _callArchiveEndpoint("/api/specs/unarchive", _focusedSpecPath).then(
+    function (res) {
+      if (!res.ok) return;
+      _lastArchiveAction = {
+        action: "unarchive",
+        path: _focusedSpecPath,
+        prevStatus: "archived",
+      };
+      _showArchiveToast("Spec unarchived.");
+      _loadAndRenderSpec();
+    },
+  );
+}
+
+function undoArchiveAction() {
+  var last = _lastArchiveAction;
+  if (!last) return;
+  var reverseUrl =
+    last.action === "archive" ? "/api/specs/unarchive" : "/api/specs/archive";
+  _callArchiveEndpoint(reverseUrl, last.path).then(function (res) {
+    if (!res.ok) return;
+    _lastArchiveAction = null;
+    dismissArchiveToast();
+    _loadAndRenderSpec();
+  });
+}
+
+function dismissArchiveToast() {
+  _lastArchiveAction = null;
+  var toast = document.getElementById("spec-archive-toast");
+  if (toast) toast.classList.add("hidden");
+  if (_archiveToastTimer) {
+    clearTimeout(_archiveToastTimer);
+    _archiveToastTimer = null;
+  }
+}
+
+function _showArchiveToast(message) {
+  var toast = document.getElementById("spec-archive-toast");
+  var text = document.getElementById("spec-archive-toast-text");
+  if (text) text.textContent = message;
+  if (toast) toast.classList.remove("hidden");
+  if (_archiveToastTimer) {
+    clearTimeout(_archiveToastTimer);
+  }
+  _archiveToastTimer = setTimeout(dismissArchiveToast, 8000);
+}
+
+function _callArchiveEndpoint(url, path) {
+  var opts = {
+    method: "POST",
+    headers: withBearerHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ path: path }),
+  };
+  return fetch(url, opts).then(function (res) {
+    if (!res.ok) {
+      return res.text().then(function (t) {
+        showAlert((t || "Request failed").trim());
+        return { ok: false };
+      });
+    }
+    return { ok: true };
+  });
 }
 
 // --- Chat pane toggle ---
