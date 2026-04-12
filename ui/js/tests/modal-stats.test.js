@@ -293,19 +293,23 @@ describe("modal-stats.js", () => {
         daily_usage: [],
         top_tasks: [],
         planning: {
-          "abc123": {
+          abc123: {
             label: "repoA",
             paths: ["/repo/a"],
             usage: { input_tokens: 10, output_tokens: 5, cost_usd: 0.01 },
             round_count: 2,
-            timeline: [{ timestamp: "2026-04-01T00:00:00Z", cost_usd: 0.01, tokens: 15 }],
+            timeline: [
+              { timestamp: "2026-04-01T00:00:00Z", cost_usd: 0.01, tokens: 15 },
+            ],
           },
-          "def456": {
+          def456: {
             label: "repoB",
             paths: ["/repo/b"],
             usage: { input_tokens: 100, output_tokens: 50, cost_usd: 0.5 },
             round_count: 5,
-            timeline: [{ timestamp: "2026-04-01T00:00:00Z", cost_usd: 0.5, tokens: 150 }],
+            timeline: [
+              { timestamp: "2026-04-01T00:00:00Z", cost_usd: 0.5, tokens: 150 },
+            ],
           },
         },
       });
@@ -360,7 +364,7 @@ describe("modal-stats.js", () => {
         daily_usage: [],
         top_tasks: [],
         planning: {
-          "k1": {
+          k1: {
             label: "group",
             paths: [],
             usage: { input_tokens: 0, output_tokens: 0, cost_usd: 0.03 },
@@ -414,7 +418,7 @@ describe("modal-stats.js", () => {
         daily_usage: [],
         top_tasks: [],
         planning: {
-          "k1": {
+          k1: {
             label: "<script>alert(1)</script>",
             paths: [],
             usage: { input_tokens: 0, output_tokens: 0, cost_usd: 0 },

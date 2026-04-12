@@ -292,9 +292,7 @@
           ? W / 2
           : (j / (timeline.length - 1)) * (W - 2) + 1;
       var y =
-        max > 0
-          ? H - 2 - ((timeline[j].cost_usd || 0) / max) * (H - 4)
-          : H / 2;
+        max > 0 ? H - 2 - ((timeline[j].cost_usd || 0) / max) * (H - 4) : H / 2;
       points.push(x.toFixed(1) + "," + y.toFixed(1));
     }
     return (

@@ -131,9 +131,9 @@ func TestIsBoostedPath(t *testing.T) {
 		{"internal/runner/foo_test.go", true}, // _test.go suffix
 		{"handler_test.go", true},
 		// Not boosted
-		{"ui/js/vendor/sortable.js", false},      // under vendor
-		{"ui/js/generated/bundle.js", false},     // under generated
-		{"ui/js/build/lib/clipboard.js", false},  // under build
+		{"ui/js/vendor/sortable.js", false},     // under vendor
+		{"ui/js/generated/bundle.js", false},    // under generated
+		{"ui/js/build/lib/clipboard.js", false}, // under build
 		{"main.go", false},
 		{"server.go", false},
 		{"README.md", false},

@@ -375,7 +375,9 @@ describe("_buildTimelineHtml", () => {
     });
     // Load time-map.js dependency
     const tmCode = readFileSync(join(jsDir, "build/time-map.js"), "utf8");
-    vm.runInContext(tmCode, ctx, { filename: join(jsDir, "build/time-map.js") });
+    vm.runInContext(tmCode, ctx, {
+      filename: join(jsDir, "build/time-map.js"),
+    });
     loadScript("modal-results.js", ctx);
   });
 
@@ -579,7 +581,9 @@ describe("renderTimeline", () => {
 
     // Load time-map.js
     const tmCode = readFileSync(join(jsDir, "build/time-map.js"), "utf8");
-    vm.runInContext(tmCode, ctx, { filename: join(jsDir, "build/time-map.js") });
+    vm.runInContext(tmCode, ctx, {
+      filename: join(jsDir, "build/time-map.js"),
+    });
     loadScript("modal-results.js", ctx);
 
     ctx.renderTimeline("t1");
@@ -632,7 +636,9 @@ describe("renderTimeline", () => {
     });
 
     const tmCode = readFileSync(join(jsDir, "build/time-map.js"), "utf8");
-    vm.runInContext(tmCode, ctx, { filename: join(jsDir, "build/time-map.js") });
+    vm.runInContext(tmCode, ctx, {
+      filename: join(jsDir, "build/time-map.js"),
+    });
     loadScript("modal-results.js", ctx);
 
     ctx.renderTimeline("t1");
