@@ -92,6 +92,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [typescript-migration.md](local/typescript-migration.md) | Drafted | Gradual migration of the frontend from JavaScript to TypeScript — tsconfig + esbuild + tsc typecheck, `.ts` source in place, compiled `.js` as build artifact. Pilot on `ui/js/lib/clipboard.ts`. |
+| [typed-dom-hooks.md](local/typed-dom-hooks.md) | Vague | Generate typed constants from `id` / `data-js-*` attributes in `ui/partials/` so renames fail type-check instead of silently breaking selectors. Contract layer between HTML, CSS, and TS. |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 | [spatial-canvas.md](local/spatial-canvas.md) | Vague | Spatial infinite-canvas view — tasks, agents, and notes as free-form nodes on a 2D plane |
 
