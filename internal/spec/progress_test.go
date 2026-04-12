@@ -81,6 +81,44 @@ func TestNodeProgress_DeepNesting(t *testing.T) {
 	}
 }
 
+func TestNodeProgress_ArchivedLeaf(t *testing.T) {
+	p := NodeProgress(leafNode(StatusArchived))
+	if p.Complete != 0 || p.Total != 0 {
+		t.Errorf("archived leaf: got %v, want {0, 0}", p)
+	}
+}
+
+func TestNodeProgress_ArchivedNonLeaf(t *testing.T) {
+	parent := &Node{
+		Value:  &Spec{Status: StatusArchived},
+		IsLeaf: false,
+		Children: []*Node{
+			leafNode(StatusComplete),
+			leafNode(StatusValidated),
+		},
+	}
+	p := NodeProgress(parent)
+	if p.Complete != 0 || p.Total != 0 {
+		t.Errorf("archived non-leaf should mask subtree: got %v, want {0, 0}", p)
+	}
+}
+
+func TestNodeProgress_MixedWithArchived(t *testing.T) {
+	parent := &Node{
+		Value:  &Spec{Status: StatusValidated},
+		IsLeaf: false,
+		Children: []*Node{
+			leafNode(StatusComplete),
+			leafNode(StatusComplete),
+			leafNode(StatusArchived),
+		},
+	}
+	p := NodeProgress(parent)
+	if p.Complete != 2 || p.Total != 2 {
+		t.Errorf("archived leaf should be excluded: got %v, want {2, 2}", p)
+	}
+}
+
 func TestNodeProgress_NoChildren(t *testing.T) {
 	node := &Node{
 		Value:  &Spec{Status: StatusValidated},

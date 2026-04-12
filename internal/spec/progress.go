@@ -24,9 +24,17 @@ func (p Progress) String() string {
 // NodeProgress recursively computes progress for a node.
 // Leaf nodes count as 1 total (complete if status is "complete").
 // Non-leaf nodes sum the progress of all children.
+// Archived leaves contribute 0 to both Complete and Total; an archived non-leaf
+// masks its entire subtree from progress.
 func NodeProgress(node *Node) Progress {
+	if node.Value != nil && node.Value.Status == StatusArchived {
+		return Progress{}
+	}
 	if node.IsLeaf {
-		if node.Value != nil && node.Value.Status == StatusComplete {
+		if node.Value == nil {
+			return Progress{}
+		}
+		if node.Value.Status == StatusComplete {
 			return Progress{Complete: 1, Total: 1}
 		}
 		return Progress{Complete: 0, Total: 1}

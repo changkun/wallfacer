@@ -187,3 +187,71 @@ func TestUnblockedSpecs_AlreadyComplete(t *testing.T) {
 		t.Error("already-complete specs should not be returned as unblocked")
 	}
 }
+
+func TestComputeImpact_ArchivedTarget(t *testing.T) {
+	tree := buildTestTree(map[string]*Spec{
+		"local/archived.md": {Status: StatusArchived},
+		"local/a.md":        {Status: StatusValidated, DependsOn: []string{"local/archived.md"}},
+	})
+	impact := ComputeImpact(tree, "local/archived.md")
+	if len(impact.Direct) != 0 || len(impact.Transitive) != 0 {
+		t.Errorf("archived target should return empty impact, got Direct=%v Transitive=%v",
+			impact.Direct, impact.Transitive)
+	}
+}
+
+func TestAdjacency_SkipsArchived(t *testing.T) {
+	tree := buildTestTree(map[string]*Spec{
+		"local/archived.md": {Status: StatusArchived, DependsOn: []string{"local/x.md"}},
+		"local/live.md":     {Status: StatusValidated, DependsOn: []string{"local/archived.md", "local/x.md"}},
+		"local/x.md":        {Status: StatusValidated},
+	})
+	adj := Adjacency(tree)
+	if len(adj["local/archived.md"]) != 0 {
+		t.Errorf("archived source should have no outgoing edges, got %v", adj["local/archived.md"])
+	}
+	if slices.Contains(adj["local/live.md"], "local/archived.md") {
+		t.Errorf("edge to archived sink should be excluded, got %v", adj["local/live.md"])
+	}
+	if !slices.Contains(adj["local/live.md"], "local/x.md") {
+		t.Errorf("non-archived edge should remain, got %v", adj["local/live.md"])
+	}
+}
+
+func TestUnblockedSpecs_SkipsArchived(t *testing.T) {
+	tree := buildTestTree(map[string]*Spec{
+		"local/a.md":        {Status: StatusComplete},
+		"local/archived.md": {Status: StatusArchived, DependsOn: []string{"local/a.md"}},
+	})
+	unblocked := UnblockedSpecs(tree, "local/a.md")
+	if len(unblocked) != 0 {
+		t.Errorf("archived candidates should not surface as unblocked, got %d", len(unblocked))
+	}
+}
+
+func TestAllDepsComplete_ArchivedDepSatisfied(t *testing.T) {
+	tree := buildTestTree(map[string]*Spec{
+		"local/complete.md": {Status: StatusComplete},
+		"local/archived.md": {Status: StatusArchived},
+		"local/live.md": {Status: StatusValidated, DependsOn: []string{
+			"local/complete.md", "local/archived.md",
+		}},
+	})
+	node := tree.All["local/live.md"]
+	if !allDepsComplete(tree, node) {
+		t.Error("archived dependency should count as satisfied")
+	}
+}
+
+func TestComputeImpact_ArchivedNonLeaf(t *testing.T) {
+	tree := buildTestTree(map[string]*Spec{
+		"local/parent.md":       {Status: StatusArchived},
+		"local/parent/child.md": {Status: StatusValidated},
+		"local/ext.md":          {Status: StatusValidated, DependsOn: []string{"local/parent/child.md"}},
+	})
+	impact := ComputeImpact(tree, "local/parent.md")
+	if len(impact.Direct) != 0 || len(impact.Transitive) != 0 {
+		t.Errorf("archived non-leaf should yield empty impact, got Direct=%v Transitive=%v",
+			impact.Direct, impact.Transitive)
+	}
+}
