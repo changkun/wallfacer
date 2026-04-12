@@ -5,7 +5,7 @@ depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
   - internal/planner/
-  - internal/planningusage/
+  - internal/store/
   - internal/handler/planning.go
   - internal/handler/stats.go
   - internal/handler/usage.go
@@ -73,11 +73,14 @@ These pieces are done; this spec does not touch them:
 ## Shape of the Solution
 
 Planning is its own track. A round is not a task — no board state, no
-worktree, no commit lifecycle — so planning usage belongs in its own store,
-keyed by workspace group, with no coupling to `store.Task`. The three real
-decisions are below; "shoehorn into a synthetic task" was considered and
-rejected as a category error that would force `kind = "planning"` filters
-into every task-facing read path just to reuse an append-file helper.
+worktree, no commit lifecycle — so planning usage is a new *record type*
+keyed by workspace group, with no coupling to the `Task` record. It still
+lives in `internal/store/` (that's the persistence package), just in its
+own file alongside the existing per-task storage, reusing the atomic-write
+and JSON helpers already there. "Shoehorn into a synthetic `Task`" was
+considered and rejected as a category error that would force
+`kind = "planning"` filters into every task-facing read path just to
+inherit an append-file helper.
 
 ### Decision 1 — Per-round record shape
 
@@ -116,23 +119,27 @@ sessions are already scoped (the planning sandbox container is per group).
 - Con: All groups share the same file — larger reads per stats call,
   coarser deletion semantics.
 
-### Decision 3 — Read path into analytics
+### Decision 3 — Where the read/write API lives inside `internal/store/`
 
-**Option 3a — Loader owned by `internal/planner/`.** The planner owns write
-AND read; `stats.go` imports a `planner.AggregateUsage(groupKey, since)`
-helper and stitches the result into the response.
+**Option 3a — Flat in `internal/store/`.** A new `planning_usage.go`
+alongside the existing task-storage files, exporting
+`AppendPlanningUsage(groupKey, record)` and
+`ReadPlanningUsage(groupKey, since) []record`. Both `internal/planner/`
+(writes) and `internal/handler/stats.go` (reads) import from `store`, as
+they already do for tasks.
 
-- Pro: Planning logic lives in one package. Thin coupling at the handler.
-- Con: `stats.go` now depends on `internal/planner/`.
+- Pro: No new package. Sits next to peer persistence code and reuses its
+  atomic-write / JSON helpers. Smallest diff.
+- Con: `internal/store` continues to grow; acceptable if the addition is
+  small (~one file + tests).
 
-**Option 3b — New `internal/planningusage/` (or `internal/store/planning/`)
-sub-package.** Owns the file format and aggregation. Both the planner (for
-writes) and `stats.go` (for reads) depend on it; neither depends on the
-other.
+**Option 3b — `internal/store/planningusage/` sub-package.** Same code
+behind a small namespace fence. The sub-package owns the file format and
+aggregation; callers import `store/planningusage`.
 
-- Pro: Clean separation; reusable if planning usage is ever needed
-  elsewhere (CLI, exports, alerts).
-- Con: One more package for a small amount of code.
+- Pro: Explicit separation from task storage; easier to evolve
+  independently if the format grows.
+- Con: A new package for what is likely ~200 lines; premature fencing.
 
 ### UI surface (orthogonal to the above)
 
@@ -151,8 +158,10 @@ alongside other sandbox activities; this is cheap and additive.
    task-shaped field from bleeding into planning storage.
 2. 2a vs. 2b — per-group file or single file? Leaning 2a: lifecycle already
    aligns per group, and retention/deletion map naturally.
-3. 3a vs. 3b — planner-owned loader or its own sub-package? Leaning 3b for
-   separation of concerns; 3a is acceptable if the footprint stays small.
+3. 3a vs. 3b — flat in `internal/store/` or a `store/planningusage/`
+   sub-package? Leaning 3a: one file keeps the footprint minimal and the
+   code stays next to the existing persistence helpers; promote to 3b only
+   if the format grows.
 4. Timeline vs. totals: do we show per-round sparklines in the focused
    planning view, or only cumulative tokens/cost per group in the stats
    modal? Either works — each record has `Timestamp`.
@@ -163,11 +172,13 @@ alongside other sandbox activities; this is cheap and additive.
 ## Affects
 
 - `internal/planner/` — capture per-round usage from the agent exec result
-  and persist it.
+  and call into `internal/store/` to persist it.
 - `internal/handler/planning.go` — wire usage capture into the message
   round handler.
-- `internal/planningusage/` (new, if 3b) — write/read/aggregate planning
-  usage records; completely independent of `store.Task`.
+- `internal/store/` — new `planning_usage.go` (or `planningusage/`
+  sub-package, per Decision 3) with append/read/aggregate for planning
+  usage records. Independent of the `Task` record but shares the
+  package's existing atomic-write and JSON helpers.
 - `internal/handler/stats.go` — additive only: append a `Planning` section
   (keyed by workspace group) to `StatsResponse`. No changes to
   `ByWorkspace` / `ByActivity` / `ByStatus` buckets.
