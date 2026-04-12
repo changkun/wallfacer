@@ -226,3 +226,173 @@ describe("spec-mode", () => {
     expect(ctx2.getCurrentMode()).toBe("spec");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Focused-view Roadmap (index) rendering — explorer-roadmap-entry spec.
+// ---------------------------------------------------------------------------
+
+describe("focusRoadmapIndex", () => {
+  function makeRoadmapContext(opts = {}) {
+    const dom = makeDom();
+    // Add the extra elements the Roadmap focus flow touches.
+    for (const id of [
+      "sidebar-nav-docs",
+      "docs-mode-container",
+      "spec-focused-view",
+      "spec-focused-title",
+      "spec-focused-status",
+      "spec-focused-kind",
+      "spec-focused-effort",
+      "spec-focused-meta",
+      "spec-focused-body",
+      "spec-focused-body-inner",
+      "spec-dispatch-btn",
+      "spec-summarize-btn",
+      "spec-archive-btn",
+      "spec-unarchive-btn",
+      "spec-archived-banner",
+    ]) {
+      if (!dom.registry.has(id)) {
+        // Reuse the same factory shape as makeDom's internal makeEl.
+        const classes = new Set();
+        const el = {
+          tagName: "DIV",
+          id,
+          innerHTML: "",
+          textContent: "",
+          className: "",
+          style: {},
+          classList: {
+            add: (c) => {
+              classes.add(c);
+              el.className = Array.from(classes).join(" ");
+            },
+            remove: (c) => {
+              classes.delete(c);
+              el.className = Array.from(classes).join(" ");
+            },
+            toggle: (c, force) => {
+              if (force === true) classes.add(c);
+              else if (force === false) classes.delete(c);
+              else (classes.has(c) ? classes.delete(c) : classes.add(c));
+              el.className = Array.from(classes).join(" ");
+            },
+            contains: (c) => classes.has(c),
+          },
+          _classes: classes,
+        };
+        dom.registry.set(id, el);
+      }
+    }
+    const storage = new Map();
+    const fetchResponse =
+      opts.fetchResponse !== undefined ? opts.fetchResponse : "# Roadmap\n\nBody.";
+    const fetchMock =
+      opts.fetch ||
+      (() =>
+        Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(fetchResponse),
+        }));
+    const ctx = {
+      document: dom,
+      localStorage: {
+        getItem: (k) => storage.get(k) ?? null,
+        setItem: (k, v) => storage.set(k, v),
+      },
+      fetch: fetchMock,
+      Routes: { explorer: { readFile: () => "/api/explorer/file" } },
+      withBearerHeaders: () => ({}),
+      renderMarkdown: (t) => "<p>" + t + "</p>",
+      setInterval: () => 42,
+      clearInterval: () => {},
+      location: { hash: "", pathname: "/" },
+      history: { replaceState: () => {} },
+      console,
+      showConfirm: () => Promise.resolve(true),
+      showAlert: () => {},
+      Promise,
+      setTimeout: (fn) => fn(),
+      clearTimeout: () => {},
+      requestAnimationFrame: (fn) => fn(),
+      _mdRender: { enhanceMarkdown: () => Promise.resolve() },
+      buildFloatingToc: () => {},
+      teardownFloatingToc: () => {},
+      storage,
+    };
+    vm.createContext(ctx);
+    vm.runInContext(code, ctx);
+    return ctx;
+  }
+
+  const INDEX_META = {
+    path: "specs/README.md",
+    workspace: "/workspace/repo",
+    title: "Custom",
+    modified: "2026-04-13T10:00:00Z",
+  };
+
+  it("TestFocusedView_IndexHidesSpecAffordances — sets the --index class and hides buttons", async () => {
+    const ctx = makeRoadmapContext();
+    ctx.focusRoadmapIndex(INDEX_META);
+    await new Promise((r) => setTimeout(r, 10));
+
+    const view = ctx.document.getElementById("spec-focused-view");
+    expect(view.classList.contains("spec-focused-view--index")).toBe(true);
+    for (const id of [
+      "spec-dispatch-btn",
+      "spec-summarize-btn",
+      "spec-archive-btn",
+      "spec-unarchive-btn",
+      "spec-archived-banner",
+    ]) {
+      const el = ctx.document.getElementById(id);
+      expect(el.classList.contains("hidden")).toBe(true);
+    }
+    // The title bar now reads the literal "Roadmap" label.
+    const titleEl = ctx.document.getElementById("spec-focused-title");
+    expect(titleEl.textContent).toBe("Roadmap");
+  });
+
+  it("TestFocusedView_IndexRendersMarkdown — README body flows through the markdown pipeline", async () => {
+    const ctx = makeRoadmapContext({
+      fetchResponse: "# Custom\n\nWelcome to the roadmap.",
+    });
+    ctx.focusRoadmapIndex(INDEX_META);
+    await new Promise((r) => setTimeout(r, 10));
+    const body = ctx.document.getElementById("spec-focused-body-inner");
+    // renderMarkdown stub wraps everything in <p>...</p>. After the
+    // "remove leading H1" pass the content is just the body prose.
+    expect(body.innerHTML).toContain("Welcome to the roadmap");
+  });
+
+  it("is a no-op when indexMeta is null", () => {
+    const ctx = makeRoadmapContext();
+    ctx.focusRoadmapIndex(null);
+    expect(ctx.isRoadmapFocused()).toBe(false);
+    const view = ctx.document.getElementById("spec-focused-view");
+    expect(view.classList.contains("spec-focused-view--index")).toBe(false);
+  });
+
+  it("switching to a regular spec drops the --index class", async () => {
+    const ctx = makeRoadmapContext();
+    ctx.focusRoadmapIndex(INDEX_META);
+    await new Promise((r) => setTimeout(r, 10));
+    const view = ctx.document.getElementById("spec-focused-view");
+    expect(view.classList.contains("spec-focused-view--index")).toBe(true);
+    ctx.focusSpec("specs/local/foo.md", "/workspace/repo");
+    expect(view.classList.contains("spec-focused-view--index")).toBe(false);
+    expect(ctx.isRoadmapFocused()).toBe(false);
+  });
+
+  it("renders an error state when the fetch fails", async () => {
+    const ctx = makeRoadmapContext({
+      fetch: () =>
+        Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve("") }),
+    });
+    ctx.focusRoadmapIndex(INDEX_META);
+    await new Promise((r) => setTimeout(r, 10));
+    const body = ctx.document.getElementById("spec-focused-body-inner");
+    expect(body.innerHTML).toContain("Failed to load Roadmap");
+  });
+});

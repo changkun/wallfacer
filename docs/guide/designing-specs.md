@@ -26,6 +26,8 @@ Plan mode uses a three-pane layout:
 
 The explorer shows all specs organized by track — the top-level directories under `specs/`. Tracks are user-defined: create a directory under `specs/` and it becomes a track. For example, a project might organize specs as `specs/backend/`, `specs/frontend/`, `specs/infra/`.
 
+When a workspace has a `specs/README.md` file, the explorer pins a `📋 Roadmap` entry at the top of the tree that links back to that file. Clicking it renders the README in the focused view with all spec-only affordances (status chip, dispatch, archive) hidden — the Roadmap is a plain markdown document with no lifecycle.
+
 Each spec entry displays a status badge indicating its lifecycle state. Non-leaf specs (those with children) show a progress indicator reflecting how many of their leaf descendants are complete.
 
 Click a folder to expand or collapse it. Click a spec file to focus it in the center pane.

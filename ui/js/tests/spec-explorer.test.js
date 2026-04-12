@@ -1,7 +1,7 @@
 /**
  * Unit tests for spec-explorer.js — spec tree rendering and explorer mode switching.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -116,6 +116,8 @@ function makeContext(opts = {}) {
     Promise,
     escapeHtml: (s) => String(s).replace(/</g, "&lt;").replace(/>/g, "&gt;"),
     focusSpec: opts.focusSpec || (() => {}),
+    focusRoadmapIndex: opts.focusRoadmapIndex || (() => {}),
+    isRoadmapFocused: opts.isRoadmapFocused || (() => false),
     getFocusedSpecPath: () => null,
     activeWorkspaces: ["/workspace/repo"],
     _loadExplorerRoots: opts._loadExplorerRoots || (() => {}),
@@ -461,5 +463,92 @@ describe("spec-explorer", () => {
     ctx._specExpandedPaths.add("local/arch.md");
     ctx._forceCollapseArchived();
     expect(ctx._specExpandedPaths.has("local/arch.md")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pinned Roadmap entry (explorer-roadmap-entry spec).
+// ---------------------------------------------------------------------------
+
+const INDEX_META = {
+  path: "specs/README.md",
+  workspace: "/workspace/repo",
+  title: "Custom Repo Roadmap",
+  modified: "2026-04-13T10:00:00Z",
+};
+
+describe("spec-explorer pinned Roadmap", () => {
+  let ctx;
+  beforeEach(() => {
+    ctx = makeContext();
+    ctx._specExpandedPaths.add("__track__local");
+  });
+
+  it("TestExplorer_PinnedRoadmap_RendersWhenIndexPresent — pinned row at top of DOM", () => {
+    ctx._specTreeData = { ...MOCK_TREE_DATA, index: INDEX_META };
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    // The pinned entry appears before the track headers — a stable
+    // visual anchor at the top of the explorer.
+    const html = treeEl.innerHTML;
+    const pinnedIdx = html.indexOf("spec-explorer-pinned");
+    const trackIdx = html.indexOf("spec-track-header");
+    expect(pinnedIdx).toBeGreaterThanOrEqual(0);
+    expect(trackIdx).toBeGreaterThanOrEqual(0);
+    expect(pinnedIdx).toBeLessThan(trackIdx);
+    expect(html).toContain("\uD83D\uDCCB Roadmap");
+    expect(html).toContain('data-entry="index"');
+    // Always renders the literal "Roadmap" label regardless of the
+    // backend-provided title — the spec forbids localising this.
+    expect(treeEl.innerHTML).not.toContain(INDEX_META.title);
+  });
+
+  it("TestExplorer_PinnedRoadmap_HiddenWhenIndexNull — no pinned node", () => {
+    ctx._specTreeData = { ...MOCK_TREE_DATA, index: null };
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).not.toContain("spec-explorer-pinned");
+    expect(treeEl.innerHTML).not.toContain("\uD83D\uDCCB Roadmap");
+  });
+
+  it("TestExplorer_PinnedRoadmap_ClickFocusesIndex — _onSpecIndexClick calls focusRoadmapIndex", () => {
+    const focusRoadmapIndex = vi.fn();
+    ctx = makeContext({ focusRoadmapIndex });
+    // Inject focusRoadmapIndex as a global visible to spec-explorer's
+    // runtime lookup (we created it via makeContext's overrides).
+    Object.assign(ctx, { focusRoadmapIndex });
+    ctx._specTreeData = { ...MOCK_TREE_DATA, index: INDEX_META };
+    ctx.renderSpecTree();
+    ctx._onSpecIndexClick();
+    expect(focusRoadmapIndex).toHaveBeenCalledWith(INDEX_META);
+  });
+
+  it("_onSpecIndexClick is a no-op when no index is present", () => {
+    const focusRoadmapIndex = vi.fn();
+    ctx = makeContext({ focusRoadmapIndex });
+    Object.assign(ctx, { focusRoadmapIndex });
+    ctx._specTreeData = { ...MOCK_TREE_DATA, index: null };
+    ctx._onSpecIndexClick();
+    expect(focusRoadmapIndex).not.toHaveBeenCalled();
+  });
+
+  it("Enter on the pinned entry triggers focus (keyboard affordance)", () => {
+    const focusRoadmapIndex = vi.fn();
+    ctx = makeContext({ focusRoadmapIndex });
+    Object.assign(ctx, { focusRoadmapIndex });
+    ctx._specTreeData = { ...MOCK_TREE_DATA, index: INDEX_META };
+    ctx._onSpecIndexKeydown({
+      key: "Enter",
+      preventDefault: () => {},
+    });
+    expect(focusRoadmapIndex).toHaveBeenCalledWith(INDEX_META);
+  });
+
+  it("pinned row gets the focused class when the index is focused", () => {
+    ctx = makeContext({ isRoadmapFocused: () => true });
+    ctx._specTreeData = { ...MOCK_TREE_DATA, index: INDEX_META };
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("spec-explorer-pinned--focused");
   });
 });

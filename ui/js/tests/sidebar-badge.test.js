@@ -30,8 +30,7 @@ function makeContext(overrides = {}) {
   const ctx = {
     console,
     document: {
-      getElementById: (id) =>
-        id === "sidebar-board-unread-dot" ? dot : null,
+      getElementById: (id) => (id === "sidebar-board-unread-dot" ? dot : null),
     },
     getCurrentMode: () => "spec",
     tasks: [],

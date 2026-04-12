@@ -272,12 +272,25 @@ var _focusedSpecPath = null;
 var _focusedSpecWorkspace = null;
 var _focusedSpecContent = null;
 var _specRefreshTimer = null;
+// When true, the focused view shows the pinned Roadmap (specs/README.md)
+// instead of a real spec — spec affordances (status chip, dispatch,
+// archive, effort badge) are hidden via the .spec-focused-view--index
+// class in ui/css/spec-mode.css.
+var _focusedIsIndex = false;
 
 // focusSpec loads and renders a spec file in the focused markdown view.
 function focusSpec(specPath, workspace) {
   // Focusing a spec is a substantive action — clear the new-workspace
   // bias so the next auto-resolution respects saved preference + tasks.
   clearWorkspaceIsNew();
+  // Leaving the Roadmap index: drop the .spec-focused-view--index marker.
+  if (_focusedIsIndex) {
+    _focusedIsIndex = false;
+    var _focusedViewEl0 = document.getElementById("spec-focused-view");
+    if (_focusedViewEl0) {
+      _focusedViewEl0.classList.remove("spec-focused-view--index");
+    }
+  }
   _focusedSpecPath = specPath;
   _focusedSpecWorkspace = workspace;
   _focusedSpecContent = null; // reset so loading indicator shows
@@ -305,6 +318,120 @@ function focusSpec(specPath, workspace) {
 
 function getFocusedSpecPath() {
   return _focusedSpecPath;
+}
+
+// isRoadmapFocused returns true when the focused-view currently shows
+// the pinned Roadmap (specs/README.md) rather than a regular spec.
+function isRoadmapFocused() {
+  return _focusedIsIndex;
+}
+
+// focusRoadmapIndex loads specs/README.md into the focused-view and
+// hides all spec affordances (status chip, dispatch, archive, effort
+// badges, depends_on indicator). The pinned Roadmap entry in the
+// explorer calls this instead of focusSpec(). `indexMeta` is the
+// Index object from GET /api/specs/tree: `{path, workspace, title,
+// modified}`. When indexMeta is null, the call is a no-op.
+function focusRoadmapIndex(indexMeta) {
+  if (!indexMeta || !indexMeta.path || !indexMeta.workspace) return;
+  clearWorkspaceIsNew();
+  _stopSpecRefreshPoll();
+  _focusedIsIndex = true;
+  _focusedSpecPath = indexMeta.path;
+  _focusedSpecWorkspace = indexMeta.workspace;
+  _focusedSpecContent = null;
+
+  var focusedView = document.getElementById("spec-focused-view");
+  if (focusedView) focusedView.classList.add("spec-focused-view--index");
+
+  // Reset all per-spec header fields and hide buttons — the markdown
+  // rendering path for regular specs touches these too, but for the
+  // index we never rewrite them after the first clear.
+  var titleEl = document.getElementById("spec-focused-title");
+  if (titleEl) titleEl.textContent = "Roadmap";
+  var metaEl = document.getElementById("spec-focused-meta");
+  if (metaEl) metaEl.textContent = "";
+  var clearIds = [
+    "spec-focused-status",
+    "spec-focused-kind",
+    "spec-focused-effort",
+  ];
+  for (var ci = 0; ci < clearIds.length; ci++) {
+    var cel = document.getElementById(clearIds[ci]);
+    if (cel) {
+      cel.textContent = "";
+      cel.className = cel.className.replace(/ spec-\S+/g, "");
+    }
+  }
+  var hideIds = [
+    "spec-dispatch-btn",
+    "spec-summarize-btn",
+    "spec-archive-btn",
+    "spec-unarchive-btn",
+    "spec-archived-banner",
+  ];
+  for (var hi = 0; hi < hideIds.length; hi++) {
+    var hel = document.getElementById(hideIds[hi]);
+    if (hel) hel.classList.add("hidden");
+  }
+
+  var bodyInner = document.getElementById("spec-focused-body-inner");
+  if (bodyInner) {
+    bodyInner.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
+  }
+
+  var absPath = indexMeta.workspace + "/" + indexMeta.path;
+  var url =
+    Routes.explorer.readFile() +
+    "?path=" +
+    encodeURIComponent(absPath) +
+    "&workspace=" +
+    encodeURIComponent(indexMeta.workspace);
+  fetch(url, { headers: withBearerHeaders() })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.text();
+    })
+    .then(function (text) {
+      _focusedSpecContent = text;
+      if (!bodyInner) return;
+      bodyInner.innerHTML = renderMarkdown(text);
+      // Roadmap's own H1 is redundant with the "Roadmap" title bar.
+      var first = bodyInner.firstElementChild;
+      if (first && first.tagName === "H1") first.remove();
+      first = bodyInner.firstElementChild;
+      if (first && first.tagName === "HR") first.remove();
+      if (_mdRender && typeof _mdRender.enhanceMarkdown === "function") {
+        _mdRender
+          .enhanceMarkdown(bodyInner, {
+            links: true,
+            linkHandler: "spec",
+            basePath: indexMeta.path,
+            workspace: indexMeta.workspace,
+          })
+          .then(function () {
+            var scrollEl = document.getElementById("spec-focused-body");
+            var anchorEl = document.getElementById("spec-focused-view");
+            if (
+              scrollEl &&
+              anchorEl &&
+              typeof buildFloatingToc === "function"
+            ) {
+              buildFloatingToc(bodyInner, scrollEl, anchorEl, {
+                headingSelector: "h1, h2, h3, h4",
+                idPrefix: "spec-heading",
+              });
+            }
+          });
+      }
+    })
+    .catch(function (err) {
+      console.error("roadmap load error:", err);
+      if (bodyInner) {
+        bodyInner.innerHTML =
+          '<div class="spec-loading">Failed to load Roadmap</div>';
+      }
+    });
 }
 
 function _loadAndRenderSpec() {

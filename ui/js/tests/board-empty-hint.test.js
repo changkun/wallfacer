@@ -22,7 +22,7 @@ function makeHintEl() {
       toggle: (c, force) => {
         if (force === true) classes.add(c);
         else if (force === false) classes.delete(c);
-        else (classes.has(c) ? classes.delete(c) : classes.add(c));
+        else classes.has(c) ? classes.delete(c) : classes.add(c);
       },
     },
     _classes: classes,
@@ -52,8 +52,7 @@ function createMinimalRenderContext({ tasks = [] } = {}) {
       // Only the empty-hint element is surfaced; every other DOM lookup
       // (column containers, counts, search input, etc.) returns null so
       // render.js's "if (!el) continue" paths safely no-op.
-      getElementById: (id) =>
-        id === "board-empty-hint" ? hint : null,
+      getElementById: (id) => (id === "board-empty-hint" ? hint : null),
       createElement: () => ({ innerHTML: "", appendChild: () => {} }),
       querySelectorAll: () => [],
       addEventListener: () => {},

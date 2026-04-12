@@ -365,6 +365,23 @@ function renderSpecTree() {
   }
 
   var html = "";
+
+  // Pinned Roadmap entry: rendered above the track list when the backend
+  // surfaced a specs/README.md index. The label is always "\uD83D\uDCCB Roadmap"
+  // regardless of the file's H1 — a stable visual anchor per the
+  // explorer-roadmap-entry spec.
+  var indexMeta = _specTreeData && _specTreeData.index;
+  if (indexMeta) {
+    var focusedIsIndex =
+      typeof isRoadmapFocused === "function" && isRoadmapFocused();
+    html +=
+      '<div class="spec-explorer-pinned spec-explorer-item--roadmap' +
+      (focusedIsIndex ? " spec-explorer-pinned--focused" : "") +
+      '" data-entry="index" role="button" tabindex="0">' +
+      "\uD83D\uDCCB Roadmap" +
+      "</div>";
+  }
+
   for (var ti = 0; ti < trackOrder.length; ti++) {
     var track = trackOrder[ti];
     var trackExpanded =
@@ -395,6 +412,13 @@ function renderSpecTree() {
   var nodeEls = treeEl.querySelectorAll("[data-spec-path]");
   for (var n = 0; n < nodeEls.length; n++) {
     nodeEls[n].addEventListener("click", _onSpecNodeClick);
+  }
+
+  // Pinned Roadmap entry: click or Enter/Space focuses the index.
+  var pinnedEls = treeEl.querySelectorAll('[data-entry="index"]');
+  for (var pi = 0; pi < pinnedEls.length; pi++) {
+    pinnedEls[pi].addEventListener("click", _onSpecIndexClick);
+    pinnedEls[pi].addEventListener("keydown", _onSpecIndexKeydown);
   }
 
   // Attach toggle handlers.
@@ -558,6 +582,25 @@ function _onSpecNodeClick(e) {
   if (typeof focusSpec === "function") {
     focusSpec(path, ws);
     renderSpecTree(); // re-render to update focused highlight
+  }
+}
+
+// _onSpecIndexClick focuses the pinned Roadmap entry — delegates to
+// focusRoadmapIndex in spec-mode.js. The tree re-renders so the
+// pinned row picks up the focused highlight.
+function _onSpecIndexClick() {
+  var idx = getSpecIndex();
+  if (!idx) return;
+  if (typeof focusRoadmapIndex === "function") {
+    focusRoadmapIndex(idx);
+    renderSpecTree();
+  }
+}
+
+function _onSpecIndexKeydown(e) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    _onSpecIndexClick();
   }
 }
 

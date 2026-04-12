@@ -87,6 +87,22 @@
   flex: 1;
 }
 
+/* Pinned Roadmap (specs/README.md) in the focused view: hide every
+   spec-only affordance — status chip, kind/effort badges, metadata bar,
+   dispatch/breakdown/archive buttons, archived banner. The Roadmap is a
+   plain markdown document with no lifecycle. */
+.spec-focused-view--index .spec-focused-view__status,
+.spec-focused-view--index .spec-focused-view__kind,
+.spec-focused-view--index .spec-focused-view__effort,
+.spec-focused-view--index .spec-focused-view__meta,
+.spec-focused-view--index #spec-dispatch-btn,
+.spec-focused-view--index #spec-summarize-btn,
+.spec-focused-view--index #spec-archive-btn,
+.spec-focused-view--index #spec-unarchive-btn,
+.spec-focused-view--index #spec-archived-banner {
+  display: none !important;
+}
+
 .spec-focused-view__meta {
   padding: 2px 16px 4px;
   font-size: 10px;
@@ -835,6 +851,33 @@
   color: var(--text-muted);
   font-size: 12px;
   font-style: italic;
+}
+
+/* Pinned Roadmap entry at the top of the spec explorer — stable visual
+   anchor for specs/README.md, regardless of track filter. */
+.spec-explorer-pinned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+.spec-explorer-pinned:hover {
+  background: var(--bg-hover);
+}
+.spec-explorer-pinned:focus {
+  outline: none;
+  background: var(--bg-hover);
+}
+.spec-explorer-pinned--focused {
+  border-left: 2px solid var(--accent);
+  background: var(--bg-hover);
 }
 
 .spec-track-header {

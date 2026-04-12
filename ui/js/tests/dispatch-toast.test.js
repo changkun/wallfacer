@@ -184,7 +184,8 @@ describe("showDispatchCompleteToast", () => {
     ctx.document.body.appendChild(card);
 
     ctx.showDispatchCompleteToast(["task-a"]);
-    const toast = ctx.document.body.children[ctx.document.body.children.length - 1];
+    const toast =
+      ctx.document.body.children[ctx.document.body.children.length - 1];
     const viewBtn = toast.children[1];
     viewBtn.dispatchEvent("click");
 
