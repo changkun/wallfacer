@@ -32,12 +32,12 @@ type MockRunner struct {
 	CodexPath   string
 
 	// Recorded call arguments (mutex-protected for race-safety).
-	RunBackgroundCalls             []uuid.UUID
-	KillContainerCalls             []uuid.UUID
-	KillRefineContainerCalls       []uuid.UUID
-	CleanupWorktreesCalls          []uuid.UUID
-	GenerateTitleCalls             []uuid.UUID
-	MaybeAutoPushWorkspaceCalls    []string
+	RunBackgroundCalls          []uuid.UUID
+	KillContainerCalls          []uuid.UUID
+	KillRefineContainerCalls    []uuid.UUID
+	CleanupWorktreesCalls       []uuid.UUID
+	GenerateTitleCalls          []uuid.UUID
+	MaybeAutoPushWorkspaceCalls []string
 
 	// Optional overrides for ContainerName / RefineContainerName return values.
 	// When nil the methods return "" (no container active), matching the default
