@@ -185,7 +185,9 @@ describe("renderResultsFromEvents", () => {
   });
 
   function resetElements() {
-    Object.keys(elements).forEach((k) => { delete elements[k]; });
+    Object.keys(elements).forEach((k) => {
+      delete elements[k];
+    });
   }
 
   it("hides the tab and summary when results are empty", () => {

@@ -2,7 +2,7 @@
  * Tests for modal-flamegraph.js — labelHue, assignLanes, width calculation,
  * and the loadFlamegraph async entry point.
  */
-import { describe, it, expect, beforeAll, } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

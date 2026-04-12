@@ -10,7 +10,7 @@
  *     the non-existent Routes.tasks.update(id), so no TypeError is thrown and
  *     the PATCH reaches the correct URL.
  */
-import { describe, it, expect, vi, } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -91,7 +91,9 @@ function makeMockEventSource(readyState = 1) {
     /** Synchronously dispatch a fake SSE event to all registered listeners. */
     fire(type, data) {
       const event = { data: JSON.stringify(data), lastEventId: "" };
-      (listeners[type] || []).forEach((fn) => { fn(event); });
+      (listeners[type] || []).forEach((fn) => {
+        fn(event);
+      });
     },
   };
   return source;

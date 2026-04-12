@@ -118,7 +118,9 @@ function createElement(ownerDocument, tagName, overrides = {}) {
     dispatchEvent(evt) {
       evt.target = evt.target || this;
       evt.currentTarget = this;
-      (this._listeners[evt.type] || []).forEach((fn) => { fn.call(this, evt); });
+      (this._listeners[evt.type] || []).forEach((fn) => {
+        fn.call(this, evt);
+      });
       return true;
     },
     setAttribute(name, value) {
@@ -127,12 +129,12 @@ function createElement(ownerDocument, tagName, overrides = {}) {
       if (name === "role") this.role = String(value);
     },
     getAttribute(name) {
-      return  Object.hasOwn(this.attributes, name)
+      return Object.hasOwn(this.attributes, name)
         ? this.attributes[name]
         : null;
     },
     hasAttribute(name) {
-      return  Object.hasOwn(this.attributes, name);
+      return Object.hasOwn(this.attributes, name);
     },
     removeAttribute(name) {
       delete this.attributes[name];

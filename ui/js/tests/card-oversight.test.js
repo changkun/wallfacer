@@ -80,7 +80,9 @@ function makeEl(tag) {
     },
     // Test helper: fire all listeners for an event type.
     _fire(evt) {
-      (this._listeners[evt] || []).forEach((fn) => { fn(); });
+      (this._listeners[evt] || []).forEach((fn) => {
+        fn();
+      });
     },
   };
   return el;

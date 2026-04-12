@@ -3,7 +3,7 @@
  *
  * Pattern: vitest + vm.createContext (same as envconfig.test.js).
  */
-import { describe, it, expect, vi, } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -73,7 +73,9 @@ function makeEl(tag, overrides = {}) {
       listeners[evt].push(fn);
     },
     _fire(evt, data) {
-      (listeners[evt] || []).forEach((fn) => { fn(data); });
+      (listeners[evt] || []).forEach((fn) => {
+        fn(data);
+      });
     },
     querySelector(_sel) {
       return null;

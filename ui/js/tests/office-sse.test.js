@@ -1,4 +1,4 @@
-import { describe, it, expect, } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -182,7 +182,10 @@ function makeContext() {
 
 function initContext(ctx) {
   const dcl = ctx.eventListeners["document"]?.["DOMContentLoaded"];
-  if (dcl) dcl.forEach((fn) => { fn(); });
+  if (dcl)
+    dcl.forEach((fn) => {
+      fn();
+    });
 }
 
 describe("office SSE integration", () => {

@@ -1,7 +1,7 @@
 /**
  * Tests for terminal.js — xterm.js integration and WebSocket management.
  */
-import { describe, it, expect, vi, } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

@@ -300,7 +300,9 @@ describe("docs.js", () => {
       });
       loadScript(ctx);
       // Trigger DOMContentLoaded
-      ctx._domContentLoadedCbs.forEach((cb) => { cb(); });
+      ctx._domContentLoadedCbs.forEach((cb) => {
+        cb();
+      });
       expect(ctx.api).toHaveBeenCalledWith("/api/docs");
     });
   });

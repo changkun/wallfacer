@@ -29,7 +29,8 @@
         <h3 style="font-size: 16px; font-weight: 600; margin: 0">
           System Prompt Templates
         </h3>
-        <button type="button"
+        <button
+          type="button"
           onclick="closeSystemPromptsEditor()"
           style="
             background: none;
@@ -109,13 +110,15 @@
                 "
               ></div>
               <div id="sysprompt-tabs" class="logs-tabs">
-                <button type="button"
+                <button
+                  type="button"
                   class="logs-tab"
                   onclick="switchEditTab('sysprompt', 'edit')"
                 >
                   Edit
                 </button>
-                <button type="button"
+                <button
+                  type="button"
                   class="logs-tab active"
                   onclick="switchEditTab('sysprompt', 'preview')"
                 >
@@ -154,14 +157,16 @@
               margin-top: 12px;
             "
           >
-            <button type="button"
+            <button
+              type="button"
               onclick="saveSystemPrompt()"
               class="btn btn-accent"
               id="system-prompt-save-btn"
             >
               Save override
             </button>
-            <button type="button"
+            <button
+              type="button"
               onclick="resetSystemPromptToDefault()"
               class="btn-icon"
               id="system-prompt-reset-btn"
@@ -169,7 +174,11 @@
             >
               Reset to default
             </button>
-            <button type="button" onclick="closeSystemPromptsEditor()" class="btn-ghost">
+            <button
+              type="button"
+              onclick="closeSystemPromptsEditor()"
+              class="btn-ghost"
+            >
               Close
             </button>
             <span

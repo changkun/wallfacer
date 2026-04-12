@@ -3,7 +3,7 @@
  *
  * explorer.js is loaded into an isolated vm context with minimal DOM stubs.
  */
-import { describe, it, expect, } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -69,9 +69,7 @@ function makeDom() {
         if (k === "id") el.id = v;
       },
       getAttribute(k) {
-        return  Object.hasOwn(_attrs, k)
-          ? _attrs[k]
-          : null;
+        return Object.hasOwn(_attrs, k) ? _attrs[k] : null;
       },
 
       appendChild(child) {
@@ -153,7 +151,7 @@ function makeContext(opts = {}) {
     window: windowObj,
     localStorage: {
       getItem(k) {
-        return  Object.hasOwn(store, k) ? store[k] : null;
+        return Object.hasOwn(store, k) ? store[k] : null;
       },
       setItem(k, v) {
         store[k] = String(v);

@@ -34,7 +34,9 @@ class MockEventSource {
     this.readyState = 2;
   }
   _emit(type, data) {
-    (this._listeners[type] || []).forEach((fn) => { fn(data); });
+    (this._listeners[type] || []).forEach((fn) => {
+      fn(data);
+    });
   }
 }
 MockEventSource.CLOSED = 2;

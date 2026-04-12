@@ -69,7 +69,9 @@ class MockAbortController {
   abort() {
     if (this.signal.aborted) return;
     this.signal.aborted = true;
-    this._handlers.forEach((fn) => { fn(); });
+    this._handlers.forEach((fn) => {
+      fn();
+    });
   }
 }
 

@@ -6,13 +6,22 @@
       <span id="spec-focused-kind" class="spec-focused-view__kind"></span>
       <span id="spec-focused-effort" class="spec-focused-view__effort"></span>
       <span class="spec-focused-view__spacer"></span>
-      <button type="button" id="spec-dispatch-btn" class="spec-dispatch-btn hidden">
+      <button
+        type="button"
+        id="spec-dispatch-btn"
+        class="spec-dispatch-btn hidden"
+      >
         Dispatch
       </button>
-      <button type="button" id="spec-summarize-btn" class="spec-summarize-btn hidden">
+      <button
+        type="button"
+        id="spec-summarize-btn"
+        class="spec-summarize-btn hidden"
+      >
         Summarize
       </button>
-      <button type="button"
+      <button
+        type="button"
         id="spec-archive-btn"
         class="spec-summarize-btn hidden"
         onclick="archiveFocusedSpec()"
@@ -20,7 +29,8 @@
       >
         Archive
       </button>
-      <button type="button"
+      <button
+        type="button"
         id="spec-unarchive-btn"
         class="spec-summarize-btn hidden"
         onclick="unarchiveFocusedSpec()"
@@ -51,7 +61,8 @@
       <span class="spec-archived-banner__text">
         Archived &mdash; read-only. Hidden from the live graph and drift checks.
       </span>
-      <button type="button"
+      <button
+        type="button"
         id="spec-archived-banner-unarchive"
         class="spec-summarize-btn"
         onclick="unarchiveFocusedSpec()"
@@ -82,14 +93,16 @@
     <div class="spec-chat-stream__header">
       <span class="spec-chat-stream__title">Planning Chat</span>
       <span class="spec-chat-stream__header-actions">
-        <button type="button"
+        <button
+          type="button"
           id="spec-chat-clear"
           class="spec-chat-clear-btn"
           title="Clear conversation"
         >
           Clear
         </button>
-        <button type="button"
+        <button
+          type="button"
           class="spec-chat-fold-btn"
           onclick="toggleSpecChat()"
           title="Hide chat (C)"
@@ -114,14 +127,16 @@
       ></textarea>
       <div class="spec-chat-composer__bar">
         <div class="spec-chat-composer__actions">
-          <button type="button"
+          <button
+            type="button"
             id="spec-chat-slash-hint"
             class="spec-chat-composer__action"
             title="Slash commands"
           >
             /
           </button>
-          <button type="button"
+          <button
+            type="button"
             id="spec-chat-at-hint"
             class="spec-chat-composer__action"
             title="Mention a file"
@@ -135,10 +150,15 @@
             class="spec-chat-composer__hint"
           ></span>
           <div class="spec-chat-send-group">
-            <button type="button" id="spec-chat-send" class="spec-chat-composer__send">
+            <button
+              type="button"
+              id="spec-chat-send"
+              class="spec-chat-composer__send"
+            >
               &#x27A4;
             </button>
-            <button type="button"
+            <button
+              type="button"
               id="spec-chat-send-mode"
               class="spec-chat-composer__send-toggle"
               title="Toggle send shortcut"

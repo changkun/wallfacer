@@ -5,7 +5,7 @@
  * _stopTimelineRefresh, renderTimeline, copyResultEntry, toggleResultEntryRaw,
  * setLeftTab, and branch paths in renderResultsFromEvents.
  */
-import { describe, it, expect, beforeAll, beforeEach, } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

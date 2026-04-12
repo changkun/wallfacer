@@ -90,7 +90,9 @@ function createElement(overrides = {}) {
       String(value)
         .split(/\s+/)
         .filter(Boolean)
-        .forEach((cls) => { classSet.add(cls); });
+        .forEach((cls) => {
+          classSet.add(cls);
+        });
     },
   });
   return Object.assign(node, overrides);

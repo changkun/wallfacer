@@ -69,9 +69,7 @@ function makeDom() {
         if (k === "id") el.id = v;
       },
       getAttribute(k) {
-        return  Object.hasOwn(_attrs, k)
-          ? _attrs[k]
-          : null;
+        return Object.hasOwn(_attrs, k) ? _attrs[k] : null;
       },
 
       appendChild(child) {
@@ -172,7 +170,7 @@ function makeContext() {
     window: windowObj,
     localStorage: {
       getItem(k) {
-        return  Object.hasOwn(store, k) ? store[k] : null;
+        return Object.hasOwn(store, k) ? store[k] : null;
       },
       setItem(k, v) {
         store[k] = String(v);

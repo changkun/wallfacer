@@ -1,7 +1,7 @@
 /**
  * Tests for planning-chat.js — PlanningChat module.
  */
-import { describe, it, expect, vi, } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -92,7 +92,9 @@ function makeElement(tag, overrides = {}) {
     },
     // For test: fire event listeners.
     _fire(event, evtObj) {
-      (eventListeners[event] || []).forEach((fn) => { fn(evtObj || {}); });
+      (eventListeners[event] || []).forEach((fn) => {
+        fn(evtObj || {});
+      });
     },
     _listeners: eventListeners,
     ...overrides,

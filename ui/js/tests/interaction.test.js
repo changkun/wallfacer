@@ -1,4 +1,4 @@
-import { describe, it, expect, } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -104,7 +104,9 @@ function makeContext() {
 }
 
 function fire(events, type, data) {
-  (events[type] || []).forEach((fn) => { fn(data); });
+  (events[type] || []).forEach((fn) => {
+    fn(data);
+  });
 }
 
 function setupInteraction() {

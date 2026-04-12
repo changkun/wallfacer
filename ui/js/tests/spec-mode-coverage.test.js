@@ -66,7 +66,9 @@ function makeEl(tag) {
       _classList.clear();
       v.split(/\s+/)
         .filter(Boolean)
-        .forEach((c) => { _classList.add(c); });
+        .forEach((c) => {
+          _classList.add(c);
+        });
     },
     addEventListener: vi.fn(),
     get onclick() {
