@@ -589,6 +589,64 @@ func TestPlanningHandler_FailedExecDoesNotPersist(t *testing.T) {
 	}
 }
 
+func TestArchivedSpecGuard(t *testing.T) {
+	ws := t.TempDir()
+
+	// Helper: write a spec file with a given status.
+	write := func(rel, status string) {
+		t.Helper()
+		body := "---\n" +
+			"title: T\n" +
+			"status: " + status + "\n" +
+			"depends_on: []\n" +
+			"affects: []\n" +
+			"effort: small\n" +
+			"created: 2026-01-01\n" +
+			"updated: 2026-01-01\n" +
+			"author: t\n" +
+			"dispatched_task_id: null\n" +
+			"---\n\n# T\n\nBody.\n"
+		abs := ws + "/" + rel
+		if err := os.MkdirAll(ws+"/specs/local", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(abs, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("specs/local/arch.md", "archived")
+	write("specs/local/live.md", "validated")
+
+	tests := []struct {
+		name    string
+		focused string
+		want    bool // whether guard should be non-empty
+	}{
+		{"archived spec yields guard", "specs/local/arch.md", true},
+		{"validated spec yields no guard", "specs/local/live.md", false},
+		{"empty path yields no guard", "", false},
+		{"missing path yields no guard", "specs/local/missing.md", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := archivedSpecGuard([]string{ws}, tc.focused)
+			if tc.want && got == "" {
+				t.Errorf("expected non-empty guard for %q, got empty", tc.focused)
+			}
+			if !tc.want && got != "" {
+				t.Errorf("expected empty guard for %q, got %q", tc.focused, got)
+			}
+			if tc.want && !strings.Contains(got, "archived") {
+				t.Errorf("guard should mention 'archived', got %q", got)
+			}
+			if tc.want && !strings.Contains(got, "unarchive") {
+				t.Errorf("guard should instruct to unarchive, got %q", got)
+			}
+		})
+	}
+}
+
 func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})

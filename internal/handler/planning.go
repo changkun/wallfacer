@@ -13,8 +13,32 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/spec"
 	"changkun.de/x/wallfacer/internal/store"
 )
+
+// archivedSpecGuard returns a system-prompt prefix to prepend when the focused
+// spec is archived, instructing the chat agent to refuse writes. Returns the
+// empty string when the spec is not archived or cannot be resolved.
+func archivedSpecGuard(workspaces []string, focusedSpec string) string {
+	if focusedSpec == "" {
+		return ""
+	}
+	abs := findSpecFile(workspaces, focusedSpec)
+	if abs == "" {
+		return ""
+	}
+	s, err := spec.ParseFile(abs)
+	if err != nil || s == nil {
+		return ""
+	}
+	if s.Status != spec.StatusArchived {
+		return ""
+	}
+	return "\u26A0 This spec is archived (read-only). Do NOT write to or modify " +
+		"this spec. If the user requests changes, tell them to unarchive " +
+		"the spec first using the Unarchive button in the focused view.\n\n"
+}
 
 // GetPlanningStatus reports whether the planning sandbox is running.
 func (h *Handler) GetPlanningStatus(w http.ResponseWriter, _ *http.Request) {
@@ -143,6 +167,9 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.FocusedSpec != "" && !strings.HasPrefix(req.Message, "/") {
 		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + prompt
+	}
+	if guard := archivedSpecGuard(h.currentWorkspaces(), req.FocusedSpec); guard != "" {
+		prompt = guard + prompt
 	}
 	cmd := []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
 
