@@ -42,8 +42,8 @@ The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). Wh
 ## Build & Run Commands
 
 ```bash
-make build          # Build Go binary + pull sandbox images
-make build-binary   # Build just the Go binary
+make build          # Full gate: fmt + lint (Go + JS) + binary + pull sandbox images
+make build-binary   # Build just the Go binary (no fmt/lint/pull)
 make pull-images    # Pull Claude and Codex sandbox images
 make install-wails  # Install the Wails CLI (tracked as tool in go.mod)
 make build-desktop  # Build native desktop app for current platform (uses go tool wails)
@@ -64,7 +64,7 @@ make e2e-lifecycle SANDBOX=claude  # E2E: task lifecycle for Claude only
 make e2e-dependency-dag WORKSPACE=/path/to/repo  # E2E: dependency DAG with conflict resolution
 ```
 
-CLI usage (after `go build -o wallfacer .`):
+CLI usage (after `make build-binary`, or `make build` for the full fmt/lint-gated build):
 
 ```bash
 wallfacer                                    # Print help
@@ -88,11 +88,23 @@ The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` 
 
 The Go source lives at the top level. Module path: `changkun.de/x/wallfacer`. Go version: 1.25.7.
 
+**Preferred loop — use `make` targets, not raw `go` invocations.** The `make` targets run the project's full validation (gofmt, golangci-lint, Biome for JS), not just compilation. Raw `go build`/`go vet` skip lint and can commit code that fails CI.
+
 ```bash
-go build -o wallfacer .   # Build server binary
-go vet ./...              # Lint
-go test ./...             # Run backend tests
-cd ui && npx --yes vitest@2 run    # Run frontend tests
+make build          # fmt + lint (Go + JS) + build + pull images (full gate)
+make build-binary   # just build the Go binary (fast; skips lint/pull)
+make lint           # lint only (fastest way to catch style regressions)
+make fmt            # format Go and JS in place
+make test           # lint + backend tests + frontend tests
+make test-backend   # go test ./...
+make test-frontend  # vitest in ui/
+
+# Raw Go equivalents (useful for debugging a single package, but run
+# `make lint` before committing — they do not run golangci-lint or Biome):
+go build -o wallfacer .
+go vet ./...
+go test ./...
+cd ui && npx --yes vitest@2 run
 ```
 
 The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
@@ -441,7 +453,7 @@ make e2e-dependency-dag WORKSPACE="$WORKSPACE"
 
 Every implementation task MUST complete all three steps before finishing:
 
-1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. **Bug fixes must always include a regression test** that fails without the fix and passes with it. Run `go test ./...` (backend) or `cd ui && npx vitest@2 run` (frontend) to confirm they pass before committing.
+1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. **Bug fixes must always include a regression test** that fails without the fix and passes with it. Run `make test` before committing — it wraps `make lint` (golangci-lint + Biome) plus backend + frontend test runs, so a clean `make test` is the single gate that matches CI. Use `make test-backend` / `make test-frontend` for faster targeted runs during iteration.
 
 2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation. Do not skip this step. The user manual lives in `docs/guide/` with these focused guides:
    - `docs/guide/usage.md` — Index page with reading order (update if adding a new guide)
@@ -460,7 +472,7 @@ Every implementation task MUST complete all three steps before finishing:
 
 ## Commit and push strategy
 
-- Before committing, always run `make fmt` and `make lint` and fix any issues they report.
+- Before committing, always run `make build` (or at minimum `make fmt && make lint`) and fix any issues they report. `make build` is the full gate — it runs fmt, lint (Go + JS), and the binary compile, catching everything CI checks at build time.
 - Keep commits small and focused on one logical change.
 - Do not include unrelated changes in the same commit.
 - Use scoped, imperative commit messages matching existing style, e.g. `internal/runner: ...`, `ui: ...`, `docs: ...`.
