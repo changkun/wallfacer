@@ -1,6 +1,6 @@
 ---
 title: "Archival: Focused view read-only banner and archive/unarchive actions"
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-archival/archive-api.md
   - specs/local/spec-coordination/spec-archival/explorer-ux.md
@@ -164,3 +164,22 @@ Manual verification:
 - Do NOT modify `specs_dispatch.go` or `specs.go` API endpoints
 - Explorer UX (tree filter, "Show archived" toggle) is in `explorer-ux.md` — do not touch
   `spec-explorer.js` here
+
+## Implementation notes
+
+- **Chat agent guard location**: the spec listed `internal/planner/spec.go` as an affected
+  file, but that file is the planner's container-spec builder, not a prompt-assembly
+  function. Prompt assembly happens in `internal/handler/planning.go:SendPlanningMessage`.
+  The guard was added there as `archivedSpecGuard()` and prepended to the prompt when the
+  focused spec's status is `archived`. The `internal/planner/spec.go` file was not touched.
+- **Refine button**: step 3 referenced a refine button; no such button exists in the focused
+  view today. Skipped — no-op.
+- **Banner location**: placed in the focused view body area (below metadata, above
+  markdown body) rather than "top of the focused view content area" to match the
+  existing partial's layout anchors.
+- **Test scaffolding**: vitest unit tests added in `ui/js/tests/spec-mode-archive.test.js`
+  covering archive/unarchive/undo/dismiss. Backend test in `planning_test.go` covers
+  `archivedSpecGuard` across archived, live, empty, and missing path cases.
+- **Additional partial changes**: the spec listed only `spec-mode.js` + `spec-mode.css` in
+  `affects`, but HTML wiring required edits to `ui/partials/spec-mode.html` for the
+  banner, two toolbar buttons, and the undo toast.
