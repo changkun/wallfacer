@@ -1,6 +1,6 @@
 ---
 title: File Explorer Panel
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/handler/explorer.go
@@ -8,10 +8,11 @@ affects:
   - ui/css/explorer.css
 effort: xlarge
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Plan: File Explorer Panel
 

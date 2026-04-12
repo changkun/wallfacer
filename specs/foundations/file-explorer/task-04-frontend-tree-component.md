@@ -1,6 +1,6 @@
 ---
 title: "Frontend Tree Component"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/file-explorer/task-01-backend-path-validation-and-tree-listing.md
   - specs/foundations/file-explorer/task-03-frontend-panel-shell.md
@@ -8,10 +8,11 @@ affects:
   - ui/js/explorer.js
 effort: large
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 4: Frontend Tree Component
 

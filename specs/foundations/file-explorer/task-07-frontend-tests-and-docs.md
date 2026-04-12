@@ -1,6 +1,6 @@
 ---
 title: "Frontend Tests and Documentation"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
   - specs/foundations/file-explorer/task-06-keyboard-shortcuts-and-polish.md
@@ -9,10 +9,11 @@ affects:
   - docs/guide/board-and-tasks.md
 effort: medium
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 7: Frontend Tests and Documentation
 

@@ -1,6 +1,6 @@
 ---
 title: "File Icons in Explorer Tree"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/file-explorer/task-04-frontend-tree-component.md
 affects:
@@ -8,10 +8,11 @@ affects:
   - ui/css/explorer.css
 effort: medium
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 11: File Icons in Explorer Tree
 
