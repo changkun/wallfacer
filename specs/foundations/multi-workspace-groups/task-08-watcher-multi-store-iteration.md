@@ -1,6 +1,6 @@
 ---
 title: "Watcher Multi-Store Task Iteration"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
   - specs/foundations/multi-workspace-groups/task-07-watcher-resubscribe.md
@@ -8,10 +8,11 @@ affects:
   - internal/handler/tasks_autopilot.go
 effort: large
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 8: Watcher Multi-Store Task Iteration
 

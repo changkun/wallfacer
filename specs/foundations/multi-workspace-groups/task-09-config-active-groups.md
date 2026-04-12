@@ -1,16 +1,17 @@
 ---
 title: "Expose Per-Group Task Counts in Config API"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
 affects:
   - internal/handler/config.go
 effort: small
 created: 2026-03-27
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 9: Expose Per-Group Task Counts in Config API
 
