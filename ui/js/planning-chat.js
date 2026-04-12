@@ -379,7 +379,8 @@ var PlanningChat = (function () {
   }
 
   async function _archiveThread(id) {
-    if (!confirm("Archive this thread? You can restore it later.")) return;
+    if (!(await showConfirm("Archive this thread? You can restore it later.")))
+      return;
     try {
       var res = await fetch(_threadUrl(Routes.planning.archiveThread, id), {
         method: "POST",

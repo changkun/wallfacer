@@ -230,7 +230,10 @@ function makeContext(opts = {}) {
           readyState: 2,
         };
       },
-    confirm: opts.confirm !== undefined ? opts.confirm : () => true,
+    showConfirm:
+      opts.showConfirm !== undefined
+        ? opts.showConfirm
+        : () => Promise.resolve(true),
     api(url, fetchOpts) {
       apiCalls.push({ url, opts: fetchOpts });
       const response = opts.apiResponse || [];
@@ -563,9 +566,9 @@ describe("_discardEdit", () => {
     expect(vm.runInContext("_editMode", ctx)).toBe(false);
   });
 
-  it("prompts confirmation when dirty and respects cancel", () => {
+  it("prompts confirmation when dirty and respects cancel", async () => {
     const { win, ctx, registry } = makeContext({
-      confirm: () => false,
+      showConfirm: () => Promise.resolve(false),
     });
     vm.runInContext(
       '_editMode = true; _editOriginalContent = "old"; _previewRawContent = "text";',
@@ -573,8 +576,8 @@ describe("_discardEdit", () => {
     );
     registry.set("explorer-edit-textarea", { value: "new" });
 
-    win._discardEdit();
-    // Should still be in edit mode because confirm returned false
+    await win._discardEdit();
+    // Should still be in edit mode because showConfirm resolved to false
     expect(vm.runInContext("_editMode", ctx)).toBe(true);
   });
 });

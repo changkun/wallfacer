@@ -636,9 +636,9 @@ function _saveFile() {
     });
 }
 
-function _discardEdit() {
+async function _discardEdit() {
   if (_isEditDirty()) {
-    if (!confirm("You have unsaved changes. Discard?")) return;
+    if (!(await showConfirm("You have unsaved changes. Discard?"))) return;
   }
 
   _editMode = false;
@@ -668,9 +668,9 @@ function _discardEdit() {
   if (errEl) errEl.style.display = "none";
 }
 
-function closeExplorerPreview() {
+async function closeExplorerPreview() {
   if (_isEditDirty()) {
-    if (!confirm("You have unsaved changes. Discard?")) return;
+    if (!(await showConfirm("You have unsaved changes. Discard?"))) return;
   }
 
   _editMode = false;
