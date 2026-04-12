@@ -21,10 +21,11 @@ import (
 	"changkun.de/x/wallfacer/internal/spec"
 )
 
-// GetSpecTree returns the full spec tree with metadata and progress for
-// all workspaces. Each workspace's specs/ directory is scanned and the
-// results are merged into a single response.
-func (h *Handler) GetSpecTree(w http.ResponseWriter, _ *http.Request) {
+// collectSpecTree merges the spec trees across all workspaces into a
+// single TreeResponse and attaches the roadmap index (specs/README.md
+// from the first workspace that has one). Shared by GetSpecTree and
+// the SSE SpecTreeStream so both surfaces emit the same shape.
+func (h *Handler) collectSpecTree() spec.TreeResponse {
 	workspaces := h.currentWorkspaces()
 
 	var allNodes []spec.NodeResponse
@@ -41,15 +42,31 @@ func (h *Handler) GetSpecTree(w http.ResponseWriter, _ *http.Request) {
 		maps.Copy(allProgress, resp.Progress)
 	}
 
-	httpjson.Write(w, http.StatusOK, spec.TreeResponse{
+	index, err := spec.ResolveIndex(workspaces)
+	if err != nil {
+		slog.Warn("resolve roadmap index failed", "err", err)
+	}
+
+	return spec.TreeResponse{
 		Nodes:    allNodes,
 		Progress: allProgress,
-	})
+		Index:    index,
+	}
+}
+
+// GetSpecTree returns the full spec tree with metadata, progress, and
+// an optional roadmap index for all workspaces. Each workspace's specs/
+// directory is scanned and the results are merged into a single response.
+func (h *Handler) GetSpecTree(w http.ResponseWriter, _ *http.Request) {
+	httpjson.Write(w, http.StatusOK, h.collectSpecTree())
 }
 
 // SpecTreeStream sends SSE notifications when the spec tree changes.
 // The server polls the spec directories every 3 seconds and sends the
 // full tree data only when it differs from the previous snapshot.
+// Changes to the roadmap (specs/README.md) also fire a snapshot via
+// this path since the poller serialises the full TreeResponse and
+// compares the JSON — any field-level change drives a new event.
 func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -61,22 +78,7 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	collectTree := func() spec.TreeResponse {
-		workspaces := h.currentWorkspaces()
-		var allNodes []spec.NodeResponse
-		allProgress := make(map[string]spec.Progress)
-		for _, ws := range workspaces {
-			specsDir := filepath.Join(ws, "specs")
-			tree, err := spec.BuildTree(specsDir)
-			if err != nil {
-				continue
-			}
-			resp := spec.SerializeTree(tree)
-			allNodes = append(allNodes, resp.Nodes...)
-			maps.Copy(allProgress, resp.Progress)
-		}
-		return spec.TreeResponse{Nodes: allNodes, Progress: allProgress}
-	}
+	collectTree := h.collectSpecTree
 
 	send := func(tree spec.TreeResponse) ([]byte, bool) {
 		data, err := json.Marshal(tree)

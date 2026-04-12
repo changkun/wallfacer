@@ -214,6 +214,69 @@ func TestArchiveSpec_CascadeAndRevert(t *testing.T) {
 	}
 }
 
+// writeReadmeIn creates a specs/README.md under the given workspace
+// with the supplied body, for GetSpecTree / stream index assertions.
+func writeReadmeIn(t *testing.T, ws, body string) {
+	t.Helper()
+	path := filepath.Join(ws, "specs", "README.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetSpecTree_ReturnsIndexField(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	writeReadmeIn(t, ws, "# My Roadmap\n\nBody.\n")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/specs/tree", nil)
+	w := httptest.NewRecorder()
+	h.GetSpecTree(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	var resp spec.TreeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Index == nil {
+		t.Fatalf("Index is nil, want non-nil\nbody: %s", w.Body.String())
+	}
+	if resp.Index.Title != "My Roadmap" {
+		t.Errorf("Index.Title = %q, want %q", resp.Index.Title, "My Roadmap")
+	}
+	if resp.Index.Path != "specs/README.md" {
+		t.Errorf("Index.Path = %q, want specs/README.md", resp.Index.Path)
+	}
+	if resp.Index.Workspace != ws {
+		t.Errorf("Index.Workspace = %q, want %q", resp.Index.Workspace, ws)
+	}
+}
+
+func TestGetSpecTree_IndexNullWhenMissing(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	// No README in the workspace.
+	req := httptest.NewRequest(http.MethodGet, "/api/specs/tree", nil)
+	w := httptest.NewRecorder()
+	h.GetSpecTree(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var resp spec.TreeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Index != nil {
+		t.Errorf("Index = %+v, want nil when no README exists", resp.Index)
+	}
+	// With omitempty, a nil Index should not serialize an "index" field at all.
+	if strings.Contains(w.Body.String(), `"index":`) {
+		t.Errorf("response should omit index field when nil; body: %s", w.Body.String())
+	}
+}
+
 func TestSpecTreeStream_SendsInitialSnapshot(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 

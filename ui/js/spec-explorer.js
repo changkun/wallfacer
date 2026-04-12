@@ -18,6 +18,17 @@ var _lastCheckedSpecIndex = -1;
 var _showArchived =
   localStorage.getItem("wallfacer-spec-show-archived") === "true";
 
+// getSpecIndex returns the current workspace's roadmap index (the
+// specs/README.md metadata surfaced by GET /api/specs/tree) or null
+// when no roadmap exists. Consumed by downstream modules (explorer
+// pinned entry, layout state machine) that need to know whether to
+// show the "Roadmap" pin or include specs/README.md in the focus
+// resolution order.
+function getSpecIndex() {
+  if (!_specTreeData || !_specTreeData.index) return null;
+  return _specTreeData.index;
+}
+
 // Status → icon mapping.
 var _specStatusIcons = {
   complete: "\u2705",

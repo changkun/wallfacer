@@ -4,6 +4,14 @@ package spec
 type TreeResponse struct {
 	Nodes    []NodeResponse      `json:"nodes"`
 	Progress map[string]Progress `json:"progress"`
+
+	// Index describes the workspace's top-level specs/README.md
+	// roadmap file when one exists in any mounted workspace. Null
+	// otherwise. Distinct from Nodes because the roadmap has no
+	// frontmatter, no lifecycle, and no dependency edges — it's a
+	// plain-markdown index surface that the explorer pins above
+	// the regular spec tree.
+	Index *Index `json:"index,omitempty"`
 }
 
 // NodeResponse represents a single spec node in the API response.
