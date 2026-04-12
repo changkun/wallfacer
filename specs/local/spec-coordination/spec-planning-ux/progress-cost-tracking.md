@@ -159,7 +159,7 @@ override per-request via the period picker in the stats modal.
 | [Planning section in /api/stats](progress-cost-tracking/stats-planning-section.md) | planning-usage-store | medium | **complete** |
 | [Merge planning into /api/usage BySubAgent](progress-cost-tracking/usage-planning-merge.md) | planning-usage-store | small | **complete** |
 | [WALLFACER_PLANNING_WINDOW_DAYS config knob](progress-cost-tracking/planning-window-config.md) | — | small | **complete** |
-| [Planning block in modal-stats.js](progress-cost-tracking/modal-stats-planning-block.md) | stats-planning-section, planning-window-config | medium | validated |
+| [Planning block in modal-stats.js](progress-cost-tracking/modal-stats-planning-block.md) | stats-planning-section, planning-window-config | medium | **complete** |
 | [Planning tile in usage-stats.js](progress-cost-tracking/usage-stats-planning-tile.md) | usage-planning-merge, planning-window-config | small | validated |
 
 ```mermaid
