@@ -210,9 +210,13 @@ function _loadAndRenderSpec() {
   if (!ws) return;
   _focusedSpecWorkspace = ws;
 
-  // The spec tree returns paths relative to specs/ (e.g., "local/foo.md").
-  // The explorer file API expects an absolute path within the workspace.
-  var absPath = ws + "/specs/" + _focusedSpecPath;
+  // The spec tree returns paths relative to the workspace root and
+  // already includes the "specs/" prefix (e.g., "specs/local/foo.md").
+  // The explorer file API expects an absolute path within the workspace,
+  // so just concatenate workspace + path. (Earlier code added another
+  // "/specs/" segment here, producing "/specs/specs/..." URLs that
+  // 404'd from /api/explorer/file.)
+  var absPath = ws + "/" + _focusedSpecPath;
   var url =
     Routes.explorer.readFile() +
     "?path=" +

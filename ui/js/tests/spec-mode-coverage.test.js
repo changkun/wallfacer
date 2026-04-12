@@ -642,6 +642,26 @@ describe("focusSpec", () => {
 });
 
 describe("_loadAndRenderSpec", () => {
+  // Regression guard: the spec tree returns paths that already include the
+  // "specs/" prefix (e.g. "specs/local/foo.md"). Earlier code re-added it
+  // when building the explorer/file URL, producing "/specs/specs/..." and
+  // 404s for every spec click.
+  it("does not double-prefix specs/ in the fetched URL", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve("---\ntitle: x\n---\n") }),
+    );
+    const ctx = makeContext({ fetch: fetchMock });
+    ctx.focusSpec("specs/local/feature.md", "/home/user/project");
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(fetchMock).toHaveBeenCalled();
+    const url = fetchMock.mock.calls[0][0];
+    // The URL-encoded absolute path must NOT contain "specs%2Fspecs".
+    expect(url).not.toMatch(/specs%2Fspecs/);
+    // It must contain the single expected absolute path.
+    expect(url).toContain(encodeURIComponent("/home/user/project/specs/local/feature.md"));
+  });
+
   it("fetches spec and renders frontmatter and body on success", async () => {
     const specText =
       "---\ntitle: My Feature\nstatus: validated\nauthor: bob\ncreated: 2026-01-01\nupdated: 2026-03-01\neffort: medium\n---\n# My Feature\nSome content here.";
@@ -843,7 +863,8 @@ describe("_loadAndRenderSpec", () => {
       activeWorkspaces: ["/new/workspace"],
     });
 
-    ctx.focusSpec("local/ws.md", "/old/workspace");
+    // Spec tree returns paths with "specs/" prefix; pass the realistic form.
+    ctx.focusSpec("specs/local/ws.md", "/old/workspace");
     await new Promise((r) => setTimeout(r, 50));
 
     const fetchUrl = fetchMock.mock.calls[0][0];
