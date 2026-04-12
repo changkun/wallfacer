@@ -17,6 +17,7 @@ function makeEl(tag, registry) {
   const _classList = new Set();
   const _children = [];
   const _listeners = {};
+  const _attrs = {};
   let _innerHTML = "";
   let _textContent = "";
   let _id = "";
@@ -75,6 +76,20 @@ function makeEl(tag, registry) {
     get children() {
       return _children;
     },
+    setAttribute(name, value) {
+      _attrs[name] = String(value);
+    },
+    getAttribute(name) {
+      return Object.prototype.hasOwnProperty.call(_attrs, name)
+        ? _attrs[name]
+        : null;
+    },
+    hasAttribute(name) {
+      return Object.prototype.hasOwnProperty.call(_attrs, name);
+    },
+    removeAttribute(name) {
+      delete _attrs[name];
+    },
     appendChild(child) {
       child.parentElement = el;
       _children.push(child);
@@ -85,7 +100,13 @@ function makeEl(tag, registry) {
       if (idx >= 0) _children.splice(idx, 0, newChild);
       else _children.push(newChild);
     },
-    remove() {},
+    remove() {
+      const parent = el.parentElement;
+      if (!parent || !parent.children) return;
+      const idx = parent.children.indexOf(el);
+      if (idx >= 0) parent.children.splice(idx, 1);
+      el.parentElement = null;
+    },
     addEventListener(type, fn) {
       if (!_listeners[type]) _listeners[type] = [];
       _listeners[type].push(fn);
@@ -94,25 +115,37 @@ function makeEl(tag, registry) {
       const fns = _listeners[e.type] || [];
       fns.forEach((fn) => fn(e));
     },
+    click() {
+      const fns = _listeners["click"] || [];
+      fns.forEach((fn) => fn({ type: "click" }));
+    },
+    focus() {},
     querySelector(sel) {
-      // Very basic: match class selector against children.
+      // Match class selector against children, recursing into descendants.
+      const want = sel.startsWith(".") ? sel.slice(1) : null;
+      if (!want) return null;
       for (const child of _children) {
-        if (sel.startsWith(".") && child.classList.contains(sel.slice(1)))
-          return child;
+        if (child.classList && child.classList.contains(want)) return child;
         const found = child.querySelector ? child.querySelector(sel) : null;
         if (found) return found;
       }
       return null;
     },
     querySelectorAll(sel) {
+      // Supports ".class" and ".class[attr]" selectors. Walks direct
+      // children only (sufficient for the planning-chat message list).
       const result = [];
+      const m = sel.match(/^\.([\w-]+)(?:\[([\w-]+)\])?$/);
+      if (!m) return result;
+      const cls = m[1];
+      const attr = m[2];
       for (const child of _children) {
-        if (sel.startsWith(".") && child.classList.contains(sel.slice(1)))
-          result.push(child);
+        if (!child.classList || !child.classList.contains(cls)) continue;
+        if (attr && !child.hasAttribute(attr)) continue;
+        result.push(child);
       }
       return result;
     },
-    focus() {},
   };
   return el;
 }
@@ -214,6 +247,7 @@ function makeContext() {
         messageStream: () => "/api/planning/messages/stream",
         commands: () => "/api/planning/commands",
         interruptMessage: () => "/api/planning/messages/interrupt",
+        undo: () => "/api/planning/undo",
       },
     },
     api: () => Promise.resolve(apiResult),
@@ -338,5 +372,211 @@ describe("PlanningChat", () => {
   it("getQueue returns empty array initially", () => {
     ctx.PlanningChat.init();
     expect(ctx.PlanningChat.getQueue()).toEqual([]);
+  });
+
+  // ---- per-message undo button ----
+
+  function messagesEl() {
+    return ctx.document.getElementById("spec-chat-messages");
+  }
+
+  function bubbleFor(children, round) {
+    return children.find(
+      (b) =>
+        b.classList.contains("planning-chat-bubble--assistant") &&
+        b.getAttribute("data-round") === String(round),
+    );
+  }
+
+  async function loadWithHistory(history) {
+    ctx._setApiResult(history);
+    ctx.PlanningChat.init();
+    // Yield for the awaited _loadHistory inside init.
+    await new Promise((r) => ctx.setTimeout(r, 10));
+  }
+
+  it("user bubble never renders an undo button", async () => {
+    await loadWithHistory([
+      {
+        role: "user",
+        content: "do a thing",
+        timestamp: "2026-04-12T10:00:00Z",
+      },
+    ]);
+    const kids = messagesEl().children;
+    const userBubble = kids.find((b) =>
+      b.classList.contains("planning-chat-bubble--user"),
+    );
+    expect(userBubble).toBeTruthy();
+    expect(userBubble.querySelector(".planning-chat-bubble__undo")).toBeNull();
+  });
+
+  it("assistant bubble without plan_round renders no undo button", async () => {
+    await loadWithHistory([
+      {
+        role: "assistant",
+        content: "noop response",
+        timestamp: "2026-04-12T10:00:00Z",
+        plan_round: 0,
+      },
+    ]);
+    const kids = messagesEl().children;
+    const ab = kids.find((b) =>
+      b.classList.contains("planning-chat-bubble--assistant"),
+    );
+    expect(ab).toBeTruthy();
+    expect(ab.getAttribute("data-round")).toBeNull();
+    expect(ab.querySelector(".planning-chat-bubble__undo")).toBeNull();
+  });
+
+  it("only the latest-round assistant bubble has its undo button enabled", async () => {
+    await loadWithHistory([
+      { role: "user", content: "a", timestamp: "t", plan_round: 0 },
+      {
+        role: "assistant",
+        content: "A1",
+        timestamp: "t",
+        plan_round: 1,
+      },
+      { role: "user", content: "b", timestamp: "t", plan_round: 0 },
+      {
+        role: "assistant",
+        content: "A2",
+        timestamp: "t",
+        plan_round: 2,
+      },
+      { role: "user", content: "c", timestamp: "t", plan_round: 0 },
+      {
+        role: "assistant",
+        content: "A3",
+        timestamp: "t",
+        plan_round: 3,
+      },
+    ]);
+    const kids = messagesEl().children;
+    const r1 = bubbleFor(kids, 1);
+    const r2 = bubbleFor(kids, 2);
+    const r3 = bubbleFor(kids, 3);
+    expect(r1 && r2 && r3).toBeTruthy();
+    expect(
+      r1.querySelector(".planning-chat-bubble__undo").disabled,
+    ).toBe(true);
+    expect(
+      r2.querySelector(".planning-chat-bubble__undo").disabled,
+    ).toBe(true);
+    expect(
+      r3.querySelector(".planning-chat-bubble__undo").disabled,
+    ).toBe(false);
+  });
+
+  it("successful undo dims the bubble, strips its button, appends a system message", async () => {
+    await loadWithHistory([
+      {
+        role: "assistant",
+        content: "drafted foo",
+        timestamp: "t",
+        plan_round: 1,
+      },
+    ]);
+    ctx._setFetchResult({
+      status: 200,
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          round: 1,
+          summary: "drafted foo",
+          files_reverted: ["specs/foo.md"],
+          workspace: "/ws",
+        }),
+    });
+    const kids = messagesEl().children;
+    const ab = bubbleFor(kids, 1);
+    const btn = ab.querySelector(".planning-chat-bubble__undo");
+    const originalLength = kids.length;
+
+    btn.click();
+    await new Promise((r) => ctx.setTimeout(r, 10));
+
+    // Bubble is dimmed, no longer keyed by round, button gone.
+    expect(ab.classList.contains("planning-chat-bubble--reverted")).toBe(true);
+    expect(ab.getAttribute("data-round")).toBeNull();
+    expect(ab.querySelector(".planning-chat-bubble__undo")).toBeNull();
+    // Original bubble still in the tree.
+    expect(kids.indexOf(ab)).toBeGreaterThanOrEqual(0);
+    // A new system bubble was appended with the expected content.
+    const sys = kids[kids.length - 1];
+    expect(sys.classList.contains("planning-chat-system--undo")).toBe(true);
+    expect(sys.textContent).toContain("Undid round 1");
+    expect(sys.textContent).toContain("drafted foo");
+    // Net count: same original bubbles + 1 appended system = +1.
+    expect(kids.length).toBe(originalLength + 1);
+  });
+
+  it("409 'not at HEAD' conflict appends a warning without reverting", async () => {
+    await loadWithHistory([
+      {
+        role: "assistant",
+        content: "drafted foo",
+        timestamp: "t",
+        plan_round: 1,
+      },
+    ]);
+    ctx._setFetchResult({
+      status: 409,
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error:
+            "latest planning commit is not at HEAD; new commits have been added since — resolve manually",
+        }),
+    });
+    const kids = messagesEl().children;
+    const ab = bubbleFor(kids, 1);
+    const btn = ab.querySelector(".planning-chat-bubble__undo");
+
+    btn.click();
+    await new Promise((r) => ctx.setTimeout(r, 10));
+
+    // Bubble is NOT reverted; it keeps its round and its button.
+    expect(ab.classList.contains("planning-chat-bubble--reverted")).toBe(false);
+    expect(ab.getAttribute("data-round")).toBe("1");
+    expect(ab.querySelector(".planning-chat-bubble__undo")).toBeTruthy();
+    // Button is re-enabled (it's still the latest round).
+    expect(
+      ab.querySelector(".planning-chat-bubble__undo").disabled,
+    ).toBe(false);
+    // A warning system bubble was appended.
+    const sys = kids[kids.length - 1];
+    expect(sys.classList.contains("planning-chat-system")).toBe(true);
+    expect(sys.textContent).toContain("unrelated commits");
+  });
+
+  it("409 stash-pop conflict appends a stash-specific warning", async () => {
+    await loadWithHistory([
+      {
+        role: "assistant",
+        content: "drafted foo",
+        timestamp: "t",
+        plan_round: 1,
+      },
+    ]);
+    ctx._setFetchResult({
+      status: 409,
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error: "stash pop conflict after undo; stash retained for manual resolution",
+        }),
+    });
+    const kids = messagesEl().children;
+    const ab = bubbleFor(kids, 1);
+    const btn = ab.querySelector(".planning-chat-bubble__undo");
+
+    btn.click();
+    await new Promise((r) => ctx.setTimeout(r, 10));
+
+    const sys = kids[kids.length - 1];
+    expect(sys.textContent).toContain("stash list");
+    expect(ab.classList.contains("planning-chat-bubble--reverted")).toBe(false);
   });
 });

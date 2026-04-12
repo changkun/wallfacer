@@ -2,7 +2,7 @@
 // Handles sending messages, streaming responses, rendering conversation,
 // and slash command autocomplete.
 
-/* global Routes, api, renderMarkdown, renderPrettyLogs, startStreamingFetch, escapeHtml, specModeState, withAuthToken, withBearerHeaders, attachMentionAutocomplete */
+/* global Routes, api, renderMarkdown, renderPrettyLogs, startStreamingFetch, escapeHtml, specModeState, withAuthToken, withBearerHeaders, attachMentionAutocomplete, reloadSpecTree */
 
 var PlanningChat = (function () {
   "use strict";
@@ -221,11 +221,18 @@ var PlanningChat = (function () {
               m.content,
               m.raw_output,
               m.timestamp,
+              m.plan_round || 0,
             );
           } else {
-            _appendMessageBubble(m.role, m.content, m.timestamp);
+            _appendMessageBubble(
+              m.role,
+              m.content,
+              m.timestamp,
+              m.plan_round || 0,
+            );
           }
         });
+        _updateUndoButtonStates();
         _scrollToBottom();
       }
     } catch (_) {
@@ -478,6 +485,14 @@ var PlanningChat = (function () {
 
     _enableInput();
     _drainQueue();
+
+    // Refetch history on a clean stop so the streaming bubble picks up
+    // its server-attributed plan_round (for the per-message undo button).
+    // Interrupted streams skip this — there's no committed round to
+    // attribute.
+    if (!interrupted) {
+      _loadHistory();
+    }
   }
 
   // no-op kept for backward compat with tests
@@ -485,7 +500,7 @@ var PlanningChat = (function () {
     if (_input) _input.focus();
   }
 
-  function _appendMessageBubble(role, content, timestamp) {
+  function _appendMessageBubble(role, content, timestamp, planRound) {
     var bubble = _createBubble(role);
     var contentEl = bubble.querySelector(".planning-chat-bubble__content");
     if (contentEl) {
@@ -495,38 +510,178 @@ var PlanningChat = (function () {
         contentEl.textContent = content;
       }
     }
-    if (timestamp) {
-      var timeEl = bubble.querySelector(".planning-chat-bubble__time");
-      if (timeEl) {
-        var d = new Date(timestamp);
-        timeEl.textContent = d.toLocaleTimeString(undefined, {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-    }
+    _applyTimestamp(bubble, timestamp);
+    _attachUndoIfRound(bubble, role, planRound);
     _messagesEl.appendChild(bubble);
   }
 
   // _appendMessageBubbleWithActivity renders an assistant bubble with
   // the collapsible agent activity section restored from raw NDJSON output.
-  function _appendMessageBubbleWithActivity(content, rawOutput, timestamp) {
+  function _appendMessageBubbleWithActivity(content, rawOutput, timestamp, planRound) {
     var bubble = _createBubble("assistant");
     var contentEl = bubble.querySelector(".planning-chat-bubble__content");
     if (contentEl) {
       _renderChatResponse(contentEl, content, rawOutput, false);
     }
-    if (timestamp) {
-      var timeEl = bubble.querySelector(".planning-chat-bubble__time");
-      if (timeEl) {
-        var d = new Date(timestamp);
-        timeEl.textContent = d.toLocaleTimeString(undefined, {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-    }
+    _applyTimestamp(bubble, timestamp);
+    _attachUndoIfRound(bubble, "assistant", planRound);
     _messagesEl.appendChild(bubble);
+  }
+
+  function _applyTimestamp(bubble, timestamp) {
+    if (!timestamp) return;
+    var timeEl = bubble.querySelector(".planning-chat-bubble__time");
+    if (!timeEl) return;
+    var d = new Date(timestamp);
+    timeEl.textContent = d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  // _attachUndoIfRound decorates an assistant bubble with its round number
+  // and a tiny undo button when planRound > 0. Only assistant bubbles that
+  // wrote to specs/ get the affordance; user bubbles and no-op rounds stay
+  // plain. Whether the button is enabled or disabled is decided later by
+  // _updateUndoButtonStates() — only the latest-round bubble's button is
+  // active at any moment.
+  function _attachUndoIfRound(bubble, role, planRound) {
+    if (role !== "assistant" || !planRound) return;
+    bubble.setAttribute("data-round", String(planRound));
+    var actions = document.createElement("div");
+    actions.className = "planning-chat-bubble__actions";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "planning-chat-bubble__undo";
+    btn.innerHTML = "&#x21BA;"; // ↺
+    btn.setAttribute("aria-label", "Undo round " + planRound);
+    btn.title = "Undo round " + planRound;
+    btn.disabled = true; // promoted to enabled by _updateUndoButtonStates
+    btn.addEventListener("click", function () {
+      if (btn.disabled) return;
+      _onUndo(bubble, planRound, btn);
+    });
+    actions.appendChild(btn);
+    // Insert actions before the time stamp so the icon sits at the top
+    // of the bubble on hover, matching the CSS layout.
+    var timeEl = bubble.querySelector(".planning-chat-bubble__time");
+    if (timeEl) {
+      bubble.insertBefore(actions, timeEl);
+    } else {
+      bubble.appendChild(actions);
+    }
+  }
+
+  // _updateUndoButtonStates enables the undo button on the latest-round
+  // assistant bubble and disables all older ones. Called after any change
+  // that adds, removes, or reverts a round-bearing bubble.
+  function _updateUndoButtonStates() {
+    if (!_messagesEl) return;
+    var bubbles = _messagesEl.querySelectorAll(
+      ".planning-chat-bubble--assistant[data-round]",
+    );
+    var latestRound = -1;
+    for (var i = 0; i < bubbles.length; i++) {
+      var n = parseInt(bubbles[i].getAttribute("data-round"), 10);
+      if (!isNaN(n) && n > latestRound) latestRound = n;
+    }
+    bubbles.forEach(function (b) {
+      var btn = b.querySelector(".planning-chat-bubble__undo");
+      if (!btn) return;
+      var n = parseInt(b.getAttribute("data-round"), 10);
+      if (n === latestRound) {
+        btn.disabled = false;
+        btn.title = "Undo round " + n;
+      } else {
+        btn.disabled = true;
+        btn.title = "Only the most recent round can be undone";
+      }
+    });
+  }
+
+  async function _onUndo(bubble, round, btn) {
+    btn.disabled = true;
+    var originalTitle = btn.title;
+    btn.title = "Undoing…";
+    try {
+      var res = await fetch(Routes.planning.undo(), {
+        method: "POST",
+        headers: withBearerHeaders({ "Content-Type": "application/json" }),
+      });
+      var body = null;
+      try {
+        body = await res.json();
+      } catch (_) {
+        body = {};
+      }
+      if (!res.ok) {
+        _appendUndoWarning(res.status, body);
+        btn.title = originalTitle;
+        _updateUndoButtonStates();
+        return;
+      }
+      // Mark the originating bubble as reverted and strip its undo button.
+      bubble.classList.add("planning-chat-bubble--reverted");
+      bubble.removeAttribute("data-round");
+      var actions = bubble.querySelector(".planning-chat-bubble__actions");
+      if (actions) actions.remove();
+      // Append the system announcement.
+      _appendUndoSystemBubble(body);
+      _updateUndoButtonStates();
+      // Best-effort spec tree refresh.
+      if (typeof reloadSpecTree === "function") {
+        try {
+          reloadSpecTree();
+        } catch (_) {}
+      }
+    } catch (err) {
+      _appendSystemMessage(
+        "Undo failed: " + (err && err.message ? err.message : "network error"),
+      );
+      btn.title = originalTitle;
+      _updateUndoButtonStates();
+    }
+  }
+
+  function _appendUndoSystemBubble(body) {
+    var round = body && body.round ? body.round : "?";
+    var summary = body && body.summary ? body.summary : "";
+    var files = body && body.files_reverted ? body.files_reverted : [];
+    var el = document.createElement("div");
+    el.className =
+      "planning-chat-system planning-chat-system--undo";
+    var text = "↺ Undid round " + round;
+    if (summary) text += " — " + summary;
+    el.textContent = text;
+    if (files.length > 0) {
+      var list = document.createElement("ul");
+      list.className = "planning-chat-system__files";
+      files.forEach(function (f) {
+        var li = document.createElement("li");
+        li.textContent = f;
+        list.appendChild(li);
+      });
+      el.appendChild(list);
+    }
+    _messagesEl.appendChild(el);
+    _scrollToBottom();
+  }
+
+  function _appendUndoWarning(status, body) {
+    var err = (body && body.error) || "";
+    var msg;
+    if (status === 409 && err.indexOf("not at HEAD") !== -1) {
+      msg =
+        "⚠ Can't undo: you have unrelated commits since the last planning round. Resolve manually before using undo.";
+    } else if (status === 409 && err.indexOf("stash pop conflict") !== -1) {
+      msg =
+        "⚠ Undo partially applied: git reset succeeded but your working-tree edits couldn't be reapplied cleanly. Your changes are preserved in the stash — run `git stash list` to recover.";
+    } else if (status === 409) {
+      msg = "⚠ Nothing to undo right now.";
+    } else {
+      msg = "Undo failed (HTTP " + status + ")" + (err ? ": " + err : "");
+    }
+    _appendSystemMessage(msg);
   }
 
   function _createBubble(role) {
