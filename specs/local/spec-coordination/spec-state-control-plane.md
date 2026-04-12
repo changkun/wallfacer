@@ -11,12 +11,15 @@ affects:
   - internal/handler/planning.go
   - internal/handler/planning_git.go
   - internal/handler/tasks.go
+  - internal/apicontract/routes.go
   - internal/cli/server.go
   - internal/runner/drift.go
   - internal/runner/oversight.go
   - internal/store/
   - ui/js/spec-explorer.js
   - ui/js/spec-mode.js
+  - ui/partials/spec-mode.html
+  - .claude/skills/wf-spec-breakdown/skill.md
 created: 2026-03-29
 updated: 2026-04-12
 author: changkun
@@ -72,10 +75,12 @@ Gaps this spec closes, in priority order:
 
 | Gap | Consequence |
 |---|---|
-| Dispatch does not set `validated` | Status lies about readiness during execution |
 | Chat edits do not fan out | Downstream specs drift silently after upstream edits |
+| Dispatch does not set `validated` | Status lies about readiness during execution |
 | Task-done writes `complete` blindly | No drift assessment; `complete` can mean "diverged from intent" |
 | Downstream dependents not notified on completion | No review signal when a dependency lands with drift |
+| `drafted → validated` has no automated trigger | "Design is settled" intent stays implicit; dispatch writes validated defensively instead of surfacing the decision |
+| `complete` specs' `affects` files change outside spec flow | Drift from manual edits / refactors never surfaces |
 
 ---
 
@@ -279,7 +284,79 @@ if users find it invisible.
 
 ---
 
-## Priority 4 — Cross-tree staleness (periodic scan)
+## Priority 4 — Explicit `drafted → validated` transition
+
+The only lifecycle edge with no server-driven trigger. Today a spec moves
+from `drafted` to `validated` only when a human edits the YAML by hand or
+`/wf-spec-refine` happens to write it. `/wf-spec-breakdown` tasks-mode
+presumes the parent is already `validated` but does not enforce or set it.
+
+**Why it matters.** `validated` is the dispatch readiness gate. Priority 2
+defensively writes it during dispatch, which papers over the gap but does
+not surface the intent — a reviewer has no explicit point at which they
+said "this design is settled." The control plane should expose the
+transition as a first-class action.
+
+### Option A (recommended): explicit Validate action
+
+Mirror the archive/unarchive UX from spec-archival.md:
+
+**Trigger:** a user clicks "Validate" in the focused-view toolbar (visible
+only when `status == "drafted"`) or issues a chat command
+(`/validate` already exists as a slash command in
+`internal/planner/commands.go`, but only populates a prompt — it does not
+mutate state).
+
+**Action:** new handler endpoint — `POST /api/specs/validate`, shape
+identical to `/api/specs/archive`. The endpoint:
+1. Validates the transition via `StatusMachine.Validate(current,
+   StatusValidated)` — only `drafted → validated` is legal today.
+2. Writes `status: validated` via `UpdateFrontmatter`.
+3. Commits with subject `<path>: mark validated`.
+
+**Non-goal:** no review gate, no signature, no checklist. Validation is an
+intent signal, not a review process. If reviewers want a gate later
+(e.g., "requires 2 approvals"), that is a separate spec.
+
+### Option B (complementary): breakdown tasks-mode writes parent validated
+
+When `/wf-spec-breakdown <path> tasks` successfully creates child impl
+specs, also write `<parent>: validated` if it was `drafted`. This is
+non-presumptuous because the user explicitly asked for an implementation
+breakdown — they have stated their intent to proceed. Can ship together
+with Option A.
+
+### Skip conditions
+- Spec is not `drafted` → endpoint rejects with 422 (invalid transition).
+- Spec is `archived` → state machine rejects.
+- Spec has unresolved Open Questions in its body (heuristic: "Open
+  Questions" section with unchecked items) → soft warn in the UI but
+  still allow the write, since "open question" semantics vary.
+
+### Files touched
+- `internal/handler/specs.go` — new `ValidateSpec` handler + routes
+  registration (same pattern as `ArchiveSpec`)
+- `internal/apicontract/routes.go` — new route entry
+- `ui/partials/spec-mode.html` — Validate button in the focused-view
+  toolbar
+- `ui/js/spec-mode.js` — button visibility (`status == "drafted"`),
+  click handler calls the endpoint, reloads spec
+- `.claude/skills/wf-spec-breakdown/skill.md` — after creating tasks,
+  transition parent to `validated` if it was `drafted` (Option B)
+
+### Acceptance
+- Clicking Validate on a `drafted` spec transitions it to `validated`,
+  commits the change, and re-renders the focused view with the new badge.
+- Clicking Validate on any non-`drafted` spec is either not offered
+  (button hidden) or returns 422.
+- Running `/wf-spec-breakdown ... tasks` on a `drafted` parent upgrades
+  the parent to `validated` after the child specs are written.
+
+**Effort:** small.
+
+---
+
+## Priority 5 — Cross-tree staleness (periodic scan)
 
 Complementary to the event-driven hooks: an `affects`-based scan catches
 drift that slipped in via commits outside the spec flow (manual edits,
@@ -309,7 +386,8 @@ Archived specs are invisible to every channel in this spec — same invariant
 | P1 — Chat fan-out | `Adjacency` already omits archived sources/sinks |
 | P2 — Dispatch | Dispatch rejects archived specs pre-write |
 | P3 — Task done (tester + fan-out) | `Adjacency` handles fan-out; the completing spec itself can't be archived (dispatch rejected it) |
-| P4 — Periodic scan | Skip archived specs; their `affects` are not checked |
+| P4 — Explicit validate | Endpoint and skill both reject archived specs via `StatusMachine` |
+| P5 — Periodic scan | Skip archived specs; their `affects` are not checked |
 
 ---
 
@@ -352,7 +430,7 @@ affects:
 Used by:
 - P3 — file-level drift: compare spec `affects` vs the task's actual diff
   to flag unexpected / missing files
-- P4 — periodic scan: check whether any `affects` file has changed since
+- P5 — periodic scan: check whether any `affects` file has changed since
   the spec's `updated`
 
 Archived specs' `affects` are not checked anywhere.
@@ -390,7 +468,7 @@ Focused view inline warning on dependents of a drifted spec:
   [Review Changes] [Dismiss]
 ```
 
-Priority 4 reuses the same badge.
+Priority 5 reuses the same badge.
 
 ---
 
@@ -403,12 +481,15 @@ Priority 4 reuses the same badge.
 | `internal/runner/drift.go` (new) | P3 | `CheckTaskDrift(taskID, spec) → DriftReport` (file-level deterministic) |
 | `internal/runner/oversight.go` | P3 | Extend or alias test-verification agent to emit drift verdict schema |
 | `internal/store/` | P3 | `SaveDriftReport` / `GetDriftReport`; persist alongside task data |
-| `internal/handler/specs.go` | P3 | `GET /api/specs/{path}/drift` — return the drift report |
+| `internal/handler/specs.go` | P3, P4 | `GET /api/specs/{path}/drift` (P3); `ValidateSpec` handler (P4) |
+| `internal/apicontract/routes.go` | P4 | Route entry for `POST /api/specs/validate` |
 | `internal/handler/explorer.go` | P3 | Propagate drift indicators to non-archived ancestors in tree response |
-| `internal/handler/tasks.go` | P4 | Workspace-load periodic scan hook |
+| `internal/handler/tasks.go` | P5 | Workspace-load periodic scan hook |
 | Shared fan-out helper | P1, P3 | `FanOutStale(tree, completedPath) error` in `internal/spec/` |
-| `ui/js/spec-explorer.js` | P3, P4 | Render drift indicators (reuses `stale` icon); suppress for archived |
-| `ui/js/spec-mode.js` | P3 | Inline drift warning in focused view with "Refine" / "Accept" |
+| `ui/partials/spec-mode.html` | P4 | Validate button in the focused-view toolbar |
+| `ui/js/spec-explorer.js` | P3, P5 | Render drift indicators (reuses `stale` icon); suppress for archived |
+| `ui/js/spec-mode.js` | P3, P4 | Inline drift warning in focused view with "Refine" / "Accept" (P3); Validate button wiring (P4) |
+| `.claude/skills/wf-spec-breakdown/skill.md` | P4 | Tasks-mode writes parent `validated` after children created |
 
 ---
 
@@ -448,7 +529,16 @@ Priority 4 reuses the same badge.
 - Integration test: full round-trip from `store.OnDone` → tester →
   `complete` for a minimal-drift case.
 
-### Priority 4 — Periodic scan
+### Priority 4 — Explicit validate
+- Clicking Validate on a `drafted` spec writes `status: validated`,
+  commits the change, and 422s on any other starting status.
+- `/wf-spec-breakdown ... tasks` on a `drafted` parent upgrades it to
+  `validated` after child impl specs are written.
+- Unit test: `POST /api/specs/validate` on a `drafted` spec returns 200
+  and the file reads `validated`; on `complete` returns 422; on
+  `archived` returns 422.
+
+### Priority 5 — Periodic scan
 - On workspace load, non-archived `complete` specs whose `affects` files
   changed since `updated` receive a stale badge in the explorer.
 - Scan does not mutate frontmatter — advisory only.
