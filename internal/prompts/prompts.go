@@ -72,28 +72,32 @@ func templateFuncMap() template.FuncMap {
 
 // embeddedToAPI maps embedded template file names to user-facing API names.
 var embeddedToAPI = map[string]string{
-	"ideation.tmpl":     "ideation",
-	"refinement.tmpl":   "refinement",
-	"oversight.tmpl":    "oversight",
-	"title.tmpl":        "title",
-	"commit.tmpl":       "commit_message",
-	"conflict.tmpl":     "conflict_resolution",
-	"test.tmpl":         "test_verification",
-	"instructions.tmpl": "instructions",
-	"planning.tmpl":     "planning",
+	"ideation.tmpl":                 "ideation",
+	"refinement.tmpl":               "refinement",
+	"oversight.tmpl":                "oversight",
+	"title.tmpl":                    "title",
+	"commit.tmpl":                   "commit_message",
+	"conflict.tmpl":                 "conflict_resolution",
+	"test.tmpl":                     "test_verification",
+	"instructions.tmpl":             "instructions",
+	"planning.tmpl":                 "planning",
+	"planning_system_empty.tmpl":    "planning_system_empty",
+	"planning_system_nonempty.tmpl": "planning_system_nonempty",
 }
 
 // apiToEmbedded maps user-facing API names to embedded template file names.
 var apiToEmbedded = map[string]string{
-	"ideation":            "ideation.tmpl",
-	"refinement":          "refinement.tmpl",
-	"oversight":           "oversight.tmpl",
-	"title":               "title.tmpl",
-	"commit_message":      "commit.tmpl",
-	"conflict_resolution": "conflict.tmpl",
-	"test_verification":   "test.tmpl",
-	"instructions":        "instructions.tmpl",
-	"planning":            "planning.tmpl",
+	"ideation":                 "ideation.tmpl",
+	"refinement":               "refinement.tmpl",
+	"oversight":                "oversight.tmpl",
+	"title":                    "title.tmpl",
+	"commit_message":           "commit.tmpl",
+	"conflict_resolution":      "conflict.tmpl",
+	"test_verification":        "test.tmpl",
+	"instructions":             "instructions.tmpl",
+	"planning":                 "planning.tmpl",
+	"planning_system_empty":    "planning_system_empty.tmpl",
+	"planning_system_nonempty": "planning_system_nonempty.tmpl",
 }
 
 // knownNames is the ordered list of all user-facing template API names.
@@ -107,6 +111,8 @@ var knownNames = []string{
 	"test_verification",
 	"instructions",
 	"planning",
+	"planning_system_empty",
+	"planning_system_nonempty",
 }
 
 // Manager manages the eight built-in prompt templates with optional
@@ -282,6 +288,8 @@ func mockContextFor(apiName string) (interface{}, bool) {
 			RepoInstructionRefs: []InstructionsRepoRef{{Workspace: "example-repo", Filename: "AGENTS.md"}},
 		}, true
 	case "planning":
+		return nil, true
+	case "planning_system_empty", "planning_system_nonempty":
 		return nil, true
 	default:
 		return nil, false
@@ -463,6 +471,21 @@ func (m *Manager) Instructions(d InstructionsData) string { return m.render("ins
 // Planning renders the planning agent system prompt.
 func (m *Manager) Planning() string { return m.render("planning.tmpl", nil) }
 
+// PlanningSystemEmpty renders the planning-agent prompt prefix used
+// when the workspace spec tree is empty (no non-archived parseable
+// specs). Encourages the agent to emit a `/spec-new` directive for
+// substantive planning work.
+func (m *Manager) PlanningSystemEmpty() string {
+	return m.render("planning_system_empty.tmpl", nil)
+}
+
+// PlanningSystemNonempty renders the planning-agent prompt prefix used
+// when at least one non-archived spec exists. Steers the agent toward
+// editing existing specs rather than creating new ones.
+func (m *Manager) PlanningSystemNonempty() string {
+	return m.render("planning_system_nonempty.tmpl", nil)
+}
+
 // --- Package-level functions (delegate to Default for backward compatibility) ---
 
 // Refinement renders the spec-writing agent prompt.
@@ -492,3 +515,11 @@ func Instructions(d InstructionsData) string { return Default.Instructions(d) }
 
 // Planning renders the planning agent system prompt.
 func Planning() string { return Default.Planning() }
+
+// PlanningSystemEmpty renders the planning-agent prompt prefix used
+// when the workspace spec tree is empty.
+func PlanningSystemEmpty() string { return Default.PlanningSystemEmpty() }
+
+// PlanningSystemNonempty renders the planning-agent prompt prefix used
+// when at least one non-archived spec exists.
+func PlanningSystemNonempty() string { return Default.PlanningSystemNonempty() }

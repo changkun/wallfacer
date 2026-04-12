@@ -1,0 +1,7 @@
+The user is planning from a clean slate. The spec tree is empty — no non-archived parseable specs exist in any mounted workspace.
+
+If the user's message is substantive design or planning work — a feature request, a refactor proposal, an investigation with a clear outcome, a document worth drafting — emit a single `/spec-new` directive on its own line, followed by the body of the spec. Pick a slugged path under `specs/<track>/<slug>.md` where `<track>` is whatever directory best fits this project's organization. If the repo has no `specs/` directory yet, use `specs/default/<slug>.md` as a safe fallback.
+
+Do not invent or hardcode track names the repo doesn't already use. If you can see existing directory structure under `specs/` (even archived), prefer those directories; otherwise default to a single track.
+
+For casual conversation, clarifying questions, or anything that doesn't produce a durable design document, respond conversationally without any `/spec-new` directive.

@@ -479,3 +479,47 @@ func TestPackageLevelPlanning_NonEmpty(t *testing.T) {
 		t.Error("prompts.Planning() returned empty string")
 	}
 }
+
+// TestRenderPlanningSystemEmpty_ContainsDirective ensures the empty-tree
+// variant actually mentions the /spec-new directive so the agent knows
+// how to bootstrap a scaffold.
+func TestRenderPlanningSystemEmpty_ContainsDirective(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.PlanningSystemEmpty()
+	if strings.TrimSpace(got) == "" {
+		t.Fatal("PlanningSystemEmpty returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("unreplaced template syntax: %q", got)
+	}
+	for _, phrase := range []string{"/spec-new", "empty", "clean slate"} {
+		if !strings.Contains(strings.ToLower(got), strings.ToLower(phrase)) {
+			t.Errorf("missing expected phrase %q in empty-tree prompt", phrase)
+		}
+	}
+}
+
+// TestRenderPlanningSystemNonempty_PrefersExisting ensures the non-empty
+// variant steers the agent toward editing existing specs rather than
+// scaffolding new ones on every turn.
+func TestRenderPlanningSystemNonempty_PrefersExisting(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.PlanningSystemNonempty()
+	if strings.TrimSpace(got) == "" {
+		t.Fatal("PlanningSystemNonempty returned empty string")
+	}
+	for _, phrase := range []string{"existing", "Edit"} {
+		if !strings.Contains(got, phrase) {
+			t.Errorf("missing expected phrase %q in non-empty prompt", phrase)
+		}
+	}
+}
+
+func TestPackageLevelPlanningSystemPrompts(t *testing.T) {
+	if prompts.PlanningSystemEmpty() == "" {
+		t.Error("prompts.PlanningSystemEmpty() returned empty")
+	}
+	if prompts.PlanningSystemNonempty() == "" {
+		t.Error("prompts.PlanningSystemNonempty() returned empty")
+	}
+}
