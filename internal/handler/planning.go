@@ -230,6 +230,15 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		// Parse response text and append assistant message (skip errors).
 		if !planner.IsErrorResult(rawStdout) {
 			resultText := planner.ExtractResultText(rawStdout)
+			// Commit any spec writes from this round to git so the undo
+			// stack has a distinct commit per round. Best-effort: log and
+			// continue on failure, never block the conversation log.
+			commitCtx := context.Background()
+			for _, ws := range h.currentWorkspaces() {
+				if cerr := commitPlanningRound(commitCtx, ws, resultText); cerr != nil {
+					slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
+				}
+			}
 			if resultText != "" {
 				_ = cs.AppendMessage(planner.Message{
 					Role:        "assistant",
