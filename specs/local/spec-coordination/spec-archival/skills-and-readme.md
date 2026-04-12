@@ -1,6 +1,6 @@
 ---
 title: "Archival: Skills and README updates"
-status: validated
+status: complete
 depends_on: []
 affects:
   - .claude/skills/wf-spec-validate/skill.md

@@ -256,7 +256,7 @@ When this spec is later dispatched as an implementation task, the following must
 | [archive-api.md](spec-archival/archive-api.md) | core-model | small | validated |
 | [explorer-ux.md](spec-archival/explorer-ux.md) | core-model | medium | validated |
 | [focused-view-ux.md](spec-archival/focused-view-ux.md) | archive-api, explorer-ux | medium | validated |
-| [skills-and-readme.md](spec-archival/skills-and-readme.md) | — | small | validated |
+| [skills-and-readme.md](spec-archival/skills-and-readme.md) | — | small | complete |
 
 ```mermaid
 graph LR
