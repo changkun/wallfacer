@@ -11,7 +11,7 @@ affects:
   - ui/js/serve.js
 effort: large
 created: 2026-03-25
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -28,12 +28,13 @@ There is also no way to keep a development server running while iterating across
 
 ---
 
-## Current State (as of 2026-03-25)
+## Current State (as of 2026-04-12)
 
 - **Task execution**: Runs AI agent containers with Claude/Codex CLI. The agent reads/writes code but never builds or runs the resulting software.
 - **Container lifecycle**: Ephemeral `--rm` containers. One container per task turn, torn down after the agent finishes.
 - **Log streaming**: `GET /api/tasks/{id}/logs` streams `docker logs -f` output via SSE. Works for agent output, not for arbitrary processes.
 - **Worktrees**: Per-task git worktrees provide isolated copies of the codebase at `/workspace/<basename>`.
+- **Sandbox images**: Published externally to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex` (maintained in the `latere-ai/images` repo). No local Dockerfile in this repo — `make build` pulls the tagged image.
 - **No**: Dev server, build pipeline, port forwarding, process manager, or any way to run user code inside or outside the sandbox.
 
 ---
@@ -489,7 +490,7 @@ The fingerprint is computed from the sorted workspace paths (same algorithm as A
 |------|--------|
 | `internal/apicontract/routes.go` | Register 9 new routes |
 | `internal/handler/serve.go` (new) | `GetServe`, `StartServe`, `StopServe`, `UpdateServe`, `ServeDiscover`, `CancelDiscover`, `ServeLogs`, `GetServeEnv`, `UpdateServeEnv` handlers |
-| `server.go` | Wire handlers in `buildMux` |
+| `internal/cli/server.go` | Wire handlers in `buildMux` (one entry in the handler map + body-limit map, per existing convention) |
 | `internal/handler/serve_test.go` (new) | Handler tests for each endpoint |
 
 **Effort:** Medium. Follows existing handler patterns (`oversight.go`, `stream.go`).
@@ -499,18 +500,22 @@ The fingerprint is computed from the sorted workspace paths (same algorithm as A
 | File | Change |
 |------|--------|
 | `internal/runner/serve.go` | Auto-rebuild wrapper script generation |
-| `internal/runner/serve.go` | `inotifywait` availability check |
-| `sandbox/claude/Dockerfile` | Install `inotify-tools` package |
+| `internal/runner/serve.go` | `inotifywait` availability check; degrade gracefully if missing |
 
 **Effort:** Low. Shell script injection into container command.
+
+> **Note:** Adding `inotify-tools` to the sandbox image requires a PR to the
+> external [`latere-ai/images`](https://github.com/latere-ai/images) repository —
+> the sandbox `Dockerfile` lives there, not in this repo. Open that PR in parallel
+> with this implementation so the image tag can be bumped in `Makefile` once merged.
 
 ### Phase 6 — UI
 
 | File | Change |
 |------|--------|
-| `ui/js/serve.js` (new) | Serve modal, config editor, log panel, SSE listener |
-| `ui/js/app.js` | Toolbar button integration, serve state management |
-| `ui/css/styles.css` | Serve button states, modal styling, log panel |
+| `ui/js/serve.js` (new) | Serve modal, config editor, log panel, SSE listener, toolbar button wiring |
+| `ui/js/render.js` | Toolbar button state updates driven by serve SSE events |
+| `ui/css/spec-mode.css` or `ui/css/styles.css` | Serve button states, modal styling, log panel |
 | `ui/index.html` | Serve modal template, toolbar button |
 | `ui/js/generated/routes.js` | Regenerated via `make api-contract` |
 
@@ -561,7 +566,7 @@ The fingerprint is computed from the sorted workspace paths (same algorithm as A
 
 2. **Container networking**: Port forwarding (`-p`) requires bridge networking. If `WALLFACER_CONTAINER_NETWORK=none`, port forwarding won't work. The serve handler should validate network config before starting and return a clear error.
 
-3. **inotifywait availability**: The `inotify-tools` package may not be installed in the sandbox image. Phase 5 adds it to the Dockerfile, but users with custom images may lack it. Auto-rebuild should degrade gracefully: check for the binary at session start and disable the option if missing.
+3. **inotifywait availability**: The `inotify-tools` package may not be installed in the sandbox image. Phase 5 requires a PR to the external `latere-ai/images` repo to add it; until that image tag is bumped in `Makefile`, auto-rebuild won't be available. Auto-rebuild should degrade gracefully: check for the binary at session start and disable the option if missing.
 
 4. **Long-running container cleanup**: Unlike task containers that exit after the agent finishes, serve containers run indefinitely. If the wallfacer server crashes or restarts, orphaned serve containers remain. Mitigate with:
    - Label-based cleanup on server startup: scan for `wallfacer.serve.id` labels and kill orphans.
