@@ -12,6 +12,8 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/planner"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // GetPlanningStatus reports whether the planning sandbox is running.
@@ -227,6 +229,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Persist round usage before building the assistant message so the
+		// stats/usage dashboards reflect the round even if the commit
+		// pipeline below produces a warning. Best-effort: errors are logged
+		// and never fail the round.
+		h.persistPlanningRoundUsage(rawStdout)
+
 		// Parse response text and append assistant message (skip errors).
 		if !planner.IsErrorResult(rawStdout) {
 			resultText := planner.ExtractResultText(rawStdout)
@@ -372,6 +380,42 @@ func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, _ *http.Reques
 		return
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "interrupted"})
+}
+
+// persistPlanningRoundUsage parses token and cost usage from a round's
+// raw stdout and appends it to the planning-usage log for the current
+// workspace group. Failed rounds, missing usage, and missing workspace
+// configuration short-circuit silently. Append errors are logged so a
+// persistence failure never fails the user-facing round.
+func (h *Handler) persistPlanningRoundUsage(raw []byte) {
+	if planner.IsErrorResult(raw) {
+		return
+	}
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 || h.configDir == "" {
+		return
+	}
+	usage, ok := planner.ExtractUsage(raw)
+	if !ok {
+		return
+	}
+	groupKey := store.PlanningGroupKey(workspaces)
+	existing, _ := store.ReadPlanningUsage(h.configDir, groupKey, time.Time{})
+	rec := store.TurnUsageRecord{
+		Turn:                 len(existing) + 1,
+		Timestamp:            time.Now().UTC(),
+		InputTokens:          usage.InputTokens,
+		OutputTokens:         usage.OutputTokens,
+		CacheReadInputTokens: usage.CacheReadInputTokens,
+		CacheCreationTokens:  usage.CacheCreationInputTokens,
+		CostUSD:              usage.CostUSD,
+		StopReason:           usage.StopReason,
+		Sandbox:              sandbox.Claude,
+		SubAgent:             store.SandboxActivityPlanning,
+	}
+	if err := store.AppendPlanningUsage(h.configDir, groupKey, rec); err != nil {
+		slog.Warn("planning: failed to append round usage", "error", err)
+	}
 }
 
 // GetPlanningCommands returns the list of available slash commands.

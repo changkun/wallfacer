@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/planner"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func TestGetPlanningStatus_NilPlanner(t *testing.T) {
@@ -485,4 +488,120 @@ func TestInterruptPlanningMessage_NilPlanner(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
+}
+
+// --- Planning round usage persistence ---
+
+// planningSuccessStdout builds a stream-json result line with the supplied
+// tokens and cost. It matches the shape emitted by the agent container.
+func planningSuccessStdout(input, output, cacheRead, cacheCreation int, cost float64) []byte {
+	payload := map[string]any{
+		"type":           "result",
+		"stop_reason":    "end_turn",
+		"result":         "done",
+		"session_id":     "s1",
+		"is_error":       false,
+		"total_cost_usd": cost,
+		"usage": map[string]any{
+			"input_tokens":                input,
+			"output_tokens":               output,
+			"cache_read_input_tokens":     cacheRead,
+			"cache_creation_input_tokens": cacheCreation,
+		},
+	}
+	b, _ := json.Marshal(payload)
+	return b
+}
+
+func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
+	ws := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{ws})
+
+	raw := planningSuccessStdout(120, 40, 15, 5, 0.0123)
+	h.persistPlanningRoundUsage(raw)
+
+	key := store.PlanningGroupKey([]string{ws})
+	recs, err := store.ReadPlanningUsage(h.configDir, key, time.Time{})
+	if err != nil {
+		t.Fatalf("ReadPlanningUsage: %v", err)
+	}
+	if len(recs) != 1 {
+		t.Fatalf("want 1 record, got %d", len(recs))
+	}
+	got := recs[0]
+	if got.InputTokens != 120 || got.OutputTokens != 40 {
+		t.Errorf("tokens: got (%d,%d), want (120,40)", got.InputTokens, got.OutputTokens)
+	}
+	if got.CacheReadInputTokens != 15 || got.CacheCreationTokens != 5 {
+		t.Errorf("cache tokens: got (%d,%d), want (15,5)", got.CacheReadInputTokens, got.CacheCreationTokens)
+	}
+	if got.CostUSD != 0.0123 {
+		t.Errorf("cost: got %v, want 0.0123", got.CostUSD)
+	}
+	if got.StopReason != "end_turn" {
+		t.Errorf("stop_reason: got %q, want end_turn", got.StopReason)
+	}
+	if got.Sandbox != sandbox.Claude {
+		t.Errorf("sandbox: got %q, want claude", got.Sandbox)
+	}
+	if got.SubAgent != store.SandboxActivityPlanning {
+		t.Errorf("sub_agent: got %q, want planning", got.SubAgent)
+	}
+	if got.Turn != 1 {
+		t.Errorf("turn: got %d, want 1", got.Turn)
+	}
+}
+
+func TestPlanningHandler_IncrementsTurn(t *testing.T) {
+	ws := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{ws})
+
+	h.persistPlanningRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
+	h.persistPlanningRoundUsage(planningSuccessStdout(20, 8, 0, 0, 0.002))
+
+	key := store.PlanningGroupKey([]string{ws})
+	recs, err := store.ReadPlanningUsage(h.configDir, key, time.Time{})
+	if err != nil {
+		t.Fatalf("ReadPlanningUsage: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("want 2 records, got %d", len(recs))
+	}
+	if recs[0].Turn != 1 || recs[1].Turn != 2 {
+		t.Errorf("turns: got (%d,%d), want (1,2)", recs[0].Turn, recs[1].Turn)
+	}
+}
+
+func TestPlanningHandler_FailedExecDoesNotPersist(t *testing.T) {
+	ws := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{ws})
+
+	errLine := []byte(`{"type":"result","stop_reason":"end_turn","result":"boom","session_id":"s1","is_error":true,"total_cost_usd":0.001}`)
+	h.persistPlanningRoundUsage(errLine)
+
+	key := store.PlanningGroupKey([]string{ws})
+	recs, err := store.ReadPlanningUsage(h.configDir, key, time.Time{})
+	if err != nil {
+		t.Fatalf("ReadPlanningUsage: %v", err)
+	}
+	if len(recs) != 0 {
+		t.Errorf("want 0 records on failed round, got %d", len(recs))
+	}
+}
+
+func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
+	ws := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{ws})
+
+	// Replace configDir with a path that cannot host a directory: point to a
+	// regular file so MkdirAll inside AppendPlanningUsage fails. The helper
+	// must log-and-continue, never panic.
+	blocker := h.configDir + "-blocker"
+	if err := os.WriteFile(blocker, []byte("not a dir"), 0644); err != nil {
+		t.Fatalf("prepare blocker: %v", err)
+	}
+	h.configDir = blocker
+
+	// Must not panic.
+	h.persistPlanningRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
 }
