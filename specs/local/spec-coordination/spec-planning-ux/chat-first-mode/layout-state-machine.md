@@ -1,15 +1,17 @@
 ---
 title: Layout state machine — chat-first vs three-pane
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/spec-tree-index-endpoint.md
 affects:
   - ui/js/spec-mode.js
+  - ui/js/spec-explorer.js
+  - ui/js/events.js
   - ui/css/spec-mode.css
   - ui/partials/spec-mode.html
 effort: medium
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -83,3 +85,11 @@ Make the Plan-mode layout respond to spec tree state: `ChatFirst` (no specs and 
 - **Do NOT** fetch markdown or render the focused view for the index — that's the `explorer-roadmap-entry.md` task.
 - **Do NOT** animate the chat pane's internal contents (messages area). Tab-bar crossfade is a separate concern.
 - **Do NOT** persist the layout state in localStorage — it's derived from server state, not user preference.
+
+## Implementation notes
+
+- The spec sample CSS targeted `.spec-explorer` as a sibling pane class. The actual explorer lives in `#explorer-panel` (owned by `ui/partials/explorer-panel.html`) — the new CSS uses the real elements (`.spec-focused-view`, `#spec-chat-resize`, `.spec-chat-stream`). Explorer panel show/hide continues to go through the existing `explorerPanel.style.display` toggle in `_applyLayout`.
+- The spec listed the three names "ChatFirst"/"ThreeIndex"/"ThreeSpec". The implementation collapses the latter two into a single `"three-pane"` state on the `data-layout` attribute — downstream rules (explorer-roadmap-entry, focused-view crossfade) already distinguish index vs regular spec via separate state (`_focusedIsIndex`), so a second layout flavour is not needed.
+- `specModeState` also holds `focusedSpecPath`, originally an undefined reference in `planning-chat.js`. The implementation now defines it for real; planning-chat's defensive `typeof specModeState !== "undefined"` check keeps the legacy no-op behaviour on older sandbox contexts.
+- Reduced-motion handling is scoped to `.spec-focused-view` and `.spec-chat-stream` instead of the explorer element (which is hidden via `display` toggles rather than CSS transitions) — the explorer's transition is effectively instant in both modes, which matches the spec's "transition-duration: 0s" intent.
+- `TestLayout_ReducedMotionHonored` from the spec is not included as an automated test because the test harness runs the JS module in a JSDOM-less `vm` context that cannot evaluate the actual `@media` rule or compute CSS. The CSS itself contains the rule (verifiable by inspection) and the rule matches the spec snippet. Automating it would require swapping the test runner to one with a full browser or `jsdom-testing-mocks`, which is out of scope.
