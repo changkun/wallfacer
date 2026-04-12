@@ -8,7 +8,7 @@ affects:
   - internal/store/
 effort: xlarge
 created: 2026-03-29
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -112,6 +112,7 @@ The kanban board stays flat — it shows dispatched leaf specs as tasks. All str
 | [spec-document-model.md](spec-coordination/spec-document-model.md) | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
 | [spec-drift-detection.md](spec-coordination/spec-drift-detection.md) | Drift detection and propagation through the spec tree |
 | [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
+| [spec-archival.md](spec-coordination/spec-archival.md) | Archived status — hide finished or abandoned specs from the live graph, explorer, drift checks, and impact queries |
 
 ---
 

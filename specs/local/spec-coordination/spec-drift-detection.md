@@ -13,7 +13,7 @@ affects:
   - ui/js/spec-mode.js
 effort: large
 created: 2026-03-29
-updated: 2026-04-04
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -87,6 +87,8 @@ A background check (triggered on workspace load or manually) scans `complete` sp
 - For each spec, check if the files in its `affects` field have been modified since `updated`
 - If changes are detected (via `git log --since`), flag as a staleness candidate
 - Surface in the spec explorer with a stale badge
+
+**Archived specs are exempt.** The periodic scan, post-task drift check, upward propagation, and DAG forward propagation all skip archived specs (see [spec-archival.md](spec-archival.md)). Archival is an explicit "stop surfacing this" signal — the drift subsystem treats archived specs as outside the live graph in every channel.
 
 ---
 

@@ -73,6 +73,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | ↳ [spec-document-model.md](local/spec-coordination/spec-document-model.md) | **Complete** | Spec frontmatter schema, filesystem-derived tree, `depends_on` DAG, five-state lifecycle, per-spec and cross-spec validation, recursive progress tracking, impact analysis. Extracted `internal/pkg/dag/`, `internal/pkg/tree/`, `internal/pkg/statemachine/` |
 | ↳ [spec-drift-detection.md](local/spec-coordination/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
 | ↳ [spec-planning-ux.md](local/spec-coordination/spec-planning-ux.md) | **In progress** (5/8) | Spec explorer, chat-driven iteration, dispatch workflow, progress tracking. Complete: planning sandbox, UI shell, spec explorer, planning chat agent, dispatch workflow |
+| ↳ [spec-archival.md](local/spec-coordination/spec-archival.md) | Drafted | Sixth lifecycle state (`archived`) — hidden by default, read-only, excluded from impact / progress / drift / stale-propagation. Lets users retire finished or abandoned specs without deleting them. |
 | [desktop-app.md](local/desktop-app.md) | **Complete** | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
 | [excalidraw-whiteboard.md](local/excalidraw-whiteboard.md) | Not started | Excalidraw-based drawing/brainstorm whiteboard as a peer view |
 | [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
