@@ -245,6 +245,38 @@ When this spec is later dispatched as an implementation task, the following must
 
 ---
 
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|---|---|---|---|
+| [core-model.md](spec-archival/core-model.md) | — | small | validated |
+| [validation.md](spec-archival/validation.md) | core-model | small | validated |
+| [impact-progress.md](spec-archival/impact-progress.md) | core-model | small | validated |
+| [dispatch-handler.md](spec-archival/dispatch-handler.md) | core-model | small | validated |
+| [archive-api.md](spec-archival/archive-api.md) | core-model | small | validated |
+| [explorer-ux.md](spec-archival/explorer-ux.md) | core-model | medium | validated |
+| [focused-view-ux.md](spec-archival/focused-view-ux.md) | archive-api, explorer-ux | medium | validated |
+| [skills-and-readme.md](spec-archival/skills-and-readme.md) | — | small | validated |
+
+```mermaid
+graph LR
+  A[core-model] --> B[validation]
+  A --> C[impact-progress]
+  A --> D[dispatch-handler]
+  A --> E[archive-api]
+  A --> F[explorer-ux]
+  E --> G[focused-view-ux]
+  F --> G
+  H[skills-and-readme]
+```
+
+**Parallelism:** After `core-model`, tasks `validation`, `impact-progress`, `dispatch-handler`,
+`archive-api`, and `explorer-ux` are all independent and can run in parallel. `focused-view-ux`
+waits on both `archive-api` (needs the endpoints) and `explorer-ux` (shares CSS).
+`skills-and-readme` has no code dependencies and can start immediately.
+
+---
+
 ## Open Questions
 
 Questions the reviewer should close during `/plan-ceo-review` or chat iteration before this spec reaches `validated`:
