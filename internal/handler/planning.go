@@ -167,8 +167,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	// HTTP request context is cancelled as soon as the 202 response is sent.
 	go func() {
 		defer func() {
-			h.planner.CloseLiveLog()
+			// SetBusy must be cleared before CloseLiveLog so that when the
+			// frontend receives the stream EOF and immediately drains its
+			// message queue, the backend is already ready to accept the next
+			// request (otherwise the queued message races and gets a 409).
 			h.planner.SetBusy(false)
+			h.planner.CloseLiveLog()
 			if rec := recover(); rec != nil {
 				slog.Error("planning exec panic", "recover", rec)
 			}
