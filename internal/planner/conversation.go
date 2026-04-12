@@ -120,11 +120,15 @@ func (s *ConversationStore) Messages() ([]Message, error) {
 		msgs = append(msgs, m)
 	}
 	if err := sc.Err(); err != nil {
-		// Don't fail the whole history read on a single oversized line —
-		// log it and return what parsed successfully so the UI stays
-		// usable.
-		slog.Warn("conversation: scanner terminated early",
-			"file", messagesFile, "line", lineNum, "err", err)
+		// Only swallow the oversized-token case (an individual record
+		// exceeded maxScanSize); everything else — I/O errors, reading
+		// a directory by mistake, truncated files — still propagates so
+		// the caller can surface it.
+		if !errors.Is(err, bufio.ErrTooLong) {
+			return msgs, err
+		}
+		slog.Warn("conversation: skipping oversized record",
+			"file", messagesFile, "line", lineNum+1, "limit_bytes", maxScanSize, "err", err)
 	}
 	return msgs, nil
 }
