@@ -1,0 +1,55 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": { "enabled": false, "clientKind": "git", "useIgnoreFile": false },
+  "files": {
+    "ignore": [
+      "js/vendor/**",
+      "js/generated/**",
+      "css/vendor/**",
+      "node_modules/**"
+    ]
+  },
+  "formatter": { "enabled": false },
+  "organizeImports": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noAssignInExpressions": "off",
+        "noControlCharactersInRegex": "off",
+        "noRedundantUseStrict": "off"
+      },
+      "style": {
+        "useTemplate": "off",
+        "useNodejsImportProtocol": "off",
+        "noParameterAssign": "off",
+        "noVar": "off",
+        "useSingleVarDeclarator": "off",
+        "noUnusedTemplateLiteral": "off",
+        "useExponentiationOperator": "off",
+        "useNumberNamespace": "off",
+        "useConst": "off",
+        "noUselessElse": "off"
+      },
+      "complexity": {
+        "noForEach": "off",
+        "useOptionalChain": "off",
+        "useLiteralKeys": "off",
+        "useArrowFunction": "off",
+        "noUselessConstructor": "off",
+        "noUselessSwitchCase": "off"
+      },
+      "correctness": {
+        "noInnerDeclarations": "off"
+      },
+      "performance": {
+        "noDelete": "off"
+      }
+    }
+  },
+  "javascript": {
+    "globals": ["Sortable", "hljs", "marked", "Pretext", "Terminal", "FitAddon"]
+  }
+}

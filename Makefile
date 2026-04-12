@@ -12,10 +12,10 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Build the wallfacer binary and pull sandbox images.
-build: build-binary pull-images
+build: fmt lint build-binary pull-images
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -126,8 +126,11 @@ fmt-go:
 fmt-js:
 	npx --yes prettier@3 --write 'ui/**/*.{js,html,css}' '!ui/index.html' '!ui/js/vendor/**' '!ui/css/vendor/**'
 
+# Run all linters (Go + frontend)
+lint: lint-go lint-js
+
 # Run Go linters (golangci-lint if available, otherwise go vet)
-lint:
+lint-go:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run ./...; \
 	else \
@@ -135,8 +138,12 @@ lint:
 		go vet ./...; \
 	fi
 
-# Run all checks (lint + backend tests + frontend tests)
-test: lint test-backend test-frontend
+# Run frontend linter (Biome) over ui/js and ui/partials
+lint-js:
+	cd ui && npx --yes @biomejs/biome@1.9.4 lint --max-diagnostics=5000 js partials
+
+# Run all checks (fmt + lint + backend tests + frontend tests)
+test: fmt lint test-backend test-frontend
 
 # Run Go unit tests
 test-backend:

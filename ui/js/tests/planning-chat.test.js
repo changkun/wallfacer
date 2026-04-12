@@ -458,15 +458,11 @@ describe("PlanningChat", () => {
     const r2 = bubbleFor(kids, 2);
     const r3 = bubbleFor(kids, 3);
     expect(r1 && r2 && r3).toBeTruthy();
-    expect(
-      r1.querySelector(".planning-chat-bubble__undo").disabled,
-    ).toBe(true);
-    expect(
-      r2.querySelector(".planning-chat-bubble__undo").disabled,
-    ).toBe(true);
-    expect(
-      r3.querySelector(".planning-chat-bubble__undo").disabled,
-    ).toBe(false);
+    expect(r1.querySelector(".planning-chat-bubble__undo").disabled).toBe(true);
+    expect(r2.querySelector(".planning-chat-bubble__undo").disabled).toBe(true);
+    expect(r3.querySelector(".planning-chat-bubble__undo").disabled).toBe(
+      false,
+    );
   });
 
   it("successful undo dims the bubble, strips its button, appends a system message", async () => {
@@ -542,9 +538,9 @@ describe("PlanningChat", () => {
     expect(ab.getAttribute("data-round")).toBe("1");
     expect(ab.querySelector(".planning-chat-bubble__undo")).toBeTruthy();
     // Button is re-enabled (it's still the latest round).
-    expect(
-      ab.querySelector(".planning-chat-bubble__undo").disabled,
-    ).toBe(false);
+    expect(ab.querySelector(".planning-chat-bubble__undo").disabled).toBe(
+      false,
+    );
     // A warning system bubble was appended.
     const sys = kids[kids.length - 1];
     expect(sys.classList.contains("planning-chat-system")).toBe(true);
@@ -565,7 +561,8 @@ describe("PlanningChat", () => {
       ok: false,
       json: () =>
         Promise.resolve({
-          error: "stash pop conflict after undo; stash retained for manual resolution",
+          error:
+            "stash pop conflict after undo; stash retained for manual resolution",
         }),
     });
     const kids = messagesEl().children;
