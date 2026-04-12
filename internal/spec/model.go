@@ -18,6 +18,7 @@ const (
 	StatusValidated Status = "validated" // reviewed, approved, ready to execute
 	StatusComplete  Status = "complete"  // all work done
 	StatusStale     Status = "stale"     // no longer matches reality
+	StatusArchived  Status = "archived"  // deliberately archived; no longer active
 )
 
 // Effort is a rough size estimate for a spec's implementation work.

@@ -19,6 +19,10 @@ func TestStatusMachine_AllValid(t *testing.T) {
 		{StatusComplete, StatusStale},
 		{StatusStale, StatusDrafted},
 		{StatusStale, StatusValidated},
+		{StatusDrafted, StatusArchived},
+		{StatusComplete, StatusArchived},
+		{StatusStale, StatusArchived},
+		{StatusArchived, StatusDrafted},
 	}
 	for _, tc := range valid {
 		if err := StatusMachine.Validate(tc.from, tc.to); err != nil {
@@ -43,6 +47,11 @@ func TestStatusMachine_AllInvalid(t *testing.T) {
 		{StatusComplete, StatusValidated},
 		{StatusStale, StatusVague},
 		{StatusStale, StatusComplete},
+		{StatusVague, StatusArchived},
+		{StatusValidated, StatusArchived},
+		{StatusArchived, StatusComplete},
+		{StatusArchived, StatusValidated},
+		{StatusArchived, StatusStale},
 	}
 	for _, tc := range invalid {
 		if err := StatusMachine.Validate(tc.from, tc.to); err == nil {
@@ -68,12 +77,12 @@ func TestStatusMachine_ErrorWrapping(t *testing.T) {
 
 func TestValidStatuses(t *testing.T) {
 	statuses := ValidStatuses()
-	if len(statuses) != 5 {
-		t.Fatalf("len(ValidStatuses()) = %d, want 5", len(statuses))
+	if len(statuses) != 6 {
+		t.Fatalf("len(ValidStatuses()) = %d, want 6", len(statuses))
 	}
 	want := map[Status]bool{
 		StatusVague: true, StatusDrafted: true, StatusValidated: true,
-		StatusComplete: true, StatusStale: true,
+		StatusComplete: true, StatusStale: true, StatusArchived: true,
 	}
 	for _, s := range statuses {
 		if !want[s] {
