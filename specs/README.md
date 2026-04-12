@@ -1,17 +1,14 @@
 # Specs
 
 Wallfacer roadmap. Three tracks run in parallel, connected by shared design foundations.
+Completed specs live in the [Archive](#archive) section at the bottom.
 
 ## Status Quo
 
 What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started.
 
 ```
-Foundations — 7/7 complete
-  ✅ Sandbox Backend Interface     ✅ Container Reuse
-  ✅ Storage Backend Interface     ✅ File Explorer
-  ✅ Multi-Workspace Groups        ✅ Host Terminal
-  ✅ Windows Support
+Foundations — 7/7 complete (see Archive)
 
 Local Product — 5 done, 1 in progress, 17 pending
   ✅ Desktop App                   ✅ Terminal Sessions
@@ -47,22 +44,6 @@ Shared Design — 0/17
 
 ---
 
-## Foundations (Complete)
-
-Abstraction interfaces that all tracks build on. These are done and stable.
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [sandbox-backends.md](foundations/sandbox-backends.md) | **Complete** | `sandbox.Backend` / `sandbox.Handle` + `LocalBackend` |
-| [storage-backends.md](foundations/storage-backends.md) | **Complete** (enablers) | `StorageBackend` + `FilesystemBackend`; cloud backends (PG, S3) deferred to cloud track |
-| [multi-workspace-groups.md](foundations/multi-workspace-groups.md) | **Complete** | Multi-store manager, runtime workspace switching |
-| [container-reuse.md](foundations/container-reuse.md) | **Complete** | Per-task worker containers via `podman exec` |
-| [file-explorer.md](foundations/file-explorer.md) | **Complete** | Browse + edit workspace files in the web UI |
-| [host-terminal.md](foundations/host-terminal.md) | **Complete** | Interactive shell in the web UI (WebSocket + PTY) |
-| [windows-support.md](foundations/windows-support.md) | **Complete** | Tier 2 Windows host support |
-
----
-
 ## Local Product
 
 Desktop experience and developer workflow improvements. No cloud dependency. Ships value to single-user deployments.
@@ -71,22 +52,17 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 |------|--------|----------|
 | [spec-coordination.md](local/spec-coordination.md) | In progress | Umbrella: recursive spec tree model, dispatch workflow, cross-task context |
 | ↳ [spec-document-model.md](local/spec-coordination/spec-document-model.md) | **Complete** | Spec frontmatter schema, filesystem-derived tree, `depends_on` DAG, six-state lifecycle (including `archived`), per-spec and cross-spec validation, recursive progress tracking, impact analysis. Extracted `internal/pkg/dag/`, `internal/pkg/tree/`, `internal/pkg/statemachine/` |
-| ↳ [spec-drift-detection.md](local/spec-coordination/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
-| ↳ [spec-planning-ux.md](local/spec-coordination/spec-planning-ux.md) | **Complete** | Three-pane spec mode (explorer, focused markdown view, chat stream), planning sandbox container, chat-driven spec iteration, dispatch & board integration, undo snapshots, planning cost tracking. Deferred: Codex compatibility, enhanced session recovery. |
 | ↳ [spec-archival.md](local/spec-coordination/spec-archival.md) | **Complete** | Sixth lifecycle state (`archived`) — hidden by default, read-only, excluded from impact / progress / drift / stale-propagation. Cascades over non-leaf subtrees on archive; unarchive reverses via `git revert` of the archive commit. Muted rendering in explorer and minimap; archived banner in focused view with stacked undo toasts. |
-| [desktop-app.md](local/desktop-app.md) | **Complete** | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
+| ↳ [spec-planning-ux.md](local/spec-coordination/spec-planning-ux.md) | **Complete** | Three-pane spec mode (explorer, focused markdown view, chat stream), planning sandbox container, chat-driven spec iteration, dispatch & board integration, undo snapshots, planning cost tracking. Deferred: Codex compatibility, enhanced session recovery. |
+| ↳ [spec-drift-detection.md](local/spec-coordination/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
 | [excalidraw-whiteboard.md](local/excalidraw-whiteboard.md) | Not started | Excalidraw-based drawing/brainstorm whiteboard as a peer view |
 | [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
 | [inline-diff-feedback.md](local/inline-diff-feedback.md) | Not started | Code-review-style inline comments on diff lines with batch feedback submission |
-| [terminal-sessions.md](local/terminal-sessions.md) | **Complete** | Multiple concurrent terminal sessions with tab bar |
-| [terminal-container-exec.md](local/terminal-container-exec.md) | **Complete** | Attach to running task containers from the terminal panel |
 | [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
 | [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
-| [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |
-| [oauth-token-setup.md](local/oauth-token-setup.md) | **Complete** | Browser-based OAuth sign-in for Claude and Codex credentials |
-| [pixel-agents.md](local/pixel-agents.md) | **Complete** | Pixel art office view — animated characters representing task agents |
+| [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer |
 | [validation-barrier.md](local/validation-barrier.md) | Not started | User-defined test criteria persisted on tasks for targeted verification |
 | [pull-request.md](local/pull-request.md) | Drafted | Agent-generated GitHub PR from current branch via lightweight sandbox |
 | [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
@@ -218,119 +194,10 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 ---
 
-## Dependency Graph
-
-How the three tracks connect through shared design and foundations.
-
-```mermaid
-graph TB
-  subgraph Foundations [Foundations ✅]
-    SBI[Sandbox Interface]
-    STI[Storage Interface]
-    CR[Container Reuse]
-    FE[File Explorer]
-    MW[Multi-Workspace]
-    HT[Host Terminal]
-  end
-
-  subgraph Shared [Shared Design]
-    AUTH[Authentication]
-    AA[Agent Abstraction]
-    OS[Overlay Snapshots]
-    NSL[Native Sandbox Linux]
-    NSM[Native Sandbox macOS]
-    NSW[Native Sandbox Windows]
-    EP[Extensible Prompts]
-    IC[Intent Commits]
-    TEL[Telemetry & Observability]
-    INB[Information Inbox]
-    MAC[Multi-Agent Consensus]
-    MAD[Multi-Agent Debate]
-    DID[Defense in Depth]
-    AMI[Agent Memory & Identity]
-    IS[Intelligence System]
-  end
-
-  subgraph Local [Local Product]
-    SC[Spec Coordination ◐]
-    FA[File Attachments]
-    HM[Host Mounts]
-    FPV[File Panel Viewer]
-    DA[Desktop App ✅]
-    TS[Terminal Sessions ✅]
-    CE[Container Exec ✅]
-    ORS[Oversight Risk Scoring]
-    VB[Validation Barrier]
-    VV[Visual Verification]
-    LS[Live Serve]
-    OTS[OAuth Token Setup ✅]
-    TUI[Terminal UI]
-    PA[Pixel Agents ✅]
-  end
-
-  subgraph External [External Dependencies]
-    FS[fs.latere.ai]
-  end
-
-  subgraph Cloud [Cloud Platform]
-    TFS[Tenant FS]
-    K8S[K8s Sandbox]
-    CS[Cloud Storage]
-    CI[Cloud Infrastructure]
-    MT[Multi-Tenant]
-    TA[Tenant API]
-  end
-
-  %% Foundations → Local
-  FE --> SC
-  FE --> FA
-  FE --> HM
-  FE --> FPV
-  FE --> DA
-  HT --> DA
-  HT --> TS --> CE
-
-  %% External → Cloud
-  FS --> TFS
-
-  %% Foundations → Cloud
-  SBI --> TFS
-  STI --> TFS
-  STI --> CS
-
-  %% Shared → Cloud
-  AUTH --> MT
-  AA --> TEL
-  AA --> INB
-  TEL --> INB
-  AA --> MAC
-  MAC --> MAD
-  TEL --> MAD
-  TEL --> LS
-  AA --> AMI
-  TEL --> AMI
-  AMI --> IS
-  AA --> DID
-  TEL --> DID
-  AA --> IS
-  TEL --> IS
-  MAC --> IS
-
-  %% Cloud internal
-  TFS --> K8S --> MT
-  CS --> MT
-  CI --> MT
-  MT --> TA
-```
-
----
-
 ## Ordering Rationale
 
 **Within local product:**
-- Spec coordination is in progress (document model complete; drift detection and planning UX remain).
-- Terminal extensions complete: sessions and container exec both shipped.
-- Desktop app is complete.
+- Spec coordination is in progress (document model, planning UX, and archival complete; drift detection remains).
 - Oversight, visual verification, live serve are independent — start anytime.
 
 **Within cloud platform:**
@@ -348,3 +215,33 @@ graph TB
 **Between tracks:**
 - The two tracks are independent after shared foundations. They can run in parallel.
 - The only hard cross-track dependency: multi-tenant requires authentication.
+
+---
+
+## Archive
+
+System of record for completed work. Stable, not under active development. Included for reference and dependency context only.
+
+### Foundations
+
+Abstraction interfaces that all tracks build on. All seven are shipped and stable.
+
+| Spec | Delivers |
+|------|----------|
+| [sandbox-backends.md](foundations/sandbox-backends.md) | `sandbox.Backend` / `sandbox.Handle` + `LocalBackend` |
+| [storage-backends.md](foundations/storage-backends.md) | `StorageBackend` + `FilesystemBackend`; cloud backends (PG, S3) deferred to cloud track |
+| [multi-workspace-groups.md](foundations/multi-workspace-groups.md) | Multi-store manager, runtime workspace switching |
+| [container-reuse.md](foundations/container-reuse.md) | Per-task worker containers via `podman exec` |
+| [file-explorer.md](foundations/file-explorer.md) | Browse + edit workspace files in the web UI |
+| [host-terminal.md](foundations/host-terminal.md) | Interactive shell in the web UI (WebSocket + PTY) |
+| [windows-support.md](foundations/windows-support.md) | Tier 2 Windows host support |
+
+### Local — Completed
+
+| Spec | Delivers |
+|------|----------|
+| [desktop-app.md](local/desktop-app.md) | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
+| [terminal-sessions.md](local/terminal-sessions.md) | Multiple concurrent terminal sessions with tab bar |
+| [terminal-container-exec.md](local/terminal-container-exec.md) | Attach to running task containers from the terminal panel |
+| [oauth-token-setup.md](local/oauth-token-setup.md) | Browser-based OAuth sign-in for Claude and Codex credentials |
+| [pixel-agents.md](local/pixel-agents.md) | Pixel art office view — animated characters representing task agents |
