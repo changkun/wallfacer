@@ -1,16 +1,17 @@
 ---
 title: Frontend Session Wiring
-status: complete
+status: archived
 depends_on:
   - specs/local/terminal-sessions/task-03-session-messages.md
   - specs/local/terminal-sessions/task-04-tab-bar-ui.md
 affects: []
 effort: large
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 5: Frontend Session Wiring
 

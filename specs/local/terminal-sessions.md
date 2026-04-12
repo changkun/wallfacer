@@ -1,6 +1,6 @@
 ---
 title: "Terminal: Multiple Sessions with Tabs"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/host-terminal.md
 affects:
@@ -10,10 +10,11 @@ affects:
   - ui/css/status-bar.css
 effort: large
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Terminal: Multiple Sessions with Tabs
 

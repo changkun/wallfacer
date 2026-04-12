@@ -1,15 +1,16 @@
 ---
 title: Documentation
-status: complete
+status: archived
 depends_on:
   - specs/local/terminal-sessions/task-05-frontend-session-wiring.md
 affects: []
 effort: small
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 6: Documentation
 
