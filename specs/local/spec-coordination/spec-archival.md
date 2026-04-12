@@ -251,7 +251,7 @@ When this spec is later dispatched as an implementation task, the following must
 |---|---|---|---|
 | [core-model.md](spec-archival/core-model.md) | — | small | complete |
 | [validation.md](spec-archival/validation.md) | core-model | small | complete |
-| [impact-progress.md](spec-archival/impact-progress.md) | core-model | small | validated |
+| [impact-progress.md](spec-archival/impact-progress.md) | core-model | small | complete |
 | [dispatch-handler.md](spec-archival/dispatch-handler.md) | core-model | small | validated |
 | [archive-api.md](spec-archival/archive-api.md) | core-model | small | validated |
 | [explorer-ux.md](spec-archival/explorer-ux.md) | core-model | medium | validated |
