@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -227,5 +228,137 @@ func TestGetUsageStats_MultipleTasksAggregated(t *testing.T) {
 	}
 	if resp.Total.InputTokens != 30 {
 		t.Errorf("expected 30 total input tokens, got %d", resp.Total.InputTokens)
+	}
+}
+
+// --- Planning merge ---
+
+// usageResponseFromHandler calls GetUsageStats with the given URL and decodes
+// the response.
+func usageResponseFromHandler(t *testing.T, h *Handler, url string) usageResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, url, nil)
+	w := httptest.NewRecorder()
+	h.GetUsageStats(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	var resp usageResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return resp
+}
+
+func TestUsage_NoPlanningRecords(t *testing.T) {
+	h := newTestHandler(t)
+	// No planning dir on disk — response must not include a planning key.
+	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
+	if _, ok := resp.BySubAgent[store.SandboxActivityPlanning]; ok {
+		t.Errorf("BySubAgent[planning] should be absent, got %+v", resp.BySubAgent[store.SandboxActivityPlanning])
+	}
+	if resp.Total.CostUSD != 0 || resp.Total.InputTokens != 0 {
+		t.Errorf("Total should be zero, got %+v", resp.Total)
+	}
+}
+
+func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
+	h := newTestHandler(t)
+	key := store.PlanningGroupKey([]string{"/repo/a"})
+	now := time.Now().UTC()
+
+	for _, rec := range []store.TurnUsageRecord{
+		{Turn: 1, Timestamp: now, InputTokens: 100, OutputTokens: 40, CostUSD: 0.05},
+		{Turn: 2, Timestamp: now.Add(time.Minute), InputTokens: 60, OutputTokens: 25, CacheReadInputTokens: 10, CostUSD: 0.03},
+	} {
+		if err := store.AppendPlanningUsage(h.configDir, key, rec); err != nil {
+			t.Fatalf("append: %v", err)
+		}
+	}
+
+	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
+
+	got, ok := resp.BySubAgent[store.SandboxActivityPlanning]
+	if !ok {
+		t.Fatal("BySubAgent[planning] missing")
+	}
+	if got.InputTokens != 160 || got.OutputTokens != 65 || got.CacheReadInputTokens != 10 {
+		t.Errorf("planning sums wrong: %+v", got)
+	}
+	if got.CostUSD != 0.08 {
+		t.Errorf("planning cost = %v, want 0.08", got.CostUSD)
+	}
+	if resp.Total.InputTokens != 160 || resp.Total.OutputTokens != 65 || resp.Total.CostUSD != 0.08 {
+		t.Errorf("Total should include planning usage: %+v", resp.Total)
+	}
+}
+
+func TestUsage_PlanningRespectsDaysWindow(t *testing.T) {
+	h := newTestHandler(t)
+	key := store.PlanningGroupKey([]string{"/repo/a"})
+	now := time.Now().UTC()
+
+	// An "old" record 10 days back and a "new" record now.
+	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+		Turn: 1, Timestamp: now.AddDate(0, 0, -10), InputTokens: 999, OutputTokens: 999, CostUSD: 9.99,
+	}); err != nil {
+		t.Fatalf("append old: %v", err)
+	}
+	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+		Turn: 2, Timestamp: now, InputTokens: 10, OutputTokens: 5, CostUSD: 0.01,
+	}); err != nil {
+		t.Fatalf("append new: %v", err)
+	}
+
+	resp := usageResponseFromHandler(t, h, "/api/usage?days=1")
+
+	got := resp.BySubAgent[store.SandboxActivityPlanning]
+	if got.InputTokens != 10 || got.OutputTokens != 5 {
+		t.Errorf("expected only recent record included, got %+v", got)
+	}
+	if got.CostUSD != 0.01 {
+		t.Errorf("expected cost 0.01, got %v", got.CostUSD)
+	}
+}
+
+func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
+	h := newTestHandler(t)
+	keyA := store.PlanningGroupKey([]string{"/repo/a"})
+	keyB := store.PlanningGroupKey([]string{"/repo/b"})
+	now := time.Now().UTC()
+
+	if err := store.AppendPlanningUsage(h.configDir, keyA, store.TurnUsageRecord{
+		Turn: 1, Timestamp: now, InputTokens: 30, OutputTokens: 10, CostUSD: 0.02,
+	}); err != nil {
+		t.Fatalf("append A: %v", err)
+	}
+	if err := store.AppendPlanningUsage(h.configDir, keyB, store.TurnUsageRecord{
+		Turn: 1, Timestamp: now, InputTokens: 70, OutputTokens: 20, CostUSD: 0.04,
+	}); err != nil {
+		t.Fatalf("append B: %v", err)
+	}
+
+	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
+	got := resp.BySubAgent[store.SandboxActivityPlanning]
+	if got.InputTokens != 100 || got.OutputTokens != 30 {
+		t.Errorf("planning tokens across groups = %+v, want sum", got)
+	}
+	if got.CostUSD != 0.06 {
+		t.Errorf("planning cost = %v, want 0.06", got.CostUSD)
+	}
+}
+
+func TestUsage_TaskCountUnchangedByPlanning(t *testing.T) {
+	h := newTestHandler(t)
+	key := store.PlanningGroupKey([]string{"/repo/a"})
+	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, CostUSD: 0.01,
+	}); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
+	if resp.TaskCount != 0 {
+		t.Errorf("TaskCount = %d, want 0 (planning rounds must not count as tasks)", resp.TaskCount)
 	}
 }

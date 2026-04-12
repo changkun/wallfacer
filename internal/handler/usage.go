@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -25,6 +27,49 @@ func addUsage(dst *store.TaskUsage, src store.TaskUsage) {
 	dst.CacheReadInputTokens += src.CacheReadInputTokens
 	dst.CacheCreationTokens += src.CacheCreationTokens
 	dst.CostUSD += src.CostUSD
+}
+
+// planningRecordAsUsage projects a TurnUsageRecord into the TaskUsage shape
+// so it can flow through the same addUsage helper as task-side data.
+func planningRecordAsUsage(rec store.TurnUsageRecord) store.TaskUsage {
+	return store.TaskUsage{
+		InputTokens:          rec.InputTokens,
+		OutputTokens:         rec.OutputTokens,
+		CacheReadInputTokens: rec.CacheReadInputTokens,
+		CacheCreationTokens:  rec.CacheCreationTokens,
+		CostUSD:              rec.CostUSD,
+	}
+}
+
+// mergePlanningUsage scans <configDir>/planning/<group>/usage.jsonl files
+// and merges records into BySubAgent["planning"] and Total, honoring the
+// caller's cutoff. It is a no-op when configDir is empty or the planning
+// directory does not exist. TaskCount is deliberately untouched — it counts
+// tasks, not planning rounds.
+func mergePlanningUsage(resp *usageResponse, configDir string, cutoff time.Time) {
+	if configDir == "" {
+		return
+	}
+	entries, err := os.ReadDir(filepath.Join(configDir, "planning"))
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		recs, err := store.ReadPlanningUsage(configDir, e.Name(), cutoff)
+		if err != nil {
+			continue
+		}
+		for _, rec := range recs {
+			u := planningRecordAsUsage(rec)
+			a := resp.BySubAgent[store.SandboxActivityPlanning]
+			addUsage(&a, u)
+			resp.BySubAgent[store.SandboxActivityPlanning] = a
+			addUsage(&resp.Total, u)
+		}
+	}
 }
 
 // GetUsageStats aggregates token/cost data across tasks and returns a summary.
@@ -73,6 +118,8 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 			resp.BySubAgent[agent] = a
 		}
 	}
+
+	mergePlanningUsage(&resp, h.configDir, cutoff)
 
 	httpjson.Write(w, http.StatusOK, resp)
 }
