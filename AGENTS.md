@@ -78,6 +78,8 @@ wallfacer exec --sandbox claude              # Open shell in a new sandbox
 wallfacer spec validate                      # Validate the entire specs/ tree
 wallfacer spec validate specs/local/foo.md   # Validate specific files only
 wallfacer spec validate -json                # Emit JSON for scripting / CI
+wallfacer spec new specs/local/foo.md        # Scaffold a spec with valid frontmatter defaults
+wallfacer spec new -title "My Feature" -status drafted specs/local/my-feature.md
 ```
 
 The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.

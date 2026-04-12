@@ -5,9 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"time"
+	"unicode"
 
 	"changkun.de/x/wallfacer/internal/spec"
 )
@@ -24,6 +28,8 @@ func RunSpec(_ string, args []string) {
 	switch sub {
 	case "validate":
 		runSpecValidate(rest)
+	case "new":
+		runSpecNew(rest)
 	case "-h", "-help", "--help":
 		specUsage(os.Stdout)
 	default:
@@ -34,8 +40,9 @@ func RunSpec(_ string, args []string) {
 }
 
 func specUsage(w *os.File) {
-	_, _ = fmt.Fprint(w, "Usage: wallfacer spec <subcommand> [flags] [paths...]\n\n"+
+	_, _ = fmt.Fprint(w, "Usage: wallfacer spec <subcommand> [flags] [args...]\n\n"+
 		"Subcommands:\n"+
+		"  new        Create a new spec file with valid frontmatter defaults\n"+
 		"  validate   Validate one or more spec files (or the whole specs/ tree)\n\n"+
 		"Run 'wallfacer spec <subcommand> -h' for flags.\n")
 }
@@ -229,3 +236,173 @@ func printValidateReport(tree *spec.Tree, results []spec.Result, errCount, warnC
 func ansiGreen() string  { return "\033[32m" }
 func ansiRed() string    { return "\033[31m" }
 func ansiYellow() string { return "\033[33m" }
+
+// runSpecNew implements `wallfacer spec new <path> [flags]`. Writes a
+// minimal spec file with valid frontmatter defaults so the author can
+// start editing immediately. The default status is `vague`, which
+// suppresses the body-not-empty validation warning — the skeleton body
+// is a placeholder, not a finished spec.
+func runSpecNew(args []string) {
+	fs := flag.NewFlagSet("spec new", flag.ExitOnError)
+	title := fs.String("title", "", "spec title (default: Title Case of the file name)")
+	status := fs.String("status", "vague", "initial status (one of: "+strings.Join(statusesForHelp(), ", ")+")")
+	effort := fs.String("effort", "medium", "initial effort estimate (one of: "+strings.Join(effortsForHelp(), ", ")+")")
+	author := fs.String("author", "", "spec author (default: git config user.name, else 'unknown')")
+	force := fs.Bool("force", false, "overwrite the file if it already exists")
+	_ = fs.Parse(args)
+
+	rest := fs.Args()
+	if len(rest) != 1 {
+		fmt.Fprintln(os.Stderr, "Usage: wallfacer spec new [flags] <path>")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Path must be under a track directory, e.g. specs/local/my-feature.md.")
+		fmt.Fprintln(os.Stderr, "Flags must come before the path (standard Go flag parsing).")
+		os.Exit(2)
+	}
+	path := rest[0]
+
+	if err := validateSpecPath(path); err != nil {
+		fmt.Fprintf(os.Stderr, "wallfacer spec new: %v\n", err)
+		os.Exit(2)
+	}
+	if !slices.Contains(stringStatuses(), *status) {
+		fmt.Fprintf(os.Stderr, "wallfacer spec new: invalid -status %q (want one of: %s)\n",
+			*status, strings.Join(statusesForHelp(), ", "))
+		os.Exit(2)
+	}
+	if !slices.Contains(stringEfforts(), *effort) {
+		fmt.Fprintf(os.Stderr, "wallfacer spec new: invalid -effort %q (want one of: %s)\n",
+			*effort, strings.Join(effortsForHelp(), ", "))
+		os.Exit(2)
+	}
+
+	if _, err := os.Stat(path); err == nil && !*force {
+		fmt.Fprintf(os.Stderr, "wallfacer spec new: %s already exists (use -force to overwrite)\n", path)
+		os.Exit(1)
+	}
+
+	effectiveTitle := *title
+	if effectiveTitle == "" {
+		effectiveTitle = titleFromFilename(path)
+	}
+	effectiveAuthor := *author
+	if effectiveAuthor == "" {
+		effectiveAuthor = resolveAuthor()
+	}
+
+	content := renderSpecSkeleton(effectiveTitle, *status, *effort, effectiveAuthor, time.Now())
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "wallfacer spec new: mkdir: %v\n", err)
+		os.Exit(1)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "wallfacer spec new: write: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("%s✓%s created %s\n", ansiGreen(), ansiReset, path)
+}
+
+// validateSpecPath checks that path looks like a valid spec location —
+// lives under a specs/<track>/ directory and ends in .md. Does not
+// check the parent directory exists on disk; MkdirAll handles that.
+func validateSpecPath(path string) error {
+	clean := filepath.ToSlash(filepath.Clean(path))
+	if !strings.HasSuffix(clean, ".md") {
+		return fmt.Errorf("path must end in .md, got %q", path)
+	}
+	parts := strings.Split(clean, "/")
+	if len(parts) < 3 || parts[0] != "specs" {
+		return fmt.Errorf("path must be under a track directory, e.g. specs/local/my-feature.md (got %q)", path)
+	}
+	if strings.TrimSpace(parts[1]) == "" {
+		return fmt.Errorf("track directory (specs/<track>/...) is required")
+	}
+	return nil
+}
+
+// titleFromFilename turns "my-new-feature.md" into "My New Feature".
+// Strips the extension, splits on hyphens/underscores, and Title-Cases
+// each word. Non-ASCII input is passed through unchanged.
+func titleFromFilename(path string) string {
+	base := filepath.Base(path)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	parts := strings.FieldsFunc(base, func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		runes := []rune(p)
+		runes[0] = unicode.ToUpper(runes[0])
+		parts[i] = string(runes)
+	}
+	if len(parts) == 0 {
+		return base
+	}
+	return strings.Join(parts, " ")
+}
+
+// resolveAuthor asks git for the current user.name; falls back to
+// "unknown" when git is not installed or no name is configured. Keeps
+// `spec new` usable in throwaway environments.
+func resolveAuthor() string {
+	out, err := exec.Command("git", "config", "user.name").Output()
+	if err == nil {
+		if name := strings.TrimSpace(string(out)); name != "" {
+			return name
+		}
+	}
+	return "unknown"
+}
+
+// renderSpecSkeleton produces the full file content — frontmatter plus
+// a minimal body skeleton. All dates use the provided `now` so tests
+// can inject a fixed timestamp.
+func renderSpecSkeleton(title, status, effort, author string, now time.Time) string {
+	date := now.Format("2006-01-02")
+	var b strings.Builder
+	b.WriteString("---\n")
+	b.WriteString("title: " + title + "\n")
+	b.WriteString("status: " + status + "\n")
+	b.WriteString("depends_on: []\n")
+	b.WriteString("affects: []\n")
+	b.WriteString("effort: " + effort + "\n")
+	b.WriteString("created: " + date + "\n")
+	b.WriteString("updated: " + date + "\n")
+	b.WriteString("author: " + author + "\n")
+	b.WriteString("dispatched_task_id: null\n")
+	b.WriteString("---\n\n")
+	b.WriteString("# " + title + "\n\n")
+	b.WriteString("## Problem\n\n")
+	b.WriteString("<!-- What problem does this spec address? Why now? -->\n\n")
+	b.WriteString("## Design\n\n")
+	b.WriteString("<!-- High-level approach. Key decisions and trade-offs. -->\n\n")
+	b.WriteString("## Acceptance\n\n")
+	b.WriteString("<!-- How will we know this is done? Tests, behaviour changes, files touched. -->\n")
+	return b.String()
+}
+
+func stringStatuses() []string {
+	all := spec.ValidStatuses()
+	out := make([]string, len(all))
+	for i, s := range all {
+		out[i] = string(s)
+	}
+	return out
+}
+
+func stringEfforts() []string {
+	all := spec.ValidEfforts()
+	out := make([]string, len(all))
+	for i, e := range all {
+		out[i] = string(e)
+	}
+	return out
+}
+
+// statusesForHelp / effortsForHelp wrap their string-slice counterparts
+// so the flag-help strings don't need to re-do the conversion inline.
+func statusesForHelp() []string { return stringStatuses() }
+func effortsForHelp() []string  { return stringEfforts() }
