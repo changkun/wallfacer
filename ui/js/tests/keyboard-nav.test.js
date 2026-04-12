@@ -118,7 +118,7 @@ function createElement(ownerDocument, tagName, overrides = {}) {
     dispatchEvent(evt) {
       evt.target = evt.target || this;
       evt.currentTarget = this;
-      (this._listeners[evt.type] || []).forEach((fn) => fn.call(this, evt));
+      (this._listeners[evt.type] || []).forEach((fn) => { fn.call(this, evt); });
       return true;
     },
     setAttribute(name, value) {

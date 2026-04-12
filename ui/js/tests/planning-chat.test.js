@@ -65,7 +65,7 @@ function makeEl(tag, registry) {
       _classList.clear();
       v.split(/\s+/)
         .filter(Boolean)
-        .forEach((c) => _classList.add(c));
+        .forEach((c) => { _classList.add(c); });
     },
     get innerHTML() {
       return _innerHTML;
@@ -120,11 +120,11 @@ function makeEl(tag, registry) {
     },
     dispatchEvent(e) {
       const fns = _listeners[e.type] || [];
-      fns.forEach((fn) => fn(e));
+      fns.forEach((fn) => { fn(e); });
     },
     click() {
       const fns = _listeners["click"] || [];
-      fns.forEach((fn) => fn({ type: "click" }));
+      fns.forEach((fn) => { fn({ type: "click" }); });
     },
     focus() {},
     querySelector(sel) {

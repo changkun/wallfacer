@@ -243,7 +243,7 @@ function makeOfficeContext(opts) {
 
 function initCtx(ctx) {
   const dcl = ctx.eventListeners["document"]?.["DOMContentLoaded"];
-  if (dcl) dcl.forEach((fn) => fn());
+  if (dcl) dcl.forEach((fn) => { fn(); });
 }
 
 describe("View preference", () => {

@@ -182,7 +182,7 @@ function makeContext() {
 
 function initContext(ctx) {
   const dcl = ctx.eventListeners["document"]?.["DOMContentLoaded"];
-  if (dcl) dcl.forEach((fn) => fn());
+  if (dcl) dcl.forEach((fn) => { fn(); });
 }
 
 describe("office SSE integration", () => {

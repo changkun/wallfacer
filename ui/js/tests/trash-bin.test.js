@@ -73,7 +73,7 @@ function createElement(tagName = "div", overrides = {}) {
       this._listeners[type].push(handler);
     },
     dispatchEvent(evt) {
-      (this._listeners[evt.type] || []).forEach((handler) => handler(evt));
+      (this._listeners[evt.type] || []).forEach((handler) => { handler(evt); });
     },
     setAttribute(name, value) {
       this.attributes[name] = String(value);

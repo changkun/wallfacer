@@ -91,7 +91,7 @@ function makeMockEventSource(readyState = 1) {
     /** Synchronously dispatch a fake SSE event to all registered listeners. */
     fire(type, data) {
       const event = { data: JSON.stringify(data), lastEventId: "" };
-      (listeners[type] || []).forEach((fn) => fn(event));
+      (listeners[type] || []).forEach((fn) => { fn(event); });
     },
   };
   return source;

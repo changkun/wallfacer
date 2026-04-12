@@ -73,7 +73,7 @@ function makeEl(tag, overrides = {}) {
       listeners[evt].push(fn);
     },
     _fire(evt, data) {
-      (listeners[evt] || []).forEach((fn) => fn(data));
+      (listeners[evt] || []).forEach((fn) => { fn(data); });
     },
     querySelector(sel) {
       return null;

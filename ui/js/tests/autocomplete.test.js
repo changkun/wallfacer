@@ -69,7 +69,7 @@ function makeEl(tag = "DIV") {
       (listeners[type] ||= []).push(fn);
     },
     dispatchEvent: (evt) => {
-      (listeners[evt.type] || []).forEach((fn) => fn(evt));
+      (listeners[evt.type] || []).forEach((fn) => { fn(evt); });
     },
     focus: () => {},
     setSelectionRange: (s, e) => {

@@ -92,7 +92,7 @@ function makeElement(tag, overrides = {}) {
     },
     // For test: fire event listeners.
     _fire(event, evtObj) {
-      (eventListeners[event] || []).forEach((fn) => fn(evtObj || {}));
+      (eventListeners[event] || []).forEach((fn) => { fn(evtObj || {}); });
     },
     _listeners: eventListeners,
     ...overrides,

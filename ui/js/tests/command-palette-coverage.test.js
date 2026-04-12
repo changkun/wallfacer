@@ -68,7 +68,7 @@ function createElement(overrides = {}) {
       this._listeners[type].push(handler);
     },
     dispatchEvent(evt) {
-      (this._listeners[evt.type] || []).forEach((fn) => fn(evt));
+      (this._listeners[evt.type] || []).forEach((fn) => { fn(evt); });
     },
     appendChild(child) {
       child._parent = this;
@@ -114,7 +114,7 @@ function createElement(overrides = {}) {
     set(value = "") {
       const next = String(value).split(/\s+/).filter(Boolean);
       node.classList = makeClassList();
-      next.forEach((cls) => node.classList.add(cls));
+      next.forEach((cls) => { node.classList.add(cls); });
       node.classList._items = new Set(next);
     },
   });

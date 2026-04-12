@@ -104,7 +104,7 @@ function makeContext() {
 }
 
 function fire(events, type, data) {
-  (events[type] || []).forEach((fn) => fn(data));
+  (events[type] || []).forEach((fn) => { fn(data); });
 }
 
 function setupInteraction() {

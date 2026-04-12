@@ -198,7 +198,7 @@ describe("office coordinator", () => {
     // Trigger DOMContentLoaded
     const dcl = eventListeners["document"]?.["DOMContentLoaded"];
     expect(dcl).toBeDefined();
-    dcl.forEach((fn) => fn());
+    dcl.forEach((fn) => { fn(); });
 
     // Toggle button should be visible
     expect(elements["status-bar-office-btn"].classList.contains("hidden")).toBe(
@@ -213,7 +213,7 @@ describe("office coordinator", () => {
   it("showOffice hides board and shows office-container", () => {
     const { windowObj, elements, eventListeners } = makeContext();
     const dcl = eventListeners["document"]?.["DOMContentLoaded"];
-    dcl.forEach((fn) => fn());
+    dcl.forEach((fn) => { fn(); });
 
     windowObj._officeShow();
 
@@ -224,7 +224,7 @@ describe("office coordinator", () => {
   it("hideOffice restores board and hides office-container", () => {
     const { windowObj, elements, eventListeners } = makeContext();
     const dcl = eventListeners["document"]?.["DOMContentLoaded"];
-    dcl.forEach((fn) => fn());
+    dcl.forEach((fn) => { fn(); });
 
     windowObj._officeShow();
     windowObj._officeHide();
@@ -235,7 +235,7 @@ describe("office coordinator", () => {
   it("toggle button click alternates views", () => {
     const { windowObj, elements, eventListeners } = makeContext();
     const dcl = eventListeners["document"]?.["DOMContentLoaded"];
-    dcl.forEach((fn) => fn());
+    dcl.forEach((fn) => { fn(); });
 
     // Show then hide
     windowObj._officeShow();
@@ -248,7 +248,7 @@ describe("office coordinator", () => {
   it("updateLayout changes the renderer layout", () => {
     const { windowObj, eventListeners } = makeContext();
     const dcl = eventListeners["document"]?.["DOMContentLoaded"];
-    dcl.forEach((fn) => fn());
+    dcl.forEach((fn) => { fn(); });
 
     // Should not throw
     windowObj._officeUpdateLayout(10);
