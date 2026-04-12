@@ -521,6 +521,98 @@ func TestCompletionHook_SpecFileNotFound(t *testing.T) {
 	}) // logs warning, no crash
 }
 
+func TestDispatch_ArchivedSpecRejectedWithMessage(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	archivedSpec := strings.Replace(testSpecValidated, "status: validated", "status: archived", 1)
+	writeTestSpec(t, ws, "specs/local/archived.md", archivedSpec)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/archived.md"}, false)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1", len(resp.Errors))
+	}
+	if !strings.Contains(resp.Errors[0].Error, "unarchive") {
+		t.Errorf("error message = %q, should mention unarchive", resp.Errors[0].Error)
+	}
+}
+
+func TestDispatch_ArchivedDependencyTreatedAsSatisfied(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+
+	archivedDep := strings.Replace(testSpecValidated, "status: validated", "status: archived", 1)
+	writeTestSpec(t, ws, "specs/local/archived-dep.md", archivedDep)
+
+	specWithArchivedDep := `---
+title: Spec With Archived Dep
+status: validated
+depends_on:
+  - specs/local/archived-dep.md
+affects: []
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+dispatched_task_id: null
+---
+
+# Spec With Archived Dep
+
+Depends on an archived spec, should still dispatch without blocker edge.
+`
+	writeTestSpec(t, ws, "specs/local/live.md", specWithArchivedDep)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/live.md"}, false)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if len(resp.Dispatched) != 1 {
+		t.Fatalf("dispatched count = %d, want 1", len(resp.Dispatched))
+	}
+
+	// Verify no blocker edge was added for the archived dep.
+	tasks, _ := h.store.ListTasks(context.Background(), false)
+	if len(tasks) != 1 {
+		t.Fatalf("task count = %d, want 1", len(tasks))
+	}
+	if len(tasks[0].DependsOn) != 0 {
+		t.Errorf("archived dep should not contribute blocker edge, got DependsOn = %v", tasks[0].DependsOn)
+	}
+}
+
+func TestDispatch_ArchivedDependencyInBatch(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+
+	archivedSpec := strings.Replace(testSpecValidated, "status: validated", "status: archived", 1)
+	writeTestSpec(t, ws, "specs/local/archived.md", archivedSpec)
+	writeTestSpec(t, ws, "specs/local/valid.md", testSpecValidated)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/archived.md", "specs/local/valid.md"}, false)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if len(resp.Dispatched) != 1 {
+		t.Fatalf("dispatched count = %d, want 1 (valid only)", len(resp.Dispatched))
+	}
+	if resp.Dispatched[0].SpecPath != "specs/local/valid.md" {
+		t.Errorf("dispatched spec = %q, want specs/local/valid.md", resp.Dispatched[0].SpecPath)
+	}
+	if len(resp.Errors) != 1 {
+		t.Fatalf("errors count = %d, want 1 (archived rejected)", len(resp.Errors))
+	}
+	if resp.Errors[0].SpecPath != "specs/local/archived.md" {
+		t.Errorf("error spec = %q, want specs/local/archived.md", resp.Errors[0].SpecPath)
+	}
+	if !strings.Contains(resp.Errors[0].Error, "unarchive") {
+		t.Errorf("error message = %q, should mention unarchive", resp.Errors[0].Error)
+	}
+}
+
 func TestCompletionHook_AlreadyComplete(t *testing.T) {
 	_, ws := newDispatchTestHandler(t)
 	completeSpec := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)

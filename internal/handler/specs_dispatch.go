@@ -83,7 +83,11 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if s.Status != spec.StatusValidated {
-			errs = append(errs, dispatchError{relPath, fmt.Sprintf("spec status is %q, must be %q", s.Status, spec.StatusValidated)})
+			msg := fmt.Sprintf("spec status is %q, must be %q", s.Status, spec.StatusValidated)
+			if s.Status == spec.StatusArchived {
+				msg = fmt.Sprintf("spec status is %q — unarchive the spec first before dispatching", s.Status)
+			}
+			errs = append(errs, dispatchError{relPath, msg})
 			continue
 		}
 
@@ -136,6 +140,11 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			}
 			depSpec, err := spec.ParseFile(depAbsPath)
 			if err != nil {
+				continue
+			}
+			// Archived dependencies are considered already satisfied — they
+			// contribute no blocker edge to the resulting kanban task.
+			if depSpec.Status == spec.StatusArchived {
 				continue
 			}
 			if depSpec.DispatchedTaskID != nil {
