@@ -1,6 +1,6 @@
 ---
 title: OAuth Token Setup
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/oauth/
@@ -10,10 +10,11 @@ affects:
   - ui/js/envconfig.js
 effort: large
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # OAuth Token Setup
 

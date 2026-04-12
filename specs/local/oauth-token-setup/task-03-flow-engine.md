@@ -1,16 +1,17 @@
 ---
 title: OAuth Flow Engine and Provider Configs
-status: complete
+status: archived
 depends_on:
   - specs/local/oauth-token-setup/task-01-pkce-utilities.md
   - specs/local/oauth-token-setup/task-02-callback-server.md
 affects: []
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 3: OAuth Flow Engine and Provider Configs
 

@@ -1,15 +1,16 @@
 ---
 title: Auth HTTP Handlers and Route Registration
-status: complete
+status: archived
 depends_on:
   - specs/local/oauth-token-setup/task-03-flow-engine.md
 affects: []
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 4: Auth HTTP Handlers and Route Registration
 
