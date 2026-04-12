@@ -14,29 +14,30 @@
 
   // Fallback: if BroadcastChannel is unsupported, every tab is its own leader.
   if (typeof BroadcastChannel === "undefined") {
-    window._sseIsLeader = function () {
-      return true;
-    };
-    window._sseRelay = function () {};
-    window._sseOnFollowerEvent = function () {};
+    window._sseIsLeader = () => true;
+    window._sseRelay = () => {};
+    window._sseOnFollowerEvent = () => {};
     return;
   }
 
-  var ELECTION_MS = 250;
-  var channel = new BroadcastChannel("wallfacer-sse-relay");
-  var isLeader = false;
-  var electionDone = false;
-  var electionTimer = null;
+  const ELECTION_MS = 250;
+  const channel = new BroadcastChannel("wallfacer-sse-relay");
+  let isLeader = false;
+  let electionDone = false;
+  let electionTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Follower event handlers, keyed by event name.
-  var followerHandlers = {};
+  const followerHandlers: Record<
+    string,
+    (data: unknown, lastEventId: string | null) => void
+  > = {};
 
   // --- Election ---
 
-  function runElection() {
+  function runElection(): void {
     electionDone = false;
     channel.postMessage({ type: "who-is-leader" });
-    electionTimer = setTimeout(function () {
+    electionTimer = setTimeout(() => {
       if (!electionDone) {
         isLeader = true;
         electionDone = true;
@@ -48,8 +49,8 @@
     }, ELECTION_MS);
   }
 
-  channel.onmessage = function (e) {
-    var msg = e.data;
+  channel.onmessage = (e: MessageEvent) => {
+    const msg = e.data;
     if (!msg || !msg.type) return;
 
     switch (msg.type) {
@@ -81,14 +82,14 @@
       // Relayed SSE events from the leader tab.
       case "sse":
         if (!isLeader) {
-          var handler = followerHandlers[msg.event];
+          const handler = followerHandlers[msg.event];
           if (handler) handler(msg.data, msg.lastEventId);
         }
         break;
     }
   };
 
-  window.addEventListener("beforeunload", function () {
+  window.addEventListener("beforeunload", () => {
     if (isLeader) {
       channel.postMessage({ type: "leader-leaving" });
     }
@@ -98,15 +99,13 @@
   // --- Public API ---
 
   /** Returns true if this tab should open real SSE connections. */
-  window._sseIsLeader = function () {
-    return isLeader;
-  };
+  window._sseIsLeader = () => isLeader;
 
   /**
    * Relay an SSE event to follower tabs. Called by the leader after processing
    * an event locally.
    */
-  window._sseRelay = function (eventName, data, lastEventId) {
+  window._sseRelay = (eventName, data, lastEventId) => {
     if (!isLeader) return;
     channel.postMessage({
       type: "sse",
@@ -116,10 +115,8 @@
     });
   };
 
-  /**
-   * Register a handler for a relayed SSE event type on follower tabs.
-   */
-  window._sseOnFollowerEvent = function (eventName, handler) {
+  /** Register a handler for a relayed SSE event type on follower tabs. */
+  window._sseOnFollowerEvent = (eventName, handler) => {
     followerHandlers[eventName] = handler;
   };
 

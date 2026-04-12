@@ -92,8 +92,8 @@ function createContextNoBroadcast() {
 }
 
 function loadTabLeader(ctx) {
-  const code = readFileSync(join(jsDir, "tab-leader.js"), "utf8");
-  vm.runInContext(code, ctx, { filename: join(jsDir, "tab-leader.js") });
+  const code = readFileSync(join(jsDir, "build/tab-leader.js"), "utf8");
+  vm.runInContext(code, ctx, { filename: join(jsDir, "build/tab-leader.js") });
 }
 
 /** Flush all pending (non-cleared) timers synchronously. */

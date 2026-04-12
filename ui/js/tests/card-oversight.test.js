@@ -205,7 +205,7 @@ function makeRenderContext({ fetchImpl } = {}) {
   });
 
   loadScript("state.js", ctx);
-  loadScript("oversight-shared.js", ctx);
+  loadScript("build/oversight-shared.js", ctx);
   loadScript("render.js", ctx);
 
   return { ctx, cardEl, detailsEl, bodyEl, summaryEl };
@@ -229,7 +229,7 @@ describe("buildPhaseListHTML", () => {
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;"),
     });
-    loadScript("oversight-shared.js", ctx);
+    loadScript("build/oversight-shared.js", ctx);
   });
 
   it("returns oversight-empty div for null phases", () => {

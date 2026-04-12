@@ -47,7 +47,7 @@ function makeFlameContext(fetchImpl) {
     return ctx._modalState.taskId;
   };
 
-  loadScript("time-map.js", ctx);
+  loadScript("build/time-map.js", ctx);
   loadScript("modal-flamegraph.js", ctx);
   return { ctx, container };
 }
@@ -315,7 +315,7 @@ describe("loadFlamegraph", () => {
       window: {},
     });
     ctx.window = ctx;
-    loadScript("time-map.js", ctx);
+    loadScript("build/time-map.js", ctx);
     loadScript("modal-flamegraph.js", ctx);
 
     // Should not throw

@@ -63,4 +63,58 @@ declare global {
     modalId: string,
     opts?: { onOpen?: () => void; onClose?: () => void },
   ): { open: () => void; close: () => void };
+
+  // --- ui/js/time-map.ts ---
+  function buildTimeMap(
+    spans: Array<{ startMs: number; endMs: number }> | null | undefined,
+    globalStartMs: number,
+    globalEndMs: number,
+  ): {
+    toPercent: (ms: number) => number;
+    fromPercent: (pct: number) => number;
+    segments: Array<{
+      start: number;
+      end: number;
+      isGap: boolean;
+      visualWeight?: number;
+      visualStart?: number;
+      visualEnd?: number;
+      compressed?: boolean;
+    }>;
+    compressed: boolean;
+    totalVisual?: number;
+  };
+
+  // --- ui/js/oversight-shared.ts ---
+  function buildPhaseListHTML(
+    phases:
+      | Array<{
+          title?: string;
+          timestamp?: string;
+          summary?: string;
+          tools_used?: string[];
+          commands?: string[];
+          actions?: string[];
+        }>
+      | null
+      | undefined,
+  ): string;
+
+  // --- ui/js/tab-leader.ts ---
+  // Defined in api.js (still JavaScript); tab-leader's election step
+  // checks `typeof restartActiveStreams === "function"` before calling.
+  function restartActiveStreams(): void;
+
+  interface Window {
+    _sseIsLeader: () => boolean;
+    _sseRelay: (
+      eventName: string,
+      data: unknown,
+      lastEventId?: string | null,
+    ) => void;
+    _sseOnFollowerEvent: (
+      eventName: string,
+      handler: (data: unknown, lastEventId: string | null) => void,
+    ) => void;
+  }
 }

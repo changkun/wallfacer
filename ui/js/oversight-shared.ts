@@ -3,32 +3,38 @@
 // objects.  It is used by both the full oversight modal (modal-oversight.js)
 // and the collapsible card accordion (render.js) so that the rendering logic
 // lives in exactly one place.
-function buildPhaseListHTML(phases) {
+
+interface OversightPhase {
+  title?: string;
+  timestamp?: string;
+  summary?: string;
+  tools_used?: string[];
+  commands?: string[];
+  actions?: string[];
+}
+
+function buildPhaseListHTML(
+  phases: OversightPhase[] | null | undefined,
+): string {
   if (!phases || phases.length === 0) {
     return '<div class="oversight-empty">No phases recorded.</div>';
   }
   return phases
-    .map(function (phase, i) {
-      var ts = phase.timestamp
+    .map((phase, i) => {
+      const ts = phase.timestamp
         ? new Date(phase.timestamp).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })
         : "";
-      var tools = (phase.tools_used || [])
-        .map(function (t) {
-          return '<span class="oversight-tool">' + escapeHtml(t) + "</span>";
-        })
+      const tools = (phase.tools_used || [])
+        .map((t) => '<span class="oversight-tool">' + escapeHtml(t) + "</span>")
         .join("");
-      var commands = (phase.commands || [])
-        .map(function (c) {
-          return '<li class="oversight-command">' + escapeHtml(c) + "</li>";
-        })
+      const commands = (phase.commands || [])
+        .map((c) => '<li class="oversight-command">' + escapeHtml(c) + "</li>")
         .join("");
-      var actions = (phase.actions || [])
-        .map(function (a) {
-          return '<li class="oversight-action">' + escapeHtml(a) + "</li>";
-        })
+      const actions = (phase.actions || [])
+        .map((a) => '<li class="oversight-action">' + escapeHtml(a) + "</li>")
         .join("");
       return (
         '<div class="oversight-phase">' +

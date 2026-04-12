@@ -37,7 +37,7 @@ function makeOversightContext() {
   });
   // oversight-shared.js must be loaded first because modal-oversight.js
   // delegates to buildPhaseListHTML defined there.
-  loadScript("oversight-shared.js", ctx);
+  loadScript("build/oversight-shared.js", ctx);
   loadScript("modal-oversight.js", ctx);
   return ctx;
 }
@@ -251,7 +251,7 @@ describe("renderOversightInLogs", () => {
       },
       ...overrides,
     });
-    loadScript("oversight-shared.js", ctx);
+    loadScript("build/oversight-shared.js", ctx);
     loadScript("modal-oversight.js", ctx);
     return { ctx, logsEl };
   }
@@ -340,7 +340,7 @@ describe("renderTestOversightInTestLogs", () => {
       },
       ...overrides,
     });
-    loadScript("oversight-shared.js", ctx);
+    loadScript("build/oversight-shared.js", ctx);
     loadScript("modal-oversight.js", ctx);
     return { ctx, logsEl };
   }
