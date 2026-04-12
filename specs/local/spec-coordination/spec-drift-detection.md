@@ -6,7 +6,6 @@ depends_on:
 affects:
   - internal/runner/drift.go
   - internal/store/
-  - internal/spec/
   - internal/handler/explorer.go
   - internal/handler/specs.go
   - ui/js/spec-explorer.js
@@ -24,6 +23,16 @@ Depends on the lifecycle model in [spec-document-model.md](spec-document-model.m
 
 ---
 
+## Current State
+
+The following infrastructure is already in place and does not need to change:
+
+- **`internal/spec/write.go`** — `UpdateFrontmatter()` atomically writes YAML frontmatter fields (status, updated, arbitrary keys) back to spec files. Shared with the dispatch workflow.
+- **Archive exemptions in `internal/spec/`** — `impact.go`, `progress.go`, and `validate.go` all skip `StatusArchived` specs. They are invisible to the live dependency graph, contribute 0 to progress counts, and are exempt from validation rules. The drift subsystem builds on the same invariant.
+- **Task completion hook** — `SpecCompletionHook` (in `internal/handler/specs_dispatch.go`) is registered as `store.OnDone` at server startup (`internal/cli/server.go`). When a dispatched task reaches `done`, the hook fires in a background goroutine and calls `UpdateFrontmatter()` to set the spec's status to `complete`. The post-task drift check (§1 below) must be inserted **before** that write so it can set `stale` instead of `complete` for significantly drifted specs.
+
+---
+
 ## What is Drift?
 
 Drift occurs when the actual state of the codebase no longer matches what a spec describes.
@@ -36,11 +45,33 @@ Drift occurs when the actual state of the codebase no longer matches what a spec
 
 ---
 
+## Archived Specs Are Fully Excluded
+
+**Archived specs (`status: archived`) are invisible to the drift subsystem in every channel.** This is both a policy decision and an invariant already enforced by the existing `internal/spec/` infrastructure:
+
+- `impact.go` returns nil edges for archived specs in both directions — they neither propagate drift to dependents nor receive staleness warnings from dependencies
+- `progress.go` returns 0/0 for archived specs and masks entire archived subtrees
+- `validate.go` exempts archived specs from most rules, including stale-propagation checks
+
+The drift detection code must apply the same filter consistently across all four detection channels:
+
+| Channel | Rule |
+|---------|------|
+| Post-task drift check (§1) | Skip if spec status is `archived`; archived specs cannot be dispatched so this is a defensive guard |
+| Upward propagation (§2) | Stop propagation at any ancestor whose status is `archived`; do not flag archived ancestors |
+| Cross-tree staleness (§3) | Exclude archived specs from the periodic scan — do not check their `affects` files or emit badges |
+| DAG forward propagation (§4) | Archived specs emit no forward drift warnings; `impact.go`'s adjacency function already omits their edges |
+
+---
+
 ## Detection Mechanisms
 
 ### 1. Post-task drift check (automatic)
 
-Triggered by the dispatch workflow's task completion hook (see [dispatch-workflow.md](spec-planning-ux/dispatch-workflow.md), layer 2). When a dispatched leaf spec's task reaches `done`, the server-side hook sets the spec to `done` (not `complete`) and records the commit range. Then drift assessment runs:
+Triggered by the task completion hook in `internal/handler/specs_dispatch.go`
+(`SpecCompletionHook`). When a dispatched leaf spec's task reaches `done`, the hook
+currently writes `status: complete` immediately. The drift check must be inserted
+**before** that write so it can conditionally set `stale` instead.
 
 **File-level drift** (deterministic, server-side):
 - Extract the file list from the spec's `affects` field
@@ -49,14 +80,14 @@ Triggered by the dispatch workflow's task completion hook (see [dispatch-workflo
 
 **Semantic drift** (non-deterministic, agent-assisted):
 - For each acceptance criterion in the spec body, classify as satisfied, diverged, not implemented, or superseded
-- Compute drift level: minimal (>90% satisfied), moderate (70-90%), significant (<70%)
+- Compute drift level: minimal (>90% satisfied), moderate (70–90%), significant (<70%)
 
 Based on drift level:
-- **Minimal** → spec transitions `done` → `complete`
-- **Moderate** → spec transitions to `complete`, drift report propagated to parents and dependents (section 2 and 3 below)
-- **Significant** → spec transitions to `stale`, re-enters the iteration loop: `/wf-spec-refine` → `/wf-spec-dispatch` for a follow-up task
+- **Minimal** → spec transitions to `complete` (existing hook behaviour, unchanged)
+- **Moderate** → spec transitions to `complete`, drift report propagated to parents and dependents (§2 and §3)
+- **Significant** → spec transitions to `stale` instead of `complete`, re-enters the iteration loop: `/wf-spec-refine` → `/wf-spec-dispatch` for a follow-up task
 
-Produces a **drift report** stored as an `## Outcome` section on the spec. The report feeds into upward propagation and cross-tree staleness checks.
+Produces a **drift report** appended as an `## Outcome` section on the spec file. The report feeds into upward propagation and cross-tree staleness checks.
 
 ```
 Drift Report — refactor-runner.md
@@ -69,26 +100,25 @@ Drift Report — refactor-runner.md
 
 ### 2. Upward propagation (children → parent)
 
-When leaves in a non-leaf spec's subtree complete with moderate or significant drift, the system flags ancestors as candidates for review. Drift propagates upward through all levels — if a deeply nested leaf drifts, every ancestor up to the root is a candidate.
+When leaves in a non-leaf spec's subtree complete with moderate or significant drift,
+the system flags non-archived ancestors as candidates for review. Propagation stops at
+any ancestor whose status is `archived`.
 
 Recursive aggregation rules:
-- If any leaf in a spec's subtree has `status: stale` (significant drift), the parent gets a **"drift: review required"** indicator
-- If 2+ leaves have moderate drift reports, the parent gets a **"drift: review suggested"** indicator
-- These indicators bubble up through every non-leaf ancestor
+- If any leaf in a spec's subtree has `status: stale` (significant drift), the nearest non-archived ancestor gets a **"drift: review required"** indicator
+- If 2+ leaves have moderate drift reports, the nearest non-archived ancestor gets a **"drift: review suggested"** indicator
+- These indicators bubble up through every non-archived ancestor
 
-The parent spec's design may no longer match what its children implemented. For example, a parent describes a two-method interface, but leaf implementations needed five methods. The parent should be refined to document the actual design.
-
-**Iteration at the parent level**: When a non-leaf spec accumulates enough child drift, the user runs `/wf-spec-refine` on the parent to update its design description. This doesn't require re-dispatching — the parent is a design document, not an implementation task. The refinement clears the drift indicators by advancing the parent's `updated` timestamp and updating its content to match reality.
+**Iteration at the parent level**: when a non-leaf spec accumulates enough child drift, the user runs `/wf-spec-refine` on the parent to update its design description. The refinement clears the drift indicators by advancing the parent's `updated` timestamp.
 
 ### 3. Cross-tree staleness (periodic)
 
-A background check (triggered on workspace load or manually) scans `complete` specs:
+A background check (triggered on workspace load or manually) scans `complete` specs,
+**skipping archived specs entirely**:
 
-- For each spec, check if the files in its `affects` field have been modified since `updated`
+- For each non-archived `complete` spec, check if the files in its `affects` field have been modified since `updated`
 - If changes are detected (via `git log --since`), flag as a staleness candidate
 - Surface in the spec explorer with a stale badge
-
-**Archived specs are exempt.** The periodic scan, post-task drift check, upward propagation, and DAG forward propagation all skip archived specs (see [spec-archival.md](spec-archival.md)). Archival is an explicit "stop surfacing this" signal — the drift subsystem treats archived specs as outside the live graph in every channel.
 
 ---
 
@@ -98,7 +128,7 @@ Drift propagates through two channels:
 
 ### Through the filesystem tree (upward)
 
-Leaf drift bubbles up to ancestors:
+Leaf drift bubbles up to non-archived ancestors:
 
 ```
 sandbox-backends.md          ← flagged: 2 leaves in subtree drifted
@@ -111,25 +141,26 @@ sandbox-backends.md          ← flagged: 2 leaves in subtree drifted
 
 ### Along the dependency DAG (forward)
 
-Drift on a completed dependency warns specs that depend on it:
+Drift on a completed dependency warns non-archived specs that depend on it:
 
 ```
 sandbox-backends/update-registry.md (complete, drift detected)
   │
   │ depends_on edge (can cross any boundary)
   ▼
-cloud/container-reuse.md (validated)
+cloud/container-reuse.md (validated, not archived)
   → "upstream drift" banner: "update-registry changed, review before proceeding"
 ```
 
 ### Rules
 
-- **Tree propagation**: upward only — leaf drift flags all non-leaf ancestors
-- **DAG propagation**: forward only — completed spec with drift warns all specs that `depends_on` it, regardless of filesystem position
+- **Tree propagation**: upward only — leaf drift flags all non-archived non-leaf ancestors
+- **DAG propagation**: forward only — a completed spec with drift warns all non-archived specs that `depends_on` it, regardless of filesystem position
+- **Archived specs are not in the live graph** in either channel; `impact.go`'s adjacency function already enforces this for the DAG — the tree propagation code must mirror it
 - Warnings are advisory — they appear in the spec explorer but do not block dispatch
 - A human acknowledges drift by updating the affected spec (warning clears, `updated` advances)
-- **Significant drift blocks completion**: a spec with significant drift transitions to `stale`, not `complete`. It must be refined and optionally re-dispatched before it can reach `complete`. This prevents the spec tree from accumulating "complete" specs that don't match reality.
-- **The iteration loop is the normal path**: most specs will go through at least one dispatch → drift → refine cycle. The system should make this loop lightweight, not penalize it.
+- **Significant drift blocks completion**: a spec with significant drift transitions to `stale`, not `complete`. It must be refined and optionally re-dispatched before reaching `complete`.
+- **The iteration loop is the normal path**: most specs will go through at least one dispatch → drift → refine cycle.
 
 ---
 
@@ -144,9 +175,9 @@ affects:
   - internal/runner/container.go
 ```
 
-This serves as the edge for targeted drift checks: when a task modifies files listed in another spec's `affects`, that spec is a candidate for staleness review.
+This serves as the edge for targeted drift checks: when a task modifies files listed in another spec's `affects`, that spec is a candidate for staleness review. Archived specs' `affects` fields are not checked.
 
-**Bootstrap:** At current scale (~20 specs), populate manually. As spec count grows, the agent can propose `affects` values during spec creation and validate against actual diffs.
+**Bootstrap:** At current scale, populate manually. As spec count grows, the agent can propose `affects` values during spec creation and validate against actual diffs.
 
 ---
 
@@ -160,11 +191,12 @@ specs/
   ✅ storage-backends.md
   ✔ container-reuse.md           ⚠ upstream drift (sandbox-backends)
   📝 k8s-sandbox.md
+  🗄 archived-spec.md            (no badge — archived)
 ```
 
-Status icons: ✅ complete, ⏳ in-progress children, ✔ validated, 📝 drafted, 💭 vague, ⚠ stale
+Status icons: ✅ complete, ⏳ in-progress children, ✔ validated, 📝 drafted, 💭 vague, ⚠ stale. The ⚠ icon is already defined in `ui/js/spec-explorer.js` (line 27, mapped to `stale`); drift badges reuse the same visual treatment. Archived specs receive no drift or staleness badge regardless of `affects` file changes.
 
-In the spec detail view, drift warnings appear inline:
+In the spec detail view, drift warnings appear inline for non-archived specs:
 
 ```
 ⚠ This spec may be stale. sandbox-backends.md (which this spec depends on)
@@ -192,22 +224,22 @@ Three approaches for semantic drift assessment:
 
 | File | Change |
 |---|---|
-| `internal/runner/drift.go` (new) | `CheckTaskDrift(taskID)` — file-level drift: compare spec `affects` vs actual `git diff` |
-| `internal/store/` | `SaveDriftReport(taskID, report)` / `GetDriftReport(taskID)` — persist drift reports |
-| `internal/spec/` | `UpdateFrontmatter()` — write `status`, `updated`, drift metadata back to spec files (shared with dispatch-workflow) |
-| `internal/handler/explorer.go` | Surface drift badges in spec tree view, propagate indicators to ancestors |
+| `internal/runner/drift.go` (new) | `CheckTaskDrift(taskID, spec)` — file-level drift: compare spec `affects` vs actual `git diff`; returns `DriftReport` |
+| `internal/store/` | `SaveDriftReport(taskID, report)` / `GetDriftReport(taskID)` — persist drift reports alongside task data |
+| `internal/handler/specs_dispatch.go` | Extend `SpecCompletionHook` to call `CheckTaskDrift` before writing status; write `stale` instead of `complete` on significant drift; skip archived specs |
 | `internal/handler/specs.go` | Drift report API: `GET /api/specs/{path}/drift` — return drift report for a spec |
-| `ui/js/spec-explorer.js` | Render drift indicators (warning badge, "review suggested" / "review required") |
-| `ui/js/spec-mode.js` | Inline drift warning in focused view with "Refine" and "Accept" actions |
+| `internal/handler/explorer.go` | Surface drift badges in spec tree response; propagate indicators to non-archived ancestors only |
+| `ui/js/spec-explorer.js` | Render drift indicators (warning badge, "review suggested" / "review required") using existing `stale` icon; suppress for archived specs |
+| `ui/js/spec-mode.js` | Inline drift warning in focused view with "Refine" and "Accept" actions; no badge for archived specs |
 
-### Hooks into dispatch-workflow
+### Hook integration point
 
-This spec's detection mechanisms are triggered by the dispatch-workflow's task completion hook:
+Drift is inserted into `SpecCompletionHook` in `internal/handler/specs_dispatch.go`,
+which is called by `store.OnDone` as a background goroutine when a task reaches `done`:
 
-1. **Layer 1** (dispatch-workflow item 5) sets `status: done` and records commit range
-2. **File-level drift** (this spec, section 1) runs immediately after layer 1 — deterministic, server-side
-3. **Semantic drift** (this spec, section 1) runs as a follow-up agent task — non-deterministic
-4. **Propagation** (this spec, sections 2-3) runs after the drift report is stored
-5. **Status transition** happens after drift assessment: `done` → `complete` or `done` → `stale`
+1. **File-level drift check** (`internal/runner/drift.go`) runs first — deterministic, server-side
+2. **Semantic drift** runs as a follow-up agent task — non-deterministic
+3. **Propagation** (upward tree + forward DAG) runs after the drift report is stored; archived specs are skipped at every step
+4. **Status transition** happens last: `complete` (minimal/moderate drift) or `stale` (significant drift)
 
-The `/diff` and `/wf-spec-diff` commands provide manual access to the same drift assessment for cases where the automatic hook isn't available or the user wants to re-run it.
+The `/wf-spec-diff` command provides manual access to the same drift assessment for cases where the automatic hook isn't available or the user wants to re-run it.
