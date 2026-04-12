@@ -238,7 +238,7 @@ describe("events.js", () => {
       loadScript(ctx);
       const handler = getDocListener(ctx, "keydown", 1);
       handler(makeShortcutEvent("p"));
-      expect(ctx.switchMode).toHaveBeenCalledWith("spec");
+      expect(ctx.switchMode).toHaveBeenCalledWith("spec", { persist: true });
     });
 
     it("reverses to board on 'p' from plan (spec) mode", () => {
@@ -248,7 +248,7 @@ describe("events.js", () => {
       loadScript(ctx);
       const handler = getDocListener(ctx, "keydown", 1);
       handler(makeShortcutEvent("p"));
-      expect(ctx.switchMode).toHaveBeenCalledWith("board");
+      expect(ctx.switchMode).toHaveBeenCalledWith("board", { persist: true });
     });
 
     it("does not switch mode on 's' (binding removed)", () => {

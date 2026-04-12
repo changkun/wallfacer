@@ -185,6 +185,12 @@ function _handleTasksSnapshot(data, lastEventId) {
     }
     scheduleRender();
     notifyTaskChangeListeners();
+    // Resolve the initial mode from saved preference + task count + the
+    // workspaceIsNew flag before the hash handler runs. Hash deep-links
+    // (#plan/<path>) still win because they call switchMode afterwards.
+    if (typeof resolveInitialMode === "function") {
+      resolveInitialMode(tasks.length);
+    }
     _handleInitialHash();
   } catch (err) {
     console.error("tasks SSE snapshot parse error:", err);

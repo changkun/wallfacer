@@ -1078,6 +1078,12 @@ async function applyWorkspaceSelection() {
     });
     activeWorkspaces = workspaceSelectionDraft.slice();
     workspacePickerRequired = activeWorkspaces.length === 0;
+    // Mark the newly activated workspace group as "fresh" so the next
+    // resolveInitialMode call forces Plan mode regardless of saved
+    // preference or task count.
+    if (typeof markWorkspaceIsNew === "function") {
+      markWorkspaceIsNew();
+    }
     await fetchConfig();
     hideHeaderWorkspaceGroups();
     if (status) status.textContent = "Saved.";

@@ -646,6 +646,13 @@ var PlanningChat = (function () {
     _input.style.height = "auto";
     if (_slashAutocomplete) _slashAutocomplete.close();
 
+    // Sending a chat message is a substantive action — drop the
+    // new-workspace bias so subsequent auto-resolutions honour saved
+    // preferences and task counts again.
+    if (typeof clearWorkspaceIsNew === "function") {
+      clearWorkspaceIsNew();
+    }
+
     // Render user message immediately only when sending to the active
     // thread (otherwise the bubble would appear in the wrong history).
     if (threadID === _activeThreadId) {

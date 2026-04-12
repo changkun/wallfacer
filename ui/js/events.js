@@ -69,7 +69,9 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "?") openKeyboardShortcuts();
   if (e.key === "e") toggleExplorer();
   if (e.key === "p")
-    switchMode(getCurrentMode() === "board" ? "spec" : "board");
+    switchMode(getCurrentMode() === "board" ? "spec" : "board", {
+      persist: true,
+    });
   // Spec-mode-only shortcuts.
   if (getCurrentMode() === "spec") {
     if (e.key === "c") toggleSpecChat();

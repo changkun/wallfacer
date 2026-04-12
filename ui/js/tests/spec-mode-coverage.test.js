@@ -972,7 +972,7 @@ describe("DOMContentLoaded handler", () => {
   });
 
   it("applies non-board mode on DOMContentLoaded", () => {
-    const storage = new Map([["wallfacer-mode", "spec"]]);
+    const storage = new Map([["wallfacer-mode", "plan"]]);
     const ctx = makeContext({ storage });
     const addEventCalls = ctx.document.addEventListener.mock.calls;
     const domReady = addEventCalls.find((c) => c[0] === "DOMContentLoaded");
@@ -1089,10 +1089,19 @@ describe("mode restoration from localStorage", () => {
     expect(ctx.getCurrentMode()).toBe("board");
   });
 
-  it("restores docs mode from localStorage", () => {
+  it("ignores legacy 'docs' and falls back to board", () => {
+    // Docs is not a persisted mode under the default-mode-resolution spec —
+    // only "board" and "plan" are valid saved values. Everything else
+    // (legacy "docs", "spec", stray strings) falls through to "board".
     const storage = new Map([["wallfacer-mode", "docs"]]);
     const ctx = makeContext({ storage });
-    expect(ctx.getCurrentMode()).toBe("docs");
+    expect(ctx.getCurrentMode()).toBe("board");
+  });
+
+  it("restores spec (internal) mode from a 'plan' saved preference", () => {
+    const storage = new Map([["wallfacer-mode", "plan"]]);
+    const ctx = makeContext({ storage });
+    expect(ctx.getCurrentMode()).toBe("spec");
   });
 });
 

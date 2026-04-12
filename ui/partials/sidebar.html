@@ -78,7 +78,7 @@
       type="button"
       id="sidebar-nav-board"
       class="sidebar-nav active"
-      onclick="switchMode('board')"
+      onclick="switchMode('board', { persist: true })"
       title="Kanban"
     >
       <svg
@@ -102,7 +102,7 @@
       type="button"
       id="sidebar-nav-spec"
       class="sidebar-nav"
-      onclick="switchMode('spec')"
+      onclick="switchMode('spec', { persist: true })"
       title="Plan"
     >
       <svg

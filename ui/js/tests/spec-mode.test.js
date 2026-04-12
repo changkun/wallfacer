@@ -123,9 +123,11 @@ describe("spec-mode", () => {
     expect(ctx.getCurrentMode()).toBe("board");
   });
 
-  it("setCurrentMode persists to localStorage", () => {
+  it("setCurrentMode updates the internal variable without writing localStorage", () => {
     ctx.setCurrentMode("spec");
-    expect(ctx.storage.get("wallfacer-mode")).toBe("spec");
+    // setCurrentMode is now a pure state setter; the saved preference is
+    // only written via explicit switchMode(..., { persist: true }) calls.
+    expect(ctx.storage.has("wallfacer-mode")).toBe(false);
     expect(ctx.getCurrentMode()).toBe("spec");
   });
 
@@ -160,9 +162,14 @@ describe("spec-mode", () => {
     expect(ctx.getCurrentMode()).toBe("board");
   });
 
-  it("switchMode persists mode", () => {
+  it("switchMode persists only when opts.persist is true", () => {
     ctx.switchMode("spec");
-    expect(ctx.storage.get("wallfacer-mode")).toBe("spec");
+    expect(ctx.storage.has("wallfacer-mode")).toBe(false);
+    ctx.switchMode("board", { persist: true });
+    expect(ctx.storage.get("wallfacer-mode")).toBe("board");
+    ctx.switchMode("spec", { persist: true });
+    // Internal mode "spec" is saved under the user-facing alias "plan".
+    expect(ctx.storage.get("wallfacer-mode")).toBe("plan");
   });
 
   it("sets _highlightTaskId when switching from spec to board with dispatched spec", () => {
@@ -185,10 +192,10 @@ describe("spec-mode", () => {
     expect(ctx._highlightTaskId).toBe(null);
   });
 
-  it("restores spec mode from localStorage", () => {
-    // Create a new context with spec mode pre-set in storage.
+  it("restores spec mode from a saved 'plan' preference", () => {
+    // Create a new context with the user-facing "plan" label pre-set.
     const dom = makeDom();
-    const storage = new Map([["wallfacer-mode", "spec"]]);
+    const storage = new Map([["wallfacer-mode", "plan"]]);
     const ctx2 = {
       document: dom,
       localStorage: {

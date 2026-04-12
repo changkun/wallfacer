@@ -14,7 +14,9 @@ A spec describes a piece of work at the design level. Unlike a task prompt (whic
 
 ### Spec Mode
 
-Press **P** to toggle between the Board view and the Plan view. Plan mode uses a three-pane layout:
+Press **P** to toggle between the Board view and the Plan view. Wallfacer remembers your last explicit choice — sidebar click or keyboard shortcut — and reopens in that mode on the next launch; if you have not picked one, it defaults to Board when the task board has any cards and to Plan when it is empty. Activating a fresh workspace group always opens in Plan, regardless of saved preference.
+
+Plan mode uses a three-pane layout:
 
 - **Left pane** -- spec explorer (file tree)
 - **Center pane** -- focused spec view (rendered content)

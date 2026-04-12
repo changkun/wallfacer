@@ -298,6 +298,12 @@ async function createTask() {
     }
     localStorage.removeItem("wallfacer-new-task-draft");
     hideNewTaskForm();
+    // Creating a task is a substantive action — drop the new-workspace
+    // bias so subsequent workspace-wide auto-resolutions respect saved
+    // preferences and task counts again.
+    if (typeof clearWorkspaceIsNew === "function") {
+      clearWorkspaceIsNew();
+    }
     if (newTask && newTask.id) {
       waitForTaskDelta(newTask.id).then(function () {
         return waitForTaskTitle(newTask.id);

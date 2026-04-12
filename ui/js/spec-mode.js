@@ -1,10 +1,68 @@
 // --- Spec mode state and switching ---
 
-// currentMode: "board" | "spec" | "docs"
+// Internal mode values: "board" | "spec" | "docs".
+// Saved localStorage values: "board" | "plan" (see _persistSavedMode).
+// "spec" and "plan" refer to the same mode — "spec" is the long-standing
+// internal identifier, "plan" is the user-facing label introduced by the
+// chat-first-mode rename.
 var _validModes = { board: true, spec: true, docs: true };
-var currentMode = _validModes[localStorage.getItem("wallfacer-mode")]
-  ? localStorage.getItem("wallfacer-mode")
+
+// resolveDefaultMode chooses the initial mode at app open. Priority:
+//   1. Brand-new workspace → "plan"
+//   2. Valid saved preference ("board" or "plan") → saved
+//   3. Any task exists → "board"
+//   4. Otherwise → "plan" (chat-first default)
+function resolveDefaultMode(opts) {
+  opts = opts || {};
+  if (opts.workspaceIsNew) return "plan";
+  if (opts.savedMode === "board" || opts.savedMode === "plan")
+    return opts.savedMode;
+  var taskCount = typeof opts.taskCount === "number" ? opts.taskCount : 0;
+  if (taskCount > 0) return "board";
+  return "plan";
+}
+
+function _readSavedMode() {
+  var v =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("wallfacer-mode")
+      : null;
+  return v === "board" || v === "plan" ? v : null;
+}
+
+function _persistSavedMode(internalMode) {
+  // Only "board" and "spec" (saved as "plan") are remembered; other modes
+  // such as "docs" leave the saved preference untouched.
+  if (typeof localStorage === "undefined") return;
+  if (internalMode === "board") {
+    localStorage.setItem("wallfacer-mode", "board");
+  } else if (internalMode === "spec") {
+    localStorage.setItem("wallfacer-mode", "plan");
+  }
+}
+
+function _modeToInternal(publicMode) {
+  return publicMode === "plan" ? "spec" : publicMode;
+}
+
+// Initial currentMode honours any previously-persisted preference; if none
+// is stored the provisional default is "board". The real initial mode is
+// resolved in resolveInitialMode() once the first task snapshot arrives.
+var _initialSavedMode = _readSavedMode();
+var currentMode = _initialSavedMode
+  ? _modeToInternal(_initialSavedMode)
   : "board";
+
+// Session-only flag set when the user activates a new workspace group via
+// PUT /api/workspaces. Causes the next resolveInitialMode call to force
+// "plan" regardless of saved preference or task count. Cleared on the first
+// substantive action (task created, chat message sent, spec focused).
+var _workspaceIsNew = false;
+
+// Guards auto mode resolution. Starts true at boot; flipped to false once
+// resolveInitialMode() has run or once the user explicitly switches. Reset
+// to true when the active workspace group changes.
+var _resolutionPending = true;
 
 function getCurrentMode() {
   return currentMode;
@@ -12,7 +70,36 @@ function getCurrentMode() {
 
 function setCurrentMode(mode) {
   currentMode = mode;
-  localStorage.setItem("wallfacer-mode", mode);
+}
+
+function markWorkspaceIsNew() {
+  _workspaceIsNew = true;
+  _resolutionPending = true;
+}
+
+function clearWorkspaceIsNew() {
+  _workspaceIsNew = false;
+}
+
+// resolveInitialMode is called once after the first task snapshot. It picks
+// the initial mode from saved preference, task count, and the
+// workspaceIsNew flag, then switches without persisting.
+function resolveInitialMode(taskCount) {
+  if (!_resolutionPending) return;
+  _resolutionPending = false;
+  var publicMode = resolveDefaultMode({
+    savedMode: _readSavedMode(),
+    taskCount: taskCount,
+    workspaceIsNew: _workspaceIsNew,
+  });
+  var target = _modeToInternal(publicMode);
+  if (target !== currentMode) {
+    switchMode(target);
+  } else {
+    // Even when already in the right mode, make sure the DOM reflects it
+    // (module-load only set the variable; the DOM was not touched).
+    _applyMode(target);
+  }
 }
 
 // _applyMode updates the DOM to reflect the given mode without checking
@@ -118,9 +205,17 @@ function _restoreSidebarState() {
 var _highlightTaskId = null;
 
 // switchMode toggles between board, spec, and docs modes. Updates sidebar
-// nav active states, swaps main content visibility, and persists the choice.
-function switchMode(mode) {
+// nav active states and swaps main content visibility. The saved
+// preference is only updated when opts.persist is true — reserved for
+// explicit user actions (sidebar nav click, keyboard shortcut).
+function switchMode(mode, opts) {
   if (mode === currentMode) return;
+
+  // An explicit user switch cancels any pending auto-resolution so a later
+  // task snapshot does not override the user's choice.
+  if (opts && opts.persist) {
+    _resolutionPending = false;
+  }
 
   // When leaving spec mode for board mode, capture the dispatched task ID
   // so we can highlight it on the board.
@@ -133,6 +228,9 @@ function switchMode(mode) {
   }
 
   setCurrentMode(mode);
+  if (opts && opts.persist) {
+    _persistSavedMode(mode);
+  }
   _applyMode(mode);
 
   // After switching to board, highlight the task card from the focused spec.
@@ -171,6 +269,9 @@ var _specRefreshTimer = null;
 
 // focusSpec loads and renders a spec file in the focused markdown view.
 function focusSpec(specPath, workspace) {
+  // Focusing a spec is a substantive action — clear the new-workspace
+  // bias so the next auto-resolution respects saved preference + tasks.
+  clearWorkspaceIsNew();
   _focusedSpecPath = specPath;
   _focusedSpecWorkspace = workspace;
   _focusedSpecContent = null; // reset so loading indicator shows
