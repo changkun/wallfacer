@@ -31,6 +31,14 @@ Type in the composer at the bottom of the chat pane. Press **Enter** to send (or
 
 Responses stream in real-time. Assistant text is rendered as markdown with syntax-highlighted code blocks. Tool activity (file reads, command execution, file writes) appears in a collapsible "Agent activity" section below each response.
 
+### Drafting a Spec from Chat (`/spec-new`)
+
+When the planning agent wants to start a new spec, it emits a single `/spec-new <path> [title="..."] [status=...] [effort=...]` directive on its own line, followed by the spec body. The server recognises the directive **only when it is not inside a fenced code block** — the agent can quote the grammar in documentation or examples without triggering a scaffold.
+
+On recognition, the server calls the shared spec scaffolder to create the file with valid YAML frontmatter, then appends the agent's body text after the frontmatter. The path must live under `specs/<track>/<slug>.md`; other locations are rejected with a `system` message in the chat. The agent's raw response (including the directive line itself) still streams to the chat unchanged — the directive is a parallel side-effect, not a stream rewrite.
+
+If the scaffold fails (name collision, invalid path, I/O error), a short "Couldn't create &lt;path&gt;: &lt;reason&gt;" message appears in the chat and the round continues normally. Archive an unwanted spec from the focused view if you want to drop one the agent created over-eagerly.
+
 ### Slash Commands
 
 Type `/` to see an autocomplete menu of built-in commands. Commands cover the full spec lifecycle:

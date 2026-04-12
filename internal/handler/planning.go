@@ -333,6 +333,31 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		// Parse response text and append assistant message (skip errors).
 		if !planner.IsErrorResult(rawStdout) {
 			resultText := planner.ExtractResultText(rawStdout)
+			// Scan the agent's assistant-text blocks for /spec-new
+			// directives. Scaffold each one into the first mounted
+			// workspace so the file is present before commitPlanningRound
+			// runs (and therefore included in the round's git commit).
+			// Scaffold errors surface as `system`-role messages; the
+			// agent's original text still flows through to the assistant
+			// log untouched.
+			dirScanner := &DirectiveScanner{}
+			for _, line := range extractAssistantLines(rawStdout) {
+				dirScanner.ScanLine(line)
+			}
+			directives := dirScanner.Directives()
+			if len(directives) > 0 {
+				workspaces := h.currentWorkspaces()
+				var scaffoldWs string
+				if len(workspaces) > 0 {
+					scaffoldWs = workspaces[0]
+				}
+				now := time.Now().UTC()
+				for _, sysMsg := range processDirectives(
+					scaffoldWs, directives, req.FocusedSpec, now,
+				) {
+					_ = cs.AppendMessage(sysMsg)
+				}
+			}
 			// Commit any spec writes from this round to git so the undo
 			// stack has a distinct commit per round. Best-effort: log and
 			// continue on failure, never block the conversation log. The
