@@ -3,10 +3,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["js/tests/**/*.test.js"],
+    include: ["js/tests/**/*.test.{js,ts}"],
     coverage: {
-      include: ["js/**/*.js"],
-      exclude: ["js/vendor/**", "js/tests/**"],
+      include: ["js/**/*.{js,ts}"],
+      exclude: ["js/vendor/**", "js/tests/**", "js/**/*.d.ts"],
       reporter: ["text"],
       thresholds: {
         statements: 0.5,
