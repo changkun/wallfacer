@@ -1,6 +1,6 @@
 ---
 title: Planning Cost Tracking
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
@@ -160,7 +160,7 @@ override per-request via the period picker in the stats modal.
 | [Merge planning into /api/usage BySubAgent](progress-cost-tracking/usage-planning-merge.md) | planning-usage-store | small | **complete** |
 | [WALLFACER_PLANNING_WINDOW_DAYS config knob](progress-cost-tracking/planning-window-config.md) | — | small | **complete** |
 | [Planning block in modal-stats.js](progress-cost-tracking/modal-stats-planning-block.md) | stats-planning-section, planning-window-config | medium | **complete** |
-| [Planning tile in usage-stats.js](progress-cost-tracking/usage-stats-planning-tile.md) | usage-planning-merge, planning-window-config | small | validated |
+| [Planning tile in usage-stats.js](progress-cost-tracking/usage-stats-planning-tile.md) | usage-planning-merge, planning-window-config | small | **complete** |
 
 ```mermaid
 graph LR

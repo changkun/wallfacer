@@ -1,6 +1,6 @@
 ---
 title: Planning Tile in usage-stats.js
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/progress-cost-tracking/usage-planning-merge.md
   - specs/local/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-window-config.md
