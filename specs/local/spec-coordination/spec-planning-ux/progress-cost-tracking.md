@@ -99,68 +99,56 @@ coupling cost here is real; the decoupling benefit is speculative.
 
 ### Decision 2 — File layout
 
-**Option 2a — One file per group**:
-`~/.wallfacer/planning/<group-key>/usage.jsonl`. Parallels how planning
-sessions are already scoped (the planning sandbox container is per group).
+One file per group: `~/.wallfacer/planning/<group-key>/usage.jsonl`. This
+falls out of the earlier decision to aggregate by workspace group — the
+group is already the primary key for both storage and reporting, so the
+directory layout mirrors it. Records don't need to carry a `group_key`
+field (the path has it), deletion/inspection per group is a single `rm`,
+and the planning-sandbox container itself is already scoped per group.
 
-- Pro: Matches session lifecycle. Easy to delete/inspect per group. No
-  group-key field needed inside each record.
-- Con: `<group-key>` must be path-safe — either hash-derived or URL-encoded.
-
-**Option 2b — Single file with `group_key` column**:
-`~/.wallfacer/planning/usage.jsonl`, each line carries its own
-`group_key`.
-
-- Pro: One file, one append path, one retention sweep.
-- Con: All groups share the same file — larger reads per stats call,
-  coarser deletion semantics.
+`<group-key>` must be path-safe; use a short hash of the sorted path
+list (e.g., SHA-256 truncated), matching the fingerprint scheme
+`~/.wallfacer/instructions/` already uses.
 
 ### Decision 3 — Where the read/write API lives inside `internal/store/`
 
-**Option 3a — Flat in `internal/store/`.** A new `planning_usage.go`
-alongside the existing task-storage files, exporting
+A new `planning_usage.go` directly under `internal/store/`, alongside the
+existing task-storage files. It exports
 `AppendPlanningUsage(groupKey, record)` and
-`ReadPlanningUsage(groupKey, since) []record`. Both `internal/planner/`
-(writes) and `internal/handler/stats.go` (reads) import from `store`, as
-they already do for tasks.
-
-- Pro: No new package. Sits next to peer persistence code and reuses its
-  atomic-write / JSON helpers. Smallest diff.
-- Con: `internal/store` continues to grow; acceptable if the addition is
-  small (~one file + tests).
-
-**Option 3b — `internal/store/planningusage/` sub-package.** Same code
-behind a small namespace fence. The sub-package owns the file format and
-aggregation; callers import `store/planningusage`.
-
-- Pro: Explicit separation from task storage; easier to evolve
-  independently if the format grows.
-- Con: A new package for what is likely ~200 lines; premature fencing.
+`ReadPlanningUsage(groupKey, since) []TurnUsageRecord`. Both
+`internal/planner/` (writes) and `internal/handler/stats.go` (reads)
+import from `store`, the same way they do for tasks. No new package —
+the code is small (~one file plus tests) and reuses the package's
+atomic-write and JSON helpers. A `store/planningusage/` sub-package is
+available later if the format grows, but premature fencing offers no
+immediate benefit.
 
 ### UI surface (orthogonal to the above)
 
-Regardless of how the store is built, planning cost lands in the UI as a
-new "Planning" block in `modal-stats.js` — a sibling to the existing
-`ByWorkspace` / `ByActivity` sections — listing one row per workspace group
-with tokens, cost, and round count. The existing execution blocks are
-untouched. Optionally, `/api/usage` also populates `BySubAgent["planning"]`
-so the period-picker view in `usage-stats.js` reflects planning activity
-alongside other sandbox activities; this is cheap and additive.
+Planning cost lands in the UI as a new "Planning" block in
+`modal-stats.js` — a sibling to the existing `ByWorkspace` / `ByActivity`
+sections — listing one row per workspace group with tokens, cost, round
+count, and a per-round sparkline driven by each record's `Timestamp`.
+`usage-stats.js` also gets a planning tile in its period-picker view, fed
+by `BySubAgent["planning"]` in `/api/usage`.
 
-## Open Questions
+### Display window, not retention
 
-1. 2a vs. 2b — per-group file or single file? Leaning 2a: lifecycle
-   already aligns per group, and retention/deletion map naturally.
-2. 3a vs. 3b — flat in `internal/store/` or a `store/planningusage/`
-   sub-package? Leaning 3a: one file keeps the footprint minimal and the
-   code stays next to the existing persistence helpers; promote to 3b only
-   if the format grows.
-3. Timeline vs. totals: do we show per-round sparklines in the focused
-   planning view, or only cumulative tokens/cost per group in the stats
-   modal? Either works — each record has `Timestamp`.
-4. Retention policy: planning JSONL has no task tombstone to ride; pick a
-   retention window (mirror `WALLFACER_TOMBSTONE_RETENTION_DAYS`, or a
-   separate knob) and compaction strategy.
+The storage layer never deletes. Planning usage records accumulate
+indefinitely in `~/.wallfacer/planning/<group-key>/usage.jsonl` — there is
+no tombstone, no compaction, no mirrored
+`WALLFACER_TOMBSTONE_RETENTION_DAYS`. The data is small (one line per
+round, bounded by user typing speed) so unbounded growth is acceptable for
+the foreseeable future.
+
+Scoping is a *read-side* concern. Both the stats API and the UI already
+use a "days" window (`/api/usage?days=N`, the 7/30/0-day picker in
+`usage-stats.js`); planning reads reuse the same pattern:
+`ReadPlanningUsage(groupKey, since time.Time)` filters on `Timestamp`.
+The default window is configurable via a new env/settings knob
+(`WALLFACER_PLANNING_WINDOW_DAYS`, default matching the existing
+period-picker default), editable from the Settings panel. Users can still
+override per-request via the period picker in the stats modal.
 
 ## Affects
 
