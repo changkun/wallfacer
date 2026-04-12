@@ -84,22 +84,18 @@ inherit an append-file helper.
 
 ### Decision 1 — Per-round record shape
 
-**Option 1a — Reuse the `TurnUsageRecord` struct as the on-disk schema.**
-Tokens, `CostUSD`, `Timestamp`, `Sandbox`, `StopReason` are all already
-modeled; the only field without a natural meaning is `Turn` (reinterpret as
-round number) and `SubAgent` (fix to `"planning"`).
+**Reuse `TurnUsageRecord`.** The fields are identical in meaning for a
+planning round: `Turn` is the round number, `Timestamp` is when the round
+happened, the token/cost fields map one-for-one, `StopReason` uses the
+same set, `Sandbox` names the runtime, and `SubAgent` is fixed to
+`"planning"`. No new type, no duplicated JSON shape, no duplicated cost
+math — existing helpers that already sum `TurnUsageRecord`s work as-is.
 
-- Pro: Zero new types. Existing JSON marshaling and cost math apply.
-- Con: Type-level coupling to a kanban-shaped struct; if either side evolves
-  (e.g., task-specific fields get added to `TurnUsageRecord`), planning
-  drags them along or has to branch.
-
-**Option 1b — New `PlanningRoundUsage` type.** Purpose-built:
-`{Round, Timestamp, GroupKey, Model, Tokens, CacheTokens, CostUSD, StopReason}`.
-
-- Pro: Decoupled evolution. The type says what it is.
-- Con: A near-duplicate struct and a second JSON shape for something cost
-  aggregators already know how to read.
+A separate `PlanningRoundUsage` type was considered for "decoupled
+evolution" but rejected: the fields genuinely match today, and a future
+task-specific field on `TurnUsageRecord` would be a smell even for tasks
+(the right move would be to split the record, not fork planning). The
+coupling cost here is real; the decoupling benefit is speculative.
 
 ### Decision 2 — File layout
 
@@ -153,19 +149,16 @@ alongside other sandbox activities; this is cheap and additive.
 
 ## Open Questions
 
-1. 1a vs. 1b — reuse `TurnUsageRecord` or define `PlanningRoundUsage`?
-   Leaning 1b: the decoupling cost is one struct, and it prevents a future
-   task-shaped field from bleeding into planning storage.
-2. 2a vs. 2b — per-group file or single file? Leaning 2a: lifecycle already
-   aligns per group, and retention/deletion map naturally.
-3. 3a vs. 3b — flat in `internal/store/` or a `store/planningusage/`
+1. 2a vs. 2b — per-group file or single file? Leaning 2a: lifecycle
+   already aligns per group, and retention/deletion map naturally.
+2. 3a vs. 3b — flat in `internal/store/` or a `store/planningusage/`
    sub-package? Leaning 3a: one file keeps the footprint minimal and the
    code stays next to the existing persistence helpers; promote to 3b only
    if the format grows.
-4. Timeline vs. totals: do we show per-round sparklines in the focused
+3. Timeline vs. totals: do we show per-round sparklines in the focused
    planning view, or only cumulative tokens/cost per group in the stats
    modal? Either works — each record has `Timestamp`.
-5. Retention policy: planning JSONL has no task tombstone to ride; pick a
+4. Retention policy: planning JSONL has no task tombstone to ride; pick a
    retention window (mirror `WALLFACER_TOMBSTONE_RETENTION_DAYS`, or a
    separate knob) and compaction strategy.
 
