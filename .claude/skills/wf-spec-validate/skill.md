@@ -134,7 +134,7 @@ Warnings: N
 - [error] depends_on target does not exist: specs/foundations/nonexistent.md
 
 #### specs/local/foo.md
-- [error] Invalid status: "wip" (must be vague|drafted|validated|complete|stale)
+- [error] Invalid status: "wip" (must be vague|drafted|validated|complete|stale|archived)
 
 ### Cross-Spec Errors
 - [error] Cycle detected: A.md -> B.md -> C.md -> A.md
