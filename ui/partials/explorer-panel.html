@@ -13,6 +13,18 @@
       <option value="complete">Complete</option>
       <option value="incomplete">Not complete</option>
     </select>
+    <label
+      id="spec-show-archived-wrap"
+      class="spec-show-archived hidden"
+      title="Show archived specs in the tree"
+    >
+      <input
+        type="checkbox"
+        id="spec-show-archived"
+        onchange="toggleShowArchived(this.checked)"
+      />
+      Show archived
+    </label>
   </div>
   <div id="explorer-tree" class="explorer-panel__tree">
     <!-- Tree nodes rendered by JS -->

@@ -367,4 +367,99 @@ describe("spec-explorer", () => {
     // Should not throw.
     ctx.dispatchSelectedSpecs();
   });
+
+  // --- Archived spec visibility ---
+
+  const MOCK_TREE_WITH_ARCHIVED = {
+    nodes: [
+      {
+        path: "local/live.md",
+        spec: {
+          title: "Live",
+          status: "validated",
+          depends_on: [],
+          track: "local",
+        },
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
+      {
+        path: "local/arch.md",
+        spec: {
+          title: "Arch",
+          status: "archived",
+          depends_on: [],
+          track: "local",
+        },
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
+    ],
+    progress: {},
+  };
+
+  it("archived status icon is mapped", () => {
+    expect(ctx._specStatusIcons["archived"]).toBe("\uD83D\uDCE6");
+  });
+
+  it("archived specs hidden by default", () => {
+    ctx._specTreeData = MOCK_TREE_WITH_ARCHIVED;
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("Live");
+    expect(treeEl.innerHTML).not.toContain("Arch");
+  });
+
+  it("toggleShowArchived on reveals archived specs with archived class", () => {
+    ctx._specTreeData = MOCK_TREE_WITH_ARCHIVED;
+    ctx.toggleShowArchived(true);
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("Arch");
+    expect(treeEl.innerHTML).toContain("spec-node--archived");
+  });
+
+  it("toggleShowArchived persists the preference to localStorage", () => {
+    ctx.toggleShowArchived(true);
+    expect(ctx.storage.get("wallfacer-spec-show-archived")).toBe("true");
+    ctx.toggleShowArchived(false);
+    expect(ctx.storage.get("wallfacer-spec-show-archived")).toBe("false");
+  });
+
+  it("incomplete filter excludes archived specs", () => {
+    ctx._specTreeData = MOCK_TREE_WITH_ARCHIVED;
+    ctx.toggleShowArchived(true);
+    ctx.filterSpecTree("incomplete");
+    const treeEl = ctx.registry.get("explorer-tree");
+    // Live is validated → incomplete; Arch is archived → excluded.
+    expect(treeEl.innerHTML).toContain("Live");
+    expect(treeEl.innerHTML).not.toContain("Arch");
+  });
+
+  it("turning archived off while filtered on archived resets filter", () => {
+    ctx._specTreeData = MOCK_TREE_WITH_ARCHIVED;
+    ctx.toggleShowArchived(true);
+    ctx.filterSpecTree("archived");
+    ctx.toggleShowArchived(false);
+    expect(ctx._specStatusFilter).toBe("all");
+  });
+
+  it("_forceCollapseArchived removes archived paths from expanded set", () => {
+    ctx._specTreeData = {
+      nodes: [
+        {
+          path: "local/arch.md",
+          spec: { title: "Arch", status: "archived", track: "local" },
+          children: ["local/arch/child.md"],
+          is_leaf: false,
+          depth: 0,
+        },
+      ],
+      progress: {},
+    };
+    ctx._specExpandedPaths.add("local/arch.md");
+    ctx._forceCollapseArchived();
+    expect(ctx._specExpandedPaths.has("local/arch.md")).toBe(false);
+  });
 });

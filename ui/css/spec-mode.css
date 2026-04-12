@@ -120,6 +120,11 @@
   color: #721c24;
 }
 
+.spec-status--archived {
+  background: #e2e3e5;
+  color: #6c757d;
+}
+
 /* Table of contents — absolutely positioned; JS exclusion keeps text clear */
 .spec-toc {
   position: absolute;
@@ -639,6 +644,30 @@
 .spec-node--focused {
   background: var(--bg-card);
   border-left: 2px solid var(--accent);
+}
+
+.spec-node--archived {
+  opacity: 0.6;
+  color: #6c757d;
+}
+
+.spec-minimap__node--archived {
+  outline: 2px dashed #adb5bd;
+  opacity: 0.6;
+}
+
+.spec-minimap__edge--archived {
+  stroke-dasharray: 4 3;
+  opacity: 0.5;
+}
+
+.spec-show-archived {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
 }
 
 .spec-node-toggle {

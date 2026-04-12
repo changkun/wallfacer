@@ -8,6 +8,7 @@ var _minimapStatusColors = {
   drafted: "#fff3cd",
   vague: "#e2e3e5",
   stale: "#f8d7da",
+  archived: "#e2e3e5",
 };
 
 // _normalizeDep strips the leading "specs/" prefix from a depends_on path
@@ -73,14 +74,20 @@ function renderMinimap(specPath, treeData) {
   var reverseIndex = buildReverseDeps(nodes);
 
   // Collect 1-hop neighborhood. Normalize depends_on paths to match tree keys.
+  // Archived neighbors are hidden unless the user has opted in via the
+  // "Show archived" toggle on the explorer.
+  var showArchived =
+    typeof _showArchived !== "undefined" ? _showArchived : false;
+  var includeNeighbor = function (p) {
+    var n = nodesByPath[p];
+    if (!n || !n.spec) return false;
+    if (!showArchived && n.spec.status === "archived") return false;
+    return true;
+  };
   var upstreamPaths = (focused.spec.depends_on || [])
     .map(_normalizeDep)
-    .filter(function (p) {
-      return !!nodesByPath[p];
-    });
-  var downstreamPaths = (reverseIndex[specPath] || []).filter(function (p) {
-    return !!nodesByPath[p];
-  });
+    .filter(includeNeighbor);
+  var downstreamPaths = (reverseIndex[specPath] || []).filter(includeNeighbor);
 
   // Hide minimap if no dependencies at all.
   if (upstreamPaths.length === 0 && downstreamPaths.length === 0) {
@@ -123,11 +130,17 @@ function renderMinimap(specPath, treeData) {
   var focusedY = (totalH - nodeH) / 2;
   _drawMinimapNode(svg, svgNS, focused, col1x, focusedY, nodeW, nodeH, true);
 
+  var focusedArchived =
+    focused.spec && focused.spec.status === "archived";
+
   // Upstream nodes (left column).
   for (var u = 0; u < upCount; u++) {
     var upNode = nodesByPath[upstreamPaths[u]];
     var uy = _columnY(u, upCount, totalH, nodeH, rowGap);
     _drawMinimapNode(svg, svgNS, upNode, col0x, uy, nodeW, nodeH, false);
+    var upArchived =
+      focusedArchived ||
+      (upNode && upNode.spec && upNode.spec.status === "archived");
     _drawMinimapEdge(
       svg,
       svgNS,
@@ -135,6 +148,7 @@ function renderMinimap(specPath, treeData) {
       uy + nodeH / 2,
       col1x,
       focusedY + nodeH / 2,
+      upArchived,
     );
   }
 
@@ -143,6 +157,9 @@ function renderMinimap(specPath, treeData) {
     var downNode = nodesByPath[downstreamPaths[d]];
     var dy = _columnY(d, downCount, totalH, nodeH, rowGap);
     _drawMinimapNode(svg, svgNS, downNode, col2x, dy, nodeW, nodeH, false);
+    var downArchived =
+      focusedArchived ||
+      (downNode && downNode.spec && downNode.spec.status === "archived");
     _drawMinimapEdge(
       svg,
       svgNS,
@@ -150,6 +167,7 @@ function renderMinimap(specPath, treeData) {
       focusedY + nodeH / 2,
       col2x,
       dy + nodeH / 2,
+      downArchived,
     );
   }
 }
@@ -176,6 +194,10 @@ function _drawMinimapNode(svg, ns, node, x, y, w, h, isFocused) {
   rect.setAttribute("fill", fill);
   rect.setAttribute("stroke", isFocused ? "#0366d6" : "#ccc");
   rect.setAttribute("stroke-width", isFocused ? 2 : 1);
+  if (status === "archived") {
+    rect.setAttribute("class", "spec-minimap__node--archived");
+    rect.setAttribute("stroke-dasharray", "4 3");
+  }
   rect.style.cursor = "pointer";
   rect.setAttribute("data-spec-path", node.path);
   rect.addEventListener("click", function () {
@@ -206,8 +228,10 @@ function _drawMinimapNode(svg, ns, node, x, y, w, h, isFocused) {
   svg.appendChild(text);
 }
 
-// _drawMinimapEdge renders a line between two points.
-function _drawMinimapEdge(svg, ns, x1, y1, x2, y2) {
+// _drawMinimapEdge renders a line between two points. When either endpoint is
+// an archived spec, the edge is rendered dashed to signal it is out of the
+// live dependency graph.
+function _drawMinimapEdge(svg, ns, x1, y1, x2, y2, archived) {
   var line = document.createElementNS(ns, "line");
   line.setAttribute("x1", x1);
   line.setAttribute("y1", y1);
@@ -215,6 +239,10 @@ function _drawMinimapEdge(svg, ns, x1, y1, x2, y2) {
   line.setAttribute("y2", y2);
   line.setAttribute("stroke", "#999");
   line.setAttribute("stroke-width", 1);
+  if (archived) {
+    line.setAttribute("class", "spec-minimap__edge--archived");
+    line.setAttribute("stroke-dasharray", "4 3");
+  }
   svg.appendChild(line);
 }
 

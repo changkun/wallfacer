@@ -224,4 +224,63 @@ describe("renderMinimap", () => {
     expect(focusedRect).toBeTruthy();
     expect(focusedRect._attrs["stroke-width"]).toBe(2);
   });
+
+  it("archived neighbors are hidden unless _showArchived is on", () => {
+    const withArchived = [
+      {
+        path: "focus.md",
+        spec: {
+          title: "Focus",
+          status: "validated",
+          depends_on: ["specs/arch.md"],
+        },
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
+      {
+        path: "arch.md",
+        spec: { title: "Arch", status: "archived", depends_on: [] },
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
+    ];
+    ctx._showArchived = false;
+    ctx.renderMinimap("focus.md", { nodes: withArchived, progress: {} });
+    // Only neighbor is archived → should hide minimap entirely.
+    expect(ctx.container.classList.contains("hidden")).toBe(true);
+  });
+
+  it("archived nodes render with dashed class when shown", () => {
+    const withArchived = [
+      {
+        path: "focus.md",
+        spec: {
+          title: "Focus",
+          status: "validated",
+          depends_on: ["specs/arch.md"],
+        },
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
+      {
+        path: "arch.md",
+        spec: { title: "Arch", status: "archived", depends_on: [] },
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
+    ];
+    ctx._showArchived = true;
+    ctx.renderMinimap("focus.md", { nodes: withArchived, progress: {} });
+    const rects = ctx.svgEl._children.filter((c) => c.tagName === "rect");
+    const archRect = rects.find((r) => r._attrs["data-spec-path"] === "arch.md");
+    expect(archRect).toBeTruthy();
+    expect(archRect._attrs["class"]).toBe("spec-minimap__node--archived");
+    const lines = ctx.svgEl._children.filter((c) => c.tagName === "line");
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0]._attrs["class"]).toBe("spec-minimap__edge--archived");
+  });
 });

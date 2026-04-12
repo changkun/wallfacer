@@ -15,6 +15,8 @@ var _specStatusFilter = localStorage.getItem("wallfacer-spec-filter") || "all";
 var _specTextFilter = ""; // text query from the search box
 var _selectedSpecPaths = new Set();
 var _lastCheckedSpecIndex = -1;
+var _showArchived =
+  localStorage.getItem("wallfacer-spec-show-archived") === "true";
 
 // Status → icon mapping.
 var _specStatusIcons = {
@@ -23,6 +25,7 @@ var _specStatusIcons = {
   drafted: "\uD83D\uDCDD",
   vague: "\uD83D\uDCAD",
   stale: "\u26A0\uFE0F",
+  archived: "\uD83D\uDCE6",
 };
 
 function loadSpecTree() {
@@ -81,8 +84,17 @@ function switchExplorerRoot(mode) {
   if (filterEl) {
     filterEl.classList.toggle("hidden", mode !== "specs");
     if (mode === "specs") {
+      _updateArchivedFilterOption();
       filterEl.value = _specStatusFilter;
     }
+  }
+  var archivedWrap = document.getElementById("spec-show-archived-wrap");
+  if (archivedWrap && archivedWrap.classList) {
+    archivedWrap.classList.toggle("hidden", mode !== "specs");
+  }
+  var archivedToggle = document.getElementById("spec-show-archived");
+  if (archivedToggle && mode === "specs") {
+    archivedToggle.checked = _showArchived;
   }
   var dispatchBar = document.getElementById("spec-dispatch-bar");
   if (dispatchBar) {
@@ -186,6 +198,76 @@ function filterSpecTree(filter) {
   renderSpecTree();
 }
 
+// toggleShowArchived flips the "Show archived" visibility, persists the choice,
+// and force-collapses any archived parents so their subtrees do not flood the
+// view when first revealed.
+function toggleShowArchived(show) {
+  _showArchived = !!show;
+  localStorage.setItem("wallfacer-spec-show-archived", String(_showArchived));
+  if (_showArchived) {
+    _forceCollapseArchived();
+  }
+  // If the user had the "archived" filter active and now hid archived specs,
+  // reset to "all" to avoid rendering an empty tree.
+  if (!_showArchived && _specStatusFilter === "archived") {
+    _specStatusFilter = "all";
+    localStorage.setItem("wallfacer-spec-filter", "all");
+    var filterEl = document.getElementById("spec-status-filter");
+    if (filterEl) filterEl.value = "all";
+  }
+  _updateArchivedFilterOption();
+  renderSpecTree();
+}
+
+// _forceCollapseArchived removes archived node paths from the expanded set so
+// their subtrees render collapsed the first time the user toggles them on.
+function _forceCollapseArchived() {
+  if (!_specTreeData || !_specTreeData.nodes) return;
+  var changed = false;
+  var nodes = _specTreeData.nodes;
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (n.spec && n.spec.status === "archived" && _specExpandedPaths.has(n.path)) {
+      _specExpandedPaths.delete(n.path);
+      changed = true;
+    }
+  }
+  if (changed) {
+    localStorage.setItem(
+      "wallfacer-spec-expanded",
+      JSON.stringify(Array.from(_specExpandedPaths)),
+    );
+  }
+}
+
+// _updateArchivedFilterOption adds (or updates) an `archived` option in the
+// status filter dropdown. The option is disabled unless `_showArchived` is on,
+// matching the rule that archived specs are hidden by default.
+function _updateArchivedFilterOption() {
+  var filterEl = document.getElementById("spec-status-filter");
+  if (!filterEl) return;
+  var existing = null;
+  if (filterEl.querySelectorAll) {
+    var opts = filterEl.querySelectorAll("option");
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].value === "archived") {
+        existing = opts[i];
+        break;
+      }
+    }
+  }
+  if (!existing) {
+    existing = document.createElement("option");
+    existing.value = "archived";
+    existing.textContent = "Archived";
+    if (filterEl.appendChild) filterEl.appendChild(existing);
+  }
+  existing.disabled = !_showArchived;
+  existing.title = _showArchived
+    ? ""
+    : "Enable 'Show archived' to filter by this status";
+}
+
 // setSpecTextFilter updates the text filter and re-renders the spec tree.
 function setSpecTextFilter(query) {
   _specTextFilter = (query || "").toLowerCase();
@@ -198,16 +280,20 @@ function setSpecTextFilter(query) {
 
 // _nodeMatchesFilter checks if a node or any of its descendants match
 // the current status filter and text query. Non-leaf nodes are visible
-// if any descendant matches.
+// if any descendant matches. Archived specs are hidden unless the user
+// has explicitly opted in via the "Show archived" toggle.
 function _nodeMatchesFilter(node, nodesByPath) {
   var spec = node.spec;
   if (!spec) return false;
+
+  // Archived specs are invisible unless opted in.
+  if (spec.status === "archived" && !_showArchived) return false;
 
   // Status filter.
   var statusMatch = true;
   if (_specStatusFilter !== "all") {
     if (_specStatusFilter === "incomplete") {
-      statusMatch = spec.status !== "complete";
+      statusMatch = spec.status !== "complete" && spec.status !== "archived";
     } else {
       statusMatch = spec.status === _specStatusFilter;
     }
@@ -363,6 +449,7 @@ function _renderSpecNode(node, nodesByPath) {
   var indent = node.depth * 16;
   var classes = "spec-node";
   if (node.is_leaf) classes += " spec-node--leaf";
+  if (spec.status === "archived") classes += " spec-node--archived";
   if (
     typeof getFocusedSpecPath === "function" &&
     getFocusedSpecPath() === node.path
