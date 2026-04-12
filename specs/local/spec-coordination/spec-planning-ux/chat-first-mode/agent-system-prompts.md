@@ -1,6 +1,6 @@
 ---
 title: Planning agent system prompt variants for empty vs non-empty tree
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/prompts/
@@ -52,3 +52,17 @@ Select the planning agent's system prompt per-turn based on whether the spec tre
 - **Do NOT** change the existing `archivedSpecGuard` behaviour. The new prompt prepend sits alongside it.
 - **Do NOT** cache the empty/non-empty decision across turns. Check per-turn so archiving the last spec takes effect on the very next message.
 - **Do NOT** change the interrupt, undo, or commit-pipeline paths. Only the exec prompt is modified.
+
+## Implementation notes
+
+1. **Templates genericized for project-agnostic use.** The spec text listed Wallfacer-specific track names in the empty-tree variant (`specs/foundations/`, `specs/local/`, etc.). During implementation the user pointed out that Wallfacer is a tool for building *any* project, not just itself — baking Wallfacer's own roadmap taxonomy into system prompts would mislead the agent when used against other repos. The shipped templates instruct the agent to pick `specs/<track>/<slug>.md` where `<track>` matches the repo's existing directory structure, falling back to `specs/default/` when none is present.
+
+2. **Template registration moved slugs `planning_system_empty` / `planning_system_nonempty`.** The spec named them without specifying whether the `api` surface uses `planning_empty` vs `planning_system_empty` vs similar. Shipped with the fully-qualified `planning_system_*` names so they sort together with the existing `planning` template in prompt listings and don't collide with any future `planning_*` template namespace.
+
+3. **Prepend order.** The spec said "Prepend the rendered template to the user's prompt (same pattern as the existing `archivedSpecGuard` prefix)." Implementation places the planning system prompt *inside* the archivedSpecGuard (i.e. archivedSpecGuard wraps the planning prompt wraps the user message), so a focused-archived-spec warning remains closest to the user's words. This matches the UX intent — the archived-spec guard is the highest-priority safety rail and must not be hidden behind other planning instructions.
+
+4. **Existing `planning.tmpl` left unchanged.** `prompts.Planning()` is defined but not currently wired into the exec path (the planner's container boots with AGENTS.md mounted; Claude Code consumes that directly). Rather than retiring `planning.tmpl` in this task, the two new `planning_system_*` templates land alongside it. A follow-up cleanup can decide whether to delete `planning.tmpl` or repurpose it.
+
+5. **Tree-count check uses an early-exit.** `selectPlanningSystemPrompt` iterates `tree.All` once, breaking on the first non-archived spec found. Avoids counting the full tree for a boolean question on repos with hundreds of specs.
+
+6. **`internal/handler/prompts_test.go` count bumped 9 → 11.** Adding two registered templates bumps the count in the existing "list all system prompts" test — a mechanical adjustment, not a behavior change.
