@@ -225,6 +225,8 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `GET /api/specs/stream` — SSE: spec tree change notifications (sends snapshot on change)
 - `POST /api/specs/dispatch` — Dispatch validated specs to create kanban tasks atomically (JSON: `{paths, run}`)
 - `POST /api/specs/undispatch` — Cancel dispatched tasks and clear spec dispatch linkage (JSON: `{paths}`)
+- `POST /api/specs/archive` — Archive a spec: transition status to `archived` (JSON: `{path}`). 409 if a dispatched task is still linked; 422 on invalid transition.
+- `POST /api/specs/unarchive` — Unarchive a spec: transition status from `archived` back to `drafted` (JSON: `{path}`).
 
 ### Planning Sandbox
 - `GET /api/planning` — Get planning sandbox status (running or not)

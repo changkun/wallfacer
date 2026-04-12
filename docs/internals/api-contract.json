@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 100,
+  "route_count": 102,
   "routes": [
     {
       "method": "GET",
@@ -216,6 +216,24 @@
       "pattern": "/api/specs/undispatch",
       "name": "UndispatchSpecs",
       "description": "Cancel dispatched tasks and clear spec dispatch linkage.",
+      "tags": [
+        "specs"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/specs/archive",
+      "name": "ArchiveSpec",
+      "description": "Archive a spec — transition its status to archived.",
+      "tags": [
+        "specs"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/specs/unarchive",
+      "name": "UnarchiveSpec",
+      "description": "Unarchive a spec — transition its status from archived back to drafted.",
       "tags": [
         "specs"
       ]

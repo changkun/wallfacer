@@ -694,6 +694,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SpecTreeStream":  h.SpecTreeStream,
 		"DispatchSpecs":   h.DispatchSpecs,
 		"UndispatchSpecs": h.UndispatchSpecs,
+		"ArchiveSpec":     h.ArchiveSpec,
+		"UnarchiveSpec":   h.UnarchiveSpec,
 
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,

@@ -202,6 +202,16 @@ var Routes = []Route{
 		Description: "Cancel dispatched tasks and clear spec dispatch linkage.",
 		Tags:        []string{"specs"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/specs/archive", Name: "ArchiveSpec",
+		Description: "Archive a spec — transition its status to archived.",
+		Tags:        []string{"specs"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/specs/unarchive", Name: "UnarchiveSpec",
+		Description: "Unarchive a spec — transition its status from archived back to drafted.",
+		Tags:        []string{"specs"},
+	},
 
 	// --- Planning sandbox ---
 

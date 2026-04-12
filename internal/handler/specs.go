@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/spec"
 )
 
@@ -118,4 +120,84 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// ArchiveSpec transitions a spec's status to archived.
+func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
+	h.transitionSpec(w, r, spec.StatusArchived)
+}
+
+// UnarchiveSpec transitions an archived spec back to drafted.
+func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
+	h.transitionSpec(w, r, spec.StatusDrafted)
+}
+
+type specTransitionRequest struct {
+	Path string `json:"path"`
+}
+
+type specTransitionResponse struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+}
+
+// transitionSpec validates and writes a status transition for a single spec.
+// Invalid transitions return 422; archiving a spec with a live dispatched_task_id
+// returns 409.
+func (h *Handler) transitionSpec(w http.ResponseWriter, r *http.Request, toStatus spec.Status) {
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	s, err := spec.ParseFile(absPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("parse error: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if err := spec.StatusMachine.Validate(s.Status, toStatus); err != nil {
+		if errors.Is(err, statemachine.ErrInvalidTransition) {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if toStatus == spec.StatusArchived && s.DispatchedTaskID != nil {
+		http.Error(w,
+			"spec has a dispatched task — cancel the dispatched task before archiving",
+			http.StatusConflict)
+		return
+	}
+
+	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+		"status":  string(toStatus),
+		"updated": time.Now(),
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(toStatus),
+	})
 }

@@ -124,6 +124,14 @@ var Routes = {
     undispatch: function () {
       return "/api/specs/undispatch";
     },
+    // POST /api/specs/archive
+    archive: function () {
+      return "/api/specs/archive";
+    },
+    // POST /api/specs/unarchive
+    unarchive: function () {
+      return "/api/specs/unarchive";
+    },
   },
 
   planning: {
