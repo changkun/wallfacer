@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -579,5 +582,218 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 	wantInputTokens := 1000 + 200 // done task.Usage.InputTokens + in-prog.Usage.InputTokens
 	if resp.TotalInputTokens != wantInputTokens {
 		t.Errorf("TotalInputTokens = %d, want %d", resp.TotalInputTokens, wantInputTokens)
+	}
+}
+
+// --- Planning section ---
+
+func TestAggregatePlanningStats_EmptyDir(t *testing.T) {
+	configDir := t.TempDir()
+	got := aggregatePlanningStats(configDir, nil, time.Time{})
+	if got == nil {
+		t.Fatal("got nil, want non-nil empty map")
+	}
+	if len(got) != 0 {
+		t.Errorf("want empty map, got %d entries", len(got))
+	}
+}
+
+func TestAggregatePlanningStats_Aggregation(t *testing.T) {
+	configDir := t.TempDir()
+	base := time.Now().UTC().Truncate(time.Second)
+
+	wsA := []string{"/repo/a"}
+	wsB := []string{"/repo/b"}
+	keyA := store.PlanningGroupKey(wsA)
+	keyB := store.PlanningGroupKey(wsB)
+
+	for i, rec := range []store.TurnUsageRecord{
+		{Turn: 1, Timestamp: base, InputTokens: 10, OutputTokens: 5, CostUSD: 0.01},
+		{Turn: 2, Timestamp: base.Add(time.Minute), InputTokens: 20, OutputTokens: 8, CostUSD: 0.02},
+	} {
+		if err := store.AppendPlanningUsage(configDir, keyA, rec); err != nil {
+			t.Fatalf("append A[%d]: %v", i, err)
+		}
+	}
+	if err := store.AppendPlanningUsage(configDir, keyB, store.TurnUsageRecord{
+		Turn: 1, Timestamp: base, InputTokens: 100, OutputTokens: 40, CostUSD: 0.5,
+	}); err != nil {
+		t.Fatalf("append B: %v", err)
+	}
+
+	got := aggregatePlanningStats(configDir, wsA, time.Time{})
+
+	if len(got) != 2 {
+		t.Fatalf("want 2 groups, got %d", len(got))
+	}
+
+	a := got[keyA]
+	if a.RoundCount != 2 {
+		t.Errorf("A.RoundCount = %d, want 2", a.RoundCount)
+	}
+	if a.Usage.CostUSD != 0.03 {
+		t.Errorf("A.Usage.CostUSD = %v, want 0.03", a.Usage.CostUSD)
+	}
+	if a.Usage.InputTokens != 30 || a.Usage.OutputTokens != 13 {
+		t.Errorf("A.Usage tokens = (%d,%d), want (30,13)", a.Usage.InputTokens, a.Usage.OutputTokens)
+	}
+	if len(a.Paths) != 1 || a.Paths[0] != "/repo/a" {
+		t.Errorf("A.Paths = %v, want [/repo/a] (active group should be resolved)", a.Paths)
+	}
+	if a.Label != "a" {
+		t.Errorf("A.Label = %q, want %q", a.Label, "a")
+	}
+
+	b := got[keyB]
+	if b.RoundCount != 1 {
+		t.Errorf("B.RoundCount = %d, want 1", b.RoundCount)
+	}
+	// B is a stale group (not the active workspaces) — Paths nil, Label is the key.
+	if b.Paths != nil {
+		t.Errorf("B.Paths = %v, want nil for stale group", b.Paths)
+	}
+	if b.Label != keyB {
+		t.Errorf("B.Label = %q, want key %q for stale group", b.Label, keyB)
+	}
+}
+
+func TestAggregatePlanningStats_RespectsSince(t *testing.T) {
+	configDir := t.TempDir()
+	base := time.Now().UTC().Truncate(time.Second)
+	ws := []string{"/repo/a"}
+	key := store.PlanningGroupKey(ws)
+
+	records := []store.TurnUsageRecord{
+		{Turn: 1, Timestamp: base.Add(-2 * time.Hour), InputTokens: 10, CostUSD: 0.01},
+		{Turn: 2, Timestamp: base.Add(-1 * time.Hour), InputTokens: 20, CostUSD: 0.02},
+		{Turn: 3, Timestamp: base, InputTokens: 30, CostUSD: 0.03},
+	}
+	for i, rec := range records {
+		if err := store.AppendPlanningUsage(configDir, key, rec); err != nil {
+			t.Fatalf("append[%d]: %v", i, err)
+		}
+	}
+
+	since := base.Add(-30 * time.Minute)
+	got := aggregatePlanningStats(configDir, ws, since)
+
+	stat, ok := got[key]
+	if !ok {
+		t.Fatal("expected group in response")
+	}
+	if stat.RoundCount != 1 {
+		t.Errorf("RoundCount = %d, want 1 (only turn 3 post-cutoff)", stat.RoundCount)
+	}
+	if stat.Usage.CostUSD != 0.03 {
+		t.Errorf("Usage.CostUSD = %v, want 0.03", stat.Usage.CostUSD)
+	}
+	if len(stat.Timeline) != 1 {
+		t.Errorf("Timeline length = %d, want 1", len(stat.Timeline))
+	}
+}
+
+func TestAggregatePlanningStats_TimelineOrdered(t *testing.T) {
+	configDir := t.TempDir()
+	base := time.Now().UTC().Truncate(time.Second)
+	ws := []string{"/repo/a"}
+	key := store.PlanningGroupKey(ws)
+
+	// Append out of chronological order (timestamps jump).
+	for i, rec := range []store.TurnUsageRecord{
+		{Turn: 2, Timestamp: base.Add(2 * time.Minute), CostUSD: 0.02, InputTokens: 20},
+		{Turn: 1, Timestamp: base, CostUSD: 0.01, InputTokens: 10},
+		{Turn: 3, Timestamp: base.Add(5 * time.Minute), CostUSD: 0.05, InputTokens: 50},
+	} {
+		if err := store.AppendPlanningUsage(configDir, key, rec); err != nil {
+			t.Fatalf("append[%d]: %v", i, err)
+		}
+	}
+
+	got := aggregatePlanningStats(configDir, ws, time.Time{})
+	tl := got[key].Timeline
+	if len(tl) != 3 {
+		t.Fatalf("Timeline length = %d, want 3", len(tl))
+	}
+	for i := 1; i < len(tl); i++ {
+		if tl[i].Timestamp.Before(tl[i-1].Timestamp) {
+			t.Errorf("Timeline not ascending at index %d: %v before %v", i, tl[i-1].Timestamp, tl[i].Timestamp)
+		}
+	}
+}
+
+func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
+	// Seed a task set and compute a baseline response via aggregateStats.
+	now := time.Now().UTC()
+	tasks := []store.Task{{
+		ID:        uuid.New(),
+		Title:     "baseline",
+		Status:    store.TaskStatusDone,
+		CreatedAt: now,
+		Usage:     store.TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.01},
+		UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
+			"implementation": {InputTokens: 100, OutputTokens: 50, CostUSD: 0.01},
+		},
+		WorktreePaths: map[string]string{"/repo/x": "/wt/x"},
+	}}
+	baseline := aggregateStats(tasks, noSummary)
+
+	// Now aggregate again with planning records present. Execution buckets
+	// must be byte-for-byte equal to the baseline (after clearing Planning).
+	withPlanning := aggregateStats(tasks, noSummary)
+	configDir := t.TempDir()
+	ws := []string{"/repo/x"}
+	key := store.PlanningGroupKey(ws)
+	if err := store.AppendPlanningUsage(configDir, key, store.TurnUsageRecord{
+		Turn: 1, Timestamp: now, CostUSD: 0.99, InputTokens: 9999, OutputTokens: 9999,
+	}); err != nil {
+		t.Fatalf("seed planning: %v", err)
+	}
+	withPlanning.Planning = aggregatePlanningStats(configDir, ws, time.Time{})
+
+	// Zero out the Planning field on both sides, then compare the rest
+	// via JSON round-trip to catch any silent drift in execution buckets.
+	baseline.Planning = nil
+	withPlanning.Planning = nil
+	wantJSON, _ := json.Marshal(baseline)
+	gotJSON, _ := json.Marshal(withPlanning)
+	if string(wantJSON) != string(gotJSON) {
+		t.Errorf("execution buckets drifted when planning data is present\nbaseline: %s\n     got: %s", wantJSON, gotJSON)
+	}
+}
+
+func TestGetStats_PlanningEndpoint(t *testing.T) {
+	// Integration-flavored: seed planning records under the handler's configDir,
+	// call GetStats over HTTP, and assert the Planning section appears in the
+	// JSON response.
+	ws := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{ws})
+
+	key := store.PlanningGroupKey([]string{ws})
+	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, OutputTokens: 5, CostUSD: 0.01,
+	}); err != nil {
+		t.Fatalf("seed planning: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/stats", nil)
+	h.GetStats(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var resp StatsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Planning == nil {
+		t.Fatal("Planning should not be nil")
+	}
+	stat, ok := resp.Planning[key]
+	if !ok {
+		t.Fatalf("no planning entry for active group key %q", key)
+	}
+	if stat.RoundCount != 1 || stat.Usage.CostUSD != 0.01 {
+		t.Errorf("planning entry wrong: %+v", stat)
 	}
 }

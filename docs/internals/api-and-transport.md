@@ -61,7 +61,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `POST /api/git/open-folder` | Open a workspace directory in the OS file manager |
 | **Usage & statistics** | |
 | `GET /api/usage` | Aggregated token and cost usage statistics |
-| `GET /api/stats` | Task status and workspace cost statistics. Optional `?workspace=<path>` restricts aggregation |
+| `GET /api/stats` | Task status and workspace cost statistics, plus a `planning` section keyed by workspace group. Optional `?workspace=<path>` restricts task aggregation; optional `?days=N` restricts planning aggregation to rounds newer than N days (execution buckets are unchanged by `?days`). |
 | **Task collection (no {id})** | |
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |

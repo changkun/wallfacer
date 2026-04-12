@@ -240,7 +240,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### Usage & Statistics
 - `GET /api/usage` — Aggregated token and cost usage statistics
-- `GET /api/stats` — Task status and workspace cost statistics
+- `GET /api/stats` — Task status and workspace cost statistics; includes a `planning` section keyed by workspace group; `?days=N` restricts planning aggregation only
 - `GET /api/containers` — List running containers
 - `GET /api/files` — File listing for @ mention autocomplete
 
