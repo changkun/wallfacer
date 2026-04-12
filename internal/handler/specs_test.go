@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -115,6 +116,101 @@ func TestUnarchiveSpec_NotArchived(t *testing.T) {
 	w := doTransition(t, h.UnarchiveSpec, "specs/local/complete.md")
 	if w.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+}
+
+// initGitRepo initializes workspace `ws` as a git repo with one initial commit
+// so archive/unarchive cascade tests can exercise the commit/revert flow.
+func initGitRepo(t *testing.T, ws string) {
+	t.Helper()
+	commands := [][]string{
+		{"init", "-q", "-b", "main"},
+		{"config", "user.name", "Test"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "commit.gpgsign", "false"},
+	}
+	for _, args := range commands {
+		cmd := exec.Command("git", append([]string{"-C", ws}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(ws, "README.md"), []byte("init\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "README.md"},
+		{"commit", "-q", "-m", "init"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", ws}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+}
+
+func lastCommitSubject(t *testing.T, ws string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", ws, "log", "-1", "--format=%s").CombinedOutput()
+	if err != nil {
+		t.Fatalf("git log: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestArchiveSpec_CascadeAndRevert(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	initGitRepo(t, ws)
+
+	parent := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
+	childA := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
+	childB := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
+	writeTestSpec(t, ws, "specs/local/parent.md", parent)
+	writeTestSpec(t, ws, "specs/local/parent/a.md", childA)
+	writeTestSpec(t, ws, "specs/local/parent/b.md", childB)
+
+	// Stage initial specs so cascade commit has a clean baseline to diff from.
+	for _, args := range [][]string{
+		{"add", "specs/"},
+		{"commit", "-q", "-m", "add specs"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", ws}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	// Archive the parent — should cascade to both children and produce one commit.
+	w := doTransition(t, h.ArchiveSpec, "specs/local/parent.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("archive status = %d, body: %s", w.Code, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/parent.md"); got != spec.StatusArchived {
+		t.Errorf("parent status = %q, want archived", got)
+	}
+	if got := readStatus(t, ws, "specs/local/parent/a.md"); got != spec.StatusArchived {
+		t.Errorf("child a status = %q, want archived (cascade)", got)
+	}
+	if got := readStatus(t, ws, "specs/local/parent/b.md"); got != spec.StatusArchived {
+		t.Errorf("child b status = %q, want archived (cascade)", got)
+	}
+	if subj := lastCommitSubject(t, ws); !strings.Contains(subj, "archive") {
+		t.Errorf("last commit = %q, want contains 'archive'", subj)
+	}
+
+	// Unarchive should revert the archive commit and restore prior statuses.
+	w = doTransition(t, h.UnarchiveSpec, "specs/local/parent.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("unarchive status = %d, body: %s", w.Code, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/parent.md"); got != spec.StatusDrafted {
+		t.Errorf("parent status = %q, want drafted", got)
+	}
+	if got := readStatus(t, ws, "specs/local/parent/a.md"); got != spec.StatusComplete {
+		t.Errorf("child a status = %q, want complete (restored)", got)
+	}
+	if got := readStatus(t, ws, "specs/local/parent/b.md"); got != spec.StatusDrafted {
+		t.Errorf("child b status = %q, want drafted (restored)", got)
 	}
 }
 
