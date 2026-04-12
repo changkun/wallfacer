@@ -118,13 +118,20 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/planning` | Planning sandbox status (running or not) |
 | `POST /api/planning` | Start the planning sandbox container (idempotent) |
 | `DELETE /api/planning` | Stop the planning sandbox container |
-| `GET /api/planning/messages` | Retrieve conversation history |
-| `POST /api/planning/messages` | Send user message (triggers agent execution) |
-| `DELETE /api/planning/messages` | Clear conversation history |
-| `GET /api/planning/messages/stream` | Stream agent response tokens |
-| `POST /api/planning/messages/interrupt` | Interrupt current agent turn |
-| `POST /api/planning/undo` | Revert the last planning commit — kanban-style subject `<primary-path>(plan): …` with a `Plan-Round: N` trailer — via git reset with stash preservation; cancels any dispatched tasks whose linkage was added by the reverted commit |
+| `GET /api/planning/messages` | Retrieve conversation history. `?thread=<id>` selects the thread; defaults to the active thread. |
+| `POST /api/planning/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the thread. |
+| `DELETE /api/planning/messages` | Clear a thread's conversation history and session (`?thread=<id>`). |
+| `GET /api/planning/messages/stream` | Stream agent response tokens for the in-flight thread. Returns 204 when `?thread=<id>` does not match the thread that owns the exec. |
+| `POST /api/planning/messages/interrupt` | Interrupt current agent turn. `?thread=<id>` must match the in-flight thread or 409. |
+| `POST /api/planning/undo` | Undo the caller thread's most recent planning round via a forward `git revert` commit (original commit stays in history; revert commit carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread. Cancels dispatched kanban tasks whose linkage was added by the reverted commit. 409 on revert conflict. |
 | `GET /api/planning/commands` | List available slash commands |
+| **Planning chat threads** | |
+| `GET /api/planning/threads` | List non-archived threads; `?includeArchived=true` includes archived ones. Returns `{threads, active_id}`. |
+| `POST /api/planning/threads` | Create a new thread. Body `{name?}`; omitted name auto-generates `Chat N`. |
+| `PATCH /api/planning/threads/{id}` | Rename a thread. Body `{name}`. |
+| `POST /api/planning/threads/{id}/archive` | Archive a thread (hide from tab bar; files retained). 409 if the thread is in-flight. |
+| `POST /api/planning/threads/{id}/unarchive` | Restore an archived thread. |
+| `POST /api/planning/threads/{id}/activate` | Record the UI's active thread. Rejects archived/unknown IDs. |
 | **Sandbox images** | |
 | `GET /api/images` | Check which sandbox images are cached locally |
 | `POST /api/images/pull` | Start async pull for a sandbox image |

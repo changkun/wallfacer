@@ -57,12 +57,24 @@ func TestUndoPlanningRound_Success(t *testing.T) {
 		t.Errorf("files_reverted = %v, want [specs/foo.md]", resp.FilesReverted)
 	}
 
-	// The planning commit should be gone and the spec file absent.
+	// With the git-revert design, the original planning commit stays in
+	// history and a forward revert commit sits on top of it. Verify both
+	// are present and that the spec file is gone from the working tree.
 	subjects := gitLogSubjects(t, ws)
+	var sawOriginal, sawRevert bool
 	for _, s := range subjects {
-		if strings.Contains(s, "(plan):") {
-			t.Errorf("planning commit still present: %q", s)
+		if strings.Contains(s, "(plan): drafted foo") {
+			sawOriginal = true
 		}
+		if strings.Contains(s, "revert round 1") {
+			sawRevert = true
+		}
+	}
+	if !sawOriginal {
+		t.Errorf("original planning commit missing from history; subjects=%v", subjects)
+	}
+	if !sawRevert {
+		t.Errorf("revert commit not found in history; subjects=%v", subjects)
 	}
 	if _, err := os.Stat(filepath.Join(ws, "specs", "foo.md")); !os.IsNotExist(err) {
 		t.Errorf("specs/foo.md still exists after undo: err=%v", err)
@@ -81,7 +93,7 @@ func TestUndoPlanningRound_NoPlanningCommits(t *testing.T) {
 		t.Fatalf("status = %d, want 409", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "no planning commits to undo") {
-		t.Errorf("body = %q, want error about no planning commits", rec.Body.String())
+		t.Errorf("body = %q, want error about no planning commits to undo", rec.Body.String())
 	}
 }
 

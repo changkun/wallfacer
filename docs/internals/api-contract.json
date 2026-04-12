@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 102,
+  "route_count": 108,
   "routes": [
     {
       "method": "GET",
@@ -324,6 +324,60 @@
       "pattern": "/api/planning/commands",
       "name": "GetPlanningCommands",
       "description": "List available slash commands.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/planning/threads",
+      "name": "ListPlanningThreads",
+      "description": "List planning chat threads for the current workspace group.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/planning/threads",
+      "name": "CreatePlanningThread",
+      "description": "Create a new planning chat thread.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "pattern": "/api/planning/threads/{id}",
+      "name": "RenamePlanningThread",
+      "description": "Rename a planning chat thread.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/planning/threads/{id}/archive",
+      "name": "ArchivePlanningThread",
+      "description": "Archive a planning chat thread (hide from tab bar; files retained).",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/planning/threads/{id}/unarchive",
+      "name": "UnarchivePlanningThread",
+      "description": "Restore a planning chat thread from archive.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/planning/threads/{id}/activate",
+      "name": "ActivatePlanningThread",
+      "description": "Set the UI's active planning chat thread.",
       "tags": [
         "planning"
       ]

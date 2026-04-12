@@ -8,6 +8,7 @@ package planner
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
@@ -49,15 +50,20 @@ type Planner struct {
 	cpus             string
 	memory           string
 
-	handle       sandbox.Handle     // non-nil when a planning invocation is active
-	active       bool               // true after Start, false after Stop
-	busy         bool               // true while a chat exec is in flight
-	liveLog      *livelog.Log       // live output buffer for the current exec (nil when idle)
-	conversation *ConversationStore // chat message persistence (nil if configDir empty)
+	handle       sandbox.Handle // non-nil when a planning invocation is active
+	active       bool           // true after Start, false after Stop
+	busy         bool           // true while a chat exec is in flight
+	busyThreadID string         // thread ID of the in-flight exec (empty when !busy)
+	liveLog      *livelog.Log   // live output buffer for the current exec (nil when idle)
+	threads      *ThreadManager // multi-thread chat persistence (nil if configDir empty)
+
+	configDir string // root config directory; kept so UpdateWorkspaces can open a new ThreadManager
 }
 
-// New creates a Planner from the given configuration.
-// If ConfigDir is set, a ConversationStore is created for chat persistence.
+// New creates a Planner from the given configuration. If ConfigDir and
+// Fingerprint are set, a [ThreadManager] is created for multi-thread
+// chat persistence; on first load, any legacy single-thread layout is
+// migrated to "Chat 1".
 func New(cfg Config) *Planner {
 	p := &Planner{
 		backend:          cfg.Backend,
@@ -70,20 +76,49 @@ func New(cfg Config) *Planner {
 		network:          cfg.Network,
 		cpus:             cfg.CPUs,
 		memory:           cfg.Memory,
+		configDir:        cfg.ConfigDir,
 	}
 	if cfg.ConfigDir != "" && cfg.Fingerprint != "" {
-		cs, err := NewConversationStore(cfg.ConfigDir, cfg.Fingerprint)
+		tm, err := NewThreadManager(filepath.Join(cfg.ConfigDir, "planning", cfg.Fingerprint))
 		if err == nil {
-			p.conversation = cs
+			p.threads = tm
 		}
 	}
 	return p
 }
 
-// Conversation returns the conversation store for chat persistence,
-// or nil if conversation storage is not configured.
+// Threads returns the multi-thread chat manager, or nil if thread
+// persistence is not configured.
+func (p *Planner) Threads() *ThreadManager {
+	return p.threads
+}
+
+// ActiveConversation returns the [ConversationStore] for the currently
+// active thread, or nil when no thread exists or thread storage is not
+// configured. Handlers should prefer looking up a store by explicit
+// thread ID via Threads().Store(id).
+func (p *Planner) ActiveConversation() *ConversationStore {
+	if p.threads == nil {
+		return nil
+	}
+	id := p.threads.ActiveID()
+	if id == "" {
+		return nil
+	}
+	s, err := p.threads.Store(id)
+	if err != nil {
+		return nil
+	}
+	return s
+}
+
+// Conversation is a compatibility shim for callers that haven't yet
+// been migrated to pass an explicit thread ID. It returns the active
+// thread's store. New code should go through Threads().Store(id).
+//
+// TODO(multi-thread): remove once all handlers route through thread IDs.
 func (p *Planner) Conversation() *ConversationStore {
-	return p.conversation
+	return p.ActiveConversation()
 }
 
 // Start marks the planner as active. The actual container is created lazily
@@ -156,11 +191,28 @@ func (p *Planner) IsBusy() bool {
 	return p.busy
 }
 
-// SetBusy marks the planner as busy (exec in flight).
-func (p *Planner) SetBusy(b bool) {
+// BusyThreadID returns the thread ID of the in-flight exec, or the empty
+// string if nothing is running.
+func (p *Planner) BusyThreadID() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.busy {
+		return ""
+	}
+	return p.busyThreadID
+}
+
+// SetBusy marks the planner as busy (exec in flight) and records the
+// thread ID that owns the exec. Pass an empty threadID when clearing.
+func (p *Planner) SetBusy(b bool, threadID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.busy = b
+	if b {
+		p.busyThreadID = threadID
+	} else {
+		p.busyThreadID = ""
+	}
 }
 
 // StartLiveLog creates a new live log buffer for the current exec.
@@ -184,13 +236,20 @@ func (p *Planner) CloseLiveLog() {
 	}
 }
 
-// LogReader returns a reader for the current exec's live log,
-// or nil if no exec is in flight.
-func (p *Planner) LogReader() *livelog.Reader {
+// LogReader returns a reader for the current exec's live log, scoped to
+// the thread that owns the exec. Pass an empty threadID to read
+// regardless of thread (used by callers that don't yet track threads).
+// Returns nil if no exec is in flight, or if threadID is non-empty and
+// does not match the thread that owns the exec.
+func (p *Planner) LogReader(threadID string) *livelog.Reader {
 	p.mu.Lock()
 	l := p.liveLog
+	owner := p.busyThreadID
 	p.mu.Unlock()
 	if l == nil {
+		return nil
+	}
+	if threadID != "" && owner != "" && threadID != owner {
 		return nil
 	}
 	return l.NewReader()
@@ -220,9 +279,11 @@ func (p *Planner) Interrupt() error {
 	return nil
 }
 
-// UpdateWorkspaces destroys the current planning container (if any) and
-// stores new workspace configuration. A subsequent Start+Exec will create
-// a container with the updated mounts.
+// UpdateWorkspaces destroys the current planning container (if any),
+// stores new workspace configuration, and re-opens the thread manager
+// rooted at the new fingerprint's planning directory so thread CRUD,
+// messages, and undo target the right workspace group after a switch.
+// A subsequent Start+Exec will create a container with the updated mounts.
 func (p *Planner) UpdateWorkspaces(workspaces []string, fingerprint string) {
 	p.Stop()
 
@@ -230,6 +291,12 @@ func (p *Planner) UpdateWorkspaces(workspaces []string, fingerprint string) {
 	defer p.mu.Unlock()
 	p.workspaces = workspaces
 	p.fingerprint = fingerprint
+	if p.configDir != "" && fingerprint != "" {
+		tm, err := NewThreadManager(filepath.Join(p.configDir, "planning", fingerprint))
+		if err == nil {
+			p.threads = tm
+		}
+	}
 }
 
 // truncFingerprint returns the first 12 characters of a fingerprint string,

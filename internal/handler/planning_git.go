@@ -57,6 +57,12 @@ const (
 	// follow the kanban `<path>: <imperative subject>` convention.
 	planRoundTrailerPrefix = "Plan-Round: "
 
+	// planThreadTrailerPrefix identifies the chat thread that produced a
+	// planning commit. Undo queries this trailer to find the most recent
+	// commit written by the caller's thread regardless of commit ordering
+	// across threads.
+	planThreadTrailerPrefix = "Plan-Thread: "
+
 	// planCommitScope tags planning commits inside the subject-line scope
 	// (e.g. `specs/local/auth(plan): ...`). Matches conventional-commits
 	// scope style.
@@ -102,6 +108,7 @@ func commitPlanningRound(
 	ctx context.Context,
 	ws, userPrompt, agentSummary string,
 	genCommit commitMessageGenerator,
+	threadID string,
 ) (int, error) {
 	out, err := cmdexec.Git(ws, "status", "--porcelain", "specs/").WithContext(ctx).Output()
 	if err != nil || out == "" {
@@ -142,7 +149,7 @@ func commitPlanningRound(
 		}
 	}
 
-	msg := buildPlanCommitMessage(agentMsg, agentSummary, primary, n)
+	msg := buildPlanCommitMessage(agentMsg, agentSummary, primary, n, threadID)
 
 	// Use the host's global git identity via -c overrides so a
 	// sandbox-polluted repo-local user.name/user.email (a task-container
@@ -183,7 +190,7 @@ func hostGitIdentityOverrides(ctx context.Context) []string {
 // end up glued to the subject line (see `buildPlanCommitMessage_Sanitizes*`
 // tests). If the agent forgot the `(plan)` scope, ensurePlanScope splices
 // it in.
-func buildPlanCommitMessage(agentMsg, agentSummary, primary string, n int) string {
+func buildPlanCommitMessage(agentMsg, agentSummary, primary string, n int, threadID string) string {
 	agentMsg = sanitizeAgentCommitMessage(agentMsg)
 
 	var body string
@@ -217,6 +224,9 @@ func buildPlanCommitMessage(agentMsg, agentSummary, primary string, n int) strin
 		msg += "\n\n" + body
 	}
 	msg += "\n\n" + planRoundTrailerPrefix + strconv.Itoa(n)
+	if threadID != "" {
+		msg += "\n" + planThreadTrailerPrefix + threadID
+	}
 	return msg
 }
 

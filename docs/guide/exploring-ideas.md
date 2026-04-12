@@ -62,7 +62,20 @@ Keep typing while the agent is responding. New messages appear as queued chips b
 
 ### Clearing History
 
-Click **Clear** in the chat header to discard all messages and start a fresh conversation. The underlying container session is preserved; only the visible message history is cleared.
+Click **Clear** in the chat header to discard all messages in the current thread and start a fresh conversation on that thread. The underlying container session is preserved; only the visible message history is cleared.
+
+### Threads
+
+The chat supports multiple named threads per workspace group. Tabs sit above the message stream:
+
+- Click **+** to create a new thread (default name `Chat N`). Click the pencil icon (or double-click the tab) to rename inline — Enter commits, Escape cancels.
+- Click **×** on a tab to archive it (the in-flight thread cannot be archived; interrupt it first). Archived threads are hidden from the tab bar but files are retained; a **▾** menu next to **+** lists archived threads for restore.
+- Each thread keeps its own Claude Code session and history. Switching tabs does not abort an in-flight agent — its output continues to land in its own thread. When a background thread finishes, its tab shows a small unread dot.
+- Only one agent turn runs at a time across all threads, since they share the single planner sandbox container. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the exec completes (global FIFO).
+
+### Undo
+
+Click the undo button on an assistant bubble to revert the planning round it produced. Undo works across threads: it targets the caller thread's most recent round even when a different thread committed afterwards. Internally this uses `git revert`, which creates a forward revert commit rather than rewriting history — both the original and the revert remain in `git log`.
 
 ---
 
@@ -70,7 +83,7 @@ Click **Clear** in the chat header to discard all messages and start a fresh con
 
 ### Session Persistence
 
-Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace paths. Reopening the app or refreshing the page restores prior messages for the same workspace group.
+Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace paths. Each thread lives under `threads/<thread-id>/` with its own `messages.jsonl` and `session.json`. Reopening the app or refreshing the page restores the full thread manifest and the last active tab for the same workspace group. Installations from before multi-thread support are migrated transparently on first run (existing conversation appears as `Chat 1`).
 
 ### Session Recovery
 

@@ -78,14 +78,17 @@ func (h *Handler) StopPlanning(w http.ResponseWriter, _ *http.Request) {
 }
 
 // GetPlanningMessages returns the planning conversation history as a JSON array.
-// Supports optional ?before=<RFC3339> for pagination.
+// Supports optional ?before=<RFC3339> for pagination. The `?thread=<id>`
+// query parameter selects which thread's history is returned; when
+// omitted, the currently active thread is used.
 func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
-	if h.planner == nil || h.planner.Conversation() == nil {
+	cs := h.lookupThreadStore(h.threadIDFromRequest(r))
+	if cs == nil {
 		httpjson.Write(w, http.StatusOK, []any{})
 		return
 	}
 
-	msgs, err := h.planner.Conversation().Messages()
+	msgs, err := cs.Messages()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -115,7 +118,9 @@ func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
 
 // SendPlanningMessage sends a user message to the planning agent.
 // The agent exec runs in a background goroutine; returns 202 immediately.
-// Returns 409 if an exec is already in flight.
+// Returns 409 if an exec is already in flight. The `?thread=<id>` query
+// parameter (or body field) selects which thread receives the message;
+// when omitted, the active thread is used.
 func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	if h.planner == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
@@ -131,6 +136,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Message     string `json:"message"`
 		FocusedSpec string `json:"focused_spec"`
+		Thread      string `json:"thread"`
 	}](w, r)
 	if !ok {
 		return
@@ -140,9 +146,13 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cs := h.planner.Conversation()
+	threadID := strings.TrimSpace(req.Thread)
+	if threadID == "" {
+		threadID = h.threadIDFromRequest(r)
+	}
+	cs := h.lookupThreadStore(threadID)
 	if cs == nil {
-		http.Error(w, "conversation store not configured", http.StatusServiceUnavailable)
+		http.Error(w, "thread not found", http.StatusNotFound)
 		return
 	}
 
@@ -156,6 +166,9 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	if err := cs.AppendMessage(userMsg); err != nil {
 		http.Error(w, "failed to persist message", http.StatusInternalServerError)
 		return
+	}
+	if tm := h.threadsManager(); tm != nil {
+		tm.Touch(threadID)
 	}
 
 	// Expand slash commands before building exec args.
@@ -187,7 +200,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.planner.SetBusy(true)
+	h.planner.SetBusy(true, threadID)
 	ll := h.planner.StartLiveLog()
 
 	// Run exec in background goroutine. Use a detached context because the
@@ -198,7 +211,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			// frontend receives the stream EOF and immediately drains its
 			// message queue, the backend is already ready to accept the next
 			// request (otherwise the queued message races and gets a 409).
-			h.planner.SetBusy(false)
+			h.planner.SetBusy(false, "")
 			h.planner.CloseLiveLog()
 			if rec := recover(); rec != nil {
 				slog.Error("planning exec panic", "recover", rec)
@@ -283,7 +296,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 				genCommit = h.runner.GenerateCommitMessage
 			}
 			for _, ws := range h.currentWorkspaces() {
-				n, cerr := commitPlanningRound(commitCtx, ws, req.Message, resultText, genCommit)
+				n, cerr := commitPlanningRound(commitCtx, ws, req.Message, resultText, genCommit, threadID)
 				if cerr != nil {
 					slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
 					continue
@@ -306,6 +319,10 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 					RawOutput:   string(rawStdout),
 					PlanRound:   planRound,
 				})
+				// Touch the thread so the UI can sort by recent activity.
+				if tm := h.threadsManager(); tm != nil {
+					tm.Touch(threadID)
+				}
 			}
 		}
 	}()
@@ -316,18 +333,25 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 // StreamPlanningMessages streams the current planning exec's raw stdout.
 // Uses the same plain-text streaming pattern as task log streaming
 // (streamLiveLog) so the frontend can reuse renderPrettyLogs().
-// Returns 204 No Content if no exec is in flight.
+// Returns 204 No Content if no exec is in flight, or if the `?thread=<id>`
+// query parameter does not match the thread that owns the exec.
 func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request) {
 	if h.planner == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
+	// Resolve the requested thread. An explicit ?thread= must match the
+	// in-flight thread exactly; otherwise the client is either polling
+	// for its own thread (which isn't the one running) or looking at a
+	// different workspace group.
+	threadID := strings.TrimSpace(r.URL.Query().Get("thread"))
+
 	// Poll briefly for the live log — there's a race between the client
 	// connecting here and the exec goroutine creating the live log.
 	var lr *livelog.Reader
 	for range 20 { // up to ~2s
-		lr = h.planner.LogReader()
+		lr = h.planner.LogReader(threadID)
 		if lr != nil {
 			break
 		}
@@ -393,23 +417,39 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// ClearPlanningMessages clears the planning conversation history and session.
-func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, _ *http.Request) {
-	if h.planner != nil && h.planner.Conversation() != nil {
-		if err := h.planner.Conversation().Clear(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+// ClearPlanningMessages clears a thread's conversation history and
+// session. The `?thread=<id>` query parameter selects which thread;
+// when omitted the active thread is used.
+func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, r *http.Request) {
+	cs := h.lookupThreadStore(h.threadIDFromRequest(r))
+	if cs == nil {
+		httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
+		return
+	}
+	if err := cs.Clear(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
 }
 
-// InterruptPlanningMessage interrupts the current agent turn.
-// Returns 409 if no exec is in flight.
-func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, _ *http.Request) {
+// InterruptPlanningMessage interrupts the current agent turn. When a
+// `?thread=<id>` is supplied it must match the in-flight thread,
+// otherwise the request is rejected (409). Returns 409 if no exec is
+// in flight.
+func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	if h.planner == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
 		return
+	}
+	if threadID := strings.TrimSpace(r.URL.Query().Get("thread")); threadID != "" {
+		owner := h.planner.BusyThreadID()
+		if owner != "" && owner != threadID {
+			httpjson.Write(w, http.StatusConflict, map[string]any{
+				"error": "a different thread is currently running",
+			})
+			return
+		}
 	}
 	if err := h.planner.Interrupt(); err != nil {
 		httpjson.Write(w, http.StatusConflict, map[string]any{"error": err.Error()})

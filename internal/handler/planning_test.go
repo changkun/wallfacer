@@ -254,7 +254,7 @@ func TestSendPlanningMessage_Busy(t *testing.T) {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	p.SetBusy(true)
+	p.SetBusy(true, "")
 	h.planner = p
 
 	rec := httptest.NewRecorder()
@@ -458,7 +458,7 @@ func TestInterruptPlanningMessage_Busy(t *testing.T) {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	p.SetBusy(true)
+	p.SetBusy(true, "")
 	_ = p.StartLiveLog()
 	h.planner = p
 
@@ -473,7 +473,7 @@ func TestInterruptPlanningMessage_Busy(t *testing.T) {
 	if p.IsBusy() {
 		t.Error("planner should not be busy after interrupt")
 	}
-	if p.LogReader() != nil {
+	if p.LogReader("") != nil {
 		t.Error("live log should be nil after interrupt")
 	}
 }

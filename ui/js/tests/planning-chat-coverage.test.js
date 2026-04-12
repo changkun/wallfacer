@@ -164,7 +164,20 @@ function makeContext(overrides = {}) {
       text: vi.fn().mockResolvedValue(""),
       json: vi.fn().mockResolvedValue({}),
     }),
-    api: vi.fn().mockResolvedValue([]),
+    api: vi.fn().mockImplementation((url) => {
+      if (
+        typeof url === "string" &&
+        url.indexOf("/api/planning/threads") !== -1
+      ) {
+        return Promise.resolve({
+          threads: [
+            { id: "t1", name: "Chat 1", archived: false, active: true },
+          ],
+          active_id: "t1",
+        });
+      }
+      return Promise.resolve([]);
+    }),
     Routes: {
       planning: {
         messages: () => "/api/planning/messages",
@@ -173,6 +186,13 @@ function makeContext(overrides = {}) {
         commands: () => "/api/planning/commands",
         interruptMessage: () => "/api/planning/messages/interrupt",
         clearMessages: () => "/api/planning/messages",
+        undo: () => "/api/planning/undo",
+        listThreads: () => "/api/planning/threads",
+        createThread: () => "/api/planning/threads",
+        renameThread: () => "/api/planning/threads/{id}",
+        archiveThread: () => "/api/planning/threads/{id}/archive",
+        unarchiveThread: () => "/api/planning/threads/{id}/unarchive",
+        activateThread: () => "/api/planning/threads/{id}/activate",
       },
     },
     renderMarkdown: vi.fn((text) => "<p>" + text + "</p>"),
@@ -214,10 +234,7 @@ function loadPlanningChat(ctx) {
   // planning-chat.js uses the shared autocomplete widget. Load the
   // compiled widget first so `attachAutocomplete` is a global in the
   // sandbox context before init() runs.
-  const widget = readFileSync(
-    join(jsDir, "build/lib/autocomplete.js"),
-    "utf8",
-  );
+  const widget = readFileSync(join(jsDir, "build/lib/autocomplete.js"), "utf8");
   vm.runInContext(widget, ctx, {
     filename: join(jsDir, "build/lib/autocomplete.js"),
   });
@@ -359,13 +376,14 @@ describe("planning-chat.js", () => {
       expect(ctx.attachMentionAutocomplete).toHaveBeenCalled();
     });
 
-    it("loads history on init", () => {
+    it("loads history on init", async () => {
       const elems = makeStandardElements();
       const ctx = makeContext({ elements: elems });
       loadPlanningChat(ctx);
-      ctx.PlanningChat.init();
-      // api should have been called with the messages route
-      expect(ctx.api).toHaveBeenCalledWith("/api/planning/messages");
+      await ctx.PlanningChat.init();
+      // api should have been called with the messages route (thread param
+      // appended once the manifest resolves to the default "Chat 1").
+      expect(ctx.api).toHaveBeenCalledWith("/api/planning/messages?thread=t1");
     });
 
     it("fetches commands on init", () => {
@@ -511,7 +529,13 @@ describe("planning-chat.js", () => {
       const ctx = makeContext({
         elements: elems,
         api: vi.fn().mockImplementation((url) => {
-          if (url === "/api/planning/messages") {
+          if (url.indexOf("/api/planning/threads") !== -1) {
+            return Promise.resolve({
+              threads: [{ id: "t1", name: "Chat 1" }],
+              active_id: "t1",
+            });
+          }
+          if (url.startsWith("/api/planning/messages")) {
             return Promise.resolve([
               {
                 role: "user",
@@ -548,7 +572,13 @@ describe("planning-chat.js", () => {
       const ctx = makeContext({
         elements: elems,
         api: vi.fn().mockImplementation((url) => {
-          if (url === "/api/planning/messages") {
+          if (url.indexOf("/api/planning/threads") !== -1) {
+            return Promise.resolve({
+              threads: [{ id: "t1", name: "Chat 1" }],
+              active_id: "t1",
+            });
+          }
+          if (url.startsWith("/api/planning/messages")) {
             return Promise.resolve([
               {
                 role: "assistant",
@@ -605,7 +635,11 @@ describe("planning-chat.js", () => {
         "/api/planning/messages",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ message: "test message", focused_spec: "" }),
+          body: JSON.stringify({
+            message: "test message",
+            focused_spec: "",
+            thread: "t1",
+          }),
         }),
       );
 
@@ -641,6 +675,7 @@ describe("planning-chat.js", () => {
           body: JSON.stringify({
             message: "hello",
             focused_spec: "specs/local/test.md",
+            thread: "t1",
           }),
         }),
       );
@@ -902,7 +937,7 @@ describe("planning-chat.js", () => {
       await ctx.PlanningChat.clearHistory();
 
       expect(ctx.fetch).toHaveBeenCalledWith(
-        "/api/planning/messages",
+        "/api/planning/messages?thread=t1",
         expect.objectContaining({ method: "DELETE" }),
       );
       expect(messagesEl.innerHTML).toBe("");
@@ -1117,6 +1152,12 @@ describe("planning-chat.js", () => {
       const ctx = makeContext({
         elements: elems,
         api: vi.fn().mockImplementation((url) => {
+          if (url.indexOf("/api/planning/threads") !== -1) {
+            return Promise.resolve({
+              threads: [{ id: "t1", name: "Chat 1" }],
+              active_id: "t1",
+            });
+          }
           if (url === "/api/planning/commands") {
             return Promise.resolve([
               { name: "help", description: "Show help" },
@@ -1163,6 +1204,12 @@ describe("planning-chat.js", () => {
       const ctx = makeContext({
         elements: elems,
         api: vi.fn().mockImplementation((url) => {
+          if (url.indexOf("/api/planning/threads") !== -1) {
+            return Promise.resolve({
+              threads: [{ id: "t1", name: "Chat 1" }],
+              active_id: "t1",
+            });
+          }
           if (url === "/api/planning/commands") {
             return Promise.resolve([
               { name: "help", description: "Show help" },

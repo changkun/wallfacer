@@ -232,13 +232,21 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `GET /api/planning` — Get planning sandbox status (running or not)
 - `POST /api/planning` — Start the planning sandbox container (idempotent)
 - `DELETE /api/planning` — Stop the planning sandbox container
-- `GET /api/planning/messages` — Retrieve conversation history (supports `?before=<RFC3339>` pagination)
-- `POST /api/planning/messages` — Send a user message, triggers agent exec (returns 202; 409 if busy)
-- `DELETE /api/planning/messages` — Clear conversation history and session
-- `GET /api/planning/messages/stream` — SSE: stream agent response tokens (204 if not busy)
-- `POST /api/planning/messages/interrupt` — Interrupt current agent turn (409 if not busy)
-- `POST /api/planning/undo` — Revert the last planning commit (kanban-style subject `<primary-path>(plan): …` with a `Plan-Round: N` trailer in the body) via `git reset --hard HEAD~1`; stashes dirty user edits across the reset and cancels any kanban tasks whose `dispatched_task_id` was added by the reverted commit. 409 if no planning commits exist, if the planning commit is not at HEAD, or on stash-pop conflict.
+- `GET /api/planning/messages` — Retrieve conversation history for a thread (supports `?before=<RFC3339>` pagination and `?thread=<id>`; defaults to the active thread)
+- `POST /api/planning/messages` — Send a user message; body field `thread` (or `?thread=`) selects the thread. Returns 202; 409 if busy
+- `DELETE /api/planning/messages` — Clear a thread's conversation history and session (`?thread=<id>`; defaults to active)
+- `GET /api/planning/messages/stream` — SSE: stream agent response tokens. Returns 204 if no exec in flight or `?thread=<id>` does not match the in-flight thread
+- `POST /api/planning/messages/interrupt` — Interrupt current agent turn. `?thread=<id>` must match the in-flight thread (409 otherwise)
+- `POST /api/planning/undo` — Undo the caller thread's most recent planning round via `git revert` (history keeps the original commit and the revert; the revert carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread; defaults to the active. Dispatched kanban tasks whose `dispatched_task_id` was added in the reverted commit are cancelled. 409 on revert conflict (aborts the revert, leaves the tree clean) or stash-pop conflict.
 - `GET /api/planning/commands` — List available slash commands for UI autocomplete
+
+### Planning Chat Threads
+- `GET /api/planning/threads` — List planning chat threads for the current workspace group; returns `{threads, active_id}`. Pass `?includeArchived=true` to include archived threads.
+- `POST /api/planning/threads` — Create a new thread. Body `{name?}`; when omitted, a default `Chat N` name is used.
+- `PATCH /api/planning/threads/{id}` — Rename a thread (body `{name}`).
+- `POST /api/planning/threads/{id}/archive` — Archive a thread (hides it from the tab bar; files are retained). 409 if the thread is in-flight.
+- `POST /api/planning/threads/{id}/unarchive` — Restore an archived thread.
+- `POST /api/planning/threads/{id}/activate` — Record the UI's active thread (rejects archived/unknown IDs).
 
 ### Usage & Statistics
 - `GET /api/usage` — Aggregated token and cost usage statistics

@@ -175,6 +175,30 @@ var Routes = {
     commands: function () {
       return "/api/planning/commands";
     },
+    // GET /api/planning/threads
+    listThreads: function () {
+      return "/api/planning/threads";
+    },
+    // POST /api/planning/threads
+    createThread: function () {
+      return "/api/planning/threads";
+    },
+    // PATCH /api/planning/threads/{id}
+    renameThread: function () {
+      return "/api/planning/threads/{id}";
+    },
+    // POST /api/planning/threads/{id}/archive
+    archiveThread: function () {
+      return "/api/planning/threads/{id}/archive";
+    },
+    // POST /api/planning/threads/{id}/unarchive
+    unarchiveThread: function () {
+      return "/api/planning/threads/{id}/unarchive";
+    },
+    // POST /api/planning/threads/{id}/activate
+    activateThread: function () {
+      return "/api/planning/threads/{id}/activate";
+    },
   },
 
   env: {

@@ -554,6 +554,154 @@
   padding: 8px;
 }
 
+/* Thread tab bar above chat messages. Mirrors the workspace-group-tab
+ * look (see ui/css/header.css) so multi-tab UX is consistent across
+ * the header and the specs chat. */
+.spec-chat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+
+.spec-chat-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.spec-chat-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-chat-tab--active {
+  color: var(--text);
+  background: var(--bg-card);
+  border-color: var(--border);
+  position: relative;
+  /* Nudge the active tab down so its bottom border meets the
+   * container's border-bottom and appears to "sit on" the content. */
+  margin-bottom: -1px;
+  border-bottom: 1px solid var(--bg-card);
+}
+
+.spec-chat-tab__label {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 160px;
+}
+
+.spec-chat-tab__unread {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #2b7cff);
+  display: inline-block;
+}
+
+.spec-chat-tab__pencil,
+.spec-chat-tab__close {
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.5;
+  line-height: 1;
+}
+
+.spec-chat-tab__pencil:hover,
+.spec-chat-tab__close:hover {
+  opacity: 1;
+}
+
+.spec-chat-tab__new-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.spec-chat-tab__new,
+.spec-chat-tab__archived-trigger {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  font-size: 14px;
+}
+
+.spec-chat-tab__new:hover,
+.spec-chat-tab__archived-trigger:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-chat-tab__rename-input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-input, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: 120px;
+  outline: none;
+}
+
+.spec-chat-archived-menu {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  min-width: 180px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  padding: 4px 0;
+  z-index: 10000;
+}
+
+.spec-chat-archived-menu__header {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.spec-chat-archived-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.spec-chat-archived-menu__item:hover {
+  background: var(--bg-hover);
+}
+
 /* Composer: Slack-style bordered container with textarea + action bar */
 .spec-chat-composer {
   margin: 6px 8px 8px;

@@ -345,14 +345,14 @@ func TestPlannerStartLiveLog(t *testing.T) {
 	}
 	// Write something and verify LogReader works.
 	_, _ = l.Write([]byte("hello"))
-	r := p.LogReader()
+	r := p.LogReader("")
 	if r == nil {
 		t.Fatal("LogReader returned nil while live log active")
 	}
 
 	p.CloseLiveLog()
 	// After close, LogReader should return nil.
-	r2 := p.LogReader()
+	r2 := p.LogReader("")
 	if r2 != nil {
 		t.Error("LogReader should return nil after CloseLiveLog")
 	}
@@ -360,7 +360,7 @@ func TestPlannerStartLiveLog(t *testing.T) {
 
 func TestPlannerLogReader_NoLiveLog(t *testing.T) {
 	p := New(Config{Command: "podman"})
-	if p.LogReader() != nil {
+	if p.LogReader("") != nil {
 		t.Error("LogReader should return nil when no live log")
 	}
 }
@@ -383,7 +383,7 @@ func TestPlannerInterrupt_NotBusy(t *testing.T) {
 
 func TestPlannerInterrupt_Busy(t *testing.T) {
 	p := New(Config{Command: "podman"})
-	p.SetBusy(true)
+	p.SetBusy(true, "")
 	p.handle = &mockHandle{}
 	l := p.StartLiveLog()
 	_ = l
@@ -395,7 +395,7 @@ func TestPlannerInterrupt_Busy(t *testing.T) {
 	if p.IsBusy() {
 		t.Error("should not be busy after Interrupt")
 	}
-	if p.LogReader() != nil {
+	if p.LogReader("") != nil {
 		t.Error("live log should be closed after Interrupt")
 	}
 }

@@ -85,7 +85,7 @@ func TestCommitPlanningRound_DirtySpecs(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# Foo\n")
 
-	round, err := commitPlanningRound(context.Background(), ws, "user asked to draft foo", "drafted foo", nil)
+	round, err := commitPlanningRound(context.Background(), ws, "user asked to draft foo", "drafted foo", nil, "")
 	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestCommitPlanningRound_NoOp(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	before := gitLogSubjects(t, ws)
 
-	round, err := commitPlanningRound(context.Background(), ws, "noop prompt", "nothing changed", nil)
+	round, err := commitPlanningRound(context.Background(), ws, "noop prompt", "nothing changed", nil, "")
 	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestCommitPlanningRound_RoundNumbering(t *testing.T) {
 
 	// Three rounds, each adding a spec file.
 	writeSpec(t, ws, "a.md", "a\n")
-	r1, err := commitPlanningRound(context.Background(), ws, "p1", "first", nil)
+	r1, err := commitPlanningRound(context.Background(), ws, "p1", "first", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestCommitPlanningRound_RoundNumbering(t *testing.T) {
 		t.Errorf("first round = %d, want 1", r1)
 	}
 	writeSpec(t, ws, "b.md", "b\n")
-	r2, err := commitPlanningRound(context.Background(), ws, "p2", "second", nil)
+	r2, err := commitPlanningRound(context.Background(), ws, "p2", "second", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestCommitPlanningRound_RoundNumbering(t *testing.T) {
 		t.Errorf("second round = %d, want 2", r2)
 	}
 	writeSpec(t, ws, "c.md", "c\n")
-	r3, err := commitPlanningRound(context.Background(), ws, "p3", "third", nil)
+	r3, err := commitPlanningRound(context.Background(), ws, "p3", "third", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestCommitPlanningRound_SubjectTruncation(t *testing.T) {
 	// 200-char summary on a single line; subject should truncate at
 	// commitPlanningRoundSubjectMax runes with an ellipsis suffix.
 	long := strings.Repeat("x", 200)
-	if _, err := commitPlanningRound(context.Background(), ws, "long prompt", long, nil); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "long prompt", long, nil, ""); err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
 
@@ -221,7 +221,7 @@ func TestCommitPlanningRound_PrimaryPathFromEpic(t *testing.T) {
 	writeSpec(t, ws, "local/auth/overview.md", "a\n")
 	writeSpec(t, ws, "local/auth/oauth.md", "b\n")
 
-	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "draft auth epic", nil); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "draft auth epic", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,7 +241,7 @@ func TestCommitPlanningRound_PrimaryPathMixedTracks(t *testing.T) {
 	writeSpec(t, ws, "local/foo.md", "a\n")
 	writeSpec(t, ws, "cloud/bar.md", "b\n")
 
-	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "cross-track note", nil); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "cross-track note", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,7 +265,7 @@ func TestCommitPlanningRound_SubjectSkipsFrontmatterAndHeadings(t *testing.T) {
 	summary := "---\ntitle: foo\n---\n\n# Heading\n\n" +
 		"Add OAuth flow breakdown for auth epic.\n\n" +
 		"Second paragraph with detail.\n"
-	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", summary, nil); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", summary, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,7 +285,7 @@ func TestCommitPlanningRound_FallbackSubjectForEmptySummary(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
-	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "   \n\n---\n\n", nil); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "   \n\n---\n\n", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -316,7 +316,7 @@ func TestCommitPlanningRound_AgentGeneratedMessage(t *testing.T) {
 			"implementation can be scheduled independently.", nil
 	}
 
-	round, err := commitPlanningRound(context.Background(), ws, "user asked for auth plan", "agent said stuff", gen)
+	round, err := commitPlanningRound(context.Background(), ws, "user asked for auth plan", "agent said stuff", gen, "")
 	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
@@ -346,7 +346,7 @@ func TestCommitPlanningRound_AgentMissingScopeGetsSpliced(t *testing.T) {
 		return "specs/local/auth: add OAuth breakdown\n\nwhy body", nil
 	}
 
-	if _, err := commitPlanningRound(context.Background(), ws, "prompt", "summary", gen); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "prompt", "summary", gen, ""); err != nil {
 		t.Fatal(err)
 	}
 	subjects := gitLogSubjects(t, ws)
@@ -364,7 +364,7 @@ func TestCommitPlanningRound_AgentErrorFallsBack(t *testing.T) {
 		return "", fmt.Errorf("agent timed out")
 	}
 
-	if _, err := commitPlanningRound(context.Background(), ws, "prompt", "agent summary text", gen); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "prompt", "agent summary text", gen, ""); err != nil {
 		t.Fatal(err)
 	}
 	subjects := gitLogSubjects(t, ws)
@@ -393,7 +393,7 @@ func TestCommitPlanningRound_SanitizesAgentFencedOutput(t *testing.T) {
 			"```\n", nil
 	}
 
-	if _, err := commitPlanningRound(context.Background(), ws, "user", "summary", gen); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "user", "summary", gen, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -426,7 +426,7 @@ func TestCommitPlanningRound_AgentPreambleOnlyFallsBack(t *testing.T) {
 		return "I'll write a commit message: it updates the auth spec with new content.", nil
 	}
 
-	if _, err := commitPlanningRound(context.Background(), ws, "user", "agent summary", gen); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, "user", "agent summary", gen, ""); err != nil {
 		t.Fatal(err)
 	}
 	subjects := gitLogSubjects(t, ws)
@@ -536,7 +536,7 @@ func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {
 
 	// Simulate the per-workspace loop inside SendPlanningMessage.
 	ctx := context.Background()
-	n, err := commitPlanningRound(ctx, ws, "draft foo spec", "drafted foo", nil)
+	n, err := commitPlanningRound(ctx, ws, "draft foo spec", "drafted foo", nil, "")
 	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
@@ -566,7 +566,7 @@ func TestPlanningCommit_AutoPushNotCalledWhenNoCommit(t *testing.T) {
 	mock := &runner.MockRunner{}
 
 	ctx := context.Background()
-	n, err := commitPlanningRound(ctx, ws, "noop", "nothing changed", nil)
+	n, err := commitPlanningRound(ctx, ws, "noop", "nothing changed", nil, "")
 	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
@@ -609,7 +609,7 @@ func TestCommitPlanningRound_IgnoresPollutedLocalIdentity(t *testing.T) {
 	writeSpec(t, ws, "local/auth.md", "# auth spec\n")
 
 	ctx := context.Background()
-	n, err := commitPlanningRound(ctx, ws, "add auth spec", "added auth spec", nil)
+	n, err := commitPlanningRound(ctx, ws, "add auth spec", "added auth spec", nil, "")
 	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}

@@ -162,6 +162,7 @@ function makeContext() {
   const ids = [
     "spec-chat-stream",
     "spec-chat-messages",
+    "spec-chat-tabs",
     "spec-chat-input",
     "spec-chat-send",
     "spec-chat-send-mode",
@@ -260,17 +261,55 @@ function makeContext() {
         commands: () => "/api/planning/commands",
         interruptMessage: () => "/api/planning/messages/interrupt",
         undo: () => "/api/planning/undo",
+        listThreads: () => "/api/planning/threads",
+        createThread: () => "/api/planning/threads",
+        renameThread: () => "/api/planning/threads/{id}",
+        archiveThread: () => "/api/planning/threads/{id}/archive",
+        unarchiveThread: () => "/api/planning/threads/{id}/unarchive",
+        activateThread: () => "/api/planning/threads/{id}/activate",
       },
     },
-    api: () => Promise.resolve(apiResult),
+    // URL-aware api stub: return a default single-thread manifest when the
+    // module asks for threads, forward everything else to `apiResult`
+    // (controlled by _setApiResult in tests).
+    api: (url) => {
+      if (
+        typeof url === "string" &&
+        url.indexOf("/api/planning/threads") !== -1
+      ) {
+        return Promise.resolve({
+          threads: [
+            { id: "t1", name: "Chat 1", archived: false, active: true },
+          ],
+          active_id: "t1",
+        });
+      }
+      return Promise.resolve(apiResult);
+    },
     renderMarkdown: (text) => "<p>" + text + "</p>",
     specModeState: { focusedSpecPath: "" },
     _setFetchResult(r) {
       fetchResult = r;
     },
     _setApiResult(r) {
+      // Preserve the threads-route behaviour so _loadThreads() still gets
+      // a valid manifest; otherwise tests that set a history result would
+      // wipe the thread state and sendMessage would short-circuit.
       apiResult = r;
-      ctx.api = () => Promise.resolve(r);
+      ctx.api = (url) => {
+        if (
+          typeof url === "string" &&
+          url.indexOf("/api/planning/threads") !== -1
+        ) {
+          return Promise.resolve({
+            threads: [
+              { id: "t1", name: "Chat 1", archived: false, active: true },
+            ],
+            active_id: "t1",
+          });
+        }
+        return Promise.resolve(r);
+      };
     },
   };
 
@@ -304,7 +343,7 @@ describe("PlanningChat", () => {
       apiCalled = true;
       return Promise.resolve([]);
     };
-    ctx.PlanningChat.init();
+    await ctx.PlanningChat.init();
     await new Promise((r) => ctx.setTimeout(r, 10));
     expect(apiCalled).toBe(true);
   });
@@ -321,7 +360,7 @@ describe("PlanningChat", () => {
         json: () => Promise.resolve({}),
       });
     };
-    ctx.PlanningChat.init();
+    await ctx.PlanningChat.init();
     await ctx.PlanningChat.sendMessage("hello world");
     expect(postBody).not.toBeNull();
     expect(postBody.message).toBe("hello world");
@@ -340,7 +379,7 @@ describe("PlanningChat", () => {
         json: () => Promise.resolve({}),
       });
     };
-    ctx.PlanningChat.init();
+    await ctx.PlanningChat.init();
     await ctx.PlanningChat.sendMessage("summarize");
     expect(postBody.focused_spec).toBe("specs/local/foo.md");
   });
@@ -357,7 +396,7 @@ describe("PlanningChat", () => {
         },
       ]);
     };
-    ctx.PlanningChat.init();
+    await ctx.PlanningChat.init();
 
     // Simulate typing / in the input — trigger _onInputChange.
     const input = ctx.document.getElementById("spec-chat-input");
@@ -371,7 +410,7 @@ describe("PlanningChat", () => {
   it("queues messages while streaming", async () => {
     // Start a streaming session.
     ctx.fetch = () => Promise.resolve({ status: 202, ok: true });
-    ctx.PlanningChat.init();
+    await ctx.PlanningChat.init();
     await ctx.PlanningChat.sendMessage("first");
     // Now streaming is true — next message should be queued.
     await ctx.PlanningChat.sendMessage("second");
@@ -382,8 +421,8 @@ describe("PlanningChat", () => {
     expect(q[1].text).toBe("third");
   });
 
-  it("getQueue returns empty array initially", () => {
-    ctx.PlanningChat.init();
+  it("getQueue returns empty array initially", async () => {
+    await ctx.PlanningChat.init();
     expect(ctx.PlanningChat.getQueue()).toEqual([]);
   });
 
@@ -403,7 +442,7 @@ describe("PlanningChat", () => {
 
   async function loadWithHistory(history) {
     ctx._setApiResult(history);
-    ctx.PlanningChat.init();
+    await ctx.PlanningChat.init();
     // Yield for the awaited _loadHistory inside init.
     await new Promise((r) => ctx.setTimeout(r, 10));
   }
@@ -521,7 +560,7 @@ describe("PlanningChat", () => {
     expect(kids.length).toBe(originalLength + 1);
   });
 
-  it("409 'not at HEAD' conflict appends a warning without reverting", async () => {
+  it("409 revert-conflict appends a warning without reverting", async () => {
     await loadWithHistory([
       {
         role: "assistant",
@@ -535,8 +574,7 @@ describe("PlanningChat", () => {
       ok: false,
       json: () =>
         Promise.resolve({
-          error:
-            "latest planning commit is not at HEAD; new commits have been added since — resolve manually",
+          error: "revert conflict; working tree left unchanged",
         }),
     });
     const kids = messagesEl().children;
@@ -554,10 +592,11 @@ describe("PlanningChat", () => {
     expect(ab.querySelector(".planning-chat-bubble__undo").disabled).toBe(
       false,
     );
-    // A warning system bubble was appended.
+    // A warning system bubble was appended with the multi-thread-aware
+    // copy ("concurrent thread edited the same spec").
     const sys = kids[kids.length - 1];
     expect(sys.classList.contains("planning-chat-system")).toBe(true);
-    expect(sys.textContent).toContain("unrelated commits");
+    expect(sys.textContent).toContain("concurrent thread");
   });
 
   it("409 stash-pop conflict appends a stash-specific warning", async () => {
@@ -588,5 +627,45 @@ describe("PlanningChat", () => {
     const sys = kids[kids.length - 1];
     expect(sys.textContent).toContain("stash list");
     expect(ab.classList.contains("planning-chat-bubble--reverted")).toBe(false);
+  });
+
+  // ---- thread tab bar ----
+
+  it("renders a tab in the tab bar after init", async () => {
+    ctx.PlanningChat = undefined;
+    ctx = makeContext();
+    await ctx.PlanningChat.init();
+    const tabs = ctx.document.getElementById("spec-chat-tabs");
+    // One thread tab + the "+" new-tab button wrapper.
+    expect(tabs.children.length).toBeGreaterThanOrEqual(2);
+    const firstTab = tabs.children.find(
+      (c) => c.classList && c.classList.contains("spec-chat-tab"),
+    );
+    expect(firstTab).toBeTruthy();
+    const label = firstTab.children.find(
+      (c) => c.classList && c.classList.contains("spec-chat-tab__label"),
+    );
+    expect(label.textContent).toBe("Chat 1");
+  });
+
+  it("sendMessage routes the POST body with the active thread id", async () => {
+    let postBody = null;
+    ctx.fetch = (_url, opts) => {
+      if (opts && opts.method === "POST" && opts.body) {
+        try {
+          postBody = JSON.parse(opts.body);
+        } catch (_) {}
+      }
+      return Promise.resolve({
+        status: 202,
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+    };
+    await ctx.PlanningChat.init();
+    await ctx.PlanningChat.sendMessage("hello");
+    expect(postBody).not.toBeNull();
+    expect(postBody.thread).toBe("t1");
+    expect(postBody.message).toBe("hello");
   });
 });

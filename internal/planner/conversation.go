@@ -50,10 +50,12 @@ const (
 	sessionFile  = "session.json"
 )
 
-// NewConversationStore creates a store rooted at configDir/planning/fingerprint/.
-// The directory is created if it does not exist.
-func NewConversationStore(configDir, fingerprint string) (*ConversationStore, error) {
-	dir := filepath.Join(configDir, "planning", fingerprint)
+// NewConversationStore creates a store rooted at dir. The directory is
+// created if it does not exist. Prior callers that used a
+// (configDir, fingerprint) pair now compose the path themselves — most
+// code should go through [ThreadManager] so that the multi-thread
+// layout (threads/<id>/) is used.
+func NewConversationStore(dir string) (*ConversationStore, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}

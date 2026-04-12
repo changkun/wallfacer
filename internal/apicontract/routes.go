@@ -279,6 +279,45 @@ var Routes = []Route{
 		Tags:        []string{"planning"},
 	},
 
+	// --- Planning chat threads ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/planning/threads", Name: "ListPlanningThreads",
+		JSName:      "listThreads",
+		Description: "List planning chat threads for the current workspace group.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning/threads", Name: "CreatePlanningThread",
+		JSName:      "createThread",
+		Description: "Create a new planning chat thread.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPatch, Pattern: "/api/planning/threads/{id}", Name: "RenamePlanningThread",
+		JSName:      "renameThread",
+		Description: "Rename a planning chat thread.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning/threads/{id}/archive", Name: "ArchivePlanningThread",
+		JSName:      "archiveThread",
+		Description: "Archive a planning chat thread (hide from tab bar; files retained).",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning/threads/{id}/unarchive", Name: "UnarchivePlanningThread",
+		JSName:      "unarchiveThread",
+		Description: "Restore a planning chat thread from archive.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning/threads/{id}/activate", Name: "ActivatePlanningThread",
+		JSName:      "activateThread",
+		Description: "Set the UI's active planning chat thread.",
+		Tags:        []string{"planning"},
+	},
+
 	// --- Environment configuration ---
 
 	{

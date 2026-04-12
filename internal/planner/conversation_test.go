@@ -11,7 +11,7 @@ import (
 
 func newTestStore(t *testing.T) *ConversationStore {
 	t.Helper()
-	cs, err := NewConversationStore(t.TempDir(), "test-fp")
+	cs, err := NewConversationStore(filepath.Join(t.TempDir(), "test-fp"))
 	if err != nil {
 		t.Fatalf("NewConversationStore: %v", err)
 	}
@@ -334,11 +334,11 @@ func TestPlannerIsBusy(t *testing.T) {
 	if p.IsBusy() {
 		t.Error("new planner should not be busy")
 	}
-	p.SetBusy(true)
+	p.SetBusy(true, "")
 	if !p.IsBusy() {
 		t.Error("IsBusy should be true after SetBusy(true)")
 	}
-	p.SetBusy(false)
+	p.SetBusy(false, "")
 	if p.IsBusy() {
 		t.Error("IsBusy should be false after SetBusy(false)")
 	}
@@ -503,7 +503,7 @@ func TestNewConversationStore_MkdirError(t *testing.T) {
 	if err := os.WriteFile(tmpFile, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := NewConversationStore(tmpFile, "fp")
+	_, err := NewConversationStore(filepath.Join(tmpFile, "fp"))
 	if err == nil {
 		t.Error("expected error when config dir path is a file")
 	}

@@ -8,14 +8,22 @@ var PlanningChat = (function () {
   "use strict";
 
   var _streaming = false;
+  var _streamingThreadId = null; // ID of the thread whose exec is in flight
   var _activeStream = null; // handle from startStreamingFetch
   var _commandsCache = null;
   // Send mode: "enter" = Enter sends (Shift+Enter for newline),
   //            "cmd-enter" = Cmd/Ctrl+Enter sends (Enter for newline).
   var _sendMode = localStorage.getItem("wallfacer-chat-send-mode") || "enter";
   var _slashAutocomplete = null; // Handle returned by attachAutocomplete.
-  var _queue = []; // Array of {id, text}
   var _nextQueueId = 0;
+
+  // Thread state. _threads maps id -> {id, name, archived, queue, enqueuedAt,
+  // lastViewedAt, unread}. enqueuedAt tracks the order of the oldest queued
+  // message per thread so the global drain dispatcher can fire in FIFO.
+  var _threads = {};
+  var _threadOrder = []; // ordered IDs (from manifest)
+  var _activeThreadId = null;
+  var _archivedList = []; // metadata for archived threads (not in _threadOrder)
 
   // DOM references (set in init).
   var _input = null;
@@ -24,6 +32,7 @@ var PlanningChat = (function () {
   var _messagesEl = null;
   var _streamEl = null;
   var _queueEl = null;
+  var _tabsEl = null;
 
   function init() {
     _input = document.getElementById("spec-chat-input");
@@ -156,8 +165,371 @@ var PlanningChat = (function () {
       });
     }
 
-    _loadHistory();
+    _tabsEl = document.getElementById("spec-chat-tabs");
+
     _fetchCommands(); // pre-fetch so autocomplete is instant
+    // Returned promise lets callers (and tests) wait until the thread
+    // manifest has loaded before interacting with the module.
+    return _loadThreads().then(function () {
+      return _loadHistory();
+    });
+  }
+
+  // --- Thread state ---
+
+  // _threadUrl substitutes the thread id into a Routes.planning.* URL
+  // template that contains the literal "{id}" placeholder. The route
+  // generator (internal/apicontract/generate.go) only special-cases
+  // /api/tasks/{id} with a nested closure; other {id} routes are emitted
+  // as literal templates, so we do the substitution here.
+  function _threadUrl(route, id) {
+    return route().replace("{id}", encodeURIComponent(id));
+  }
+
+  function _activeThread() {
+    return _activeThreadId ? _threads[_activeThreadId] : null;
+  }
+
+  // _loadThreads fetches the thread list, populates local state, and
+  // renders the tab bar. Called once on init and after any CRUD call.
+  async function _loadThreads() {
+    try {
+      var res = await api(
+        Routes.planning.listThreads() + "?includeArchived=true",
+      );
+      var all = (res && res.threads) || [];
+      _threadOrder = [];
+      _archivedList = [];
+      var seen = {};
+      all.forEach(function (t) {
+        var existing = _threads[t.id] || {};
+        _threads[t.id] = {
+          id: t.id,
+          name: t.name,
+          archived: !!t.archived,
+          queue: existing.queue || [],
+          enqueuedAt: existing.enqueuedAt || 0,
+          lastViewedAt: existing.lastViewedAt || 0,
+          unread: existing.unread || false,
+          scrollTop: existing.scrollTop || 0,
+        };
+        seen[t.id] = true;
+        if (t.archived) {
+          _archivedList.push(_threads[t.id]);
+        } else {
+          _threadOrder.push(t.id);
+        }
+      });
+      // Drop any stale cached thread not in the manifest.
+      Object.keys(_threads).forEach(function (id) {
+        if (!seen[id]) delete _threads[id];
+      });
+      _activeThreadId = res && res.active_id ? res.active_id : _threadOrder[0];
+      if (!_activeThreadId && _threadOrder.length > 0) {
+        _activeThreadId = _threadOrder[0];
+      }
+      _renderTabs();
+    } catch (_) {
+      // Swallow — a planner misconfig leaves the tab bar empty.
+    }
+  }
+
+  // _renderTabs repaints the tab bar from _threadOrder / _activeThreadId.
+  function _renderTabs() {
+    if (!_tabsEl) return;
+    _tabsEl.innerHTML = "";
+    _threadOrder.forEach(function (id) {
+      var t = _threads[id];
+      if (!t) return;
+      _tabsEl.appendChild(_buildTabEl(t));
+    });
+    _tabsEl.appendChild(_buildNewTabButton());
+  }
+
+  function _buildTabEl(t) {
+    var active = t.id === _activeThreadId;
+    var el = document.createElement(active ? "div" : "button");
+    el.className = "spec-chat-tab" + (active ? " spec-chat-tab--active" : "");
+    el.dataset.threadId = t.id;
+    if (active) el.setAttribute("role", "tab");
+    var label = document.createElement("span");
+    label.className = "spec-chat-tab__label";
+    label.textContent = t.name;
+    el.appendChild(label);
+    if (!active && t.unread) {
+      var dot = document.createElement("span");
+      dot.className = "spec-chat-tab__unread";
+      dot.setAttribute("aria-label", "unread");
+      el.appendChild(dot);
+    }
+    if (active) {
+      var pencil = document.createElement("button");
+      pencil.type = "button";
+      pencil.className = "spec-chat-tab__pencil";
+      pencil.title = "Rename";
+      pencil.innerHTML = "\u270E"; // ✎
+      pencil.addEventListener("click", function (e) {
+        e.stopPropagation();
+        _startInlineRename(el, t.id);
+      });
+      el.appendChild(pencil);
+      el.addEventListener("dblclick", function () {
+        _startInlineRename(el, t.id);
+      });
+    } else {
+      el.addEventListener("click", function () {
+        _switchToThread(t.id);
+      });
+    }
+    // Close button (archive) — shown for all tabs except the in-flight one.
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "spec-chat-tab__close";
+    closeBtn.title = "Archive thread";
+    closeBtn.textContent = "\u00d7"; // ×
+    closeBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      _archiveThread(t.id);
+    });
+    el.appendChild(closeBtn);
+    return el;
+  }
+
+  function _buildNewTabButton() {
+    var wrap = document.createElement("span");
+    wrap.className = "spec-chat-tab__new-wrap";
+    var plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "spec-chat-tab__new";
+    plus.title = "New thread";
+    plus.textContent = "+";
+    plus.addEventListener("click", function () {
+      _createThread();
+    });
+    wrap.appendChild(plus);
+    if (_archivedList.length > 0) {
+      var caret = document.createElement("button");
+      caret.type = "button";
+      caret.className = "spec-chat-tab__archived-trigger";
+      caret.title = "Archived threads";
+      caret.textContent = "\u25BE"; // ▾
+      caret.addEventListener("click", function (e) {
+        e.stopPropagation();
+        _toggleArchivedMenu(caret);
+      });
+      wrap.appendChild(caret);
+    }
+    return wrap;
+  }
+
+  function _toggleArchivedMenu(anchor) {
+    var existing = document.querySelector(".spec-chat-archived-menu");
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    var menu = document.createElement("div");
+    menu.className = "spec-chat-archived-menu";
+    var header = document.createElement("div");
+    header.className = "spec-chat-archived-menu__header";
+    header.textContent = "Archived threads";
+    menu.appendChild(header);
+    _archivedList.forEach(function (t) {
+      var row = document.createElement("button");
+      row.type = "button";
+      row.className = "spec-chat-archived-menu__item";
+      row.textContent = t.name;
+      row.addEventListener("click", function () {
+        menu.remove();
+        _unarchiveThread(t.id);
+      });
+      menu.appendChild(row);
+    });
+    document.body.appendChild(menu);
+    var rect = anchor.getBoundingClientRect();
+    menu.style.position = "fixed";
+    menu.style.top = rect.bottom + 4 + "px";
+    menu.style.left = rect.left + "px";
+    // Close on outside click.
+    setTimeout(function () {
+      function closer(e) {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener("click", closer);
+        }
+      }
+      document.addEventListener("click", closer);
+    }, 0);
+  }
+
+  async function _createThread() {
+    try {
+      var t = await api(Routes.planning.createThread(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (t && t.id) {
+        await _loadThreads();
+        await _switchToThread(t.id);
+      }
+    } catch (err) {
+      _appendSystemMessage("Failed to create thread: " + (err.message || err));
+    }
+  }
+
+  async function _archiveThread(id) {
+    if (!confirm("Archive this thread? You can restore it later.")) return;
+    try {
+      var res = await fetch(_threadUrl(Routes.planning.archiveThread, id), {
+        method: "POST",
+        headers: withBearerHeaders({ "Content-Type": "application/json" }),
+      });
+      if (res.status === 409) {
+        _appendSystemMessage("Thread is busy — interrupt it before archiving.");
+        return;
+      }
+      if (!res.ok) {
+        _appendSystemMessage("Archive failed: HTTP " + res.status);
+        return;
+      }
+      await _loadThreads();
+      // After archive, switch to the (new) active thread so the chat
+      // stream stops showing an archived thread's history.
+      if (_activeThreadId && _activeThreadId !== id) {
+        await _loadHistory();
+      } else if (_threadOrder.length > 0) {
+        await _switchToThread(_threadOrder[0]);
+      } else {
+        _messagesEl.innerHTML = "";
+      }
+    } catch (err) {
+      _appendSystemMessage("Archive failed: " + (err.message || err));
+    }
+  }
+
+  async function _unarchiveThread(id) {
+    try {
+      await api(_threadUrl(Routes.planning.unarchiveThread, id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      await _loadThreads();
+      await _switchToThread(id);
+    } catch (err) {
+      _appendSystemMessage("Restore failed: " + (err.message || err));
+    }
+  }
+
+  // _switchToThread updates UI state synchronously first (tab bar
+  // visibly flips, scroll is saved, stream reader detaches) so clicks
+  // always feel instant, then fires the server-side activate POST and
+  // history fetch in the background. Concurrent switches from rapid
+  // clicks during an agent wrap-up are guarded by a per-switch epoch:
+  // only the latest switch's history fetch is allowed to paint.
+  var _switchEpoch = 0;
+  function _switchToThread(id) {
+    if (!id || id === _activeThreadId) return Promise.resolve();
+    var outgoing = _activeThread();
+    if (outgoing && _messagesEl) {
+      outgoing.scrollTop = _messagesEl.scrollTop;
+    }
+    _activeThreadId = id;
+    var t = _threads[id];
+    if (t) {
+      t.unread = false;
+      t.lastViewedAt = Date.now();
+    }
+
+    // Detach the local stream reader when leaving the in-flight thread
+    // so further chunks don't land in the wrong history. The server
+    // exec keeps running.
+    if (_streaming && _streamingThreadId !== id) {
+      if (_activeStream) {
+        _activeStream.abort();
+        _activeStream = null;
+      }
+      _streaming = false;
+      if (_interruptBtn) _interruptBtn.style.display = "none";
+      if (_sendBtn) _sendBtn.style.display = "";
+    }
+
+    _renderTabs();
+
+    var epoch = ++_switchEpoch;
+    // Fire-and-forget activate — the UI already reflects the new
+    // active thread; this is just a server-side preference save.
+    api(_threadUrl(Routes.planning.activateThread, id), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).catch(function () {});
+
+    return _loadHistory().then(function () {
+      // A newer switch happened while we were loading — discard our
+      // results so we don't paint stale history over the new thread.
+      if (epoch !== _switchEpoch) return;
+      if (!_streaming && _streamingThreadId === id) {
+        _attachStreamToLastBubble();
+      }
+    });
+  }
+
+  async function _startInlineRename(tabEl, id) {
+    var t = _threads[id];
+    if (!t) return;
+    var input = document.createElement("input");
+    input.type = "text";
+    input.value = t.name;
+    input.className = "spec-chat-tab__rename-input";
+    var origHtml = tabEl.innerHTML;
+    tabEl.innerHTML = "";
+    tabEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    var committed = false;
+    async function commit() {
+      if (committed) return;
+      committed = true;
+      var newName = input.value.trim();
+      if (!newName || newName === t.name) {
+        tabEl.innerHTML = origHtml;
+        return;
+      }
+      try {
+        await api(_threadUrl(Routes.planning.renameThread, id), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName }),
+        });
+        t.name = newName;
+      } catch (_) {}
+      _renderTabs();
+    }
+    function cancel() {
+      if (committed) return;
+      committed = true;
+      tabEl.innerHTML = origHtml;
+    }
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    });
+    input.addEventListener("blur", commit);
+  }
+
+  // _attachStreamToLastBubble re-attaches the SSE reader to the last
+  // assistant bubble in the currently rendered thread. Used when
+  // switching into the in-flight thread mid-exec.
+  function _attachStreamToLastBubble() {
+    // The server will respond 204 if the thread isn't actually in
+    // flight, so this is safe as a best-effort attach.
+    _startStreaming();
   }
 
   function _onInputKeydown(e) {
@@ -205,10 +577,26 @@ var PlanningChat = (function () {
   }
 
   async function _loadHistory() {
+    if (!_messagesEl) return;
+    // Clear the pane before rendering so switching threads doesn't
+    // stack old bubbles. _messagesEl is always repainted here so callers
+    // don't need to clear it themselves.
+    _messagesEl.innerHTML = "";
+    _renderQueue();
+    if (!_activeThreadId) return;
+    // Capture the active thread at fetch start; if the user switches
+    // tabs while the response is in flight (rapid clicks during a
+    // stream wrap-up), we drop this response on the floor so we don't
+    // paint stale messages into the new thread.
+    var fetchedThreadId = _activeThreadId;
+    var url =
+      Routes.planning.messages() +
+      "?thread=" +
+      encodeURIComponent(fetchedThreadId);
     try {
-      var msgs = await api(Routes.planning.messages());
+      var msgs = await api(url);
+      if (fetchedThreadId !== _activeThreadId) return;
       if (msgs && msgs.length > 0) {
-        _messagesEl.innerHTML = "";
         msgs.forEach(function (m) {
           if (m.role === "assistant" && m.raw_output) {
             _appendMessageBubbleWithActivity(
@@ -227,16 +615,29 @@ var PlanningChat = (function () {
           }
         });
         _updateUndoButtonStates();
-        _scrollToBottom();
+      }
+      // Restore scroll position for this thread (or scroll to bottom by
+      // default).
+      var t = _activeThread();
+      if (t && t.scrollTop > 0) {
+        _messagesEl.scrollTop = t.scrollTop;
+      } else {
+        _scrollToBottom(true);
       }
     } catch (_) {
       // Ignore — history may not be available yet.
     }
   }
 
-  async function sendMessage(text) {
+  async function sendMessage(text, opts) {
+    opts = opts || {};
+    var threadID = opts.threadID || _activeThreadId;
+    if (!threadID) {
+      _appendSystemMessage("No active thread — create one first.");
+      return;
+    }
     if (_streaming) {
-      _enqueue(text);
+      _enqueue(text, threadID);
       return;
     }
 
@@ -244,10 +645,13 @@ var PlanningChat = (function () {
     _input.style.height = "auto";
     if (_slashAutocomplete) _slashAutocomplete.close();
 
-    // Render user message immediately and force-scroll to show it.
-    _appendMessageBubble("user", text, new Date().toISOString());
-    _userScrolledUp = false;
-    _scrollToBottom(true);
+    // Render user message immediately only when sending to the active
+    // thread (otherwise the bubble would appear in the wrong history).
+    if (threadID === _activeThreadId) {
+      _appendMessageBubble("user", text, new Date().toISOString());
+      _userScrolledUp = false;
+      _scrollToBottom(true);
+    }
 
     // Get focused spec from spec mode state.
     var focusedSpec = "";
@@ -262,6 +666,7 @@ var PlanningChat = (function () {
         body: JSON.stringify({
           message: text,
           focused_spec: focusedSpec,
+          thread: threadID,
         }),
       });
 
@@ -277,6 +682,7 @@ var PlanningChat = (function () {
         return;
       }
 
+      _streamingThreadId = threadID;
       // Start streaming the response.
       _startStreaming();
     } catch (err) {
@@ -306,8 +712,13 @@ var PlanningChat = (function () {
     var retried = false;
 
     function _connectStream() {
+      var streamUrl =
+        Routes.planning.messageStream() +
+        (_streamingThreadId
+          ? "?thread=" + encodeURIComponent(_streamingThreadId)
+          : "");
       _activeStream = startStreamingFetch({
-        url: Routes.planning.messageStream(),
+        url: streamUrl,
         onChunk: function (chunk) {
           rawBuffer += chunk;
           assistantText = _extractAssistantText(rawBuffer);
@@ -460,17 +871,12 @@ var PlanningChat = (function () {
       _activeStream = null;
     }
     _streaming = false;
+    var finishedThreadId = _streamingThreadId;
+    _streamingThreadId = null;
     if (_interruptBtn) _interruptBtn.style.display = "none";
     if (_sendBtn) _sendBtn.style.display = "";
 
-    if (interrupted) {
-      // Mark the last assistant bubble as interrupted.
-      var bubbles = _messagesEl.querySelectorAll
-        ? _messagesEl.children.filter
-          ? []
-          : []
-        : [];
-      // Simple approach: append an interrupted indicator.
+    if (interrupted && _messagesEl) {
       var indicator = document.createElement("div");
       indicator.className = "planning-chat-interrupted";
       indicator.textContent = "interrupted";
@@ -478,14 +884,24 @@ var PlanningChat = (function () {
     }
 
     _enableInput();
-    _drainQueue();
+
+    // Global drain dispatcher: pick the thread with the oldest queued
+    // message across all threads. This is what lets a queued message
+    // in a background tab fire without the user switching back to it.
+    _drainNextQueuedThread();
 
     // Refetch history on a clean stop so the streaming bubble picks up
-    // its server-attributed plan_round (for the per-message undo button).
-    // Interrupted streams skip this — there's no committed round to
-    // attribute.
+    // its server-attributed plan_round (for the per-message undo
+    // button). Only reload the UI if the finished thread is still the
+    // active one; otherwise mark the background thread as unread.
     if (!interrupted) {
-      _loadHistory();
+      if (finishedThreadId && finishedThreadId !== _activeThreadId) {
+        var t = _threads[finishedThreadId];
+        if (t) t.unread = true;
+        _renderTabs();
+      } else {
+        _loadHistory();
+      }
     }
   }
 
@@ -603,7 +1019,11 @@ var PlanningChat = (function () {
     var originalTitle = btn.title;
     btn.title = "Undoing…";
     try {
-      var res = await fetch(Routes.planning.undo(), {
+      var undoUrl = Routes.planning.undo();
+      if (_activeThreadId) {
+        undoUrl += "?thread=" + encodeURIComponent(_activeThreadId);
+      }
+      var res = await fetch(undoUrl, {
         method: "POST",
         headers: withBearerHeaders({ "Content-Type": "application/json" }),
       });
@@ -668,12 +1088,12 @@ var PlanningChat = (function () {
   function _appendUndoWarning(status, body) {
     var err = (body && body.error) || "";
     var msg;
-    if (status === 409 && err.indexOf("not at HEAD") !== -1) {
+    if (status === 409 && err.indexOf("revert conflict") !== -1) {
       msg =
-        "⚠ Can't undo: you have unrelated commits since the last planning round. Resolve manually before using undo.";
+        "⚠ Undo ran into a merge conflict — a concurrent thread edited the same spec. Resolve manually before retrying.";
     } else if (status === 409 && err.indexOf("stash pop conflict") !== -1) {
       msg =
-        "⚠ Undo partially applied: git reset succeeded but your working-tree edits couldn't be reapplied cleanly. Your changes are preserved in the stash — run `git stash list` to recover.";
+        "⚠ Undo partially applied: your working-tree edits couldn't be reapplied cleanly. Your changes are preserved in the stash — run `git stash list` to recover.";
     } else if (status === 409) {
       msg = "⚠ Nothing to undo right now.";
     } else {
@@ -732,22 +1152,39 @@ var PlanningChat = (function () {
   }
 
   // --- Message queue ---
+  //
+  // Each thread keeps its own queue (_threads[id].queue). The global
+  // drain dispatcher picks the thread with the oldest queued message
+  // across all threads — not just the active tab — so a queued message
+  // in a background tab still fires when the in-flight exec finishes.
 
-  function _enqueue(text) {
+  function _currentQueue() {
+    var t = _activeThread();
+    return t ? t.queue : [];
+  }
+
+  function _enqueue(text, threadID) {
     var id = _nextQueueId++;
-    _queue.push({ id: id, text: text });
+    var t = _threads[threadID || _activeThreadId];
+    if (!t) return;
+    if (t.queue.length === 0) t.enqueuedAt = Date.now();
+    t.queue.push({ id: id, text: text });
     _renderQueue();
   }
 
   function _removeFromQueue(id) {
-    _queue = _queue.filter(function (item) {
+    var t = _activeThread();
+    if (!t) return;
+    t.queue = t.queue.filter(function (item) {
       return item.id !== id;
     });
+    if (t.queue.length === 0) t.enqueuedAt = 0;
     _renderQueue();
   }
 
   function _editQueueItem(id) {
-    var item = _queue.find(function (q) {
+    var queue = _currentQueue();
+    var item = queue.find(function (q) {
       return q.id === id;
     });
     if (!item || !_queueEl) return;
@@ -783,7 +1220,8 @@ var PlanningChat = (function () {
   function _renderQueue() {
     if (!_queueEl) return;
     _queueEl.innerHTML = "";
-    _queue.forEach(function (item) {
+    var queue = _currentQueue();
+    queue.forEach(function (item) {
       var chip = document.createElement("div");
       chip.className = "planning-chat-queue__chip";
       chip.dataset.queueId = item.id;
@@ -808,19 +1246,40 @@ var PlanningChat = (function () {
     });
   }
 
-  function _drainQueue() {
-    if (_queue.length > 0 && !_streaming) {
-      var next = _queue.shift();
-      _renderQueue();
-      sendMessage(next.text);
-    }
+  // _drainNextQueuedThread picks the thread whose oldest queued message
+  // is the oldest across all threads and fires that message. This is
+  // the global FIFO dispatcher described in the spec — without it,
+  // background tabs with queued messages would never drain until the
+  // user switched to them.
+  function _drainNextQueuedThread() {
+    if (_streaming) return;
+    var bestId = null;
+    var bestTs = Infinity;
+    Object.keys(_threads).forEach(function (id) {
+      var t = _threads[id];
+      if (!t || t.queue.length === 0) return;
+      if (t.enqueuedAt < bestTs) {
+        bestTs = t.enqueuedAt;
+        bestId = id;
+      }
+    });
+    if (!bestId) return;
+    var t = _threads[bestId];
+    var next = t.queue.shift();
+    t.enqueuedAt = t.queue.length > 0 ? Date.now() : 0;
+    _renderQueue();
+    sendMessage(next.text, { threadID: bestId });
   }
 
   // --- Interrupt ---
 
   async function _onInterrupt() {
+    var url = Routes.planning.interruptMessage();
+    if (_streamingThreadId) {
+      url += "?thread=" + encodeURIComponent(_streamingThreadId);
+    }
     try {
-      await fetch(Routes.planning.interruptMessage(), {
+      await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -831,8 +1290,12 @@ var PlanningChat = (function () {
   }
 
   async function clearHistory() {
+    var url = Routes.planning.clearMessages();
+    if (_activeThreadId) {
+      url += "?thread=" + encodeURIComponent(_activeThreadId);
+    }
     try {
-      await fetch(Routes.planning.clearMessages(), {
+      await fetch(url, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
@@ -845,7 +1308,7 @@ var PlanningChat = (function () {
   }
 
   function getQueue() {
-    return _queue.slice();
+    return _currentQueue().slice();
   }
 
   return {
