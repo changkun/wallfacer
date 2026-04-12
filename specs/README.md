@@ -13,7 +13,7 @@ Foundations — 7/7 complete
   ✅ Multi-Workspace Groups        ✅ Host Terminal
   ✅ Windows Support
 
-Local Product — 5 done, 1 in progress, 16 pending
+Local Product — 5 done, 1 in progress, 17 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
@@ -25,11 +25,13 @@ Local Product — 5 done, 1 in progress, 16 pending
   ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
   ○ TypeScript Migration           ○ Typed DOM Hooks
   ○ Rebrand Module Path            ○ Spatial Canvas
+  ○ Data Boundary Enforcement
 
-Cloud Platform — 0/6
+Cloud Platform — 0/8
   ○ Tenant Filesystem              ○ K8s Sandbox Backend
   ○ Sandbox Isolation              ○ Cloud Infrastructure
   ○ Multi-Tenant (capstone)        ○ Tenant API
+  ○ Billing Idempotency            ○ Telemetry Queue Backpressure
 
 Shared Design — 0/17
   ○ Authentication                 ○ Agent Abstraction
@@ -93,6 +95,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [typed-dom-hooks.md](local/typed-dom-hooks.md) | Vague | Generate typed constants from `id` / `data-js-*` attributes in `ui/partials/` so renames fail type-check instead of silently breaking selectors. Contract layer between HTML, CSS, and TS. |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 | [spatial-canvas.md](local/spatial-canvas.md) | Vague | Spatial infinite-canvas view — tasks, agents, and notes as free-form nodes on a 2D plane |
+| [data-boundary-enforcement.md](local/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets |
 
 ### Local product dependencies
 
@@ -142,6 +145,8 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
 | [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning, policy-controlled sandbox model |
 | [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
+| [billing-idempotency.md](cloud/billing-idempotency.md) | Drafted | Stripe idempotency keys on every charge operation — prevents double-billing under retry, single-charge guarantee for cost-visibility trust story |
+| [telemetry-queue-backpressure.md](cloud/telemetry-queue-backpressure.md) | Drafted | Cap on the local telemetry queue when the cloud is unreachable — bounded disk use, defined drop policy, keeps the local UI responsive under long outages |
 
 ### Cloud platform dependencies
 
