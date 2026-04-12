@@ -1,6 +1,6 @@
 ---
 title: Planning Cost Tracking
-status: drafted
+status: validated
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
@@ -149,6 +149,41 @@ The default window is configurable via a new env/settings knob
 (`WALLFACER_PLANNING_WINDOW_DAYS`, default matching the existing
 period-picker default), editable from the Settings panel. Users can still
 override per-request via the period picker in the stats modal.
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Planning usage store primitive](progress-cost-tracking/planning-usage-store.md) | — | small | validated |
+| [Capture planning round usage](progress-cost-tracking/capture-planning-round-usage.md) | planning-usage-store | medium | validated |
+| [Planning section in /api/stats](progress-cost-tracking/stats-planning-section.md) | planning-usage-store | medium | validated |
+| [Merge planning into /api/usage BySubAgent](progress-cost-tracking/usage-planning-merge.md) | planning-usage-store | small | validated |
+| [WALLFACER_PLANNING_WINDOW_DAYS config knob](progress-cost-tracking/planning-window-config.md) | — | small | validated |
+| [Planning block in modal-stats.js](progress-cost-tracking/modal-stats-planning-block.md) | stats-planning-section, planning-window-config | medium | validated |
+| [Planning tile in usage-stats.js](progress-cost-tracking/usage-stats-planning-tile.md) | usage-planning-merge, planning-window-config | small | validated |
+
+```mermaid
+graph LR
+  A[Planning usage store primitive]
+  B[Capture planning round usage]
+  C[Planning section in /api/stats]
+  D[Merge planning into /api/usage]
+  E[PLANNING_WINDOW_DAYS knob]
+  F[Modal-stats planning block]
+  G[Usage-stats planning tile]
+
+  A --> B
+  A --> C
+  A --> D
+  C --> F
+  E --> F
+  D --> G
+  E --> G
+```
+
+Parallelism: once the store primitive lands, {capture, stats endpoint,
+usage endpoint, env knob} run in parallel. UI blocks run in parallel
+once their respective backend and config dependencies are in.
 
 ## Affects
 
