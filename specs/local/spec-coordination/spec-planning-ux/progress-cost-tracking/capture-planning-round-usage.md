@@ -1,10 +1,11 @@
 ---
 title: Capture Planning Round Usage
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
 affects:
-  - internal/planner/planner.go
+  - internal/planner/usage.go
+  - internal/planner/usage_test.go
   - internal/handler/planning.go
   - internal/handler/planning_test.go
 effort: medium
@@ -77,3 +78,26 @@ Extend or create `internal/handler/planning_test.go`:
 - Do not wire capture into any handler other than planning.
 - Do not touch kanban task execution, commit pipeline, or their usage
   tracking.
+
+## Implementation notes
+
+- **Planner.Exec return unchanged.** The spec suggested extending
+  `planner.Exec`'s return with a per-round usage value. In practice the
+  handler already consumes stdout from the returned `sandbox.Handle`
+  after `Wait()`, so usage can only be known downstream of `Exec`. The
+  implementation instead adds a pure parser, `planner.ExtractUsage(raw)`,
+  that the handler calls after reading `rawStdout`. `Exec`'s signature is
+  untouched, which matched the spec's boundary "do not mutate
+  `sandbox.Handle`" and avoided a speculative return shape.
+- **New file `internal/planner/usage.go`** (not listed in the original
+  `affects` — added during implementation) hosts the `RoundUsage` type
+  and `ExtractUsage` function. The `affects` list was updated to reflect
+  the actual files touched.
+- **Sandbox type is hardcoded to `sandbox.Claude`** in the persisted
+  record, matching `planner.Exec`'s existing hardcoded
+  `sandbox.Claude` at the container spec site. When the planner learns
+  to run other sandboxes, both sites will flip together.
+- **Turn number derived from the existing log.** As suggested by the
+  spec, `Turn = len(ReadPlanningUsage(...)) + 1`. This naturally survives
+  process restarts and avoids an in-memory counter. Planning's `busy`
+  lock serializes rounds, so the read-then-append has no race.
