@@ -188,7 +188,8 @@
 }
 
 .spec-dispatch-btn,
-.spec-summarize-btn {
+.spec-summarize-btn,
+.spec-chat-toggle-btn {
   padding: 4px 12px;
   font-size: 11px;
   font-weight: 500;
@@ -201,6 +202,26 @@
   transition:
     background 0.12s,
     border-color 0.12s;
+}
+
+.spec-chat-toggle-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+/* When the chat pane is folded, emphasise the toggle so the user
+   can easily find their way back to the chat. */
+.spec-chat-toggle-btn--folded {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.spec-chat-toggle-btn--folded:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  opacity: 0.9;
 }
 
 .spec-dispatch-btn:hover {

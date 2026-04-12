@@ -578,6 +578,18 @@ function breakDownFocusedSpec() {
 
 var _specChatOpenKey = "wallfacer-spec-chat-open";
 
+// _syncSpecChatToggle keeps the header Chat button's pressed state and
+// tooltip in sync with the actual pane visibility so screen readers hear
+// "pressed / not pressed" and sighted users see a consistent affordance
+// whether the pane is open or folded.
+function _syncSpecChatToggle(isOpen) {
+  var btn = document.getElementById("spec-chat-toggle-btn");
+  if (!btn) return;
+  btn.setAttribute("aria-pressed", isOpen ? "true" : "false");
+  btn.title = isOpen ? "Hide chat pane (C)" : "Show chat pane (C)";
+  btn.classList.toggle("spec-chat-toggle-btn--folded", !isOpen);
+}
+
 // toggleSpecChat shows/hides the chat pane and its resize handle.
 // When opened, auto-focuses the chat input.
 function toggleSpecChat() {
@@ -589,6 +601,7 @@ function toggleSpecChat() {
   chatStream.style.display = isHidden ? "" : "none";
   if (resizeHandle) resizeHandle.style.display = isHidden ? "" : "none";
   localStorage.setItem(_specChatOpenKey, isHidden ? "1" : "0");
+  _syncSpecChatToggle(isHidden);
 
   // Auto-focus the input when opening.
   if (isHidden) {
@@ -605,6 +618,9 @@ function _restoreSpecChatState() {
     var resizeHandle = document.getElementById("spec-chat-resize");
     if (chatStream) chatStream.style.display = "none";
     if (resizeHandle) resizeHandle.style.display = "none";
+    _syncSpecChatToggle(false);
+  } else {
+    _syncSpecChatToggle(true);
   }
 }
 
