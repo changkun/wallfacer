@@ -1,6 +1,6 @@
 ---
 title: Render pinned Roadmap entry in the spec explorer
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/spec-tree-index-endpoint.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - ui/js/spec-mode.js
 effort: small
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -63,3 +63,10 @@ Show `specs/README.md` as a pinned `📋 Roadmap` entry at the top of the spec e
 - **Do NOT** add a "create Roadmap" affordance for repos that don't have one. That's implicit in the first-scaffold task (`readme-autocreate.md`).
 - **Do NOT** change how non-index nodes render. The pinned entry is an addition, not a refactor.
 - **Do NOT** make the pinned entry draggable, right-clickable for a context menu, or anything beyond "click / keyboard focus." Keep the surface minimal.
+
+## Implementation notes
+
+- The CSS selectors in the spec sample (`.spec-focused-status-chip`, `.spec-depends-on`) do not exist in the actual markup. The real elements are `#spec-focused-status`, `#spec-focused-kind`, `#spec-focused-effort`, `#spec-focused-meta`, and the button IDs (`#spec-dispatch-btn` / `#spec-summarize-btn` / `#spec-archive-btn` / `#spec-unarchive-btn` / `#spec-archived-banner`). The implementation hides those actual selectors; there is no separate "depends_on indicator" element in the focused view today.
+- The spec described `j`/`k`/arrow keyboard navigation as a test case (`TestExplorer_PinnedRoadmap_KeyboardNav`), but the explorer does not currently implement tree-level keyboard navigation. The pinned entry supports Enter/Space to focus itself (via `tabindex="0"` + `_onSpecIndexKeydown`), which matches the spec's "Enter on the pinned entry focuses it" requirement, but the broader j/k listing navigation is deferred to a future spec if it is added at all.
+- The spec mentioned a "Chat header label reads Roadmap" requirement. The planning chat pane always says "Planning Chat"; there is no per-spec title in that header. The focused-view title bar (`#spec-focused-title`) is set to the literal `Roadmap`, which is what the user-visible label in the focus area looks like, so the intent ("the focused-view title reads Roadmap") is honoured.
+- `focusRoadmapIndex` reuses `_focusedSpecPath` / `_focusedSpecWorkspace` rather than introducing separate state, with a `_focusedIsIndex` flag to disambiguate. This keeps downstream consumers (hash deeplink, mode switches, explorer highlight) working without special-casing.

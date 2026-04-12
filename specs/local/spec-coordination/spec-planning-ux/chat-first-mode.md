@@ -646,7 +646,7 @@ Accept both `#spec/<path>` and `#plan/<path>` in the hash router (`ui/js/hash-de
 | [Agent system prompts](chat-first-mode/agent-system-prompts.md) | — | small | **complete** |
 | [Default mode resolution](chat-first-mode/default-mode-resolution.md) | — | small | **complete** |
 | [Plan → Board bridges](chat-first-mode/plan-to-board-bridges.md) | — | medium | **complete** |
-| [Explorer Roadmap entry](chat-first-mode/explorer-roadmap-entry.md) | spec-tree-index-endpoint | small | validated |
+| [Explorer Roadmap entry](chat-first-mode/explorer-roadmap-entry.md) | spec-tree-index-endpoint | small | **complete** |
 | [Layout state machine](chat-first-mode/layout-state-machine.md) | spec-tree-index-endpoint | medium | validated |
 | [/spec-new directive parser](chat-first-mode/spec-new-directive-parser.md) | spec-scaffold-library, agent-system-prompts | large | validated |
 | [Focused view crossfade](chat-first-mode/focused-view-crossfade.md) | layout-state-machine, explorer-roadmap-entry | small | validated |
