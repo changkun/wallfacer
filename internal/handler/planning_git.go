@@ -22,16 +22,34 @@ type commitMessageGenerator func(ctx context.Context, data prompts.CommitData) (
 
 // planCommitScopeInstruction is the hint we splice into the commit-agent
 // prompt so the generated subject carries the `(plan)` scope marker
-// natively, without post-hoc string surgery.
+// natively, without post-hoc string surgery. Also re-emphasizes the
+// "no prose, no code fences" contract because some agents wrap the real
+// commit message in explanatory text otherwise — sanitizeAgentCommitMessage
+// is the second line of defense.
 const planCommitScopeInstruction = "This is a planning round commit touching only specs/. " +
 	"In the subject line's path prefix, append the scope `(plan)` before the colon, " +
 	"e.g. `specs/local/auth(plan): add OAuth breakdown`. " +
-	"Keep the body under 400 characters.\n\n"
+	"Keep the body under 400 characters. " +
+	"Output the commit message and nothing else — no preamble, no explanation, " +
+	"no markdown code fences, no surrounding prose.\n\n"
 
 // planSubjectScopeRe matches a kanban-style subject `<path>: <rest>` so we
 // can splice `(plan)` into it as a safety net when the agent ignored the
 // scope instruction. Captures group 1 = path, group 2 = rest.
 var planSubjectScopeRe = regexp.MustCompile(`^(\S+?):\s+(.*)$`)
+
+// validCommitSubjectRe validates that a line actually looks like a kanban
+// commit subject (`path: imperative`) rather than prose that happens to
+// contain a colon. The path must start with an alphanumeric and may contain
+// slashes, dots, dashes, and an optional `(scope)` suffix; whitespace is
+// forbidden inside the path so a sentence like "Based on: the foo" cannot
+// pass. Content after the colon must be non-empty and non-whitespace.
+var validCommitSubjectRe = regexp.MustCompile(`^[A-Za-z0-9][\w./-]*(\([\w-]+\))?:\s+\S`)
+
+// fencedBlockRe extracts the contents of the first ``` fenced block in a
+// string. Group 1 is the body between the fences; the opening fence line
+// may carry a language tag. Non-greedy so nested text is not swallowed.
+var fencedBlockRe = regexp.MustCompile("(?s)```[^\n]*\n(.*?)\n```")
 
 const (
 	// planRoundTrailerPrefix anchors planning commits in `git log --grep`.
@@ -134,22 +152,34 @@ func commitPlanningRound(
 
 // buildPlanCommitMessage assembles the final commit message from either the
 // agent's output (preferred) or a deterministic fallback, then appends the
-// Plan-Round trailer. If the agent forgot to include the `(plan)` scope in
-// the subject line, it is spliced in so the undo grep and the at-a-glance
-// planning marker both stay reliable.
+// Plan-Round trailer. Sanitizes the agent output because in practice the
+// commit agent sometimes ignores the "no prose, no fences" instruction and
+// wraps the real message in explanation — without this the preamble would
+// end up glued to the subject line (see `buildPlanCommitMessage_Sanitizes*`
+// tests). If the agent forgot the `(plan)` scope, ensurePlanScope splices
+// it in.
 func buildPlanCommitMessage(agentMsg, agentSummary, primary string, n int) string {
+	agentMsg = sanitizeAgentCommitMessage(agentMsg)
+
 	var body string
 	var subject string
+	useAgent := false
 	if agentMsg != "" {
-		// Split subject (first line) from body (rest).
 		if i := strings.IndexByte(agentMsg, '\n'); i >= 0 {
 			subject = strings.TrimSpace(agentMsg[:i])
 			body = strings.TrimSpace(agentMsg[i+1:])
 		} else {
 			subject = strings.TrimSpace(agentMsg)
 		}
-		subject = ensurePlanScope(subject, primary)
-	} else {
+		// The agent's first line must actually look like a commit subject.
+		// When it doesn't (prose, blank, or garbage) the deterministic path
+		// is strictly safer than splicing `(plan):` onto arbitrary text.
+		if validCommitSubjectRe.MatchString(subject) {
+			subject = ensurePlanScope(subject, primary)
+			useAgent = true
+		}
+	}
+	if !useAgent {
 		// Deterministic fallback: derive subject from the planner's
 		// response text and the primary path.
 		s, b := planCommitSubjectBody(agentSummary, primary)
@@ -163,6 +193,34 @@ func buildPlanCommitMessage(agentMsg, agentSummary, primary string, n int) strin
 	}
 	msg += "\n\n" + planRoundTrailerPrefix + strconv.Itoa(n)
 	return msg
+}
+
+// sanitizeAgentCommitMessage strips preamble, fenced code blocks, and
+// trailing commentary that the commit agent sometimes emits despite being
+// told not to. Preference order:
+//
+//  1. If a ``` fenced block is present, use its content (the agent almost
+//     always puts the real message inside one when it also writes prose).
+//  2. Otherwise drop every line before the first kanban-style subject.
+//  3. If neither heuristic applies, return the trimmed input unchanged and
+//     let buildPlanCommitMessage's validator decide whether to fall back.
+func sanitizeAgentCommitMessage(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if m := fencedBlockRe.FindStringSubmatch(raw); m != nil {
+		if inner := strings.TrimSpace(m[1]); inner != "" {
+			return inner
+		}
+	}
+	lines := strings.Split(raw, "\n")
+	for i, l := range lines {
+		if validCommitSubjectRe.MatchString(strings.TrimSpace(l)) {
+			return strings.TrimSpace(strings.Join(lines[i:], "\n"))
+		}
+	}
+	return raw
 }
 
 // ensurePlanScope inserts `(plan)` before the colon in a `<path>: <rest>`

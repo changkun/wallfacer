@@ -370,6 +370,115 @@ func TestCommitPlanningRound_AgentErrorFallsBack(t *testing.T) {
 	}
 }
 
+func TestCommitPlanningRound_SanitizesAgentFencedOutput(t *testing.T) {
+	// Reproduces a real-world failure: the commit agent wrote explanatory
+	// prose, wrapped the actual commit message in a ``` fence, and ended
+	// with more prose. Without sanitization the primary-path scope got
+	// spliced onto the first preamble sentence and the fence bodies were
+	// kept as body text.
+	ws := initPlanningTestRepo(t)
+	writeSpec(t, ws, "local/spec-coordination/spec-planning-ux/codex.md", "x\n")
+
+	gen := func(_ context.Context, _ prompts.CommitData) (string, error) {
+		return "Based on the filename and the diff stats (77 insertions, 11 deletions):\n\n" +
+			"```\n" +
+			"specs/local/spec-coordination/spec-planning-ux(plan): expand codex compatibility spec\n\n" +
+			"Flesh out planning-codex-compat spec with additional coverage,\n" +
+			"clarifying compatibility between the planning flow and codex.\n" +
+			"```\n", nil
+	}
+
+	if _, err := commitPlanningRound(context.Background(), ws, "user", "summary", gen); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := gitHeadMessage(t, ws)
+	wantSubject := "specs/local/spec-coordination/spec-planning-ux(plan): expand codex compatibility spec"
+	if !strings.HasPrefix(msg, wantSubject+"\n") {
+		t.Errorf("subject = first line of %q, want %q", msg, wantSubject)
+	}
+	if strings.Contains(msg, "Based on the filename") {
+		t.Errorf("preamble prose leaked into commit message:\n%s", msg)
+	}
+	if strings.Contains(msg, "```") {
+		t.Errorf("code fence leaked into commit message:\n%s", msg)
+	}
+	if !strings.Contains(msg, "Flesh out planning-codex-compat spec") {
+		t.Errorf("body content missing:\n%s", msg)
+	}
+	if !strings.HasSuffix(strings.TrimRight(msg, "\n"), "Plan-Round: 1") {
+		t.Errorf("trailer not at end of message:\n%s", msg)
+	}
+}
+
+func TestCommitPlanningRound_AgentPreambleOnlyFallsBack(t *testing.T) {
+	// Agent returned prose with no kanban-style line anywhere — cannot be
+	// rescued, must fall back to the deterministic path.
+	ws := initPlanningTestRepo(t)
+	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
+
+	gen := func(_ context.Context, _ prompts.CommitData) (string, error) {
+		return "I'll write a commit message: it updates the auth spec with new content.", nil
+	}
+
+	if _, err := commitPlanningRound(context.Background(), ws, "user", "agent summary", gen); err != nil {
+		t.Fatal(err)
+	}
+	subjects := gitLogSubjects(t, ws)
+	// Fallback: primary(plan): <firstMeaningfulLine(agentSummary)>
+	want := "specs/local/auth(plan): agent summary"
+	if subjects[0] != want {
+		t.Errorf("subject = %q, want %q", subjects[0], want)
+	}
+}
+
+func TestSanitizeAgentCommitMessage(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "fenced block with preamble",
+			in:   "Here is the message:\n```\nfoo/bar(plan): do thing\n\nbody line\n```\n",
+			want: "foo/bar(plan): do thing\n\nbody line",
+		},
+		{
+			name: "fenced block with language tag",
+			in:   "```text\nfoo: subject\n\nbody\n```",
+			want: "foo: subject\n\nbody",
+		},
+		{
+			name: "preamble with no fence",
+			in:   "Sure, here it is:\nfoo/bar(plan): subject\n\nbody",
+			want: "foo/bar(plan): subject\n\nbody",
+		},
+		{
+			name: "already clean",
+			in:   "foo(plan): x\n\nbody",
+			want: "foo(plan): x\n\nbody",
+		},
+		{
+			name: "pure prose",
+			in:   "I cannot generate a commit message for this.",
+			want: "I cannot generate a commit message for this.",
+		},
+		{
+			name: "empty",
+			in:   "   \n\n",
+			want: "",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := sanitizeAgentCommitMessage(c.in)
+			if got != c.want {
+				t.Errorf("sanitize(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 func TestEnsurePlanScope(t *testing.T) {
 	cases := []struct {
 		name    string
