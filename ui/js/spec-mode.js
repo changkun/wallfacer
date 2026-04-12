@@ -515,6 +515,14 @@ function _showSpecReadme() {
   if (dispatchBtn) dispatchBtn.classList.add("hidden");
   var breakdownBtn = document.getElementById("spec-summarize-btn");
   if (breakdownBtn) breakdownBtn.classList.add("hidden");
+  // README is not a spec — it has no lifecycle state, so the archive affordances
+  // must not leak in from a previously-focused spec.
+  var archiveBtn = document.getElementById("spec-archive-btn");
+  if (archiveBtn) archiveBtn.classList.add("hidden");
+  var unarchiveBtn = document.getElementById("spec-unarchive-btn");
+  if (unarchiveBtn) unarchiveBtn.classList.add("hidden");
+  var archivedBanner = document.getElementById("spec-archived-banner");
+  if (archivedBanner) archivedBanner.classList.add("hidden");
 
   var innerEl = document.getElementById("spec-focused-body-inner");
   if (innerEl)
