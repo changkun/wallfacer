@@ -657,7 +657,7 @@ Accept both `#spec/<path>` and `#plan/<path>` in the hash router (`ui/js/hash-de
 
 ```mermaid
 graph LR
-  A[Scaffold library] --> H[spec-new parser]
+  A[Scaffold library] --> H["/spec-new parser"]
   G[Agent prompts] --> H
   B[Tree index endpoint] --> C[Roadmap entry]
   B --> E[Layout state machine]
@@ -665,11 +665,11 @@ graph LR
   E --> F
   E --> O[Bootstrap choreography]
   H --> I[README auto-create]
-  H --> J[/create expansion]
+  H --> J["/create expansion"]
   H --> O
   I --> O
-  L[Plan → Board bridges] --> M[Empty-Board composer]
-  D[Rename Specs → Plan]
+  L["Plan to Board bridges"] --> M[Empty-Board composer]
+  D["Rename Specs to Plan"]
   K[Default mode resolution]
 ```
 
