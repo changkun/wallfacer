@@ -1,16 +1,17 @@
 ---
 title: "Add WebSocket Dependency and Inline PTY Helper"
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/pty/
   - go.mod
 effort: small
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 1: Add WebSocket Dependency and Inline PTY Helper
 

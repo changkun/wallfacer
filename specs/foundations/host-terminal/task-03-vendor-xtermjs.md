@@ -1,16 +1,17 @@
 ---
 title: "Vendor xterm.js Assets"
-status: complete
+status: archived
 depends_on: []
 affects:
   - ui/js/vendor/
   - ui/css/vendor/
 effort: small
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 3: Vendor xterm.js Assets
 

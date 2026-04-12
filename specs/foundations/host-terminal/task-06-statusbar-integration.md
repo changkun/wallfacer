@@ -1,6 +1,6 @@
 ---
 title: "Status Bar Integration and Visibility Gate"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/host-terminal/task-02-envconfig-terminal-enabled.md
   - specs/foundations/host-terminal/task-04-backend-terminal-handler.md
@@ -10,10 +10,11 @@ affects:
   - ui/css/status-bar.css
 effort: medium
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 6: Status Bar Integration and Visibility Gate
 

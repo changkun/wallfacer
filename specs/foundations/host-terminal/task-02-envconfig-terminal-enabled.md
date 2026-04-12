@@ -1,16 +1,17 @@
 ---
 title: "Add TerminalEnabled to Envconfig and Config Response"
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/envconfig/envconfig.go
   - internal/handler/config.go
 effort: small
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 2: Add TerminalEnabled to Envconfig and Config Response
 

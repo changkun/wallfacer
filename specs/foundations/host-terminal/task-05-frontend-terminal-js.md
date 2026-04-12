@@ -1,16 +1,17 @@
 ---
 title: "Frontend Terminal Module"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/host-terminal/task-03-vendor-xtermjs.md
 affects:
   - ui/js/terminal.js
 effort: medium
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 5: Frontend Terminal Module
 
