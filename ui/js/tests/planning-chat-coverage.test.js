@@ -211,6 +211,16 @@ function makeContext(overrides = {}) {
 }
 
 function loadPlanningChat(ctx) {
+  // planning-chat.js uses the shared autocomplete widget. Load the
+  // compiled widget first so `attachAutocomplete` is a global in the
+  // sandbox context before init() runs.
+  const widget = readFileSync(
+    join(jsDir, "build/lib/autocomplete.js"),
+    "utf8",
+  );
+  vm.runInContext(widget, ctx, {
+    filename: join(jsDir, "build/lib/autocomplete.js"),
+  });
   const code = readFileSync(join(jsDir, "planning-chat.js"), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, "planning-chat.js") });
   return ctx;

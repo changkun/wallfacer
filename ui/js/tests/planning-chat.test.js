@@ -10,6 +10,13 @@ import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
+// planning-chat.js uses attachAutocomplete from the shared widget
+// (ui/js/lib/autocomplete.ts, compiled to build/lib/autocomplete.js by
+// `make ui-ts`). Load the widget first so the global is available.
+const autocompleteCode = readFileSync(
+  join(jsDir, "build/lib/autocomplete.js"),
+  "utf8",
+);
 const chatCode = readFileSync(join(jsDir, "planning-chat.js"), "utf8");
 
 // Minimal DOM element factory.
@@ -186,8 +193,13 @@ function makeContext() {
   };
   let apiResult = [];
 
+  // The shared autocomplete widget appends its dropdown to document.body.
+  // Supply a minimal body so fetchItems-driven renders don't crash.
+  const body = makeEl("BODY", registry);
+
   const ctx = {
     document: {
+      body,
       getElementById(id) {
         return registry.get(id) || null;
       },
@@ -200,7 +212,7 @@ function makeContext() {
         return null;
       },
     },
-    window: {},
+    window: { addEventListener() {} },
     navigator: { platform: "MacIntel" },
     localStorage: {
       _data: {},
@@ -263,6 +275,7 @@ function makeContext() {
   };
 
   vm.createContext(ctx);
+  vm.runInContext(autocompleteCode, ctx);
   vm.runInContext(chatCode, ctx);
   return ctx;
 }

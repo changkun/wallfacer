@@ -2,7 +2,7 @@
 // Handles sending messages, streaming responses, rendering conversation,
 // and slash command autocomplete.
 
-/* global Routes, api, renderMarkdown, renderPrettyLogs, startStreamingFetch, escapeHtml, specModeState, withAuthToken, withBearerHeaders, attachMentionAutocomplete, reloadSpecTree */
+/* global Routes, api, renderMarkdown, renderPrettyLogs, startStreamingFetch, escapeHtml, specModeState, withAuthToken, withBearerHeaders, attachMentionAutocomplete, attachAutocomplete, reloadSpecTree */
 
 var PlanningChat = (function () {
   "use strict";
@@ -13,8 +13,7 @@ var PlanningChat = (function () {
   // Send mode: "enter" = Enter sends (Shift+Enter for newline),
   //            "cmd-enter" = Cmd/Ctrl+Enter sends (Enter for newline).
   var _sendMode = localStorage.getItem("wallfacer-chat-send-mode") || "enter";
-  var _autocompleteEl = null;
-  var _autocompleteIndex = -1;
+  var _slashAutocomplete = null; // Handle returned by attachAutocomplete.
   var _queue = []; // Array of {id, text}
   var _nextQueueId = 0;
 
@@ -34,7 +33,6 @@ var PlanningChat = (function () {
     if (!_input || !_messagesEl) return;
 
     _input.addEventListener("keydown", _onInputKeydown);
-    _input.addEventListener("input", _onInputChange);
     _input.addEventListener("input", _autoGrow);
     if (_sendBtn) {
       _sendBtn.addEventListener("click", function () {
@@ -48,6 +46,46 @@ var PlanningChat = (function () {
       attachMentionAutocomplete(_input, {
         position: "above",
         priorityPrefix: "specs/",
+      });
+    }
+
+    // Attach / slash-command autocomplete via the same shared widget.
+    if (typeof attachAutocomplete === "function") {
+      _slashAutocomplete = attachAutocomplete(_input, {
+        position: "above",
+        emptyMessage: null, // Close the dropdown when no command matches.
+        triggerOnCursorMove: false,
+        shouldActivate: function (textarea) {
+          var v = textarea.value;
+          if (v.indexOf("\n") !== -1) return null;
+          if (v[0] !== "/") return null;
+          return { query: v.slice(1), startIdx: 0 };
+        },
+        fetchItems: async function (match) {
+          var commands = await _fetchCommands();
+          if (!commands) return [];
+          var q = (match.query || "").toLowerCase();
+          return commands.filter(function (c) {
+            return c.name.toLowerCase().startsWith(q);
+          });
+        },
+        renderItem: function (cmd) {
+          var item = document.createElement("div");
+          item.className = "mention-item";
+          var nameEl = document.createElement("span");
+          nameEl.className = "mention-filename";
+          nameEl.textContent = "/" + cmd.name;
+          var descEl = document.createElement("span");
+          descEl.className = "mention-path";
+          descEl.textContent = cmd.description || "";
+          item.appendChild(nameEl);
+          item.appendChild(descEl);
+          return item;
+        },
+        onSelect: function (cmd, textarea) {
+          textarea.value = "/" + cmd.name + " ";
+          textarea.focus();
+        },
       });
     }
 
@@ -75,7 +113,7 @@ var PlanningChat = (function () {
       slashBtn.addEventListener("click", function () {
         _input.value = "/";
         _input.focus();
-        _onInputChange();
+        _input.dispatchEvent(new Event("input"));
       });
     }
     var atBtn = document.getElementById("spec-chat-at-hint");
@@ -123,48 +161,13 @@ var PlanningChat = (function () {
   }
 
   function _onInputKeydown(e) {
-    // If the @-mention dropdown is open (managed by mention.js) and our own
-    // slash dropdown is not open, let mention.js handle the keys.
-    if (!_autocompleteEl && document.querySelector(".mention-dropdown")) return;
-
-    // If user presses arrow key while typing a slash command but autocomplete
-    // hasn't rendered yet, trigger it synchronously from cache.
-    if (
-      !_autocompleteEl &&
-      _input.value.startsWith("/") &&
-      (e.key === "ArrowDown" || e.key === "ArrowUp")
-    ) {
-      _showAutocompleteSync(_input.value);
-    }
-
-    if (_autocompleteEl) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        var len = _autocompleteEl.children.length;
-        _autocompleteIndex = len > 0 ? (_autocompleteIndex + 1) % len : 0;
-        _highlightAutocomplete();
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        var len2 = _autocompleteEl.children.length;
-        _autocompleteIndex =
-          len2 > 0 ? (_autocompleteIndex - 1 + len2) % len2 : 0;
-        _highlightAutocomplete();
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        if (_autocompleteIndex >= 0) {
-          e.preventDefault();
-          _selectAutocomplete(_autocompleteIndex);
-          return;
-        }
-      }
-      if (e.key === "Escape") {
-        _closeAutocomplete();
-        return;
-      }
-    }
+    // The shared autocomplete widget handles its own ArrowUp/Down/Enter/Tab/
+    // Escape when its dropdown is open. Skip send-on-Enter so selecting an
+    // autocomplete row doesn't also submit the message.
+    var autocompleteOpen =
+      (_slashAutocomplete && _slashAutocomplete.isOpen()) ||
+      !!document.querySelector(".mention-dropdown");
+    if (autocompleteOpen) return;
 
     if (e.key === "Enter") {
       var shouldSend = false;
@@ -199,15 +202,6 @@ var PlanningChat = (function () {
     if (!_input) return;
     _input.style.height = "auto";
     _input.style.height = Math.min(_input.scrollHeight, 200) + "px";
-  }
-
-  function _onInputChange() {
-    var val = _input.value;
-    if (val.startsWith("/") && val.indexOf("\n") === -1) {
-      _showAutocomplete(val);
-    } else {
-      _closeAutocomplete();
-    }
   }
 
   async function _loadHistory() {
@@ -248,7 +242,7 @@ var PlanningChat = (function () {
 
     _input.value = "";
     _input.style.height = "auto";
-    _closeAutocomplete();
+    if (_slashAutocomplete) _slashAutocomplete.close();
 
     // Render user message immediately and force-scroll to show it.
     _appendMessageBubble("user", text, new Date().toISOString());
@@ -721,6 +715,11 @@ var PlanningChat = (function () {
   }
 
   // --- Slash command autocomplete ---
+  //
+  // Dropdown UI, keyboard nav, and lifecycle are owned by the shared
+  // attachAutocomplete widget (ui/js/lib/autocomplete.ts). This module only
+  // supplies the command source via _fetchCommands below; the widget is
+  // attached in init() with slash-specific shouldActivate/renderItem/onSelect.
 
   async function _fetchCommands() {
     if (_commandsCache) return _commandsCache;
@@ -730,118 +729,6 @@ var PlanningChat = (function () {
     } catch (_) {
       return [];
     }
-  }
-
-  // Synchronous version for keydown handler — uses cached commands only.
-  function _showAutocompleteSync(text) {
-    if (!_commandsCache || _commandsCache.length === 0) return;
-    _renderAutocomplete(text, _commandsCache);
-  }
-
-  async function _showAutocomplete(text) {
-    var commands = await _fetchCommands();
-    _renderAutocomplete(text, commands);
-  }
-
-  function _renderAutocomplete(text, commands) {
-    if (!commands || commands.length === 0) {
-      _closeAutocomplete();
-      return;
-    }
-
-    var query = text.slice(1).toLowerCase(); // remove leading /
-    var matches = commands.filter(function (c) {
-      return c.name.toLowerCase().startsWith(query);
-    });
-
-    if (matches.length === 0) {
-      _closeAutocomplete();
-      return;
-    }
-
-    if (!_autocompleteEl) {
-      _autocompleteEl = document.createElement("div");
-      _autocompleteEl.className = "mention-dropdown";
-      // Position above the composer input.
-      var rect = _input.getBoundingClientRect();
-      _autocompleteEl.style.position = "fixed";
-      _autocompleteEl.style.left = rect.left + "px";
-      _autocompleteEl.style.width = Math.max(320, rect.width) + "px";
-      _autocompleteEl.style.bottom = window.innerHeight - rect.top + 4 + "px";
-      _autocompleteEl.style.top = "auto";
-      document.body.appendChild(_autocompleteEl);
-    }
-
-    _autocompleteEl.innerHTML = "";
-    _autocompleteIndex = 0;
-
-    matches.forEach(function (cmd, i) {
-      var item = document.createElement("div");
-      item.className = "mention-item";
-      var nameEl = document.createElement("span");
-      nameEl.className = "mention-filename";
-      nameEl.textContent = "/" + cmd.name;
-      var descEl = document.createElement("span");
-      descEl.className = "mention-path";
-      descEl.textContent = cmd.description;
-      item.appendChild(nameEl);
-      item.appendChild(descEl);
-      item.addEventListener("mousedown", function (e) {
-        e.preventDefault();
-        _selectAutocomplete(i);
-      });
-      _autocompleteEl.appendChild(item);
-    });
-
-    _highlightAutocomplete();
-  }
-
-  function _highlightAutocomplete() {
-    if (!_autocompleteEl) return;
-    // Clamp index to valid range when results shrink.
-    if (_autocompleteIndex >= _autocompleteEl.children.length) {
-      _autocompleteIndex = Math.max(0, _autocompleteEl.children.length - 1);
-    }
-    var items = _autocompleteEl.children;
-    for (var i = 0; i < items.length; i++) {
-      items[i].classList.toggle(
-        "mention-item-selected",
-        i === _autocompleteIndex,
-      );
-    }
-    // Scroll active item into view.
-    if (
-      _autocompleteIndex >= 0 &&
-      items[_autocompleteIndex] &&
-      typeof items[_autocompleteIndex].scrollIntoView === "function"
-    ) {
-      items[_autocompleteIndex].scrollIntoView({ block: "nearest" });
-    }
-  }
-
-  function _selectAutocomplete(index) {
-    if (!_autocompleteEl) return;
-    var items = _autocompleteEl.children;
-    if (index < 0 || index >= items.length) return;
-    var nameEl = items[index].querySelector(".mention-filename");
-    var name = nameEl ? nameEl.textContent : "";
-    _input.value = name + " ";
-    _input.focus();
-    _closeAutocomplete();
-  }
-
-  function _closeAutocomplete() {
-    if (_autocompleteEl) {
-      _autocompleteEl.remove();
-      _autocompleteEl = null;
-    }
-    _autocompleteIndex = -1;
-  }
-
-  function _escapeHtml(s) {
-    var el = document.createElement("span");
-    el.textContent = s;
-    return el.innerHTML;
   }
 
   // --- Message queue ---

@@ -64,6 +64,36 @@ declare global {
     opts?: { onOpen?: () => void; onClose?: () => void },
   ): { open: () => void; close: () => void };
 
+  // --- ui/js/lib/autocomplete.ts ---
+  interface AutocompleteMatch {
+    query: string;
+    startIdx: number;
+  }
+  interface AutocompleteOptions<T> {
+    shouldActivate: (textarea: HTMLTextAreaElement) => AutocompleteMatch | null;
+    fetchItems: (match: AutocompleteMatch) => Promise<T[]> | T[];
+    renderItem: (row: T) => HTMLElement;
+    onSelect: (
+      row: T,
+      textarea: HTMLTextAreaElement,
+      match: AutocompleteMatch,
+    ) => void;
+    position?: "above" | "below";
+    dropdownClassName?: string;
+    emptyMessage?: string | null;
+    triggerOnCursorMove?: boolean;
+    closeOnWindowScroll?: boolean;
+  }
+  interface AutocompleteHandle {
+    refresh: () => void;
+    close: () => void;
+    isOpen: () => boolean;
+  }
+  function attachAutocomplete<T>(
+    textarea: HTMLTextAreaElement | null,
+    opts: AutocompleteOptions<T>,
+  ): AutocompleteHandle;
+
   // --- ui/js/time-map.ts ---
   function buildTimeMap(
     spans: Array<{ startMs: number; endMs: number }> | null | undefined,

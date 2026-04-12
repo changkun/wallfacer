@@ -133,6 +133,18 @@ function loadScript(ctx, filename) {
   return ctx;
 }
 
+// mention.js delegates its dropdown UI to the shared autocomplete widget
+// (ui/js/lib/autocomplete.ts, compiled to build/lib/autocomplete.js by
+// `make ui-ts`). Load the widget before mention.js so `attachAutocomplete`
+// is visible as a global, just like it is in the browser. Tests that only
+// exercise the pure @-helpers (_mentionGetQuery, _mentionFilter,
+// _mentionLoadFiles) don't call attachAutocomplete so they can skip this
+// step — but callers of attachMentionAutocomplete must use this loader.
+function loadMentionWithWidget(ctx) {
+  loadScript(ctx, "build/lib/autocomplete.js");
+  loadScript(ctx, "mention.js");
+}
+
 describe("_mentionGetQuery", () => {
   it("returns query when @ is at beginning", () => {
     const ctx = makeContext();
@@ -231,7 +243,7 @@ describe("attachMentionAutocomplete", () => {
       files: ["src/main/app.go", "README.md", "lib/main_test.go"],
     });
     const ctx = makeContext({ elements: nodes, api });
-    loadScript(ctx, "mention.js");
+    loadMentionWithWidget(ctx);
     ctx.attachMentionAutocomplete(textarea);
 
     const inputHandler = textarea._listeners.input[0];
@@ -276,7 +288,7 @@ describe("attachMentionAutocomplete", () => {
       files: ["src/main/app.go", "README.md", "lib/main_test.go"],
     });
     const ctx = makeContext({ elements: nodes, api });
-    loadScript(ctx, "mention.js");
+    loadMentionWithWidget(ctx);
     ctx.attachMentionAutocomplete(textarea);
 
     const inputHandler = textarea._listeners.input[0];

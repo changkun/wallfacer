@@ -2,6 +2,13 @@
 //
 // Typing "@" in a prompt textarea opens a dropdown that filters workspace
 // files as you type.  Select with Enter/Tab or click; dismiss with Escape.
+//
+// The dropdown UI, keyboard nav, and lifecycle live in the shared
+// `attachAutocomplete` widget (ui/js/lib/autocomplete.ts). This file
+// supplies only the @-specific bits: query detection, file loading,
+// ranking, and splice-on-select.
+
+/* global attachAutocomplete */
 
 const _mentionFiles = { list: null, loading: false };
 
@@ -12,15 +19,15 @@ async function _mentionLoadFiles() {
   try {
     const res = await api("/api/files");
     _mentionFiles.list = res.files || [];
-  } catch (e) {
+  } catch (_e) {
     _mentionFiles.list = [];
   }
   _mentionFiles.loading = false;
   return _mentionFiles.list;
 }
 
-// Returns { query, atIdx } when the cursor is right after an active "@mention",
-// or null when the cursor is not inside one.
+// Returns { query, atIdx } when the cursor sits inside an active
+// "@mention", or null when it doesn't.
 function _mentionGetQuery(textarea) {
   const pos = textarea.selectionStart;
   const text = textarea.value.substring(0, pos);
@@ -62,14 +69,6 @@ function _mentionFilter(files, query, priorityPrefix) {
   return scored.slice(0, 20).map((s) => s.f);
 }
 
-function _scrollSelectedIntoView(dropdown, index) {
-  if (!dropdown || index < 0) return;
-  var item = dropdown.children && dropdown.children[index];
-  if (item && typeof item.scrollIntoView === "function") {
-    item.scrollIntoView({ block: "nearest" });
-  }
-}
-
 // Attach @-mention autocomplete to a single textarea element.
 // Options:
 //   position: "below" (default) — dropdown appears below the textarea
@@ -77,165 +76,49 @@ function _scrollSelectedIntoView(dropdown, index) {
 //   priorityPrefix: path prefix to boost in ranking (e.g. "specs/")
 function attachMentionAutocomplete(textarea, opts) {
   if (!textarea) return;
-  var position = (opts && opts.position) || "below";
-  var priorityPrefix = (opts && opts.priorityPrefix) || "";
+  const position = (opts && opts.position) || "below";
+  const priorityPrefix = (opts && opts.priorityPrefix) || "";
 
-  let dropdown = null;
-  let selectedIndex = -1;
-  let currentMatches = [];
-  // Tracks the async load so we can cancel stale renders.
-  let renderGeneration = 0;
-
-  function closeDropdown() {
-    if (dropdown) {
-      dropdown.remove();
-      dropdown = null;
-    }
-    selectedIndex = -1;
-    currentMatches = [];
-  }
-
-  function selectFile(file) {
-    const info = _mentionGetQuery(textarea);
-    if (!info) {
-      closeDropdown();
-      return;
-    }
-    const { atIdx } = info;
-    const cursorPos = textarea.selectionStart;
-    const before = textarea.value.substring(0, atIdx);
-    const after = textarea.value.substring(cursorPos);
-    const insert = "@" + file + " ";
-    textarea.value = before + insert + after;
-    const newPos = before.length + insert.length;
-    textarea.setSelectionRange(newPos, newPos);
-    // Notify listeners (e.g. auto-save in tasks.js).
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    closeDropdown();
-    textarea.focus();
-  }
-
-  function renderItems(matches) {
-    if (!dropdown) {
-      dropdown = document.createElement("div");
-      dropdown.className = "mention-dropdown";
-      document.body.appendChild(dropdown);
-    }
-
-    const rect = textarea.getBoundingClientRect();
-    dropdown.style.left = rect.left + "px";
-    dropdown.style.width = Math.max(320, rect.width) + "px";
-    if (position === "above") {
-      dropdown.style.bottom = window.innerHeight - rect.top + 4 + "px";
-      dropdown.style.top = "auto";
-    } else {
-      dropdown.style.top = rect.bottom + 4 + "px";
-      dropdown.style.bottom = "auto";
-    }
-
-    dropdown.innerHTML = "";
-
-    if (matches.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "mention-item mention-empty";
-      empty.textContent = "No matching files";
-      dropdown.appendChild(empty);
-      currentMatches = [];
-      return;
-    }
-
-    currentMatches = matches;
-    // Auto-select first item when dropdown opens; clamp when result count shrinks.
-    if (selectedIndex < 0) selectedIndex = 0;
-    selectedIndex = Math.min(selectedIndex, matches.length - 1);
-    matches.forEach((file, i) => {
+  return attachAutocomplete(textarea, {
+    position,
+    emptyMessage: "No matching files",
+    shouldActivate: (ta) => {
+      const q = _mentionGetQuery(ta);
+      return q ? { query: q.query, startIdx: q.atIdx } : null;
+    },
+    fetchItems: async (match) => {
+      const files = await _mentionLoadFiles();
+      return _mentionFilter(files, match.query, priorityPrefix);
+    },
+    renderItem: (file) => {
       const item = document.createElement("div");
-      item.className =
-        "mention-item" + (i === selectedIndex ? " mention-item-selected" : "");
-      item.dataset.index = i;
-
+      item.className = "mention-item";
       const parts = file.split("/");
       const basename = parts.pop();
       const dir = parts.join("/");
-
-      const nameEl = document.createElement("span");
-      nameEl.className = "mention-filename";
-      nameEl.textContent = basename;
-
       const pathEl = document.createElement("span");
       pathEl.className = "mention-path";
       pathEl.textContent = dir ? dir + "/" : "";
-
+      const nameEl = document.createElement("span");
+      nameEl.className = "mention-filename";
+      nameEl.textContent = basename;
       item.appendChild(pathEl);
       item.appendChild(nameEl);
-
-      item.addEventListener("mousedown", (e) => {
-        e.preventDefault(); // Keep textarea focused.
-        selectFile(file);
-      });
-      dropdown.appendChild(item);
-    });
-  }
-
-  async function update() {
-    const info = _mentionGetQuery(textarea);
-    if (!info) {
-      closeDropdown();
-      return;
-    }
-
-    const gen = ++renderGeneration;
-    const files = await _mentionLoadFiles();
-    if (gen !== renderGeneration) return; // Stale — a newer update superseded this one.
-
-    const matches = _mentionFilter(files, info.query, priorityPrefix);
-    renderItems(matches);
-  }
-
-  textarea.addEventListener("input", update);
-
-  // Also re-evaluate on cursor movement (keyboard nav, click inside textarea).
-  textarea.addEventListener("keyup", (e) => {
-    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) update();
+      return item;
+    },
+    onSelect: (file, ta, match) => {
+      const cursorPos = ta.selectionStart;
+      const before = ta.value.substring(0, match.startIdx);
+      const after = ta.value.substring(cursorPos);
+      const insert = "@" + file + " ";
+      ta.value = before + insert + after;
+      const newPos = before.length + insert.length;
+      ta.setSelectionRange(newPos, newPos);
+      // Notify listeners (e.g. auto-save in tasks.js).
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+      ta.focus();
+    },
   });
-  textarea.addEventListener("click", update);
-
-  textarea.addEventListener("keydown", (e) => {
-    if (!dropdown) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      selectedIndex =
-        currentMatches.length > 0
-          ? (selectedIndex + 1) % currentMatches.length
-          : 0;
-      renderItems(currentMatches);
-      _scrollSelectedIntoView(dropdown, selectedIndex);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      selectedIndex =
-        currentMatches.length > 0
-          ? (selectedIndex - 1 + currentMatches.length) % currentMatches.length
-          : 0;
-      renderItems(currentMatches);
-      _scrollSelectedIntoView(dropdown, selectedIndex);
-    } else if ((e.key === "Enter" || e.key === "Tab") && selectedIndex >= 0) {
-      e.preventDefault();
-      selectFile(currentMatches[selectedIndex]);
-    } else if (e.key === "Escape") {
-      e.stopPropagation();
-      closeDropdown();
-    }
-  });
-
-  textarea.addEventListener("blur", () => {
-    // Delay slightly so a mousedown on a dropdown item fires first.
-    setTimeout(closeDropdown, 150);
-  });
-
-  // Reposition or close on window scroll/resize.
-  window.addEventListener("scroll", closeDropdown, { passive: true });
-  window.addEventListener("resize", closeDropdown, { passive: true });
 }
 
 // Attach to all prompt textareas that exist at load time.
