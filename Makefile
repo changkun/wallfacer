@@ -1,7 +1,22 @@
 SHELL            := /bin/bash
 PODMAN           := /opt/podman/bin/podman
-# Resolve the latest release tag from latere-ai/images; fall back to "latest".
-SANDBOX_TAG      := $(shell curl -sf https://api.github.com/repos/latere-ai/images/releases/latest | jq -r '.tag_name // empty' 2>/dev/null || echo latest)
+# Resolve the latest versioned tag (e.g. v0.0.4) of latere-ai/images.
+# Tries the GitHub releases API first (one HTTP call); on failure — rate-limit,
+# offline, jq missing, field absent — falls back to `git ls-remote --tags` on
+# the images repo, which is unauthenticated and works in more environments.
+# The result is the highest semver-sorted tag matching `vMAJOR.MINOR.PATCH`.
+# If both lookups fail the expansion is empty and the `ifeq` below fails the
+# build with a clear message (old behaviour silently pulled `image:` with a
+# bare colon). Override on the command line: `make SANDBOX_TAG=v0.0.3 …`.
+SANDBOX_TAG      := $(shell \
+  tag=$$(curl -sf https://api.github.com/repos/latere-ai/images/releases/latest 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null); \
+  if [ -z "$$tag" ]; then \
+    tag=$$(git ls-remote --tags https://github.com/latere-ai/images 2>/dev/null | awk -F/ '{print $$NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -1); \
+  fi; \
+  echo $$tag)
+ifeq ($(SANDBOX_TAG),)
+$(error Could not resolve the latest sandbox image tag from GitHub. Check your network, or override: make SANDBOX_TAG=vX.Y.Z <target>)
+endif
 IMAGE            := sandbox-claude:$(SANDBOX_TAG)
 GHCR_IMAGE       := ghcr.io/latere-ai/sandbox-claude:$(SANDBOX_TAG)
 CODEX_IMAGE      := sandbox-codex:$(SANDBOX_TAG)
@@ -12,10 +27,10 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Build the wallfacer binary and pull sandbox images.
-build: fmt lint build-binary pull-images
+build: fmt lint ui-ts build-binary pull-images
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -109,6 +124,19 @@ api-contract:
 	npx --yes prettier@3 --write ui/js/generated/
 	go test ./internal/cli/ -run TestContractRoutes_AllRegisteredInMux -count=1
 
+# Transpile TypeScript sources under ui/js/ to sibling .js files so the
+# embedded UI keeps working without a bundler. Uses esbuild as a pure
+# per-file transpiler (no IIFE wrap, no module shim) to preserve the
+# script-tag global-scope model. Re-run after editing any .ts source.
+ui-ts:
+	cd ui && node scripts/build-ts.mjs
+
+# Run the TypeScript type checker without emitting output. Runs as part
+# of `make lint` so pre-commit catches type errors before shipping.
+typecheck-js:
+	cd ui && npx --no-install tsc --noEmit || \
+		(cd ui && npm install --no-audit --no-fund && npx --no-install tsc --noEmit)
+
 # Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
 # Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
 ui-css:
@@ -138,8 +166,8 @@ lint-go:
 		go vet ./...; \
 	fi
 
-# Run frontend linter (Biome) over ui/js and ui/partials
-lint-js:
+# Run frontend linter (Biome) over ui/js and ui/partials, plus TypeScript typecheck.
+lint-js: typecheck-js
 	cd ui && npx --yes @biomejs/biome@1.9.4 lint --max-diagnostics=5000 js partials
 
 # Run all checks (fmt + lint + backend tests + frontend tests)
@@ -149,8 +177,9 @@ test: fmt lint test-backend test-frontend
 test-backend:
 	go test ./...
 
-# Run frontend JavaScript unit tests
-test-frontend:
+# Run frontend JavaScript unit tests. Depends on ui-ts so vm-based
+# tests that readFileSync the compiled .js twins see fresh output.
+test-frontend: ui-ts
 	cd ui && npx --yes vitest@2 run
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex sandboxes.
