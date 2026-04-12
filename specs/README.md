@@ -4,45 +4,43 @@ Wallfacer roadmap. Three tracks run in parallel, connected by shared design foun
 
 ## Status Quo
 
-What has shipped vs what remains. ✅ = complete, ○ = not started.
+What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started.
 
 ```
-Foundations (complete)
-  ✅ Sandbox Backend Interface
-  ✅ Storage Backend Interface
-  ✅ Container Reuse
-  ✅ File Explorer
-  ✅ Host Terminal
+Foundations — 7/7 complete
+  ✅ Sandbox Backend Interface     ✅ Container Reuse
+  ✅ Storage Backend Interface     ✅ File Explorer
+  ✅ Multi-Workspace Groups        ✅ Host Terminal
+  ✅ Windows Support
 
-Local Product                     Cloud Platform
-  ◐ Spec Coordination               ○ Cloud Deployment (overview)
-  ✅ Desktop App                     ○ Tenant Filesystem (→ fs.latere.ai)
-  ○ File/Image Attachments          ○ K8s Sandbox Backend
-  ○ Host Mounts                     ○ Cloud Infrastructure
-  ○ File Panel Viewer
-  ○ Inline Diff Feedback               ○ Multi-Tenant (capstone)
-  ✅ Terminal Sessions               ○ Tenant API
-  ✅ Container Exec
-  ○ Oversight Risk Scoring        Shared Design
-  ○ Validation Barrier              ○ Authentication
-  ○ Visual Verification             ○ Agent Abstraction
-  ✅ OAuth Token Setup              ○ Native Sandboxes (Linux/macOS/Win)
-  ○ Live Serve                      ○ Overlay Snapshots
-  ○ Pull Request Creation
-  ○ Task Revert
-  ○ Terminal UI (TUI mode)            ○ Telemetry & Observability
-  ✅ Pixel Agent Avatars
-  ○ Excalidraw Whiteboard
-  ○ Spatial Canvas (vague)              ○ Information Inbox
-                                    ○ Multi-Agent Consensus
-                                    ○ Multi-Agent Debate
-                                    ○ Token & Cost Optimization
-                                    ○ Intent-Driven Commits
-                                    ○ Extensible Prompts
-                                    ○ Sandbox Hooks
-                                    ○ Defense in Depth
-                                    ○ Agent Memory & Identity
-                                    ○ Intelligence System
+Local Product — 5 done, 1 in progress, 16 pending
+  ✅ Desktop App                   ✅ Terminal Sessions
+  ✅ Container Exec                ✅ OAuth Token Setup
+  ✅ Pixel Agent Avatars           ◐ Spec Coordination
+  ○ File/Image Attachments         ○ Host Mounts
+  ○ File Panel Viewer              ○ Inline Diff Feedback
+  ○ Oversight Risk Scoring         ○ Validation Barrier
+  ○ Visual Verification            ○ Live Serve
+  ○ Pull Request Creation          ○ Task Revert
+  ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
+  ○ TypeScript Migration           ○ Typed DOM Hooks
+  ○ Rebrand Module Path            ○ Spatial Canvas
+
+Cloud Platform — 0/6
+  ○ Tenant Filesystem              ○ K8s Sandbox Backend
+  ○ Sandbox Isolation              ○ Cloud Infrastructure
+  ○ Multi-Tenant (capstone)        ○ Tenant API
+
+Shared Design — 0/17
+  ○ Authentication                 ○ Agent Abstraction
+  ○ Overlay Snapshots              ○ Native Sandbox (Linux)
+  ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
+  ○ Telemetry & Observability      ○ Information Inbox
+  ○ Multi-Agent Consensus          ○ Multi-Agent Debate
+  ○ Token & Cost Optimization      ○ Extensible Prompts
+  ○ Intent-Driven Commits          ○ Sandbox Hooks
+  ○ Defense in Depth               ○ Agent Memory & Identity
+  ○ Intelligence System
 ```
 
 ---
