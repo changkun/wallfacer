@@ -241,7 +241,7 @@ describe("_ensureTimelineStyles", () => {
         getElementById(id) {
           return elements[id] || null;
         },
-        createElement(tag) {
+        createElement(_tag) {
           const el = { id: "", textContent: "", style: {} };
           return el;
         },
@@ -357,7 +357,7 @@ describe("_buildTimelineHtml", () => {
         getElementById(id) {
           return elements[id] || null;
         },
-        createElement(tag) {
+        createElement(_tag) {
           const el = { id: "", textContent: "", style: {} };
           return el;
         },
@@ -574,7 +574,7 @@ describe("renderTimeline", () => {
       getOpenModalTaskId() {
         return "t1";
       },
-      apiGet(url) {
+      apiGet(_url) {
         return Promise.resolve(spansData);
       },
     });
@@ -682,7 +682,7 @@ describe("copyResultEntry", () => {
       },
       navigator: { clipboard: { writeText: () => Promise.resolve() } },
       event: { currentTarget: { querySelector: () => null } },
-      copyWithFeedback(text, el) {
+      copyWithFeedback(text, _el) {
         copiedText = text;
       },
     });

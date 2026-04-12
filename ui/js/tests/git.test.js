@@ -805,7 +805,7 @@ describe("pushWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Push",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.pushWorkspace(btn);
     expect(mockApi).toHaveBeenCalledWith("/api/git/push", {
@@ -829,7 +829,7 @@ describe("pushWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Push",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.pushWorkspace(btn);
     expect(mockAlert).toHaveBeenCalledWith(
@@ -854,7 +854,7 @@ describe("pushWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Push",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.pushWorkspace(btn);
     expect(mockAlert).toHaveBeenCalledWith(expect.stringContaining("Sync"));
@@ -871,7 +871,7 @@ describe("pushWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Push",
-      getAttribute: (a) => "5",
+      getAttribute: (_a) => "5",
     };
     await ctx.pushWorkspace(btn);
     expect(mockApi).not.toHaveBeenCalled();
@@ -897,7 +897,7 @@ describe("syncWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Sync",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.syncWorkspace(btn);
     expect(mockFetch).toHaveBeenCalledWith(
@@ -929,7 +929,7 @@ describe("syncWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Sync",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.syncWorkspace(btn);
     expect(mockAlert).toHaveBeenCalledWith(
@@ -954,7 +954,7 @@ describe("syncWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Sync",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.syncWorkspace(btn);
     expect(mockAlert).toHaveBeenCalledWith(
@@ -980,7 +980,7 @@ describe("syncWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Sync",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.syncWorkspace(btn);
     expect(mockAlert).toHaveBeenCalledWith(
@@ -999,7 +999,7 @@ describe("syncWorkspace", () => {
     const btn = {
       disabled: false,
       textContent: "Sync",
-      getAttribute: (a) => "99",
+      getAttribute: (_a) => "99",
     };
     await ctx.syncWorkspace(btn);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -1025,7 +1025,7 @@ describe("rebaseOnMain", () => {
     const btn = {
       disabled: false,
       textContent: "Rebase",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.rebaseOnMain(btn);
     expect(mockFetch).toHaveBeenCalledWith(
@@ -1060,7 +1060,7 @@ describe("rebaseOnMain", () => {
     const btn = {
       disabled: false,
       textContent: "Rebase",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.rebaseOnMain(btn);
     expect(mockAlert).toHaveBeenCalledWith(
@@ -1085,7 +1085,7 @@ describe("rebaseOnMain", () => {
     const btn = {
       disabled: false,
       textContent: "Rebase",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.rebaseOnMain(btn);
     expect(mockAlert).toHaveBeenCalledWith(expect.stringContaining("conflict"));
@@ -1110,7 +1110,7 @@ describe("rebaseOnMain", () => {
     const btn = {
       disabled: false,
       textContent: "Rebase",
-      getAttribute: (a) => "0",
+      getAttribute: (_a) => "0",
     };
     await ctx.rebaseOnMain(btn);
     expect(mockAlert).toHaveBeenCalledWith(
@@ -1129,7 +1129,7 @@ describe("rebaseOnMain", () => {
     const btn = {
       disabled: false,
       textContent: "Rebase",
-      getAttribute: (a) => "99",
+      getAttribute: (_a) => "99",
     };
     await ctx.rebaseOnMain(btn);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -1156,7 +1156,7 @@ describe("startGitStream", () => {
 
   it("closes existing source before creating new one", () => {
     const closeFn = vi.fn();
-    const mockES = function (url) {
+    const mockES = function (_url) {
       this.onmessage = null;
       this.onerror = null;
       this.readyState = 1;

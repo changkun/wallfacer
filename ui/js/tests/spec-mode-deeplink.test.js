@@ -96,7 +96,7 @@ function makeContext(opts = {}) {
       },
     },
     history: {
-      replaceState(state, title, url) {
+      replaceState(_state, _title, url) {
         replaceStateCalls.push(url);
         if (url.indexOf("#") >= 0) {
           _hash = url.substring(url.indexOf("#"));

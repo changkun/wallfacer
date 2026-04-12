@@ -111,7 +111,7 @@ function makeDom() {
       get firstChild() {
         return _children[0] || null;
       },
-      querySelector(sel) {
+      querySelector(_sel) {
         return null;
       },
       querySelectorAll(sel) {

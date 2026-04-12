@@ -89,7 +89,7 @@
 
   // ---- Update ----
 
-  Character.prototype.update = function (dt, tileMap) {
+  Character.prototype.update = function (dt, _tileMap) {
     if (this.dead) return;
 
     switch (this.state) {

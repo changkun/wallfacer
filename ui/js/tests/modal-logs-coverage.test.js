@@ -172,7 +172,7 @@ function makeLogsContext(overrides = {}) {
         if (!elements[id]) makeEl(id);
         return elements[id];
       },
-      createTreeWalker: (root, filter) => {
+      createTreeWalker: (_root, _filter) => {
         // Simulate a tree walker that returns text nodes
         const textNodes = overrides.textNodes || [];
         let idx = 0;
@@ -471,7 +471,7 @@ describe("highlightLogMatches", () => {
     const textNode = {
       textContent: "hello world hello",
       parentNode: {
-        replaceChild: (newNode, oldNode) => {
+        replaceChild: (newNode, _oldNode) => {
           replacedWith = newNode;
         },
       },

@@ -75,13 +75,13 @@ function makeEl(tag, overrides = {}) {
     _fire(evt, data) {
       (listeners[evt] || []).forEach((fn) => { fn(data); });
     },
-    querySelector(sel) {
+    querySelector(_sel) {
       return null;
     },
-    querySelectorAll(sel) {
+    querySelectorAll(_sel) {
       return [];
     },
-    closest(sel) {
+    closest(_sel) {
       return null;
     },
     appendChild(child) {
@@ -247,8 +247,8 @@ function makeContext(overrides = {}) {
         createdElements.push(el);
         return el;
       },
-      querySelector: (sel) => null,
-      querySelectorAll: (sel) => [],
+      querySelector: (_sel) => null,
+      querySelectorAll: (_sel) => [],
       addEventListener: () => {},
       readyState: "complete",
     },
@@ -469,7 +469,7 @@ describe("populateDependsOnPicker", () => {
         if (sel === ".dep-picker-chips") return chipsEl;
         return null;
       },
-      querySelectorAll: (sel) => [],
+      querySelectorAll: (_sel) => [],
     });
 
     const ctx = makeContext({
@@ -493,7 +493,7 @@ describe("populateDependsOnPicker", () => {
         if (sel === ".dep-picker-chips") return chipsEl;
         return null;
       },
-      querySelectorAll: (sel) => [],
+      querySelectorAll: (_sel) => [],
     });
 
     const taskData = [
@@ -691,7 +691,7 @@ describe("createTask", () => {
       api,
       elements,
       // Don't execute setTimeout callbacks immediately for createTask
-      setTimeout: (fn, ms) => 0,
+      setTimeout: (_fn, _ms) => 0,
       ...overrides,
     });
   }
@@ -817,7 +817,7 @@ describe("createTask", () => {
     const ctx2 = makeContext({
       api,
       elements: [...elementsMap.entries()],
-      setTimeout: (fn, ms) => 0,
+      setTimeout: (_fn, _ms) => 0,
     });
     loadTasks(ctx2);
 

@@ -63,7 +63,7 @@ function makeEl(tag, overrides = {}) {
     getAttribute(name) {
       return _attrs[name] ?? null;
     },
-    addEventListener(type, fn, opts) {
+    addEventListener(type, fn, _opts) {
       if (!_listeners[type]) _listeners[type] = [];
       _listeners[type].push(fn);
     },
@@ -139,7 +139,7 @@ function makeContext() {
       return 1;
     },
     cancelAnimationFrame: () => {},
-    setTimeout: (fn, ms) => {
+    setTimeout: (_fn, _ms) => {
       return 1;
     },
     clearTimeout: () => {},
@@ -224,7 +224,7 @@ describe("floating-toc", () => {
       }
 
       const bodyEl = makeEl("div", {
-        querySelectorAll: (sel) => headings,
+        querySelectorAll: (_sel) => headings,
       });
 
       const scrollEl = makeEl("div", {

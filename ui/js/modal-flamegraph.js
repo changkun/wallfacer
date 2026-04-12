@@ -222,7 +222,7 @@
   // Returns an HTML string (SVG element) or empty string if there is no data.
   function buildCostChart(
     turnUsages,
-    spans,
+    _spans,
     globalStartMs,
     total,
     toPercentFn,

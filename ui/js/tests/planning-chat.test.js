@@ -350,7 +350,7 @@ describe("PlanningChat", () => {
 
   it("sendMessage posts to server", async () => {
     let postBody = null;
-    ctx.fetch = (url, opts) => {
+    ctx.fetch = (_url, opts) => {
       if (opts && opts.method === "POST") {
         postBody = JSON.parse(opts.body);
       }
@@ -369,7 +369,7 @@ describe("PlanningChat", () => {
   it("sendMessage includes focused_spec from specModeState", async () => {
     let postBody = null;
     ctx.specModeState.focusedSpecPath = "specs/local/foo.md";
-    ctx.fetch = (url, opts) => {
+    ctx.fetch = (_url, opts) => {
       if (opts && opts.method === "POST") {
         postBody = JSON.parse(opts.body);
       }

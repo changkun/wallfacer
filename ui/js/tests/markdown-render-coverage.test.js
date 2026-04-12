@@ -84,7 +84,7 @@ function makeEl(tag = "div") {
       }
       return [];
     },
-    querySelector(sel) {
+    querySelector(_sel) {
       return null;
     },
     cloneNode() {
@@ -93,7 +93,7 @@ function makeEl(tag = "div") {
       if (attrs.style) clone.setAttribute("style", attrs.style);
       return clone;
     },
-    closest(sel) {
+    closest(_sel) {
       return null;
     },
     getBoundingClientRect() {
@@ -170,7 +170,7 @@ function makeContext(extra = {}) {
       getElementById: () => null,
       querySelector: () => null,
       querySelectorAll: () => [],
-      addEventListener(type, handler, opts) {
+      addEventListener(type, handler, _opts) {
         if (!docListeners[type]) docListeners[type] = [];
         docListeners[type].push(handler);
       },
@@ -533,7 +533,7 @@ describe("enhanceMarkdown options coverage", () => {
       mermaid: { initialize() {} },
     });
     const container = makeEl("div");
-    container.querySelectorAll = (sel) => [];
+    container.querySelectorAll = (_sel) => [];
     await ctx._mdRender.enhanceMarkdown(container, {});
   });
 
@@ -542,7 +542,7 @@ describe("enhanceMarkdown options coverage", () => {
       mermaid: { initialize() {} },
     });
     const container = makeEl("div");
-    container.querySelectorAll = (sel) => [];
+    container.querySelectorAll = (_sel) => [];
     await ctx._mdRender.enhanceMarkdown(container);
   });
 });
@@ -900,7 +900,7 @@ describe("_renderMermaidBlocks without mermaid global", () => {
     // Actually, the existing test "skips mermaid when opts.mermaid is false"
     // covers this. Let's verify the no-block path instead.
     const container = makeEl("div");
-    container.querySelectorAll = (sel) => [];
+    container.querySelectorAll = (_sel) => [];
     await ctx._mdRender.enhanceMarkdown(container, { links: false });
     // No error
   });

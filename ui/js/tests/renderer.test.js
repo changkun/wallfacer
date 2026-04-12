@@ -109,7 +109,7 @@ function makeContext() {
   const ctx = vm.createContext({
     window: windowObj,
     OffscreenCanvas: MockOffscreenCanvas,
-    requestAnimationFrame(fn) {
+    requestAnimationFrame(_fn) {
       return 1;
     },
     cancelAnimationFrame() {},

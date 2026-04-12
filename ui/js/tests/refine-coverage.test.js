@@ -152,7 +152,7 @@ function makeRefineContext(overrides = {}) {
       }
     },
     TextDecoder: class {
-      decode(v, opts) {
+      decode(_v, _opts) {
         return "";
       }
     },

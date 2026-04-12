@@ -108,7 +108,7 @@ function makeContext(opts = {}) {
       createElement(tag) {
         return makeEl(tag, registry);
       },
-      querySelectorAll(sel) {
+      querySelectorAll(_sel) {
         return [];
       },
     },
@@ -148,12 +148,12 @@ function makeContext(opts = {}) {
     _hideMinimap: opts._hideMinimap || (() => {}),
     _updateSpecPaneVisibility: opts._updateSpecPaneVisibility || (() => {}),
     renderMinimap: opts.renderMinimap || (() => {}),
-    setInterval: (fn, ms) => {
+    setInterval: (fn, _ms) => {
       ctx._lastIntervalFn = fn;
       return 99;
     },
     clearInterval: vi.fn(),
-    setTimeout: (fn, ms) => {
+    setTimeout: (fn, _ms) => {
       ctx._lastTimeoutFn = fn;
       return 88;
     },

@@ -100,7 +100,7 @@
 
   // ---- Draw bubble programmatically ----
 
-  function drawBubble(ctx, x, y, bubbleInfo, zoom) {
+  function drawBubble(ctx, x, y, bubbleInfo, _zoom) {
     if (!bubbleInfo.visible) return;
 
     var bw = BUBBLE_W;

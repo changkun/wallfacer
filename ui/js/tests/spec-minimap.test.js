@@ -33,7 +33,7 @@ function makeSvgEl(tag) {
     get style() {
       return {};
     },
-    set innerHTML(v) {
+    set innerHTML(_v) {
       _children.length = 0;
     },
     get children() {
@@ -67,8 +67,8 @@ function makeContext() {
           return _classList.has(c);
         },
       },
-      setAttribute(k, v) {},
-      set innerHTML(v) {},
+      setAttribute(_k, _v) {},
+      set innerHTML(_v) {},
     };
     if (id) registry.set(id, el);
     return el;
@@ -99,7 +99,7 @@ function makeContext() {
       getElementById(id) {
         return registry.get(id) || null;
       },
-      createElementNS(ns, tag) {
+      createElementNS(_ns, tag) {
         return makeSvgEl(tag);
       },
       addEventListener() {},

@@ -81,7 +81,7 @@ function makeContainersContext(overrides = {}) {
     apiGet: overrides.apiGet || undefined,
     loadJsonEndpoint: overrides.loadJsonEndpoint || vi.fn(),
     closeSettings: vi.fn(),
-    createHoverRow: function (cells) {
+    createHoverRow: function (_cells) {
       const tr = {
         tagName: "TR",
         innerHTML: "",

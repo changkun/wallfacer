@@ -739,7 +739,7 @@ describe("modal-core.js initEditPreviewTabs", () => {
       if (id === "my-ta-preview") return null; // doesn't exist yet
       return null;
     };
-    ctx.document.createElement = (tag) => {
+    ctx.document.createElement = (_tag) => {
       createdEl = makeEl("new-preview");
       return createdEl;
     };

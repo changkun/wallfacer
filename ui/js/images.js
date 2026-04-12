@@ -209,7 +209,7 @@ async function pullSandboxImage(sandboxType) {
 }
 
 // Connects to the SSE stream for pull progress.
-function _connectPullStream(pullId, sandboxType, progressEl, btn) {
+function _connectPullStream(pullId, sandboxType, _progressEl, _btn) {
   var url =
     Routes.images.pullStream() + "?pull_id=" + encodeURIComponent(pullId);
   var source = new EventSource(url);

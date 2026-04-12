@@ -108,7 +108,7 @@
 
   // ---- Render loop ----
 
-  OfficeRenderer.prototype.render = function (timestamp) {
+  OfficeRenderer.prototype.render = function (_timestamp) {
     if (!this._running) return;
 
     var ctx = this._ctx;
@@ -422,7 +422,7 @@
 
   OfficeRenderer.prototype._drawCharacterWithEffect = function (
     ctx,
-    info,
+    _info,
     px,
     py,
     effect,

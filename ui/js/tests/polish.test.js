@@ -201,7 +201,7 @@ function makeOfficeContext(opts) {
         this.onload = null;
         this.onerror = null;
       }
-      set src(v) {}
+      set src(_v) {}
     },
     Set,
     JSON,

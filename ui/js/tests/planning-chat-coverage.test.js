@@ -141,7 +141,7 @@ function makeContext(overrides = {}) {
     JSON,
     RegExp,
     Promise,
-    setTimeout: vi.fn((fn, ms) => {
+    setTimeout: vi.fn((fn, _ms) => {
       if (typeof fn === "function") fn();
       return 1;
     }),

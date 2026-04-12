@@ -13,7 +13,7 @@ function makeContext() {
 
   const canvas = {
     setPointerCapture() {},
-    addEventListener(type, fn, opts) {
+    addEventListener(type, fn, _opts) {
       if (!events[type]) events[type] = [];
       events[type].push(fn);
     },

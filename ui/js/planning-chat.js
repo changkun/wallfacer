@@ -1015,7 +1015,7 @@ var PlanningChat = (function () {
     });
   }
 
-  async function _onUndo(bubble, round, btn) {
+  async function _onUndo(bubble, _round, btn) {
     btn.disabled = true;
     var originalTitle = btn.title;
     btn.title = "Undoing…";

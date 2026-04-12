@@ -46,7 +46,7 @@ function makeContext(overrides = {}) {
     escapeHtml: (s) => String(s),
     bindModalBackdropClose: vi.fn(),
     createModalStateController: vi.fn().mockReturnValue(vi.fn()),
-    loadJsonEndpoint: vi.fn((url, renderCb) => {
+    loadJsonEndpoint: vi.fn((_url, renderCb) => {
       capturedRenderCb = renderCb;
     }),
     openModalPanel: vi.fn(),

@@ -88,7 +88,7 @@ function makeDom() {
       },
 
       // 'afterend' — register the new element so getElementById can find it.
-      insertAdjacentElement(pos, newEl) {
+      insertAdjacentElement(_pos, newEl) {
         if (newEl.id) registry.set(newEl.id, newEl);
         else registry.set("__last_inserted", newEl);
       },
