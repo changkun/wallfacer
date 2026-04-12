@@ -1,6 +1,6 @@
 ---
 title: "Archival: Archive/unarchive HTTP endpoints"
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-archival/core-model.md
 affects:
