@@ -1,6 +1,6 @@
 ---
 title: "Replace OutputsDir with Backend Methods"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/storage-backends/task-02-filesystem-backend.md
 affects:
@@ -8,10 +8,11 @@ affects:
   - internal/handler/execute.go
 effort: small
 created: 2026-03-23
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 3: Replace OutputsDir with Backend Methods
 

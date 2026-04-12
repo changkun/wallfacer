@@ -1,6 +1,6 @@
 ---
 title: "Implement FilesystemBackend"
-status: complete
+status: archived
 depends_on:
   - specs/foundations/storage-backends/task-01-extract-interface.md
 affects:
@@ -9,10 +9,11 @@ affects:
   - internal/store/store.go
 effort: large
 created: 2026-03-23
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 2: Implement FilesystemBackend
 

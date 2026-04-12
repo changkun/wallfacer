@@ -1,16 +1,17 @@
 ---
 title: "Extract StorageBackend Interface"
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/store/backend.go
   - internal/store/store.go
 effort: medium
 created: 2026-03-23
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 1: Extract StorageBackend Interface
 
