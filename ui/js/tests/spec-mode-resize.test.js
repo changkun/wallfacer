@@ -1,7 +1,7 @@
 /**
  * Unit tests for spec mode chat pane resize.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

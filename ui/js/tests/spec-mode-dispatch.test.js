@@ -1,7 +1,7 @@
 /**
  * Unit tests for dispatchFocusedSpec() in spec-mode.js.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

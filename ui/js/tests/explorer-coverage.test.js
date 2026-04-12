@@ -6,7 +6,7 @@
  * _discardEdit, _isEditDirty (edit mode), _initExplorerResize,
  * and various branch paths.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

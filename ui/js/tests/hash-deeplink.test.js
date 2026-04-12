@@ -6,7 +6,7 @@
  *  - setRightTab / setLeftTab updating the hash when a tab is switched
  *  - _handleInitialHash opening the correct modal on page load
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

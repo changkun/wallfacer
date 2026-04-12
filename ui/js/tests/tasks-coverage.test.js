@@ -3,7 +3,7 @@
  *
  * Pattern: vitest + vm.createContext (same as envconfig.test.js).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

@@ -5,7 +5,7 @@
  * not tested here because they require live fetch/ReadableStream APIs.
  * The tab-switching and mode-setting functions are fully testable with DOM stubs.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

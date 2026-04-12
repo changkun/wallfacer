@@ -4,7 +4,7 @@
  * The script is loaded into an isolated vm context.  DOM APIs are fully
  * stubbed so no real browser is required.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

@@ -5,7 +5,7 @@
  * dependency on a real browser DOM.  Only the minimal browser globals that
  * each script needs at module-evaluation time are provided.
  */
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

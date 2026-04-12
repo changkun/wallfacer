@@ -3,7 +3,7 @@
  *
  * explorer.js is loaded into an isolated vm context with minimal DOM stubs.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

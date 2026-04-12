@@ -10,7 +10,7 @@
  *     the non-existent Routes.tasks.update(id), so no TypeError is thrown and
  *     the PATCH reaches the correct URL.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
