@@ -21,6 +21,11 @@ type Message struct {
 	Timestamp   time.Time `json:"timestamp"`              // when the message was recorded
 	FocusedSpec string    `json:"focused_spec,omitempty"` // spec path focused at the time
 	RawOutput   string    `json:"raw_output,omitempty"`   // raw NDJSON output (assistant only)
+	// PlanRound, when non-zero, identifies the planning git commit this
+	// assistant message produced ("plan: round N — ..."). Zero means the
+	// round wrote nothing to specs/ (or the message is from a user).
+	// Undo affordances key off this field.
+	PlanRound int `json:"plan_round,omitempty"`
 }
 
 // SessionInfo tracks the active Claude Code session for --resume.

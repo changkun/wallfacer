@@ -232,11 +232,19 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			resultText := planner.ExtractResultText(rawStdout)
 			// Commit any spec writes from this round to git so the undo
 			// stack has a distinct commit per round. Best-effort: log and
-			// continue on failure, never block the conversation log.
+			// continue on failure, never block the conversation log. The
+			// max round across workspaces attributes the assistant message
+			// for UI undo affordances.
 			commitCtx := context.Background()
+			planRound := 0
 			for _, ws := range h.currentWorkspaces() {
-				if cerr := commitPlanningRound(commitCtx, ws, resultText); cerr != nil {
+				n, cerr := commitPlanningRound(commitCtx, ws, resultText)
+				if cerr != nil {
 					slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
+					continue
+				}
+				if n > planRound {
+					planRound = n
 				}
 			}
 			if resultText != "" {
@@ -246,6 +254,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 					Timestamp:   time.Now().UTC(),
 					FocusedSpec: req.FocusedSpec,
 					RawOutput:   string(rawStdout),
+					PlanRound:   planRound,
 				})
 			}
 		}

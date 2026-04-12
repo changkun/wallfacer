@@ -65,8 +65,12 @@ func TestCommitPlanningRound_DirtySpecs(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# Foo\n")
 
-	if err := commitPlanningRound(context.Background(), ws, "drafted foo"); err != nil {
+	round, err := commitPlanningRound(context.Background(), ws, "drafted foo")
+	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
+	}
+	if round != 1 {
+		t.Errorf("round = %d, want 1", round)
 	}
 
 	subjects := gitLogSubjects(t, ws)
@@ -99,8 +103,12 @@ func TestCommitPlanningRound_NoOp(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	before := gitLogSubjects(t, ws)
 
-	if err := commitPlanningRound(context.Background(), ws, "nothing changed"); err != nil {
+	round, err := commitPlanningRound(context.Background(), ws, "nothing changed")
+	if err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
+	}
+	if round != 0 {
+		t.Errorf("round = %d on clean tree, want 0", round)
 	}
 
 	after := gitLogSubjects(t, ws)
@@ -114,18 +122,30 @@ func TestCommitPlanningRound_RoundNumbering(t *testing.T) {
 
 	// Seed two rounds.
 	writeSpec(t, ws, "a.md", "a\n")
-	if err := commitPlanningRound(context.Background(), ws, "first"); err != nil {
+	r1, err := commitPlanningRound(context.Background(), ws, "first")
+	if err != nil {
 		t.Fatal(err)
 	}
+	if r1 != 1 {
+		t.Errorf("first round = %d, want 1", r1)
+	}
 	writeSpec(t, ws, "b.md", "b\n")
-	if err := commitPlanningRound(context.Background(), ws, "second"); err != nil {
+	r2, err := commitPlanningRound(context.Background(), ws, "second")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if r2 != 2 {
+		t.Errorf("second round = %d, want 2", r2)
 	}
 
 	// Third round should be round 3.
 	writeSpec(t, ws, "c.md", "c\n")
-	if err := commitPlanningRound(context.Background(), ws, "third"); err != nil {
+	r3, err := commitPlanningRound(context.Background(), ws, "third")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if r3 != 3 {
+		t.Errorf("third round = %d, want 3", r3)
 	}
 
 	subjects := gitLogSubjects(t, ws)
@@ -144,7 +164,7 @@ func TestCommitPlanningRound_SummaryTruncation(t *testing.T) {
 
 	// 120-char summary; should truncate to 80.
 	long := strings.Repeat("x", 120)
-	if err := commitPlanningRound(context.Background(), ws, long); err != nil {
+	if _, err := commitPlanningRound(context.Background(), ws, long); err != nil {
 		t.Fatalf("commitPlanningRound: %v", err)
 	}
 
