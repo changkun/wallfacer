@@ -37,7 +37,7 @@ document.addEventListener("keydown", (e) => {
     e.key !== "n" &&
     e.key !== "?" &&
     e.key !== "e" &&
-    e.key !== "s" &&
+    e.key !== "p" &&
     e.key !== "c" &&
     e.key !== "d" &&
     e.key !== "b"
@@ -68,7 +68,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "n") showNewTaskForm();
   if (e.key === "?") openKeyboardShortcuts();
   if (e.key === "e") toggleExplorer();
-  if (e.key === "s")
+  if (e.key === "p")
     switchMode(getCurrentMode() === "board" ? "spec" : "board");
   // Spec-mode-only shortcuts.
   if (getCurrentMode() === "spec") {

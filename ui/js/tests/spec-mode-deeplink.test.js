@@ -124,10 +124,20 @@ function makeContext(opts = {}) {
 }
 
 describe("spec deep-linking", () => {
-  it("focusSpec updates location hash", () => {
+  it("focusSpec writes plan-form location hash", () => {
     const ctx = makeContext();
     ctx.focusSpec("specs/local/foo.md", "/workspace");
-    expect(ctx.replaceStateCalls).toContain("#spec/specs%2Flocal%2Ffoo.md");
+    expect(ctx.replaceStateCalls).toContain("#plan/specs%2Flocal%2Ffoo.md");
+  });
+
+  it("accepts legacy #spec/ hash when leaving spec mode", () => {
+    const ctx = makeContext({ hash: "#spec/specs/local/foo.md" });
+    ctx.switchMode("spec");
+    const before = ctx.replaceStateCalls.length;
+    ctx.switchMode("board");
+    // Last replaceState should clear the legacy #spec/ hash.
+    expect(ctx.replaceStateCalls.length).toBeGreaterThan(before);
+    expect(ctx.replaceStateCalls[ctx.replaceStateCalls.length - 1]).toBe("/");
   });
 
   it("switching to board mode clears spec hash", () => {

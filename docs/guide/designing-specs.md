@@ -1,5 +1,7 @@
 # Designing Specs
 
+Plan mode (formerly Specs) is where you browse, author, and dispatch spec files from inside the app.
+
 Specs are structured design documents that bridge ideas and executable tasks. Each spec is a markdown file with YAML frontmatter that tracks lifecycle state, dependencies, affected code paths, and effort estimates. Specs live in `specs/` and are organized by track.
 
 ---
@@ -12,7 +14,7 @@ A spec describes a piece of work at the design level. Unlike a task prompt (whic
 
 ### Spec Mode
 
-Press **S** to toggle between the Board view and the Spec view. Spec mode uses a three-pane layout:
+Press **P** to toggle between the Board view and the Plan view. Plan mode uses a three-pane layout:
 
 - **Left pane** -- spec explorer (file tree)
 - **Center pane** -- focused spec view (rendered content)

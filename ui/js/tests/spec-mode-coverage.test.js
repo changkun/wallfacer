@@ -621,7 +621,7 @@ describe("focusSpec", () => {
     expect(replaceState).toHaveBeenCalledWith(
       null,
       "",
-      "#spec/" + encodeURIComponent("local/my-spec.md"),
+      "#plan/" + encodeURIComponent("local/my-spec.md"),
     );
   });
 

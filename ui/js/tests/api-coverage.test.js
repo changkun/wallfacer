@@ -280,11 +280,27 @@ describe("_handleTaskDeleted modal dependencies", () => {
 // ---------------------------------------------------------------------------
 
 describe("_handleInitialHash extended", () => {
-  it("handles spec deep-link hash", async () => {
+  it("handles legacy #spec/ deep-link hash", async () => {
     const switchMode = vi.fn();
     const focusSpec = vi.fn();
     const ctx = makeContext({
       location: { hash: "#spec/specs/local/foo.md" },
+      switchMode,
+      focusSpec,
+    });
+    loadApiCoreStack(ctx);
+    vm.runInContext(`activeWorkspaces = ["/repo"]; _hashHandled = false;`, ctx);
+
+    await ctx._handleInitialHash();
+    expect(switchMode).toHaveBeenCalledWith("spec");
+    expect(focusSpec).toHaveBeenCalledWith("specs/local/foo.md", "/repo");
+  });
+
+  it("handles #plan/ deep-link hash identically to #spec/", async () => {
+    const switchMode = vi.fn();
+    const focusSpec = vi.fn();
+    const ctx = makeContext({
+      location: { hash: "#plan/specs/local/foo.md" },
       switchMode,
       focusSpec,
     });

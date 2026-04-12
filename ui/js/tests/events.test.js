@@ -233,12 +233,30 @@ describe("events.js", () => {
       expect(ctx.toggleExplorer).toHaveBeenCalled();
     });
 
-    it("switches mode on 's'", () => {
+    it("switches to plan (spec) mode on 'p' from board", () => {
+      const ctx = makeContext();
+      loadScript(ctx);
+      const handler = getDocListener(ctx, "keydown", 1);
+      handler(makeShortcutEvent("p"));
+      expect(ctx.switchMode).toHaveBeenCalledWith("spec");
+    });
+
+    it("reverses to board on 'p' from plan (spec) mode", () => {
+      const ctx = makeContext({
+        getCurrentMode: vi.fn().mockReturnValue("spec"),
+      });
+      loadScript(ctx);
+      const handler = getDocListener(ctx, "keydown", 1);
+      handler(makeShortcutEvent("p"));
+      expect(ctx.switchMode).toHaveBeenCalledWith("board");
+    });
+
+    it("does not switch mode on 's' (binding removed)", () => {
       const ctx = makeContext();
       loadScript(ctx);
       const handler = getDocListener(ctx, "keydown", 1);
       handler(makeShortcutEvent("s"));
-      expect(ctx.switchMode).toHaveBeenCalledWith("spec");
+      expect(ctx.switchMode).not.toHaveBeenCalled();
     });
 
     it("ignores shortcuts with modifier keys", () => {

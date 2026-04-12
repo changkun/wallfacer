@@ -16,8 +16,8 @@ function _handleInitialHash() {
   if (_hashHandled) return;
   _hashHandled = true;
 
-  // Handle spec deep-links: #spec/<path>
-  var specMatch = location.hash.match(/^#spec\/(.+)$/);
+  // Handle plan deep-links: #plan/<path> (and legacy #spec/<path>).
+  var specMatch = location.hash.match(/^#(?:plan|spec)\/(.+)$/);
   if (specMatch) {
     var specPath = decodeURIComponent(specMatch[1]);
     switchMode("spec");

@@ -42,7 +42,8 @@ function _applyMode(mode) {
     if (
       typeof location !== "undefined" &&
       location.hash &&
-      location.hash.indexOf("#spec/") === 0
+      (location.hash.indexOf("#plan/") === 0 ||
+        location.hash.indexOf("#spec/") === 0)
     ) {
       history.replaceState(null, "", location.pathname);
     }
@@ -183,8 +184,9 @@ function focusSpec(specPath, workspace) {
 
   _loadAndRenderSpec();
   _startSpecRefreshPoll();
-  // Update hash for deep-linking.
-  history.replaceState(null, "", "#spec/" + encodeURIComponent(specPath));
+  // Update hash for deep-linking. Writes always use the #plan/ prefix;
+  // the reader also accepts legacy #spec/ URLs for backward compatibility.
+  history.replaceState(null, "", "#plan/" + encodeURIComponent(specPath));
   // Update dependency minimap.
   if (
     typeof renderMinimap === "function" &&
@@ -411,7 +413,11 @@ function _loadAndRenderSpec() {
       if (unarchiveBtn) unarchiveBtn.classList.add("hidden");
       var archivedBanner = document.getElementById("spec-archived-banner");
       if (archivedBanner) archivedBanner.classList.add("hidden");
-      if (location.hash && location.hash.indexOf("#spec/") === 0) {
+      if (
+        location.hash &&
+        (location.hash.indexOf("#plan/") === 0 ||
+          location.hash.indexOf("#spec/") === 0)
+      ) {
         history.replaceState(null, "", location.pathname);
       }
     });

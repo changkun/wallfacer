@@ -1,6 +1,8 @@
 # Exploring Ideas
 
-The planning chat is a conversational interface for exploring ideas with an AI agent before committing to structured specs or tasks. It runs inside the spec mode view and is backed by a persistent sandbox container that can read your codebase, create files, and execute commands.
+Plan mode (formerly Specs) is where you explore ideas conversationally with an AI agent before committing to structured specs or tasks.
+
+The planning chat is a conversational interface for exploring ideas with an AI agent before committing to structured specs or tasks. It runs inside Plan mode and is backed by a persistent sandbox container that can read your codebase, create files, and execute commands.
 
 ---
 
