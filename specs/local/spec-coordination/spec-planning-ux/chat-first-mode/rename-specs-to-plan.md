@@ -1,13 +1,15 @@
 ---
 title: Rename "Specs" mode to "Plan" in the UI
-status: validated
+status: complete
 depends_on: []
 affects:
   - ui/partials/sidebar.html
   - ui/js/spec-mode.js
-  - ui/js/hash-deeplink.js
-  - ui/js/keyboard-shortcuts.js
+  - ui/js/api.js
+  - ui/js/events.js
   - ui/partials/keyboard-shortcuts-modal.html
+  - docs/guide/designing-specs.md
+  - docs/guide/exploring-ideas.md
 effort: small
 created: 2026-04-12
 updated: 2026-04-12
@@ -48,3 +50,9 @@ Change the user-facing label from "Specs" to "Plan" across the sidebar nav, keyb
 - **Do NOT** touch API routes, backend handler names, or `specs/` directory layout.
 - **Do NOT** add a deprecation toast or console warning for the `S` shortcut — clean cutover per the parent spec's non-goal list.
 - **Do NOT** change `#spec/` behaviour on write — this is only about the reading path accepting both, while writes go to `#plan/`.
+
+## Implementation notes
+
+- The spec referenced `ui/js/hash-deeplink.js` and `ui/js/keyboard-shortcuts.js` as the homes for deep-link parsing and the mode-switch shortcut, but those concerns actually live in `ui/js/spec-mode.js` + `ui/js/api.js` (deep-link read/write) and `ui/js/events.js` (global keyboard shortcut). The edits were applied to the actual files; `ui/js/keyboard-shortcuts.js` is only the modal controller.
+- The keyboard-shortcuts modal did not previously list the mode-switch shortcut at all, so the spec's directive to "update" the row was implemented as adding a new `p — Switch to Plan mode` row under the Global section. The legacy `s` row never existed there.
+- Tests were added across `ui/js/tests/spec-mode-deeplink.test.js`, `ui/js/tests/events.test.js`, and `ui/js/tests/api-coverage.test.js` (rather than a single `keyboard-shortcuts.test.js`) because the affected code is split across `events.js` (shortcut), `spec-mode.js` (writer / mode-exit clear), and `api.js` (initial-load parser).
