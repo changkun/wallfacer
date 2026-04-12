@@ -23,7 +23,7 @@
             ></a
           ></span>
         </div>
-        <button
+        <button type="button"
           onclick="closeModal()"
           class="text-v-muted text-xl leading-none"
           style="
@@ -56,13 +56,13 @@
             <div class="flex items-center justify-between mb-1">
               <h3 class="section-title" style="margin-bottom: 0">Goal</h3>
               <div id="modal-goal-tabs" class="logs-tabs hidden">
-                <button
+                <button type="button"
                   class="logs-tab"
                   onclick="switchEditTab('goal', 'edit')"
                 >
                   Edit
                 </button>
-                <button
+                <button type="button"
                   class="logs-tab active"
                   onclick="switchEditTab('goal', 'preview')"
                 >
@@ -93,10 +93,10 @@
           <div class="flex items-center justify-between mb-2">
             <h3 class="section-title" style="margin-bottom: 0">Spec</h3>
             <div id="modal-spec-tabs" class="logs-tabs hidden">
-              <button class="logs-tab" onclick="switchEditTab('spec', 'edit')">
+              <button type="button" class="logs-tab" onclick="switchEditTab('spec', 'edit')">
                 Edit
               </button>
-              <button
+              <button type="button"
                 class="logs-tab active"
                 onclick="switchEditTab('spec', 'preview')"
               >
@@ -107,7 +107,7 @@
               id="modal-prompt-actions"
               class="flex items-center gap-1.5 hidden"
             >
-              <button
+              <button type="button"
                 id="copy-prompt-btn"
                 onclick="copyModalText('prompt')"
                 class="btn-icon"
@@ -130,7 +130,7 @@
                 </svg>
                 Copy
               </button>
-              <button
+              <button type="button"
                 id="toggle-prompt-btn"
                 onclick="toggleModalSection('prompt')"
                 class="btn-icon"
@@ -548,7 +548,7 @@
 
           <!-- Start section (backlog only) -->
           <div id="modal-start-section" class="hidden mb-4">
-            <button
+            <button type="button"
               onclick="startTask()"
               class="btn btn-accent"
               style="width: 100%"
@@ -565,7 +565,7 @@
               left off with an extended timeout.
             </p>
             <div class="flex items-center gap-2">
-              <button onclick="resumeTask()" class="btn btn-green">
+              <button type="button" onclick="resumeTask()" class="btn btn-green">
                 Resume
               </button>
               <label for="modal-resume-timeout" class="text-xs text-v-muted"
@@ -586,14 +586,14 @@
 
           <div id="modal-summary-section" class="hidden mb-4">
             <div class="left-panel-tabs">
-              <button
+              <button type="button"
                 id="left-tab-implementation"
                 onclick="setLeftTab('implementation')"
                 class="left-tab active"
               >
                 Implementation
               </button>
-              <button
+              <button type="button"
                 id="left-tab-testing"
                 onclick="setLeftTab('testing')"
                 class="left-tab hidden"
@@ -732,7 +732,7 @@
                   style="font-size: 12px; color: #78350f; margin-top: 2px"
                 ></div>
               </div>
-              <button
+              <button type="button"
                 onclick="openRaiseLimitInline()"
                 class="btn"
                 style="
@@ -757,13 +757,13 @@
               class="field"
             ></textarea>
             <div class="flex items-center gap-2 mt-2">
-              <button onclick="submitFeedback()" class="btn btn-yellow">
+              <button type="button" onclick="submitFeedback()" class="btn btn-yellow">
                 Submit Feedback
               </button>
-              <button onclick="completeTask()" class="btn btn-green">
+              <button type="button" onclick="completeTask()" class="btn btn-green">
                 Mark as Done
               </button>
-              <button
+              <button type="button"
                 id="modal-test-btn"
                 onclick="toggleTestSection()"
                 class="btn btn-accent"
@@ -788,10 +788,10 @@
                 class="field"
               ></textarea>
               <div class="flex items-center gap-2 mt-2">
-                <button onclick="runTestTask()" class="btn btn-accent">
+                <button type="button" onclick="runTestTask()" class="btn btn-accent">
                   Run Test Agent
                 </button>
-                <button onclick="toggleTestSection()" class="btn btn-ghost">
+                <button type="button" onclick="toggleTestSection()" class="btn btn-ghost">
                   Cancel
                 </button>
               </div>
@@ -803,13 +803,13 @@
             <div class="flex items-center justify-between mb-1">
               <h3 class="section-title" style="margin-bottom: 0">Retry</h3>
               <div id="modal-retry-tabs" class="logs-tabs">
-                <button
+                <button type="button"
                   class="logs-tab"
                   onclick="switchEditTab('retry', 'edit')"
                 >
                   Edit
                 </button>
-                <button
+                <button type="button"
                   class="logs-tab active"
                   onclick="switchEditTab('retry', 'preview')"
                 >
@@ -842,7 +842,7 @@
                 >Resume previous session</label
               >
             </div>
-            <button onclick="retryTask()" class="btn btn-accent mt-2">
+            <button type="button" onclick="retryTask()" class="btn btn-accent mt-2">
               Move to Backlog
             </button>
           </div>
@@ -858,7 +858,7 @@
               Hide this task from the Done column. It can be restored from
               Settings &rarr; Show archived tasks.
             </p>
-            <button
+            <button type="button"
               onclick="archiveTask()"
               class="btn btn-ghost"
               style="border: 1px solid var(--border)"
@@ -873,7 +873,7 @@
             <p class="text-sm text-v-secondary mb-2">
               This task is archived and hidden from the Done column by default.
             </p>
-            <button
+            <button type="button"
               onclick="unarchiveTask()"
               class="btn btn-ghost"
               style="border: 1px solid var(--border)"
@@ -889,7 +889,7 @@
               Discard all prepared changes and move this task to Cancelled.
               History and logs are preserved so the task can be retried later.
             </p>
-            <button
+            <button type="button"
               id="modal-cancel-btn"
               onclick="cancelTask()"
               class="btn btn-ghost"
@@ -901,7 +901,7 @@
 
           <!-- Delete button -->
           <div class="mt-6 pt-4" style="border-top: 1px solid var(--border)">
-            <button onclick="deleteCurrentTask()" class="btn-danger">
+            <button type="button" onclick="deleteCurrentTask()" class="btn-danger">
               Delete task
             </button>
           </div>
@@ -910,35 +910,35 @@
         <!-- Right panel: tabbed view for non-backlog tasks -->
         <div id="modal-right" class="hidden">
           <div class="right-panel-tabs">
-            <button
+            <button type="button"
               id="right-tab-implementation"
               onclick="setRightTab('implementation')"
               class="right-tab active"
             >
               Implementation
             </button>
-            <button
+            <button type="button"
               id="right-tab-testing"
               onclick="setRightTab('testing')"
               class="right-tab hidden"
             >
               Testing
             </button>
-            <button
+            <button type="button"
               id="right-tab-changes"
               onclick="setRightTab('changes')"
               class="right-tab hidden"
             >
               Changes
             </button>
-            <button
+            <button type="button"
               id="right-tab-spans"
               onclick="setRightTab('spans')"
               class="right-tab hidden"
             >
               Flamegraph
             </button>
-            <button
+            <button type="button"
               id="right-tab-timeline"
               onclick="setRightTab('timeline')"
               class="right-tab hidden"
@@ -950,21 +950,21 @@
             <div id="modal-logs-section" class="mb-4">
               <div class="flex items-center justify-end mb-2">
                 <div class="logs-tabs">
-                  <button
+                  <button type="button"
                     id="logs-tab-oversight"
                     onclick="setLogsMode('oversight')"
                     class="logs-tab"
                   >
                     Oversight
                   </button>
-                  <button
+                  <button type="button"
                     id="logs-tab-pretty"
                     onclick="setLogsMode('pretty')"
                     class="logs-tab active"
                   >
                     Pretty
                   </button>
-                  <button
+                  <button type="button"
                     id="logs-tab-raw"
                     onclick="setLogsMode('raw')"
                     class="logs-tab"
@@ -1012,21 +1012,21 @@
             <div id="modal-test-logs-section" class="mb-4">
               <div class="flex items-center justify-end mb-2">
                 <div class="logs-tabs">
-                  <button
+                  <button type="button"
                     id="test-logs-tab-oversight"
                     onclick="setTestLogsMode('oversight')"
                     class="logs-tab"
                   >
                     Oversight
                   </button>
-                  <button
+                  <button type="button"
                     id="test-logs-tab-pretty"
                     onclick="setTestLogsMode('pretty')"
                     class="logs-tab active"
                   >
                     Pretty
                   </button>
-                  <button
+                  <button type="button"
                     id="test-logs-tab-raw"
                     onclick="setTestLogsMode('raw')"
                     class="logs-tab"
@@ -1065,7 +1065,7 @@
               >
             </h3>
             <div style="display: flex; gap: 8px; align-items: center">
-              <button
+              <button type="button"
                 id="refine-start-btn"
                 onclick="startRefinement()"
                 class="btn btn-ghost"
@@ -1073,7 +1073,7 @@
               >
                 Refine
               </button>
-              <button
+              <button type="button"
                 id="refine-cancel-btn"
                 onclick="cancelRefinement()"
                 class="hidden btn btn-ghost text-xs"
@@ -1121,14 +1121,14 @@
                 >
               </div>
               <div class="logs-tabs">
-                <button
+                <button type="button"
                   id="refine-logs-tab-pretty"
                   onclick="setRefineLogsMode('pretty')"
                   class="logs-tab active"
                 >
                   Pretty
                 </button>
-                <button
+                <button type="button"
                   id="refine-logs-tab-raw"
                   onclick="setRefineLogsMode('raw')"
                   class="logs-tab"
@@ -1158,7 +1158,7 @@
                 >Spec — edit before applying</span
               >
               <div style="display: flex; gap: 8px; align-items: center">
-                <button
+                <button type="button"
                   id="refine-dismiss-btn"
                   onclick="dismissRefinement()"
                   class="hidden btn btn-ghost text-xs"
@@ -1166,7 +1166,7 @@
                 >
                   Dismiss
                 </button>
-                <button
+                <button type="button"
                   id="refine-apply-btn"
                   onclick="applyRefinement()"
                   class="btn btn-accent"

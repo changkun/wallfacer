@@ -28,7 +28,7 @@
         <h3 style="font-size: 16px; font-weight: 600; margin: 0">
           Workspace AGENTS.md
         </h3>
-        <button
+        <button type="button"
           onclick="closeInstructionsEditor()"
           style="
             background: none;
@@ -60,13 +60,13 @@
           "
         ></div>
         <div id="instructions-tabs" class="logs-tabs">
-          <button
+          <button type="button"
             class="logs-tab"
             onclick="switchEditTab('instructions', 'edit')"
           >
             Edit
           </button>
-          <button
+          <button type="button"
             class="logs-tab active"
             onclick="switchEditTab('instructions', 'preview')"
           >
@@ -96,13 +96,13 @@
       <div
         style="display: flex; align-items: center; gap: 8px; margin-top: 12px"
       >
-        <button onclick="saveInstructions()" class="btn btn-accent">
+        <button type="button" onclick="saveInstructions()" class="btn btn-accent">
           Save
         </button>
-        <button onclick="closeInstructionsEditor()" class="btn-ghost">
+        <button type="button" onclick="closeInstructionsEditor()" class="btn-ghost">
           Cancel
         </button>
-        <button
+        <button type="button"
           onclick="reinitInstructionsFromEditor()"
           class="btn-icon"
           style="margin-left: 8px; font-size: 12px; padding: 4px 10px"

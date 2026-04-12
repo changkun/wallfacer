@@ -28,7 +28,7 @@
       </button>
     </div>
     <div class="column col-bg flex flex-col">
-      <button
+      <button type="button"
         id="new-task-btn"
         onclick="showNewTaskForm()"
         class="btn-dashed mb-2"
@@ -400,8 +400,8 @@
         </div>
         <!-- Save / Cancel -->
         <div class="flex items-center gap-1 mt-2">
-          <button onclick="createTask()" class="btn btn-accent">Save</button>
-          <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
+          <button type="button" onclick="createTask()" class="btn btn-accent">Save</button>
+          <button type="button" onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
         </div>
       </div>
       <button
@@ -440,7 +440,7 @@
         class="max-parallel-tag hidden"
         title="Max parallel tasks"
       ></span>
-      <button
+      <button type="button"
         onclick="showContainerMonitor(event)"
         title="Sandbox Monitor"
         style="
@@ -534,7 +534,7 @@
       <h2 class="col-header col-header-done">Done</h2>
       <span id="count-done" class="text-xs text-v-muted">0</span>
       <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
-      <button
+      <button type="button"
         id="archive-all-btn"
         onclick="archiveAllDone()"
         class="hidden"

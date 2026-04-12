@@ -24,7 +24,7 @@
         autocomplete="off"
         class="task-search-input"
       />
-      <button
+      <button type="button"
         id="task-search-clear"
         class="task-search-clear"
         title="Clear search"
@@ -34,7 +34,7 @@
     </div>
 
     <div class="app-header__button-row">
-      <button
+      <button type="button"
         id="explorer-toggle-btn"
         class="settings-btn"
         onclick="toggleExplorer()"
@@ -60,7 +60,7 @@
 
       {{template "automation-menu.html"}}
 
-      <button
+      <button type="button"
         onclick="showSpanStats()"
         class="settings-btn"
         title="Execution Timing"
@@ -79,7 +79,7 @@
           <polyline points="12 6 12 12 16 14"></polyline>
         </svg>
       </button>
-      <button
+      <button type="button"
         onclick="openStatsModal()"
         class="settings-btn"
         title="Usage Analytics"

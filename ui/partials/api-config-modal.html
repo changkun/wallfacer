@@ -16,7 +16,7 @@
         <h3 style="font-size: 16px; font-weight: 600; margin: 0">
           Sandbox Configuration
         </h3>
-        <button
+        <button type="button"
           onclick="closeEnvConfigEditor()"
           style="
             background: none;
@@ -104,7 +104,7 @@
                   gap: 8px;
                 "
               >
-                <button
+                <button type="button"
                   id="claude-oauth-signin-btn"
                   class="btn btn-sm"
                   style="font-size: 12px"
@@ -339,7 +339,7 @@
                   gap: 8px;
                 "
               >
-                <button
+                <button type="button"
                   id="codex-oauth-signin-btn"
                   class="btn btn-sm"
                   style="font-size: 12px"
@@ -672,8 +672,8 @@
       <div
         style="display: flex; align-items: center; gap: 8px; margin-top: 20px"
       >
-        <button onclick="saveEnvConfig()" class="btn btn-accent">Save</button>
-        <button onclick="closeEnvConfigEditor()" class="btn-ghost">
+        <button type="button" onclick="saveEnvConfig()" class="btn btn-accent">Save</button>
+        <button type="button" onclick="closeEnvConfigEditor()" class="btn-ghost">
           Cancel
         </button>
         <span
