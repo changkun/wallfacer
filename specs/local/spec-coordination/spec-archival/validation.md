@@ -1,6 +1,6 @@
 ---
 title: "Archival: Validation skips for archived specs"
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-archival/core-model.md
 affects:
