@@ -575,3 +575,53 @@ func TestPlanningCommit_AutoPushNotCalledWhenNoCommit(t *testing.T) {
 		t.Errorf("expected no auto-push calls when nothing was committed, got %v", calls)
 	}
 }
+
+// TestCommitPlanningRound_IgnoresPollutedLocalIdentity verifies that a polluted
+// per-repo user.name/user.email (as left behind by a sandbox container agent
+// that ran `git config user.name X` inside a shared worktree) does not override
+// the host's global identity on the resulting commit. Regression test for the
+// incident where planning commits landed authored as `Claude <claude@wallfacer.local>`.
+func TestCommitPlanningRound_IgnoresPollutedLocalIdentity(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+
+	// Stage 1: seed a polluted per-repo identity of the kind a sandbox agent
+	// might leave behind. Without the -c overrides, git would pick these up.
+	runGit(t, ws, "config", "user.name", "Claude")
+	runGit(t, ws, "config", "user.email", "claude@wallfacer.local")
+
+	// Stage 2: install a synthetic "host global" identity via GIT_CONFIG_GLOBAL
+	// so the test runs in isolation from the developer's real ~/.gitconfig.
+	globalGitConfig := filepath.Join(t.TempDir(), "gitconfig")
+	globalContent := "[user]\n\tname = Host User\n\temail = host@example.com\n"
+	if err := os.WriteFile(globalGitConfig, []byte(globalContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", globalGitConfig)
+	// Also neutralize the system-level config so nothing stray on CI leaks in.
+	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+
+	// Stage 3: produce a pending specs/ change and commit it via the planning
+	// round path. Use a nil genCommit to force the deterministic subject.
+	writeSpec(t, ws, "local/auth.md", "# auth spec\n")
+
+	ctx := context.Background()
+	n, err := commitPlanningRound(ctx, ws, "add auth spec", "added auth spec", nil)
+	if err != nil {
+		t.Fatalf("commitPlanningRound: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("round count = %d, want 1", n)
+	}
+
+	// Stage 4: inspect the HEAD author — must match the "host global" identity,
+	// not the polluted per-repo one.
+	authorOut, err := exec.Command("git", "-C", ws, "log", "-1", "--format=%an <%ae>").Output()
+	if err != nil {
+		t.Fatalf("git log author: %v", err)
+	}
+	got := strings.TrimSpace(string(authorOut))
+	want := "Host User <host@example.com>"
+	if got != want {
+		t.Errorf("commit author = %q, want %q (polluted local identity leaked through)", got, want)
+	}
+}

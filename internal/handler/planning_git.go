@@ -144,10 +144,35 @@ func commitPlanningRound(
 
 	msg := buildPlanCommitMessage(agentMsg, agentSummary, primary, n)
 
-	if err := cmdexec.Git(ws, "commit", "-m", msg).WithContext(ctx).Run(); err != nil {
+	// Use the host's global git identity via -c overrides so a
+	// sandbox-polluted repo-local user.name/user.email (a task-container
+	// agent can write to .git/config and all worktrees share it) never
+	// ends up as the author on planning commits. Mirrors the pattern
+	// used by the kanban commit pipeline in internal/runner/commit.go.
+	args := []string{"-C", ws}
+	args = append(args, hostGitIdentityOverrides(ctx)...)
+	args = append(args, "commit", "-m", msg)
+	if err := cmdexec.New("git", args...).WithContext(ctx).Run(); err != nil {
 		return 0, fmt.Errorf("git commit: %w", err)
 	}
 	return n, nil
+}
+
+// hostGitIdentityOverrides returns the `-c user.name=... -c user.email=...`
+// flags needed to force `git commit` to use the host user's global identity,
+// ignoring any per-repo or per-worktree config. Returns an empty slice when
+// the host has no global identity configured (a brand-new machine); in that
+// case git falls back to whatever is in the local config, preserving the
+// historical behavior.
+func hostGitIdentityOverrides(ctx context.Context) []string {
+	var out []string
+	if n, err := cmdexec.New("git", "config", "--global", "user.name").WithContext(ctx).Output(); err == nil && n != "" {
+		out = append(out, "-c", "user.name="+n)
+	}
+	if e, err := cmdexec.New("git", "config", "--global", "user.email").WithContext(ctx).Output(); err == nil && e != "" {
+		out = append(out, "-c", "user.email="+e)
+	}
+	return out
 }
 
 // buildPlanCommitMessage assembles the final commit message from either the
