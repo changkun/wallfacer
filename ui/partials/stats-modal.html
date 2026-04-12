@@ -367,6 +367,153 @@
             </div>
           </div>
 
+          <!-- Planning section -->
+          <div
+            id="stats-planning-section"
+            style="margin-bottom: 20px; display: none"
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 8px;
+              "
+            >
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 600;
+                  color: var(--text-muted);
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                Planning
+              </div>
+              <label
+                style="
+                  font-size: 11px;
+                  color: var(--text-muted);
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                "
+              >
+                Window
+                <select
+                  id="stats-planning-period"
+                  style="
+                    font-size: 11px;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    border: 1px solid var(--border);
+                    background: var(--bg);
+                    color: inherit;
+                  "
+                >
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="0">All time</option>
+                </select>
+              </label>
+            </div>
+            <div style="overflow-x: auto">
+              <table
+                style="width: 100%; border-collapse: collapse; font-size: 12px"
+              >
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border)">
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                      "
+                    >
+                      Group
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Rounds
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Input Tokens
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Output Tokens
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Cost USD
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Trend
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="stats-planning-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Top 10 Tasks by Cost -->
           <div>
             <div
