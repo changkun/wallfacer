@@ -9,7 +9,6 @@ affects:
   - internal/handler/planning.go
   - internal/handler/stats.go
   - internal/handler/usage.go
-  - internal/workspace/groups.go
   - ui/js/modal-stats.js
   - ui/js/usage-stats.js
 effort: medium
@@ -23,151 +22,136 @@ dispatched_task_id: null
 
 ## Design Problem
 
-How is planning sandbox cost recorded, aggregated, and surfaced in the existing
-usage analytics? Planning happens in a long-lived sandbox that the user drives
-conversationally — each user message triggers one agent turn ("round") that
-may read many files and edit any subset of the spec tree. Unlike kanban tasks,
-planning has no `Task` record to attach `TaskUsage` to, so per-turn token and
-cost data needs a dedicated capture path.
+How is planning sandbox cost recorded and surfaced alongside the existing
+board execution cost analytics? Planning is a separate, orthogonal cost
+dimension from kanban task execution:
+
+- **Board execution cost is already tracked and solved.** Kanban tasks accrue
+  per-turn `TurnUsageRecord`s and per-activity `UsageBreakdown` rows;
+  `GET /api/stats` aggregates these by workspace, activity, status, and
+  failure category; `modal-stats.js` renders it. This spec does not change any
+  of that.
+- **Planning cost is currently not captured at all.** The planning sandbox
+  (`internal/planner/`, `internal/handler/planning.go`) runs an agent turn
+  per user message round but discards usage after streaming the response.
+  There is no persisted record, no aggregate, no dashboard row.
+
+The only remaining question is how planning usage is captured and where it
+appears in the existing analytics UI — without disturbing the solved
+execution-cost path.
 
 Decisions baked in by feedback:
 
-- **Unit of attribution is the message round**, not the spec file. Each round
-  records one cost entry regardless of how many specs the round modifies.
-  Splitting a round's cost across multiple specs is explicitly out of scope.
-- **Aggregation key is the workspace group**, matching how planning sessions
-  are scoped (`internal/workspace/groups.go::GroupKey`). A planning session
-  belongs to exactly one group; per-round costs roll up to that group.
-- **Reporting surface is the existing usage analytics** (`GET /api/stats`,
-  `GET /api/usage`, and the modal-stats / usage-stats dashboards). Planning
-  cost is a new row/column in those views, not a separate dashboard.
+- **Unit of attribution is the message round.** Each round produces one usage
+  record regardless of how many specs the round modifies. Splitting a round's
+  cost across multiple specs is explicitly out of scope.
+- **Aggregation key is the workspace group.** A planning session is scoped to
+  exactly one group (via `internal/workspace/groups.go::GroupKey`); its
+  per-round usage rolls up to that group.
+- **Planning cost appears in the existing usage analytics surface**
+  (`modal-stats.js` / `usage-stats.js`) as a new, clearly-labelled planning
+  section, distinct from — and additive to — the existing execution
+  breakdowns.
 
-Recursive spec progress (`done/total` leaf counts) is already implemented and
-exposed; see "Already Implemented" below. This spec is now scoped to planning
-cost only.
+## Already Implemented (out of scope)
 
-## Already Implemented
+These pieces are done; this spec does not touch them:
 
-These pieces are done and not part of this spec's remaining work:
-
-- `internal/spec/progress.go` — `NodeProgress`, `TreeProgress` compute
-  recursive `done/total` leaf counts across the spec tree.
-- `GET /api/specs/tree` (`internal/handler/specs.go::GetSpecTree`) returns
-  `{Nodes, Progress: map[string]Progress}` keyed by spec path; the server is
-  the single source of truth for progress numbers.
-- `ui/js/spec-mode.js` renders the recursive progress badges from this
-  response; the SSE stream at `GET /api/specs/stream` keeps them live.
-- The `planning` `SandboxActivity` constant already exists in
-  `internal/store/models.go` and is routable via
-  `WALLFACER_SANDBOX_IMPLEMENTATION`-style env vars, but nothing currently
-  writes `TaskUsage` rows under it for the planning sandbox.
-
-## Context
-
-Planning sandbox (`internal/planner/`, `internal/handler/planning.go`) runs a
-persistent container per workspace group. User messages arrive via
-`POST /api/planning/messages`; each call triggers one agent exec turn. Token
-usage for these turns is currently discarded — the planner emits SSE tokens
-but does not persist a usage record.
-
-The existing cost model in `internal/store/models.go`:
-
-- `TaskUsage{InputTokens, OutputTokens, CacheReadInputTokens, CacheCreationTokens, CostUSD}`
-- `TurnUsageRecord{Turn, Timestamp, tokens…, CostUSD, StopReason, Sandbox, SubAgent}`
-- `Task.UsageBreakdown map[SandboxActivity]TaskUsage`
-
-The existing analytics surface:
-
-- `GET /api/stats` (`internal/handler/stats.go`) returns `StatsResponse` with
-  `ByWorkspace map[string]UsageStat` keyed by individual workspace paths
-  pulled from each task's `WorktreePaths`. It does not yet aggregate by
-  workspace group key.
-- `GET /api/usage` (`internal/handler/usage.go`) returns aggregate totals plus
-  `ByStatus` and `BySubAgent` breakdowns.
-- `ui/js/modal-stats.js` renders `ByWorkspace` as a list of per-path cards;
-  `ui/js/usage-stats.js` renders a simpler period-picker view.
-
-The gap: planning cost has no storage, no aggregation layer, no dashboard row.
+- Recursive spec progress: `internal/spec/progress.go` (`NodeProgress`,
+  `TreeProgress`), exposed via `GET /api/specs/tree`, rendered by
+  `ui/js/spec-mode.js`, live via `GET /api/specs/stream`.
+- Board execution cost model: `TaskUsage`, `TurnUsageRecord`,
+  `UsageBreakdown map[SandboxActivity]TaskUsage` in
+  `internal/store/models.go`.
+- Board execution analytics: `GET /api/stats`
+  (`internal/handler/stats.go`) with `ByWorkspace`, `ByActivity`,
+  `ByStatus`, `ByFailureCategory`, top-tasks, and daily rollup; `GET /api/usage`
+  (`internal/handler/usage.go`) with `ByStatus` / `BySubAgent`.
+- Sandbox activity enum: the `planning` `SandboxActivity` constant already
+  exists and is routable, but nothing writes usage under it yet.
 
 ## Options
 
-### Cost Storage
+### Planning Usage Capture
 
-**Option A — Attach to a synthetic planning "task" per session.** For each
-planning session (per workspace group), create or reuse a `Task` record with
-`kind = "planning"` and no kanban state. Each round writes a
-`TurnUsageRecord` to that task, and `UsageBreakdown[planning]` accumulates.
-The `ByWorkspace` aggregation then picks it up for free once the task's
-`WorktreePaths` are set to the group's paths.
+**Option A — Synthetic planning task per session.** On first message in a
+group, create (or reuse) a `Task` with `kind = "planning"` whose
+`WorktreePaths` mirror the group's workspaces. Each round writes a
+`TurnUsageRecord` to that task; `UsageBreakdown[planning]` accumulates.
+The task is hidden from the kanban board (`GET /api/tasks` filters
+`kind = "planning"`) and from task-centric analytics. The only visible
+surface is a new planning section in the stats dashboard.
 
-- Pro: Reuses `TaskUsage`, `TurnUsageRecord`, and the per-turn storage pipeline
-  unchanged. The `planning` `SandboxActivity` slot already exists.
-- Con: A task-shaped record for something that isn't a task is a light abuse of
-  the model. Must hide the synthetic task from the kanban board and task list
-  endpoints (filter by `kind = "planning"`).
+- Pro: Reuses `TurnUsageRecord` plumbing, per-turn storage, retention, and
+  index rebuild paths unchanged. The `planning` activity slot already exists.
+- Con: A task-shaped record for something that isn't a task. Needs filters
+  in task list / stats-by-activity endpoints to avoid polluting the
+  already-solved execution views.
 
-**Option B — Dedicated planning usage store.** New file
-`~/.wallfacer/planning/<group-key>/usage.jsonl`, one `TurnUsageRecord`-shaped
-line per round. `stats.go` loads these alongside task usage when building
-`ByWorkspaceGroup`.
+**Option B — Dedicated per-group planning usage store.** New file
+`~/.wallfacer/planning/<group-key>/usage.jsonl`, one
+`TurnUsageRecord`-shaped entry per round. A small loader in
+`stats.go` reads these and attaches a `Planning map[groupKey]UsageStat`
+section to the response. Completely separate from `store.Task` and from
+the existing execution aggregation code path.
 
-- Pro: Clean separation; planning storage is purpose-built and keyed directly
-  by `GroupKey`. No synthetic tasks to hide.
-- Con: Two usage data sources to merge at read time. Separate retention, backup,
-  and rebuild-index logic. A new file format for something close to an
-  existing type.
+- Pro: Zero risk of leaking into the solved execution analytics. Keyed
+  natively by `GroupKey`. Storage and retention are self-contained.
+- Con: New file format, new retention policy, new rebuild-index story for
+  something close to (but not the same as) an existing type.
 
-### Aggregation Key
+### Where Planning Cost Surfaces in the UI
 
-**Option X — Add `ByWorkspaceGroup` alongside `ByWorkspace`.** Extend
-`StatsResponse` with a new `ByWorkspaceGroup map[string]UsageStat` keyed by
-`GroupKey(sortedPaths)` (or a stable group name). Populate from both task
-usage (by resolving each task's `WorktreePaths` to the group it belongs to)
-and planning usage. Keep `ByWorkspace` for backwards compatibility.
+**Option X — New "Planning" block in `modal-stats.js`.** A sibling to
+`ByWorkspace` / `ByActivity`, listing one row per workspace group with
+tokens, cost, and round count. `ByWorkspace` (paths) and `ByActivity` are
+untouched. `usage-stats.js` gets a matching tile in its period-picker view.
 
-- Pro: Non-breaking. Matches the user's scoping model for planning. The UI can
-  show both breakdowns.
-- Con: Two parallel breakdowns in the response; UI has to pick a default.
+- Pro: Additive only; zero change to the existing execution rollup or its
+  UI. Easy to A/B hide behind a flag.
+- Con: Two places with different grouping semantics (paths vs. groups) —
+  users need to understand the distinction from the label.
 
-**Option Y — Replace `ByWorkspace` with group-keyed buckets.** Change the
-existing bucket to group by `GroupKey` only. Individual-path breakdowns go
-away.
+**Option Y — Weave planning into the existing `BySubAgent` row.** The
+`planning` activity bucket already exists; just make sure planning usage
+from Option A/B flows into `BySubAgent["planning"]` in
+`usage.go::GetUsageStats`. No new UI block.
 
-- Pro: One consistent bucketing scheme.
-- Con: Breaks consumers of the current `ByWorkspace` shape (modal-stats.js
-  keys off paths). Loses per-path visibility for multi-repo groups where users
-  might still want it.
+- Pro: Minimal UI surface; piggybacks on existing rendering.
+- Con: No workspace-group granularity — the feedback explicitly asks for
+  per-group aggregation, so this alone is insufficient. Viable only as a
+  supplement to Option X.
 
 ## Open Questions
 
-1. Option A or B for storage? Leaning A — the `planning` activity slot and
-   turn-record plumbing are already there, and a filter on `kind = "planning"`
-   in the task list endpoints is cheap.
-2. Option X or Y for aggregation? Leaning X — additive is safer and the UI
-   can promote the group view to the default without removing per-path data.
-3. Where does planning cost appear in the UI — as a new row in modal-stats
-   (alongside `ByWorkspace` / `ByActivity`), as a new tile in usage-stats,
-   or both?
-4. Do we show cumulative planning cost only, or also a per-round timeline
-   (small sparkline in the focused planning view)? Timeline is easy if we use
-   Option A since `TurnUsageRecord` already carries timestamps.
-5. Retention: planning usage piggybacks on task tombstone retention if we
-   pick Option A; otherwise we need a separate retention policy.
+1. Option A or B for capture? Leaning A — per-turn storage plumbing is
+   already there and the `planning` activity slot is already reserved; the
+   only real work is filtering synthetic tasks out of the
+   already-solved execution views.
+2. Whether to also populate `BySubAgent["planning"]` in `/api/usage`
+   (Option Y on top of Option X). Cheap with Option A, essentially free.
+3. Timeline vs. totals: do we show per-round sparklines in the focused
+   planning view, or only cumulative tokens/cost per group in the stats
+   modal? Timeline is easy if Option A is chosen, since `TurnUsageRecord`
+   already carries `Timestamp`.
+4. Retention: if Option A, planning rides task-tombstone retention; if
+   Option B, we need an explicit retention policy for
+   `~/.wallfacer/planning/<group-key>/usage.jsonl`.
 
 ## Affects
 
-- `internal/planner/` — capture per-round usage from the agent exec result and
-  hand it to the store.
-- `internal/store/` — either write `TurnUsageRecord` entries under a synthetic
-  planning task (Option A) or add a dedicated planning usage store (Option B).
-- `internal/handler/planning.go` — wire the usage capture into the message
-  handler's turn loop.
-- `internal/handler/stats.go` — add `ByWorkspaceGroup` to `StatsResponse` and
-  include planning usage in the aggregation.
-- `internal/handler/usage.go` — include planning activity in the period
-  rollup; confirm `BySubAgent` surfaces it.
-- `internal/workspace/groups.go` — expose `GroupKey` / a stable group name
-  helper for stats bucketing if not already public-enough.
-- `ui/js/modal-stats.js` — render `ByWorkspaceGroup` and a planning row in
-  `ByActivity`.
-- `ui/js/usage-stats.js` — ensure the `BySubAgent` list shows `planning`.
+- `internal/planner/` — capture per-round usage from the agent exec result.
+- `internal/handler/planning.go` — wire usage capture into the message
+  round handler.
+- `internal/store/` — Option A: write `TurnUsageRecord`s under a synthetic
+  planning task and filter `kind = "planning"` from task-list reads.
+  Option B: new `planning` sub-package with a JSONL usage store.
+- `internal/handler/stats.go` — additive only: append a `Planning` section
+  (keyed by workspace group) to `StatsResponse`. No changes to
+  `ByWorkspace` / `ByActivity` / `ByStatus` buckets.
+- `internal/handler/usage.go` — optional: surface `planning` in
+  `BySubAgent` alongside existing activities.
+- `ui/js/modal-stats.js` — render the new `Planning` block beside the
+  existing execution breakdowns; the execution blocks stay unchanged.
+- `ui/js/usage-stats.js` — optional: add a planning tile to the
+  period-picker view if `BySubAgent` is populated.
