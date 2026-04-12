@@ -1,15 +1,16 @@
 ---
 title: Platform-Specific Tray and Window Behaviors
-status: complete
+status: archived
 depends_on:
   - specs/local/desktop-app/task-03-tray-skeleton.md
 affects: []
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 7: Platform-Specific Tray and Window Behaviors
 

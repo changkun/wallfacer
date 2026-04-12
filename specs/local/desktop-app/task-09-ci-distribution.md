@@ -1,15 +1,16 @@
 ---
 title: CI Builds and Release Distribution
-status: complete
+status: archived
 depends_on:
   - specs/local/desktop-app/task-08-icons-packaging.md
 affects: []
 effort: large
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 9: CI Builds and Release Distribution
 

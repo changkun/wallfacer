@@ -1,6 +1,6 @@
 ---
 title: Native Desktop App
-status: complete
+status: archived
 depends_on:
   - specs/foundations/file-explorer.md
   - specs/foundations/host-terminal.md
@@ -11,10 +11,11 @@ affects:
   - wails.json
 effort: large
 created: 2026-02-21
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Native Desktop App
 

@@ -1,15 +1,16 @@
 ---
 title: Desktop Subcommand with Wails Window
-status: complete
+status: archived
 depends_on:
   - specs/local/desktop-app/task-01-wails-dependency.md
 affects: []
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 2: Desktop Subcommand with Wails Window
 
