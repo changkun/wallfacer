@@ -43,6 +43,11 @@ type MockRunner struct {
 	// behaviour expected by most tests.
 	ContainerNameFn       func(taskID uuid.UUID) string
 	RefineContainerNameFn func(taskID uuid.UUID) string
+
+	// GenerateCommitMessageFn lets tests stub the task-free commit-message
+	// generator. When nil the method returns an empty string and a nil
+	// error so callers fall back to their deterministic path.
+	GenerateCommitMessageFn func(ctx context.Context, data prompts.CommitData) (string, error)
 }
 
 // compile-time assertion.
@@ -217,6 +222,16 @@ func (m *MockRunner) EnvFile() string { return m.EnvFilePath }
 
 // Prompts returns nil.
 func (m *MockRunner) Prompts() *prompts.Manager { return nil }
+
+// GenerateCommitMessage delegates to GenerateCommitMessageFn when set; the
+// default returns ("", nil) so callers hit their deterministic fallback
+// path without signalling an error.
+func (m *MockRunner) GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error) {
+	if m.GenerateCommitMessageFn != nil {
+		return m.GenerateCommitMessageFn(ctx, data)
+	}
+	return "", nil
+}
 
 // WorkspaceManager returns nil.
 func (m *MockRunner) WorkspaceManager() *workspace.Manager { return nil }

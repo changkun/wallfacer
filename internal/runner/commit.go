@@ -383,6 +383,101 @@ func localFallbackCommitMessage(prompt, diffStat string) string {
 	return prefix + subject
 }
 
+// runCommitContainer launches one commit-message agent container and
+// returns the parsed output. This is the lowest-level primitive shared by
+// both the task-aware commit path and the planning-facing public method;
+// callers are responsible for timeouts, retry policy, spans, and usage
+// attribution.
+func (r *Runner) runCommitContainer(
+	ctx context.Context,
+	containerName, commitPrompt string,
+	sb sandbox.Type,
+	labels map[string]string,
+) (*agentOutput, error) {
+	model := r.modelFromEnvForSandbox(sb)
+
+	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	spec.Labels = labels
+	spec.Cmd = buildAgentCmd(commitPrompt, model)
+
+	handle, launchErr := r.backend.Launch(ctx, spec)
+	if launchErr != nil {
+		return nil, fmt.Errorf("launch commit message container: %w", launchErr)
+	}
+	rawStdout, _ := io.ReadAll(handle.Stdout())
+	rawStderr, _ := io.ReadAll(handle.Stderr())
+	exitCode, _ := handle.Wait()
+
+	if exitCode != 0 && ctx.Err() == nil {
+		return nil, fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 200))
+	}
+
+	raw := strings.TrimSpace(string(rawStdout))
+	if raw == "" {
+		return nil, fmt.Errorf("empty output")
+	}
+
+	output, err := parseOutput(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse failure: raw=%s", truncate(raw, 200))
+	}
+	output.ActualSandbox = sb
+	return output, nil
+}
+
+// GenerateCommitMessage runs the commit-message agent on the given inputs
+// (a task-free flavor of generateCommitMessage). Used by callers that do
+// not have a task ID in scope — notably the planning pipeline, which fires
+// this after each planning round to produce a kanban-style commit message.
+// Applies a 90-second sub-deadline and retries once with codex on a
+// claude token-limit hit. Does not record span events or sub-agent usage,
+// since there is no task to attribute them to.
+func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+
+	containerName := "wallfacer-plancommit-" + uuid.NewString()[:8]
+	commitPrompt := r.promptsMgr.CommitMessage(data)
+	labels := map[string]string{"wallfacer.task.activity": "commit_message_planning"}
+
+	initial := sandbox.Claude
+	output, err := r.runCommitContainer(ctx, containerName, commitPrompt, initial, labels)
+	if err != nil {
+		if isLikelyTokenLimitError(err.Error()) {
+			logger.Runner.Warn("plan commit message: claude token limit hit; retrying with codex")
+			output, err = r.runCommitContainer(ctx, containerName, commitPrompt, sandbox.Codex, labels)
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	if output != nil && output.IsError && isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("plan commit message: claude reported token limit in output; retrying with codex")
+		output, err = r.runCommitContainer(ctx, containerName, commitPrompt, sandbox.Codex, labels)
+		if err != nil {
+			return "", err
+		}
+	}
+	if output == nil {
+		return "", fmt.Errorf("commit message agent returned nil output")
+	}
+	if output.IsError {
+		msg := strings.TrimSpace(output.Result)
+		if msg == "" {
+			msg = "agent returned error"
+		}
+		return "", fmt.Errorf("commit message agent: %s", msg)
+	}
+
+	msg := strings.TrimSpace(output.Result)
+	msg = strings.Trim(msg, "`")
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return "", fmt.Errorf("commit message agent returned blank result")
+	}
+	return msg, nil
+}
+
 // generateCommitMessage runs a lightweight container to produce a descriptive
 // git commit message from the task prompt, staged diff stats, and recent git
 // log history (used to match the project's commit style).
@@ -411,40 +506,13 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		DiffStat:  diffStat,
 		RecentLog: recentLog,
 	})
+	labels := map[string]string{"wallfacer.task.id": taskID.String(), "wallfacer.task.activity": "commit_message"}
+
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
-		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
-
-		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
-		spec.Labels = map[string]string{"wallfacer.task.id": taskID.String(), "wallfacer.task.activity": "commit_message"}
-		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)
-
 		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
-
-		handle, launchErr := r.backend.Launch(ctx, spec)
-		if launchErr != nil {
-			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
-			return nil, fmt.Errorf("launch commit message container: %w", launchErr)
-		}
-		rawStdout, _ := io.ReadAll(handle.Stdout())
-		rawStderr, _ := io.ReadAll(handle.Stderr())
-		exitCode, _ := handle.Wait()
+		output, err := r.runCommitContainer(ctx, containerName, commitPrompt, selectedSandbox, labels)
 		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
-
-		if exitCode != 0 && ctx.Err() == nil {
-			return nil, fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 200))
-		}
-
-		raw := strings.TrimSpace(string(rawStdout))
-		if raw == "" {
-			return nil, fmt.Errorf("empty output")
-		}
-
-		output, err := parseOutput(raw)
-		if err != nil {
-			return nil, fmt.Errorf("parse failure: raw=%s", truncate(raw, 200))
-		}
-		output.ActualSandbox = selectedSandbox
-		return output, nil
+		return output, err
 	}
 
 	initialSandbox := sb

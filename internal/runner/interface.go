@@ -51,6 +51,10 @@ type Interface interface {
 	GenerateOversight(taskID uuid.UUID)
 	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error)
 
+	// Commit-message generation (task-free flavor). Used by callers that do
+	// not have a task ID in scope, e.g. the planning commit pipeline.
+	GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error)
+
 	// Ideation.
 	BuildIdeationPrompt(existingTasks []store.Task) string
 	CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error
