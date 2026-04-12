@@ -202,11 +202,11 @@ func TestValidateSpecPath(t *testing.T) {
 		{"specs/local/foo.md", false},
 		{"specs/local/sub/foo.md", false},
 		{"specs/foundations/backend.md", false},
-		{"foo.md", true},               // not under specs/
-		{"specs/foo.md", true},         // missing track directory
-		{"specs/local/foo.txt", true},  // wrong extension
-		{"specs/local/foo", true},      // no extension
-		{"specs//foo.md", true},        // empty track
+		{"foo.md", true},              // not under specs/
+		{"specs/foo.md", true},        // missing track directory
+		{"specs/local/foo.txt", true}, // wrong extension
+		{"specs/local/foo", true},     // no extension
+		{"specs//foo.md", true},       // empty track
 	}
 	for _, c := range cases {
 		err := validateSpecPath(c.in)
