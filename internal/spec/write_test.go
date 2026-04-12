@@ -33,6 +33,28 @@ func TestUpdateFrontmatter_SingleField(t *testing.T) {
 	}
 }
 
+// TestUpdateFrontmatter_CRLFLineEndings covers Windows / autocrlf=true
+// round-trips: a file with CRLF line endings must still update cleanly.
+func TestUpdateFrontmatter_CRLFLineEndings(t *testing.T) {
+	dir := t.TempDir()
+	crlf := "---\r\ntitle: CRLF Spec\r\nstatus: drafted\r\ndepends_on: []\r\n" +
+		"affects: []\r\neffort: small\r\ncreated: 2026-01-01\r\n" +
+		"updated: 2026-01-01\r\nauthor: test\r\n" +
+		"dispatched_task_id: null\r\n---\r\n\r\n# Body\r\n"
+	path := writeSpec(t, dir, "crlf.md", crlf)
+
+	if err := UpdateFrontmatter(path, map[string]any{"status": "complete"}); err != nil {
+		t.Fatalf("UpdateFrontmatter on CRLF file: %v", err)
+	}
+	s, err := ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile after update: %v", err)
+	}
+	if s.Status != StatusComplete {
+		t.Errorf("Status = %q, want %q", s.Status, StatusComplete)
+	}
+}
+
 func TestUpdateFrontmatter_MultipleFields(t *testing.T) {
 	dir := t.TempDir()
 	path := writeSpec(t, dir, "multi.md", validSpec)

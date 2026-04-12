@@ -197,6 +197,26 @@ func TestParseFile_BodyExtraction(t *testing.T) {
 	}
 }
 
+// TestParseFile_CRLFLineEndings covers specs written on Windows or
+// round-tripped through git with core.autocrlf=true — the file on disk
+// has "\r\n" line endings and must still parse.
+func TestParseFile_CRLFLineEndings(t *testing.T) {
+	dir := t.TempDir()
+	crlf := "---\r\ntitle: CRLF Spec\r\nstatus: drafted\r\ndepends_on: []\r\n" +
+		"affects: []\r\neffort: small\r\ncreated: 2026-01-01\r\n" +
+		"updated: 2026-01-01\r\nauthor: test\r\n" +
+		"dispatched_task_id: null\r\n---\r\n\r\n# Body\r\n"
+	path := writeSpec(t, dir, "crlf.md", crlf)
+
+	s, err := ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile with CRLF: %v", err)
+	}
+	if s.Title != "CRLF Spec" {
+		t.Errorf("Title = %q, want %q", s.Title, "CRLF Spec")
+	}
+}
+
 func TestParseFile_MissingFrontmatter(t *testing.T) {
 	dir := t.TempDir()
 	path := writeSpec(t, dir, "no-fm.md", "# Just a markdown file\n\nNo frontmatter here.\n")

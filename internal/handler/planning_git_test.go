@@ -22,6 +22,10 @@ func initPlanningTestRepo(t *testing.T) string {
 	runGit(t, dir, "config", "user.email", "planning-test@example.com")
 	runGit(t, dir, "config", "user.name", "Planning Test")
 	runGit(t, dir, "config", "commit.gpgsign", "false")
+	// Pin line-ending behaviour so stash/pop round-trips preserve the bytes
+	// we wrote on Windows runners (git's default core.autocrlf=true there
+	// would rewrite LF → CRLF on checkout).
+	runGit(t, dir, "config", "core.autocrlf", "false")
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("init\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

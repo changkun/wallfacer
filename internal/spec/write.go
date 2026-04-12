@@ -34,7 +34,9 @@ func UpdateFrontmatter(path string, updates map[string]any) error {
 		return fmt.Errorf("read spec %s: %w", path, err)
 	}
 
-	content := string(data)
+	// Normalize CRLF to LF so files round-tripped through git on Windows
+	// (core.autocrlf=true) parse the same as LF-only files.
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
 
 	// Split into frontmatter and body using the same logic as parse.go.
 	if !strings.HasPrefix(content, "---\n") {

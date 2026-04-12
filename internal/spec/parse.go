@@ -26,7 +26,9 @@ func ParseBytes(data []byte, path string) (*Spec, error) {
 		return nil, errors.New("empty spec file")
 	}
 
-	content := string(data)
+	// Normalize CRLF to LF so files written on Windows (or round-tripped
+	// through git with core.autocrlf=true) parse the same as LF-only files.
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
 
 	// Frontmatter must start with "---\n".
 	if !strings.HasPrefix(content, "---\n") {
