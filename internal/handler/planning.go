@@ -260,6 +260,11 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 				if n > planRound {
 					planRound = n
 				}
+				// Auto-push after a successful planning commit, mirroring the
+				// behaviour of the task "mark as done" flow.
+				if n > 0 && h.runner != nil {
+					h.runner.MaybeAutoPushWorkspace(commitCtx, ws)
+				}
 			}
 			if resultText != "" {
 				_ = cs.AppendMessage(planner.Message{

@@ -32,11 +32,12 @@ type MockRunner struct {
 	CodexPath   string
 
 	// Recorded call arguments (mutex-protected for race-safety).
-	RunBackgroundCalls       []uuid.UUID
-	KillContainerCalls       []uuid.UUID
-	KillRefineContainerCalls []uuid.UUID
-	CleanupWorktreesCalls    []uuid.UUID
-	GenerateTitleCalls       []uuid.UUID
+	RunBackgroundCalls             []uuid.UUID
+	KillContainerCalls             []uuid.UUID
+	KillRefineContainerCalls       []uuid.UUID
+	CleanupWorktreesCalls          []uuid.UUID
+	GenerateTitleCalls             []uuid.UUID
+	MaybeAutoPushWorkspaceCalls    []string
 
 	// Optional overrides for ContainerName / RefineContainerName return values.
 	// When nil the methods return "" (no container active), matching the default
@@ -231,6 +232,20 @@ func (m *MockRunner) GenerateCommitMessage(ctx context.Context, data prompts.Com
 		return m.GenerateCommitMessageFn(ctx, data)
 	}
 	return "", nil
+}
+
+// MaybeAutoPushWorkspace records the workspace path for later inspection by tests.
+func (m *MockRunner) MaybeAutoPushWorkspace(_ context.Context, ws string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.MaybeAutoPushWorkspaceCalls = append(m.MaybeAutoPushWorkspaceCalls, ws)
+}
+
+// AutoPushWorkspaceCalls returns a race-safe snapshot of the workspaces passed to MaybeAutoPushWorkspace.
+func (m *MockRunner) AutoPushWorkspaceCalls() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.MaybeAutoPushWorkspaceCalls)
 }
 
 // WorkspaceManager returns nil.

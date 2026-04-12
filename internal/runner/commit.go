@@ -205,6 +205,39 @@ func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePa
 	}
 }
 
+// MaybeAutoPushWorkspace performs auto-push for a single workspace if
+// auto-push is enabled and the repo is at least AutoPushThreshold commits
+// ahead of its upstream. Unlike maybeAutoPush it does not require a task ID
+// — log events are written via slog. Used by callers that have no task in
+// scope, e.g. the planning commit pipeline.
+func (r *Runner) MaybeAutoPushWorkspace(ctx context.Context, ws string) {
+	if r.envFile == "" {
+		return
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil || !cfg.AutoPushEnabled {
+		return
+	}
+	threshold := cfg.AutoPushThreshold
+	if threshold <= 0 {
+		threshold = 1
+	}
+	if !gitutil.IsGitRepo(ws) {
+		return
+	}
+	s := gitutil.WorkspaceStatus(ws)
+	if !s.HasRemote || s.AheadCount < threshold {
+		return
+	}
+	logger.Runner.Info("planning auto-push", "workspace", ws, "ahead", s.AheadCount)
+	out, pushErr := cmdexec.Git(ws, "push").WithContext(ctx).Combined()
+	if pushErr != nil {
+		logger.Runner.Error("planning auto-push failed", "workspace", ws, "error", pushErr, "output", out)
+	} else {
+		logger.Runner.Info("planning auto-push succeeded", "workspace", ws)
+	}
+}
+
 // hostStageAndCommit stages and commits all uncommitted changes in each
 // worktree directly on the host. Returns true if any new commits were created.
 // Returns an error if changes were present but could not be staged or committed.

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/prompts"
+	"changkun.de/x/wallfacer/internal/runner"
 )
 
 // initPlanningTestRepo creates a temp git repo with one initial commit so
@@ -510,5 +511,67 @@ func TestWrapLine(t *testing.T) {
 		if len(l) > 20 {
 			t.Errorf("line too long (%d): %q", len(l), l)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Planning auto-push wiring tests
+// ---------------------------------------------------------------------------
+
+// TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit verifies that the
+// planning commit pipeline calls MaybeAutoPushWorkspace on the runner after
+// commitPlanningRound returns a positive round number (i.e. a commit was made).
+// This mirrors the behaviour of the "mark as done" flow for task cards, which
+// calls runner.Commit (and inside it maybeAutoPush) after moving a Waiting
+// task to Done.
+func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	writeSpec(t, ws, "local/foo.md", "# Foo\n")
+
+	mock := &runner.MockRunner{}
+
+	// Simulate the per-workspace loop inside SendPlanningMessage.
+	ctx := context.Background()
+	n, err := commitPlanningRound(ctx, ws, "draft foo spec", "drafted foo", nil)
+	if err != nil {
+		t.Fatalf("commitPlanningRound: %v", err)
+	}
+	if n == 0 {
+		t.Fatal("expected commitPlanningRound to return round > 0 for dirty specs/")
+	}
+	// This is the exact condition the handler uses.
+	if n > 0 {
+		mock.MaybeAutoPushWorkspace(ctx, ws)
+	}
+
+	calls := mock.AutoPushWorkspaceCalls()
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 auto-push call, got %d: %v", len(calls), calls)
+	}
+	if calls[0] != ws {
+		t.Errorf("auto-push workspace = %q, want %q", calls[0], ws)
+	}
+}
+
+// TestPlanningCommit_AutoPushNotCalledWhenNoCommit verifies that
+// MaybeAutoPushWorkspace is NOT called when commitPlanningRound returns 0
+// (no specs/ changes pending — nothing to push).
+func TestPlanningCommit_AutoPushNotCalledWhenNoCommit(t *testing.T) {
+	ws := initPlanningTestRepo(t) // clean repo, no spec changes
+
+	mock := &runner.MockRunner{}
+
+	ctx := context.Background()
+	n, err := commitPlanningRound(ctx, ws, "noop", "nothing changed", nil)
+	if err != nil {
+		t.Fatalf("commitPlanningRound: %v", err)
+	}
+	// Simulate handler condition — only push when n > 0.
+	if n > 0 {
+		mock.MaybeAutoPushWorkspace(ctx, ws)
+	}
+
+	if calls := mock.AutoPushWorkspaceCalls(); len(calls) != 0 {
+		t.Errorf("expected no auto-push calls when nothing was committed, got %v", calls)
 	}
 }

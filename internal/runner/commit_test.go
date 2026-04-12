@@ -891,3 +891,121 @@ func TestMaybeAutoPush_MissingEnvFile(t *testing.T) {
 	// envconfig.Parse will fail → maybeAutoPush returns early without panic.
 	r.maybeAutoPush(context.Background(), uuid.New(), map[string]string{})
 }
+
+// ---------------------------------------------------------------------------
+// MaybeAutoPushWorkspace unit tests (task-free auto-push for planning commits)
+// ---------------------------------------------------------------------------
+
+func newRunnerWithEnvFile(t *testing.T, envContent string) *Runner {
+	t.Helper()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte(envContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRunner(s, RunnerConfig{EnvFile: envFile, WorktreesDir: worktreesDir})
+	t.Cleanup(func() { r.Shutdown() })
+	return r
+}
+
+// TestMaybeAutoPushWorkspace_NoEnvFile verifies no-op when envFile is empty.
+func TestMaybeAutoPushWorkspace_NoEnvFile(t *testing.T) {
+	s, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRunner(s, RunnerConfig{EnvFile: "", WorktreesDir: worktreesDir})
+	t.Cleanup(func() { r.Shutdown() })
+	// Must not panic when envFile is not configured.
+	r.MaybeAutoPushWorkspace(context.Background(), t.TempDir())
+}
+
+// TestMaybeAutoPushWorkspace_DisabledIsNoOp verifies no-op when WALLFACER_AUTO_PUSH=false.
+func TestMaybeAutoPushWorkspace_DisabledIsNoOp(t *testing.T) {
+	r := newRunnerWithEnvFile(t, "WALLFACER_AUTO_PUSH=false\n")
+	repo := setupTestRepo(t)
+	// Even if the repo is a valid git repo, auto-push disabled → no action.
+	r.MaybeAutoPushWorkspace(context.Background(), repo)
+}
+
+// TestMaybeAutoPushWorkspace_NonGitDirIsNoOp verifies no-op for non-git directories.
+func TestMaybeAutoPushWorkspace_NonGitDirIsNoOp(t *testing.T) {
+	r := newRunnerWithEnvFile(t, "WALLFACER_AUTO_PUSH=true\nWALLFACER_AUTO_PUSH_THRESHOLD=1\n")
+	r.MaybeAutoPushWorkspace(context.Background(), t.TempDir())
+}
+
+// TestMaybeAutoPushWorkspace_NoRemoteIsNoOp verifies no-op when the repo has no remote.
+func TestMaybeAutoPushWorkspace_NoRemoteIsNoOp(t *testing.T) {
+	r := newRunnerWithEnvFile(t, "WALLFACER_AUTO_PUSH=true\nWALLFACER_AUTO_PUSH_THRESHOLD=1\n")
+	repo := setupTestRepo(t) // no remote configured
+	r.MaybeAutoPushWorkspace(context.Background(), repo)
+}
+
+// TestMaybeAutoPushWorkspace_PushesWhenAhead verifies that MaybeAutoPushWorkspace
+// pushes when the workspace is ahead of its upstream by at least the threshold.
+func TestMaybeAutoPushWorkspace_PushesWhenAhead(t *testing.T) {
+	r := newRunnerWithEnvFile(t, "WALLFACER_AUTO_PUSH=true\nWALLFACER_AUTO_PUSH_THRESHOLD=1\n")
+
+	// Create a bare remote and a local repo that tracks it.
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare", "-b", "main")
+	repo := setupTestRepo(t)
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
+	// Make a local commit so the repo is 1 ahead of origin.
+	if err := os.WriteFile(filepath.Join(repo, "spec.md"), []byte("# spec\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "add spec")
+
+	r.MaybeAutoPushWorkspace(context.Background(), repo)
+
+	// Verify the push reached the remote by checking origin's log.
+	log := gitRun(t, origin, "log", "--oneline")
+	if !strings.Contains(log, "add spec") {
+		t.Errorf("expected 'add spec' commit in origin after auto-push; origin log:\n%s", log)
+	}
+}
+
+// TestMaybeAutoPushWorkspace_BelowThresholdIsNoOp verifies that MaybeAutoPushWorkspace
+// does not push when ahead count is below the configured threshold.
+func TestMaybeAutoPushWorkspace_BelowThresholdIsNoOp(t *testing.T) {
+	// Threshold = 3; we're only 1 ahead → no push.
+	r := newRunnerWithEnvFile(t, "WALLFACER_AUTO_PUSH=true\nWALLFACER_AUTO_PUSH_THRESHOLD=3\n")
+
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare", "-b", "main")
+	repo := setupTestRepo(t)
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
+	// 1 commit ahead — below threshold of 3.
+	if err := os.WriteFile(filepath.Join(repo, "spec.md"), []byte("# spec\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "local only")
+
+	r.MaybeAutoPushWorkspace(context.Background(), repo)
+
+	// The commit must NOT be in origin.
+	log, _ := gitRunMayFail(origin, "log", "--oneline")
+	if strings.Contains(log, "local only") {
+		t.Errorf("expected no push below threshold; origin log:\n%s", log)
+	}
+}

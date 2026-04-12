@@ -55,6 +55,10 @@ type Interface interface {
 	// not have a task ID in scope, e.g. the planning commit pipeline.
 	GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error)
 
+	// Auto-push for a single workspace (task-free flavor). Used by callers
+	// that do not have a task ID in scope, e.g. the planning commit pipeline.
+	MaybeAutoPushWorkspace(ctx context.Context, ws string)
+
 	// Ideation.
 	BuildIdeationPrompt(existingTasks []store.Task) string
 	CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error
