@@ -133,7 +133,11 @@ function makeContext(opts = {}) {
     confirm: () => opts.confirmResult !== false,
     alert: vi.fn(),
     api: vi.fn(() => Promise.resolve({ dispatched: [], errors: [] })),
-    Routes: { specs: {} },
+    Routes: {
+      specs: {},
+      explorer: { readFile: () => "/api/explorer/file" },
+    },
+    activeWorkspaces: ["/workspace/repo"],
     renderMarkdown: (t) => "<p>" + t + "</p>",
     setInterval: () => 42,
     clearInterval: () => {},
@@ -285,6 +289,30 @@ describe("dismissArchiveToast", () => {
     expect(ctx._lastArchiveAction).toBeNull();
     const toasts = ctx.registry.get("spec-archive-toasts");
     expect(toasts.children.length).toBe(0);
+  });
+});
+
+describe("_showSpecReadme", () => {
+  it("hides archive/unarchive buttons and archived banner (regression)", () => {
+    const ctx = makeContext();
+    // Simulate stale state from a previously-focused archived spec.
+    ctx.registry.get("spec-archive-btn").classList.remove("hidden");
+    ctx.registry.get("spec-unarchive-btn").classList.remove("hidden");
+    ctx.registry.get("spec-archived-banner").classList.remove("hidden");
+
+    // _showSpecReadme must reset all three so specs/README.md never appears
+    // archived. README has no frontmatter — the affordances shouldn't leak in.
+    ctx._showSpecReadme();
+
+    expect(
+      ctx.registry.get("spec-archive-btn").classList.contains("hidden"),
+    ).toBe(true);
+    expect(
+      ctx.registry.get("spec-unarchive-btn").classList.contains("hidden"),
+    ).toBe(true);
+    expect(
+      ctx.registry.get("spec-archived-banner").classList.contains("hidden"),
+    ).toBe(true);
   });
 });
 
