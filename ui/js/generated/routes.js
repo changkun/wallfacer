@@ -159,6 +159,10 @@ var Routes = {
     interruptMessage: function () {
       return "/api/planning/messages/interrupt";
     },
+    // POST /api/planning/undo
+    undo: function () {
+      return "/api/planning/undo";
+    },
     // GET /api/planning/commands
     commands: function () {
       return "/api/planning/commands";

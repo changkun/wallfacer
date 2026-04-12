@@ -257,6 +257,12 @@ var Routes = []Route{
 		Tags:        []string{"planning"},
 	},
 	{
+		Method: http.MethodPost, Pattern: "/api/planning/undo", Name: "UndoPlanningRound",
+		JSName:      "undo",
+		Description: "Undo the last planning round (git reset --hard on the last plan: round commit).",
+		Tags:        []string{"planning"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/planning/commands", Name: "GetPlanningCommands",
 		JSName:      "commands",
 		Description: "List available slash commands.",
