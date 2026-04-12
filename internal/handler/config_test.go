@@ -1546,3 +1546,73 @@ func TestGetConfig_IncludesTerminalEnabled(t *testing.T) {
 		t.Errorf("terminal_enabled = %v; want true by default", te)
 	}
 }
+
+func TestConfigResponse_IncludesPlanningWindowDays(t *testing.T) {
+	ws := t.TempDir()
+	configDir := t.TempDir()
+
+	s, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Seed the env file with an explicit override so we can verify that
+	// /api/config surfaces the parsed value (not just the default).
+	envPath := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envPath, []byte("WALLFACER_PLANNING_WINDOW_DAYS=14\n"), 0600); err != nil {
+		t.Fatalf("write env: %v", err)
+	}
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		EnvFile:    envPath,
+		Workspaces: []string{ws},
+	})
+	t.Cleanup(r.WaitBackground)
+	h := NewHandler(s, r, configDir, []string{ws}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	got, ok := resp["planning_window_days"]
+	if !ok {
+		t.Fatal("planning_window_days missing from config response")
+	}
+	// JSON numbers decode into float64 when the target is map[string]any.
+	if n, _ := got.(float64); int(n) != 14 {
+		t.Errorf("planning_window_days = %v, want 14", got)
+	}
+}
+
+func TestConfigResponse_PlanningWindowDaysDefault(t *testing.T) {
+	// With no env file configured (h.envFile == ""), the handler must still
+	// return a sensible default so the UI always has a value to start with.
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got, ok := resp["planning_window_days"]
+	if !ok {
+		t.Fatal("planning_window_days missing from config response")
+	}
+	if n, _ := got.(float64); int(n) != 30 {
+		t.Errorf("planning_window_days = %v, want 30 (default)", got)
+	}
+}

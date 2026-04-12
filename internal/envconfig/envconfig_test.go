@@ -806,3 +806,64 @@ func TestParseTerminalEnabledFalse(t *testing.T) {
 		t.Error("TerminalEnabled = true; want false when explicitly set to false")
 	}
 }
+
+// --- PlanningWindowDays ---
+
+func TestParse_PlanningWindowDaysDefault(t *testing.T) {
+	path := writeEnvFile(t, ``)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.PlanningWindowDays != 30 {
+		t.Errorf("PlanningWindowDays = %d; want 30 when unset", cfg.PlanningWindowDays)
+	}
+}
+
+func TestParse_PlanningWindowDays(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{"positive", "WALLFACER_PLANNING_WINDOW_DAYS=14", 14},
+		{"zero means all time", "WALLFACER_PLANNING_WINDOW_DAYS=0", 0},
+		{"large value", "WALLFACER_PLANNING_WINDOW_DAYS=365", 365},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeEnvFile(t, tc.raw)
+			cfg, err := envconfig.Parse(path)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if cfg.PlanningWindowDays != tc.want {
+				t.Errorf("PlanningWindowDays = %d; want %d", cfg.PlanningWindowDays, tc.want)
+			}
+		})
+	}
+}
+
+func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
+	// Non-numeric and negative values fall back to the default 30 so the
+	// planning UI always has a sane starting window. This matches how the
+	// other int knobs treat malformed input.
+	for _, tc := range []struct {
+		name string
+		raw  string
+	}{
+		{"non-numeric", "WALLFACER_PLANNING_WINDOW_DAYS=soon"},
+		{"negative", "WALLFACER_PLANNING_WINDOW_DAYS=-5"},
+		{"float", "WALLFACER_PLANNING_WINDOW_DAYS=1.5"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeEnvFile(t, tc.raw)
+			cfg, err := envconfig.Parse(path)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if cfg.PlanningWindowDays != 30 {
+				t.Errorf("PlanningWindowDays = %d; want 30 (fallback for %q)", cfg.PlanningWindowDays, tc.raw)
+			}
+		})
+	}
+}

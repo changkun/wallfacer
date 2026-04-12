@@ -345,6 +345,7 @@ Optional variables (also in `.env`):
 - `WALLFACER_OVERSIGHT_INTERVAL` — minutes between periodic oversight generation while a task runs (0 = only at task completion, default: 0)
 - `WALLFACER_AUTO_PUSH` — enable auto-push after task completion (`true`/`false`)
 - `WALLFACER_AUTO_PUSH_THRESHOLD` — minimum completed tasks before auto-push triggers
+- `WALLFACER_PLANNING_WINDOW_DAYS` — default window (in days) for the planning-cost analytics display (default: `30`; `0` = all time)
 - `WALLFACER_SANDBOX_FAST` — enable fast-mode sandbox hints (default: `true`)
 - `WALLFACER_SANDBOX_BACKEND` — sandbox backend selection (values: `local`; default: `local`)
 - `WALLFACER_CONTAINER_NETWORK` — container network name

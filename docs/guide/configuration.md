@@ -220,6 +220,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 | `WALLFACER_OVERSIGHT_INTERVAL` | `0` | Minutes between periodic oversight generation while a task runs (0 = only at completion) |
 | `WALLFACER_AUTO_PUSH` | `false` | Enable automatic `git push` after task completion |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push triggers |
+| `WALLFACER_PLANNING_WINDOW_DAYS` | `30` | Default window (in days) for the planning-cost analytics display. `0` means all time. Only affects the UI's default period selection; the server always returns the full record set until the UI requests a narrower window via `?days=N`. |
 | `WALLFACER_SANDBOX_FAST` | `true` | Enable fast-mode sandbox hints |
 | `WALLFACER_TERMINAL_ENABLED` | `true` | Enable the integrated host terminal panel. The Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. Supports multiple concurrent sessions with a tab bar — click "+" to add sessions, click tabs to switch, click x to close. Set to `false` to disable. |
 

@@ -29,6 +29,7 @@ type Config struct {
 	ArchivedTasksPerPage int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 	AutoPushEnabled      bool   // WALLFACER_AUTO_PUSH ("true"/"false")
 	AutoPushThreshold    int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
+	PlanningWindowDays   int    // WALLFACER_PLANNING_WINDOW_DAYS — default planning cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -78,6 +79,7 @@ var knownKeys = []string{
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
+	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
 	"WALLFACER_SANDBOX_IMPLEMENTATION",
 	"WALLFACER_SANDBOX_TESTING",
@@ -107,7 +109,16 @@ func Parse(path string) (Config, error) {
 	// SandboxFast, TaskWorkers, and TerminalEnabled default to true; only an
 	// explicit "false" value in the file disables them. This opt-out semantic
 	// means missing keys preserve the safer default (features enabled).
-	cfg := Config{SandboxFast: true, TaskWorkers: true, TerminalEnabled: true}
+	//
+	// PlanningWindowDays defaults to 30 so the planning-cost period picker
+	// opens on a sensible "last month" view when the user hasn't configured
+	// anything. An explicit 0 in the file still means "all time".
+	cfg := Config{
+		SandboxFast:        true,
+		TaskWorkers:        true,
+		TerminalEnabled:    true,
+		PlanningWindowDays: 30,
+	}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
 		if !ok {
@@ -149,6 +160,12 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_AUTO_PUSH_THRESHOLD":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.AutoPushThreshold = n
+			}
+		case "WALLFACER_PLANNING_WINDOW_DAYS":
+			// 0 means "all time"; negative values are rejected silently (keeps
+			// the initialized default of 30).
+			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+				cfg.PlanningWindowDays = n
 			}
 		case "OPENAI_API_KEY":
 			cfg.OpenAIAPIKey = v
