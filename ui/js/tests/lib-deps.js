@@ -14,13 +14,13 @@ const jsDir = join(__dirname, "..");
 
 const LIB_DEPS = {
   "utils.js": ["lib/formatting.js", "lib/modal.js"],
-  "markdown.js": ["lib/clipboard.js", "lib/toggle.js"],
+  "markdown.js": ["build/lib/clipboard.js", "lib/toggle.js"],
   "modal.js": ["lib/tab-switcher.js", "lib/markdown-render.js"],
   "modal-core.js": ["lib/tab-switcher.js", "lib/markdown-render.js"],
   "modal-logs.js": ["lib/scheduling.js", "lib/tab-switcher.js"],
   "modal-results.js": [
     "lib/formatting.js",
-    "lib/clipboard.js",
+    "build/lib/clipboard.js",
     "lib/toggle.js",
     "lib/tab-switcher.js",
     "lib/markdown-render.js",

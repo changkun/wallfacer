@@ -1,8 +1,12 @@
-// Compile every .ts source under ui/js/ to a sibling .js file.
+// Compile every .ts source under ui/js/ to a .js file under ui/js/build/.
 //
 // Keeps the no-bundler, global-scope <script>-tag model: each .ts file
-// transpiles to a .js file in place, preserving top-level bindings so
-// other scripts on the page see the same globals they did before.
+// transpiles to a .js file that preserves top-level bindings so other
+// scripts on the page see the same globals they did before.
+//
+// Output layout mirrors sources: ui/js/lib/foo.ts -> ui/js/build/lib/foo.js.
+// The build directory is gitignored; go:embed picks it up at Go build time
+// because `make build` runs `ui-ts` before `build-binary`.
 //
 // Run via `make ui-ts`. Re-run after editing any .ts source.
 
@@ -14,8 +18,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const uiRoot = resolve(__dirname, "..");
 const jsRoot = join(uiRoot, "js");
+const buildRoot = join(jsRoot, "build");
 
-const SKIP_DIRS = new Set(["vendor", "generated", "tests"]);
+const SKIP_DIRS = new Set(["vendor", "generated", "tests", "build"]);
 
 /**
  * Recursively collect .ts files under jsRoot, skipping generated/vendor
@@ -63,7 +68,7 @@ if (files.length === 0) {
 // source emits as a top-level function declaration in the output.
 await build({
   entryPoints: files.map((f) => f.full),
-  outdir: jsRoot,
+  outdir: buildRoot,
   outbase: jsRoot,
   outExtension: { ".js": ".js" },
   bundle: false,

@@ -5,6 +5,7 @@
     "ignore": [
       "js/vendor/**",
       "js/generated/**",
+      "js/build/**",
       "css/vendor/**",
       "node_modules/**"
     ]

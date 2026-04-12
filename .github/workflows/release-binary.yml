@@ -36,6 +36,21 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: ui
+
+      - name: Compile TypeScript sources
+        run: node scripts/build-ts.mjs
+        working-directory: ui
+
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}

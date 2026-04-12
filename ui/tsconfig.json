@@ -19,5 +19,5 @@
     "types": []
   },
   "include": ["js/**/*.ts", "js/**/*.js", "types/**/*.d.ts"],
-  "exclude": ["node_modules", "js/vendor", "js/generated", "wailsjs"]
+  "exclude": ["node_modules", "js/vendor", "js/generated", "js/build", "wailsjs"]
 }

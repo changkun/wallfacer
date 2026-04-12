@@ -152,7 +152,7 @@ fmt-go:
 
 # Format frontend JS, HTML, and CSS files
 fmt-js:
-	npx --yes prettier@3 --write 'ui/**/*.{js,html,css}' '!ui/index.html' '!ui/js/vendor/**' '!ui/css/vendor/**'
+	npx --yes prettier@3 --write 'ui/**/*.{js,html,css}' '!ui/index.html' '!ui/js/vendor/**' '!ui/js/build/**' '!ui/css/vendor/**'
 
 # Run all linters (Go + frontend)
 lint: lint-go lint-js

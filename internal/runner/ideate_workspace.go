@@ -20,6 +20,7 @@ import (
 var ignoredChurnPrefixes = []string{
 	"ui/js/vendor/",
 	"ui/js/generated/",
+	"ui/js/build/",
 	"node_modules/",
 	".git/",
 	"vendor/",
@@ -35,6 +36,7 @@ var ignoredChurnPrefixes = []string{
 var ignoredTodoPrefixes = []string{
 	"ui/js/vendor/",
 	"ui/js/generated/",
+	"ui/js/build/",
 	"node_modules/",
 	".git/",
 	"vendor/",
@@ -179,10 +181,11 @@ func isBoostedPath(path string) bool {
 			return true
 		}
 	}
-	// ui/js/ is boosted only outside the vendor/generated subdirectories.
+	// ui/js/ is boosted only outside the vendor/generated/build subdirectories.
 	if strings.HasPrefix(path, "ui/js/") &&
 		!strings.HasPrefix(path, "ui/js/vendor/") &&
-		!strings.HasPrefix(path, "ui/js/generated/") {
+		!strings.HasPrefix(path, "ui/js/generated/") &&
+		!strings.HasPrefix(path, "ui/js/build/") {
 		return true
 	}
 	for _, sfx := range boostedPathSuffixes {

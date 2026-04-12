@@ -40,6 +40,7 @@ func TestIsIgnoredChurnPath(t *testing.T) {
 		// Ignored vendor/generated trees
 		{"ui/js/vendor/sortable.min.js", true},
 		{"ui/js/generated/bundle.js", true},
+		{"ui/js/build/lib/clipboard.js", true},
 		{"node_modules/lodash/index.js", true},
 		{".git/config", true},
 		{"vendor/github.com/foo/bar/bar.go", true},
@@ -89,6 +90,7 @@ func TestIsIgnoredTodoPath(t *testing.T) {
 	}{
 		// Ignored vendor/generated trees (same as churn)
 		{"ui/js/vendor/sortable.min.js", true},
+		{"ui/js/build/lib/clipboard.js", true},
 		{"node_modules/foo/index.js", true},
 		{"vendor/dep/file.go", true},
 		// Additionally excluded for TODO
@@ -129,8 +131,9 @@ func TestIsBoostedPath(t *testing.T) {
 		{"internal/runner/foo_test.go", true}, // _test.go suffix
 		{"handler_test.go", true},
 		// Not boosted
-		{"ui/js/vendor/sortable.js", false},  // under vendor
-		{"ui/js/generated/bundle.js", false}, // under generated
+		{"ui/js/vendor/sortable.js", false},      // under vendor
+		{"ui/js/generated/bundle.js", false},     // under generated
+		{"ui/js/build/lib/clipboard.js", false},  // under build
 		{"main.go", false},
 		{"server.go", false},
 		{"README.md", false},
