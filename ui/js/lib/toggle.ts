@@ -6,14 +6,14 @@
 /**
  * Toggle between a rendered element and a raw element, updating a button label.
  * Convention: when raw is hidden, button says "Raw"; when raw is shown, "Preview".
- *
- * @param {HTMLElement} renderedEl  The rendered/preview element.
- * @param {HTMLElement} rawEl       The raw text element.
- * @param {HTMLElement} [btn]       The toggle button (updated with "Raw"/"Preview").
  */
-function toggleRenderedRaw(renderedEl, rawEl, btn) {
+function toggleRenderedRaw(
+  renderedEl: HTMLElement | null,
+  rawEl: HTMLElement | null,
+  btn?: HTMLElement | null,
+): void {
   if (!renderedEl || !rawEl) return;
-  var showingRaw = !rawEl.classList.contains("hidden");
+  const showingRaw = !rawEl.classList.contains("hidden");
   if (showingRaw) {
     renderedEl.classList.remove("hidden");
     rawEl.classList.add("hidden");

@@ -40,8 +40,8 @@ function makeContext() {
 }
 
 function loadScript(ctx) {
-  const code = readFileSync(join(jsDir, "lib/modal.js"), "utf8");
-  vm.runInContext(code, ctx, { filename: join(jsDir, "lib/modal.js") });
+  const code = readFileSync(join(jsDir, "build/lib/modal.js"), "utf8");
+  vm.runInContext(code, ctx, { filename: join(jsDir, "build/lib/modal.js") });
   return ctx;
 }
 

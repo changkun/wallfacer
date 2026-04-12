@@ -7,16 +7,13 @@
  * Create a scheduler that coalesces rapid calls into a single
  * requestAnimationFrame callback. Useful for batching DOM updates
  * triggered by high-frequency events (SSE chunks, input events, etc.).
- *
- * @param {function} callback  The function to call at most once per frame.
- * @returns {function}         The debounced schedule function.
  */
-function createRAFScheduler(callback) {
-  var pending = false;
-  return function schedule() {
+function createRAFScheduler(callback: () => void): () => void {
+  let pending = false;
+  return function schedule(): void {
     if (pending) return;
     pending = true;
-    requestAnimationFrame(function () {
+    requestAnimationFrame(() => {
       pending = false;
       callback();
     });

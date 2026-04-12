@@ -44,7 +44,7 @@ function makeContext(overrides = {}) {
 }
 
 function loadScript(ctx) {
-  const code = readFileSync(join(jsDir, "lib/modal-controller.js"), "utf8");
+  const code = readFileSync(join(jsDir, "build/lib/modal-controller.js"), "utf8");
   vm.runInContext(code, ctx);
   return ctx;
 }

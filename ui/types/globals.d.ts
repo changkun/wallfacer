@@ -18,4 +18,49 @@ declare global {
     feedback?: string,
     duration?: number,
   ): void;
+
+  // --- ui/js/lib/scheduling.ts ---
+  function createRAFScheduler(callback: () => void): () => void;
+
+  // --- ui/js/lib/toggle.ts ---
+  function toggleRenderedRaw(
+    renderedEl: HTMLElement | null,
+    rawEl: HTMLElement | null,
+    btn?: HTMLElement | null,
+  ): void;
+
+  // --- ui/js/lib/formatting.ts ---
+  function escapeHtml(s: string | null | undefined): string;
+  function fmtMs(ms: number): string;
+  function timeAgo(dateStr: string): string;
+  function formatTimeout(minutes: number): string;
+
+  // --- ui/js/lib/tab-switcher.ts ---
+  function createTabSwitcher(opts: {
+    tabs: string[];
+    prefix: string;
+    onActivate?: Record<string, (tab: string) => void>;
+    onSwitch?: (tab: string) => void;
+  }): (tab: string) => void;
+
+  // --- ui/js/lib/modal.ts ---
+  function openModalPanel(modal: HTMLElement | null): void;
+  function closeModalPanel(modal: HTMLElement | null): void;
+  function bindModalDismiss(
+    modal: HTMLElement | null,
+    onClose: () => void,
+  ): () => void;
+  function createModalStateController(nodes: {
+    loadingEl?: HTMLElement | null;
+    errorEl?: HTMLElement | null;
+    emptyEl?: HTMLElement | null;
+    contentEl?: HTMLElement | null;
+    contentState?: string;
+  }): (state: string, msg?: string) => void;
+
+  // --- ui/js/lib/modal-controller.ts ---
+  function createModalController(
+    modalId: string,
+    opts?: { onOpen?: () => void; onClose?: () => void },
+  ): { open: () => void; close: () => void };
 }

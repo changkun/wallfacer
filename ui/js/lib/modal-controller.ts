@@ -6,19 +6,21 @@
 /**
  * Create a modal open/close controller with automatic dismiss binding.
  * Returns {open, close} functions that manage the modal lifecycle.
- *
- * @param {string} modalId      The modal element ID.
- * @param {Object} [opts]       Options.
- * @param {function} [opts.onOpen]   Called after the modal is shown (for loading data, etc.).
- * @param {function} [opts.onClose]  Called after the modal is hidden (for cleanup like clearInterval).
- * @returns {{open: function, close: function}}
+ * `onOpen` runs after the modal is shown (e.g. for loading data);
+ * `onClose` runs after it is hidden (e.g. for clearInterval cleanup).
  */
-function createModalController(modalId, opts) {
-  var _dismiss = null;
-  var options = opts || {};
+function createModalController(
+  modalId: string,
+  opts?: {
+    onOpen?: () => void;
+    onClose?: () => void;
+  },
+): { open: () => void; close: () => void } {
+  let _dismiss: (() => void) | null = null;
+  const options = opts || {};
 
-  function close() {
-    var modal = document.getElementById(modalId);
+  function close(): void {
+    const modal = document.getElementById(modalId);
     closeModalPanel(modal);
     if (_dismiss) {
       _dismiss();
@@ -27,8 +29,8 @@ function createModalController(modalId, opts) {
     if (typeof options.onClose === "function") options.onClose();
   }
 
-  function open() {
-    var modal = document.getElementById(modalId);
+  function open(): void {
+    const modal = document.getElementById(modalId);
     if (!modal) return;
     openModalPanel(modal);
     if (_dismiss) _dismiss();
