@@ -7,6 +7,27 @@
   aria-atomic="true"
 ></div>
 <main class="board-grid flex-1 min-h-0" id="board" tabindex="-1">
+  <!--
+    Empty-Board hint — rendered by render.js when the task list is empty.
+    The full empty-board composer will replace this minimal hint once the
+    empty-board-composer spec lands.
+  -->
+  <div
+    id="board-empty-hint"
+    class="board-empty-hint hidden"
+    role="note"
+    aria-live="polite"
+  >
+    Nothing to execute yet. Start a chat in
+    <button
+      type="button"
+      class="board-empty-hint__plan"
+      onclick="switchMode('spec', { persist: true })"
+    >
+      Plan
+    </button>
+    to draft your first spec, or drop a task directly into the backlog &rarr;
+  </div>
   <div
     class="flex flex-col min-h-0"
     id="col-wrapper-backlog"

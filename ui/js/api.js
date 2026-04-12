@@ -185,6 +185,15 @@ function _handleTasksSnapshot(data, lastEventId) {
     }
     scheduleRender();
     notifyTaskChangeListeners();
+    // Seed the Board unread-dot seen-set so existing tasks never trigger
+    // the dot on cold open — only tasks that appear later count.
+    if (typeof initBoardUnreadSeen === "function") {
+      initBoardUnreadSeen(
+        tasks.map(function (t) {
+          return t.id;
+        }),
+      );
+    }
     // Resolve the initial mode from saved preference + task count + the
     // workspaceIsNew flag before the hash handler runs. Hash deep-links
     // (#plan/<path>) still win because they call switchMode afterwards.
@@ -234,6 +243,11 @@ function _handleTaskUpdated(data, lastEventId) {
       announceBoardStatus(
         `Task "${getTaskAccessibleTitle(task)}" is now ${formatTaskStatusLabel(task.status)}`,
       );
+    }
+    // A task with no previousTask is newly created — surface the Board
+    // unread dot if the user is not currently looking at the Board.
+    if (!reduced.previousTask && typeof noteBoardNewTask === "function") {
+      noteBoardNewTask(task.id);
     }
     invalidateDiffBehindCounts(task.id);
     scheduleRender();

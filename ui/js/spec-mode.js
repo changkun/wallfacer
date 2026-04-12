@@ -233,6 +233,12 @@ function switchMode(mode, opts) {
   }
   _applyMode(mode);
 
+  // Entering Board clears the sidebar unread dot — every visible task is
+  // implicitly "seen" for the purpose of dismissing the bridge badge.
+  if (mode === "board" && typeof clearBoardUnreadDot === "function") {
+    clearBoardUnreadDot();
+  }
+
   // After switching to board, highlight the task card from the focused spec.
   if (mode === "board" && _highlightTaskId) {
     _highlightBoardTask(_highlightTaskId);
@@ -697,11 +703,24 @@ function dispatchFocusedSpec() {
         method: "POST",
         body: JSON.stringify({ paths: [_focusedSpecPath], run: false }),
       })
-        .then(function () {
+        .then(function (resp) {
           // Hide the dispatch button (spec is no longer validated after dispatch).
           if (btn) btn.classList.add("hidden");
           // Refresh the focused spec view to reflect the new dispatched_task_id.
           _loadAndRenderSpec();
+          // Surface a dispatch-complete toast with a "View on Board →"
+          // affordance, per the plan-to-board-bridges spec.
+          var taskIds = [];
+          if (resp && Array.isArray(resp.dispatched)) {
+            for (var i = 0; i < resp.dispatched.length; i++) {
+              if (resp.dispatched[i] && resp.dispatched[i].task_id) {
+                taskIds.push(resp.dispatched[i].task_id);
+              }
+            }
+          }
+          if (typeof showDispatchCompleteToast === "function") {
+            showDispatchCompleteToast(taskIds);
+          }
         })
         .catch(function (err) {
           showAlert("Dispatch failed: " + err.message);

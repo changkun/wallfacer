@@ -616,6 +616,17 @@ function render() {
     }
   }
 
+  // Toggle the empty-Board hint — only visible when no tasks exist in any
+  // column (archived-only rows do not count as a "non-empty" board).
+  const _emptyHint = document.getElementById("board-empty-hint");
+  if (_emptyHint) {
+    const totalVisible = Object.values(columns).reduce(
+      (n, items) => n + items.length,
+      0,
+    );
+    _emptyHint.classList.toggle("hidden", totalVisible !== 0);
+  }
+
   const _colTitles = {
     backlog: "Backlog",
     in_progress: "In Progress",

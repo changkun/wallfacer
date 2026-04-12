@@ -338,3 +338,141 @@
     box-shadow: none;
   }
 }
+
+/* One-cycle pulse applied to task cards freshly dispatched from Plan mode.
+   Coordinated with the 1200ms timeout in ui/js/dispatch-toast.js. */
+.task-card--just-created {
+  animation: task-card-just-created 1.2s ease-out;
+}
+@keyframes task-card-just-created {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.55);
+    transform: translateY(0);
+  }
+  30% {
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.35);
+    transform: translateY(-1px);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-card--just-created {
+    animation: none;
+  }
+}
+
+/* Dispatch-complete toast — bottom-right, appended to <body>. */
+.dispatch-toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1100;
+  max-width: 360px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent, #6366f1);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  animation: dispatch-toast-in 0.2s cubic-bezier(0.2, 0.8, 0.4, 1);
+}
+.dispatch-toast__text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dispatch-toast__view {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.dispatch-toast__view:hover {
+  background: var(--bg-hover);
+}
+.dispatch-toast__close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.dispatch-toast__close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+@keyframes dispatch-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dispatch-toast {
+    animation: none;
+  }
+}
+
+/* Empty-Board hint — shown when there are no tasks across all columns. */
+.board-empty-hint {
+  grid-column: 1 / -1;
+  margin: 16px 8px 0;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.board-empty-hint__plan {
+  color: var(--accent, #6366f1);
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.board-empty-hint__plan:hover {
+  color: var(--text);
+}
+
+/* Sidebar unread dot (Board nav) — mirrors spec-chat-tab__unread. */
+.sidebar-nav__unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #6366f1);
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.sidebar-nav__unread-dot[hidden] {
+  display: none;
+}
