@@ -1,6 +1,6 @@
 ---
 title: Spec Planning UX
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination.md
   - specs/foundations/file-explorer.md
@@ -11,7 +11,7 @@ affects:
   - internal/handler/explorer.go
 effort: xlarge
 created: 2026-03-29
-updated: 2026-03-31
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
@@ -424,6 +424,34 @@ Additional mitigations:
 
 ---
 
+## Outcome
+
+The planning UX shipped as a complete spec-driven workflow environment integrated into the existing Wallfacer SPA. A three-pane spec mode (explorer, focused markdown view, chat stream) sits alongside the board kanban, switchable with a single click or `S` shortcut. The planning agent runs inside a long-lived workspace-scoped container, iterates on specs via natural-language chat, and dispatches validated leaf specs directly as kanban tasks with dependency wiring and bidirectional navigation — all without permission prompts or approval gates.
+
+### What Shipped
+
+- **Planning Sandbox** (`internal/planner/`) — workspace-scoped singleton container lifecycle over `sandbox.Backend`; 3 HTTP endpoints (`GET/POST/DELETE /api/planning`); workspace-switch wiring via `applySnapshot`; 16 backend tests.
+- **Spec Mode UI Shell** (`ui/js/spec-mode.js`, `ui/css/spec-mode.css`) — three-pane layout with mode state persisted to `localStorage`; `#spec/<path>` deep-link routing; 2-second polling for live spec updates; YAML frontmatter parser; keyboard shortcuts (`S`, `D`, `B`, `C`); 32 frontend tests.
+- **Spec Explorer & Dependency Minimap** (`ui/js/spec-explorer.js`, `ui/js/spec-minimap.js`) — `GET /api/specs/tree` endpoint with recursive progress counts; status icons, filtering dropdown, "Show workspace files" toggle, multi-select dispatch checkboxes; draggable SVG 1-hop minimap with status-colored nodes; 30 tests.
+- **Planning Chat Agent** (`ui/js/planning-chat.js`, `internal/handler/planning.go`, `internal/planner/`) — 8 API endpoints including SSE stream and interrupt; JSONL conversation log + session tracking in `~/.wallfacer/planning/<fingerprint>/`; planning system prompt (`internal/prompts/planning.tmpl`); 7 built-in slash commands with embedded templates; `@`-file mention autocomplete with `specs/` priority; ideation routed through `Planner.Exec()`; shared `internal/pkg/livelog/` package; 44+ tests.
+- **Dispatch & Board Integration** (`internal/handler/specs_dispatch.go`, `internal/spec/write.go`) — `POST /api/specs/dispatch` (atomic batch with dependency wiring and rollback) and `POST /api/specs/undispatch`; `spec.UpdateFrontmatter()` for atomic YAML field updates; `SpecSourcePath` task field; `SpecCompletionHook` advancing spec to `complete` on task done; spec badge on task cards; board highlight on mode switch; 53+ tests.
+- **Undo & Snapshot System** — per-round snapshot of modified spec files before agent writes; undo API and UI button on each agent response; post-exec git commit with `Plan-Round: N` trailer for traceability.
+- **Planning Cost Tracking** — per-round token usage attributed to focused spec; planning usage store in `~/.wallfacer/`; per-group cost aggregation surfaced in the existing usage stats modal with a dedicated planning tile; configurable planning window.
+
+### Design Evolution
+
+1. **Dispatch workflow table entry was stale.** The Design Breakdown table above originally showed dispatch-workflow as `drafted`; it shipped complete during implementation without the parent table being updated.
+
+2. **Codex compatibility deferred.** Item 8 (Planning Codex Compatibility) was listed as `vague` at design time. It was subsequently refined into a full design spec (`planning-codex-compat.md`, now `drafted`) covering CLI flag translation, `--resume` skip, AGENTS.md mounting, and Codex auth mounting — but implementation was deferred. The planning agent runs Claude Code only.
+
+3. **Session persistence shipped at basic fidelity only.** The original spec envisioned full per-turn NDJSON storage (`turns/` directory), a `ReconstructContext()` function with a 30K-token budget, and a dedicated `claude-planning-config` volume to isolate planning sessions from task workers. What shipped is the simpler fallback: JSONL message log, session ID file, and `BuildHistoryContext()` with a lossy 20-message text summary. The enhanced design is captured in `planning-chat-agent/session-persistence.md` for future implementation.
+
+4. **Focused markdown view uses polling, not push.** The original spec implied live updates as the agent writes. The implementation uses 2-second client-side polling of `GET /api/specs/file?path=...` rather than server-sent events, which is simpler and sufficient for the planning loop cadence.
+
+5. **Chat pane fold/unfold added.** A `C` keyboard shortcut to collapse/expand the right chat pane was added during implementation — not in the original spec — to support focused reading of long specs.
+
+---
+
 ## Design Breakdown
 
 | # | Sub-design | Design problem | Depends on | Effort | Status |
@@ -432,10 +460,10 @@ Additional mitigations:
 | 2 | [Spec Mode UI Shell](spec-planning-ux/spec-mode-ui-shell.md) | Three-pane layout integration with the existing SPA, mode switching, keyboard routing | — | large | complete |
 | 3 | [Spec Explorer & Dependency Minimap](spec-planning-ux/spec-explorer.md) | Spec-aware tree rendering with status badges, progress indicators, and dependency graph overlay | spec-mode-ui-shell | large | complete |
 | 4 | [Planning Chat Agent](spec-planning-ux/planning-chat-agent.md) | Interactive conversational agent model for spec iteration, skills, and session persistence | spec-mode-ui-shell, planning-sandbox | xlarge | complete |
-| 5 | [Dispatch & Board Integration](spec-planning-ux/dispatch-workflow.md) | Translating validated leaf specs into kanban tasks with bidirectional links and dependency wiring | spec-mode-ui-shell | medium | drafted |
+| 5 | [Dispatch & Board Integration](spec-planning-ux/dispatch-workflow.md) | Translating validated leaf specs into kanban tasks with bidirectional links and dependency wiring | spec-mode-ui-shell | medium | complete |
 | 6 | [Undo & Snapshot System](spec-planning-ux/undo-snapshots.md) | Per-round implicit snapshots for reversible agent writes | planning-sandbox | medium | complete |
 | 7 | [Planning Cost Tracking](spec-planning-ux/progress-cost-tracking.md) | Per-round planning cost capture, per-group aggregation, and surfacing in the existing usage analytics (recursive progress was already shipped separately) | planning-sandbox | medium | complete |
-| 8 | [Planning Codex Compatibility](spec-planning-ux/planning-codex-compat.md) | Codex sandbox support for the planning chat agent (CLI flags, session resumption, output format) | planning-chat-agent | medium | vague |
+| 8 | [Planning Codex Compatibility](spec-planning-ux/planning-codex-compat.md) | Codex sandbox support for the planning chat agent (CLI flags, session resumption, output format) | planning-chat-agent | medium | drafted — deferred |
 
 ```mermaid
 graph LR
