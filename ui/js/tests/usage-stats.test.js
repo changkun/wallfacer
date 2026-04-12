@@ -264,5 +264,119 @@ describe("usage-stats.js", () => {
         "No data",
       );
     });
+
+    it("renders planning row in by_sub_agent table", () => {
+      const { ctx } = setupAndLoad();
+      ctx.window.showUsageStats();
+      const renderCb = ctx._getCapturedRenderCb();
+
+      renderCb({
+        task_count: 0,
+        period_days: 7,
+        total: { input_tokens: 120, output_tokens: 40, cost_usd: 0.05 },
+        by_status: {},
+        by_sub_agent: {
+          planning: {
+            input_tokens: 120,
+            output_tokens: 40,
+            cost_usd: 0.05,
+          },
+        },
+      });
+
+      // Capture the row args that carry the planning label.
+      const rowArgs = ctx.createHoverRow.mock.calls.map((c) => c[0]);
+      const planningRow = rowArgs.find(
+        (row) => Array.isArray(row) && row[0] && row[0].text === "Planning",
+      );
+      expect(planningRow).toBeDefined();
+    });
+  });
+
+  describe("period selector seeding", () => {
+    // Wait for one microtask turn so the fetch().then() chain runs.
+    const flush = () => new Promise((r) => setTimeout(r, 0));
+
+    it("defaults period selector from config", async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ planning_window_days: 30 }),
+        }),
+      );
+      const ctx = makeContext({ fetch: fetchMock });
+      const modal = makeElement();
+      const periodSelect = makeElement({ value: "7" });
+      ctx.document.getElementById = (id) => {
+        switch (id) {
+          case "usage-stats-modal":
+            return modal;
+          case "usage-stats-period":
+            return periodSelect;
+          default:
+            return makeElement();
+        }
+      };
+      const code = readFileSync(join(jsDir, "usage-stats.js"), "utf8");
+      vm.runInContext(code, ctx, { filename: join(jsDir, "usage-stats.js") });
+      ctx._triggerDomReady();
+
+      ctx.window.showUsageStats();
+      await flush();
+      await flush();
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/config");
+      expect(periodSelect.value).toBe("30");
+    });
+
+    it("falls back when config missing planning_window_days", async () => {
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ workspaces: ["/tmp/x"] }),
+        }),
+      );
+      const ctx = makeContext({ fetch: fetchMock });
+      const modal = makeElement();
+      const periodSelect = makeElement({ value: "7" });
+      ctx.document.getElementById = (id) => {
+        switch (id) {
+          case "usage-stats-modal":
+            return modal;
+          case "usage-stats-period":
+            return periodSelect;
+          default:
+            return makeElement();
+        }
+      };
+      const code = readFileSync(join(jsDir, "usage-stats.js"), "utf8");
+      vm.runInContext(code, ctx, { filename: join(jsDir, "usage-stats.js") });
+      ctx._triggerDomReady();
+
+      ctx.window.showUsageStats();
+      await flush();
+      await flush();
+
+      // Value must be preserved from the HTML default when config omits
+      // planning_window_days.
+      expect(periodSelect.value).toBe("7");
+    });
+
+    it("period change refetches /api/usage with new days", () => {
+      const { ctx, periodSelect } = setupAndLoad();
+      // Simulate user selection before change event fires.
+      periodSelect.value = "30";
+      const changeHandler = periodSelect.addEventListener.mock.calls.find(
+        (c) => c[0] === "change",
+      )[1];
+      ctx.loadJsonEndpoint.mockClear();
+      changeHandler();
+
+      expect(ctx.loadJsonEndpoint).toHaveBeenCalledWith(
+        "/api/usage?days=30",
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
   });
 });

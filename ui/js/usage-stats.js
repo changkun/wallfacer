@@ -80,6 +80,7 @@
     title: "Title gen.",
     oversight: "Oversight",
     "oversight-test": "Oversight (test)",
+    planning: "Planning",
   };
 
   function agentLabel(key) {
@@ -189,8 +190,43 @@
     setState("content");
   }
 
+  // periodSeeded flips after the first /api/config read so later opens reuse
+  // the user's most recent selection instead of snapping back to the default.
+  var periodSeeded = false;
+
+  // seedPeriodFromConfig fetches WALLFACER_PLANNING_WINDOW_DAYS via /api/config
+  // and picks it as the selector's initial value. Missing or malformed values
+  // leave the HTML default in place.
+  function seedPeriodFromConfig(done) {
+    if (typeof fetch !== "function") {
+      done();
+      return;
+    }
+    fetch("/api/config")
+      .then(function (r) {
+        return r && r.ok ? r.json() : null;
+      })
+      .then(function (cfg) {
+        if (cfg && periodSelect) {
+          var n = parseInt(cfg.planning_window_days, 10);
+          if (!Number.isNaN(n) && n >= 0) {
+            periodSelect.value = String(n);
+          }
+        }
+        done();
+      })
+      .catch(function () {
+        done();
+      });
+  }
+
   window.showUsageStats = function () {
     openModalPanel(modal);
+    if (!periodSeeded) {
+      periodSeeded = true;
+      seedPeriodFromConfig(fetchStats);
+      return;
+    }
     fetchStats();
   };
 
