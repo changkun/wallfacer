@@ -15,7 +15,9 @@ const specModeCode = readFileSync(join(jsDir, "spec-mode.js"), "utf8");
 function makeEl(tag, registry) {
   const _classList = new Set();
   const _style = {};
+  const _attrs = new Map();
   let _id = "";
+  let _className = "";
 
   const el = {
     tagName: tag,
@@ -27,6 +29,13 @@ function makeEl(tag, registry) {
       if (v) registry.set(v, el);
     },
     style: _style,
+    textContent: "",
+    get className() {
+      return _className;
+    },
+    set className(v) {
+      _className = v || "";
+    },
     classList: {
       add(c) {
         _classList.add(c);
@@ -41,6 +50,18 @@ function makeEl(tag, registry) {
       contains(c) {
         return _classList.has(c);
       },
+    },
+    setAttribute(k, v) {
+      _attrs.set(k, v);
+    },
+    getAttribute(k) {
+      return _attrs.has(k) ? _attrs.get(k) : null;
+    },
+    hasAttribute(k) {
+      return _attrs.has(k);
+    },
+    removeAttribute(k) {
+      _attrs.delete(k);
     },
     innerHTML: "",
   };
@@ -57,6 +78,7 @@ function makeContext() {
     "sidebar-nav-spec",
     "board",
     "spec-mode-container",
+    "explorer-panel",
     "spec-focused-view",
     "spec-focused-title",
     "spec-focused-status",
@@ -156,5 +178,117 @@ describe("spec-mode-layout", () => {
 
   it("resize handle exists", () => {
     expect(ctx.registry.get("spec-chat-resize")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layout state machine (layout-state-machine spec).
+// ---------------------------------------------------------------------------
+
+describe("spec-mode layout state machine", () => {
+  let ctx;
+
+  beforeEach(() => {
+    ctx = makeContext();
+    // Enter spec mode so the explorer-panel show/hide logic exercises the
+    // `getCurrentMode() === "spec"` branch.
+    ctx.switchMode("spec");
+  });
+
+  function container() {
+    return ctx.registry.get("spec-mode-container");
+  }
+
+  function explorer() {
+    return ctx.registry.get("explorer-panel");
+  }
+
+  function setTree(nodes) {
+    ctx.specModeState.tree = nodes || [];
+  }
+
+  function setIndex(idx) {
+    ctx.specModeState.index = idx || null;
+  }
+
+  it("TestLayout_EmptyTreeNullIndex_RendersChatFirst", () => {
+    setTree([]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("chat-first");
+    expect(explorer().style.display).toBe("none");
+  });
+
+  it("TestLayout_NonEmptyTree_RendersThreePane", () => {
+    setTree([{ path: "local/a.md" }]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("three-pane");
+    expect(explorer().style.display).toBe("");
+  });
+
+  it("TestLayout_IndexOnlyNoSpecs_RendersThreePane", () => {
+    setTree([]);
+    setIndex({ path: "specs/README.md", workspace: "/ws" });
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("three-pane");
+  });
+
+  it("TestLayout_TransitionOnSSEUpdate — chat-first → three-pane when index arrives", () => {
+    setTree([]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("chat-first");
+    // Simulate an SSE snapshot that adds the Roadmap index.
+    setIndex({ path: "specs/README.md", workspace: "/ws" });
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("three-pane");
+  });
+
+  it("TestLayout_TransitionReverseOnEmpty — three-pane → chat-first when everything clears", () => {
+    setTree([{ path: "local/a.md" }]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("three-pane");
+    setTree([]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(container().getAttribute("data-layout")).toBe("chat-first");
+  });
+
+  it("_updateSpecPaneVisibility delegates to _applyLayout and sets data-layout", () => {
+    ctx._updateSpecPaneVisibility(false);
+    expect(container().getAttribute("data-layout")).toBe("chat-first");
+    expect(container().classList.contains("spec-mode--chat-only")).toBe(true);
+    ctx._updateSpecPaneVisibility(true);
+    expect(container().getAttribute("data-layout")).toBe("three-pane");
+    expect(container().classList.contains("spec-mode--chat-only")).toBe(false);
+  });
+
+  it("getLayoutState returns the currently applied layout", () => {
+    setTree([]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(ctx.getLayoutState()).toBe("chat-first");
+    setTree([{ path: "x" }]);
+    ctx._applyLayout();
+    expect(ctx.getLayoutState()).toBe("three-pane");
+  });
+
+  it("focusRoadmapIndex updates specModeState.focusedSpecPath", () => {
+    // focusRoadmapIndex calls fetch(); stub it to resolve without
+    // triggering the markdown path (not exercised here).
+    ctx.fetch = () =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve("") });
+    ctx.focusRoadmapIndex({
+      path: "specs/README.md",
+      workspace: "/ws",
+    });
+    expect(ctx.specModeState.focusedSpecPath).toBe("specs/README.md");
+  });
+
+  it("focusSpec updates specModeState.focusedSpecPath", () => {
+    ctx.focusSpec("specs/local/bar.md", "/ws");
+    expect(ctx.specModeState.focusedSpecPath).toBe("specs/local/bar.md");
   });
 });

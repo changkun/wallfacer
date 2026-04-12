@@ -29,6 +29,16 @@ function getSpecIndex() {
   return _specTreeData.index;
 }
 
+// _syncSpecModeState mirrors the freshly fetched tree + index onto the
+// shared specModeState object so spec-mode.js's layout state machine
+// (and any other consumer) can read authoritative state without a
+// second round-trip.
+function _syncSpecModeState(data) {
+  if (typeof specModeState === "undefined" || !specModeState) return;
+  specModeState.tree = (data && data.nodes) || [];
+  specModeState.index = (data && data.index) || null;
+}
+
 // Status → icon mapping.
 var _specStatusIcons = {
   complete: "\u2705",
@@ -52,6 +62,7 @@ function loadSpecTree() {
     })
     .then(function (data) {
       _specTreeData = data;
+      _syncSpecModeState(data);
       renderSpecTree();
       // Update minimap with fresh tree data if a spec is focused.
       if (
@@ -159,6 +170,7 @@ function _startSpecTreeStream() {
     _specStreamRetryDelay = 1000;
     try {
       _specTreeData = JSON.parse(e.data);
+      _syncSpecModeState(_specTreeData);
       renderSpecTree();
       if (
         typeof renderMinimap === "function" &&

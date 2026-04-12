@@ -304,11 +304,23 @@ describe("events.js", () => {
     it("toggles spec chat on 'c' in spec mode", () => {
       const ctx = makeContext({
         getCurrentMode: vi.fn().mockReturnValue("spec"),
+        getLayoutState: vi.fn().mockReturnValue("three-pane"),
       });
       loadScript(ctx);
       const handler = getDocListener(ctx, "keydown", 1);
       handler(makeShortcutEvent("c"));
       expect(ctx.toggleSpecChat).toHaveBeenCalled();
+    });
+
+    it("TestLayout_CIsNoOpInChatFirst — 'c' is a no-op in chat-first layout", () => {
+      const ctx = makeContext({
+        getCurrentMode: vi.fn().mockReturnValue("spec"),
+        getLayoutState: vi.fn().mockReturnValue("chat-first"),
+      });
+      loadScript(ctx);
+      const handler = getDocListener(ctx, "keydown", 1);
+      handler(makeShortcutEvent("c"));
+      expect(ctx.toggleSpecChat).not.toHaveBeenCalled();
     });
 
     it("dispatches focused spec on 'd' in spec mode", () => {

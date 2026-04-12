@@ -274,7 +274,7 @@ describe("focusRoadmapIndex", () => {
             toggle: (c, force) => {
               if (force === true) classes.add(c);
               else if (force === false) classes.delete(c);
-              else (classes.has(c) ? classes.delete(c) : classes.add(c));
+              else classes.has(c) ? classes.delete(c) : classes.add(c);
               el.className = Array.from(classes).join(" ");
             },
             contains: (c) => classes.has(c),
@@ -286,7 +286,9 @@ describe("focusRoadmapIndex", () => {
     }
     const storage = new Map();
     const fetchResponse =
-      opts.fetchResponse !== undefined ? opts.fetchResponse : "# Roadmap\n\nBody.";
+      opts.fetchResponse !== undefined
+        ? opts.fetchResponse
+        : "# Roadmap\n\nBody.";
     const fetchMock =
       opts.fetch ||
       (() =>
@@ -388,7 +390,11 @@ describe("focusRoadmapIndex", () => {
   it("renders an error state when the fetch fails", async () => {
     const ctx = makeRoadmapContext({
       fetch: () =>
-        Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve("") }),
+        Promise.resolve({
+          ok: false,
+          status: 500,
+          text: () => Promise.resolve(""),
+        }),
     });
     ctx.focusRoadmapIndex(INDEX_META);
     await new Promise((r) => setTimeout(r, 10));

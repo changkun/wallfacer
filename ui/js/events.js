@@ -74,7 +74,14 @@ document.addEventListener("keydown", (e) => {
     });
   // Spec-mode-only shortcuts.
   if (getCurrentMode() === "spec") {
-    if (e.key === "c") toggleSpecChat();
+    // In chat-first layout the chat pane is the only visible pane —
+    // `c` has nothing to toggle, so skip it. Dispatch/breakdown remain
+    // useful even in chat-first (they target the focused spec, if any).
+    if (e.key === "c") {
+      var layout =
+        typeof getLayoutState === "function" ? getLayoutState() : "three-pane";
+      if (layout !== "chat-first") toggleSpecChat();
+    }
     if (e.key === "d") dispatchFocusedSpec();
     if (e.key === "b") breakDownFocusedSpec();
   }

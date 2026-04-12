@@ -8,17 +8,57 @@
   min-width: 0;
 }
 
-/* Chat-only mode: no specs exist, chat takes full width */
-.spec-mode-container.spec-mode--chat-only .spec-focused-view,
-.spec-mode-container.spec-mode--chat-only .spec-chat-resize {
+/*
+ * Layout state machine (layout-state-machine spec).
+ *
+ * [data-layout="three-pane"] (default) — explorer + focused view + chat.
+ * [data-layout="chat-first"] — no specs and no Roadmap: chat takes the
+ *   full Plan-mode width. Explorer + focused view + resize handle animate
+ *   out to width:0 with a short deceleration curve; the reverse
+ *   transition uses a longer acceleration/exit curve for subtlety.
+ */
+.spec-focused-view,
+.spec-chat-stream {
+  transition:
+    width 260ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 260ms cubic-bezier(0.2, 0, 0, 1),
+    transform 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.spec-mode-container[data-layout="chat-first"] .spec-focused-view {
+  width: 0;
+  opacity: 0;
+  transform: translateX(-12px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.spec-mode-container[data-layout="chat-first"] #spec-chat-resize {
   display: none;
 }
 
-.spec-mode-container.spec-mode--chat-only .spec-chat-stream {
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream {
   width: 100%;
   min-width: 0;
   border-left: none;
 }
+
+.spec-mode-container[data-layout="chat-first"] {
+  transition-timing-function: cubic-bezier(0.3, 0, 0.8, 0.15);
+  transition-duration: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spec-focused-view,
+  .spec-chat-stream {
+    transition-duration: 0s;
+  }
+}
+
+/* The `spec-mode--chat-only` class is still toggled by
+ * _updateSpecPaneVisibility for backwards compat with external hooks
+ * and tests that assert on its presence, but all layout CSS is now
+ * driven by the [data-layout] attribute above. */
 
 /* Center pane: focused markdown view */
 .spec-focused-view {

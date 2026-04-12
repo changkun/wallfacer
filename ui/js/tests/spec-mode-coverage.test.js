@@ -19,6 +19,7 @@ const code = readFileSync(join(jsDir, "spec-mode.js"), "utf8");
 function makeEl(tag) {
   const _classList = new Set();
   const _style = {};
+  const _attrs = new Map();
   let _id = "";
   let _textContent = "";
   let _innerHTML = "";
@@ -108,6 +109,18 @@ function makeEl(tag) {
       contains(c) {
         return _classList.has(c);
       },
+    },
+    setAttribute(k, v) {
+      _attrs.set(k, v);
+    },
+    getAttribute(k) {
+      return _attrs.has(k) ? _attrs.get(k) : null;
+    },
+    hasAttribute(k) {
+      return _attrs.has(k);
+    },
+    removeAttribute(k) {
+      _attrs.delete(k);
     },
     focus: vi.fn(),
     remove() {

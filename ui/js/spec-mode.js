@@ -59,6 +59,52 @@ var currentMode = _initialSavedMode
 // substantive action (task created, chat message sent, spec focused).
 var _workspaceIsNew = false;
 
+// specModeState is the shared state object read by other modules
+// (planning-chat.js, tests) to inspect Plan-mode state without touching
+// private vars. The fields are kept in sync by focusSpec,
+// focusRoadmapIndex, and the spec-tree load / SSE handlers.
+//   - tree: current spec tree nodes array from /api/specs/tree
+//           (empty array = no specs)
+//   - index: Roadmap (specs/README.md) metadata or null
+//   - focusedSpecPath: currently focused spec path or "" when none
+var specModeState = {
+  tree: [],
+  index: null,
+  focusedSpecPath: "",
+};
+
+// _applyLayout drives the Plan-mode layout state machine. Chat-first
+// layout renders when the workspace has no specs and no Roadmap index;
+// otherwise the three-pane explorer + focused-view + chat layout shows.
+// The chosen layout is reflected on `#spec-mode-container` via
+// `data-layout="chat-first" | "three-pane"`; CSS transitions in
+// `ui/css/spec-mode.css` animate the switch.
+function _applyLayout() {
+  var container = document.getElementById("spec-mode-container");
+  var explorerPanel = document.getElementById("explorer-panel");
+  var treeNodes = (specModeState.tree && specModeState.tree.length) || 0;
+  var hasIndex = !!specModeState.index;
+  var layout = treeNodes === 0 && !hasIndex ? "chat-first" : "three-pane";
+  if (container) {
+    container.setAttribute("data-layout", layout);
+    // Legacy class retained for backwards compatibility with CSS rules
+    // and tests that predate the data-layout attribute.
+    container.classList.toggle("spec-mode--chat-only", layout === "chat-first");
+  }
+  if (explorerPanel) {
+    explorerPanel.style.display =
+      layout === "three-pane" && getCurrentMode() === "spec" ? "" : "none";
+  }
+}
+
+// getLayoutState returns the currently applied layout name. Exposed for
+// keyboard-shortcut callers that need to short-circuit when the chat
+// pane is the only visible pane.
+function getLayoutState() {
+  var container = document.getElementById("spec-mode-container");
+  return (container && container.getAttribute("data-layout")) || "three-pane";
+}
+
 // Guards auto mode resolution. Starts true at boot; flipped to false once
 // resolveInitialMode() has run or once the user explicitly switches. Reset
 // to true when the active workspace group changes.
@@ -294,6 +340,7 @@ function focusSpec(specPath, workspace) {
   _focusedSpecPath = specPath;
   _focusedSpecWorkspace = workspace;
   _focusedSpecContent = null; // reset so loading indicator shows
+  specModeState.focusedSpecPath = specPath || "";
 
   // Show loading state in the focused view.
   var titleEl = document.getElementById("spec-focused-title");
@@ -340,6 +387,7 @@ function focusRoadmapIndex(indexMeta) {
   _focusedSpecPath = indexMeta.path;
   _focusedSpecWorkspace = indexMeta.workspace;
   _focusedSpecContent = null;
+  specModeState.focusedSpecPath = indexMeta.path;
 
   var focusedView = document.getElementById("spec-focused-view");
   if (focusedView) focusedView.classList.add("spec-focused-view--index");
@@ -695,20 +743,21 @@ function parseSpecFrontmatter(text) {
 
 // --- Spec pane visibility based on spec availability ---
 
-// _updateSpecPaneVisibility is called after the spec tree loads. If specs
-// exist, the three-pane layout (explorer + focused view + chat) is shown.
-// If no specs exist, only the chat pane is shown (full width).
+// _updateSpecPaneVisibility is called after the spec tree loads. It syncs
+// the shared specModeState and delegates to the layout state machine.
+// Kept as a named export because existing callers (spec-explorer.js) and
+// tests reference it by name.
 function _updateSpecPaneVisibility(hasSpecs) {
-  var container = document.getElementById("spec-mode-container");
-  var explorerPanel = document.getElementById("explorer-panel");
-
-  if (container) {
-    container.classList.toggle("spec-mode--chat-only", !hasSpecs);
+  // Treat "hasSpecs === true" as "there is at least one spec in the tree";
+  // the real node array is populated by callers that have access to it.
+  if (hasSpecs) {
+    if (!specModeState.tree || specModeState.tree.length === 0) {
+      specModeState.tree = [{ __synthetic: true }];
+    }
+  } else {
+    specModeState.tree = [];
   }
-  if (explorerPanel) {
-    explorerPanel.style.display =
-      hasSpecs && getCurrentMode() === "spec" ? "" : "none";
-  }
+  _applyLayout();
 
   // Auto-show README.md as the default focused content when specs exist
   // but nothing is focused yet.

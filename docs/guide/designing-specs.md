@@ -16,11 +16,13 @@ A spec describes a piece of work at the design level. Unlike a task prompt (whic
 
 Press **P** to toggle between the Board view and the Plan view. Wallfacer remembers your last explicit choice — sidebar click or keyboard shortcut — and reopens in that mode on the next launch; if you have not picked one, it defaults to Board when the task board has any cards and to Plan when it is empty. Activating a fresh workspace group always opens in Plan, regardless of saved preference.
 
-Plan mode uses a three-pane layout:
+Plan mode picks one of two layouts based on the workspace's spec tree:
 
-- **Left pane** -- spec explorer (file tree)
-- **Center pane** -- focused spec view (rendered content)
-- **Right pane** -- planning chat (toggleable with **C**)
+- **Three-pane** (default) — when any spec exists or a `specs/README.md` Roadmap is present:
+  - **Left pane** — spec explorer (file tree)
+  - **Center pane** — focused spec view (rendered content)
+  - **Right pane** — planning chat (toggleable with **C**)
+- **Chat-first** — when the workspace has no specs and no Roadmap, the chat takes the full Plan-mode width. The **C** shortcut is a no-op in this layout because the chat pane is already the only visible surface. The layout flips automatically once specs appear (via the spec tree SSE stream).
 
 ### Spec Explorer
 
