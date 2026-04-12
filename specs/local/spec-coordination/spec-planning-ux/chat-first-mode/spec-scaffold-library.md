@@ -1,6 +1,6 @@
 ---
 title: Extract spec scaffold into a reusable library
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/spec/
@@ -71,3 +71,17 @@ In `internal/cli/spec_test.go`:
 - **Do NOT change** the rendered frontmatter format — this task is a pure extraction, not a schema change.
 - **Do NOT** add new fields to `ScaffoldOptions` beyond what's listed. Extending (e.g. for multi-workspace routing) is a follow-up.
 - **Do NOT** touch `internal/cli/spec.go:runSpecValidate` — validation is a separate concern.
+
+## Implementation notes
+
+1. **Helpers exported as public API.** The spec named the moved helpers with lowercase names (`validateSpecPath`, `titleFromFilename`, `resolveAuthor`, `renderSpecSkeleton`) implying unexported symbols. They landed as `ValidateSpecPath`, `TitleFromFilename`, `ResolveAuthor`, `RenderSkeleton` — exported — because the follow-up `/spec-new` directive parser will need `ValidateSpecPath` and `RenderSkeleton` from a different package (`internal/handler`). Exporting was simpler than introducing a duplicate parallel API or moving the directive handler into the spec package. `renderSpecSkeleton` was renamed to `RenderSkeleton` (dropped "Spec" redundant-with-package-name per Go convention).
+
+2. **CLI error-to-exit-code mapping.** The spec said `runSpecNew` should become "a thin argv-parser that constructs ScaffoldOptions from flags, calls spec.Scaffold, and prints the CLI success/error line." The exit-code contract of the original code was:
+   - Invalid path / invalid status / invalid effort → `os.Exit(2)` (usage error).
+   - File already exists / mkdir failure / write failure → `os.Exit(1)` (I/O error).
+
+   The new code preserves this by inspecting the error string: any error whose message contains `" already exists"` or matches `os.ErrPermission` exits 1; everything else exits 2. This is a slight abuse of string-matching for exit-code routing but avoids introducing typed errors in the library that only the CLI would use.
+
+3. **`RenderSkeleton` signature gained a `dependsOn` parameter.** The original `renderSpecSkeleton` hardcoded `depends_on: []`. `ScaffoldOptions.DependsOn` is now plumbed through to render non-empty lists, because the follow-up server-side scaffold paths (bootstrap hook, `/create` expansion) will sometimes know the parent spec's `depends_on` at creation time.
+
+4. **Test call-sites use `chdir` instead of absolute paths.** `ValidateSpecPath` expects repo-relative paths (the first path segment must be `specs/`). Initial tests that used `filepath.Join(t.TempDir(), "specs", "local", "foo.md")` built absolute paths, which the validator correctly rejected. Tests now chdir into a temp dir and use relative paths, matching how production code invokes `Scaffold`.
