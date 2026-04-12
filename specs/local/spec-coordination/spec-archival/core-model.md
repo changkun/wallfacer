@@ -1,6 +1,6 @@
 ---
 title: "Archival: StatusArchived constant and lifecycle transitions"
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/spec/model.go
