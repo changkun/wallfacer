@@ -154,7 +154,7 @@ override per-request via the period picker in the stats modal.
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Planning usage store primitive](progress-cost-tracking/planning-usage-store.md) | — | small | validated |
+| [Planning usage store primitive](progress-cost-tracking/planning-usage-store.md) | — | small | **complete** |
 | [Capture planning round usage](progress-cost-tracking/capture-planning-round-usage.md) | planning-usage-store | medium | validated |
 | [Planning section in /api/stats](progress-cost-tracking/stats-planning-section.md) | planning-usage-store | medium | validated |
 | [Merge planning into /api/usage BySubAgent](progress-cost-tracking/usage-planning-merge.md) | planning-usage-store | small | validated |

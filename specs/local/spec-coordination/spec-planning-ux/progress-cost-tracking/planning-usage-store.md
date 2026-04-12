@@ -1,6 +1,6 @@
 ---
 title: Planning Usage Store Primitive
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/store/planning_usage.go
