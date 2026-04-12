@@ -612,8 +612,10 @@ function breakDownFocusedSpec() {
 
 // _lastArchiveAction stores the most recent archive/unarchive so the Undo
 // button in the toast can reverse it. Shape: {action, path, prevStatus}.
+// New toasts overwrite this; dismissing the latest toast clears it.
 var _lastArchiveAction = null;
-var _archiveToastTimer = null;
+// _archiveToastCount is a monotonically increasing id used to key timers.
+var _archiveToastCount = 0;
 
 function _focusedSpecHasChildren() {
   if (!_focusedSpecPath) return false;
@@ -675,71 +677,113 @@ function archiveFocusedSpec() {
       "Archiving will hide " + n + " descendant spec(s). Continue?",
     );
   }
+  var path = _focusedSpecPath;
   proceed.then(function (ok) {
     if (!ok) return;
-    _callArchiveEndpoint("/api/specs/archive", _focusedSpecPath).then(
-      function (res) {
-        if (!res.ok) return;
-        _lastArchiveAction = {
-          action: "archive",
-          path: _focusedSpecPath,
-          prevStatus: prevStatus,
-        };
-        _showArchiveToast("Spec archived.");
-        _loadAndRenderSpec();
-      },
-    );
+    _callArchiveEndpoint("/api/specs/archive", path).then(function (res) {
+      if (!res.ok) return;
+      var action = { action: "archive", path: path, prevStatus: prevStatus };
+      _lastArchiveAction = action;
+      _showArchiveToast("Spec archived: " + path, action);
+      _loadAndRenderSpec();
+    });
   });
 }
 
 function unarchiveFocusedSpec() {
   if (!_focusedSpecPath) return;
-  _callArchiveEndpoint("/api/specs/unarchive", _focusedSpecPath).then(
-    function (res) {
-      if (!res.ok) return;
-      _lastArchiveAction = {
-        action: "unarchive",
-        path: _focusedSpecPath,
-        prevStatus: "archived",
-      };
-      _showArchiveToast("Spec unarchived.");
-      _loadAndRenderSpec();
-    },
-  );
-}
-
-function undoArchiveAction() {
-  var last = _lastArchiveAction;
-  if (!last) return;
-  var reverseUrl =
-    last.action === "archive" ? "/api/specs/unarchive" : "/api/specs/archive";
-  _callArchiveEndpoint(reverseUrl, last.path).then(function (res) {
+  var path = _focusedSpecPath;
+  _callArchiveEndpoint("/api/specs/unarchive", path).then(function (res) {
     if (!res.ok) return;
-    _lastArchiveAction = null;
-    dismissArchiveToast();
+    var action = {
+      action: "unarchive",
+      path: path,
+      prevStatus: "archived",
+    };
+    _lastArchiveAction = action;
+    _showArchiveToast("Spec unarchived: " + path, action);
     _loadAndRenderSpec();
   });
 }
 
+// undoArchiveAction reverses the most recent archive/unarchive. Kept as a
+// global for back-compat (tests call it without args); per-toast undo buttons
+// call _undoAction directly so they reverse the specific toast's action even
+// when a later toast has moved _lastArchiveAction on.
+function undoArchiveAction() {
+  var last = _lastArchiveAction;
+  if (!last) return;
+  _undoAction(last, null);
+}
+
+function _undoAction(action, toastEl) {
+  var reverseUrl =
+    action.action === "archive" ? "/api/specs/unarchive" : "/api/specs/archive";
+  _callArchiveEndpoint(reverseUrl, action.path).then(function (res) {
+    if (!res.ok) return;
+    if (_lastArchiveAction === action) _lastArchiveAction = null;
+    if (toastEl) _dismissToast(toastEl);
+    _loadAndRenderSpec();
+  });
+}
+
+// dismissArchiveToast clears the most recent toast and its pending action.
+// Kept as a named global so existing tests and callers still resolve.
 function dismissArchiveToast() {
   _lastArchiveAction = null;
-  var toast = document.getElementById("spec-archive-toast");
-  if (toast) toast.classList.add("hidden");
-  if (_archiveToastTimer) {
-    clearTimeout(_archiveToastTimer);
-    _archiveToastTimer = null;
+  var container = document.getElementById("spec-archive-toasts");
+  if (!container) return;
+  // Clear all toasts — single-arg dismiss is the "close everything" path.
+  while (container.firstChild) {
+    _dismissToast(container.firstChild);
   }
 }
 
-function _showArchiveToast(message) {
-  var toast = document.getElementById("spec-archive-toast");
-  var text = document.getElementById("spec-archive-toast-text");
-  if (text) text.textContent = message;
-  if (toast) toast.classList.remove("hidden");
-  if (_archiveToastTimer) {
-    clearTimeout(_archiveToastTimer);
+function _dismissToast(toastEl) {
+  if (!toastEl) return;
+  if (toastEl._dismissTimer) {
+    clearTimeout(toastEl._dismissTimer);
+    toastEl._dismissTimer = null;
   }
-  _archiveToastTimer = setTimeout(dismissArchiveToast, 8000);
+  if (toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
+}
+
+function _showArchiveToast(message, action) {
+  var container = document.getElementById("spec-archive-toasts");
+  if (!container || !container.appendChild) return;
+
+  _archiveToastCount++;
+  var toast = document.createElement("div");
+  toast.className = "spec-archive-toast";
+
+  var textEl = document.createElement("span");
+  textEl.className = "spec-archive-toast__text";
+  textEl.textContent = message;
+  toast.appendChild(textEl);
+
+  if (action) {
+    var undoBtn = document.createElement("button");
+    undoBtn.className = "spec-summarize-btn";
+    undoBtn.textContent = "Undo";
+    undoBtn.addEventListener("click", function () {
+      _undoAction(action, toast);
+    });
+    toast.appendChild(undoBtn);
+  }
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "spec-archive-toast__close";
+  closeBtn.setAttribute("aria-label", "Dismiss");
+  closeBtn.textContent = "\u2715";
+  closeBtn.addEventListener("click", function () {
+    _dismissToast(toast);
+  });
+  toast.appendChild(closeBtn);
+
+  container.appendChild(toast);
+  toast._dismissTimer = setTimeout(function () {
+    _dismissToast(toast);
+  }, 8000);
 }
 
 function _callArchiveEndpoint(url, path) {

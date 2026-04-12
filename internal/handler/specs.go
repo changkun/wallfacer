@@ -1,15 +1,19 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/spec"
@@ -122,6 +126,66 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// commitSpecTransition stages and commits a spec frontmatter change so the
+// resulting mutation is tracked in git rather than leaving the worktree dirty.
+// Returns nil (without committing) when the workspace is not a git repo, when
+// nothing is staged (e.g. the file was already at the target status on disk),
+// or when git is unavailable. All other errors are returned to the caller.
+func commitSpecTransition(
+	ctx context.Context,
+	workspaces []string,
+	absPath, relPath string,
+	toStatus spec.Status,
+) error {
+	ws := findWorkspaceRoot(workspaces, absPath)
+	if ws == "" {
+		return nil
+	}
+	// Skip when the workspace is not a git repository — the .env-only
+	// workspaces and test harnesses should not block archival.
+	if err := cmdexec.Git(ws, "rev-parse", "--git-dir").WithContext(ctx).Run(); err != nil {
+		return nil
+	}
+	if err := cmdexec.Git(ws, "add", relPath).WithContext(ctx).Run(); err != nil {
+		return fmt.Errorf("git add %s: %w", relPath, err)
+	}
+	// Nothing to commit — the frontmatter write may have produced no diff
+	// (idempotent re-write with identical bytes); skip silently.
+	staged, err := cmdexec.Git(ws, "diff", "--cached", "--name-only", "--", relPath).
+		WithContext(ctx).Output()
+	if err != nil || strings.TrimSpace(staged) == "" {
+		return err
+	}
+	subject := fmt.Sprintf("%s: mark %s", relPath, toStatus)
+	args := []string{"-C", ws}
+	args = append(args, hostGitIdentityOverrides(ctx)...)
+	args = append(args, "commit", "-m", subject)
+	if err := cmdexec.New("git", args...).WithContext(ctx).Run(); err != nil {
+		return fmt.Errorf("git commit: %w", err)
+	}
+	return nil
+}
+
+// findWorkspaceRoot returns the workspace directory containing absPath, or
+// empty string if no configured workspace is an ancestor.
+func findWorkspaceRoot(workspaces []string, absPath string) string {
+	for _, ws := range workspaces {
+		abs, err := filepath.Abs(ws)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(abs, absPath)
+		if err != nil {
+			continue
+		}
+		if rel == "" || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		return abs
+	}
+	return ""
+}
+
 // ArchiveSpec transitions a spec's status to archived.
 func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
 	h.transitionSpec(w, r, spec.StatusArchived)
@@ -194,6 +258,15 @@ func (h *Handler) transitionSpec(w http.ResponseWriter, r *http.Request, toStatu
 	}); err != nil {
 		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
 		return
+	}
+
+	// Commit the status change. Failure is non-fatal — the frontmatter is
+	// already updated on disk and the client gets a success response either
+	// way. A missed commit just leaves a dirty worktree the user can stage
+	// manually; blocking the UI on git issues would be worse UX.
+	if err := commitSpecTransition(r.Context(), workspaces, absPath, req.Path, toStatus); err != nil {
+		slog.Warn("spec transition commit failed",
+			"path", req.Path, "status", toStatus, "err", err)
 	}
 
 	httpjson.Write(w, http.StatusOK, specTransitionResponse{

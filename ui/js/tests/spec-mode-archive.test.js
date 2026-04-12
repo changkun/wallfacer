@@ -13,10 +13,11 @@ const code = readFileSync(join(jsDir, "spec-mode.js"), "utf8");
 
 function makeEl(tag, registry) {
   const _classList = new Set();
+  const _children = [];
   let _id = "";
   let _textContent = "";
   let _disabled = false;
-  return {
+  const el = {
     tagName: tag,
     get id() {
       return _id;
@@ -40,6 +41,8 @@ function makeEl(tag, registry) {
       _disabled = v;
     },
     onclick: null,
+    className: "",
+    _dismissTimer: null,
     classList: {
       add(c) {
         _classList.add(c);
@@ -55,7 +58,26 @@ function makeEl(tag, registry) {
         return _classList.has(c);
       },
     },
+    appendChild(child) {
+      _children.push(child);
+      child.parentNode = el;
+    },
+    removeChild(child) {
+      const i = _children.indexOf(child);
+      if (i >= 0) _children.splice(i, 1);
+      child.parentNode = null;
+    },
+    addEventListener() {},
+    setAttribute() {},
+    get firstChild() {
+      return _children[0] || null;
+    },
+    get children() {
+      return _children;
+    },
+    parentNode: null,
   };
+  return el;
 }
 
 function makeContext(opts = {}) {
@@ -71,8 +93,7 @@ function makeContext(opts = {}) {
     "spec-archive-btn",
     "spec-unarchive-btn",
     "spec-archived-banner",
-    "spec-archive-toast",
-    "spec-archive-toast-text",
+    "spec-archive-toasts",
   ];
   for (const id of ids) {
     const el = makeEl("DIV", registry);
@@ -90,6 +111,9 @@ function makeContext(opts = {}) {
     document: {
       getElementById(id) {
         return registry.get(id) || null;
+      },
+      createElement(tag) {
+        return makeEl(tag, registry);
       },
       addEventListener() {},
     },
@@ -250,7 +274,7 @@ describe("unarchiveFocusedSpec", () => {
 });
 
 describe("dismissArchiveToast", () => {
-  it("clears last action and hides toast", () => {
+  it("clears last action and empties the toast container", () => {
     const ctx = makeContext();
     ctx._lastArchiveAction = {
       action: "archive",
@@ -259,7 +283,29 @@ describe("dismissArchiveToast", () => {
     };
     ctx.dismissArchiveToast();
     expect(ctx._lastArchiveAction).toBeNull();
-    const toast = ctx.registry.get("spec-archive-toast");
-    expect(toast.classList.contains("hidden")).toBe(true);
+    const toasts = ctx.registry.get("spec-archive-toasts");
+    expect(toasts.children.length).toBe(0);
+  });
+});
+
+describe("archive toast stacking", () => {
+  it("appends a new toast per action instead of replacing", async () => {
+    const ctx = makeContext();
+    ctx._focusedSpecPath = "specs/local/a.md";
+    ctx._focusedSpecContent = "---\nstatus: drafted\n---\n\n# A";
+    ctx._specTreeData = {
+      nodes: [{ path: "specs/local/a.md", is_leaf: true, children: [] }],
+    };
+    ctx.archiveFocusedSpec();
+    await new Promise((r) => setTimeout(r, 10));
+    ctx._focusedSpecPath = "specs/local/b.md";
+    ctx._focusedSpecContent = "---\nstatus: complete\n---\n\n# B";
+    ctx._specTreeData = {
+      nodes: [{ path: "specs/local/b.md", is_leaf: true, children: [] }],
+    };
+    ctx.archiveFocusedSpec();
+    await new Promise((r) => setTimeout(r, 10));
+    const toasts = ctx.registry.get("spec-archive-toasts");
+    expect(toasts.children.length).toBe(2);
   });
 });

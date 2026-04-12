@@ -14,7 +14,7 @@
       </button>
       <button
         id="spec-archive-btn"
-        class="spec-btn spec-btn--secondary hidden"
+        class="spec-summarize-btn hidden"
         onclick="archiveFocusedSpec()"
         title="Archive this spec (hide from live graph)"
       >
@@ -22,7 +22,7 @@
       </button>
       <button
         id="spec-unarchive-btn"
-        class="spec-btn spec-btn--secondary hidden"
+        class="spec-summarize-btn hidden"
         onclick="unarchiveFocusedSpec()"
         title="Unarchive this spec (return to drafted)"
       >
@@ -53,7 +53,7 @@
       </span>
       <button
         id="spec-archived-banner-unarchive"
-        class="spec-btn spec-btn--secondary"
+        class="spec-summarize-btn"
         onclick="unarchiveFocusedSpec()"
       >
         Unarchive
@@ -66,30 +66,11 @@
       ></div>
     </div>
     <div
-      id="spec-archive-toast"
-      class="spec-archive-toast hidden"
+      id="spec-archive-toasts"
+      class="spec-archive-toasts"
       role="status"
       aria-live="polite"
-    >
-      <span
-        id="spec-archive-toast-text"
-        class="spec-archive-toast__text"
-      ></span>
-      <button
-        id="spec-archive-toast-undo"
-        class="spec-btn spec-btn--secondary"
-        onclick="undoArchiveAction()"
-      >
-        Undo
-      </button>
-      <button
-        class="spec-archive-toast__close"
-        onclick="dismissArchiveToast()"
-        aria-label="Dismiss"
-      >
-        &#x2715;
-      </button>
-    </div>
+    ></div>
   </div>
   <div
     id="spec-chat-resize"
