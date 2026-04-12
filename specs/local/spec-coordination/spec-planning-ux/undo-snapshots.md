@@ -120,7 +120,7 @@ overflow.
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
 | [Post-exec planning commit](undo-snapshots/post-exec-commit.md) | — | small | complete |
-| [Undo API endpoint](undo-snapshots/undo-api.md) | post-exec-commit | small | validated |
+| [Undo API endpoint](undo-snapshots/undo-api.md) | post-exec-commit | small | complete |
 | [UI undo button](undo-snapshots/undo-ui.md) | undo-api | small | validated |
 
 ```mermaid
