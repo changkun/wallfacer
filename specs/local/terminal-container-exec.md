@@ -1,6 +1,6 @@
 ---
 title: "Terminal: Container Exec Integration"
-status: complete
+status: archived
 depends_on:
   - specs/local/terminal-sessions.md
 affects:
@@ -8,10 +8,11 @@ affects:
   - ui/js/terminal.js
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Terminal: Container Exec Integration
 
