@@ -1,15 +1,16 @@
 ---
 title: Pluggable Sandbox Backends
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/sandbox/
 effort: large
 created: 2026-03-23
-updated: 2026-03-30
+updated: 2026-04-12
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Pluggable Sandbox Backends
 
