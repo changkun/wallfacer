@@ -648,7 +648,10 @@ describe("_loadAndRenderSpec", () => {
   // 404s for every spec click.
   it("does not double-prefix specs/ in the fetched URL", async () => {
     const fetchMock = vi.fn(() =>
-      Promise.resolve({ ok: true, text: () => Promise.resolve("---\ntitle: x\n---\n") }),
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve("---\ntitle: x\n---\n"),
+      }),
     );
     const ctx = makeContext({ fetch: fetchMock });
     ctx.focusSpec("specs/local/feature.md", "/home/user/project");
@@ -659,7 +662,9 @@ describe("_loadAndRenderSpec", () => {
     // The URL-encoded absolute path must NOT contain "specs%2Fspecs".
     expect(url).not.toMatch(/specs%2Fspecs/);
     // It must contain the single expected absolute path.
-    expect(url).toContain(encodeURIComponent("/home/user/project/specs/local/feature.md"));
+    expect(url).toContain(
+      encodeURIComponent("/home/user/project/specs/local/feature.md"),
+    );
   });
 
   it("fetches spec and renders frontmatter and body on success", async () => {
