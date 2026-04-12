@@ -452,11 +452,22 @@ make e2e-dependency-dag WORKSPACE="$WORKSPACE"
 - After sandbox image updates (new versions of sandbox-claude or sandbox-codex)
 - Before releases to verify end-to-end correctness
 
+## Bug fixes require a reproducible test
+
+Every bug fix MUST ship with a regression test that **fails without the fix and passes with it**. No exceptions — this applies to backend, frontend, and CLI bugs alike. Before applying the fix:
+
+1. Write a test that reproduces the bug and confirm it fails on the unpatched code.
+2. Apply the minimal fix.
+3. Confirm the same test now passes.
+4. Commit the test and the fix together (single logical change).
+
+If a bug genuinely cannot be covered by an automated test (e.g. a rare race reproducible only under manual load), document in the commit message *why* and what manual reproduction steps were used.
+
 ## Implementation checklist
 
 Every implementation task MUST complete all three steps before finishing:
 
-1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. **Bug fixes must always include a regression test** that fails without the fix and passes with it. Run `make test` before committing — it wraps `make lint` (golangci-lint + Biome) plus backend + frontend test runs, so a clean `make test` is the single gate that matches CI. Use `make test-backend` / `make test-frontend` for faster targeted runs during iteration.
+1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. **Bug fixes must always include a reproducible regression test** (see the *Bug fixes require a reproducible test* section above) — this is mandatory, not a best effort. Run `make test` before committing — it wraps `make lint` (golangci-lint + Biome) plus backend + frontend test runs, so a clean `make test` is the single gate that matches CI. Use `make test-backend` / `make test-frontend` for faster targeted runs during iteration.
 
 2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation. Do not skip this step. The user manual lives in `docs/guide/` with these focused guides:
    - `docs/guide/usage.md` — Index page with reading order (update if adding a new guide)
