@@ -86,4 +86,4 @@ The spec originated as a detailed five-phase implementation plan with code block
 
 ## Future Work
 
-None planned. The feature is complete. Remote backends ([Cloud Backends](../cloud/cloud-backends.md)) will need to ensure their store lifecycle integrates with `activeGroups` when implemented.
+None planned. The feature is complete. Remote backends (see `specs/cloud/`) will need to ensure their store lifecycle integrates with `activeGroups` when implemented.

@@ -135,7 +135,6 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [cloud-backends.md](cloud/cloud-backends.md) | Not started | Overview: VPS recipe, per-user instance architecture, sub-milestone index |
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | fs.latere.ai integration, repo provisioner, workspace group cloud mapping |
 | [k8s-sandbox.md](cloud/k8s-sandbox.md) | Not started | `K8sBackend` — K8s Jobs with fs.latere.ai hot tier mounts, pod log streaming, exec |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
@@ -162,14 +161,15 @@ graph LR
   style FS fill:#e8daef,stroke:#8e44ad
 ```
 
-### Scaling strategy
+### Deployment modes
 
-Two modes, no intermediate step:
+Three modes, auth is opt-in at every mode (see [authentication.md](shared/authentication.md)):
 
-1. **VPS (today):** Single VM, single user, filesystem storage, local containers.
-2. **K8s (when scaling):** Managed K8s. Each tenant gets a wallfacer pod + fs.latere.ai workspace. Task containers dispatch as K8s Jobs mounting the hot tier.
+1. **Local anonymous (today):** Wallfacer runs on the user's machine, no auth. Filesystem storage, local containers.
+2. **Local authenticated:** Same binary, signed in to latere.ai. Enables the remote-control placeholder (auth spec) — no other changes.
+3. **Cloud hosted:** Wallfacer runs in latere.ai's K8s cluster. Each user gets a dedicated pod + fs.latere.ai workspace; task containers dispatch as K8s Jobs. See [multi-tenant.md](cloud/multi-tenant.md) and [cloud-infrastructure.md](cloud/cloud-infrastructure.md) for cost estimates.
 
-Why no VM-per-tenant intermediate? The wallfacer binary is identical in both modes. Building a VM provisioner then replacing it with K8s is wasted work. See [cloud-backends.md](cloud/cloud-backends.md) for cost estimates.
+Why no VM-per-tenant intermediate? The wallfacer binary is identical in all three modes. Building a VM provisioner then replacing it with K8s is wasted work.
 
 ---
 

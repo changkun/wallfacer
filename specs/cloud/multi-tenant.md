@@ -221,6 +221,50 @@ To save resources, idle instances should hibernate (stop the process, persist st
 
 ---
 
+## Integration Boundary: What Cloud-Hosted Mode Does NOT Manage
+
+**Decision (2026-03-28):** Cloud-hosted wallfacer is a task runner, not a cloud workstation. It manages LLM API keys and git credentials — nothing else. External service integrations (GitHub API, Slack, Google, etc.) are not per-tenant concerns in cloud-hosted mode.
+
+### Why not per-tenant external credentials?
+
+Locally, wallfacer benefits from the user's existing tool credentials (`gh`, `gcloud`, Slack MCP, etc.) for free — they're already on the machine. Moving to cloud creates pressure to replicate this, but every approach has fundamental problems:
+
+| Approach | Problem |
+|----------|---------|
+| **VM per tenant** (full user environment) | You're building a cloud workstation (Gitpod/Codespaces). One VM compromise leaks all tenant credentials. Control plane breach = access to every tenant's secrets. You inherit patching, hardening, and monitoring N internet-facing VMs. |
+| **K8s + credential injectors** | Combinatorial explosion of tool-specific formats (`~/.config/gh/`, `~/.aws/`, `.npmrc`, etc.). OAuth tools need browser flows that don't work in pods. Token refresh/rotation becomes your problem. |
+| **K8s + MCP as auth boundary** | Every external service needs a custom MCP wrapper. Agents must use MCP tools instead of native CLIs they already know. You're building an integration platform. |
+
+All three turn wallfacer into a credential management platform, which is a different product.
+
+### Why it's not needed
+
+Tracing the idea → implementation → serve pipeline, the only credentials the sandbox agent genuinely needs are:
+
+1. **LLM API key** — already handled (`.env`)
+2. **Git read/write** — already handled (per-tenant SSH keys / HTTPS tokens)
+
+Everything else separates cleanly into concerns *outside* the sandbox:
+
+| Need | Who handles it | How |
+|------|---------------|-----|
+| **Create PR from completed task** | CI/CD or control plane webhook | Wallfacer pushes branch → GitHub Action or control plane API call creates PR. One GitHub App token in the control plane, not per-tenant. |
+| **Notify user (Slack, email)** | Control plane | One bot/webhook token, shared. Not a sandbox concern. |
+| **Run CI checks** | GitHub Actions / external CI | Triggered by push, not by wallfacer. |
+| **Application secrets (DB, APIs)** | `serve.env` (live-serve spec) | Secrets for the *built app*, not for the agent. Already designed. |
+| **Deploy** | CD pipeline or live-serve (live-serve spec) | Separate from task execution. |
+
+The integrations feel essential locally because they're interleaved with the dev workflow. In an automated pipeline, they separate into "what the agent needs" (LLM + git) and "what happens around the agent" (CI/CD, notifications, deployment), which are better handled by dedicated systems.
+
+### Implications
+
+- **Local modes** (anonymous or authenticated) remain the power-user environment with full host credential access. This is a feature, not a limitation — local mode is strictly more capable for integration-heavy workflows.
+- **Cloud-hosted mode** is scoped to: receive task → execute in sandbox (LLM + git) → push result. The surrounding pipeline (PR creation, CI, notifications, deployment) connects via webhooks and the control plane, not per-tenant credentials in sandboxes.
+- **No VM-per-tenant mode.** The flexibility gain doesn't justify the security liability and operational burden. K8s remains the only multi-tenant target.
+- **Control plane integrations** (one GitHub App, one Slack bot, one notification webhook) are in scope for cloud-hosted mode, but these are control-plane-level credentials, not per-tenant secrets.
+
+---
+
 ## Implementation Order
 
 1. **Control plane scaffold** — Auth, user DB, instance table, health check loop

@@ -275,6 +275,22 @@ Tasks 1 and 2 are independent and can proceed in parallel.
 
 ---
 
+## Cost Estimates (DigitalOcean)
+
+| Scale | Cost | Notes |
+|-------|------|-------|
+| **Single node** (current latere.ai baseline) | ~$38/mo | K8s + LB + Spaces; shared with other latere.ai services |
+| **+ wallfacer server** | +$0 | Runs on existing node pool within spare capacity |
+| **+ sandbox node pool** (1× `s-4vcpu-8gb`) | +$48/mo | Dedicated node for sandbox Jobs |
+| **+ managed PG** (Option B storage) | +$15/mo | `db-s-1vcpu-1gb` — only if transitioning away from FilesystemBackend |
+| **5 concurrent tenants** (cloud-hosted) | ~$320/mo | 3 sandbox worker nodes, shared PG, shared Spaces |
+| **10 concurrent tenants** | ~$430/mo | 4 sandbox worker nodes; idle tenants cost ~$0 (hibernated) |
+| **20 concurrent tenants** | ~$530/mo | Cost per tenant drops as density grows |
+
+The single-node baseline ($38/mo) already exists as part of latere.ai. Adding wallfacer for internal/beta use only requires the sandbox node pool (+$48/mo). Managed PG and further scaling are incremental decisions.
+
+---
+
 ## Future Work (deferred)
 
 - **Multi-cloud support** (AWS, GCP, Alibaba): Not needed now. The application layer is cloud-agnostic by design; adding another provider means writing new terraform + adjusting manifests, not changing wallfacer code.
@@ -298,9 +314,8 @@ Tasks 1 and 2 are independent and can proceed in parallel.
 
 ## Note: Cloud Track Alignment
 
-This spec has been rewritten to reflect latere.ai's real infrastructure. The other cloud track specs (`cloud-backends.md`, `tenant-filesystem.md`, `k8s-sandbox.md`, `multi-tenant.md`, `tenant-api.md`) still assume a greenfield, multi-cloud architecture and will need similar alignment. Key shifts:
+The other cloud track specs (`tenant-filesystem.md`, `k8s-sandbox.md`, `multi-tenant.md`, `tenant-api.md`) are being aligned with latere.ai's real infrastructure. Key shifts:
 
-- **cloud-backends.md**: The "VPS mode" is effectively what we have now (single K8s node). No separate VPS provisioner needed.
 - **tenant-filesystem.md**: Integrates with fs.latere.ai for per-tenant storage (cold tier for config persistence, hot tier for runtime workspace). No standalone tenant PVC needed — fs.latere.ai owns storage allocation.
 - **k8s-sandbox.md**: RBAC and namespace assumptions should match the latere.ai cluster setup. Volume mounts point at fs.latere.ai hot tier paths instead of standalone PVCs.
-- **multi-tenant.md**: Control plane runs in the same cluster, not a separate provisioning system.
+- **multi-tenant.md**: Control plane runs in the same latere.ai cluster, not a separate provisioning system; scoped to cloud-hosted mode only.

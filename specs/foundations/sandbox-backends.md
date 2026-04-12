@@ -127,4 +127,4 @@ The spec originated on 2026-03-23 as **"Cloud Sandbox Executor"** — part of a 
 
 ## Future Work
 
-Remote backend implementations (K8s, remote Docker) and cloud worktree management are scoped under [Cloud Backends](../cloud/cloud-backends.md).
+Remote backend implementations (K8s, remote Docker) and cloud worktree management are scoped under the cloud track — see [k8s-sandbox.md](../cloud/k8s-sandbox.md) and [tenant-filesystem.md](../cloud/tenant-filesystem.md).
