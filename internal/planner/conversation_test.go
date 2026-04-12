@@ -18,6 +18,36 @@ func newTestStore(t *testing.T) *ConversationStore {
 	return cs
 }
 
+// TestConversationStore_LargeRawOutput guards against the bufio.Scanner
+// token-too-long regression that made /api/planning/messages return 500
+// once any single round's raw NDJSON output exceeded 64 KiB. Before the
+// fix, a 200 KiB raw_output terminated the scanner with an error and the
+// whole history became unreadable.
+func TestConversationStore_LargeRawOutput(t *testing.T) {
+	cs := newTestStore(t)
+	bigRaw := strings.Repeat("x", 200*1024)
+	msg := Message{
+		Role:      "assistant",
+		Content:   "short reply",
+		Timestamp: time.Now().UTC().Truncate(time.Millisecond),
+		RawOutput: bigRaw,
+	}
+	if err := cs.AppendMessage(msg); err != nil {
+		t.Fatalf("AppendMessage: %v", err)
+	}
+	got, err := cs.Messages()
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len(msgs) = %d, want 1", len(got))
+	}
+	if len(got[0].RawOutput) != len(bigRaw) {
+		t.Errorf("raw_output round-trip length = %d, want %d",
+			len(got[0].RawOutput), len(bigRaw))
+	}
+}
+
 func TestConversationStore_AppendAndRead(t *testing.T) {
 	cs := newTestStore(t)
 

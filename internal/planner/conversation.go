@@ -99,6 +99,15 @@ func (s *ConversationStore) Messages() ([]Message, error) {
 
 	var msgs []Message
 	sc := bufio.NewScanner(f)
+	// A single assistant message carries the entire raw NDJSON stream for
+	// that round in its raw_output field; one round can easily exceed the
+	// default 64 KiB Scanner token limit. Bumping the buffer to 32 MiB
+	// covers even lengthy agent transcripts; over that, the scanner falls
+	// back to ErrTooLong and that line is skipped with a warning rather
+	// than failing the whole history read (old behaviour turned a single
+	// oversized record into a 500 that made the chat appear empty).
+	const maxScanSize = 32 * 1024 * 1024
+	sc.Buffer(make([]byte, 0, 64*1024), maxScanSize)
 	lineNum := 0
 	for sc.Scan() {
 		lineNum++
@@ -111,7 +120,11 @@ func (s *ConversationStore) Messages() ([]Message, error) {
 		msgs = append(msgs, m)
 	}
 	if err := sc.Err(); err != nil {
-		return msgs, err
+		// Don't fail the whole history read on a single oversized line —
+		// log it and return what parsed successfully so the UI stays
+		// usable.
+		slog.Warn("conversation: scanner terminated early",
+			"file", messagesFile, "line", lineNum, "err", err)
 	}
 	return msgs, nil
 }
