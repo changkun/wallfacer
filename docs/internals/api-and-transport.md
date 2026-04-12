@@ -123,7 +123,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `DELETE /api/planning/messages` | Clear conversation history |
 | `GET /api/planning/messages/stream` | Stream agent response tokens |
 | `POST /api/planning/messages/interrupt` | Interrupt current agent turn |
-| `POST /api/planning/undo` | Revert the last `plan: round N` commit (git reset with stash preservation); cancels any dispatched tasks whose linkage was added by the reverted commit |
+| `POST /api/planning/undo` | Revert the last planning commit — kanban-style subject `<primary-path>(plan): …` with a `Plan-Round: N` trailer — via git reset with stash preservation; cancels any dispatched tasks whose linkage was added by the reverted commit |
 | `GET /api/planning/commands` | List available slash commands |
 | **Sandbox images** | |
 | `GET /api/images` | Check which sandbox images are cached locally |

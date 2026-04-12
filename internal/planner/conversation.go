@@ -22,9 +22,10 @@ type Message struct {
 	FocusedSpec string    `json:"focused_spec,omitempty"` // spec path focused at the time
 	RawOutput   string    `json:"raw_output,omitempty"`   // raw NDJSON output (assistant only)
 	// PlanRound, when non-zero, identifies the planning git commit this
-	// assistant message produced ("plan: round N — ..."). Zero means the
-	// round wrote nothing to specs/ (or the message is from a user).
-	// Undo affordances key off this field.
+	// assistant message produced — the commit carries a matching
+	// `Plan-Round: N` trailer and a `<primary-path>(plan): …` subject.
+	// Zero means the round wrote nothing to specs/ (or the message is
+	// from a user). Undo affordances key off this field.
 	PlanRound int `json:"plan_round,omitempty"`
 }
 

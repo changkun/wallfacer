@@ -23,12 +23,18 @@ type undoResult struct {
 	Workspace     string   `json:"workspace"`
 }
 
-// planRoundSubject parses "plan: round N — <summary>" as written by
-// commitPlanningRound. The em-dash (U+2014) must match exactly; surrounding
-// whitespace is flexible because git's default --cleanup=strip removes
-// trailing spaces from commit subjects (so "plan: round 42 — " becomes
-// "plan: round 42 —" on disk). The summary group may be empty or missing.
-var planRoundSubject = regexp.MustCompile(`^plan: round (\d+)(?:\s+—\s*(.*))?$`)
+// planCommitSubject parses a kanban-style planning commit subject like
+// "specs/local/auth(plan): add OAuth breakdown" as written by
+// commitPlanningRound. Group 1 is the primary-path scope, group 2 is the
+// imperative summary. A missing summary yields an empty group rather than
+// a match failure, so `<path>(plan):` alone still parses (git's default
+// --cleanup=strip drops the trailing space).
+var planCommitSubject = regexp.MustCompile(`^(\S+)\(plan\):\s*(.*)$`)
+
+// planRoundTrailer parses the `Plan-Round: N` git trailer that
+// commitPlanningRound writes at the bottom of the commit body. This is
+// what `git log --grep="^Plan-Round: "` anchors on.
+var planRoundTrailer = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(planRoundTrailerPrefix) + `(\d+)\s*$`)
 
 // addedDispatchLine matches unified-diff added lines that set a UUID
 // dispatched_task_id. Excludes diff headers like "+++ b/specs/..." since
@@ -37,9 +43,10 @@ var addedDispatchLine = regexp.MustCompile(
 	`(?m)^\+dispatched_task_id:\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`)
 
 // UndoPlanningRound resets the first workspace with a planning commit back to
-// the state before the last `plan: round N` commit. Stashes dirty user edits
-// across the reset, pops the stash after (returning 409 on conflict), and
-// cancels any kanban tasks that were dispatched by the reverted commit.
+// the state before the last commit carrying the Plan-Round trailer. Stashes
+// dirty user edits across the reset, pops the stash after (returning 409 on
+// conflict), and cancels any kanban tasks that were dispatched by the
+// reverted commit.
 //
 // Responds 409 if no planning commits exist in any workspace, or if the
 // latest planning commit is not at HEAD (manual commits made since would be
@@ -48,14 +55,20 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	for _, ws := range h.currentWorkspaces() {
-		out, err := cmdexec.Git(ws, "log", "--format=%H %s", "--grep=^plan: round", "-1").WithContext(ctx).Output()
+		// %x00 separates the three fields so subject or body text with
+		// spaces and newlines round-trips cleanly. We need the body in
+		// addition to the subject to read the Plan-Round trailer.
+		out, err := cmdexec.Git(ws, "log", "-1",
+			"--grep=^"+planRoundTrailerPrefix,
+			"--format=%H%x00%s%x00%B").WithContext(ctx).Output()
 		if err != nil || out == "" {
 			continue
 		}
-		hash, subject, ok := strings.Cut(out, " ")
-		if !ok {
+		parts := strings.SplitN(out, "\x00", 3)
+		if len(parts) < 3 {
 			continue
 		}
+		hash, subject, body := parts[0], parts[1], parts[2]
 
 		head, err := cmdexec.Git(ws, "rev-parse", "HEAD").WithContext(ctx).Output()
 		if err != nil {
@@ -98,7 +111,7 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 			h.cancelDispatchedTask(ctx, id)
 		}
 
-		round, summary := parsePlanSubject(subject)
+		round, summary := parsePlanMessage(subject, body)
 		var filesReverted []string
 		if files != "" {
 			filesReverted = strings.Split(files, "\n")
@@ -117,16 +130,21 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// parsePlanSubject extracts the round number and summary from a commit
-// subject line. Returns (0, "") if the subject doesn't match the expected
-// format.
-func parsePlanSubject(subject string) (int, string) {
-	m := planRoundSubject.FindStringSubmatch(strings.TrimSpace(subject))
-	if m == nil {
-		return 0, ""
+// parsePlanMessage extracts the round number (from the Plan-Round trailer
+// in body) and the imperative summary (from the `<path>(plan): <subject>`
+// subject line) of a planning commit. Either value is zero/empty when the
+// commit doesn't follow the expected shape, so callers can still surface
+// whatever the log gave them.
+func parsePlanMessage(subject, body string) (int, string) {
+	round := 0
+	if m := planRoundTrailer.FindStringSubmatch(body); m != nil {
+		round, _ = strconv.Atoi(m[1])
 	}
-	n, _ := strconv.Atoi(m[1])
-	return n, m[2]
+	summary := ""
+	if m := planCommitSubject.FindStringSubmatch(strings.TrimSpace(subject)); m != nil {
+		summary = strings.TrimSpace(m[2])
+	}
+	return round, summary
 }
 
 // extractDispatchedTaskIDs scans a unified diff for lines that add a

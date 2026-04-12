@@ -296,7 +296,7 @@
       "method": "POST",
       "pattern": "/api/planning/undo",
       "name": "UndoPlanningRound",
-      "description": "Undo the last planning round (git reset --hard on the last plan: round commit).",
+      "description": "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
       "tags": [
         "planning"
       ]

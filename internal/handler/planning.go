@@ -237,8 +237,14 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			// for UI undo affordances.
 			commitCtx := context.Background()
 			planRound := 0
+			// h.runner may be nil in narrow test setups; a nil generator
+			// makes commitPlanningRound fall back to its deterministic path.
+			var genCommit commitMessageGenerator
+			if h.runner != nil {
+				genCommit = h.runner.GenerateCommitMessage
+			}
 			for _, ws := range h.currentWorkspaces() {
-				n, cerr := commitPlanningRound(commitCtx, ws, resultText)
+				n, cerr := commitPlanningRound(commitCtx, ws, req.Message, resultText, genCommit)
 				if cerr != nil {
 					slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
 					continue

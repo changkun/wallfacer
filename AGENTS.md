@@ -235,7 +235,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `DELETE /api/planning/messages` — Clear conversation history and session
 - `GET /api/planning/messages/stream` — SSE: stream agent response tokens (204 if not busy)
 - `POST /api/planning/messages/interrupt` — Interrupt current agent turn (409 if not busy)
-- `POST /api/planning/undo` — Revert the last `plan: round N` commit via `git reset --hard HEAD~1`; stashes dirty user edits across the reset and cancels any kanban tasks whose `dispatched_task_id` was added by the reverted commit. 409 if no planning commits exist, if the planning commit is not at HEAD, or on stash-pop conflict.
+- `POST /api/planning/undo` — Revert the last planning commit (kanban-style subject `<primary-path>(plan): …` with a `Plan-Round: N` trailer in the body) via `git reset --hard HEAD~1`; stashes dirty user edits across the reset and cancels any kanban tasks whose `dispatched_task_id` was added by the reverted commit. 409 if no planning commits exist, if the planning commit is not at HEAD, or on stash-pop conflict.
 - `GET /api/planning/commands` — List available slash commands for UI autocomplete
 
 ### Usage & Statistics

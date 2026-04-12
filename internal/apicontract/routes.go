@@ -259,7 +259,7 @@ var Routes = []Route{
 	{
 		Method: http.MethodPost, Pattern: "/api/planning/undo", Name: "UndoPlanningRound",
 		JSName:      "undo",
-		Description: "Undo the last planning round (git reset --hard on the last plan: round commit).",
+		Description: "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
 		Tags:        []string{"planning"},
 	},
 	{

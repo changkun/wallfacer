@@ -16,11 +16,14 @@ import (
 )
 
 // seedPlanningCommit stages all changes under specs/ and creates a
-// `plan: round N — <summary>` commit in the given workspace.
+// kanban-style planning commit carrying the Plan-Round trailer. Used by the
+// undo tests to hand-craft a history that matches what commitPlanningRound
+// produces without going through the whole planning pipeline.
 func seedPlanningCommit(t *testing.T, ws string, n int, summary string) {
 	t.Helper()
 	runGit(t, ws, "add", "specs/")
-	runGit(t, ws, "commit", "-m", fmt.Sprintf("plan: round %d — %s", n, summary))
+	msg := fmt.Sprintf("specs(plan): %s\n\nseeded by test\n\nPlan-Round: %d", summary, n)
+	runGit(t, ws, "commit", "-m", msg)
 }
 
 func TestUndoPlanningRound_Success(t *testing.T) {
@@ -57,7 +60,7 @@ func TestUndoPlanningRound_Success(t *testing.T) {
 	// The planning commit should be gone and the spec file absent.
 	subjects := gitLogSubjects(t, ws)
 	for _, s := range subjects {
-		if strings.HasPrefix(s, "plan: round") {
+		if strings.Contains(s, "(plan):") {
 			t.Errorf("planning commit still present: %q", s)
 		}
 	}
@@ -193,23 +196,57 @@ func TestExtractDispatchedTaskIDs(t *testing.T) {
 	}
 }
 
-func TestParsePlanSubject(t *testing.T) {
+func TestParsePlanMessage(t *testing.T) {
 	cases := []struct {
-		in      string
+		name    string
+		subject string
+		body    string
 		round   int
 		summary string
 	}{
-		{"plan: round 1 — hello", 1, "hello"},
-		{"plan: round 42 — ", 42, ""},
-		{"plan: round 3", 3, ""},
-		{"not a planning subject", 0, ""},
-		{"plan: round abc — bad", 0, ""},
+		{
+			name:    "canonical",
+			subject: "specs/local/auth(plan): add OAuth breakdown",
+			body:    "body text\n\nPlan-Round: 3\n",
+			round:   3,
+			summary: "add OAuth breakdown",
+		},
+		{
+			name:    "deep path",
+			subject: "specs/local/spec-coordination/foo(plan): draft proposal",
+			body:    "Plan-Round: 42",
+			round:   42,
+			summary: "draft proposal",
+		},
+		{
+			name:    "empty summary",
+			subject: "specs(plan):",
+			body:    "Plan-Round: 7",
+			round:   7,
+			summary: "",
+		},
+		{
+			name:    "missing trailer",
+			subject: "specs(plan): did a thing",
+			body:    "no trailer here",
+			round:   0,
+			summary: "did a thing",
+		},
+		{
+			name:    "non-planning subject",
+			subject: "internal/runner: unrelated",
+			body:    "Plan-Round: 1",
+			round:   1,
+			summary: "",
+		},
 	}
 	for _, c := range cases {
-		n, s := parsePlanSubject(c.in)
-		if n != c.round || s != c.summary {
-			t.Errorf("parsePlanSubject(%q) = (%d, %q), want (%d, %q)",
-				c.in, n, s, c.round, c.summary)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			n, s := parsePlanMessage(c.subject, c.body)
+			if n != c.round || s != c.summary {
+				t.Errorf("parsePlanMessage(%q, %q) = (%d, %q), want (%d, %q)",
+					c.subject, c.body, n, s, c.round, c.summary)
+			}
+		})
 	}
 }
