@@ -1,6 +1,6 @@
 ---
 title: Merge Planning Into /api/usage BySubAgent
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
 affects:
