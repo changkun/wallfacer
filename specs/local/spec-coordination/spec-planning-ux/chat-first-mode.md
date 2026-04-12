@@ -644,7 +644,7 @@ Accept both `#spec/<path>` and `#plan/<path>` in the hash router (`ui/js/hash-de
 | [Spec tree index endpoint](chat-first-mode/spec-tree-index-endpoint.md) | — | medium | **complete** |
 | [Rename Specs → Plan](chat-first-mode/rename-specs-to-plan.md) | — | small | **complete** |
 | [Agent system prompts](chat-first-mode/agent-system-prompts.md) | — | small | **complete** |
-| [Default mode resolution](chat-first-mode/default-mode-resolution.md) | — | small | validated |
+| [Default mode resolution](chat-first-mode/default-mode-resolution.md) | — | small | **complete** |
 | [Plan → Board bridges](chat-first-mode/plan-to-board-bridges.md) | — | medium | validated |
 | [Explorer Roadmap entry](chat-first-mode/explorer-roadmap-entry.md) | spec-tree-index-endpoint | small | validated |
 | [Layout state machine](chat-first-mode/layout-state-machine.md) | spec-tree-index-endpoint | medium | validated |

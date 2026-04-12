@@ -1,10 +1,15 @@
 ---
 title: Default mode resolution on app open
-status: validated
+status: complete
 depends_on: []
 affects:
   - ui/js/spec-mode.js
-  - ui/js/app-init.js
+  - ui/js/api.js
+  - ui/js/events.js
+  - ui/js/workspace.js
+  - ui/js/tasks.js
+  - ui/js/planning-chat.js
+  - ui/partials/sidebar.html
 effort: small
 created: 2026-04-12
 updated: 2026-04-12
@@ -57,3 +62,10 @@ Resolve the initial mode when Wallfacer opens, in priority order: saved user pre
 - **Do NOT** add a user-facing "default mode" preference in Settings. The automatic resolution is the feature.
 - **Do NOT** extend this to account for the Chat mode from `chat-mode.md` — that spec handles its own entries. Default mode here is a Board/Plan binary.
 - **Do NOT** migrate any existing localStorage keys. This is a net-new key.
+
+## Implementation notes
+
+- The spec referenced `ui/js/app-init.js` as the home for the bootstrap hook; that file does not exist. `resolveInitialMode(taskCount)` is instead invoked from the first task SSE snapshot in `ui/js/api.js` (`_handleTasksSnapshot`), which is the effective app-init path in the current codebase.
+- The spec algorithm returns the user-facing labels (`"plan"` / `"board"`), but the internal mode identifier for Plan mode is still `"spec"` (per the rename-specs-to-plan spec's "do not rename internal identifiers" boundary). A small `_modeToInternal` mapping bridges the two.
+- Persistence gating is implemented via `switchMode(mode, { persist: true })`. The sidebar nav buttons and the `P` shortcut set `persist: true`; all other call sites (hash deeplink, command palette, spec-badge clicks, task-modal links, dispatch toast) omit it and therefore do not write the saved preference.
+- `clearWorkspaceIsNew()` is invoked from `focusSpec`, `createTask`, and `planning-chat.js`'s `sendMessage` — the three "substantive action" surfaces listed in the spec. The dispatch-complete toast is covered by a separate spec and does not yet exist; the call site will be added when that spec lands.
