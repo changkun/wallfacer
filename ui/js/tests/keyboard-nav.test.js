@@ -127,12 +127,12 @@ function createElement(ownerDocument, tagName, overrides = {}) {
       if (name === "role") this.role = String(value);
     },
     getAttribute(name) {
-      return Object.prototype.hasOwnProperty.call(this.attributes, name)
+      return  Object.hasOwn(this.attributes, name)
         ? this.attributes[name]
         : null;
     },
     hasAttribute(name) {
-      return Object.prototype.hasOwnProperty.call(this.attributes, name);
+      return  Object.hasOwn(this.attributes, name);
     },
     removeAttribute(name) {
       delete this.attributes[name];

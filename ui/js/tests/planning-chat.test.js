@@ -87,12 +87,12 @@ function makeEl(tag, registry) {
       _attrs[name] = String(value);
     },
     getAttribute(name) {
-      return Object.prototype.hasOwnProperty.call(_attrs, name)
+      return  Object.hasOwn(_attrs, name)
         ? _attrs[name]
         : null;
     },
     hasAttribute(name) {
-      return Object.prototype.hasOwnProperty.call(_attrs, name);
+      return  Object.hasOwn(_attrs, name);
     },
     removeAttribute(name) {
       delete _attrs[name];
