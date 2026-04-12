@@ -1,17 +1,16 @@
 ---
 title: Windows Support — Tier 2 (Native Windows Host)
-status: archived
+status: complete
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects:
   - internal/sandbox/
 effort: medium
 created: 2026-03-22
-updated: 2026-04-12
+updated: 2026-03-30
 author: changkun
 dispatched_task_id: null
 ---
-
 
 # Windows Support — Tier 2 (Native Windows Host)
 
