@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/store"
@@ -228,9 +229,10 @@ func TestMetricsGauge_TasksTotal(t *testing.T) {
 func TestMetricsGauge_SubscriberCount(t *testing.T) {
 	h := newTestHandler(t)
 
-	// The runner holds one internal board-cache subscription; capture the
-	// baseline so the test remains correct regardless of runner internals.
-	baseline := h.store.SubscriberCount()
+	// The runner's board-cache subscription goroutine calls Subscribe()
+	// asynchronously, so wait until it has attached before capturing the
+	// baseline — otherwise we race and record a too-low count.
+	baseline := waitForSubscriberBaseline(t, h.store)
 
 	subID, _ := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)
@@ -248,4 +250,26 @@ func TestMetricsGauge_SubscriberCount(t *testing.T) {
 	if !strings.Contains(body, want) {
 		t.Errorf("expected %q; got:\n%s", want, body)
 	}
+}
+
+// waitForSubscriberBaseline polls until the store's SubscriberCount has been
+// stable for a short window, ensuring any async subscribers (e.g. the runner's
+// board-cache loop) have attached before the caller records a baseline.
+func waitForSubscriberBaseline(t *testing.T, s *store.Store) int {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	stableFor := 50 * time.Millisecond
+	last := s.SubscriberCount()
+	lastChange := time.Now()
+	for time.Now().Before(deadline) {
+		cur := s.SubscriberCount()
+		if cur != last {
+			last = cur
+			lastChange = time.Now()
+		} else if time.Since(lastChange) >= stableFor {
+			return cur
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return last
 }
