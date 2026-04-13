@@ -17,15 +17,15 @@ Open source. Runs locally. No IDE lock-in. No cloud dependency. Bring your own L
 |:--:|
 | *Task board — coordinate parallel agent execution* |
 
-| ![Spec mode](./assets/overview-spec.png) |
+| ![Plan mode](./assets/overview-spec.png) |
 |:--:|
-| *Spec mode — design before you build* |
+| *Plan mode — design before you build* |
 
 ## Why Wallfacer
 
 Every AI coding tool today pins you to one interaction mode. Chat-based tools are fast but lose structure at scale. Spec-driven tools add discipline but slow you down on day one. Task boards help you coordinate but don't understand your architecture. Wallfacer connects all of these into a continuous workflow.
 
-**Adaptive abstraction** — Chat-centric for greenfield exploration, spec-centric for complex systems, task-centric for parallel execution, code-level for surgical edits. Move between levels as your project evolves.
+**Adaptive abstraction** — Chat-centric for greenfield exploration, spec-centric for complex systems — a recursive tree of markdown specs that agents can read, iterate on, break down, and dispatch as tasks — task-centric for parallel execution, code-level for surgical edits. Move between levels as your project evolves.
 
 **Autonomy spectrum** — Run the full loop autonomously (implement, test, commit, push) or step in at any point. Dial autonomy up or down per task, per spec, per project.
 
@@ -68,6 +68,80 @@ A browser window opens automatically. Add your Claude credential (OAuth token vi
 3. **Execute** — Specs break into tasks on a board. Agents implement, test, and commit in isolated sandboxes.
 4. **Ship** — Reviewed changes merge automatically. Auto-commit, auto-push, auto-build when you're ready.
 
+```mermaid
+flowchart LR
+    Idea([Idea]) --> Chat[Planning Chat]
+    Chat --> Spec[Root Spec]
+    Spec --> BreakDown[Break Down]
+    BreakDown --> Leaves[Leaf Specs]
+    Leaves --> Tasks[Dispatched Tasks]
+    Tasks --> Commits([Commits])
+```
+
+## Plan Mode
+
+Plan mode is Wallfacer's design-time surface. A three-pane layout appears whenever any spec exists: **file explorer** on the left, **focused spec view** in the center, and **planning chat** on the right. When the specs tree is empty, plan mode collapses into a chat-first experience so you can start from an idea with zero scaffolding. Press `P` to toggle between the board and plan mode; `E` toggles the explorer, `C` toggles the chat, `D` dispatches, `B` breaks down.
+
+```mermaid
+graph LR
+    Chat[Chat<br/>exploratory] --> Spec[Spec<br/>structured design]
+    Spec --> Task[Task<br/>scoped execution]
+    Task --> Code[Code<br/>surgical edits]
+```
+
+Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one.
+
+### Spec Lifecycle
+
+Every spec carries one of six lifecycle states. Transitions are intentional — the planner drives them explicitly via slash commands or direct edits, and the tree UI surfaces the current state as a colored pill.
+
+```mermaid
+stateDiagram-v2
+    [*] --> vague
+    vague --> drafted
+    drafted --> validated
+    drafted --> stale
+    drafted --> archived
+    validated --> complete
+    validated --> stale
+    complete --> stale
+    complete --> archived
+    stale --> drafted
+    stale --> validated
+    stale --> archived
+    archived --> drafted
+```
+
+- **vague** — a seed idea, still being shaped in chat.
+- **drafted** — structure and frontmatter in place; ready for review.
+- **validated** — reviewed and accepted; leaf specs in this state are dispatchable.
+- **complete** — all dispatched work landed; outcomes recorded.
+- **stale** — the world moved; spec needs refresh before further work.
+- **archived** — retired but preserved; can be revived back to drafted.
+
+### Slash Commands
+
+Planning chat accepts these slash commands. Type `/` to autocomplete.
+
+| Command | Purpose |
+|---------|---------|
+| `/summarize` | Summarize the current thread or focused spec |
+| `/create` | Create a new spec from the conversation |
+| `/refine` | Tighten wording, scope, or structure of a spec |
+| `/validate` | Check spec against the document model and mark validated |
+| `/impact` | Analyze blast radius against existing specs and code |
+| `/status` | Report progress across the spec tree |
+| `/break-down` | Split a spec into child design specs or leaf tasks |
+| `/review-breakdown` | Sanity-check a proposed breakdown |
+| `/dispatch` | Dispatch validated leaf specs to the task board |
+| `/review-impl` | Review an implementation against its spec |
+| `/diff` | Compare a completed task against its source spec |
+| `/wrapup` | Finalize a completed spec and record outcomes |
+
+The agent may also emit `/spec-new <path>` as a scaffold directive — this is not a user command; it tells the server to create a new spec file at the given path with valid frontmatter defaults.
+
+Read more: [Designing Specs](docs/guide/designing-specs.md) and [Exploring Ideas](docs/guide/exploring-ideas.md).
+
 ## Product Tour
 
 ### Task Board — Managed Execution
@@ -76,11 +150,11 @@ A browser window opens automatically. Add your Claude credential (OAuth token vi
 
 Coordinate many agent tasks on a kanban board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs in an isolated container with its own git worktree.
 
-### Spec Mode — Structured Design
+### Plan Mode — Structured Design
 
-![Wallfacer spec mode](./assets/overview-spec.png)
+![Wallfacer plan mode](./assets/overview-spec.png)
 
-Design before you build. The three-pane spec view gives you an explorer tree (left), focused markdown view (center), and planning chat (right). Break large ideas into structured specs, validate dependencies, and dispatch leaf specs to the task board when the design is right.
+Design before you build. The three-pane plan view gives you an explorer tree (left), focused markdown view (center), and planning chat (right). Break large ideas into structured specs, validate dependencies, and dispatch leaf specs to the task board when the design is right.
 
 ### Oversight — Actionable Audit Trail
 
