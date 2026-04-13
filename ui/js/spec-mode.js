@@ -105,6 +105,68 @@ function getLayoutState() {
   return (container && container.getAttribute("data-layout")) || "three-pane";
 }
 
+// --- Focused-view crossfade ---
+//
+// Whenever the focused entry changes (spec ↔ index or spec ↔ spec) the
+// body element's content is swapped via a short CSS crossfade:
+//   1. Fade the outgoing opacity to 0 over 140ms (accelerate curve).
+//   2. 40ms into the fade, run the caller-provided replaceFn to swap
+//      innerHTML (so the new content arrives while the container is
+//      visually gone).
+//   3. On the next frame, transition the container back to opacity 1
+//      over 180ms (decelerate curve).
+//
+// An epoch counter absorbs click-spam: if a second crossfade starts
+// while the first is still animating, the first's fade-in tick is
+// discarded. The newer call re-drives the opacity so no frame is
+// left stuck at 0.
+var _focusedCrossfadeEpoch = 0;
+
+function _scheduleFocusedCrossfade(replaceFn) {
+  var bodyInner = document.getElementById("spec-focused-body-inner");
+  var reducedMotion = _prefersReducedMotion();
+  if (!bodyInner || reducedMotion) {
+    if (typeof replaceFn === "function") replaceFn();
+    if (bodyInner) {
+      bodyInner.style.opacity = "";
+      bodyInner.style.transition = "";
+    }
+    return;
+  }
+  var myEpoch = ++_focusedCrossfadeEpoch;
+  bodyInner.style.transition =
+    "opacity 140ms cubic-bezier(0.3, 0, 0.8, 0.15)";
+  bodyInner.style.opacity = "0";
+  setTimeout(function () {
+    if (myEpoch !== _focusedCrossfadeEpoch) return;
+    if (typeof replaceFn === "function") replaceFn();
+    // Next frame: switch to decelerate curve and fade back in.
+    var schedule =
+      typeof requestAnimationFrame === "function"
+        ? requestAnimationFrame
+        : function (fn) {
+            return setTimeout(fn, 16);
+          };
+    schedule(function () {
+      if (myEpoch !== _focusedCrossfadeEpoch) return;
+      bodyInner.style.transition =
+        "opacity 180ms cubic-bezier(0.2, 0, 0, 1)";
+      bodyInner.style.opacity = "1";
+    });
+  }, 40);
+}
+
+function _prefersReducedMotion() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    return false;
+  try {
+    var mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    return !!(mq && mq.matches);
+  } catch (_e) {
+    return false;
+  }
+}
+
 // Guards auto mode resolution. Starts true at boot; flipped to false once
 // resolveInitialMode() has run or once the user explicitly switches. Reset
 // to true when the active workspace group changes.
@@ -342,12 +404,16 @@ function focusSpec(specPath, workspace) {
   _focusedSpecContent = null; // reset so loading indicator shows
   specModeState.focusedSpecPath = specPath || "";
 
-  // Show loading state in the focused view.
+  // Show loading state in the focused view with a crossfade so the
+  // old content dissolves rather than snapping.
   var titleEl = document.getElementById("spec-focused-title");
-  var innerEl = document.getElementById("spec-focused-body-inner");
   if (titleEl) titleEl.textContent = specPath;
-  if (innerEl)
-    innerEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
+  _scheduleFocusedCrossfade(function () {
+    var innerEl = document.getElementById("spec-focused-body-inner");
+    if (innerEl) {
+      innerEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
+    }
+  });
 
   _loadAndRenderSpec();
   _startSpecRefreshPoll();
@@ -423,10 +489,14 @@ function focusRoadmapIndex(indexMeta) {
     if (hel) hel.classList.add("hidden");
   }
 
+  _scheduleFocusedCrossfade(function () {
+    var bodyInnerInit = document.getElementById("spec-focused-body-inner");
+    if (bodyInnerInit) {
+      bodyInnerInit.innerHTML =
+        '<div class="spec-loading">Loading\u2026</div>';
+    }
+  });
   var bodyInner = document.getElementById("spec-focused-body-inner");
-  if (bodyInner) {
-    bodyInner.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
-  }
 
   var absPath = indexMeta.workspace + "/" + indexMeta.path;
   var url =

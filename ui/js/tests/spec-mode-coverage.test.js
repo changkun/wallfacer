@@ -232,6 +232,30 @@ function makeContext(overrides = {}) {
       overrides.renderMarkdown || ((text) => "<p>" + text + "</p>"),
     setInterval: overrides.setInterval || vi.fn(() => 42),
     clearInterval: overrides.clearInterval || vi.fn(),
+    setTimeout:
+      overrides.setTimeout ||
+      ((fn) => {
+        // Invoke the callback synchronously so the crossfade helper's
+        // replaceFn runs before focusSpec returns — matches the pre-
+        // crossfade test expectations without needing microtask waits.
+        try {
+          fn();
+        } catch (_e) {
+          // Swallow — tests assert on post-call state directly.
+        }
+        return 0;
+      }),
+    clearTimeout: overrides.clearTimeout || vi.fn(),
+    requestAnimationFrame:
+      overrides.requestAnimationFrame ||
+      ((fn) => {
+        try {
+          fn();
+        } catch (_e) {
+          // Swallow — tests assert on post-call state directly.
+        }
+        return 0;
+      }),
     location: overrides.location || { hash: "", pathname: "/" },
     history: overrides.history || { replaceState: vi.fn() },
     console,

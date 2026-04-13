@@ -457,6 +457,15 @@ var PlanningChat = (function () {
 
     _renderTabs();
 
+    // Crossfade the messages area so the switch reads as a fade, not a
+    // hard snap. The opacity drop is driven by a CSS class so the exact
+    // duration lives in ui/css/spec-mode.css; reduced-motion users get
+    // the no-op transition. Any stale paint that would race us in is
+    // still guarded by the existing _switchEpoch.
+    if (_messagesEl && _messagesEl.classList) {
+      _messagesEl.classList.add("spec-chat-stream__messages--swapping");
+    }
+
     var epoch = ++_switchEpoch;
     // Fire-and-forget activate — the UI already reflects the new
     // active thread; this is just a server-side preference save.
@@ -469,6 +478,11 @@ var PlanningChat = (function () {
       // A newer switch happened while we were loading — discard our
       // results so we don't paint stale history over the new thread.
       if (epoch !== _switchEpoch) return;
+      if (_messagesEl && _messagesEl.classList) {
+        _messagesEl.classList.remove(
+          "spec-chat-stream__messages--swapping",
+        );
+      }
       if (!_streaming && _streamingThreadId === id) {
         _attachStreamToLastBubble();
       }

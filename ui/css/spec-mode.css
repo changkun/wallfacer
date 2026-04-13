@@ -131,6 +131,23 @@
    spec-only affordance — status chip, kind/effort badges, metadata bar,
    dispatch/breakdown/archive buttons, archived banner. The Roadmap is a
    plain markdown document with no lifecycle. */
+/* Spec-only affordances: always have a transition so toggling the
+   Roadmap marker class (.spec-focused-view--index) slides them out
+   with a subtle translateY + opacity dissolve rather than snapping.
+   Honouring reduced motion collapses the transition to zero. */
+.spec-focused-view__status,
+.spec-focused-view__kind,
+.spec-focused-view__effort,
+.spec-focused-view__meta,
+#spec-dispatch-btn,
+#spec-summarize-btn,
+#spec-archive-btn,
+#spec-unarchive-btn,
+#spec-archived-banner {
+  transition:
+    opacity 220ms cubic-bezier(0.2, 0, 0, 1),
+    transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
 .spec-focused-view--index .spec-focused-view__status,
 .spec-focused-view--index .spec-focused-view__kind,
 .spec-focused-view--index .spec-focused-view__effort,
@@ -140,7 +157,45 @@
 .spec-focused-view--index #spec-archive-btn,
 .spec-focused-view--index #spec-unarchive-btn,
 .spec-focused-view--index #spec-archived-banner {
-  display: none !important;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  /* Keep the elements out of the flow so the index view reads as a
+     pure markdown document without reserved button-sized gaps. */
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spec-focused-view__status,
+  .spec-focused-view__kind,
+  .spec-focused-view__effort,
+  .spec-focused-view__meta,
+  #spec-dispatch-btn,
+  #spec-summarize-btn,
+  #spec-archive-btn,
+  #spec-unarchive-btn,
+  #spec-archived-banner,
+  #spec-focused-body-inner {
+    transition-duration: 0s !important;
+  }
+}
+
+/* Chat messages crossfade on thread switch — triggered by the
+   `.spec-chat-stream__messages--swapping` class added in
+   planning-chat.js::_switchToThread. */
+#spec-chat-messages {
+  transition: opacity 120ms linear;
+}
+.spec-chat-stream__messages--swapping {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  #spec-chat-messages {
+    transition: none;
+  }
 }
 
 .spec-focused-view__meta {
