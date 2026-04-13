@@ -3,6 +3,7 @@ package spec
 import (
 	"bufio"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,18 +55,21 @@ const indexTitleScanMax = 200
 // to choose which roadmap surfaces; for now this keeps the frontend
 // consumer simple.
 //
-// IO errors other than "file does not exist" propagate to the caller
-// so a misconfigured mount (permission denied, etc.) is visible rather
-// than silently dropping the index.
+// Per-workspace stat / read errors are logged and skipped rather than
+// aborting the whole resolution: a misconfigured mount on workspace A
+// must not hide a perfectly readable roadmap in workspace B. Returns
+// (nil, nil) when no workspace yields a usable README — the explorer
+// hides the pinned entry in that case.
 func ResolveIndex(workspaces []string) (*Index, error) {
 	for _, ws := range workspaces {
 		path := filepath.Join(ws, "specs", "README.md")
 		info, err := os.Stat(path)
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				continue
+			if !errors.Is(err, os.ErrNotExist) {
+				slog.Warn("spec: skipping unreadable roadmap",
+					"workspace", ws, "path", path, "err", err)
 			}
-			return nil, err
+			continue
 		}
 		if info.IsDir() {
 			// Treat a directory named README.md as "no roadmap" —
@@ -74,7 +78,13 @@ func ResolveIndex(workspaces []string) (*Index, error) {
 		}
 		title, err := readFirstH1(path, indexFallbackTitle)
 		if err != nil {
-			return nil, err
+			// A transient open / scan error shouldn't strip the index
+			// entirely — fall back to the default title and surface
+			// the failure in logs instead. The explorer entry stays
+			// pinned with stat-derived mtime.
+			slog.Warn("spec: roadmap title scan failed; using fallback",
+				"workspace", ws, "path", path, "err", err)
+			title = indexFallbackTitle
 		}
 		return &Index{
 			Path:      "specs/README.md",
