@@ -253,8 +253,6 @@
 }
 
 /* --- Markdown in card previews (compact overrides) --- */
-.card-prose {
-}
 .card-prose p {
   margin: 0 !important;
 }
