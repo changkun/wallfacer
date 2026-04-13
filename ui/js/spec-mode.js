@@ -112,6 +112,44 @@ function _applyLayout() {
       _syncSpecChatToggle(true);
     }
   }
+  _ensureChatMessagesObserver();
+  _syncChatFirstEmptyHint();
+}
+
+// _chatMessagesObserver watches the chat message list so the empty-state
+// hint is re-evaluated whenever planning-chat.js appends, clears, or
+// rebuilds bubbles — avoids sprinkling _syncChatFirstEmptyHint calls
+// across every mutation site.
+var _chatMessagesObserver = null;
+
+function _ensureChatMessagesObserver() {
+  if (_chatMessagesObserver) return;
+  if (typeof MutationObserver !== "function") return;
+  var messages = document.getElementById("spec-chat-messages");
+  if (!messages) return;
+  _chatMessagesObserver = new MutationObserver(function () {
+    _syncChatFirstEmptyHint();
+  });
+  _chatMessagesObserver.observe(messages, { childList: true });
+}
+
+// _syncChatFirstEmptyHint shows the "/create" hint and swaps the
+// composer placeholder when Plan mode is in chat-first layout AND the
+// active thread has no messages yet. Invoked from _applyLayout and via
+// the MutationObserver above.
+function _syncChatFirstEmptyHint() {
+  var hint = document.getElementById("spec-chat-empty-hint");
+  var input = document.getElementById("spec-chat-input");
+  var messages = document.getElementById("spec-chat-messages");
+  if (!hint || !input) return;
+  var layout = getLayoutState();
+  var hasMessages =
+    !!messages && messages.querySelector(".planning-chat-bubble") !== null;
+  var showHint = layout === "chat-first" && !hasMessages;
+  hint.classList.toggle("spec-chat-empty-hint--visible", showHint);
+  input.placeholder = showHint
+    ? "Describe what you'd like to plan, or /create <title>..."
+    : "Message...";
 }
 
 // getLayoutState returns the currently applied layout name. Exposed for

@@ -26,6 +26,9 @@
 }
 
 .spec-mode-container[data-layout="chat-first"] .spec-focused-view {
+  /* Override the default flex:1 so the collapsed focused-view doesn't
+     eat horizontal space and push the centered chat card off-axis. */
+  flex: 0 0 0;
   width: 0;
   opacity: 0;
   transform: translateX(-12px);
@@ -37,15 +40,56 @@
   display: none;
 }
 
-.spec-mode-container[data-layout="chat-first"] .spec-chat-stream {
-  width: 100%;
-  min-width: 0;
-  border-left: none;
-}
-
+/* Chat-first mirrors the empty-Board composer's spatial language: a
+   centered card with padding around it, not a full-width slab. The
+   parent flex centers the card; the card itself has a max-width that
+   matches the empty-Board composer family so both modes' empty states
+   read as visually continuous. */
 .spec-mode-container[data-layout="chat-first"] {
+  justify-content: center;
+  align-items: stretch;
+  padding: 32px 16px;
   transition-timing-function: cubic-bezier(0.3, 0, 0.8, 0.15);
   transition-duration: 200ms;
+}
+
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream {
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card, var(--bg));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+/* Suppress the redundant "PLANNING CHAT" header row in chat-first —
+   the thread tab bar already labels the pane and the card framing
+   makes the explicit header look like visual noise. */
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream__header {
+  display: none;
+}
+
+/* The "/create" hint slot sits between the messages area and the
+   composer. Only renders when the chat has no messages (JS toggles
+   the .spec-chat-empty-hint--visible modifier). */
+.spec-chat-empty-hint {
+  display: none;
+  padding: 8px 14px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.spec-mode-container[data-layout="chat-first"] .spec-chat-empty-hint--visible {
+  display: block;
+}
+.spec-chat-empty-hint__cmd {
+  font-family: var(--font-mono, monospace);
+  color: var(--text);
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

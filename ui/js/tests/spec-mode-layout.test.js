@@ -64,6 +64,11 @@ function makeEl(tag, registry) {
       _attrs.delete(k);
     },
     innerHTML: "",
+    // Stubbed for _syncChatFirstEmptyHint's has-messages probe. Tests that
+    // need a truthy result set `__childMatches` on the element directly.
+    querySelector(_sel) {
+      return el.__childMatches ? {} : null;
+    },
   };
   return el;
 }
@@ -90,6 +95,7 @@ function makeContext() {
     "spec-chat-messages",
     "spec-chat-input",
     "spec-chat-send",
+    "spec-chat-empty-hint",
   ];
   for (const id of ids) {
     const el = makeEl("DIV", registry);
@@ -290,5 +296,54 @@ describe("spec-mode layout state machine", () => {
   it("focusSpec updates specModeState.focusedSpecPath", () => {
     ctx.focusSpec("specs/local/bar.md", "/ws");
     expect(ctx.specModeState.focusedSpecPath).toBe("specs/local/bar.md");
+  });
+
+  // ---------------------------------------------------------------------
+  // Chat-first empty-state hint (parent chat-first-mode spec, lines 540+).
+  // The composer placeholder must mention /create and a visible hint must
+  // sit above the composer whenever chat-first layout has no messages.
+  // ---------------------------------------------------------------------
+
+  function hint() {
+    return ctx.registry.get("spec-chat-empty-hint");
+  }
+  function input() {
+    return ctx.registry.get("spec-chat-input");
+  }
+  function messages() {
+    return ctx.registry.get("spec-chat-messages");
+  }
+
+  it("chat-first + no messages → hint visible and placeholder mentions /create", () => {
+    messages().__childMatches = false;
+    setTree([]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(hint().classList.contains("spec-chat-empty-hint--visible")).toBe(
+      true,
+    );
+    expect(input().placeholder).toContain("/create");
+  });
+
+  it("chat-first + messages present → hint hidden and placeholder resets", () => {
+    messages().__childMatches = true;
+    setTree([]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(hint().classList.contains("spec-chat-empty-hint--visible")).toBe(
+      false,
+    );
+    expect(input().placeholder).toBe("Message...");
+  });
+
+  it("three-pane layout never shows the empty-state hint", () => {
+    messages().__childMatches = false;
+    setTree([{ path: "a.md" }]);
+    setIndex(null);
+    ctx._applyLayout();
+    expect(hint().classList.contains("spec-chat-empty-hint--visible")).toBe(
+      false,
+    );
+    expect(input().placeholder).toBe("Message...");
   });
 });
