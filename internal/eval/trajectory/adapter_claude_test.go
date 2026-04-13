@@ -25,24 +25,24 @@ func TestClaudeCodeAdapter_Parse(t *testing.T) {
 	if got, want := tr.ProviderVersion, "claude-code/1.2.3"; got != want {
 		t.Errorf("ProviderVersion = %q, want %q", got, want)
 	}
-	if got, want := len(tr.Messages), 4; got != want {
-		t.Fatalf("len(Messages) = %d, want %d", got, want)
+	if got, want := len(tr.Events), 4; got != want {
+		t.Fatalf("len(Events) = %d, want %d", got, want)
 	}
 
 	// Verify discriminators flowed through.
 	kinds := []struct{ typ, sub string }{
-		{TypeSystem, SubtypeInit},
-		{TypeAssistant, ""},
-		{TypeUser, ""},
-		{TypeResult, SubtypeSuccess},
+		{ClaudeTypeSystem, ClaudeSubtypeInit},
+		{ClaudeTypeAssistant, ""},
+		{ClaudeTypeUser, ""},
+		{ClaudeTypeResult, ClaudeSubtypeSuccess},
 	}
 	for i, want := range kinds {
-		got := tr.Messages[i]
+		got := tr.Events[i]
 		if got.Type != want.typ || got.Subtype != want.sub {
-			t.Errorf("Messages[%d] = {%q,%q}, want {%q,%q}", i, got.Type, got.Subtype, want.typ, want.sub)
+			t.Errorf("Events[%d] = {%q,%q}, want {%q,%q}", i, got.Type, got.Subtype, want.typ, want.sub)
 		}
 		if len(got.Raw) == 0 {
-			t.Errorf("Messages[%d] Raw is empty", i)
+			t.Errorf("Events[%d] Raw is empty", i)
 		}
 	}
 }
@@ -56,7 +56,7 @@ func TestClaudeCodeAdapter_TypedDecode(t *testing.T) {
 	}
 
 	var init SDKSystemInit
-	if err := tr.Messages[0].Decode(&init); err != nil {
+	if err := tr.Events[0].Decode(&init); err != nil {
 		t.Fatalf("Decode init: %v", err)
 	}
 	if init.Model != "claude-opus-4-6" {
@@ -67,7 +67,7 @@ func TestClaudeCodeAdapter_TypedDecode(t *testing.T) {
 	}
 
 	var user SDKUserMessage
-	if err := tr.Messages[2].Decode(&user); err != nil {
+	if err := tr.Events[2].Decode(&user); err != nil {
 		t.Fatalf("Decode user: %v", err)
 	}
 	if !user.IsSynthetic {
@@ -78,7 +78,7 @@ func TestClaudeCodeAdapter_TypedDecode(t *testing.T) {
 	}
 
 	var res SDKResultSuccess
-	if err := tr.Messages[3].Decode(&res); err != nil {
+	if err := tr.Events[3].Decode(&res); err != nil {
 		t.Fatalf("Decode result: %v", err)
 	}
 	if res.NumTurns != 3 {
@@ -104,8 +104,8 @@ func TestClaudeCodeAdapter_EmptyLinesSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if got, want := len(tr.Messages), 4; got != want {
-		t.Errorf("len(Messages) = %d, want %d", got, want)
+	if got, want := len(tr.Events), 4; got != want {
+		t.Errorf("len(Events) = %d, want %d", got, want)
 	}
 }
 
@@ -132,15 +132,15 @@ func TestClaudeCodeAdapter_UnknownTypePreserved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if got, want := len(tr.Messages), 1; got != want {
-		t.Fatalf("len(Messages) = %d, want %d", got, want)
+	if got, want := len(tr.Events), 1; got != want {
+		t.Fatalf("len(Events) = %d, want %d", got, want)
 	}
-	if tr.Messages[0].Type != "tool_progress" {
-		t.Errorf("Type = %q, want %q", tr.Messages[0].Type, "tool_progress")
+	if tr.Events[0].Type != "tool_progress" {
+		t.Errorf("Type = %q, want %q", tr.Events[0].Type, "tool_progress")
 	}
 	// Raw payload must still be decodable.
 	var fields map[string]json.RawMessage
-	if err := tr.Messages[0].Decode(&fields); err != nil {
+	if err := tr.Events[0].Decode(&fields); err != nil {
 		t.Errorf("Decode unknown: %v", err)
 	}
 	if _, ok := fields["payload"]; !ok {
@@ -148,12 +148,12 @@ func TestClaudeCodeAdapter_UnknownTypePreserved(t *testing.T) {
 	}
 }
 
-func TestSDKMessage_DecodeEmpty(t *testing.T) {
+func TestStreamEvent_DecodeEmpty(t *testing.T) {
 	t.Parallel()
 
-	var m SDKMessage // no Raw set
+	var e StreamEvent // no Raw set
 	var dst struct{}
-	if err := m.Decode(&dst); err != ErrNoRawPayload {
+	if err := e.Decode(&dst); err != ErrNoRawPayload {
 		t.Errorf("Decode empty = %v, want %v", err, ErrNoRawPayload)
 	}
 }

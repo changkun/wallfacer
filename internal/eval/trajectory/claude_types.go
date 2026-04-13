@@ -6,54 +6,33 @@ import "encoding/json"
 // https://github.com/anthropics/claude-code src/entrypoints/sdk/coreSchemas.ts
 // (SDKMessageSchema — a 22-variant discriminated union).
 //
-// Not every variant is typed here; callers use (SDKMessage).Type and
-// (SDKMessage).Subtype to discriminate and Decode to unmarshal into the
-// typed struct below. New variants can be added without breaking callers.
+// Not every variant is typed here; callers use StreamEvent.Type and
+// StreamEvent.Subtype to discriminate and StreamEvent.Decode to
+// unmarshal into the typed struct below. New variants can be added
+// without breaking callers.
 
-// Discriminator values for SDKMessage.Type.
+// Discriminator values for StreamEvent.Type on Claude Code streams.
 const (
-	TypeAssistant   = "assistant"
-	TypeUser        = "user"
-	TypeResult      = "result"
-	TypeSystem      = "system"
-	TypeStreamEvent = "stream_event"
+	ClaudeTypeAssistant   = "assistant"
+	ClaudeTypeUser        = "user"
+	ClaudeTypeResult      = "result"
+	ClaudeTypeSystem      = "system"
+	ClaudeTypeStreamEvent = "stream_event"
 )
 
-// Discriminator values for SDKMessage.Subtype on system and result.
+// Discriminator values for StreamEvent.Subtype on Claude Code system
+// and result messages.
 const (
-	SubtypeInit                        = "init"
-	SubtypeCompactBoundary             = "compact_boundary"
-	SubtypeStatus                      = "status"
-	SubtypePostTurnSummary             = "post_turn_summary"
-	SubtypeSuccess                     = "success"
-	SubtypeErrorDuringExecution        = "error_during_execution"
-	SubtypeErrorMaxTurns               = "error_max_turns"
-	SubtypeErrorMaxBudgetUSD           = "error_max_budget_usd"
-	SubtypeErrorMaxStructuredOutRetry  = "error_max_structured_output_retries"
+	ClaudeSubtypeInit                     = "init"
+	ClaudeSubtypeCompactBoundary          = "compact_boundary"
+	ClaudeSubtypeStatus                   = "status"
+	ClaudeSubtypePostTurnSummary          = "post_turn_summary"
+	ClaudeSubtypeSuccess                  = "success"
+	ClaudeSubtypeErrorDuringExecution     = "error_during_execution"
+	ClaudeSubtypeErrorMaxTurns            = "error_max_turns"
+	ClaudeSubtypeErrorMaxBudgetUSD        = "error_max_budget_usd"
+	ClaudeSubtypeErrorMaxStructuredRetry  = "error_max_structured_output_retries"
 )
-
-// SDKMessage is one line of Claude Code stream-json output with the
-// Type and Subtype discriminators surfaced for dispatch. Raw preserves
-// the full JSON payload so callers can decode into a typed variant —
-// or hand the bytes onward unchanged when no typed form is available.
-type SDKMessage struct {
-	Type    string `json:"type"`
-	Subtype string `json:"subtype,omitempty"`
-
-	// Raw is the full JSON line as received. Not populated by json
-	// decoding — the adapter sets it from the source bytes.
-	Raw json.RawMessage `json:"-"`
-}
-
-// Decode unmarshals m.Raw into v. Returns an error if Raw is empty,
-// which signals that the message was hand-constructed rather than
-// produced by an adapter.
-func (m SDKMessage) Decode(v any) error {
-	if len(m.Raw) == 0 {
-		return ErrNoRawPayload
-	}
-	return json.Unmarshal(m.Raw, v)
-}
 
 // SDKAssistantMessage is the assistant turn — model output. The inner
 // Message field mirrors Anthropic's APIAssistantMessage from the

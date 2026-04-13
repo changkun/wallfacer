@@ -17,9 +17,10 @@ func NewClaudeCodeAdapter() ClaudeCodeAdapter { return ClaudeCodeAdapter{} }
 // Provider reports the provider this adapter handles.
 func (ClaudeCodeAdapter) Provider() Provider { return ProviderClaudeCode }
 
-// Parse decodes rawNDJSON line-by-line into SDK messages. The ProviderVersion
-// on the returned Trajectory is set to the first claude_code_version string
-// found in a system init message; absent init message = empty version.
+// Parse decodes rawNDJSON line-by-line into stream events. The
+// ProviderVersion on the returned Trajectory is set to the first
+// claude_code_version string found in a system init message; absent
+// init message = empty version.
 //
 // Parse returns an error on the first malformed line, identifying the
 // 1-based line number. Empty lines are skipped.
@@ -37,21 +38,21 @@ func (a ClaudeCodeAdapter) Parse(rawNDJSON []byte) (Trajectory, error) {
 		if len(raw) == 0 {
 			continue
 		}
-		var m SDKMessage
-		if err := json.Unmarshal(raw, &m); err != nil {
+		var ev StreamEvent
+		if err := json.Unmarshal(raw, &ev); err != nil {
 			return Trajectory{}, fmt.Errorf("trajectory: line %d: %w", lineNum, err)
 		}
 		// Copy raw out of the scanner's buffer before it is reused on
 		// the next iteration.
-		m.Raw = append(json.RawMessage(nil), raw...)
+		ev.Raw = append(json.RawMessage(nil), raw...)
 
-		if tr.ProviderVersion == "" && m.Type == TypeSystem && m.Subtype == SubtypeInit {
+		if tr.ProviderVersion == "" && ev.Type == ClaudeTypeSystem && ev.Subtype == ClaudeSubtypeInit {
 			var init SDKSystemInit
-			if err := m.Decode(&init); err == nil && init.ClaudeCodeVersion != "" {
+			if err := ev.Decode(&init); err == nil && init.ClaudeCodeVersion != "" {
 				tr.ProviderVersion = "claude-code/" + init.ClaudeCodeVersion
 			}
 		}
-		tr.Messages = append(tr.Messages, m)
+		tr.Events = append(tr.Events, ev)
 	}
 	if err := scanner.Err(); err != nil {
 		return Trajectory{}, fmt.Errorf("trajectory: scan: %w", err)
