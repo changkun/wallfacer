@@ -18,3 +18,4 @@ ui/assets/office/furniture/*.png
 ui/assets/office/tiles/*.png
 !ui/assets/office/effects/bubbles.png
 !ui/assets/office/README.md
+.gstack/
