@@ -449,30 +449,36 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 32px 16px 0;
+  padding: 48px 16px 0;
 }
 .board-empty-composer:empty {
   display: none;
 }
 
-.board-composer {
+/* The composer element also carries `.spec-chat-composer` so shared
+   child-class styles apply. Double-class selectors (.board-composer
+   .spec-chat-composer) raise specificity above the plain
+   `.spec-chat-composer*` rules in spec-mode.css and let us override
+   the shell's margin/padding/border-radius designed for the chat
+   footer variant. */
+.board-composer.spec-chat-composer {
   width: 100%;
-  max-width: 640px;
+  max-width: 680px;
+  margin: 0;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 20px;
+  gap: 14px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow, 0 4px 12px rgba(0, 0, 0, 0.12));
-  /* The composer also lives inside a `.spec-chat-composer` shell that
-     the planning chat uses; that shell ships its own margin which
-     would offset the centred card oddly here, so reset it. */
-  margin: 0;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   transition:
     opacity 260ms cubic-bezier(0.3, 0, 0.8, 0.15),
     transform 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
+}
+.board-composer.spec-chat-composer:focus-within {
+  border-color: var(--border);
 }
 .board-composer--submitting {
   opacity: 0;
@@ -480,44 +486,119 @@
   pointer-events: none;
 }
 .board-composer__label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
+  letter-spacing: -0.01em;
+  margin: 0;
 }
-.board-composer__input {
+.board-composer__input.spec-chat-composer__input {
   width: 100%;
+  min-height: 112px;
+  max-height: 320px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg-input, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 10px;
   resize: vertical;
-  min-height: 96px;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
-.board-composer__input--error {
+.board-composer__input.spec-chat-composer__input::placeholder {
+  color: var(--text-muted);
+}
+.board-composer__input.spec-chat-composer__input:focus {
+  border-color: var(--accent, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+.board-composer__input--error,
+.board-composer__input.spec-chat-composer__input.board-composer__input--error {
   border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
 }
-.board-composer__bar {
+.board-composer__bar.spec-chat-composer__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 0;
 }
-.board-composer__advanced-toggle {
-  background: none;
-  border: none;
-  padding: 4px 8px;
+.board-composer__advanced-toggle.spec-chat-composer__action {
+  width: auto;
+  height: auto;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
-.board-composer__advanced-toggle:hover {
+.board-composer__advanced-toggle.spec-chat-composer__action:hover {
+  background: var(--bg-hover);
   color: var(--text);
 }
-.board-composer__submit {
+.board-composer__chevron {
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.board-composer__advanced-toggle[aria-expanded="true"]
+  .board-composer__chevron {
+  transform: rotate(0deg);
+}
+.board-composer__submit.spec-chat-composer__send {
+  padding: 9px 18px;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: var(--accent, #6366f1);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.05s ease,
+    box-shadow 0.15s ease;
+}
+.board-composer__submit.spec-chat-composer__send:hover {
+  background: var(--accent-hover, var(--accent, #6366f1));
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+  opacity: 1;
+}
+.board-composer__submit.spec-chat-composer__send:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.board-composer__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 .board-composer__advanced {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border);
+  padding: 14px;
+  background: var(--bg-input, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 .board-composer__advanced.hidden {
   display: none;
@@ -525,8 +606,9 @@
 .board-composer__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--text-muted);
 }
 .board-composer__field--wide {
@@ -536,26 +618,31 @@
   align-self: flex-start;
 }
 .board-composer__bridge {
-  margin: 0;
-  padding-top: 4px;
+  margin: 2px 0 0;
+  padding: 0;
   font-size: 12px;
   color: var(--text-muted);
+  text-align: center;
 }
 .board-composer__plan-link {
   color: var(--accent, #6366f1);
   background: none;
   border: none;
-  padding: 0 4px;
+  padding: 0 2px;
   font: inherit;
+  font-weight: 500;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
 }
 .board-composer__plan-link:hover {
-  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .board-composer {
+  .board-composer.spec-chat-composer {
+    transition: none;
+  }
+  .board-composer__chevron {
     transition: none;
   }
 }
