@@ -438,24 +438,29 @@
 
 /* Empty-Board composer — mounted by ui/js/board-composer.js when the
    workspace has no tasks. The slot spans the whole board grid so the
-   composer can be horizontally centred above the (empty) columns. We
-   pin the composer to the top of the slot via align-items:flex-start
-   so the card is sized to its content rather than stretching to fill
-   whatever vertical space the implicit grid row absorbs. */
+   composer can be centred (horizontally AND vertically) over the now-
+   hidden kanban columns. */
 .board-empty-composer {
   grid-column: 1 / -1;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 32px 16px 0;
+  align-items: center;
+  padding: 16px;
+  min-height: 100%;
 }
 .board-empty-composer:empty {
   display: none;
 }
 
-/* When the composer is mounted, hide the kanban column wrappers so the
-   empty board shows only the composer — not a composer floating above
-   four empty column headers. */
+/* When the composer is mounted, collapse the board grid to a single
+   full-height row and hide the kanban columns so the empty board
+   shows only the composer — not a composer floating above four empty
+   column headers. The single 1fr row is what lets the flex slot above
+   resolve its `min-height: 100%` into real vertical space. */
+#board:has(#board-empty-composer:not(:empty)) {
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+}
 #board:has(#board-empty-composer:not(:empty)) > [id^="col-wrapper-"] {
   display: none;
 }
@@ -491,8 +496,10 @@
   width: 100%;
   max-width: 520px;
   margin: 0;
+  padding: 14px 14px 0;
   display: flex;
   flex-direction: column;
+  gap: 8px;
   transition:
     opacity 200ms ease,
     transform 200ms ease;
@@ -503,12 +510,10 @@
   pointer-events: none;
 }
 .board-composer__label {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
 }
 .board-composer__input.spec-chat-composer__input {
   min-height: 80px;
@@ -562,8 +567,8 @@
   transition: transform 0.15s ease;
 }
 .board-composer__submit.spec-chat-composer__send {
-  padding: 4px 12px;
-  font-size: 12px;
+  padding: 6px 14px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
   color: #fff;
@@ -615,8 +620,8 @@
   font-size: 11px;
 }
 .board-composer__bridge {
-  margin: 8px 0 0;
-  padding: 0;
+  margin: 4px 0 0;
+  padding: 0 0 12px;
   font-size: 11px;
   color: var(--text-muted);
   text-align: center;
