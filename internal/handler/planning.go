@@ -33,11 +33,18 @@ import (
 // BuildTree and therefore also don't count, which matches the
 // chat-first-mode spec's definition of an "effectively empty" tree.
 func selectPlanningSystemPrompt(workspaces []string) string {
-	activeCount := 0
 	for _, ws := range workspaces {
 		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
 		if err != nil {
-			continue // no specs/ directory — treat as empty
+			// BuildTree already returns (empty tree, nil) when specs/ is
+			// absent (os.IsNotExist), so any error here is a genuine I/O
+			// failure (permission denied, EIO, etc.). Defaulting to the
+			// empty-variant prompt would falsely signal "no specs" and
+			// invite the agent to scaffold against an unknown tree —
+			// safer to assume non-empty and surface the failure in logs.
+			slog.Warn("planning: spec tree read failed; defaulting to nonempty prompt",
+				"workspace", ws, "err", err)
+			return prompts.PlanningSystemNonempty()
 		}
 		for _, node := range tree.All {
 			if node.Value == nil {
@@ -46,19 +53,31 @@ func selectPlanningSystemPrompt(workspaces []string) string {
 			if node.Value.Status == spec.StatusArchived {
 				continue
 			}
-			activeCount++
-			if activeCount > 0 {
-				break
-			}
-		}
-		if activeCount > 0 {
-			break
+			return prompts.PlanningSystemNonempty()
 		}
 	}
-	if activeCount == 0 {
-		return prompts.PlanningSystemEmpty()
+	return prompts.PlanningSystemEmpty()
+}
+
+// assemblePlanningPrompt layers the per-turn system prompts on top of
+// the (already user-message-shaped) base. Final layout:
+//
+//	[planning_system][archivedSpecGuard][base]
+//
+// archivedSpecGuard sits closest to the base because its rail
+// ("don't write to this archived spec") is most relevant the moment
+// the model reads the user's request. The planning_system prompt wraps
+// the whole turn from the outside. Empty layers are skipped, so an
+// unfocused or non-archived spec produces just [planning_system][base].
+func assemblePlanningPrompt(workspaces []string, focusedSpec, base string) string {
+	out := base
+	if guard := archivedSpecGuard(workspaces, focusedSpec); guard != "" {
+		out = guard + out
 	}
-	return prompts.PlanningSystemNonempty()
+	if prefix := selectPlanningSystemPrompt(workspaces); prefix != "" {
+		out = prefix + "\n\n" + out
+	}
+	return out
 }
 
 // archivedSpecGuard returns a system-prompt prefix to prepend when the focused
@@ -253,16 +272,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	if req.FocusedSpec != "" && !strings.HasPrefix(req.Message, "/") {
 		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + prompt
 	}
-	// Prepend the planning-agent system prompt chosen per-turn based on
-	// whether the spec tree is effectively empty (no non-archived
-	// specs). Comes before archivedSpecGuard so a focused-archived-spec
-	// warning sits closest to the user prompt.
-	if prefix := selectPlanningSystemPrompt(h.currentWorkspaces()); prefix != "" {
-		prompt = prefix + "\n\n" + prompt
-	}
-	if guard := archivedSpecGuard(h.currentWorkspaces(), req.FocusedSpec); guard != "" {
-		prompt = guard + prompt
-	}
+	prompt = assemblePlanningPrompt(h.currentWorkspaces(), req.FocusedSpec, prompt)
 	cmd := []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
 
 	// Resume existing session if available.
