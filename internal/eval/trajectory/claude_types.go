@@ -82,6 +82,7 @@ type SDKResultSuccess struct {
 	ModelUsage        map[string]ModelUsage `json:"modelUsage"`
 	PermissionDenials []PermissionDenial    `json:"permission_denials"`
 	StructuredOutput  json.RawMessage       `json:"structured_output,omitempty"`
+	FastModeState     FastModeState         `json:"fast_mode_state,omitempty"`
 	UUID              string                `json:"uuid"`
 	SessionID         string                `json:"session_id"`
 }
@@ -102,9 +103,21 @@ type SDKResultError struct {
 	ModelUsage        map[string]ModelUsage `json:"modelUsage"`
 	PermissionDenials []PermissionDenial    `json:"permission_denials"`
 	Errors            []string              `json:"errors"`
+	FastModeState     FastModeState         `json:"fast_mode_state,omitempty"`
 	UUID              string                `json:"uuid"`
 	SessionID         string                `json:"session_id"`
 }
+
+// FastModeState enumerates Claude Code's fast-mode states. Values:
+// "off", "cooldown", "on".
+type FastModeState string
+
+// FastModeState values.
+const (
+	FastModeOff      FastModeState = "off"
+	FastModeCooldown FastModeState = "cooldown"
+	FastModeOn       FastModeState = "on"
+)
 
 // SDKSystemInit is the first message of a session — environment
 // manifest. Contains the claude-code CLI version string used to produce
@@ -126,6 +139,7 @@ type SDKSystemInit struct {
 	OutputStyle       string            `json:"output_style"`
 	Skills            []string          `json:"skills"`
 	Plugins           []PluginInfo      `json:"plugins"`
+	FastModeState     FastModeState     `json:"fast_mode_state,omitempty"`
 	UUID              string            `json:"uuid"`
 	SessionID         string            `json:"session_id"`
 }
