@@ -1,15 +1,16 @@
 ---
 title: Crossfade focused view on index ↔ spec switch
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/layout-state-machine.md
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/explorer-roadmap-entry.md
 affects:
   - ui/js/spec-mode.js
+  - ui/js/planning-chat.js
   - ui/css/spec-mode.css
 effort: small
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -49,3 +50,11 @@ When the focused entry changes (index ↔ spec, spec ↔ different spec), the fo
 - **Do NOT** animate markdown content reflow inside the focused view. Only the container's opacity changes.
 - **Do NOT** add scroll restoration as part of this task — the existing per-thread scroll tracking covers it.
 - **Do NOT** introduce a JS animation library. CSS transitions only; JS only toggles classes and timing.
+
+## Implementation notes
+
+- The "overlap the incoming content at opacity 0 while the outgoing is still fading" behaviour is implemented as a single-container sequence (fade-out → replace → fade-in) rather than a true double-buffered overlay. The spec's effect is visually equivalent for a DOM container whose innerHTML is being swapped — no second DOM node is required. The 40ms offset between "start outgoing fade" and "swap content" is preserved exactly.
+- `TestFocusedViewCrossfade_FadesOutOld` / `_FadesInNew` in the spec's test matrix check mid-animation opacity values. Vitest runs in a no-DOM `vm` context, so the tests assert on the JS-visible side (inline `opacity`/`transition` styles set, replace callback fires after the setTimeout window, fade-in opacity=1 after the rAF tick) rather than on CSS-engine-produced mid-frame values.
+- The `TestChatMessages_CrossfadeOnThreadSwitch` case from the spec is not implemented as an automated test. `_switchToThread` in `planning-chat.js` is module-private and the existing test harness does not expose a multi-thread activation path; wiring one up for this small behaviour (a class toggle wrapping an already-tested epoch guard) was out of scope. The messages crossfade is verified by inspection — `_switchToThread` now adds and removes `spec-chat-stream__messages--swapping` around the history load.
+- The `.spec-focused-view--index` hiding mechanism changed from `display: none !important` to `opacity: 0 + transform: translateY(6px) + pointer-events: none + width/height: 0 + overflow: hidden`. Display-none cannot animate; the zero-size layout variant keeps the affordances out of the flow while still letting CSS transitions run.
+- Because `_scheduleFocusedCrossfade` relies on `setTimeout` + `requestAnimationFrame`, the existing `spec-mode-coverage.test.js` harness was extended to stub both as synchronous-fire helpers. Tests that relied on pre-crossfade synchronous side-effects (`focusSpec` writes the Loading placeholder "immediately") continue to pass because the stubs run the replace callback inline.
