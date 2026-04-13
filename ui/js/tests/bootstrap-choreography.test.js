@@ -30,7 +30,7 @@ function makeEl(tag) {
       toggle: (c, force) => {
         if (force === true) classes.add(c);
         else if (force === false) classes.delete(c);
-        else (classes.has(c) ? classes.delete(c) : classes.add(c));
+        else classes.has(c) ? classes.delete(c) : classes.add(c);
       },
     },
     _classes: classes,

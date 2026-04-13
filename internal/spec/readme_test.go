@@ -9,12 +9,12 @@ import (
 
 func TestTrackDisplayName(t *testing.T) {
 	cases := map[string]string{
-		"local":         "Local Product",
-		"foundations":   "Foundations",
-		"cloud":         "Cloud Platform",
-		"shared":        "Shared Design",
-		"custom-track":  "Custom Track",
-		"single":        "Single",
+		"local":        "Local Product",
+		"foundations":  "Foundations",
+		"cloud":        "Cloud Platform",
+		"shared":       "Shared Design",
+		"custom-track": "Custom Track",
+		"single":       "Single",
 	}
 	for in, want := range cases {
 		if got := TrackDisplayName(in); got != want {

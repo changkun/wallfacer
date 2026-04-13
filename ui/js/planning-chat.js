@@ -479,9 +479,7 @@ var PlanningChat = (function () {
       // results so we don't paint stale history over the new thread.
       if (epoch !== _switchEpoch) return;
       if (_messagesEl && _messagesEl.classList) {
-        _messagesEl.classList.remove(
-          "spec-chat-stream__messages--swapping",
-        );
+        _messagesEl.classList.remove("spec-chat-stream__messages--swapping");
       }
       if (!_streaming && _streamingThreadId === id) {
         _attachStreamToLastBubble();

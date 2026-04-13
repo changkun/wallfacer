@@ -45,7 +45,7 @@ function makeEl(tag, id, registry) {
       toggle: (c, force) => {
         if (force === true) classes.add(c);
         else if (force === false) classes.delete(c);
-        else (classes.has(c) ? classes.delete(c) : classes.add(c));
+        else classes.has(c) ? classes.delete(c) : classes.add(c);
       },
     },
     setAttribute: (k, v) => attrs.set(k, v),

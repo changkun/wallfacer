@@ -135,14 +135,14 @@ func TestSlashCreate_ExpandsToDirective(t *testing.T) {
 
 func TestSlugify_BasicCases(t *testing.T) {
 	cases := map[string]string{
-		"Auth Refactor":              "auth-refactor",
-		"Hello, World!":              "hello-world",
-		"  Leading and trailing  ":   "leading-and-trailing",
-		"Multiple   spaces":          "multiple-spaces",
-		"UPPER case":                 "upper-case",
-		"snake_case_too":             "snake-case-too",
-		"numbers 123 and 456":        "numbers-123-and-456",
-		"!!! only punctuation ???":   "only-punctuation",
+		"Auth Refactor":            "auth-refactor",
+		"Hello, World!":            "hello-world",
+		"  Leading and trailing  ": "leading-and-trailing",
+		"Multiple   spaces":        "multiple-spaces",
+		"UPPER case":               "upper-case",
+		"snake_case_too":           "snake-case-too",
+		"numbers 123 and 456":      "numbers-123-and-456",
+		"!!! only punctuation ???": "only-punctuation",
 	}
 	for in, want := range cases {
 		if got := Slugify(in); got != want {

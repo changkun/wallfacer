@@ -29,7 +29,7 @@ function makeEl(tag) {
       toggle: (c, force) => {
         if (force === true) classes.add(c);
         else if (force === false) classes.delete(c);
-        else (classes.has(c) ? classes.delete(c) : classes.add(c));
+        else classes.has(c) ? classes.delete(c) : classes.add(c);
       },
     },
     _classes: classes,
@@ -84,7 +84,11 @@ function makeEl(tag) {
     querySelector: (sel) => {
       // Support `#id`, `.class`, `[attr=...]`, and `tag.class`
       const m = /^#([\w-]+)$/.exec(sel);
-      if (m) return el.children.find((c) => c.id === m[1]) || walk(el, (c) => c.id === m[1]);
+      if (m)
+        return (
+          el.children.find((c) => c.id === m[1]) ||
+          walk(el, (c) => c.id === m[1])
+        );
       const cm = /^\.([\w-]+)$/.exec(sel);
       if (cm) return walk(el, (c) => c._classes && c._classes.has(cm[1]));
       return null;
@@ -156,7 +160,8 @@ function makeContext({ reducedMotion = false, fetchImpl } = {}) {
     clearTimeout: () => {},
     populateSandboxSelects: vi.fn(),
     openTemplatesPicker: vi.fn(),
-    api: fetchImpl ||
+    api:
+      fetchImpl ||
       vi.fn(() => Promise.resolve({ id: "new-task-1", prompt: "Hi" })),
     Routes: {
       tasks: {

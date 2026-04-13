@@ -134,8 +134,7 @@ function _scheduleFocusedCrossfade(replaceFn) {
     return;
   }
   var myEpoch = ++_focusedCrossfadeEpoch;
-  bodyInner.style.transition =
-    "opacity 140ms cubic-bezier(0.3, 0, 0.8, 0.15)";
+  bodyInner.style.transition = "opacity 140ms cubic-bezier(0.3, 0, 0.8, 0.15)";
   bodyInner.style.opacity = "0";
   setTimeout(function () {
     if (myEpoch !== _focusedCrossfadeEpoch) return;
@@ -149,8 +148,7 @@ function _scheduleFocusedCrossfade(replaceFn) {
           };
     schedule(function () {
       if (myEpoch !== _focusedCrossfadeEpoch) return;
-      bodyInner.style.transition =
-        "opacity 180ms cubic-bezier(0.2, 0, 0, 1)";
+      bodyInner.style.transition = "opacity 180ms cubic-bezier(0.2, 0, 0, 1)";
       bodyInner.style.opacity = "1";
     });
   }, 40);
@@ -492,8 +490,7 @@ function focusRoadmapIndex(indexMeta) {
   _scheduleFocusedCrossfade(function () {
     var bodyInnerInit = document.getElementById("spec-focused-body-inner");
     if (bodyInnerInit) {
-      bodyInnerInit.innerHTML =
-        '<div class="spec-loading">Loading\u2026</div>';
+      bodyInnerInit.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
     }
   });
   var bodyInner = document.getElementById("spec-focused-body-inner");
