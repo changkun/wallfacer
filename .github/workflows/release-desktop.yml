@@ -56,6 +56,7 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Build desktop app
+        shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           go tool wails build -tags desktop,webkit2_41 -skipbindings -s -platform ${{ matrix.platform }} \
