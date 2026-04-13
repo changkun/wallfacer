@@ -503,7 +503,7 @@ describe("_applyMode edge cases", () => {
     ctx.switchMode("spec");
     const searchInput = ctx.document.getElementById("task-search");
     expect(searchInput.textContent || searchInput.placeholder).toContain(
-      "spec",
+      "plans",
     );
   });
 
@@ -1041,7 +1041,7 @@ describe("_showSpecReadme", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const titleEl = ctx.document.getElementById("spec-focused-title");
-    expect(titleEl.textContent).toBe("Specs");
+    expect(titleEl.textContent).toBe("Roadmap");
 
     expect(fetchMock).toHaveBeenCalled();
     const url = fetchMock.mock.calls[0][0];

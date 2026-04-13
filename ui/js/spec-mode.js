@@ -23,11 +23,17 @@ function resolveDefaultMode(opts) {
 }
 
 function _readSavedMode() {
-  var v =
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("wallfacer-mode")
-      : null;
-  return v === "board" || v === "plan" ? v : null;
+  if (typeof localStorage === "undefined") return null;
+  var v = localStorage.getItem("wallfacer-mode");
+  if (v === "board" || v === "plan") return v;
+  // Pre-rename installs persisted "spec" as the saved mode. Migrate it
+  // to "plan" on first read so the user's chat-first preference survives
+  // the rename instead of silently falling back to Board.
+  if (v === "spec") {
+    localStorage.setItem("wallfacer-mode", "plan");
+    return "plan";
+  }
+  return null;
 }
 
 function _persistSavedMode(internalMode) {
@@ -274,7 +280,7 @@ function _applyMode(mode) {
   if (searchInput) {
     searchInput.placeholder =
       mode === "spec"
-        ? "Filter specs\u2026"
+        ? "Filter plans\u2026"
         : "Filter tasks\u2026 or @search server";
   }
 
@@ -315,13 +321,16 @@ var _highlightTaskId = null;
 // preference is only updated when opts.persist is true — reserved for
 // explicit user actions (sidebar nav click, keyboard shortcut).
 function switchMode(mode, opts) {
-  if (mode === currentMode) return;
-
-  // An explicit user switch cancels any pending auto-resolution so a later
-  // task snapshot does not override the user's choice.
+  // An explicit user switch cancels any pending auto-resolution and
+  // updates the persisted preference even when clicking the already-
+  // active mode. Without this, clicking the provisional Board nav while
+  // resolution is still pending would leave _resolutionPending=true and
+  // the next task snapshot could flip back to Plan against the click.
   if (opts && opts.persist) {
     _resolutionPending = false;
+    _persistSavedMode(mode);
   }
+  if (mode === currentMode) return;
 
   // When leaving spec mode for board mode, capture the dispatched task ID
   // so we can highlight it on the board.
@@ -334,9 +343,6 @@ function switchMode(mode, opts) {
   }
 
   setCurrentMode(mode);
-  if (opts && opts.persist) {
-    _persistSavedMode(mode);
-  }
   _applyMode(mode);
 
   // Entering Board clears the sidebar unread dot — every visible task is
@@ -862,7 +868,10 @@ function _showSpecReadme() {
   var kindEl = document.getElementById("spec-focused-kind");
   var effortEl = document.getElementById("spec-focused-effort");
   var metaEl = document.getElementById("spec-focused-meta");
-  if (titleEl) titleEl.textContent = "Specs";
+  // The auto-loaded README acts as the Roadmap landing — match the
+  // pinned-explorer entry's "Roadmap" label rather than the legacy
+  // "Specs" string left over from the rename.
+  if (titleEl) titleEl.textContent = "Roadmap";
   if (statusEl) {
     statusEl.textContent = "";
     statusEl.className = "spec-focused-view__status";

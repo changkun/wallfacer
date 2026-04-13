@@ -777,18 +777,18 @@ function _searchLocal(query) {
     groups = [
       _groupWithTitle("Docs", docRows),
       _groupWithTitle("Tasks", taskRows),
-      _groupWithTitle("Specs", specRows),
+      _groupWithTitle("Plan", specRows),
     ];
   } else if (mode === "spec") {
     groups = [
-      _groupWithTitle("Specs", specRows),
+      _groupWithTitle("Plan", specRows),
       _groupWithTitle("Tasks", taskRows),
     ];
     if (docsAvailable) groups.push(_groupWithTitle("Docs", docRows));
   } else {
     groups = [
       _groupWithTitle("Tasks", taskRows),
-      _groupWithTitle("Specs", specRows),
+      _groupWithTitle("Plan", specRows),
     ];
     if (docsAvailable) groups.push(_groupWithTitle("Docs", docRows));
   }
