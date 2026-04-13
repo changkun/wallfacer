@@ -8,17 +8,18 @@ on:
 jobs:
   build-desktop:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: macos-latest
             platform: darwin/universal
-            artifact: Wallfacer-darwin-universal.zip
+            artifact: Wallfacer-Desktop-darwin-universal.zip
           - runner: windows-latest
             platform: windows/amd64
-            artifact: Wallfacer-windows-amd64.exe
+            artifact: Wallfacer-Desktop-windows-amd64.exe
           - runner: ubuntu-latest
             platform: linux/amd64
-            artifact: Wallfacer-linux-amd64
+            artifact: Wallfacer-Desktop-linux-amd64
 
     runs-on: ${{ matrix.runner }}
 
@@ -105,7 +106,7 @@ jobs:
 
       - name: Package macOS app
         if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent build/bin/Wallfacer.app Wallfacer-darwin-universal.zip
+        run: ditto -c -k --keepParent build/bin/Wallfacer.app Wallfacer-Desktop-darwin-universal.zip
 
       # --- Windows: code sign and rename ---
 
@@ -126,13 +127,13 @@ jobs:
       - name: Rename Windows executable
         if: runner.os == 'Windows'
         shell: powershell
-        run: Move-Item build\bin\Wallfacer.exe Wallfacer-windows-amd64.exe
+        run: Move-Item build\bin\Wallfacer.exe Wallfacer-Desktop-windows-amd64.exe
 
       # --- Linux: rename ---
 
       - name: Rename Linux binary
         if: runner.os == 'Linux'
-        run: mv build/bin/Wallfacer Wallfacer-linux-amd64
+        run: mv build/bin/Wallfacer Wallfacer-Desktop-linux-amd64
 
       # --- Upload ---
 
