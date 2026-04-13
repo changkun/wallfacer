@@ -407,6 +407,10 @@ function focusSpec(specPath, workspace) {
   var titleEl = document.getElementById("spec-focused-title");
   if (titleEl) titleEl.textContent = specPath;
   _scheduleFocusedCrossfade(function () {
+    // Guard against the fetch winning the race with the 40ms crossfade
+    // delay: when _focusedSpecContent is already populated, the spec has
+    // rendered and the loading placeholder would silently overwrite it.
+    if (_focusedSpecContent !== null) return;
     var innerEl = document.getElementById("spec-focused-body-inner");
     if (innerEl) {
       innerEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
@@ -488,6 +492,8 @@ function focusRoadmapIndex(indexMeta) {
   }
 
   _scheduleFocusedCrossfade(function () {
+    // See focusSpec for why this guard exists.
+    if (_focusedSpecContent !== null) return;
     var bodyInnerInit = document.getElementById("spec-focused-body-inner");
     if (bodyInnerInit) {
       bodyInnerInit.innerHTML = '<div class="spec-loading">Loading\u2026</div>';

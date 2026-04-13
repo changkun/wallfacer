@@ -253,3 +253,69 @@ describe("focusRoadmapIndex / focusSpec affordance toggle", () => {
     expect(view._classes.has("spec-focused-view--index")).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: focusSpec must not stomp the rendered body with "Loading…"
+// when fetch resolves before the 40ms crossfade replaceFn fires.
+// ---------------------------------------------------------------------------
+
+describe("focusSpec / focusRoadmapIndex — fast-fetch race", () => {
+  const SPEC_TEXT = `---
+title: My Spec
+status: drafted
+---
+
+# My Spec
+
+Body text here.
+`;
+
+  async function flushMicrotasks() {
+    // Three rounds covers fetch().then(res => res.text()).then(text => …).
+    for (let i = 0; i < 3; i++) await Promise.resolve();
+  }
+
+  it("TestFocusSpec_FetchBeatsCrossfade — body keeps rendered content, not 'Loading…'", async () => {
+    const ctx = makeContext();
+    ctx.activeWorkspaces = ["/ws"];
+    ctx.fetch = () =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(SPEC_TEXT),
+      });
+
+    ctx.focusSpec("specs/local/foo.md", "/ws");
+    // Fetch resolves on the microtask queue, beating the 40ms macrotask.
+    await flushMicrotasks();
+    // Now drain the 40ms timer (which would have set "Loading…" before the fix).
+    drainTimers(ctx);
+    drainRafs(ctx);
+
+    const inner = ctx.registry.get("spec-focused-body-inner");
+    expect(inner.innerHTML).not.toContain("Loading");
+    expect(inner.innerHTML).toContain("Body text here.");
+  });
+
+  it("TestFocusRoadmap_FetchBeatsCrossfade — roadmap body keeps content, not 'Loading…'", async () => {
+    const ctx = makeContext();
+    ctx.activeWorkspaces = ["/ws"];
+    ctx.fetch = () =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve("# Roadmap\n\nRoadmap body."),
+      });
+
+    ctx.focusRoadmapIndex({
+      path: "specs/README.md",
+      workspace: "/ws",
+      title: "Roadmap",
+    });
+    await flushMicrotasks();
+    drainTimers(ctx);
+    drainRafs(ctx);
+
+    const inner = ctx.registry.get("spec-focused-body-inner");
+    expect(inner.innerHTML).not.toContain("Loading");
+    expect(inner.innerHTML).toContain("Roadmap body.");
+  });
+});
