@@ -1063,6 +1063,53 @@ function startInlineTabRename(tabEl, index) {
   });
 }
 
+// _workspaceGroupKey returns a deterministic string identifier for a
+// workspace path-set: the absolute paths sorted and joined with "\u0000"
+// (NUL is illegal in POSIX paths, so it can't appear inside any path).
+function _workspaceGroupKey(paths) {
+  if (!paths || paths.length === 0) return "";
+  return paths.slice().sort().join("\u0000");
+}
+
+// _seenWorkspaceGroups returns the set of group keys that have ever been
+// activated on this device, persisted in localStorage so the markers
+// survive reloads.
+function _seenWorkspaceGroups() {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    var raw = localStorage.getItem("wallfacer-seen-workspace-groups");
+    if (!raw) return {};
+    var parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function _isUnseenWorkspaceGroup(paths) {
+  var key = _workspaceGroupKey(paths);
+  if (!key) return false;
+  var seen = _seenWorkspaceGroups();
+  return !seen[key];
+}
+
+function _rememberWorkspaceGroup(paths) {
+  if (typeof localStorage === "undefined") return;
+  var key = _workspaceGroupKey(paths);
+  if (!key) return;
+  var seen = _seenWorkspaceGroups();
+  seen[key] = 1;
+  try {
+    localStorage.setItem(
+      "wallfacer-seen-workspace-groups",
+      JSON.stringify(seen),
+    );
+  } catch (_) {
+    // Quota exceeded or storage disabled — best-effort only; the worst
+    // case is that the next switch is treated as new again.
+  }
+}
+
 async function applyWorkspaceSelection() {
   var status = document.getElementById("workspace-apply-status");
   var settingsStatus = document.getElementById("settings-workspace-status");
@@ -1078,11 +1125,23 @@ async function applyWorkspaceSelection() {
     });
     activeWorkspaces = workspaceSelectionDraft.slice();
     workspacePickerRequired = activeWorkspaces.length === 0;
-    // Mark the newly activated workspace group as "fresh" so the next
-    // resolveInitialMode call forces Plan mode regardless of saved
-    // preference or task count.
-    if (typeof markWorkspaceIsNew === "function") {
+    // Mark the newly activated workspace group as "fresh" only when its
+    // path-set fingerprint hasn't been activated before. Switching back
+    // to a long-used group (with its own saved Plan/Board preference)
+    // must not re-force Plan and override the user's saved choice.
+    if (
+      typeof markWorkspaceIsNew === "function" &&
+      _isUnseenWorkspaceGroup(activeWorkspaces)
+    ) {
       markWorkspaceIsNew();
+      _rememberWorkspaceGroup(activeWorkspaces);
+    }
+    // Tear down planning chat state — the server's planner now points at
+    // a different workspace group's threads, but the cached UI threads,
+    // tabs, and message bubbles all belong to the prior group and would
+    // bleed into the new one until something forced a reload.
+    if (typeof PlanningChat !== "undefined" && PlanningChat.reload) {
+      PlanningChat.reload();
     }
     await fetchConfig();
     hideHeaderWorkspaceGroups();

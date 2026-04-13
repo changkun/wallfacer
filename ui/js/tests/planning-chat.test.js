@@ -74,6 +74,13 @@ function makeEl(tag, registry) {
     },
     set innerHTML(v) {
       _innerHTML = v;
+      // Real DOM detaches all children when innerHTML is overwritten
+      // (including setting to ""). Mirror that here so tests catch
+      // teardown bugs that depend on the children list shrinking.
+      for (const child of _children) {
+        if (child) child.parentElement = null;
+      }
+      _children.length = 0;
     },
     get textContent() {
       return _textContent;
@@ -671,5 +678,92 @@ describe("PlanningChat", () => {
     expect(postBody).not.toBeNull();
     expect(postBody.thread).toBe("t1");
     expect(postBody.message).toBe("hello");
+  });
+
+  // ---- workspace switch teardown (regression) ----
+
+  it("reload tears down threads + messages so a workspace switch doesn't leak the prior group's chat", async () => {
+    // Workspace A: the default makeContext() seeds {t1: 'Chat 1'} and one
+    // history entry. Initialise so the tab/messages caches are populated.
+    const messagesFetched = [];
+    const baseApi = ctx.api;
+    ctx.api = (url) => {
+      if (
+        typeof url === "string" &&
+        url.indexOf("/api/planning/messages") === 0
+      ) {
+        messagesFetched.push(url);
+        return Promise.resolve([
+          {
+            role: "user",
+            content: "groupA-msg",
+            timestamp: "2026-01-01T00:00:00Z",
+          },
+        ]);
+      }
+      return baseApi(url);
+    };
+    await ctx.PlanningChat.init();
+    const tabs = ctx.document.getElementById("spec-chat-tabs");
+    const messages = ctx.document.getElementById("spec-chat-messages");
+    const initialTabCount = tabs.children.length;
+    const initialMessagesCount = messages.children.length;
+    expect(initialTabCount).toBeGreaterThan(0);
+    expect(initialMessagesCount).toBe(1);
+
+    // Workspace B: a different thread manifest and history. After reload
+    // the previous group's tabs and bubbles must be gone, replaced by B's.
+    ctx.api = (url) => {
+      if (
+        typeof url === "string" &&
+        url.indexOf("/api/planning/threads") !== -1
+      ) {
+        return Promise.resolve({
+          threads: [
+            { id: "t99", name: "B-Chat", archived: false, active: true },
+          ],
+          active_id: "t99",
+        });
+      }
+      if (
+        typeof url === "string" &&
+        url.indexOf("/api/planning/messages") === 0
+      ) {
+        messagesFetched.push(url);
+        return Promise.resolve([
+          {
+            role: "user",
+            content: "groupB-msg",
+            timestamp: "2026-02-01T00:00:00Z",
+          },
+          {
+            role: "assistant",
+            content: "groupB-reply",
+            timestamp: "2026-02-01T00:00:01Z",
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    };
+    await ctx.PlanningChat.reload();
+
+    // Tab bar must reflect B exclusively — no t1/Chat 1 leftover.
+    const tabLabels = tabs.children
+      .flatMap((c) => (c.children ? c.children : []))
+      .filter(
+        (c) => c.classList && c.classList.contains("spec-chat-tab__label"),
+      )
+      .map((c) => c.textContent);
+    expect(tabLabels).toContain("B-Chat");
+    expect(tabLabels).not.toContain("Chat 1");
+
+    // The history fetch after reload must be scoped to thread t99
+    // (the newly active thread of the new workspace group), not t1.
+    const lastFetch = messagesFetched[messagesFetched.length - 1];
+    expect(lastFetch).toContain("thread=t99");
+
+    // Messages list shrunk back to exactly B's two bubbles — A's bubble
+    // is gone and B's two are appended fresh (not stacked on top of A).
+    expect(messages.children.length).toBe(2);
   });
 });

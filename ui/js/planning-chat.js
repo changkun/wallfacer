@@ -1331,11 +1331,38 @@ var PlanningChat = (function () {
     return _currentQueue().slice();
   }
 
+  // reload tears down all per-workspace-group state (threads, history,
+  // any in-flight stream) and re-fetches the manifest for the new active
+  // workspace group. Called from applyWorkspaceSelection in workspace.js
+  // so the chat pane never displays the previous group's messages after
+  // a switch.
+  async function reload() {
+    if (_activeStream) {
+      _activeStream.abort();
+      _activeStream = null;
+    }
+    _streaming = false;
+    _streamingThreadId = null;
+    if (_interruptBtn) _interruptBtn.style.display = "none";
+    if (_sendBtn) _sendBtn.style.display = "";
+    _threads = {};
+    _threadOrder = [];
+    _archivedList = [];
+    _activeThreadId = null;
+    if (_messagesEl) _messagesEl.innerHTML = "";
+    if (_tabsEl) _tabsEl.innerHTML = "";
+    _renderQueue();
+    if (!_messagesEl) return;
+    await _loadThreads();
+    await _loadHistory();
+  }
+
   return {
     init: init,
     sendMessage: sendMessage,
     clearHistory: clearHistory,
     isStreaming: isStreaming,
     getQueue: getQueue,
+    reload: reload,
   };
 })();
