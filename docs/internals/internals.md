@@ -40,13 +40,19 @@ Full HTTP route reference (97 routes), SSE streaming, WebSocket terminal, Promet
 
 Background watchers, the autopilot promotion loop, auto-test, auto-submit, auto-retry, circuit breakers, ideation scheduling, and startup sequence.
 
-### 7. Workspaces & Configuration
+### 7. Plan Mode
+
+[Plan Mode](plan-mode.md)
+
+Spec document model, spec tree building, planning sandbox, slash commands, dispatch pipeline, archive/unarchive, planning undo via git revert, and the SSE spec tree stream.
+
+### 8. Workspaces & Configuration
 
 [Workspaces & Configuration](workspaces-and-config.md)
 
 Workspace manager, sandbox routing, system prompt templates, environment configuration, runtime workspace switching, and AGENTS.md instructions.
 
-### 8. Development Setup
+### 9. Development Setup
 
 [Development Setup](development.md)
 

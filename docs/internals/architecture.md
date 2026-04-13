@@ -7,7 +7,7 @@ Wallfacer is a host-native Go service that coordinates autonomous coding agents 
 ```mermaid
 graph TB
     subgraph Browser
-        UI["Browser UI<br/>(Vanilla JS + Tailwind + Sortable.js)<br/>Drag-and-drop task board, SSE live updates"]
+        UI["Browser UI<br/>(Vanilla JS + Tailwind + Sortable.js)<br/>Board + Plan (spec explorer, minimap, planning chat)"]
     end
 
     subgraph Server["Go Server (stdlib net/http)"]
@@ -15,21 +15,27 @@ graph TB
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
         Automation["Automation Loops<br/>promote / test / submit<br/>sync / retry / refine / ideation"]
+        Plan["Plan Mode<br/>spec tree + planner<br/>dispatch + undo"]
 
         Handler --> Runner
+        Handler --> Plan
         Runner --> Store
         Automation --> Store
+        Plan --> Store
         Store -.->|pub/sub| Automation
     end
 
     subgraph Infra["Host Infrastructure"]
-        Containers["Sandbox Containers<br/>Claude / Codex images<br/>ephemeral, one per turn"]
+        Containers["Sandbox Containers<br/>Claude / Codex images<br/>ephemeral task + long-lived planning"]
         Worktrees["Per-task Git Worktrees<br/>~/.wallfacer/worktrees/<br/>task/ID branches"]
+        SpecsFS["specs/ (markdown + frontmatter)<br/>planning threads<br/>~/.wallfacer/planning/&lt;fp&gt;/"]
         Containers --- Worktrees
     end
 
     UI -->|"HTTP / SSE"| Handler
     Runner -->|os/exec| Containers
+    Plan -->|os/exec| Containers
+    Plan -->|read/write| SpecsFS
 ```
 
 ## Design Decisions
@@ -309,8 +315,8 @@ Every `internal/` package and its role in the system:
 | `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support; persistent workspace group configurations | `Manager`, `Snapshot`, `Group`, `NewManager()`, `NewStatic()`, `LoadGroups()`, `SaveGroups()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `StartFlow()`, `Provider`, `Claude`, `Codex` |
-| `planner` | Planning sandbox lifecycle, conversation store, slash command registry | `Planner`, `ConversationStore`, `CommandRegistry` |
-| `spec` | Spec document model: types, YAML frontmatter parsing, tree building, validation, progress tracking, impact analysis | `Spec`, `Tree`, `BuildTree()`, `ParseFrontmatter()`, `Validate()` |
+| `planner` | Long-lived workspace-scoped planning sandbox lifecycle; per-thread `messages.jsonl` + `session.json` persistence under `~/.wallfacer/planning/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination so only one thread runs at once | `Planner`, `ThreadManager`, `ConversationStore`, `CommandRegistry`, `ThreadMeta`, `Slugify`, `Expand` |
+| `spec` | Spec document model: YAML frontmatter parse/write round-trip; six-state lifecycle state machine; recursive tree builder with companion-directory convention; per-spec + cross-spec validation; atomic scaffold (`O_CREATE|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
 | `pty` | PTY relay for WebSocket terminal integration | `PTY`, `Start()` |
 
 Top-level packages:
@@ -387,7 +393,13 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `explorer.go` | File explorer: directory listing, file read/write, binary detection | `GET /api/explorer/tree`, `GET /api/explorer/file`, `PUT /api/explorer/file`, `GET /api/explorer/stream` |
 | `images.go` | Sandbox image management: status check, pull, delete | `GET /api/images`, `POST /api/images/pull`, `DELETE /api/images`, `GET /api/images/pull/stream` |
 | `planning.go` | Planning chat agent: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/planning/messages`, `GET /api/planning/messages/stream`, `POST /api/planning/messages/interrupt`, `GET /api/planning/commands` |
-| `specs.go` | Spec tree with metadata and progress | `GET /api/specs/tree`, `GET /api/specs/stream` |
+| `planning_directive.go` | `/spec-new` directive scanner: line-oriented, fence-aware parser that extracts scaffold requests from assistant output and calls `spec.Scaffold` | — (internal; called from planning chat commit path) |
+| `planning_git.go` | Staging/committing planning rounds on the workspace branch with `Plan-Thread` and `Plan-Round` trailers so undo can target the caller's thread | — (internal) |
+| `planning_system_prompt.go` | Per-turn selection of the planning-agent system prompt (empty vs non-empty workspace variants) and archived-spec guard | — (internal) |
+| `planning_threads.go` | Planning chat thread CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/planning/threads`, `PATCH /api/planning/threads/{id}`, `POST /api/planning/threads/{id}/archive|unarchive|activate` |
+| `planning_undo.go` | Undo the caller thread's most recent planning round via `git revert`; cancels kanban tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/planning/undo` |
+| `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/archive`, `POST /api/specs/unarchive` |
+| `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates kanban tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter (rollback on partial failure) | `POST /api/specs/dispatch`, `POST /api/specs/undispatch` |
 | `terminal.go` | WebSocket terminal relay for host shell and container exec | `GET /api/terminal/ws` |
 
 ## Structured Logging
