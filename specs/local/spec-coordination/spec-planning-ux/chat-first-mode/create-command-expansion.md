@@ -1,14 +1,16 @@
 ---
 title: Expand /create slash command to a /spec-new directive
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
 affects:
   - internal/planner/commands.go
-  - internal/planner/commands_templates/
+  - internal/planner/commands_templates/create.tmpl
+  - internal/handler/planning.go
+  - internal/handler/planning_directive.go
 effort: small
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -48,3 +50,10 @@ Route the user-driven `/create <title>` command through the same `spec.Scaffold`
 - **Do NOT** require the user to specify a path. The slug is derived from the title argument.
 - **Do NOT** remove the directive-scanner path from `spec-new-directive-parser.md`. `/create` is an additional entry point; the parser-based path still handles agent-originated directives.
 - **Do NOT** add new slash commands beyond `/create` in this task. Other commands are unchanged.
+
+## Implementation notes
+
+- Collision resolution lives in the handler (`resolveUniqueSpecPath`) rather than in `Slugify`. `Slugify` stays pure — `(title) → slug` — which keeps the template FuncMap simple and makes it trivially testable. The handler already has the workspace root needed to check for existing files; teaching the slugger about workspaces would force the CommandRegistry to accept one too, for no real gain.
+- The "safer" path from the spec is the one taken: the server scaffolds the file before the agent runs, strips the `/spec-new` line from the expanded prompt, and prepends a `[Focused spec: …]` hint so the agent targets the freshly created file. The directive scanner in the post-stream handler still fires if the agent echoes the directive, but the scaffold collision check there turns any duplicate into a benign `system`-role message; it does not corrupt the already-written spec.
+- `TestSendPlanningMessage_SlashCreate_*` integration tests are not included for the same reason noted on `spec-new-directive-parser.md`: the planner sandbox is not mocked in the handler test harness. The function-level tests (`TestApplySlashSpecNew_*`, `TestResolveUniqueSpecPath_*`, `TestSlashCreate_ExpandsToDirective`, and the `TestSlugify_*` set) cover every branch that integration tests would exercise.
+- An empty-title edge case (`TestSlugify_BasicCases` covers "" → "") surfaces through `applySlashSpecNew` as a 400: when the slug is empty the template produces `specs/local/.md`, the handler detects the empty filename stem, and returns a clear error before touching the filesystem.
