@@ -37,6 +37,8 @@ When the planning agent wants to start a new spec, it emits a single `/spec-new 
 
 On recognition, the server calls the shared spec scaffolder to create the file with valid YAML frontmatter, then appends the agent's body text after the frontmatter. The path must live under `specs/<track>/<slug>.md`; other locations are rejected with a `system` message in the chat. The agent's raw response (including the directive line itself) still streams to the chat unchanged — the directive is a parallel side-effect, not a stream rewrite.
 
+After each successful scaffold the server also ensures `specs/README.md` exists: if missing, it is created with a minimal template listing the new spec under the correct track heading; if present, a new row is appended to the track's table. User-authored prose outside the track tables is preserved byte-for-byte, and existing rows are never re-ordered. If the agent opened its body with a short summary sentence, that sentence is used as the "Delivers" cell; otherwise a placeholder invites a later manual fill.
+
 If the scaffold fails (name collision, invalid path, I/O error), a short "Couldn't create &lt;path&gt;: &lt;reason&gt;" message appears in the chat and the round continues normally. Archive an unwanted spec from the focused view if you want to drop one the agent created over-eagerly.
 
 ### Slash Commands

@@ -264,7 +264,61 @@ func scaffoldDirective(workspace string, d Directive, now time.Time) (string, er
 			return abs, appendErr
 		}
 	}
+	// Ensure the workspace Roadmap references the new spec. Failures
+	// here surface up as a scaffold-level error so the caller can
+	// decide whether to emit a system message (processDirectives
+	// currently does — README failures are never silently swallowed,
+	// per the "best-effort but visible" design).
+	readmeMeta := spec.Meta{
+		Path:    d.Path,
+		Title:   title,
+		Status:  status,
+		Summary: firstSentence(d.Body),
+	}
+	if rerr := spec.EnsureReadme(workspace, readmeMeta); rerr != nil {
+		return abs, fmt.Errorf("update specs/README.md: %w", rerr)
+	}
 	return abs, nil
+}
+
+// firstSentence returns the leading sentence of a markdown body so it
+// can be used as the README's "Delivers" column. Sentence boundaries
+// are approximated by the first `.`, `!`, `?`, or end-of-line outside
+// of a code fence. Returns an empty string when the body has no
+// meaningful prose.
+func firstSentence(body string) string {
+	if body == "" {
+		return ""
+	}
+	inFence := false
+	var sentence strings.Builder
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || trimmed == "" || strings.HasPrefix(trimmed, "#") ||
+			strings.HasPrefix(trimmed, "<!--") ||
+			strings.HasPrefix(trimmed, "|") {
+			// Skip structural lines — we only want prose.
+			if sentence.Len() > 0 {
+				break
+			}
+			continue
+		}
+		for _, r := range trimmed {
+			if r == '.' || r == '!' || r == '?' {
+				sentence.WriteRune(r)
+				return strings.TrimSpace(sentence.String())
+			}
+			sentence.WriteRune(r)
+		}
+		if sentence.Len() > 0 {
+			break
+		}
+	}
+	return strings.TrimSpace(sentence.String())
 }
 
 func isValidStatus(s spec.Status) bool {

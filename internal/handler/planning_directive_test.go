@@ -317,3 +317,77 @@ func TestProcessDirectives_NoWorkspaceReturnsSystemMessage(t *testing.T) {
 		t.Fatalf("expected single system message, got %+v", sys)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// README auto-create — readme-autocreate spec.
+// ---------------------------------------------------------------------------
+
+func TestScaffoldDirective_FirstScaffoldCreatesReadme(t *testing.T) {
+	ws := t.TempDir()
+	d := Directive{
+		Path:   "specs/local/auth.md",
+		Title:  "Auth refactor",
+		Status: spec.StatusDrafted,
+		Body:   "Rework the session token storage to meet the new compliance rule. Extra paragraph describing approach.",
+	}
+	if _, err := scaffoldDirective(ws, d, time.Now()); err != nil {
+		t.Fatalf("scaffoldDirective: %v", err)
+	}
+	readme, err := os.ReadFile(filepath.Join(ws, "specs", "README.md"))
+	if err != nil {
+		t.Fatalf("read readme: %v", err)
+	}
+	body := string(readme)
+	if !strings.Contains(body, "## Local Product") {
+		t.Errorf("missing track heading: %s", body)
+	}
+	if !strings.Contains(body, "| [auth.md](local/auth.md) | Drafted | Rework the session token storage to meet the new compliance rule. |") {
+		t.Errorf("row missing or summary wrong: %s", body)
+	}
+}
+
+func TestScaffoldDirective_SecondScaffoldAppendsRow(t *testing.T) {
+	ws := t.TempDir()
+	first := Directive{Path: "specs/local/one.md", Body: "Entry one summary."}
+	if _, err := scaffoldDirective(ws, first, time.Now()); err != nil {
+		t.Fatalf("first scaffold: %v", err)
+	}
+	second := Directive{Path: "specs/local/two.md", Body: "Entry two summary."}
+	if _, err := scaffoldDirective(ws, second, time.Now()); err != nil {
+		t.Fatalf("second scaffold: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(ws, "specs", "README.md"))
+	if err != nil {
+		t.Fatalf("read readme: %v", err)
+	}
+	got := string(body)
+	if !strings.Contains(got, "[one.md](local/one.md)") {
+		t.Errorf("first row missing: %s", got)
+	}
+	if !strings.Contains(got, "[two.md](local/two.md)") {
+		t.Errorf("second row missing: %s", got)
+	}
+	oneIdx := strings.Index(got, "[one.md]")
+	twoIdx := strings.Index(got, "[two.md]")
+	if oneIdx > twoIdx {
+		t.Errorf("row order wrong: one=%d, two=%d", oneIdx, twoIdx)
+	}
+}
+
+func TestFirstSentence(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"", ""},
+		{"A short one-liner.", "A short one-liner."},
+		{"First sentence. Second one.", "First sentence."},
+		{"Question? Not this.", "Question?"},
+		{"## Heading\n\nBody sentence. Extra.", "Body sentence."},
+		{"```\ncode block\n```\nProse sentence. Rest.", "Prose sentence."},
+		{"<!-- comment -->\nReal prose here.", "Real prose here."},
+		{"No terminator but just text", "No terminator but just text"},
+	}
+	for _, tc := range cases {
+		if got := firstSentence(tc.in); got != tc.want {
+			t.Errorf("firstSentence(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
