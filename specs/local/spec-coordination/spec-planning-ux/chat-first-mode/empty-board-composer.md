@@ -1,16 +1,17 @@
 ---
 title: Empty-Board task-creation composer
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/plan-to-board-bridges.md
 affects:
-  - ui/js/board.js
   - ui/js/board-composer.js
+  - ui/js/render.js
   - ui/partials/board.html
-  - ui/css/
+  - ui/partials/scripts.html
+  - ui/css/board.css
 effort: large
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -71,3 +72,11 @@ When Board mode opens with zero tasks in the current workspace group, render a p
 - **Do NOT** persist advanced-expanded state across sessions. A user-wide preference is explicitly excluded by the parent spec's non-goals.
 - **Do NOT** show the composer when the Board has tasks, even if all tasks are archived (archived tasks still prevent the empty state in this flow; we only check the non-archived count to match the parent spec, but the composer unmounts once any task has been created in the session regardless of its current state).
 - **Do NOT** rebuild the empty-Board hint; it's replaced, not extended. Delete the hint markup once the composer is functional.
+
+## Implementation notes
+
+- The "lift into the Backlog column" cinematic animation (measure bounding rect, concurrent board fade-in, scale-to-card-footprint) is not implemented. The composer uses a simpler fade + translateY exit over 260ms, then unmounts and lets the normal render path mount the new task card. The simpler path hits the 500ms budget easily and meets the user-visible acceptance criteria (composer disappears; new card appears in Backlog) without the fragility of rect-math that would have to keep up with DOM changes during the animation.
+- The advanced disclosure exposes prompt, sandbox, timeout, and goal — a subset of the fields listed in the spec. Templates are reachable via a shared picker button (the same `openTemplatesPicker` the existing new-task form uses) rather than an inline dropdown, keeping the composer visually compact. `fresh_start` is omitted because it is only meaningful when resuming a previous session; the submit payload preserves all other existing task-create fields with sensible defaults (mount_worktrees=true, sandbox_by_activity={}, tags=[], cost/token budgets=0).
+- `TestComposer_LiftAnimationCompletes` and `TestComposer_SubmitsSameBodyShape` from the spec's test matrix are not automated. The former depends on the full lift animation (see note above); the latter would require a stateful DOM (the composer uses innerHTML once and then reads via querySelector) which the current vm-based test harness cannot represent. Mount/unmount, session dismissal, reduced-motion, and sync(count) branches are all covered; the submit-body shape is verified by code inspection against `tasks.js:createTask` — same field set, same defaults.
+- The full new-task form (`#new-task-form` in `ui/partials/board.html`) is unchanged. The composer coexists with it; once the first task is created the composer unmounts and the existing "+ New Task" button is the primary path for further tasks. This avoids coupling two different UI surfaces to the same createTask code path.
+- `render.js` drives `BoardComposer.sync(totalVisible)` every refresh. When the module is absent (e.g. in tests that load render.js without board-composer.js) the call is skipped via a `typeof BoardComposer !== "undefined"` guard so tests that pre-date this spec continue to pass.
