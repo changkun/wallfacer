@@ -15,10 +15,11 @@ import (
 // haven't mirrored yet, a test here fails with a pointer to the missing
 // field instead of the drift sneaking in silently.
 
-// TestClaudeCodeAdapter_RealFixture parses a real captured turn and
-// asserts the adapter produces the expected event sequence. This is a
-// "soft" test — it verifies parsing works end-to-end without enforcing
-// schema completeness. The companion strict test enforces that.
+// TestClaudeCodeAdapter_RealFixture parses a real captured multi-tool
+// turn and asserts the adapter produces the expected event mix.
+// Long assistant text, thinking, tool_use inputs, and tool_result
+// payloads were trimmed before check-in to keep the fixture compact;
+// event shape is otherwise unchanged from the on-disk original.
 func TestClaudeCodeAdapter_RealFixture(t *testing.T) {
 	t.Parallel()
 
@@ -35,34 +36,49 @@ func TestClaudeCodeAdapter_RealFixture(t *testing.T) {
 		t.Errorf("ProviderVersion empty; expected claude-code/<version> from init")
 	}
 
-	// Expected event sequence, matching the fixture's 9 lines:
-	//   system/init, assistant, assistant, rate_limit_event, user,
-	//   assistant, user, assistant, result/success.
-	wantTypes := []struct{ Type, Subtype string }{
-		{ClaudeTypeSystem, ClaudeSubtypeInit},
-		{ClaudeTypeAssistant, ""},
-		{ClaudeTypeAssistant, ""},
-		{"rate_limit_event", ""},
-		{ClaudeTypeUser, ""},
-		{ClaudeTypeAssistant, ""},
-		{ClaudeTypeUser, ""},
-		{ClaudeTypeAssistant, ""},
-		{ClaudeTypeResult, ClaudeSubtypeSuccess},
+	counts := map[string]int{}
+	for _, ev := range tr.Events {
+		key := ev.Type
+		if ev.Subtype != "" {
+			key += "/" + ev.Subtype
+		}
+		counts[key]++
 	}
-	if got, want := len(tr.Events), len(wantTypes); got != want {
-		t.Fatalf("len(Events) = %d, want %d", got, want)
-	}
-	for i, w := range wantTypes {
-		got := tr.Events[i]
-		if got.Type != w.Type || got.Subtype != w.Subtype {
-			t.Errorf("Events[%d] = {%q,%q}, want {%q,%q}", i, got.Type, got.Subtype, w.Type, w.Subtype)
+	for _, want := range []string{
+		ClaudeTypeSystem + "/" + ClaudeSubtypeInit,
+		ClaudeTypeAssistant,
+		ClaudeTypeUser,
+		ClaudeTypeResult + "/" + ClaudeSubtypeSuccess,
+	} {
+		if counts[want] == 0 {
+			t.Errorf("expected at least one %q event, got none", want)
 		}
 	}
+	// Multi-tool trajectory should have plenty of assistant and user
+	// turns, not just a single round-trip.
+	if counts[ClaudeTypeAssistant] < 5 {
+		t.Errorf("assistant events = %d, want >= 5 (multi-tool trajectory)", counts[ClaudeTypeAssistant])
+	}
+	if counts[ClaudeTypeUser] < 3 {
+		t.Errorf("user events = %d, want >= 3 (tool_result rounds)", counts[ClaudeTypeUser])
+	}
 
-	// Spot-check typed decoding of the init message.
+	// Find the system.init event and verify it carries usable
+	// metadata. Position is not guaranteed — real streams can open
+	// with a rate_limit_event before init lands.
 	var init SDKSystemInit
-	if err := tr.Events[0].Decode(&init); err != nil {
-		t.Fatalf("Decode init: %v", err)
+	foundInit := false
+	for _, ev := range tr.Events {
+		if ev.Type == ClaudeTypeSystem && ev.Subtype == ClaudeSubtypeInit {
+			if err := ev.Decode(&init); err != nil {
+				t.Fatalf("Decode init: %v", err)
+			}
+			foundInit = true
+			break
+		}
+	}
+	if !foundInit {
+		t.Fatalf("no system.init event in fixture")
 	}
 	if init.Model == "" {
 		t.Errorf("init.Model empty")
@@ -71,9 +87,13 @@ func TestClaudeCodeAdapter_RealFixture(t *testing.T) {
 		t.Errorf("init.ClaudeCodeVersion empty")
 	}
 
-	// Spot-check typed decoding of the final result.
+	// The final event must be the terminal result.success.
+	last := tr.Events[len(tr.Events)-1]
+	if last.Type != ClaudeTypeResult || last.Subtype != ClaudeSubtypeSuccess {
+		t.Fatalf("last event = {%q,%q}, want result/success", last.Type, last.Subtype)
+	}
 	var res SDKResultSuccess
-	if err := tr.Events[8].Decode(&res); err != nil {
+	if err := last.Decode(&res); err != nil {
 		t.Fatalf("Decode result: %v", err)
 	}
 	if res.NumTurns == 0 {
@@ -84,6 +104,36 @@ func TestClaudeCodeAdapter_RealFixture(t *testing.T) {
 	}
 	if len(res.ModelUsage) == 0 {
 		t.Errorf("res.ModelUsage empty")
+	}
+
+	// Spot-check that assistant messages carry the content block mix
+	// this fixture was chosen for — thinking + tool_use + text.
+	blockKinds := map[string]int{}
+	for _, ev := range tr.Events {
+		if ev.Type != ClaudeTypeAssistant {
+			continue
+		}
+		var asm SDKAssistantMessage
+		if err := ev.Decode(&asm); err != nil {
+			t.Fatalf("Decode assistant: %v", err)
+		}
+		// message is raw — peek just enough to count block kinds.
+		var shaped struct {
+			Content []struct {
+				Type string `json:"type"`
+			} `json:"content"`
+		}
+		if err := decodeRaw(asm.Message, &shaped); err != nil {
+			t.Fatalf("decode assistant message body: %v", err)
+		}
+		for _, c := range shaped.Content {
+			blockKinds[c.Type]++
+		}
+	}
+	for _, kind := range []string{"thinking", "tool_use", "text"} {
+		if blockKinds[kind] == 0 {
+			t.Errorf("no assistant content blocks of kind %q", kind)
+		}
 	}
 }
 
@@ -165,4 +215,12 @@ func mustRead(t *testing.T, path string) []byte {
 		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
+}
+
+// decodeRaw unmarshals raw into v without the strict-decoder's
+// DisallowUnknownFields — used when peeking into nested, vendor-owned
+// JSON shapes (e.g. assistant message bodies) that this package
+// intentionally does not model.
+func decodeRaw(raw []byte, v any) error {
+	return json.Unmarshal(raw, v)
 }
