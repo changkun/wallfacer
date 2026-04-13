@@ -3,6 +3,7 @@ package spec
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -298,7 +299,12 @@ func TestEnsureReadme_AtomicWriteDoesNotLoseContentOnRenameFailure(t *testing.T)
 	// Simulate a rename failure by making the parent directory
 	// read-only AFTER the initial file is in place. On most POSIX
 	// systems this prevents rename from replacing the file, so the
-	// original should remain untouched.
+	// original should remain untouched. Windows does not honor POSIX
+	// directory permissions, so the rename succeeds and the simulation
+	// does not apply.
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX directory perms don't block writes on Windows")
+	}
 	if os.Getuid() == 0 {
 		t.Skip("skipping atomic-write failure simulation as root")
 	}
