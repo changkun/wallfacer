@@ -449,156 +449,122 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 48px 16px 0;
+  padding: 32px 16px 0;
 }
 .board-empty-composer:empty {
   display: none;
 }
 
-/* The composer element also carries `.spec-chat-composer` so shared
-   child-class styles apply. Double-class selectors (.board-composer
-   .spec-chat-composer) raise specificity above the plain
-   `.spec-chat-composer*` rules in spec-mode.css and let us override
-   the shell's margin/padding/border-radius designed for the chat
-   footer variant. */
+/* When the composer is mounted, hide the kanban column wrappers so the
+   empty board shows only the composer — not a composer floating above
+   four empty column headers. */
+#board:has(#board-empty-composer:not(:empty)) > [id^="col-wrapper-"] {
+  display: none;
+}
+
+/* The composer carries `.spec-chat-composer` so its shared Slack-style
+   shell applies (border, radius, focus ring). Board-specific rules here
+   only tune width, spacing, and the internal layout for the empty-state
+   use. Double-class selectors raise specificity above the base rules
+   in spec-mode.css. */
 .board-composer.spec-chat-composer {
   width: 100%;
-  max-width: 680px;
+  max-width: 520px;
   margin: 0;
-  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   transition:
-    opacity 260ms cubic-bezier(0.3, 0, 0.8, 0.15),
-    transform 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
-}
-.board-composer.spec-chat-composer:focus-within {
-  border-color: var(--border);
+    opacity 200ms ease,
+    transform 200ms ease;
 }
 .board-composer--submitting {
   opacity: 0;
-  transform: translateY(-8px) scale(0.97);
+  transform: translateY(-4px);
   pointer-events: none;
 }
 .board-composer__label {
-  font-size: 15px;
+  margin: 0 0 6px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.01em;
-  margin: 0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 .board-composer__input.spec-chat-composer__input {
-  width: 100%;
-  min-height: 112px;
-  max-height: 320px;
-  padding: 12px 14px;
+  min-height: 80px;
+  max-height: 240px;
+  padding: 10px 12px;
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--text);
-  background: var(--bg-input, var(--bg));
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  resize: vertical;
+  background: transparent;
+  border: none;
+  resize: none;
   outline: none;
   box-sizing: border-box;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
 }
 .board-composer__input.spec-chat-composer__input::placeholder {
   color: var(--text-muted);
 }
-.board-composer__input.spec-chat-composer__input:focus {
-  border-color: var(--accent, #6366f1);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
-}
 .board-composer__input--error,
 .board-composer__input.spec-chat-composer__input.board-composer__input--error {
-  border-color: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .board-composer__bar.spec-chat-composer__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0;
+  padding: 4px 6px 6px;
 }
 .board-composer__advanced-toggle.spec-chat-composer__action {
   width: auto;
-  height: auto;
-  padding: 6px 10px;
+  height: 24px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
 }
 .board-composer__advanced-toggle.spec-chat-composer__action:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 .board-composer__chevron {
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
   transition: transform 0.15s ease;
 }
-.board-composer__advanced-toggle[aria-expanded="true"]
-  .board-composer__chevron {
-  transform: rotate(0deg);
-}
 .board-composer__submit.spec-chat-composer__send {
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
   color: #fff;
-  background: var(--accent, #6366f1);
+  background: var(--accent);
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    transform 0.05s ease,
-    box-shadow 0.15s ease;
 }
 .board-composer__submit.spec-chat-composer__send:hover {
-  background: var(--accent-hover, var(--accent, #6366f1));
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-  opacity: 1;
-}
-.board-composer__submit.spec-chat-composer__send:active {
-  transform: translateY(1px);
-  box-shadow: none;
+  background: var(--accent-hover);
 }
 .board-composer__submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  box-shadow: none;
 }
 .board-composer__advanced {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 14px;
-  background: var(--bg-input, var(--bg));
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
 }
 .board-composer__advanced.hidden {
   display: none;
@@ -606,37 +572,46 @@
 .board-composer__field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
+  gap: 4px;
+  font-size: 11px;
   color: var(--text-muted);
+}
+.board-composer__field > span {
+  letter-spacing: 0.02em;
+}
+.board-composer__field .select,
+.board-composer__field .field {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  max-width: none;
 }
 .board-composer__field--wide {
   grid-column: 1 / -1;
 }
 .board-composer__templates {
   align-self: flex-start;
+  padding: 2px 8px;
+  font-size: 11px;
 }
 .board-composer__bridge {
-  margin: 2px 0 0;
+  margin: 8px 0 0;
   padding: 0;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   text-align: center;
 }
 .board-composer__plan-link {
-  color: var(--accent, #6366f1);
+  color: var(--accent);
   background: none;
   border: none;
   padding: 0 2px;
   font: inherit;
-  font-weight: 500;
   cursor: pointer;
-  text-decoration: none;
 }
 .board-composer__plan-link:hover {
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-underline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .board-composer.spec-chat-composer {
