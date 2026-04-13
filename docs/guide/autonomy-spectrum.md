@@ -23,7 +23,7 @@ The planning chat (accessible in Plan mode) is a persistent conversation backed 
 
 ### Spec (Structured Design)
 
-Ideas crystallize into structured documents with lifecycle states, dependencies, and acceptance criteria. Specs track progress through a defined lifecycle: vague, drafted, validated, complete, stale.
+Ideas crystallize into structured documents with lifecycle states, dependencies, and acceptance criteria. Specs track progress through a six-state lifecycle: the main axis runs vague → drafted → validated → complete, with `stale` and `archived` as off-axis states for designs that have drifted from reality or been set aside. Transitions are not free-form — they are enforced by a server-side state machine (`internal/spec/lifecycle.go`) that rejects illegal jumps and keeps dispatched work consistent with the underlying spec.
 
 At this level, agents iterate on design rather than code. They break large specs into sub-specs, validate consistency across the dependency graph, and analyze cross-impacts with existing plans. The output is a blueprint, not a pull request.
 

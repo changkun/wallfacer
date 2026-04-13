@@ -2,6 +2,12 @@
 
 Plan mode is where you browse, author, and dispatch spec files from inside the app.
 
+```mermaid
+graph LR
+  explorer["Explorer<br/>spec tree"] --- focused["Focused View<br/>rendered markdown"]
+  focused --- chat["Planning Chat<br/>agent + slash commands"]
+```
+
 Specs are structured design documents that bridge ideas and executable tasks. Each spec is a markdown file with YAML frontmatter that tracks lifecycle state, dependencies, affected code paths, and effort estimates. Specs live in `specs/` and are organized by track.
 
 ---
@@ -43,9 +49,36 @@ Clicking a spec in the explorer opens it in the center pane. The content is rend
 - Table of contents navigation
 - YAML frontmatter displayed as a structured header
 
+### Planning Chat Threads
+
+The planning chat supports multiple named threads per workspace group, shown as tabs above the chat stream. Click **+** to start a new thread, double-click a tab (or use the pencil icon) to rename it, and **×** to archive it. Archiving hides the thread from the tab bar but keeps its files on disk; unarchive from the thread manager to restore it.
+
+Each thread keeps its own Claude Code session and its own message history, so parallel lines of design inquiry do not contaminate each other. Only one agent turn runs at a time across all threads — every thread shares the single planner sandbox container. Messages sent to a background thread while another turn is in-flight are queued locally and flushed when the container becomes free.
+
+`/undo` targets the caller thread's most recent round and is implemented via `git revert`: the original commit and its revert both stay in history, so you retain a full audit trail. Dispatched tasks whose linkage was introduced in the reverted commit are automatically cancelled.
+
 ### Spec Workflow
 
 Specs follow a structured lifecycle driven by slash commands in the planning chat. Each command maps to a step in the workflow:
+
+```mermaid
+flowchart LR
+  idea["Idea"] --> create["/create"]
+  create --> drafted["drafted"]
+  drafted --> refine["/refine"]
+  refine --> validate["/validate"]
+  validate --> impact["/impact"]
+  impact --> breakdown{"/break-down"}
+  breakdown -->|design mode| sub["sub-specs<br/>(drafted)"]
+  breakdown -->|tasks mode| leaves["leaf specs<br/>(validated)"]
+  sub --> refine
+  leaves --> dispatch["/dispatch"]
+  dispatch --> board["Kanban task"]
+  board --> reviewimpl["/review-impl"]
+  reviewimpl --> diff["/diff"]
+  diff --> wrapup["/wrapup"]
+  wrapup --> complete["complete"]
+```
 
 ```
 /create → /refine → /validate → /impact → /break-down → /review-breakdown → /dispatch → /review-impl → /diff → /wrapup
@@ -74,6 +107,8 @@ specs/
 When a leaf spec is validated and ready for implementation, press **D** or use `/dispatch` in the chat. This creates a task on the kanban board with the spec's content as the prompt. The spec's `dispatched_task_id` field is updated to link back to the created task.
 
 On a successful dispatch, a small "Dispatched N task(s) to the Board." toast appears at the bottom-right with a **View on Board →** action. Clicking it switches to the Board without altering your saved mode preference, scrolls the Backlog to the freshly created card, and gives it a one-second pulse so you can pick up where you left off. If you stay in Plan, a subtle unread dot lights up on the sidebar Board nav button until you visit the Board. When the board has zero tasks, a focused task-creation composer takes over the Board view with a prompt field, an **Advanced** disclosure (sandbox / timeout / goal), and a link back to Plan — once you create your first task the composer fades out for the rest of the session, even if the task is later archived.
+
+Dispatch is atomic across a batch: task creation and the corresponding `dispatched_task_id` frontmatter writes either all succeed or all roll back, so you never end up with orphaned tasks or dangling spec links. Dependencies within the same batch are resolved by pre-assigning task UUIDs before creation, so child specs wire to their parents correctly even when tasks are persisted out of order. Dispatching a non-leaf spec or a spec that is not yet `validated` returns an error without mutating any state.
 
 ---
 
@@ -105,7 +140,14 @@ The spec document model (`specs/local/spec-coordination/spec-document-model.md`)
 
 Specs declare dependencies via the `depends_on` field, which lists paths to prerequisite specs. The resulting dependency graph must be a directed acyclic graph (DAG) -- circular dependencies are rejected.
 
-The minimap at the bottom of the explorer visualizes the DAG, showing which specs block others and where the critical path lies.
+### Dependency Minimap
+
+The minimap at the bottom of the explorer renders the DAG as nodes (specs) connected by edges (`depends_on` relationships). It is a navigation aid over the same graph the validator uses.
+
+- Filter the graph by lifecycle status to isolate, for example, only `validated` leaves ready for dispatch.
+- Multi-select nodes and batch-dispatch them; the minimap orders the batch topologically so upstream tasks land on the board first.
+- Hovering a node highlights its transitive upstream (what it depends on) and downstream (what depends on it) edges, making the critical path visible at a glance.
+- Orphan specs — those with no dependents and no dependencies — are easy to spot as isolated nodes, which usually signals a missing `depends_on` or a spec that can be retired.
 
 ### Status Lifecycle
 
@@ -118,6 +160,7 @@ Specs progress through a defined lifecycle:
 | `validated` | Reviewed, dependencies checked, ready for implementation or dispatch |
 | `complete` | Fully implemented and verified |
 | `stale` | Overtaken by events or no longer relevant |
+| `archived` | Deliberately archived — hidden from the live explorer, drift checks, and impact queries. Unarchive to restore. |
 
 ```mermaid
 stateDiagram-v2
@@ -125,14 +168,28 @@ stateDiagram-v2
   vague --> drafted
   drafted --> validated
   drafted --> stale
+  drafted --> archived
   validated --> complete
   validated --> stale
   complete --> stale
+  complete --> archived
   stale --> drafted
   stale --> validated
+  stale --> archived
+  archived --> drafted
 ```
 
-Any status can transition to `stale`. Leaf specs should reach `validated` before being dispatched to the task board.
+Any status except `archived` can transition to `stale`. Leaf specs should reach `validated` before being dispatched to the task board.
+
+### Archive and Unarchive
+
+Archiving takes a spec out of active circulation without deleting it. Archiving a parent cascades to every non-archived descendant, and all of the resulting frontmatter changes land in a single commit so the history is easy to audit and to revert.
+
+The archive handler rejects the cascade if any target has a live `dispatched_task_id` — it returns HTTP 409 and mutates nothing. Cancel the dispatched task first (or wait for it to finish and be cleared), then retry.
+
+Unarchive prefers a lossless path: it locates the archive commit in git history and runs `git revert` on it, which restores every descendant's pre-archive status exactly. If the archive commit cannot be found, or the revert conflicts, it falls back to a single-spec transition from `archived` back to `drafted`.
+
+Archived specs remain on disk but are filtered out of the spec tree by default, and they are skipped when the planning system prompt decides whether the workspace is "empty" versus "non-empty" — so archiving a workspace's only spec will flip Plan mode back into chat-first layout.
 
 ### Progress Tracking
 
@@ -170,3 +227,4 @@ Use `#plan/<path>` in the URL to link directly to a spec. For example, `http://l
 - [Exploring Ideas](exploring-ideas.md) -- the planning chat for conversational exploration
 - [Board & Tasks](board-and-tasks.md) -- the task board where dispatched specs are executed
 - [Configuration](configuration.md) -- keyboard shortcuts and settings
+- [Plan Mode internals](../internals/plan-mode.md) -- architecture, lifecycle state machine, dispatch/archive/undo implementation

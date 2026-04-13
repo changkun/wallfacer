@@ -4,6 +4,15 @@ Plan mode (formerly Specs) is where you explore ideas conversationally with an A
 
 The planning chat is a conversational interface for exploring ideas with an AI agent before committing to structured specs or tasks. It runs inside Plan mode and is backed by a persistent sandbox container that can read your codebase, create files, and execute commands.
 
+```mermaid
+flowchart LR
+  user["You"] -->|message / slash command| agent["Planning Agent<br/>(sandbox container)"]
+  agent -->|reads| code["Workspace code"]
+  agent -->|writes| specs["specs/"]
+  specs -->|SSE snapshot| explorer["Spec Explorer"]
+  agent -->|streams| user
+```
+
 ---
 
 ## Essentials
@@ -78,6 +87,10 @@ Keep typing while the agent is responding. New messages appear as queued chips b
 
 Click **Clear** in the chat header to discard all messages in the current thread and start a fresh conversation on that thread. The underlying container session is preserved; only the visible message history is cleared.
 
+### Empty vs Non-empty Workspace
+
+The planning agent's system prompt has two variants. The **empty** variant kicks in when the workspace has zero non-archived specs and actively encourages `/spec-new` to bootstrap the first draft; the **nonempty** variant is the normal case and assumes you are iterating on an existing tree. Selection happens per-turn rather than being cached at session start, so archiving the last spec flips the agent's behaviour on the very next message — no restart or clear required.
+
 ### Threads
 
 The chat supports multiple named threads per workspace group. Tabs sit above the message stream:
@@ -103,6 +116,14 @@ Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `
 
 If the Claude Code session inside the planning container is lost (container recreated, session expired, or server restart), the system automatically retries with the conversation history replayed as context. You do not need to re-enter previous messages.
 
+### Planning Sandbox
+
+The planning container is a long-lived, workspace-scoped sandbox keyed by a fingerprint of the mounted workspaces. It is the same backend type as task sandboxes (Claude or Codex) but is reused across messages rather than spun up fresh for each turn. The container is created lazily on the first message in a workspace group — nothing runs until you speak to it.
+
+Because threads share the single container, only one agent turn runs at a time globally. Messages sent to background threads while another is in-flight are queued FIFO and fire automatically as the in-flight round completes. When the active workspace group changes, `UpdateWorkspaces` restarts the container so it sees the new mount set; open threads keep their history intact.
+
+Stopping the sandbox from **Settings → Planning** tears down the container but does not touch conversation history — the next message simply relaunches it.
+
 ### Send Mode Toggle
 
 Click the dropdown arrow next to the send button to switch between two modes:
@@ -123,3 +144,4 @@ When a spec is selected in the explorer (left pane), the agent automatically rec
 - [The Autonomy Spectrum](autonomy-spectrum.md) -- where the planning chat fits in the overall workflow
 - [Designing Specs](designing-specs.md) -- structured design with specs
 - [Refinement & Ideation](refinement-and-ideation.md) -- AI-assisted prompt improvement for tasks
+- [Plan Mode Internals](../internals/plan-mode.md) -- packages, SSE protocol, and undo plumbing

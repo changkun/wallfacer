@@ -15,10 +15,10 @@ Start here for the full reading order.
 [The Autonomy Spectrum](autonomy-spectrum.md) — The mental model: chat, spec, task, code. How to move between levels and dial autonomy up or down.
 
 ### Exploring Ideas
-[Exploring Ideas](exploring-ideas.md) — Planning chat, slash commands, @mentions, conversation persistence.
+[Exploring Ideas](exploring-ideas.md) — Planning chat, slash commands, @mentions, threads, the planning sandbox.
 
 ### Designing Specs
-[Designing Specs](designing-specs.md) — Plan mode, focused view, dependency minimap, spec lifecycle.
+[Designing Specs](designing-specs.md) — Plan mode layout, spec lifecycle (six states), dispatch workflow, archive/unarchive, dependency minimap.
 
 ### Executing Tasks
 [Board & Tasks](board-and-tasks.md) — Task board, lifecycle, dependencies, batch creation, search.
@@ -42,6 +42,15 @@ Start here for the full reading order.
 [Circuit Breakers](circuit-breakers.md) — Fault isolation, self-healing automation, container launch protection.
 
 ## Common Workflows
+
+### Plan mode workflow
+
+1. Sketch the idea in the planning chat (Plan mode, press **P**).
+2. Issue `/create` (or let the agent emit `/spec-new`) to scaffold a first draft.
+3. Refine with `/refine`, `/impact`, then `/validate`.
+4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.
+5. When leaves are ready, `/dispatch` to push them to the board with dependency wiring.
+6. After tasks finish, `/review-impl` and `/wrapup` to close out the parent.
 
 ### Parallel feature development
 
