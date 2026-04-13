@@ -31,7 +31,7 @@ Cloud Platform — 0/8
   ○ Multi-Tenant (capstone)        ○ Tenant API
   ○ Billing Idempotency            ○ Telemetry Queue Backpressure
 
-Shared Design — 0/17
+Shared Design — 0/18
   ○ Authentication                 ○ Agent Abstraction
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
@@ -40,7 +40,7 @@ Shared Design — 0/17
   ○ Token & Cost Optimization      ○ Extensible Prompts
   ○ Intent-Driven Commits          ○ Sandbox Hooks
   ○ Defense in Depth               ○ Agent Memory & Identity
-  ○ Intelligence System
+  ○ Intelligence System            ○ Eval Pipeline & Benchmark
 ```
 
 ---
@@ -182,6 +182,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [intent-commits.md](shared/intent-commits.md) | Not started | Both | Every intent (task, planning chat, explorer edit) produces a git commit — enables fine-grained undo, attribution, and revert. |
 | [sandbox-hooks.md](shared/sandbox-hooks.md) | Not started | Both | Agent lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Mechanism layer for token cost optimization. |
 | [defense-in-depth.md](shared/defense-in-depth.md) | Drafted | Both | Layered oversight composition (Swiss cheese model), task-level permission modes, pre-dispatch validation, escalation cascade, unified decision audit. |
+| [eval-pipeline.md](shared/eval-pipeline.md) | Drafted | Both | Evaluation pipeline over captured Claude Code / Codex trajectories — vendor-format normalizer, rule-based + LLM-as-judge metrics, first-party benchmark bundles, dataset export, paired comparison reports. Keeps the door open for downstream RL/RLVR without implementing it. |
 | [agent-memory-identity.md](shared/agent-memory-identity.md) | Vague | Both | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. Foundation for intelligence system's shared world model. |
 | [intelligence-system.md](shared/intelligence-system.md) | Vague | Both | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. |
 
