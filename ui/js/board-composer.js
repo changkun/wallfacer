@@ -45,25 +45,35 @@ var BoardComposer = (function () {
   }
 
   function _buildComposer() {
-    var el = document.createElement("div");
-    el.className = "board-composer spec-chat-composer";
-    el.innerHTML =
-      '<label class="board-composer__label" for="board-composer-prompt">' +
-      "What should the agent work on?" +
-      "</label>" +
-      '<textarea id="board-composer-prompt" class="spec-chat-composer__input board-composer__input" ' +
-      'rows="4" placeholder="Describe the task (Markdown supported)..."></textarea>' +
-      '<div class="spec-chat-composer__bar board-composer__bar">' +
+    // Outer wrap mirrors the chat-first `.spec-chat-stream` card (border,
+    // radius, soft shadow, bg-card); the inner `.spec-chat-composer`
+    // uses its native Slack-style inset look (bg-input, smaller border)
+    // with zero board-specific overrides. The hint, composer, and
+    // advanced panel are all children of the wrap; the bridge line sits
+    // outside the card as a sibling.
+    var wrap = document.createElement("div");
+    wrap.className = "board-composer-wrap";
+    wrap.innerHTML =
+      '<p class="spec-chat-empty-hint spec-chat-empty-hint--visible board-composer-wrap__hint">' +
+      'Type <span class="spec-chat-empty-hint__cmd">@</span> to reference a file, ' +
+      '<span class="spec-chat-empty-hint__cmd">/</span> to insert a template' +
+      "</p>" +
+      '<div class="board-composer spec-chat-composer">' +
+      '<textarea id="board-composer-prompt" class="spec-chat-composer__input" ' +
+      'rows="3" placeholder="Describe a task for the agent..."></textarea>' +
+      '<div class="spec-chat-composer__bar">' +
       '<div class="spec-chat-composer__actions">' +
+      '<button type="button" class="spec-chat-composer__action board-composer__slash" ' +
+      'title="Insert a prompt template">/</button>' +
+      '<button type="button" class="spec-chat-composer__action board-composer__at" ' +
+      'title="Mention a file">@</button>' +
       '<button type="button" class="spec-chat-composer__action board-composer__advanced-toggle" ' +
-      'aria-expanded="false">' +
-      '<span class="board-composer__chevron">\u25BE</span> Advanced' +
-      "</button>" +
+      'aria-expanded="false" title="Advanced options">\u25BE</button>' +
       "</div>" +
       '<div class="spec-chat-composer__right">' +
-      '<button type="button" class="spec-chat-composer__send board-composer__submit">' +
-      "Create \u27A4" +
-      "</button>" +
+      '<button type="button" class="spec-chat-composer__send board-composer__submit" ' +
+      'title="Create task">\u27A4</button>' +
+      "</div>" +
       "</div>" +
       "</div>" +
       '<div class="board-composer__advanced hidden">' +
@@ -82,33 +92,34 @@ var BoardComposer = (function () {
       '<input type="text" id="board-composer-goal" class="field" ' +
       'placeholder="What does success look like?" />' +
       "</label>" +
-      '<div class="board-composer__field board-composer__field--wide">' +
-      '<button type="button" class="btn-icon board-composer__templates">' +
-      "Insert from template" +
-      "</button>" +
-      "</div>" +
-      "</div>" +
-      '<p class="board-composer__bridge">' +
+      "</div>";
+    var bridge = document.createElement("p");
+    bridge.className = "board-composer__bridge";
+    bridge.innerHTML =
       "Planning something larger? Start a chat in " +
-      '<button type="button" class="board-composer__plan-link">Plan</button> \u2192' +
-      "</p>";
-    return el;
+      '<button type="button" class="board-composer__plan-link">Plan</button> \u2192';
+    // Return a host element containing both the card and the bridge so
+    // _root refers to a single element for mount/unmount/animation.
+    var host = document.createElement("div");
+    host.className = "board-composer-host";
+    host.appendChild(wrap);
+    host.appendChild(bridge);
+    return host;
   }
 
   function _wireComposer(el) {
     var toggle = el.querySelector(".board-composer__advanced-toggle");
     var advanced = el.querySelector(".board-composer__advanced");
-    var chevron = el.querySelector(".board-composer__chevron");
     function applyAdvanced() {
       if (!advanced || !toggle) return;
       if (_advancedOpen) {
         advanced.classList.remove("hidden");
         toggle.setAttribute("aria-expanded", "true");
-        if (chevron) chevron.textContent = "\u25B4";
+        toggle.textContent = "\u25B4";
       } else {
         advanced.classList.add("hidden");
         toggle.setAttribute("aria-expanded", "false");
-        if (chevron) chevron.textContent = "\u25BE";
+        toggle.textContent = "\u25BE";
       }
     }
     applyAdvanced();
@@ -156,15 +167,39 @@ var BoardComposer = (function () {
       });
     }
 
-    var templatesBtn = el.querySelector(".board-composer__templates");
-    if (templatesBtn && typeof openTemplatesPicker === "function") {
-      templatesBtn.addEventListener("click", function () {
+    // `/` action: opens the templates picker anchored to the button —
+    // the board-mode analogue of Plan mode's slash-command menu.
+    var slashBtn = el.querySelector(".board-composer__slash");
+    if (slashBtn && typeof openTemplatesPicker === "function") {
+      slashBtn.addEventListener("click", function () {
         openTemplatesPicker(function (body) {
           if (prompt) {
             prompt.value = body;
             prompt.focus();
           }
-        }, prompt);
+        }, slashBtn);
+      });
+    }
+
+    // `@` action: inserts an `@` at the cursor and re-fires the input
+    // event so the mention autocomplete widget opens — matches
+    // planning-chat.js's at-button behaviour.
+    var atBtn = el.querySelector(".board-composer__at");
+    if (atBtn && prompt) {
+      atBtn.addEventListener("click", function () {
+        var pos =
+          prompt.selectionStart != null
+            ? prompt.selectionStart
+            : prompt.value.length;
+        var before = prompt.value.substring(0, pos);
+        var after = prompt.value.substring(pos);
+        var needsSpace = before.length > 0 && !/\s$/.test(before);
+        var insert = needsSpace ? " @" : "@";
+        prompt.value = before + insert + after;
+        var newPos = pos + insert.length;
+        prompt.focus();
+        prompt.setSelectionRange(newPos, newPos);
+        prompt.dispatchEvent(new Event("input", { bubbles: true }));
       });
     }
 
