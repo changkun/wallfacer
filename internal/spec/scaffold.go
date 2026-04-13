@@ -87,18 +87,32 @@ func Scaffold(opts ScaffoldOptions) (string, error) {
 		opts.Now = time.Now()
 	}
 
-	if _, err := os.Stat(opts.Path); err == nil && !opts.Force {
-		return "", fmt.Errorf("%s already exists (pass Force=true to overwrite)", opts.Path)
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("stat %s: %w", opts.Path, err)
-	}
-
 	content := RenderSkeleton(opts.Title, opts.Status, opts.Effort, opts.Author, opts.DependsOn, opts.Now)
 
 	if err := os.MkdirAll(filepath.Dir(opts.Path), 0o755); err != nil {
 		return "", fmt.Errorf("mkdir %s: %w", filepath.Dir(opts.Path), err)
 	}
-	if err := os.WriteFile(opts.Path, []byte(content), 0o644); err != nil {
+
+	// Open with O_EXCL when Force is false so the kernel atomically
+	// rejects a race where two concurrent Scaffold calls both stat
+	// ENOENT and then both write — the second one would silently
+	// clobber the first. Force=true falls back to plain WriteFile,
+	// which is the documented "overwrite if present" behavior.
+	if opts.Force {
+		if err := os.WriteFile(opts.Path, []byte(content), 0o644); err != nil {
+			return "", fmt.Errorf("write %s: %w", opts.Path, err)
+		}
+		return opts.Path, nil
+	}
+	f, err := os.OpenFile(opts.Path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return "", fmt.Errorf("%s already exists (pass Force=true to overwrite)", opts.Path)
+		}
+		return "", fmt.Errorf("create %s: %w", opts.Path, err)
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.Write([]byte(content)); err != nil {
 		return "", fmt.Errorf("write %s: %w", opts.Path, err)
 	}
 	return opts.Path, nil
