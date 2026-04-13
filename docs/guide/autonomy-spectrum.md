@@ -19,7 +19,7 @@ Wallfacer organizes work into four levels, from highest autonomy to most direct 
 
 You describe what you want in natural language. The agent shapes ideas, explores trade-offs, and proposes directions. This is the entry point for greenfield work -- when you do not yet know what to build.
 
-The planning chat (accessible in spec mode) is a persistent conversation backed by a sandbox container. It can read your codebase, create files, and execute commands while you steer the direction.
+The planning chat (accessible in Plan mode) is a persistent conversation backed by a sandbox container. It can read your codebase, create files, and execute commands while you steer the direction.
 
 ### Spec (Structured Design)
 

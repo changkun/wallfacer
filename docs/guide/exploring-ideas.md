@@ -21,7 +21,7 @@ sequenceDiagram
 
 ### Opening the Planning Chat
 
-Switch to spec mode by pressing **S** (or clicking the mode toggle in the header). The chat pane appears on the right side of the layout. Press **C** to toggle it open or closed.
+Switch to Plan mode by pressing **P** (or clicking the mode toggle in the header). The chat pane appears on the right side of the layout. Press **C** to toggle it open or closed.
 
 ### Sending Messages
 
@@ -64,7 +64,7 @@ Type `/` to see an autocomplete menu of built-in commands. Commands cover the fu
 
 ### @mentions
 
-Type `@` in the composer to trigger file path autocomplete. In spec mode, spec files are prioritized in the suggestion list. Mentioned files are included as context for the agent.
+Type `@` in the composer to trigger file path autocomplete. In Plan mode, spec files are prioritized in the suggestion list. Mentioned files are included as context for the agent.
 
 ### Interrupting
 

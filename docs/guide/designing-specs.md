@@ -1,6 +1,6 @@
 # Designing Specs
 
-Plan mode (formerly Specs) is where you browse, author, and dispatch spec files from inside the app.
+Plan mode is where you browse, author, and dispatch spec files from inside the app.
 
 Specs are structured design documents that bridge ideas and executable tasks. Each spec is a markdown file with YAML frontmatter that tracks lifecycle state, dependencies, affected code paths, and effort estimates. Specs live in `specs/` and are organized by track.
 
@@ -150,13 +150,13 @@ Use `/wrapup` to finalize a completed spec. The agent verifies all leaf children
 
 ### Deep Linking
 
-Use `#spec/<path>` in the URL to link directly to a spec. For example, `http://localhost:8080/#spec/specs/local/live-serve.md` opens the app in spec mode with that file focused.
+Use `#plan/<path>` in the URL to link directly to a spec. For example, `http://localhost:8080/#plan/specs/local/live-serve.md` opens the app in Plan mode with that file focused. The legacy `#spec/<path>` form still works for back-compat with existing bookmarks.
 
 ### Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
-| **S** | Toggle between Board and Spec mode |
+| **P** | Toggle between Board and Plan mode |
 | **E** | Toggle the spec explorer pane |
 | **C** | Toggle the planning chat pane |
 | **D** | Dispatch the focused spec to the task board |

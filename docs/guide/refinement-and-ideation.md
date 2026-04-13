@@ -204,7 +204,7 @@ Automation toggles (set via `PUT /api/config`):
 
 ### Planning Chat for Spec Iteration
 
-For spec-level iteration, see the Planning Chat in Spec Mode (press **S** to switch, then **C** for chat). The planning agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
+For spec-level iteration, see the Planning Chat in Plan Mode (press **P** to switch, then **C** for chat). The planning agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
 
 ---
 

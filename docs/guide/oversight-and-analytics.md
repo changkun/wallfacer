@@ -264,13 +264,13 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 
 ### Keyboard Shortcuts
 
-**Global shortcuts** (work in both Board and Spec modes):
+**Global shortcuts** (work in both Board and Plan modes):
 
 | Shortcut | Action |
 |---|---|
 | `?` | Show keyboard shortcuts help |
 | `E` | Toggle file explorer |
-| `S` | Toggle board/spec mode |
+| `P` | Toggle board/Plan mode |
 | `` ` `` | Toggle terminal panel |
 | `Escape` | Close topmost modal or blur search bar |
 

@@ -18,7 +18,7 @@ Start here for the full reading order.
 [Exploring Ideas](exploring-ideas.md) — Planning chat, slash commands, @mentions, conversation persistence.
 
 ### Designing Specs
-[Designing Specs](designing-specs.md) — Spec mode, focused view, dependency minimap, spec lifecycle.
+[Designing Specs](designing-specs.md) — Plan mode, focused view, dependency minimap, spec lifecycle.
 
 ### Executing Tasks
 [Board & Tasks](board-and-tasks.md) — Task board, lifecycle, dependencies, batch creation, search.

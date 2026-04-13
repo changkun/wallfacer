@@ -62,9 +62,9 @@ wallfacer status -watch                 # Live-updating board state
 wallfacer doctor                        # Check prerequisites and config
 ```
 
-### 📐 Spec Mode
+### 📐 Plan Mode
 
-See [Designing Specs](designing-specs.md) for the full spec mode guide.
+See [Designing Specs](designing-specs.md) for the full Plan mode guide.
 
 ### 💬 Planning Chat
 
@@ -77,10 +77,10 @@ See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
 | `N` | Board | Open new task form |
 | `?` | Global | Show keyboard shortcuts help |
 | `E` | Global | Toggle file explorer |
-| `S` | Global | Toggle board/spec mode |
-| `C` | Spec mode | Toggle chat pane |
-| `D` | Spec mode | Dispatch focused spec as a task |
-| `B` | Spec mode | Break down focused spec into sub-specs |
+| `P` | Global | Toggle board/Plan mode |
+| `C` | Plan mode | Toggle chat pane |
+| `D` | Plan mode | Dispatch focused spec as a task |
+| `B` | Plan mode | Break down focused spec into sub-specs |
 | `` ` `` | Global | Toggle terminal panel |
 
 ---
