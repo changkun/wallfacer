@@ -569,6 +569,11 @@
 .board-composer__field--wide {
   grid-column: 1 / -1;
 }
+.board-composer__templates {
+  align-self: flex-start;
+  padding: 3px 10px;
+  font-size: 11px;
+}
 
 /* Bridge line — plain muted text below the card, not inside it. */
 .board-composer__bridge {

@@ -55,16 +55,13 @@ var BoardComposer = (function () {
     wrap.className = "board-composer-wrap";
     wrap.innerHTML =
       '<p class="spec-chat-empty-hint spec-chat-empty-hint--visible board-composer-wrap__hint">' +
-      'Type <span class="spec-chat-empty-hint__cmd">@</span> to reference a file, ' +
-      '<span class="spec-chat-empty-hint__cmd">/</span> to insert a template' +
+      'Type <span class="spec-chat-empty-hint__cmd">@</span> to reference a file' +
       "</p>" +
       '<div class="board-composer spec-chat-composer">' +
       '<textarea id="board-composer-prompt" class="spec-chat-composer__input" ' +
       'rows="3" placeholder="Describe a task for the agent..."></textarea>' +
       '<div class="spec-chat-composer__bar">' +
       '<div class="spec-chat-composer__actions">' +
-      '<button type="button" class="spec-chat-composer__action board-composer__slash" ' +
-      'title="Insert a prompt template">/</button>' +
       '<button type="button" class="spec-chat-composer__action board-composer__at" ' +
       'title="Mention a file">@</button>' +
       '<button type="button" class="spec-chat-composer__action board-composer__advanced-toggle" ' +
@@ -92,6 +89,11 @@ var BoardComposer = (function () {
       '<input type="text" id="board-composer-goal" class="field" ' +
       'placeholder="What does success look like?" />' +
       "</label>" +
+      '<div class="board-composer__field board-composer__field--wide">' +
+      '<button type="button" class="btn-icon board-composer__templates">' +
+      "Insert from template" +
+      "</button>" +
+      "</div>" +
       "</div>";
     var bridge = document.createElement("p");
     bridge.className = "board-composer__bridge";
@@ -167,17 +169,19 @@ var BoardComposer = (function () {
       });
     }
 
-    // `/` action: opens the templates picker anchored to the button —
-    // the board-mode analogue of Plan mode's slash-command menu.
-    var slashBtn = el.querySelector(".board-composer__slash");
-    if (slashBtn && typeof openTemplatesPicker === "function") {
-      slashBtn.addEventListener("click", function () {
+    // Templates picker — only surfaced from inside the advanced panel,
+    // since Board mode doesn't have a live slash-command system the way
+    // Plan mode does and a top-level `/` button would promise a UX that
+    // doesn't exist.
+    var templatesBtn = el.querySelector(".board-composer__templates");
+    if (templatesBtn && typeof openTemplatesPicker === "function") {
+      templatesBtn.addEventListener("click", function () {
         openTemplatesPicker(function (body) {
           if (prompt) {
             prompt.value = body;
             prompt.focus();
           }
-        }, slashBtn);
+        }, templatesBtn);
       });
     }
 
