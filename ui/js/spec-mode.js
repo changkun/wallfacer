@@ -101,6 +101,17 @@ function _applyLayout() {
     explorerPanel.style.display =
       layout === "three-pane" && getCurrentMode() === "spec" ? "" : "none";
   }
+  // Chat-first is the only pane available; force it visible so a user
+  // who previously hid the chat (C key in three-pane) doesn't land on
+  // an empty Plan-mode page after switching to a workspace that has no
+  // specs and no Roadmap.
+  if (layout === "chat-first") {
+    var chatStream = document.getElementById("spec-chat-stream");
+    if (chatStream && chatStream.style.display === "none") {
+      chatStream.style.display = "";
+      _syncSpecChatToggle(true);
+    }
+  }
 }
 
 // getLayoutState returns the currently applied layout name. Exposed for
