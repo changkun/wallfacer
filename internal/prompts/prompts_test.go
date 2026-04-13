@@ -523,3 +523,72 @@ func TestPackageLevelPlanningSystemPrompts(t *testing.T) {
 		t.Error("prompts.PlanningSystemNonempty() returned empty")
 	}
 }
+
+// TestPromptRegistry_PlanningOverridable exercises the full
+// write → render → delete → render cycle for both planning_system_*
+// templates. Required by agent-system-prompts.md so that users can
+// customize the planning agent's framing without forking the binary.
+func TestPromptRegistry_PlanningOverridable(t *testing.T) {
+	for _, name := range []string{"planning_system_empty", "planning_system_nonempty"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			mgr := prompts.NewManager(dir)
+
+			// Snapshot the embedded default so we can compare against it
+			// after the override is removed.
+			defaultBody, hasOverride, err := mgr.Content(name)
+			if err != nil {
+				t.Fatalf("Content(default): %v", err)
+			}
+			if hasOverride {
+				t.Fatalf("fresh manager should have no override for %s", name)
+			}
+			if strings.TrimSpace(defaultBody) == "" {
+				t.Fatalf("embedded default for %s is empty", name)
+			}
+
+			// Write an override and confirm it lands on disk + renders.
+			const customBody = "OVERRIDE-MARKER-12345"
+			if err := mgr.WriteOverride(name, customBody); err != nil {
+				t.Fatalf("WriteOverride: %v", err)
+			}
+			gotBody, hasOverride, err := mgr.Content(name)
+			if err != nil {
+				t.Fatalf("Content(after write): %v", err)
+			}
+			if !hasOverride {
+				t.Errorf("expected hasOverride=true after WriteOverride")
+			}
+			if gotBody != customBody {
+				t.Errorf("Content body = %q, want %q", gotBody, customBody)
+			}
+			// The render path must surface the override, not the embed.
+			var rendered string
+			switch name {
+			case "planning_system_empty":
+				rendered = mgr.PlanningSystemEmpty()
+			case "planning_system_nonempty":
+				rendered = mgr.PlanningSystemNonempty()
+			}
+			if !strings.Contains(rendered, "OVERRIDE-MARKER-12345") {
+				t.Errorf("rendered prompt did not pick up override; got: %q", rendered)
+			}
+
+			// Delete the override and confirm we fall back to the embed.
+			if err := mgr.DeleteOverride(name); err != nil {
+				t.Fatalf("DeleteOverride: %v", err)
+			}
+			restored, hasOverride, err := mgr.Content(name)
+			if err != nil {
+				t.Fatalf("Content(after delete): %v", err)
+			}
+			if hasOverride {
+				t.Errorf("expected hasOverride=false after DeleteOverride")
+			}
+			if restored != defaultBody {
+				t.Errorf("Content after delete = %q, want embedded default %q",
+					restored, defaultBody)
+			}
+		})
+	}
+}

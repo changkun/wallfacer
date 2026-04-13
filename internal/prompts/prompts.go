@@ -115,8 +115,8 @@ var knownNames = []string{
 	"planning_system_nonempty",
 }
 
-// Manager manages the eight built-in prompt templates with optional
-// per-user overrides stored in userDir.
+// Manager manages the built-in prompt templates (see knownNames for the
+// authoritative list) with optional per-user overrides stored in userDir.
 //
 // On each render call the Manager checks userDir/<apiName>.tmpl; if the file
 // is readable and parses without error it is used in place of the embedded
