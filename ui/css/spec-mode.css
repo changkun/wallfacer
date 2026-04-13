@@ -183,6 +183,53 @@
   }
 }
 
+/* First-spec bootstrap toast — slides in from the top centre when a
+   chat-first workspace transitions to three-pane on the very first
+   /spec-new. Differentiated from the bottom-right dispatch toast to
+   avoid visual confusion during onboarding. */
+.bootstrap-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  opacity: 0;
+  z-index: 1150;
+  max-width: 520px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent, #6366f1);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  animation: bootstrap-toast-in 200ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+.bootstrap-toast--no-motion,
+.bootstrap-toast.bootstrap-toast--no-motion {
+  animation: none;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+@keyframes bootstrap-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bootstrap-toast {
+    animation: none;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 /* Chat messages crossfade on thread switch — triggered by the
    `.spec-chat-stream__messages--swapping` class added in
    planning-chat.js::_switchToThread. */

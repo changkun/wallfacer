@@ -39,6 +39,8 @@ On recognition, the server calls the shared spec scaffolder to create the file w
 
 After each successful scaffold the server also ensures `specs/README.md` exists: if missing, it is created with a minimal template listing the new spec under the correct track heading; if present, a new row is appended to the track's table. User-authored prose outside the track tables is preserved byte-for-byte, and existing rows are never re-ordered. If the agent opened its body with a short summary sentence, that sentence is used as the "Delivers" cell; otherwise a placeholder invites a later manual fill.
 
+When `/spec-new` fires the very first spec in a previously empty workspace, a short bootstrap choreography stitches the moment together: about 130 ms after the spec-tree SSE arrives the focused view auto-opens onto the new spec, and around 160 ms a top-centre toast slides in reading "Your first spec was created at &lt;path&gt;. Rename or move it anytime." The toast auto-dismisses after six seconds (or on click). Reconnection-induced repeat snapshots never replay the choreography — it fires once per session. Under `prefers-reduced-motion: reduce` the toast still appears but without the slide-in animation.
+
 If the scaffold fails (name collision, invalid path, I/O error), a short "Couldn't create &lt;path&gt;: &lt;reason&gt;" message appears in the chat and the round continues normally. Archive an unwanted spec from the focused view if you want to drop one the agent created over-eagerly.
 
 ### Slash Commands

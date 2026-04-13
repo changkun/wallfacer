@@ -39,6 +39,18 @@ function _syncSpecModeState(data) {
   specModeState.index = (data && data.index) || null;
 }
 
+// _firstLeafPath returns the path of the first leaf node in `nodes`,
+// or the first node's path if no node is explicitly marked is_leaf.
+// Used by the bootstrap choreography to auto-focus the first spec
+// after a chat-first → three-pane transition.
+function _firstLeafPath(nodes) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return "";
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i] && nodes[i].is_leaf && nodes[i].path) return nodes[i].path;
+  }
+  return nodes[0].path || "";
+}
+
 // Status → icon mapping.
 var _specStatusIcons = {
   complete: "\u2705",
@@ -169,6 +181,14 @@ function _startSpecTreeStream() {
   _specStreamSource.addEventListener("snapshot", function (e) {
     _specStreamRetryDelay = 1000;
     try {
+      // Capture the pre-update state so we can detect the
+      // chat-first → three-pane transition that triggers the
+      // first-spec bootstrap choreography.
+      var prevEmpty =
+        !_specTreeData ||
+        (!(_specTreeData.nodes && _specTreeData.nodes.length > 0) &&
+          !_specTreeData.index);
+
       _specTreeData = JSON.parse(e.data);
       _syncSpecModeState(_specTreeData);
       renderSpecTree();
@@ -184,6 +204,28 @@ function _startSpecTreeStream() {
         _specTreeData && _specTreeData.nodes && _specTreeData.nodes.length > 0;
       if (typeof _updateSpecPaneVisibility === "function") {
         _updateSpecPaneVisibility(hasSpecs);
+      }
+
+      // Chat-first → three-pane transition driven by a newly-created
+      // spec: kick the bootstrap choreography (auto-focus + toast).
+      // The layout transition itself is already in flight via
+      // _updateSpecPaneVisibility / _applyLayout above.
+      if (
+        prevEmpty &&
+        hasSpecs &&
+        typeof BootstrapChoreography !== "undefined" &&
+        BootstrapChoreography
+      ) {
+        var firstNode = _firstLeafPath(_specTreeData.nodes);
+        if (firstNode) {
+          var ws =
+            typeof activeWorkspaces !== "undefined" &&
+            activeWorkspaces &&
+            activeWorkspaces.length > 0
+              ? activeWorkspaces[0]
+              : "";
+          BootstrapChoreography.trigger(firstNode, ws);
+        }
       }
     } catch (err) {
       console.error("spec stream parse error:", err);
