@@ -374,6 +374,138 @@ func TestScaffoldDirective_SecondScaffoldAppendsRow(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// applySlashSpecNew + resolveUniqueSpecPath — create-command-expansion spec.
+// ---------------------------------------------------------------------------
+
+func TestResolveUniqueSpecPath_NoCollisionPassThrough(t *testing.T) {
+	ws := t.TempDir()
+	got := resolveUniqueSpecPath(ws, "specs/local/auth.md")
+	if got != "specs/local/auth.md" {
+		t.Errorf("got %q, want unchanged", got)
+	}
+}
+
+func TestResolveUniqueSpecPath_CollisionAppendsSuffix(t *testing.T) {
+	ws := t.TempDir()
+	// Pre-create auth.md so the first candidate collides.
+	dir := filepath.Join(ws, "specs/local")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "auth.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := resolveUniqueSpecPath(ws, "specs/local/auth.md")
+	if got != "specs/local/auth-2.md" {
+		t.Errorf("got %q, want specs/local/auth-2.md", got)
+	}
+	// A second collision bumps to -3.
+	if err := os.WriteFile(filepath.Join(dir, "auth-2.md"), []byte("y"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got2 := resolveUniqueSpecPath(ws, "specs/local/auth.md")
+	if got2 != "specs/local/auth-3.md" {
+		t.Errorf("got %q, want specs/local/auth-3.md", got2)
+	}
+}
+
+func TestApplySlashSpecNew_ScaffoldsAndStripsDirective(t *testing.T) {
+	ws := t.TempDir()
+	prompt := `/spec-new specs/local/auth.md title="Auth"
+User requested a spec with title "Auth". Write a first-draft body for it below.
+`
+	rest, path, err := applySlashSpecNew(prompt, ws, time.Now())
+	if err != nil {
+		t.Fatalf("applySlashSpecNew: %v", err)
+	}
+	if path != "specs/local/auth.md" {
+		t.Errorf("created path = %q, want specs/local/auth.md", path)
+	}
+	// The directive line is removed from the agent-facing prompt.
+	if strings.HasPrefix(rest, "/spec-new") {
+		t.Errorf("expected directive stripped; got: %q", rest)
+	}
+	if !strings.Contains(rest, "Write a first-draft body") {
+		t.Errorf("body instruction missing: %q", rest)
+	}
+	// File exists with frontmatter.
+	body, err := os.ReadFile(filepath.Join(ws, path))
+	if err != nil {
+		t.Fatalf("read scaffolded file: %v", err)
+	}
+	if !strings.Contains(string(body), "title: Auth") {
+		t.Errorf("frontmatter missing title: %s", body)
+	}
+}
+
+func TestApplySlashSpecNew_CollisionBumpsSuffix(t *testing.T) {
+	ws := t.TempDir()
+	// Pre-create a collision.
+	dir := filepath.Join(ws, "specs/local")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "auth.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prompt := `/spec-new specs/local/auth.md title="Auth"
+Body.
+`
+	_, path, err := applySlashSpecNew(prompt, ws, time.Now())
+	if err != nil {
+		t.Fatalf("applySlashSpecNew: %v", err)
+	}
+	if path != "specs/local/auth-2.md" {
+		t.Errorf("path = %q, want specs/local/auth-2.md", path)
+	}
+	if _, err := os.Stat(filepath.Join(ws, path)); err != nil {
+		t.Errorf("spec not created at %s: %v", path, err)
+	}
+}
+
+func TestApplySlashSpecNew_NoDirectivePassThrough(t *testing.T) {
+	prompt := "Just a plain message.\n"
+	rest, path, err := applySlashSpecNew(prompt, t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if path != "" {
+		t.Errorf("path = %q, want empty", path)
+	}
+	if rest != prompt {
+		t.Errorf("prompt mutated: %q", rest)
+	}
+}
+
+func TestApplySlashSpecNew_InvalidDirectiveErrors(t *testing.T) {
+	ws := t.TempDir()
+	// No path after /spec-new — invalid.
+	prompt := "/spec-new\nsome body\n"
+	_, _, err := applySlashSpecNew(prompt, ws, time.Now())
+	if err == nil {
+		t.Fatalf("expected error for missing path")
+	}
+	// Path missing the specs/<track>/ prefix — invalid.
+	prompt2 := "/spec-new foo.md\nbody\n"
+	_, _, err2 := applySlashSpecNew(prompt2, ws, time.Now())
+	if err2 == nil {
+		t.Fatalf("expected error for bad path")
+	}
+}
+
+func TestApplySlashSpecNew_EmptySlugFromBlankCreate(t *testing.T) {
+	// Simulates `/create` (no args) after template expansion: the
+	// slug helper returns "" so the directive path becomes
+	// specs/local/.md — invalid. applySlashSpecNew must surface that.
+	ws := t.TempDir()
+	prompt := "/spec-new specs/local/.md title=\"\"\nbody\n"
+	_, _, err := applySlashSpecNew(prompt, ws, time.Now())
+	if err == nil {
+		t.Fatalf("expected error for empty slug path")
+	}
+}
+
 func TestFirstSentence(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"", ""},

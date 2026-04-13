@@ -109,6 +109,79 @@ func TestCommandRegistry_Expand_Create(t *testing.T) {
 	}
 }
 
+// TestSlashCreate_ExpandsToDirective covers the create-command-expansion
+// contract: `/create <title>` produces a prompt whose first line is a
+// server-readable /spec-new directive pointing at the slugged filename.
+func TestSlashCreate_ExpandsToDirective(t *testing.T) {
+	r := NewCommandRegistry()
+
+	expanded, ok := r.Expand("/create Auth Refactor", "")
+	if !ok {
+		t.Fatal("expected create to be recognized")
+	}
+	lines := strings.SplitN(expanded, "\n", 2)
+	if len(lines) == 0 {
+		t.Fatalf("expanded prompt is empty: %q", expanded)
+	}
+	first := strings.TrimSpace(lines[0])
+	want := `/spec-new specs/local/auth-refactor.md title="Auth Refactor"`
+	if first != want {
+		t.Errorf("first line = %q, want %q", first, want)
+	}
+	if !strings.Contains(expanded, "Write a first-draft body") {
+		t.Errorf("expected instruction body, got: %q", expanded)
+	}
+}
+
+func TestSlugify_BasicCases(t *testing.T) {
+	cases := map[string]string{
+		"Auth Refactor":              "auth-refactor",
+		"Hello, World!":              "hello-world",
+		"  Leading and trailing  ":   "leading-and-trailing",
+		"Multiple   spaces":          "multiple-spaces",
+		"UPPER case":                 "upper-case",
+		"snake_case_too":             "snake-case-too",
+		"numbers 123 and 456":        "numbers-123-and-456",
+		"!!! only punctuation ???":   "only-punctuation",
+	}
+	for in, want := range cases {
+		if got := Slugify(in); got != want {
+			t.Errorf("Slugify(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := Slugify(""); got != "" {
+		t.Errorf("Slugify(\"\") = %q, want empty", got)
+	}
+	if got := Slugify("!!!???"); got != "" {
+		t.Errorf("Slugify(\"!!!???\") = %q, want empty", got)
+	}
+}
+
+func TestSlugify_LengthCapped(t *testing.T) {
+	// 14 words × avg 5 chars + dashes > 48, so the slug must trim
+	// cleanly at a word boundary without exceeding the cap.
+	long := "one two three four five six seven eight nine ten eleven twelve thirteen fourteen"
+	got := Slugify(long)
+	if len(got) > slugMaxLen {
+		t.Errorf("len(%q) = %d, want <= %d", got, len(got), slugMaxLen)
+	}
+	// The cut lands on a word boundary: no trailing `-`.
+	if strings.HasSuffix(got, "-") {
+		t.Errorf("slug ends with trailing dash: %q", got)
+	}
+	// And the prefix is preserved (it still starts with the first word).
+	if !strings.HasPrefix(got, "one-two-three") {
+		t.Errorf("unexpected prefix: %q", got)
+	}
+
+	// A single massively long word hard-cuts at the cap.
+	single := strings.Repeat("x", 100)
+	out := Slugify(single)
+	if len(out) != slugMaxLen {
+		t.Errorf("hard-cut len = %d, want %d", len(out), slugMaxLen)
+	}
+}
+
 func TestCommandRegistry_Expand_Status(t *testing.T) {
 	r := NewCommandRegistry()
 

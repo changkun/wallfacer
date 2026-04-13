@@ -369,6 +369,75 @@ func appendDirectiveBody(path, body string) (err error) {
 	return nil
 }
 
+// resolveUniqueSpecPath returns a spec path whose absolute form under
+// `workspace` does not yet exist. If `specPath` collides with an
+// existing file, numeric suffixes (`-2`, `-3`, …) are appended to the
+// filename stem until a free slot is found. Returns the original path
+// unchanged when there is no collision, and gives up after 99 tries.
+func resolveUniqueSpecPath(workspace, specPath string) string {
+	if workspace == "" {
+		return specPath
+	}
+	base := filepath.Base(specPath)
+	dir := filepath.Dir(specPath)
+	stem := strings.TrimSuffix(base, filepath.Ext(base))
+	ext := filepath.Ext(base)
+	try := specPath
+	for n := 2; n < 100; n++ {
+		abs := filepath.Join(workspace, try)
+		if _, err := os.Stat(abs); os.IsNotExist(err) {
+			return try
+		}
+		try = filepath.ToSlash(
+			filepath.Join(dir, fmt.Sprintf("%s-%d%s", stem, n, ext)),
+		)
+	}
+	return try
+}
+
+// applySlashSpecNew checks whether a slash-expanded user prompt begins
+// with a `/spec-new ...` line. If so, it scaffolds the spec on the
+// server (without waiting for the agent to echo the directive) and
+// returns the leftover prompt with the directive line stripped, plus
+// the scaffolded spec path to thread through as the focused spec.
+//
+// On a scaffold error the directive line is preserved in the prompt
+// and an error is returned so the caller can surface a 4xx — this
+// matches the spec's "InvalidTitle → 400" requirement for empty
+// `/create` args (which produce an invalid path).
+//
+// When the prompt does not start with a `/spec-new` line, returns the
+// prompt unchanged, an empty scaffolded path, and a nil error.
+func applySlashSpecNew(prompt, workspace string, now time.Time) (string, string, error) {
+	lines := strings.SplitN(prompt, "\n", 2)
+	first := strings.TrimSpace(lines[0])
+	if !strings.HasPrefix(first, "/spec-new") {
+		return prompt, "", nil
+	}
+	directive := parseDirective(first)
+	if directive == nil || directive.Path == "" {
+		return prompt, "", fmt.Errorf("invalid /spec-new directive: %q", first)
+	}
+	// Reject a directive whose filename has no stem — typically the
+	// result of `/create` with no title argument (the slug helper
+	// returns "" so the template produces `specs/local/.md`).
+	base := filepath.Base(directive.Path)
+	if strings.TrimSuffix(base, filepath.Ext(base)) == "" {
+		return prompt, "", fmt.Errorf("empty spec title (slug resolves to nothing)")
+	}
+	directive.Path = resolveUniqueSpecPath(workspace, directive.Path)
+	if _, err := scaffoldDirective(workspace, *directive, now); err != nil {
+		return prompt, "", err
+	}
+	// Strip the directive line from the prompt the agent sees so its
+	// response can't accidentally re-trigger the scanner on echo.
+	rest := ""
+	if len(lines) > 1 {
+		rest = strings.TrimLeft(lines[1], "\n")
+	}
+	return rest, directive.Path, nil
+}
+
 // processDirectives runs each captured [Directive] against a workspace.
 // Returns one [planner.Message] per directive that failed so the
 // caller can surface the error as a `system`-role entry in the thread

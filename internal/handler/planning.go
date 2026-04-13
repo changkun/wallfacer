@@ -222,6 +222,34 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			prompt = expanded
 		}
 	}
+	// Slash commands can expand to a leading `/spec-new <path>` line
+	// (see create-command-expansion). When they do, scaffold the file
+	// server-side immediately so the agent sees an already-created spec
+	// instead of having to echo the directive. Errors here are user-
+	// fixable (empty title, collision-loop exhausted, invalid path),
+	// so surface a 400 rather than spinning the agent.
+	if strings.HasPrefix(strings.TrimSpace(prompt), "/spec-new") {
+		workspaces := h.currentWorkspaces()
+		scaffoldWs := ""
+		if len(workspaces) > 0 {
+			scaffoldWs = workspaces[0]
+		}
+		next, createdPath, serr := applySlashSpecNew(prompt, scaffoldWs, time.Now().UTC())
+		if serr != nil {
+			http.Error(w, "slash command: "+serr.Error(), http.StatusBadRequest)
+			return
+		}
+		prompt = next
+		if createdPath != "" {
+			// Thread the just-scaffolded spec through to the agent: the
+			// directive line has been stripped, so without this hint the
+			// agent would not know what path to populate.
+			prompt = "[Focused spec: " + createdPath + "]\n\n" + prompt
+			if req.FocusedSpec == "" {
+				req.FocusedSpec = createdPath
+			}
+		}
+	}
 	if req.FocusedSpec != "" && !strings.HasPrefix(req.Message, "/") {
 		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + prompt
 	}

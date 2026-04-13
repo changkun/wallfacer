@@ -8,6 +8,49 @@ import (
 	"text/template"
 )
 
+// slugMaxLen caps the length of slugs produced by [Slugify] so the
+// resulting path stays comfortable on Windows (MAX_PATH) and in small
+// file trees. When trimmed, the cut prefers a word boundary (`-`) over
+// a hard truncation so the slug still reads cleanly.
+const slugMaxLen = 48
+
+// Slugify turns a free-form title into a URL-safe spec filename stem:
+// lowercase, runs of non-alphanumerics collapse to a single `-`, and
+// the result is trimmed to [slugMaxLen] chars at the nearest trailing
+// word boundary. Returns the empty string when the input has no
+// alphanumeric characters — callers should treat that as an error.
+func Slugify(title string) string {
+	var b strings.Builder
+	lastWasDash := true // treats leading separators as dashes so we skip them
+	for _, r := range strings.ToLower(title) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastWasDash = false
+			continue
+		}
+		if lastWasDash {
+			continue
+		}
+		b.WriteByte('-')
+		lastWasDash = true
+	}
+	out := strings.TrimRight(b.String(), "-")
+	if out == "" {
+		return ""
+	}
+	if len(out) <= slugMaxLen {
+		return out
+	}
+	// Hunt for the last `-` before slugMaxLen so the cut lands at a
+	// word boundary; fall back to a hard cut if the first word is
+	// longer than the cap.
+	cut := strings.LastIndexByte(out[:slugMaxLen], '-')
+	if cut <= 0 {
+		return out[:slugMaxLen]
+	}
+	return out[:cut]
+}
+
 //go:embed commands_templates/*.tmpl
 var commandTemplatesFS embed.FS
 
@@ -124,7 +167,9 @@ func (r *CommandRegistry) Expand(input, focusedSpec string) (string, bool) {
 		return input, false
 	}
 
-	t, err := template.New(name).Parse(string(content))
+	t, err := template.New(name).Funcs(template.FuncMap{
+		"slugify": Slugify,
+	}).Parse(string(content))
 	if err != nil {
 		return input, false
 	}
