@@ -380,3 +380,62 @@ func TestSpecTreeStream_SendsSnapshotOnChange(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// TestSpecTreeStream_IncludesIndex verifies that the SSE snapshot
+// carries the roadmap index alongside the tree, and that creating /
+// modifying specs/README.md fires a fresh snapshot whose JSON body
+// surfaces the index field. Required by spec-tree-index-endpoint.md.
+func TestSpecTreeStream_IncludesIndex(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/specs/stream", nil).WithContext(ctx)
+	w := newSyncResponseWriter()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.SpecTreeStream(w, req)
+	}()
+
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	// Wait for the initial snapshot — without any README it should
+	// still emit, with the index field omitted (omitempty).
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for initial snapshot")
+		default:
+		}
+		if strings.Contains(w.bodyString(), "event: snapshot") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	initialCount := strings.Count(w.bodyString(), "event: snapshot")
+
+	// Drop a README into the workspace; the next poll tick must
+	// detect the new index and emit a snapshot with it inlined.
+	writeReadmeIn(t, ws, "# My Roadmap\n\nBody.\n")
+
+	deadline = time.After(10 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for index-bearing snapshot;\nbody: %s", w.bodyString())
+		default:
+		}
+		body := w.bodyString()
+		if strings.Count(body, "event: snapshot") > initialCount &&
+			strings.Contains(body, `"index"`) &&
+			strings.Contains(body, `"My Roadmap"`) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
