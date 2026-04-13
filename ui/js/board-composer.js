@@ -1,5 +1,6 @@
 /* global populateSandboxSelects, openTemplatesPicker, api, Routes,
-   switchMode, clearWorkspaceIsNew, showAlert, DEFAULT_TASK_TIMEOUT */
+   switchMode, clearWorkspaceIsNew, showAlert, DEFAULT_TASK_TIMEOUT,
+   attachMentionAutocomplete */
 //
 // Board empty-state composer: when Board mode opens with zero tasks in
 // the current workspace group, render a task-creation composer in place
@@ -163,8 +164,13 @@ var BoardComposer = (function () {
             prompt.value = body;
             prompt.focus();
           }
-        });
+        }, prompt);
       });
+    }
+
+    // @-mention file autocomplete, matching the Plan-mode chat composer.
+    if (prompt && typeof attachMentionAutocomplete === "function") {
+      attachMentionAutocomplete(prompt, { priorityPrefix: "specs/" });
     }
   }
 

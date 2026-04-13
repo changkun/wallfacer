@@ -3,14 +3,20 @@
 var _templatesPickerEl = null;
 var _templatesPickerCleanup = null;
 
-// openTemplatesPicker(onSelect) fetches GET /api/templates and renders a
-// scrollable, searchable dropdown anchored below the prompt textarea.
-// Clicking a row calls onSelect(template.body) and closes the picker.
-async function openTemplatesPicker(onSelect) {
+// openTemplatesPicker(onSelect, anchor) fetches GET /api/templates and
+// renders a scrollable, searchable dropdown anchored below `anchor` (an
+// element or element id). Falls back to the "+ New Task" prompt
+// textarea when no anchor is given. Clicking a row calls
+// onSelect(template.body) and closes the picker.
+async function openTemplatesPicker(onSelect, anchor) {
   closeTemplatesPicker();
 
-  var textarea = document.getElementById("new-prompt");
-  if (!textarea) return;
+  var anchorEl =
+    typeof anchor === "string" ? document.getElementById(anchor) : anchor;
+  if (!anchorEl) {
+    anchorEl = document.getElementById("new-prompt");
+  }
+  if (!anchorEl) return;
 
   var templates = [];
   try {
@@ -37,8 +43,8 @@ async function openTemplatesPicker(onSelect) {
     "flex-direction:column",
   ].join(";");
 
-  // Position below textarea.
-  var rect = textarea.getBoundingClientRect();
+  // Position below the anchor.
+  var rect = anchorEl.getBoundingClientRect();
   el.style.top = rect.bottom + window.scrollY + 4 + "px";
   el.style.left = rect.left + window.scrollX + "px";
 
@@ -125,7 +131,7 @@ async function openTemplatesPicker(onSelect) {
     if (
       _templatesPickerEl &&
       !_templatesPickerEl.contains(e.target) &&
-      e.target !== textarea
+      e.target !== anchorEl
     ) {
       closeTemplatesPicker();
     }
