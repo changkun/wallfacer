@@ -616,15 +616,20 @@ function render() {
     }
   }
 
-  // Toggle the empty-Board hint — only visible when no tasks exist in any
-  // column (archived-only rows do not count as a "non-empty" board).
-  const _emptyHint = document.getElementById("board-empty-hint");
-  if (_emptyHint) {
+  // Keep the BoardComposer in sync with the current task count. It
+  // mounts when the workspace has no tasks and the user has not yet
+  // dismissed it this session; it unmounts once at least one task
+  // exists. See ui/js/board-composer.js.
+  if (typeof BoardComposer !== "undefined" && BoardComposer) {
     const totalVisible = Object.values(columns).reduce(
       (n, items) => n + items.length,
       0,
     );
-    _emptyHint.classList.toggle("hidden", totalVisible !== 0);
+    try {
+      BoardComposer.sync(totalVisible);
+    } catch (_e) {
+      // Render must never throw — the composer is cosmetic here.
+    }
   }
 
   const _colTitles = {

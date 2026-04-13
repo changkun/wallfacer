@@ -438,18 +438,102 @@
   }
 }
 
-/* Empty-Board hint — shown when there are no tasks across all columns. */
-.board-empty-hint {
+/* Empty-Board composer — mounted by ui/js/board-composer.js when the
+   workspace has no tasks. Occupies the full board grid so the user
+   sees a single focused prompt instead of four empty columns. */
+.board-empty-composer {
   grid-column: 1 / -1;
-  margin: 16px 8px 0;
-  padding: 14px 16px;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px 0;
 }
-.board-empty-hint__plan {
+.board-empty-composer:empty {
+  display: none;
+}
+
+.board-composer {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow, 0 4px 12px rgba(0, 0, 0, 0.12));
+  transition:
+    opacity 260ms cubic-bezier(0.3, 0, 0.8, 0.15),
+    transform 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
+}
+.board-composer--submitting {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  pointer-events: none;
+}
+.board-composer__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.board-composer__input {
+  width: 100%;
+  resize: vertical;
+  min-height: 96px;
+}
+.board-composer__input--error {
+  border-color: #dc2626;
+}
+.board-composer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.board-composer__advanced-toggle {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.board-composer__advanced-toggle:hover {
+  color: var(--text);
+}
+.board-composer__submit {
+  font-weight: 600;
+}
+.board-composer__advanced {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.board-composer__advanced.hidden {
+  display: none;
+}
+.board-composer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.board-composer__field--wide {
+  grid-column: 1 / -1;
+}
+.board-composer__templates {
+  align-self: flex-start;
+}
+.board-composer__bridge {
+  margin: 0;
+  padding-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.board-composer__plan-link {
   color: var(--accent, #6366f1);
   background: none;
   border: none;
@@ -459,8 +543,13 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.board-empty-hint__plan:hover {
+.board-composer__plan-link:hover {
   color: var(--text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-composer {
+    transition: none;
+  }
 }
 
 /* Sidebar unread dot (Board nav) — mirrors spec-chat-tab__unread. */
