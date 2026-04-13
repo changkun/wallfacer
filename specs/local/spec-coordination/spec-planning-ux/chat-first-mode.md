@@ -650,7 +650,7 @@ Accept both `#spec/<path>` and `#plan/<path>` in the hash router (`ui/js/hash-de
 | [Layout state machine](chat-first-mode/layout-state-machine.md) | spec-tree-index-endpoint | medium | **complete** |
 | [/spec-new directive parser](chat-first-mode/spec-new-directive-parser.md) | spec-scaffold-library, agent-system-prompts | large | **complete** |
 | [Focused view crossfade](chat-first-mode/focused-view-crossfade.md) | layout-state-machine, explorer-roadmap-entry | small | **complete** |
-| [README auto-create](chat-first-mode/readme-autocreate.md) | spec-new-directive-parser | small | validated |
+| [README auto-create](chat-first-mode/readme-autocreate.md) | spec-new-directive-parser | small | **complete** |
 | [/create command expansion](chat-first-mode/create-command-expansion.md) | spec-new-directive-parser | small | validated |
 | [Empty-Board composer](chat-first-mode/empty-board-composer.md) | plan-to-board-bridges | large | validated |
 | [Bootstrap choreography](chat-first-mode/bootstrap-choreography.md) | layout-state-machine, spec-new-directive-parser, readme-autocreate | small | validated |

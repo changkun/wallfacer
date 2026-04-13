@@ -1,14 +1,15 @@
 ---
 title: Auto-create specs/README.md on first scaffold and append rows thereafter
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
 affects:
-  - internal/spec/
-  - internal/handler/planning.go
+  - internal/spec/readme.go
+  - internal/handler/planning_directive.go
+  - internal/prompts/planning_system_empty.tmpl
 effort: small
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 author: changkun
 dispatched_task_id: null
 ---
@@ -69,3 +70,11 @@ When a `/spec-new` directive successfully scaffolds a spec, ensure `specs/README
 - **Do NOT** touch this logic when a `/spec-new` fails — README update only on successful scaffold.
 - **Do NOT** add a UI surface for editing the README auto-update behaviour. It's implicit; users who don't want it can `git revert` or edit the README directly.
 - **Do NOT** create `specs/README.md` on any path other than post-successful-scaffold. The parent spec explicitly forbids rewriting an existing README.
+
+## Implementation notes
+
+- `EnsureReadme` is wired into `handler.scaffoldDirective` (not directly into `SendPlanningMessage`). This keeps the scaffold-plus-roadmap-sync as a single atomic step per directive and lets the surrounding `processDirectives` loop surface roadmap failures through the same system-message channel it already uses for scaffold failures.
+- `TestSendPlanningMessage_*` integration tests from the spec's test matrix are not included. Per the spec-new-directive-parser implementation notes, the handler test harness does not mock the planner sandbox; the same constraint applies here. The equivalent behaviour is covered at the function level by `TestScaffoldDirective_FirstScaffoldCreatesReadme` and `TestScaffoldDirective_SecondScaffoldAppendsRow` in `internal/handler/planning_directive_test.go`.
+- `firstSentence` is a small helper in `planning_directive.go` (rather than `internal/spec/`) because its job is to turn raw agent output into the `Summary` field of `spec.Meta` — one-way, handler-specific wrangling. It skips code fences, headings, HTML comments, and table rows so the summary is always user-facing prose.
+- The spec text said "unknown tracks use title-cased directory name" — implemented by `TrackDisplayName` via a small splitting-on-hyphens/underscores helper to avoid pulling `golang.org/x/text/cases` into the spec package for a tiny presentation concern.
+- Pipe characters in the summary are escaped (`\|`) before being rendered into the table row, per standard GFM rules — an extra forward-compat detail beyond what the spec required.
