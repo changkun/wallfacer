@@ -242,15 +242,98 @@ var BoardComposer = (function () {
       });
   }
 
+  function _liftTarget() {
+    // The Backlog "+ New Task" button occupies roughly the footprint of
+    // the first card about to land; it's a better-looking landing spot
+    // than the raw column top which has no visible anchor.
+    var btn = document.getElementById("new-task-btn");
+    if (btn) return btn.getBoundingClientRect();
+    var col = document.getElementById("col-backlog");
+    if (col) return col.getBoundingClientRect();
+    return null;
+  }
+
   function _animateOutAndUnmount(el) {
-    if (_prefersReducedMotion()) {
+    var board = document.getElementById("board");
+    var target = _liftTarget();
+    if (_prefersReducedMotion() || !board || !target) {
       unmount();
       return;
     }
-    el.classList.add("board-composer--submitting");
-    setTimeout(function () {
+    var src = el.getBoundingClientRect();
+    if (!src.width || !src.height) {
       unmount();
-    }, 260);
+      return;
+    }
+
+    // Pin the composer to its current viewport rect on document.body so
+    // the slot goes :empty and the #board:has(...) rule disengages —
+    // the kanban columns reappear behind us and get faded in via the
+    // board--columns-entering class. Reparenting avoids clipping and
+    // stacking-context surprises from the grid cell.
+    el.style.position = "fixed";
+    el.style.left = src.left + "px";
+    el.style.top = src.top + "px";
+    el.style.width = src.width + "px";
+    el.style.height = src.height + "px";
+    el.style.maxWidth = src.width + "px";
+    el.style.margin = "0";
+    el.style.transformOrigin = "top left";
+    el.style.willChange = "transform, opacity";
+    el.style.pointerEvents = "none";
+    el.style.zIndex = "50";
+    document.body.appendChild(el);
+    board.classList.add("board--columns-entering");
+
+    // Compress the interior content first: textarea shrinks to a
+    // one-line preview while chrome (label, bar, advanced, bridge)
+    // fades out. This makes the outer translate+scale read as a card
+    // "settling" into the Backlog rather than a box collapsing.
+    var inner = el.querySelectorAll(
+      ".board-composer__label," +
+        ".board-composer__bar," +
+        ".board-composer__advanced," +
+        ".board-composer__bridge",
+    );
+    for (var i = 0; i < inner.length; i++) {
+      inner[i].style.transition =
+        "opacity 180ms cubic-bezier(0.3, 0, 0.8, 0.15)";
+      inner[i].style.opacity = "0";
+    }
+    var textarea = el.querySelector(".board-composer__input");
+    if (textarea) {
+      textarea.style.transition =
+        "opacity 180ms cubic-bezier(0.3, 0, 0.8, 0.15)";
+      textarea.style.opacity = "0.2";
+    }
+
+    var dx = target.left - src.left;
+    var dy = target.top - src.top;
+    var scaleX = Math.max(0.2, target.width / src.width);
+    var scaleY = Math.max(0.08, target.height / src.height);
+
+    requestAnimationFrame(function () {
+      el.style.transition =
+        "transform 260ms cubic-bezier(0.05, 0.7, 0.1, 1)," +
+        " opacity 200ms ease 120ms";
+      el.style.transform =
+        "translate(" +
+        dx +
+        "px, " +
+        dy +
+        "px) scale(" +
+        scaleX +
+        ", " +
+        scaleY +
+        ")";
+      el.style.opacity = "0";
+    });
+
+    setTimeout(function () {
+      board.classList.remove("board--columns-entering");
+      if (el.parentNode) el.parentNode.removeChild(el);
+      if (_root === el) _root = null;
+    }, 380);
   }
 
   function mount() {

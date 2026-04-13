@@ -462,6 +462,28 @@
   display: none;
 }
 
+/* On submit the composer reparents to document.body and the slot goes
+   :empty, so the hide rule above disengages and columns reappear. We
+   fade them in from opacity 0 with a short delay so the composer's
+   lift animation is already underway before the board reveals itself.
+   See ui/js/board-composer.js _animateOutAndUnmount. */
+#board.board--columns-entering > [id^="col-wrapper-"] {
+  animation: board-columns-fade-in 200ms ease 60ms both;
+}
+@keyframes board-columns-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #board.board--columns-entering > [id^="col-wrapper-"] {
+    animation: none;
+  }
+}
+
 /* The composer carries `.spec-chat-composer` so its shared Slack-style
    shell applies (border, radius, focus ring). Board-specific rules here
    only tune width, spacing, and the internal layout for the empty-state
