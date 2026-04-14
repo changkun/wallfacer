@@ -34,8 +34,10 @@ build: fmt lint ui-ts build-binary pull-images
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
+# SANDBOX_TAG (resolved above from latere-ai/images releases) is embedded so
+# the binary pulls the matching image tag without a runtime network lookup.
 VERSION ?=
-LDFLAGS := -s -w
+LDFLAGS := -s -w -X changkun.de/x/wallfacer/internal/cli.SandboxTag=$(SANDBOX_TAG)
 ifneq ($(VERSION),)
 LDFLAGS += -X changkun.de/x/wallfacer/internal/cli.Version=$(VERSION)
 endif

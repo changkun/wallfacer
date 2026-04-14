@@ -56,12 +56,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
+      - name: Resolve sandbox image tag
+        id: sandbox_tag
+        shell: bash
+        run: |
+          # Source of truth: latest release of github.com/latere-ai/images.
+          # Fall back to the highest vMAJOR.MINOR.PATCH git tag if the
+          # releases API is unavailable (rate limit, transient failure).
+          tag=$(curl -sf https://api.github.com/repos/latere-ai/images/releases/latest 2>/dev/null | jq -r '.tag_name // empty')
+          if [ -z "$tag" ]; then
+            tag=$(git ls-remote --tags https://github.com/latere-ai/images 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          if [ -z "$tag" ]; then
+            echo "Could not resolve latere-ai/images tag" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
       - name: Build desktop app
         shell: bash
+        env:
+          SANDBOX_TAG: ${{ steps.sandbox_tag.outputs.tag }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           go tool wails build -tags desktop,webkit2_41 -skipbindings -s -platform ${{ matrix.platform }} \
-            -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION}"
+            -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION} -X changkun.de/x/wallfacer/internal/cli.SandboxTag=${SANDBOX_TAG}"
 
       # --- macOS: code sign, notarize, and zip ---
 

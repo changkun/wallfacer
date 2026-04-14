@@ -16,20 +16,28 @@ import (
 )
 
 // Version is set at build time via -ldflags (e.g. -X cli.Version=1.2.3).
-// When empty (dev build), the binary pulls the :latest sandbox image and
-// the doctor subcommand displays "dev" as the version string.
+// When empty (dev build), the doctor subcommand displays "dev" as the
+// version string. Version tracks wallfacer's own release and is
+// intentionally independent of the sandbox image tag.
 var Version = ""
+
+// SandboxTag is the sandbox image tag embedded at build time via -ldflags
+// (e.g. -X cli.SandboxTag=v0.0.4). It is resolved from the latest release of
+// github.com/latere-ai/images at build time and MUST NOT be derived from
+// wallfacer's own Version — the two repositories release independently.
+var SandboxTag = ""
 
 // sandboxImageBase is the registry path for the published sandbox image.
 const sandboxImageBase = "ghcr.io/latere-ai/sandbox-claude"
 
 // defaultSandboxImage returns the tagged sandbox image reference.
-// Release builds (version set via ldflags) use the matching version tag.
-// Dev builds query the GitHub API for the latest release of latere-ai/images
-// and use that tag. Falls back to :latest only if the query fails.
+// Builds that embed SandboxTag via ldflags use that tag directly.
+// Otherwise the binary queries the GitHub API for the latest release of
+// latere-ai/images and uses that tag. Falls back to :latest only if the
+// query fails.
 func defaultSandboxImage() string {
-	if Version != "" {
-		return sandboxImageBase + ":v" + Version
+	if SandboxTag != "" {
+		return sandboxImageBase + ":" + SandboxTag
 	}
 	if tag := resolveLatestImageTag(); tag != "" {
 		logger.Main.Info("resolved latest sandbox image tag", "tag", tag)

@@ -51,14 +51,31 @@ jobs:
         run: node scripts/build-ts.mjs
         working-directory: ui
 
+      - name: Resolve sandbox image tag
+        id: sandbox_tag
+        run: |
+          # Source of truth: latest release of github.com/latere-ai/images.
+          # Fall back to the highest vMAJOR.MINOR.PATCH git tag if the
+          # releases API is unavailable (rate limit, transient failure).
+          tag=$(curl -sf https://api.github.com/repos/latere-ai/images/releases/latest 2>/dev/null | jq -r '.tag_name // empty')
+          if [ -z "$tag" ]; then
+            tag=$(git ls-remote --tags https://github.com/latere-ai/images 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          if [ -z "$tag" ]; then
+            echo "Could not resolve latere-ai/images tag" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: '0'
+          SANDBOX_TAG: ${{ steps.sandbox_tag.outputs.tag }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          go build -trimpath -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION}" \
+          go build -trimpath -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION} -X changkun.de/x/wallfacer/internal/cli.SandboxTag=${SANDBOX_TAG}" \
             -o wallfacer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
 
       - name: Upload release asset

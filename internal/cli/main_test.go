@@ -196,25 +196,52 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	}
 }
 
-// TestDefaultSandboxImage_WithVersion verifies that when Version is set the
-// image reference includes the version tag instead of :latest.
-func TestDefaultSandboxImage_WithVersion(t *testing.T) {
-	old := Version
-	Version = "1.2.3"
-	defer func() { Version = old }()
+// TestDefaultSandboxImage_WithSandboxTag verifies that a build-time SandboxTag
+// is used verbatim (already includes the "v" prefix).
+func TestDefaultSandboxImage_WithSandboxTag(t *testing.T) {
+	oldTag := SandboxTag
+	SandboxTag = "v0.0.4"
+	defer func() { SandboxTag = oldTag }()
 
 	got := defaultSandboxImage()
-	if got != sandboxImageBase+":v1.2.3" {
-		t.Fatalf("expected image tag :v1.2.3, got %q", got)
+	if got != sandboxImageBase+":v0.0.4" {
+		t.Fatalf("expected image tag :v0.0.4, got %q", got)
 	}
 }
 
-// TestDefaultSandboxImage_DevBuild verifies that the dev build (empty Version)
-// either resolves to the latest release tag or falls back to :latest.
+// TestDefaultSandboxImage_VersionDoesNotDriveTag verifies that wallfacer's own
+// Version must NOT be used as the sandbox image tag. The sandbox image comes
+// from github.com/latere-ai/images, which releases independently of wallfacer.
+// Setting Version without SandboxTag must fall back to runtime resolution or
+// :latest, never to ":v<wallfacer-version>".
+func TestDefaultSandboxImage_VersionDoesNotDriveTag(t *testing.T) {
+	oldVersion := Version
+	oldTag := SandboxTag
+	Version = "9.9.9"
+	SandboxTag = ""
+	defer func() {
+		Version = oldVersion
+		SandboxTag = oldTag
+	}()
+
+	got := defaultSandboxImage()
+	if got == sandboxImageBase+":v9.9.9" {
+		t.Fatalf("sandbox tag must not be derived from wallfacer Version; got %q", got)
+	}
+}
+
+// TestDefaultSandboxImage_DevBuild verifies that when no SandboxTag is embedded
+// the binary either resolves the latest release tag from latere-ai/images or
+// falls back to :latest.
 func TestDefaultSandboxImage_DevBuild(t *testing.T) {
-	old := Version
+	oldVersion := Version
+	oldTag := SandboxTag
 	Version = ""
-	defer func() { Version = old }()
+	SandboxTag = ""
+	defer func() {
+		Version = oldVersion
+		SandboxTag = oldTag
+	}()
 
 	got := defaultSandboxImage()
 	// Dev build queries GitHub API for the latest tag; if the query succeeds

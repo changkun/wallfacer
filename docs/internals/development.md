@@ -89,17 +89,20 @@ Local builds are tagged as `sandbox-claude:latest` and `sandbox-codex:latest`, w
 
 ## Release Workflow
 
-Releases are triggered by pushing a version tag (`v*`). Three GitHub Actions workflows run in parallel:
+Releases are triggered by pushing a version tag (`v*`). Two GitHub Actions workflows run in parallel in this repository:
 
-| Workflow | Artifact | Registry |
-|---|---|---|
-| `release-binary.yml` | `wallfacer-{linux,darwin}-{amd64,arm64}` binaries | GitHub Release assets |
-| `release-claude.yml` | Claude Code sandbox image | `ghcr.io/latere-ai/sandbox-claude` |
-| `release-codex.yml` | Codex sandbox image | `ghcr.io/latere-ai/sandbox-codex` |
+| Workflow | Artifact |
+|---|---|
+| `release-binary.yml` | `wallfacer-{linux,darwin,windows}-{amd64,arm64}` binaries on the GitHub Release |
+| `release-desktop.yml` | Signed desktop apps (`Wallfacer-Desktop-*`) on the GitHub Release |
 
-**Version embedding.** Release binaries are built with `-ldflags "-X main.version=X.Y.Z"`. This makes the binary pull the sandbox image tagged with the matching version (e.g. `ghcr.io/latere-ai/sandbox-claude:v0.0.6`) instead of `:latest`. Dev builds without a version set fall back to `:latest`.
+Sandbox images (`ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex`) are built and published from [`github.com/latere-ai/images`](https://github.com/latere-ai/images) on its own release cadence.
 
-**Image tagging.** Each release produces three image tags: `v<version>` (e.g. `v0.0.6`), `v<major>.<minor>` (e.g. `v0.0`), and `latest`.
+**Version embedding.** Release binaries are built with `-ldflags "-X changkun.de/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output. It does **not** determine the sandbox image tag.
+
+**Sandbox image tag embedding.** The sandbox image is maintained in a separate repository (`github.com/latere-ai/images`) that releases independently of wallfacer. Its latest tag is resolved from that repo at build time and passed via `-ldflags "-X changkun.de/x/wallfacer/internal/cli.SandboxTag=vA.B.C"`. The `Makefile` resolves `SANDBOX_TAG` for local builds; the release workflows (`release-binary.yml`, `release-desktop.yml`) resolve it before the build step. If neither is set, the binary queries the GitHub API for the latest `latere-ai/images` release at runtime and falls back to `:latest` when the lookup fails.
+
+**Image tagging.** Each `latere-ai/images` release produces three image tags on GHCR: `v<version>` (e.g. `v0.0.6`), `v<major>.<minor>` (e.g. `v0.0`), and `latest`.
 
 **Creating a release:**
 
