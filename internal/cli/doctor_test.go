@@ -281,9 +281,11 @@ func TestRunDoctor_SandboxImageFallback(t *testing.T) {
 	}
 }
 
-// TestRunDoctor_VersionTaggedCodex verifies that when Version is set, the
-// codex sandbox image uses the version tag.
-func TestRunDoctor_VersionTaggedCodex(t *testing.T) {
+// TestRunDoctor_CodexImageNotCached verifies that doctor reports the codex
+// sandbox image as not cached when the runtime does not have it locally.
+// The codex image tag is resolved from the latest latere-ai/images release
+// (independent of the wallfacer Version).
+func TestRunDoctor_CodexImageNotCached(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test uses shell scripts")
 	}
@@ -309,7 +311,6 @@ func TestRunDoctor_VersionTaggedCodex(t *testing.T) {
 		RunDoctor(configDir)
 	})
 
-	// Should use version tag for codex image check.
 	if !strings.Contains(out, "Codex sandbox image not cached") {
 		t.Errorf("expected codex image not cached message, got:\n%s", out)
 	}

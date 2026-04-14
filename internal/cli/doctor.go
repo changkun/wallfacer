@@ -146,8 +146,8 @@ func RunDoctor(configDir string) {
 		}
 
 		codexTag := ":latest"
-		if Version != "" {
-			codexTag = ":v" + Version
+		if tag := resolveLatestImageTag(); tag != "" {
+			codexTag = ":" + tag
 		}
 		codexImage := envOrDefault("CODEX_SANDBOX_IMAGE", "ghcr.io/latere-ai/sandbox-codex"+codexTag)
 		if imageExists(runtimePath, codexImage) {

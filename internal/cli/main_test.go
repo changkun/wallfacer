@@ -196,40 +196,40 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	}
 }
 
-// TestDefaultSandboxImage_WithVersion verifies that when Version is set the
-// image reference includes the version tag instead of :latest.
+// TestDefaultSandboxImage_WithVersion verifies that even when Version is set,
+// the image tag is resolved from latere-ai/images (not the wallfacer version),
+// because the two repos have an independent release cycle.
 func TestDefaultSandboxImage_WithVersion(t *testing.T) {
 	old := Version
 	Version = "1.2.3"
 	defer func() { Version = old }()
 
 	got := defaultSandboxImage()
-	if got != sandboxImageBase+":v1.2.3" {
-		t.Fatalf("expected image tag :v1.2.3, got %q", got)
+	// Must never use the embedded wallfacer version as the image tag.
+	if got == sandboxImageBase+":v1.2.3" {
+		t.Fatalf("must not use embedded wallfacer version as image tag, got %q", got)
+	}
+	if !strings.HasPrefix(got, sandboxImageBase+":") {
+		t.Fatalf("unexpected image base, got %q", got)
 	}
 }
 
-// TestDefaultSandboxImage_DevBuild verifies that the dev build (empty Version)
-// either resolves to the latest release tag or falls back to :latest.
+// TestDefaultSandboxImage_DevBuild verifies that a dev build (empty Version)
+// resolves to the latest release tag or falls back to :latest.
 func TestDefaultSandboxImage_DevBuild(t *testing.T) {
 	old := Version
 	Version = ""
 	defer func() { Version = old }()
 
 	got := defaultSandboxImage()
-	// Dev build queries GitHub API for the latest tag; if the query succeeds
-	// we get e.g. ":v0.0.4", otherwise ":latest" as fallback.
-	if got == sandboxImageBase+":latest" {
-		return // fallback path — OK
-	}
+	// Either the GitHub-resolved tag (e.g. ":v0.0.4") or the :latest fallback.
 	if !strings.HasPrefix(got, sandboxImageBase+":") {
 		t.Fatalf("unexpected image base, got %q", got)
 	}
 	tag := strings.TrimPrefix(got, sandboxImageBase+":")
-	if tag == "" || tag == "latest" {
-		t.Fatalf("expected a resolved tag or :latest, got %q", got)
+	if tag == "" {
+		t.Fatalf("expected a non-empty tag, got %q", got)
 	}
-	// Resolved a real tag (e.g. "v0.0.4") — valid.
 }
 
 func TestCodexImageFromClaude(t *testing.T) {
