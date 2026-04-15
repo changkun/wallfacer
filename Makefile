@@ -17,10 +17,10 @@ SANDBOX_TAG      := $(shell \
 ifeq ($(SANDBOX_TAG),)
 $(error Could not resolve the latest sandbox image tag from GitHub. Check your network, or override: make SANDBOX_TAG=vX.Y.Z <target>)
 endif
-IMAGE            := sandbox-claude:$(SANDBOX_TAG)
-GHCR_IMAGE       := ghcr.io/latere-ai/sandbox-claude:$(SANDBOX_TAG)
-CODEX_IMAGE      := sandbox-codex:$(SANDBOX_TAG)
-GHCR_CODEX_IMAGE := ghcr.io/latere-ai/sandbox-codex:$(SANDBOX_TAG)
+# Single unified sandbox image. Both Claude Code and Codex live in
+# sandbox-agents; the entrypoint dispatches via WALLFACER_AGENT.
+IMAGE            := sandbox-agents:$(SANDBOX_TAG)
+GHCR_IMAGE       := ghcr.io/latere-ai/sandbox-agents:$(SANDBOX_TAG)
 NAME             := wallfacer
 
 # Load .env if it exists
@@ -67,13 +67,11 @@ build-desktop-windows:
 build-desktop-linux:
 	go tool wails build -tags desktop -skipbindings -s -platform linux/amd64
 
-# Pull sandbox images from GHCR and tag locally.
-# Images are maintained in https://github.com/latere-ai/images
+# Pull the unified sandbox image from GHCR and tag locally.
+# Image source: https://github.com/latere-ai/images
 pull-images:
 	$(PODMAN) pull $(GHCR_IMAGE)
 	$(PODMAN) tag $(GHCR_IMAGE) $(IMAGE)
-	$(PODMAN) pull $(GHCR_CODEX_IMAGE)
-	$(PODMAN) tag $(GHCR_CODEX_IMAGE) $(CODEX_IMAGE)
 
 # Build and run the Go server natively
 server:
@@ -87,7 +85,7 @@ VOLUME_MOUNTS := $(foreach ws,$(WORKSPACES),-v $(ws):/workspace/$(notdir $(ws)):
 
 # Headless one-shot: make run PROMPT="fix the failing tests"
 # Mount host gitconfig read-only; set safe.directory via env so the file stays immutable
-GITCONFIG_MOUNT := -v $(HOME)/.gitconfig:/home/claude/.gitconfig:ro,z \
+GITCONFIG_MOUNT := -v $(HOME)/.gitconfig:/home/agent/.gitconfig:ro,z \
 	-e "GIT_CONFIG_COUNT=1" \
 	-e "GIT_CONFIG_KEY_0=safe.directory" \
 	-e "GIT_CONFIG_VALUE_0=*"
@@ -101,7 +99,7 @@ endif
 		--env-file .env \
 		$(GITCONFIG_MOUNT) \
 		$(VOLUME_MOUNTS) \
-		-v claude-config:/home/claude/.claude \
+		-v claude-config:/home/agent/.claude \
 		-w /workspace \
 		$(IMAGE) -p "$(PROMPT)" --verbose --output-format stream-json
 
@@ -112,7 +110,7 @@ shell:
 		--env-file .env \
 		$(GITCONFIG_MOUNT) \
 		$(VOLUME_MOUNTS) \
-		-v claude-config:/home/claude/.claude \
+		-v claude-config:/home/agent/.claude \
 		-w /workspace \
 		--entrypoint /bin/bash \
 		$(IMAGE)

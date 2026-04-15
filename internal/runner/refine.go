@@ -98,7 +98,7 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 	spec := sandbox.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImageForSandbox(sb),
+		Image:   strings.TrimSpace(r.sandboxImage),
 	}
 
 	if taskID != "" {
@@ -112,13 +112,14 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 		spec.EnvFile = r.envFile
 	}
 
+	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
 	if model != "" {
-		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
+		spec.Env["CLAUDE_CODE_MODEL"] = model
 	}
 
 	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 		Host:      "claude-config",
-		Container: "/home/claude/.claude",
+		Container: "/home/agent/.claude",
 		Named:     true,
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)

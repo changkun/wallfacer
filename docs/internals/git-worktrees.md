@@ -63,7 +63,7 @@ The sandbox container sees worktrees, not the live main working directory:
 ```
 ~/.wallfacer/worktrees/<uuid>/<repo>  ->  /workspace/<repo>:z   (read-write)
 AGENTS.md (or CLAUDE.md)               ->  /workspace/AGENTS.md  (read-only)
-claude-config (named volume)           ->  /home/claude/.claude
+claude-config (named volume)           ->  /home/agent/.claude
 ```
 
 The `.env` file is passed via `--env-file`, not as a bind mount.

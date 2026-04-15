@@ -16,7 +16,7 @@ import (
 func TestPlannerNew(t *testing.T) {
 	cfg := Config{
 		Command:     "/usr/bin/podman",
-		Image:       "sandbox-claude:latest",
+		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{"/home/user/repo"},
 		EnvFile:     "/home/user/.env",
 		Fingerprint: "abc123def456",
@@ -121,7 +121,7 @@ func TestBuildContainerSpec(t *testing.T) {
 
 	p := New(Config{
 		Command:          "/usr/bin/podman",
-		Image:            "sandbox-claude:latest",
+		Image:            "sandbox-agents:latest",
 		Workspaces:       []string{tmpDir},
 		EnvFile:          "/tmp/test.env",
 		Fingerprint:      "abc123",
@@ -137,8 +137,8 @@ func TestBuildContainerSpec(t *testing.T) {
 	if spec.Name != "wallfacer-plan-test" {
 		t.Errorf("Name = %q, want %q", spec.Name, "wallfacer-plan-test")
 	}
-	if spec.Image != "sandbox-claude:latest" {
-		t.Errorf("Image = %q, want %q", spec.Image, "sandbox-claude:latest")
+	if spec.Image != "sandbox-agents:latest" {
+		t.Errorf("Image = %q, want %q", spec.Image, "sandbox-agents:latest")
 	}
 	if spec.EnvFile != "/tmp/test.env" {
 		t.Errorf("EnvFile = %q, want %q", spec.EnvFile, "/tmp/test.env")
@@ -215,7 +215,7 @@ func TestBuildContainerSpecMultiWorkspace(t *testing.T) {
 
 	p := New(Config{
 		Command:     "podman",
-		Image:       "sandbox-claude:latest",
+		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{tmpDir1, tmpDir2},
 		Fingerprint: "multi",
 	})
@@ -257,7 +257,7 @@ func TestBuildContainerSpecNoSpecsDir(t *testing.T) {
 
 	p := New(Config{
 		Command:     "podman",
-		Image:       "sandbox-claude:latest",
+		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{tmpDir},
 		Fingerprint: "nospecs",
 	})
@@ -465,7 +465,7 @@ func TestAppendInstructionsMount_Codex(t *testing.T) {
 
 	p := New(Config{
 		Command:          "podman",
-		Image:            "sandbox-claude:latest",
+		Image:            "sandbox-agents:latest",
 		Workspaces:       []string{"/workspace/repo"},
 		InstructionsPath: instrFile,
 	})
@@ -516,7 +516,7 @@ func TestAppendInstructionsMount_MissingFile(t *testing.T) {
 func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
-		Image:       "sandbox-claude:latest",
+		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{"", "  "},
 		Fingerprint: "fp",
 	})
@@ -531,7 +531,7 @@ func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 func TestBuildContainerSpec_NoEnvFile(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
-		Image:       "sandbox-claude:latest",
+		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{t.TempDir()},
 		Fingerprint: "fp",
 	})

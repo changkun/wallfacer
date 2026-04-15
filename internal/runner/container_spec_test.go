@@ -321,7 +321,7 @@ func TestContainerSpecFullArgs(t *testing.T) {
 	spec := sandbox.ContainerSpec{
 		Runtime: "/opt/podman/bin/podman",
 		Name:    "wallfacer-task-abc12345",
-		Image:   "sandbox-claude:latest",
+		Image:   "sandbox-agents:latest",
 		Labels: map[string]string{
 			"wallfacer.task.id":     "abc12345-1111-2222-3333-444444444444",
 			"wallfacer.task.prompt": "fix the bug",
@@ -329,7 +329,7 @@ func TestContainerSpecFullArgs(t *testing.T) {
 		EnvFile: "/home/user/.wallfacer/.env",
 		Env:     map[string]string{"CLAUDE_CODE_MODEL": "claude-opus-4-6"},
 		Volumes: []sandbox.VolumeMount{
-			{Host: "claude-config", Container: "/home/claude/.claude", Named: true},
+			{Host: "claude-config", Container: "/home/agent/.claude", Named: true},
 			{Host: "/repos/myproject", Container: "/workspace/myproject", Options: "z"},
 			{Host: "/instructions/CLAUDE.md", Container: "/workspace/CLAUDE.md", Options: "z,ro"},
 		},
@@ -352,11 +352,11 @@ func TestContainerSpecFullArgs(t *testing.T) {
 		"--label", "wallfacer.task.prompt=fix the bug",
 		"--env-file", "/home/user/.wallfacer/.env",
 		"-e", "CLAUDE_CODE_MODEL=claude-opus-4-6",
-		"-v", "claude-config:/home/claude/.claude",
+		"-v", "claude-config:/home/agent/.claude",
 		"--mount", "type=bind,src=/repos/myproject,dst=/workspace/myproject,z",
 		"--mount", "type=bind,src=/instructions/CLAUDE.md,dst=/workspace/CLAUDE.md,z,readonly",
 		"-w", "/workspace/myproject",
-		"sandbox-claude:latest",
+		"sandbox-agents:latest",
 		"-p", "fix the bug", "--verbose", "--output-format", "stream-json",
 	}
 
@@ -420,7 +420,7 @@ func TestCacheVolumeMountsPresent(t *testing.T) {
 			found[v.Container] = true
 		}
 	}
-	for _, want := range []string{"/home/claude/.npm", "/home/claude/.cache/pip", "/home/claude/.cargo/registry", "/home/claude/.cache/go-build"} {
+	for _, want := range []string{"/home/agent/.npm", "/home/agent/.cache/pip", "/home/agent/.cargo/registry", "/home/agent/.cache/go-build"} {
 		if !found[want] {
 			t.Errorf("expected cache volume for %s", want)
 		}
