@@ -116,10 +116,10 @@ See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
 
 **Global Sandbox Routing** -- Select the default sandbox type and override the sandbox for individual activities: Implementation, Testing, Refinement, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available sandbox types (claude, codex) or "default".
 
-Wallfacer supports two sandbox types:
+Wallfacer supports two sandbox types, both backed by the same unified container image (`sandbox-agents:latest`). The container's entrypoint dispatches to the right CLI based on the `WALLFACER_AGENT` env var the runner sets per task:
 
-- **Claude** -- runs Claude Code CLI inside an Ubuntu-based container (`sandbox-claude:latest`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **Codex** -- runs OpenAI Codex CLI inside a companion image (`sandbox-codex:latest`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **Claude** -- runs Claude Code CLI (`WALLFACER_AGENT=claude`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **Codex** -- runs OpenAI Codex CLI (`WALLFACER_AGENT=codex`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 
 Each task can be assigned a specific sandbox type when created or edited. The task-level sandbox selection overrides the global default for that task's implementation run.
 
@@ -328,7 +328,7 @@ wallfacer run [flags] [workspace...]
 | `-addr` | `ADDR` | `:8080` | Listen address |
 | `-data` | `DATA_DIR` | `~/.wallfacer/data` | Task data directory |
 | `-container` | `CONTAINER_CMD` | auto-detected | Container runtime command (`podman` or `docker`) |
-| `-image` | `SANDBOX_IMAGE` | `ghcr.io/latere-ai/sandbox-claude:latest` | Sandbox image name |
+| `-image` | `SANDBOX_IMAGE` | `ghcr.io/latere-ai/sandbox-agents:latest` | Sandbox image name (same image serves both Claude and Codex; `WALLFACER_AGENT` selects the CLI) |
 | `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
 | `-no-browser` | -- | `false` | Skip auto-opening the browser |
 | `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |

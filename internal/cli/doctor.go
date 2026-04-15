@@ -133,27 +133,19 @@ func RunDoctor(configDir string) {
 	}
 	fmt.Printf("[ok] Sandbox backend: %s\n", sandboxBackend)
 
-	// --- Sandbox images ---
+	// --- Sandbox image ---
+	// The unified sandbox-agents image ships both Claude Code and Codex;
+	// the entrypoint dispatches via WALLFACER_AGENT. A single image check
+	// covers both agent types.
 	if lookErr == nil {
 		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage())
 		switch {
 		case imageExists(runtimePath, image):
-			fmt.Printf("[ok] Claude sandbox image: %s\n", image)
+			fmt.Printf("[ok] Sandbox image: %s\n", image)
 		case image != fallbackSandboxImage && imageExists(runtimePath, fallbackSandboxImage):
-			fmt.Printf("[ ] Claude sandbox image %s not cached (fallback %s available)\n", image, fallbackSandboxImage)
+			fmt.Printf("[ ] Sandbox image %s not cached (fallback %s available)\n", image, fallbackSandboxImage)
 		default:
-			fmt.Printf("[ ] Claude sandbox image not cached (will be pulled on first task)\n")
-		}
-
-		codexTag := ":latest"
-		if Version != "" {
-			codexTag = ":v" + Version
-		}
-		codexImage := envOrDefault("CODEX_SANDBOX_IMAGE", "ghcr.io/latere-ai/sandbox-codex"+codexTag)
-		if imageExists(runtimePath, codexImage) {
-			fmt.Printf("[ok] Codex sandbox image: %s\n", codexImage)
-		} else {
-			fmt.Printf("[ ] Codex sandbox image not cached (pulled on demand if Codex is used)\n")
+			fmt.Printf("[ ] Sandbox image not cached (will be pulled on first task)\n")
 		}
 	}
 

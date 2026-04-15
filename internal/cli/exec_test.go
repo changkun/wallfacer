@@ -71,24 +71,6 @@ func TestParseExecConfig_SandboxRejectsInvalidRuntime(t *testing.T) {
 	}
 }
 
-// TestResolveSandboxImageForExec_CodexFromWallfacer verifies that "sandbox-claude:latest"
-// is rewritten to "sandbox-codex:latest" for the Codex sandbox.
-func TestResolveSandboxImageForExec_CodexFromWallfacer(t *testing.T) {
-	got := resolveSandboxImageForExec("sandbox-claude:latest", "codex")
-	if got != "sandbox-codex:latest" {
-		t.Fatalf("expected sandbox-codex:latest, got %q", got)
-	}
-}
-
-// TestResolveSandboxImageForExec_CodexKeepsUnrelatedImage verifies that non-wallfacer
-// images are returned unchanged even when Codex sandbox is requested.
-func TestResolveSandboxImageForExec_CodexKeepsUnrelatedImage(t *testing.T) {
-	got := resolveSandboxImageForExec("ghcr.io/acme/custom:tag", "codex")
-	if got != "ghcr.io/acme/custom:tag" {
-		t.Fatalf("expected unchanged image, got %q", got)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // resolveContainerByPrefix
 // ---------------------------------------------------------------------------
@@ -221,8 +203,11 @@ func TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount(t *testing.T) {
 	if !strings.Contains(got, "--env-file "+filepath.Join(tmp, ".env")) {
 		t.Fatalf("expected env-file arg, got %q", got)
 	}
-	if !strings.Contains(got, "-v claude-config:/home/claude/.claude") {
+	if !strings.Contains(got, "-v claude-config:/home/agent/.claude") {
 		t.Fatalf("expected claude config mount, got %q", got)
+	}
+	if !strings.Contains(got, "-e WALLFACER_AGENT=claude") {
+		t.Fatalf("expected WALLFACER_AGENT=claude env, got %q", got)
 	}
 	if !strings.Contains(got, "--mount type=bind,src="+tmp+",dst=/workspace/"+base+",z") {
 		t.Fatalf("expected repository workspace mount, got %q", got)
@@ -261,56 +246,15 @@ func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
 	if !strings.Contains(got, expectedWorkspaceMount) {
 		t.Fatalf("expected workspace mount, got %q", got)
 	}
-	if !strings.Contains(got, "--mount type=bind,src="+authDir+",dst=/home/codex/.codex,readonly,z") {
-		t.Fatalf("expected codex auth mount, got %q", got)
+	authFile := filepath.Join(authDir, "auth.json")
+	if !strings.Contains(got, "--mount type=bind,src="+authFile+",dst=/home/agent/.codex/auth.json,readonly,z") {
+		t.Fatalf("expected codex auth.json mount, got %q", got)
+	}
+	if !strings.Contains(got, "-e WALLFACER_AGENT=codex") {
+		t.Fatalf("expected WALLFACER_AGENT=codex env, got %q", got)
 	}
 	if !strings.Contains(got, "--mount type=bind,src="+tmp+",dst=/workspace/"+base+",z") {
 		t.Fatalf("expected repository workspace mount, got %q", got)
-	}
-}
-
-// TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest verifies that
-// both the tag and digest portions are preserved when rewriting a sandbox-claude
-// image to sandbox-codex.
-func TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest(t *testing.T) {
-	got := resolveSandboxImageForExec("ghcr.io/acme/sandbox-claude:latest@sha256:12345", "codex")
-	if got != "ghcr.io/acme/sandbox-codex:latest@sha256:12345" {
-		t.Fatalf("expected converted digest image, got %q", got)
-	}
-}
-
-// TestResolveSandboxImageForExec_EmptyImage verifies that an empty image
-// returns sandbox-codex:latest for Codex sandbox.
-func TestResolveSandboxImageForExec_EmptyImage(t *testing.T) {
-	got := resolveSandboxImageForExec("", "codex")
-	if got != "sandbox-codex:latest" {
-		t.Fatalf("expected sandbox-codex:latest, got %q", got)
-	}
-}
-
-// TestResolveSandboxImageForExec_AlreadyCodex verifies that an image already
-// containing "sandbox-codex" is returned unchanged.
-func TestResolveSandboxImageForExec_AlreadyCodex(t *testing.T) {
-	got := resolveSandboxImageForExec("ghcr.io/acme/sandbox-codex:v1", "codex")
-	if got != "ghcr.io/acme/sandbox-codex:v1" {
-		t.Fatalf("expected unchanged image, got %q", got)
-	}
-}
-
-// TestResolveSandboxImageForExec_ClaudeReturnsUnchanged verifies that Claude
-// sandbox type returns the image unchanged regardless of content.
-func TestResolveSandboxImageForExec_ClaudeReturnsUnchanged(t *testing.T) {
-	got := resolveSandboxImageForExec("wallfacer:v2", "claude")
-	if got != "wallfacer:v2" {
-		t.Fatalf("expected unchanged for claude, got %q", got)
-	}
-}
-
-// TestResolveSandboxImageForExec_WhitespaceImage verifies whitespace trimming.
-func TestResolveSandboxImageForExec_WhitespaceImage(t *testing.T) {
-	got := resolveSandboxImageForExec("  sandbox-claude:latest  ", "codex")
-	if got != "sandbox-codex:latest" {
-		t.Fatalf("expected trimmed and rewritten image, got %q", got)
 	}
 }
 

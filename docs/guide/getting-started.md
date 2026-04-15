@@ -28,7 +28,7 @@ On startup, Wallfacer restores the most recently used workspace group from your 
 
 On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
-The sandbox image (`ghcr.io/latere-ai/sandbox-claude:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB). To build sandbox images locally instead, see [Building sandbox images from source](#building-sandbox-images-from-source) below.
+The sandbox image (`ghcr.io/latere-ai/sandbox-agents:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB). The same image hosts both Claude Code and Codex; the runner sets `WALLFACER_AGENT` per task to pick the right CLI. To build the sandbox image locally instead, see [Building the sandbox image from source](#building-the-sandbox-image-from-source) below.
 
 ## Step 3 — Configure Your Credential
 
@@ -128,18 +128,18 @@ Windows users can also run Wallfacer inside WSL2 with the same experience as nat
 
 The container runtime override `CONTAINER_CMD` works on all platforms if the auto-detection picks the wrong binary.
 
-## Building Sandbox Images from Source
+## Building the Sandbox Image from Source
 
-Sandbox images are pulled automatically from `ghcr.io/latere-ai/`. If you need to customize them or build offline, clone the images repository and build locally:
+The sandbox image is pulled automatically from `ghcr.io/latere-ai/`. If you need to customize it or build offline, clone the images repository and build locally:
 
 ```bash
 git clone https://github.com/latere-ai/images.git
 cd images
-make                   # Build both sandbox-claude and sandbox-codex
+make                   # Build the unified sandbox-agents image
 make RUNTIME=docker    # Use Docker instead of Podman
 ```
 
-The local build tags the images as `sandbox-claude:latest` and `sandbox-codex:latest`, which Wallfacer finds automatically. See the [images repository](https://github.com/latere-ai/images) for details on what's bundled and the entrypoint contract.
+The local build tags the image as `sandbox-agents:latest`, which Wallfacer finds automatically. See the [images repository](https://github.com/latere-ai/images) for details on what's bundled, the `WALLFACER_AGENT` dispatch contract, and the JSON-envelope output expected by the runner.
 
 ## Next Steps
 

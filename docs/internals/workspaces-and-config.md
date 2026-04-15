@@ -132,8 +132,10 @@ This is handled by `appendInstructionsMount()` in `container.go`, which selects 
 
 The `internal/sandbox` package defines two sandbox types as `Type` constants:
 
-- **`Claude`** (`"claude"`) — Runs Claude Code in a container built from the `sandbox-claude` image. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **`Codex`** (`"codex"`) — Runs OpenAI Codex CLI in a container built from the `sandbox-codex` image. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **`Claude`** (`"claude"`) — Runs Claude Code in a `sandbox-agents` container with `WALLFACER_AGENT=claude`. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **`Codex`** (`"codex"`) — Runs OpenAI Codex CLI in the same `sandbox-agents` container with `WALLFACER_AGENT=codex`. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+
+Both sandbox types use the same unified container image — only the `WALLFACER_AGENT` env var differs at runtime.
 
 `sandbox.Default(value)` returns the parsed type or falls back to `Claude` for unknown values.
 
@@ -161,12 +163,9 @@ The seven routable activities (defined as `SandboxActivity` constants in `intern
 
 Two additional activities (`test`, `oversight-test`) are usage-attribution-only and not used for sandbox routing.
 
-### 🖼️ Container image selection
+### 🖼️ Container image
 
-`Runner.sandboxImageForSandbox()` selects the container image:
-
-- For **Claude**: uses the configured `--image` flag value (default: `ghcr.io/latere-ai/sandbox-claude:latest`).
-- For **Codex**: derives the image by replacing `sandbox-claude` with `sandbox-codex` in the image name, preserving the registry prefix and tag/digest. Falls back to `sandbox-codex:latest` if the base image is empty.
+The runner uses the configured `--image` flag value verbatim for every task and sub-agent — there is no per-sandbox image rewriting. The default is `ghcr.io/latere-ai/sandbox-agents:latest`, the unified image that ships both Claude Code and Codex. The agent CLI is selected at container start by the `WALLFACER_AGENT` env var the runner injects (`claude` or `codex`).
 
 ### 🧠 Model selection
 

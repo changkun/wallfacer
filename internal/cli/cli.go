@@ -28,7 +28,9 @@ var Version = ""
 var SandboxTag = ""
 
 // sandboxImageBase is the registry path for the published sandbox image.
-const sandboxImageBase = "ghcr.io/latere-ai/sandbox-claude"
+// The single sandbox-agents image ships both Claude Code and Codex CLIs;
+// the entrypoint selects between them at runtime via WALLFACER_AGENT.
+const sandboxImageBase = "ghcr.io/latere-ai/sandbox-agents"
 
 // defaultSandboxImage returns the tagged sandbox image reference.
 // Builds that embed SandboxTag via ldflags use that tag directly.
@@ -71,41 +73,7 @@ func resolveLatestImageTag() string {
 // fallbackSandboxImage is the locally-built image name used when the
 // remote registry image cannot be pulled (e.g. no network, auth failure).
 // This intentionally uses :latest as a last-resort local fallback.
-const fallbackSandboxImage = "sandbox-claude:latest"
-
-// codexImageFromClaude derives the codex sandbox image name from the claude
-// base image by replacing "sandbox-claude" with "sandbox-codex" in the
-// repository name, preserving registry prefix, tag, and digest.
-func codexImageFromClaude(baseImage string) string {
-	baseImage = strings.TrimSpace(baseImage)
-	if baseImage == "" {
-		return "sandbox-codex:latest"
-	}
-	if strings.Contains(strings.ToLower(baseImage), "sandbox-codex") {
-		return baseImage
-	}
-	registry := baseImage
-	digest := ""
-	if at := strings.Index(registry, "@"); at != -1 {
-		digest = registry[at:]
-		registry = registry[:at]
-	}
-	tag := ""
-	if at := strings.LastIndex(registry, ":"); at != -1 {
-		tag = registry[at:]
-		registry = registry[:at]
-	}
-	prefix := ""
-	repoName := registry
-	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
-		prefix = repoName[:idx+1]
-		repoName = repoName[idx+1:]
-	}
-	if repoName != "sandbox-claude" {
-		return baseImage
-	}
-	return prefix + "sandbox-codex" + tag + digest
-}
+const fallbackSandboxImage = "sandbox-agents:latest"
 
 // ConfigDir returns the default wallfacer configuration directory.
 func ConfigDir() string {
@@ -161,7 +129,7 @@ func initConfigDir(configDir, envFile string) {
 			"# Optional: model for auto-generating task titles (falls back to default model).\n" +
 			"# CLAUDE_TITLE_MODEL=\n\n" +
 			"# =============================================================================\n" +
-			"# OpenAI Codex sandbox (use with wallfacer-codex image)\n" +
+			"# OpenAI Codex sandbox (uses the unified sandbox-agents image; WALLFACER_AGENT=codex selects this CLI at runtime)\n" +
 			"# =============================================================================\n\n" +
 			"# Authentication: set your OpenAI API key.\n" +
 			"# OPENAI_API_KEY=sk-...\n\n" +

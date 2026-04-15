@@ -13,7 +13,7 @@ func TestParseContainerListPodmanJSON(t *testing.T) {
 		{
 			"Id":      "abc123",
 			"Names":   []string{"wallfacer-myslug-12345678"},
-			"Image":   "sandbox-claude:latest",
+			"Image":   "sandbox-agents:latest",
 			"State":   "running",
 			"Status":  "Up 5 minutes",
 			"Created": 1711150800,
@@ -44,8 +44,8 @@ func TestParseContainerListPodmanJSON(t *testing.T) {
 // TestParseContainerListDockerNDJSON verifies parsing Docker's NDJSON format
 // (one JSON object per line) where Names is a bare string with a leading "/".
 func TestParseContainerListDockerNDJSON(t *testing.T) {
-	line1 := `{"Id":"def456","Names":"wallfacer-slug-aabbccdd","Image":"sandbox-claude:latest","State":"running","Status":"Up 2 minutes","Labels":{"wallfacer.task.id":"11111111-2222-3333-4444-555555555555"}}`
-	line2 := `{"Id":"ghi789","Names":"/wallfacer-other-11223344","Image":"sandbox-codex:latest","State":"exited","Status":"Exited (0) 1 minute ago","Labels":{}}`
+	line1 := `{"Id":"def456","Names":"wallfacer-slug-aabbccdd","Image":"sandbox-agents:latest","State":"running","Status":"Up 2 minutes","Labels":{"wallfacer.task.id":"11111111-2222-3333-4444-555555555555"}}`
+	line2 := `{"Id":"ghi789","Names":"/wallfacer-other-11223344","Image":"sandbox-agents:latest","State":"exited","Status":"Exited (0) 1 minute ago","Labels":{}}`
 	data := []byte(line1 + "\n" + line2 + "\n")
 
 	result, err := ParseContainerList(data)
@@ -81,7 +81,7 @@ func TestParseContainerListTaskIDFallback(t *testing.T) {
 		{
 			"Id":      "xyz999",
 			"Names":   []string{"wallfacer-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
-			"Image":   "sandbox-claude:latest",
+			"Image":   "sandbox-agents:latest",
 			"State":   "running",
 			"Status":  "Up 1 minute",
 			"Created": 1711150800,
@@ -203,7 +203,7 @@ func TestBuildCreatePreservesAllMounts(t *testing.T) {
 		Name:    "test-worker",
 		Image:   "test:latest",
 		Volumes: []VolumeMount{
-			{Host: "claude-config", Container: "/home/claude/.claude", Named: true},
+			{Host: "claude-config", Container: "/home/agent/.claude", Named: true},
 			{Host: "/host/worktree", Container: "/workspace/repo", Options: "z"},
 			{Host: "/host/instructions", Container: "/workspace/AGENTS.md", Options: "ro"},
 		},
@@ -212,7 +212,7 @@ func TestBuildCreatePreservesAllMounts(t *testing.T) {
 	args := spec.BuildCreate()
 	joined := strings.Join(args, " ")
 
-	if !strings.Contains(joined, "-v claude-config:/home/claude/.claude") {
+	if !strings.Contains(joined, "-v claude-config:/home/agent/.claude") {
 		t.Errorf("missing named volume: %s", joined)
 	}
 	if !strings.Contains(joined, "src=/host/worktree") {

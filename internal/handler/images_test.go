@@ -26,15 +26,14 @@ func TestGetImageStatus_ReturnsImages(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected images array, got %T", resp["images"])
 	}
-	if len(images) != 2 {
-		t.Fatalf("expected 2 images (claude + codex), got %d", len(images))
+	// The unified sandbox-agents image returns a single entry; the legacy
+	// per-agent images have been collapsed.
+	if len(images) != 1 {
+		t.Fatalf("expected 1 image (unified sandbox-agents), got %d", len(images))
 	}
-	// With test runner (empty config), both should be uncached.
-	for _, img := range images {
-		m := img.(map[string]any)
-		if m["cached"].(bool) {
-			t.Errorf("expected cached=false for test handler, got true for %v", m["sandbox"])
-		}
+	m := images[0].(map[string]any)
+	if m["cached"].(bool) {
+		t.Errorf("expected cached=false for test handler, got true for %v", m["sandbox"])
 	}
 }
 

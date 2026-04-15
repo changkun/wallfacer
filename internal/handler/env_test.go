@@ -487,52 +487,19 @@ func TestTestSandbox_InvalidBaseURLRejected(t *testing.T) {
 	}
 }
 
-func TestSandboxImageForTest_CodexResolution(t *testing.T) {
-	tests := []struct {
-		name    string
-		sandbox string
-		inImage string
-		want    string
-	}{
-		{
-			name:    "codex uses wallfacer-codex default image",
-			sandbox: "codex",
-			inImage: "sandbox-claude:latest",
-			want:    "sandbox-codex:latest",
-		},
-		{
-			name:    "codex preserves hosted wallfacer image family",
-			sandbox: "codex",
-			inImage: "ghcr.io/latere-ai/sandbox-claude:latest",
-			want:    "ghcr.io/latere-ai/sandbox-codex:latest",
-		},
-		{
-			name:    "codex keeps preconfigured codex image",
-			sandbox: "codex",
-			inImage: "sandbox-codex:latest",
-			want:    "sandbox-codex:latest",
-		},
-		{
-			name:    "claude keeps default image",
-			sandbox: "claude",
-			inImage: "sandbox-claude:latest",
-			want:    "sandbox-claude:latest",
-		},
-		{
-			name:    "codex default fallback",
-			sandbox: "codex",
-			inImage: "",
-			want:    fallbackCodexSandboxImage,
-		},
+// TestSandboxImageForTest verifies the unified-image behavior: the same
+// image is used for every sandbox type. The agent CLI is selected via
+// WALLFACER_AGENT inside the container, not via the image name.
+func TestSandboxImageForTest(t *testing.T) {
+	const image = "ghcr.io/latere-ai/sandbox-agents:v0.0.5"
+	for _, sb := range []sandbox.Type{sandbox.Claude, sandbox.Codex} {
+		got := sandboxImageForTest(sb, image)
+		if got != image {
+			t.Fatalf("sandboxImageForTest(%q, %q) = %q; want %q", sb, image, got, image)
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := sandboxImageForTest(sandbox.Type(tt.sandbox), tt.inImage)
-			if got != tt.want {
-				t.Fatalf("sandboxImageForTest(%q, %q) = %q; want %q", tt.sandbox, tt.inImage, got, tt.want)
-			}
-		})
+	if got := sandboxImageForTest(sandbox.Codex, "  spaced  "); got != "spaced" {
+		t.Fatalf("expected whitespace-trimmed image, got %q", got)
 	}
 }
 

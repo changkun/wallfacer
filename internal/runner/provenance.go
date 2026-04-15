@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
@@ -36,8 +37,10 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 	// Sandbox: record the configured sandbox for this task.
 	env.Sandbox = r.sandboxForTaskActivity(&task, activityImplementation)
 
-	// Container image: resolve using the same logic as the container runner.
-	env.ContainerImage = r.sandboxImageForSandbox(task.Sandbox)
+	// Container image: the unified sandbox-agents image is used regardless
+	// of the per-task agent type; the agent is selected at runtime via
+	// WALLFACER_AGENT inside the container.
+	env.ContainerImage = strings.TrimSpace(r.sandboxImage)
 
 	// Container digest: query the runtime for the image's content digest.
 	// Failures are non-fatal; digest is left empty when unavailable.

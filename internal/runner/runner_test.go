@@ -105,7 +105,7 @@ func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runne
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsPath,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -223,7 +223,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws},
 	})
@@ -263,7 +263,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws1, ws2},
 	})
@@ -312,16 +312,16 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsFile,
 		CodexAuthPath:    codexAuthDir,
 	})
 	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := "type=bind,src=" + hostPath(codexAuthDir, "podman") + ",dst=/home/codex/.codex," + expectedBuildROSuffix()
+	expectedMount := "type=bind,src=" + hostPath(filepath.Join(codexAuthDir, "auth.json"), "podman") + ",dst=/home/agent/.codex/auth.json," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("codex sandbox: expected host codex auth cache mount %q; got args: %v", expectedMount, args)
+		t.Fatalf("codex sandbox: expected host codex auth.json mount %q; got args: %v", expectedMount, args)
 	}
 }
 
@@ -339,7 +339,7 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsFile,
 	})
 	t.Cleanup(func() { runner.Shutdown() })
@@ -347,7 +347,7 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 
 	found := false
 	for _, a := range args {
-		if a == "sandbox-codex:latest" {
+		if a == "sandbox-agents:latest" {
 			found = true
 			break
 		}
@@ -416,7 +416,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws},
 	})
@@ -429,7 +429,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 		if strings.Contains(a, "CLAUDE.md") {
 			claudeMDIdx = i
 		}
-		if a == "sandbox-claude:latest" {
+		if a == "sandbox-agents:latest" {
 			imageIdx = i
 		}
 	}
@@ -516,7 +516,7 @@ func TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate(t *testing.T) {
 	// Start with ws1 only.
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-claude:latest",
+		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws1},
 	})

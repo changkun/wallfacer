@@ -170,7 +170,7 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 		return nil, fmt.Errorf("getwd: %w", err)
 	}
 	base := sanitize.Base(filepath.Base(cwd))
-	image := resolveSandboxImageForExec(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), sb)
+	image := strings.TrimSpace(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()))
 	envFile := envOrDefault("ENV_FILE", filepath.Join(configDir, ".env"))
 	runtimeBin := filepath.Base(runtimePath)
 
@@ -178,16 +178,23 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
 		args = append(args, "--env-file", envFile)
 	}
+	// The unified sandbox image dispatches between Claude Code and Codex at
+	// runtime via WALLFACER_AGENT. Set it to the requested sandbox so the
+	// entrypoint launches the right CLI.
+	args = append(args, "-e", "WALLFACER_AGENT="+string(sb))
 	if sb == sandbox.Claude {
-		args = append(args, "-v", "claude-config:/home/claude/.claude")
+		args = append(args, "-v", "claude-config:/home/agent/.claude")
 	}
 	if sb == sandbox.Codex {
-		// Mount the host's ~/.codex directory (read-only) into the container so
-		// the Codex CLI can authenticate without re-login.
+		// Mount the host's ~/.codex/auth.json (read-only) into the container
+		// so Codex can authenticate without re-login. Mount only the file —
+		// Codex 0.120+ writes config.toml and session state into ~/.codex at
+		// startup, which requires the directory itself to be writable inside
+		// the container.
 		if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
-			codexPath := filepath.Join(home, ".codex")
-			if info, err := os.Stat(filepath.Join(codexPath, "auth.json")); err == nil && !info.IsDir() {
-				args = append(args, "--mount", "type=bind,src="+codexPath+",dst=/home/codex/.codex,readonly,z")
+			authFile := filepath.Join(home, ".codex", "auth.json")
+			if info, err := os.Stat(authFile); err == nil && !info.IsDir() {
+				args = append(args, "--mount", "type=bind,src="+authFile+",dst=/home/agent/.codex/auth.json,readonly,z")
 			}
 		}
 	}
@@ -199,49 +206,6 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 	)
 	args = append(args, command...)
 	return args, nil
-}
-
-// resolveSandboxImageForExec derives the correct container image for the given
-// sandbox type. For Codex, it rewrites "sandbox-claude" image names to
-// "sandbox-codex" while preserving the registry prefix, tag, and digest.
-// Non-sandbox-claude images and Claude sandboxes are returned unchanged.
-func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
-	baseImage = strings.TrimSpace(baseImage)
-	if sb != sandbox.Codex {
-		return baseImage
-	}
-	if baseImage == "" {
-		return "sandbox-codex:latest"
-	}
-	low := strings.ToLower(baseImage)
-	if strings.Contains(low, "sandbox-codex") {
-		return baseImage
-	}
-
-	// Decompose the image reference into components:
-	//   [registry/prefix/]sandbox-claude[:tag][@digest]
-	// so we can swap "sandbox-claude" for "sandbox-codex" while keeping everything else.
-	registry := baseImage
-	digest := ""
-	if at := strings.Index(registry, "@"); at != -1 {
-		digest = registry[at:]
-		registry = registry[:at]
-	}
-	tag := ""
-	if at := strings.LastIndex(registry, ":"); at != -1 {
-		tag = registry[at:]
-		registry = registry[:at]
-	}
-	prefix := ""
-	repoName := registry
-	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
-		prefix = repoName[:idx+1]
-		repoName = repoName[idx+1:]
-	}
-	if repoName != "sandbox-claude" {
-		return baseImage // not a sandbox-claude image; return as-is
-	}
-	return prefix + "sandbox-codex" + tag + digest
 }
 
 // resolveContainerByPrefix searches the newline-separated output of

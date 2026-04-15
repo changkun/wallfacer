@@ -26,7 +26,7 @@ Pull sandbox images (optional — auto-pulled from ghcr.io at runtime):
 make pull-images    # Pull Claude and Codex sandbox images
 ```
 
-`make build` builds the binary and pulls both sandbox images in one step. Sandbox images are maintained in a separate repository (`github.com/latere-ai/images`); for normal development the server pulls `ghcr.io/latere-ai/sandbox-claude:latest` automatically on first task run.
+`make build` builds the binary and pulls the unified sandbox image in one step. The sandbox image is maintained in a separate repository (`github.com/latere-ai/images`); for normal development the server pulls `ghcr.io/latere-ai/sandbox-agents:latest` automatically on first task run. The same image ships both the Claude Code and Codex CLIs; the entrypoint dispatches to the correct one based on `WALLFACER_AGENT` (`claude` or `codex`), which the runner sets per task.
 
 ## Configure Credentials
 
@@ -71,21 +71,21 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 ## Sandbox Images
 
 ```bash
-podman images sandbox-claude   # or: docker images sandbox-claude
+podman images sandbox-agents   # or: docker images sandbox-agents
 ```
 
-The sandbox images are maintained in a separate repository ([github.com/latere-ai/images](https://github.com/latere-ai/images)). They are Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex` on version tags via GitHub Actions.
+The sandbox image is maintained in a separate repository ([github.com/latere-ai/images](https://github.com/latere-ai/images)). It is an Ubuntu 24.04 image bundling Go 1.25, Node.js 22, Python 3, and both agent CLIs (Claude Code and Codex). The entrypoint dispatches to the requested CLI based on `WALLFACER_AGENT`. The multi-arch image (amd64 + arm64) is published to `ghcr.io/latere-ai/sandbox-agents` on version tags via GitHub Actions.
 
 To build sandbox images locally (e.g. for customization or offline use):
 
 ```bash
 git clone https://github.com/latere-ai/images.git
 cd images
-make                   # Build both sandbox-claude and sandbox-codex
+make                   # Build the unified sandbox-agents image
 make RUNTIME=docker    # Use Docker instead of Podman
 ```
 
-Local builds are tagged as `sandbox-claude:latest` and `sandbox-codex:latest`, which wallfacer picks up automatically as the fallback when the GHCR image is unavailable.
+Local builds are tagged as `sandbox-agents:latest`, which wallfacer picks up automatically as the fallback when the GHCR image is unavailable.
 
 ## Release Workflow
 
@@ -96,7 +96,7 @@ Releases are triggered by pushing a version tag (`v*`). Two GitHub Actions workf
 | `release-binary.yml` | `wallfacer-{linux,darwin,windows}-{amd64,arm64}` binaries on the GitHub Release |
 | `release-desktop.yml` | Signed desktop apps (`Wallfacer-Desktop-*`) on the GitHub Release |
 
-Sandbox images (`ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex`) are built and published from [`github.com/latere-ai/images`](https://github.com/latere-ai/images) on its own release cadence.
+The unified sandbox image (`ghcr.io/latere-ai/sandbox-agents`) is built and published from [`github.com/latere-ai/images`](https://github.com/latere-ai/images) on its own release cadence.
 
 **Version embedding.** Release binaries are built with `-ldflags "-X changkun.de/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output. It does **not** determine the sandbox image tag.
 

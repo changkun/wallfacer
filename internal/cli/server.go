@@ -133,10 +133,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	}
 
 	resolvedImage := ensureImage(cfg.ContainerCmd, cfg.SandboxImage)
-	codexImage := codexImageFromClaude(resolvedImage)
-	if codexImage != resolvedImage {
-		ensureImage(cfg.ContainerCmd, codexImage)
-	}
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
@@ -1021,7 +1017,7 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 
 // ensureImage checks whether the sandbox image is present locally and pulls it
 // from the registry if it is not.  When the pull fails and a local fallback
-// image (sandbox-claude:latest) is available, that image is used instead.
+// image (sandbox-agents:latest) is available, that image is used instead.
 // Returns the image reference that should actually be used.
 func ensureImage(containerCmd, image string) string {
 	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()

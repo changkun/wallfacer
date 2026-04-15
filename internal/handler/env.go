@@ -19,10 +19,6 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
-// fallbackCodexSandboxImage is used when the base Claude image is empty or
-// unrecognised, ensuring Codex always has a usable image name.
-const fallbackCodexSandboxImage = "sandbox-codex:latest"
-
 // privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
 // ranges, loopback (IPv4 and IPv6), and link-local ranges. Populated once at
 // init to avoid repeated CIDR parsing on every validateBaseURL call.
@@ -398,54 +394,10 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 }
 
 // sandboxImageForTest returns the container image name to use for a sandbox
-// connectivity test. For Codex it derives the image from the base Claude image.
-func sandboxImageForTest(sb sandbox.Type, baseImage string) string {
-	if sb == sandbox.Codex {
-		return testCodexImage(baseImage)
-	}
+// connectivity test. The unified sandbox-agents image serves both Claude and
+// Codex; the agent CLI is selected at runtime via WALLFACER_AGENT.
+func sandboxImageForTest(_ sandbox.Type, baseImage string) string {
 	return strings.TrimSpace(baseImage)
-}
-
-// testCodexImage derives the Codex sandbox image name from the Claude base
-// image by replacing the repository name "sandbox-claude" with "sandbox-codex"
-// while preserving registry, tag, and digest components.
-func testCodexImage(baseImage string) string {
-	baseImage = strings.TrimSpace(baseImage)
-	if baseImage == "" {
-		return fallbackCodexSandboxImage
-	}
-
-	low := strings.ToLower(baseImage)
-	if strings.Contains(low, "sandbox-codex") {
-		return baseImage
-	}
-
-	registry := baseImage
-	digest := ""
-	if at := strings.Index(registry, "@"); at != -1 {
-		digest = registry[at:]
-		registry = registry[:at]
-	}
-
-	// Assume tag format <repo>:<tag> and preserve host:port if present.
-	tag := ""
-	if at := strings.LastIndex(registry, ":"); at != -1 {
-		tag = registry[at:]
-		registry = registry[:at]
-	}
-
-	prefix := ""
-	repoName := registry
-	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
-		prefix = repoName[:idx+1]
-		repoName = repoName[idx+1:]
-	}
-
-	if repoName != "sandbox-claude" {
-		return baseImage
-	}
-
-	return prefix + "sandbox-codex" + tag + digest
 }
 
 // UpdateEnvConfig writes changes to the env file.

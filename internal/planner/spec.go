@@ -32,7 +32,7 @@ func (p *Planner) buildContainerSpec(containerName string, sb sandbox.Type) sand
 	// claude-config named volume for agent configuration persistence.
 	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 		Host:      "claude-config",
-		Container: "/home/claude/.claude",
+		Container: "/home/agent/.claude",
 		Named:     true,
 	})
 
