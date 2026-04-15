@@ -154,15 +154,16 @@ func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err erro
 	return 0, nil, nil
 }
 
-// GetImageStatus returns the availability of sandbox images.
+// GetImageStatus returns the availability of the unified sandbox image.
+// The legacy split images have collapsed into a single sandbox-agents
+// image; the response keeps the array shape for UI compatibility but
+// always contains exactly one entry.
 func (h *Handler) GetImageStatus(w http.ResponseWriter, _ *http.Request) {
 	cmd := h.runner.Command()
-	claudeImage := h.runner.SandboxImage()
-	codexImage := testCodexImage(claudeImage)
+	image := h.runner.SandboxImage()
 
 	images := []imageStatus{
-		h.inspectImage(cmd, sandbox.Claude, claudeImage),
-		h.inspectImage(cmd, sandbox.Codex, codexImage),
+		h.inspectImage(cmd, sandbox.Claude, image),
 	}
 
 	httpjson.Write(w, http.StatusOK, map[string]any{
@@ -206,12 +207,10 @@ func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sb := sandbox.Default(req.Sandbox)
-	claudeImage := h.runner.SandboxImage()
-	image := claudeImage
-	if sb == sandbox.Codex {
-		image = testCodexImage(claudeImage)
-	}
+	// The unified sandbox-agents image serves both Claude and Codex; the
+	// req.Sandbox field is accepted for API compatibility but ignored.
+	_ = req
+	image := h.runner.SandboxImage()
 
 	cmd := h.runner.Command()
 	if cmd == "" || image == "" {
@@ -236,12 +235,10 @@ func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sb := sandbox.Default(req.Sandbox)
-	claudeImage := h.runner.SandboxImage()
-	image := claudeImage
-	if sb == sandbox.Codex {
-		image = testCodexImage(claudeImage)
-	}
+	// The unified sandbox-agents image serves both Claude and Codex; the
+	// req.Sandbox field is accepted for API compatibility but ignored.
+	_ = req
+	image := h.runner.SandboxImage()
 	if image == "" {
 		http.Error(w, "no sandbox image configured", http.StatusBadRequest)
 		return
@@ -262,7 +259,7 @@ func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
 	p := &imagePull{
 		ID:      uuid.New().String(),
 		Image:   image,
-		Sandbox: sb,
+		Sandbox: sandbox.Claude,
 		Lines:   make(chan string, 64),
 		Done:    make(chan struct{}),
 	}

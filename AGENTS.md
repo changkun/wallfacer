@@ -457,7 +457,7 @@ make e2e-dependency-dag WORKSPACE="$WORKSPACE"
 - After changes to `internal/runner/` (task execution, commit pipeline, conflict resolution)
 - After changes to `internal/handler/tasks*.go` or `internal/handler/execute.go` (task API, automation)
 - After changes to `internal/gitutil/` (worktree, rebase, merge operations)
-- After sandbox image updates (new versions of sandbox-claude or sandbox-codex)
+- After sandbox image updates (new versions of sandbox-agents)
 - Before releases to verify end-to-end correctness
 
 ## Bug fixes require a reproducible test

@@ -275,29 +275,44 @@ func buildAgentCmd(prompt, model string) []string {
 	return cmd
 }
 
-// appendCodexAuthMount adds the host Codex auth cache as a read-only bind
-// mount when the sandbox is Codex and the host path exists. No-op for other sandboxes.
+// appendCodexAuthMount adds the host Codex auth.json file as a read-only
+// bind mount when the sandbox is Codex and the file exists. No-op for
+// other sandboxes.
+//
+// Only the file is mounted (not the entire ~/.codex directory): codex
+// 0.120+ writes config.toml and session state into $HOME/.codex at
+// startup, so the directory itself must remain writable inside the
+// container. Mounting the whole dir read-only would break the CLI;
+// mounting it read-write would let the container clobber host state.
 func (r *Runner) appendCodexAuthMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
 	if sb != sandbox.Codex {
 		return volumes
 	}
-	if hostPath := r.hostCodexAuthPath(); hostPath != "" {
+	if hostDir := r.hostCodexAuthPath(); hostDir != "" {
 		volumes = append(volumes, sandbox.VolumeMount{
-			Host:      hostPath,
-			Container: "/home/codex/.codex",
+			Host:      filepath.Join(hostDir, "auth.json"),
+			Container: "/home/agent/.codex/auth.json",
 			Options:   mountOpts("z", "ro"),
 		})
 	}
 	return volumes
 }
 
+// sandboxEntrypoint is the in-image dispatcher script. The sandbox-agents
+// image installs a single entrypoint that reads WALLFACER_AGENT to decide
+// whether to launch claude-agent.sh or codex-agent.sh; both classic and
+// worker exec invocations point at the same path.
+const sandboxEntrypoint = "/usr/local/bin/entrypoint.sh"
+
 // buildBaseContainerSpec creates a ContainerSpec pre-populated with the
 // configuration shared across all sub-agent invocations:
-//   - Runtime, Name, and Image resolved from the configured sandbox
+//   - Runtime, Name, and the unified sandbox-agents image
 //   - EnvFile (when configured)
+//   - WALLFACER_AGENT environment variable (claude or codex) so the image
+//     entrypoint dispatches to the correct CLI
 //   - CLAUDE_CODE_MODEL environment variable (when model is non-empty)
 //   - claude-config named volume for agent configuration persistence
-//   - Codex auth bind-mount (when sandbox=="codex" and the path exists on the host)
+//   - Codex auth.json bind-mount (when sandbox=="codex" and the file exists)
 //
 // Callers set Labels, additional Volumes (workspace directories, instructions
 // file, board context), WorkDir, and Cmd for their specific needs.
@@ -305,52 +320,40 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 	spec := sandbox.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImageForSandbox(sb),
+		Image:   strings.TrimSpace(r.sandboxImage),
 	}
 	if r.envFile != "" {
 		spec.EnvFile = r.envFile
 	}
+	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
 	if model != "" {
-		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
+		spec.Env["CLAUDE_CODE_MODEL"] = model
 	}
 	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 		Host:      "claude-config",
-		Container: "/home/claude/.claude",
+		Container: "/home/agent/.claude",
 		Named:     true,
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
 	spec.Volumes = r.appendDependencyCacheVolumes(spec.Volumes)
-	spec.Entrypoint = entrypointForSandbox(sb)
+	spec.Entrypoint = sandboxEntrypoint
 	spec.Network = r.resolvedContainerNetwork()
 	spec.CPUs = r.resolvedContainerCPUs()
 	spec.Memory = r.resolvedContainerMemory()
 	return spec
 }
 
-// entrypointForSandbox returns the entrypoint script path for the given
-// sandbox type. This is needed because podman exec does not invoke the
-// image ENTRYPOINT automatically; worker containers must prepend it.
-// Both sandbox types currently use the same path; the switch exists to
-// make future divergence explicit without requiring a code restructure.
-func entrypointForSandbox(sb sandbox.Type) string {
-	switch sb {
-	case sandbox.Codex:
-		return "/usr/local/bin/entrypoint.sh"
-	default:
-		return "/usr/local/bin/entrypoint.sh"
-	}
-}
-
 // dependencyCacheVolumes are the common dependency cache directories
 // mounted as named volumes so warm caches persist across container lifetimes.
+// Paths target the unified sandbox-agents image's `agent` user home.
 var dependencyCacheVolumes = []struct {
 	suffix    string // volume name suffix (e.g. "npm")
 	container string // container path
 }{
-	{"npm", "/home/claude/.npm"},
-	{"pip", "/home/claude/.cache/pip"},
-	{"cargo", "/home/claude/.cargo/registry"},
-	{"go-build", "/home/claude/.cache/go-build"},
+	{"npm", "/home/agent/.npm"},
+	{"pip", "/home/agent/.cache/pip"},
+	{"cargo", "/home/agent/.cargo/registry"},
+	{"go-build", "/home/agent/.cache/go-build"},
 }
 
 // appendDependencyCacheVolumes adds named volumes for dependency caches when
@@ -378,43 +381,6 @@ func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []s
 	return volumes
 }
 
-// sandboxImageForSandbox derives the container image name for the given sandbox type.
-// For Claude it returns the configured sandboxImage as-is. For Codex it rewrites
-// "sandbox-claude" → "sandbox-codex" in the image name (preserving registry, tag, and digest).
-func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
-	if sb != sandbox.Codex {
-		return strings.TrimSpace(r.sandboxImage)
-	}
-	baseImage := strings.TrimSpace(r.sandboxImage)
-	if baseImage == "" {
-		return "sandbox-codex:latest"
-	}
-	low := strings.ToLower(baseImage)
-	if strings.Contains(low, "sandbox-codex") {
-		return baseImage
-	}
-	registry := baseImage
-	digest := ""
-	if at := strings.Index(registry, "@"); at != -1 {
-		digest = registry[at:]
-		registry = registry[:at]
-	}
-	tag := ""
-	if at := strings.LastIndex(registry, ":"); at != -1 {
-		tag = registry[at:]
-		registry = registry[:at]
-	}
-	prefix := ""
-	repoName := registry
-	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
-		prefix = repoName[:idx+1]
-		repoName = repoName[idx+1:]
-	}
-	if repoName != "sandbox-claude" {
-		return baseImage
-	}
-	return prefix + "sandbox-codex" + tag + digest
-}
 
 // sandboxForTask returns the resolved sandbox type for the task's implementation activity.
 // Shorthand for sandboxForTaskActivity(task, activityImplementation).
