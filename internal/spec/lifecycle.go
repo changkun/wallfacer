@@ -6,7 +6,7 @@ import (
 
 // StatusMachine is the spec lifecycle state machine.
 var StatusMachine = statemachine.New(map[Status][]Status{
-	StatusVague:     {StatusDrafted},
+	StatusVague:     {StatusDrafted, StatusArchived},
 	StatusDrafted:   {StatusValidated, StatusStale, StatusArchived},
 	StatusValidated: {StatusComplete, StatusStale},
 	StatusComplete:  {StatusStale, StatusArchived},

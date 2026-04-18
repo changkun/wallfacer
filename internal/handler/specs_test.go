@@ -50,10 +50,10 @@ func TestArchiveSpec_Success(t *testing.T) {
 
 func TestArchiveSpec_InvalidTransition(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
-	vague := strings.Replace(testSpecValidated, "status: validated", "status: vague", 1)
-	writeTestSpec(t, ws, "specs/local/vague.md", vague)
+	// `validated → archived` is invalid (must route through complete or stale).
+	writeTestSpec(t, ws, "specs/local/validated.md", testSpecValidated)
 
-	w := doTransition(t, h.ArchiveSpec, "specs/local/vague.md")
+	w := doTransition(t, h.ArchiveSpec, "specs/local/validated.md")
 	if w.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
 	}
