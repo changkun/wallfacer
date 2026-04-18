@@ -370,6 +370,22 @@ function showNewTaskForm() {
   textarea.value = draft;
   textarea.style.height = draft ? textarea.scrollHeight + "px" : "";
   textarea.focus();
+  // ⌘↵ / Ctrl-Enter submits without reaching for the mouse. Bind once
+  // per lifetime of the form element; subsequent opens reuse the same
+  // handler. Escape collapses the form back to the "+ New Task"
+  // button for symmetry with other modal-like surfaces.
+  if (!textarea._composerKeysBound) {
+    textarea._composerKeysBound = true;
+    textarea.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        createTask();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        hideNewTaskForm();
+      }
+    });
+  }
   const sandboxSelect = document.getElementById("new-sandbox");
   bindTaskSandboxInheritance("new-sandbox", "new-sandbox-");
   if (sandboxSelect) {
@@ -389,16 +405,15 @@ function showNewTaskForm() {
   if (depsRow) depsRow.style.display = tasks.length > 0 ? "" : "none";
 
   // Wire the "Repeat on a schedule" toggle once per form open so the
-  // interval input (hidden by default) follows the checkbox state.
+  // interval input row (hidden by default) follows the checkbox state.
   var repeatToggle = document.getElementById("new-repeat-toggle");
-  var repeatMinutesEl = document.getElementById("new-repeat-minutes");
   var repeatMinutesRow = document.getElementById("new-repeat-minutes-row");
   if (repeatToggle && !repeatToggle._bound) {
     repeatToggle._bound = true;
     repeatToggle.addEventListener("change", function () {
-      var show = repeatToggle.checked ? "" : "none";
-      if (repeatMinutesEl) repeatMinutesEl.style.display = show;
-      if (repeatMinutesRow) repeatMinutesRow.style.display = show;
+      if (repeatMinutesRow) {
+        repeatMinutesRow.style.display = repeatToggle.checked ? "" : "none";
+      }
     });
   }
 }
@@ -431,10 +446,7 @@ function hideNewTaskForm() {
   const repeatMinutesEl = document.getElementById("new-repeat-minutes");
   const repeatMinutesRow = document.getElementById("new-repeat-minutes-row");
   if (repeatToggle) repeatToggle.checked = false;
-  if (repeatMinutesEl) {
-    repeatMinutesEl.value = "60";
-    repeatMinutesEl.style.display = "none";
-  }
+  if (repeatMinutesEl) repeatMinutesEl.value = "60";
   if (repeatMinutesRow) repeatMinutesRow.style.display = "none";
   initTagInput("new-task-tag-input", []);
   var depPicker = document.getElementById("new-depends-on-picker");
