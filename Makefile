@@ -27,10 +27,18 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary pull-images pull-images-force install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-host build-binary pull-images pull-images-force install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
-# Build the wallfacer binary and pull sandbox images.
+# Build the wallfacer binary and pull sandbox images (container-mode default).
+# For host mode (`wallfacer run --backend host`) use `make build-host` instead
+# — it keeps the full fmt + lint + ts-build gate but skips the image pull,
+# so machines without a container runtime installed don't fail the build.
 build: fmt lint ui-ts build-binary pull-images
+
+# Build gate for host-mode users: full validation pipeline, no image pull.
+# Run `wallfacer run --backend host` afterwards to exec claude / codex
+# directly on the host.
+build-host: fmt lint ui-ts build-binary
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -96,7 +104,7 @@ server:
 # Dev mode: build once, then serve the UI from ./ui on disk so frontend
 # edits (HTML, CSS, JS) are visible on reload without rebuilding the binary.
 server-dev:
-	go build -o wallfacer . && ./wallfacer run -ui-dir ./ui
+	go build -o wallfacer . && ./wallfacer run --backend host -ui-dir ./ui
 
 # Space-separated list of folders to mount under /workspace/<basename>
 WORKSPACES ?= $(CURDIR)
