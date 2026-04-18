@@ -769,6 +769,12 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TriggerIdeation":   h.TriggerIdeation,
 		"CancelIdeation":    h.CancelIdeation,
 
+		// Routines.
+		"ListRoutines":          h.ListRoutines,
+		"CreateRoutine":         h.CreateRoutine,
+		"UpdateRoutineSchedule": h.UpdateRoutineSchedule,
+		"TriggerRoutine":        h.TriggerRoutine,
+
 		// Planning sandbox.
 		"GetPlanningStatus":        h.GetPlanningStatus,
 		"StartPlanning":            h.StartPlanning,
@@ -898,6 +904,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Ideation agent.
 		"TriggerIdeation": handler.BodyLimitDefault,
+
+		// Routines.
+		"CreateRoutine":         handler.BodyLimitDefault,
+		"UpdateRoutineSchedule": handler.BodyLimitDefault,
+		"TriggerRoutine":        handler.BodyLimitDefault,
 
 		// Planning sandbox.
 		"StartPlanning":            handler.BodyLimitDefault,

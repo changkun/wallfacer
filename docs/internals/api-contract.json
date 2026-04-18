@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 108,
+  "route_count": 112,
   "routes": [
     {
       "method": "GET",
@@ -181,6 +181,42 @@
       "description": "Cancel an in-progress ideation run.",
       "tags": [
         "ideate"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/routines",
+      "name": "ListRoutines",
+      "description": "List routine task cards with their schedules and next-run times.",
+      "tags": [
+        "routines"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/routines",
+      "name": "CreateRoutine",
+      "description": "Create a new routine card that spawns instance tasks on a fixed interval.",
+      "tags": [
+        "routines"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "pattern": "/api/routines/{id}/schedule",
+      "name": "UpdateRoutineSchedule",
+      "description": "Update a routine's interval or enabled flag; unset fields are left unchanged.",
+      "tags": [
+        "routines"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/routines/{id}/trigger",
+      "name": "TriggerRoutine",
+      "description": "Fire a routine immediately, bypassing the schedule; the scheduled cycle continues.",
+      "tags": [
+        "routines"
       ]
     },
     {

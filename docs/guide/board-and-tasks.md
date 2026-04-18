@@ -180,6 +180,26 @@ The file explorer panel lets you browse workspace files directly in the web UI w
 
 ## Advanced Topics
 
+### ⏰ Routine Tasks
+
+Routine tasks are board cards that run on a schedule. The card itself never executes — when its interval elapses the server spawns a fresh **instance task** with the routine's prompt, and the routine card stays on the board waiting for the next cycle.
+
+A routine card carries:
+
+- **Prompt / goal** — what the spawned instance should do.
+- **Interval (minutes)** — the fixed schedule; minimum of 1 minute. Editable anytime.
+- **Enabled toggle** — pauses the schedule without losing the interval.
+- **Spawn kind** — usually blank (spawns a normal task); `idea-agent` is reserved for the system ideation routine.
+
+The interactive controls live on the routine card (a dedicated UI ships alongside this feature). Programmatic access is exposed via the `/api/routines` endpoints:
+
+- `GET /api/routines` — list routine cards with their schedules and next-run times.
+- `POST /api/routines` — create a routine: `{prompt, interval_minutes, spawn_kind?, enabled?, goal?, tags?, timeout?}`.
+- `PATCH /api/routines/{id}/schedule` — update interval and/or enabled flag; fields omitted from the body are left unchanged.
+- `POST /api/routines/{id}/trigger` — fire immediately; the scheduled cycle continues unchanged afterwards.
+
+Routine cards are filtered out of auto-promote, auto-refine, and the dependency graph — they stay pinned in backlog regardless of capacity. To remove a routine, delete its card with `DELETE /api/tasks/{id}` (or the UI's delete action); its pending fires are dropped atomically.
+
 ### 📝 Prompt Templates
 
 Save reusable prompt patterns so you do not have to retype common instructions:
