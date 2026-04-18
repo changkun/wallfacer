@@ -633,7 +633,11 @@ describe("renderUnifiedGraph", () => {
     );
   }
 
-  it("orders task_dep prerequisites to the left of their dependents", () => {
+  it("places connected task nodes within a bounded spring distance", () => {
+    // Force-directed layout doesn't guarantee a specific axis ordering,
+    // but it does keep connected nodes closer than the initial circular
+    // seed radius. A two-node component should converge to roughly an
+    // edge-rest-length apart.
     const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
     const tasks = [
       { id: "a", title: "A", depends_on: [] },
@@ -643,22 +647,27 @@ describe("renderUnifiedGraph", () => {
     const svg = makeEl("svg");
     renderUnifiedGraph(graph, svg);
 
-    // Find the two task groups and extract their rect x coordinates.
-    // Each node <g> wraps a body <g> which holds the <rect>.
     const groups = svg.children.filter((c) => c.tagName === "g");
     const byId = new Map();
     for (const g of groups) {
       byId.set(g.getAttribute("data-id"), g);
     }
-    const getX = (g) => {
+    const getRect = (g) => {
       const body = g.children.find((c) => c.tagName === "g");
       const host = body || g;
-      const rect = host.children.find((c) => c.tagName === "rect");
-      return Number(rect.getAttribute("x"));
+      return host.children.find((c) => c.tagName === "rect");
     };
-    const xA = getX(byId.get("task:a"));
-    const xB = getX(byId.get("task:b"));
-    expect(xA).toBeLessThan(xB);
+    const rectA = getRect(byId.get("task:a"));
+    const rectB = getRect(byId.get("task:b"));
+    const xA = Number(rectA.getAttribute("x"));
+    const yA = Number(rectA.getAttribute("y"));
+    const xB = Number(rectB.getAttribute("x"));
+    const yB = Number(rectB.getAttribute("y"));
+    const dist = Math.hypot(xA - xB, yA - yB);
+    // Nodes should separate (minimum-anti-overlap kicks in) but stay
+    // within a reasonable cluster.
+    expect(dist).toBeGreaterThan(80);
+    expect(dist).toBeLessThan(1200);
   });
 
   describe("interactions", () => {
