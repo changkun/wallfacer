@@ -1,6 +1,6 @@
 ---
 title: Host mode defaults to MAX_PARALLEL=1
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-exec-mode/runner-host-switch.md
 affects:
