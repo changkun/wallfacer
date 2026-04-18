@@ -350,3 +350,94 @@ func TestEngine_NilClockDefaultsToSystem(t *testing.T) {
 		t.Fatalf("expected non-zero next run with system clock")
 	}
 }
+
+// TestEngine_RegisterIsIdempotent covers the reconcile feedback loop:
+// calling Register twice with an equal schedule must leave the same
+// timer in place so NextRun stays stable across reconciliation ticks.
+// Without idempotence, every store-change notification would reset the
+// countdown and cascade writes back through the watcher.
+func TestEngine_RegisterIsIdempotent(t *testing.T) {
+	clock := newFakeClock()
+	fire, fires := collectFires(t)
+	eng := NewEngine(context.Background(), clock, fire)
+
+	id := uuid.New()
+	eng.Register(id, FixedInterval{D: 60 * time.Second})
+	firstNext := eng.NextRuns()[id]
+
+	// Advance part-way to the first fire. A redundant Register with the
+	// same schedule must not reset the countdown.
+	clock.Advance(30 * time.Second)
+	eng.Register(id, FixedInterval{D: 60 * time.Second})
+
+	got := eng.NextRuns()[id]
+	if !got.Equal(firstNext) {
+		t.Fatalf("redundant Register shifted NextRun: first %v, now %v", firstNext, got)
+	}
+
+	// After the remaining 30 seconds the original timer should still fire.
+	clock.Advance(31 * time.Second)
+	if got := waitFire(t, fires); got != id {
+		t.Fatalf("original timer should still fire")
+	}
+}
+
+// TestEngine_RegisterDuringFireWins is a regression test for a race
+// where a Register call issued inside the FireFunc — for example, the
+// handler's reconciler reacting to a routine_last_fired_at write —
+// would be overwritten by reArmAfterFire using the stale pre-fire
+// schedule. The test fires a routine, has the FireFunc install a new
+// 60-second schedule, and asserts no fire for well past the old 10s
+// cycle but before the new one elapses.
+func TestEngine_RegisterDuringFireWins(t *testing.T) {
+	clock := newFakeClock()
+	fires := make(chan uuid.UUID, 4)
+	var eng *Engine
+	fireCount := 0
+	eng = NewEngine(context.Background(), clock, func(_ context.Context, id uuid.UUID) {
+		fires <- id
+		fireCount++
+		if fireCount == 1 {
+			// Switch the routine to a slower schedule from inside the fire
+			// callback. Without the race fix, reArmAfterFire would
+			// clobber this with the original 10-second cadence.
+			eng.Register(id, FixedInterval{D: 60 * time.Second})
+		}
+	})
+
+	id := uuid.New()
+	eng.Register(id, FixedInterval{D: 10 * time.Second})
+
+	// First fire.
+	clock.Advance(11 * time.Second)
+	if got := <-fires; got != id {
+		t.Fatalf("first fire id mismatch")
+	}
+	// Give the re-arm goroutine a moment to run.
+	for range 100 {
+		if eng.NextRuns()[id] != (time.Time{}) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	// Advance past the old 10-second cycle but well shy of the new 60-second
+	// one. No fire should occur.
+	clock.Advance(20 * time.Second)
+	select {
+	case id := <-fires:
+		t.Fatalf("unexpected fire with stale schedule: %s", id)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// Advance the remaining window; the 60-second cadence should fire now.
+	clock.Advance(45 * time.Second)
+	select {
+	case got := <-fires:
+		if got != id {
+			t.Fatalf("second fire id mismatch")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for new-schedule fire")
+	}
+}
