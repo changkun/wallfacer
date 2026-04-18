@@ -111,10 +111,13 @@
 .card-waiting {
   border-left: 3px solid var(--col-waiting);
 }
-.card-done {
+.card-done,
+.card-cancelled {
   opacity: 0.82;
 }
-.card-done .card-title {
+.card-done .card-title,
+.card-cancelled .card-title,
+.card-cancelled-done .card-title {
   text-decoration: line-through;
   text-decoration-color: var(--ink-4);
   text-decoration-thickness: 1px;
@@ -133,22 +136,26 @@
   background: color-mix(in oklab, var(--bg-card) 96%, var(--accent));
 }
 .routine-footer {
-  margin-top: 8px;
+  margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed var(--rule);
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: var(--fs-11);
+  /* One shared font-size across all footer rows keeps the metadata
+     row, selector, toggle, and button visually balanced with the rest
+     of the card meta. */
+  font-size: var(--fs-10);
+  color: var(--ink-3);
 }
 .routine-footer-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .routine-next-run {
-  color: var(--text-muted);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 .routine-interval-label,
@@ -156,31 +163,46 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 .routine-interval-select {
-  font-size: var(--fs-11);
+  font-size: var(--fs-10);
   padding: 1px 4px;
-  background: var(--bg-input);
-  color: var(--text);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--ink-1);
+  border: 1px solid var(--rule);
   border-radius: var(--r-sm);
 }
-.routine-trigger-btn {
-  font-size: var(--fs-10);
-  padding: 2px 8px;
-  background: var(--accent);
-  color: var(--accent-fg, white);
-  border: none;
-  border-radius: var(--r-sm);
+.routine-enabled-toggle {
+  width: 11px;
+  height: 11px;
+  accent-color: var(--accent);
   cursor: pointer;
 }
+.routine-trigger-btn {
+  /* Calm secondary style — matches the existing card-action-retry /
+     neutral button chrome so it doesn't fight Start / Refine for
+     attention. Routine cards don't render those standard actions, but
+     the visual vocabulary stays consistent with the rest of the UI. */
+  font-size: var(--fs-10);
+  font-weight: 500;
+  padding: 2px 8px;
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  line-height: 1.5;
+  margin-left: auto;
+}
 .routine-trigger-btn:hover {
-  filter: brightness(1.1);
+  background: var(--tint-blue, var(--bg-sunk));
+  color: var(--tint-blue-ink, var(--ink-1));
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--rule));
 }
 .routine-last-fired {
-  color: var(--text-muted);
-  font-size: var(--fs-10);
+  color: var(--ink-4);
+  font-size: var(--fs-9);
 }
 .badge-routine {
   background: color-mix(in oklab, var(--accent) 20%, transparent);
@@ -188,9 +210,9 @@
   border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
 }
 .badge-routine-spawn {
-  background: var(--bg-subtle, var(--bg-card));
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
   font-family: var(--font-mono);
   font-size: var(--fs-9);
 }
