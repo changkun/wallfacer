@@ -542,7 +542,6 @@ describe("renderSidebarWorkspaceSwitch", () => {
     expect(menuHtml).toContain("repo-c");
     expect(menuHtml).toContain("useWorkspaceGroup(2)");
   });
-
 });
 
 // ---------------------------------------------------------------------------
