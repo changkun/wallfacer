@@ -43,6 +43,7 @@ The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). Wh
 
 ```bash
 make build          # Full gate: fmt + lint (Go + JS) + binary + pull sandbox images
+make build-host     # Host-mode build: full gate, no image pull (for `wallfacer run --backend host`)
 make build-binary   # Build just the Go binary (no fmt/lint/pull)
 make pull-images    # Pull Claude and Codex sandbox images
 make install-wails  # Install the Wails CLI (tracked as tool in go.mod)
@@ -61,6 +62,7 @@ make ui-css         # Regenerate Tailwind CSS from UI sources
 make api-contract   # Regenerate API route artifacts from apicontract/routes.go
 make e2e-lifecycle              # E2E: task lifecycle for both sandboxes (requires running server)
 make e2e-lifecycle SANDBOX=claude  # E2E: task lifecycle for Claude only
+make e2e-lifecycle BACKEND=host    # E2E against `wallfacer run --backend host`
 make e2e-dependency-dag WORKSPACE=/path/to/repo  # E2E: dependency DAG with conflict resolution
 ```
 
@@ -70,7 +72,9 @@ CLI usage (after `make build-binary`, or `make build` for the full fmt/lint-gate
 wallfacer                                    # Print help
 wallfacer run                                # Start server, restore last workspace group
 wallfacer run -addr :9090 -no-browser        # Custom port, no browser
+wallfacer run --backend host                 # Host mode: exec claude/codex directly (no container)
 wallfacer doctor                             # Check prerequisites and config
+wallfacer doctor --backend host              # Readiness check for host-mode deployments
 wallfacer status                             # Print board state to terminal
 wallfacer status -watch                      # Live-updating board state
 wallfacer exec <task-id-prefix>              # Attach to running task container
@@ -366,7 +370,9 @@ Optional variables (also in `.env`):
 - `WALLFACER_AUTO_PUSH_THRESHOLD` — minimum completed tasks before auto-push triggers
 - `WALLFACER_PLANNING_WINDOW_DAYS` — default window (in days) for the planning-cost analytics display (default: `30`; `0` = all time)
 - `WALLFACER_SANDBOX_FAST` — enable fast-mode sandbox hints (default: `true`)
-- `WALLFACER_SANDBOX_BACKEND` — sandbox backend selection (values: `local`; default: `local`)
+- `WALLFACER_HOST_CLAUDE_BINARY` — explicit path to the host `claude` CLI (host-mode only; default: `$PATH` lookup)
+- `WALLFACER_HOST_CODEX_BINARY` — explicit path to the host `codex` CLI (host-mode only; default: `$PATH` lookup)
+- *(backend selection)* Not an env var — pass `--backend container` (default) or `--backend host` to `wallfacer run`.
 - `WALLFACER_CONTAINER_NETWORK` — container network name
 - `WALLFACER_CONTAINER_CPUS` — container CPU limit (e.g. `"2.0"`)
 - `WALLFACER_CONTAINER_MEMORY` — container memory limit (e.g. `"4g"`)

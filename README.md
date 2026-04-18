@@ -56,10 +56,11 @@ wallfacer doctor
 Start the server:
 
 ```bash
-wallfacer run
+wallfacer run                    # container backend (default) — uses podman/docker
+wallfacer run --backend host     # host mode — execs claude/codex directly, no container
 ```
 
-A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
+A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough, and [Configuration → Host mode](docs/guide/configuration.md#host-mode) if you'd rather skip the container runtime entirely.
 
 ## How It Works
 

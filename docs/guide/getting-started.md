@@ -4,7 +4,13 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 
 ## Prerequisites
 
-- **Podman** or **Docker** — Wallfacer auto-detects whichever is available
+Pick one of the two execution backends:
+
+- **Container mode (default)** — **Podman** or **Docker**. Wallfacer auto-detects whichever is available, pulls the unified sandbox image on first use, and runs tasks in isolated containers.
+- **Host mode** — **claude** (and optionally **codex**) installed directly on your machine, invoked via `wallfacer run --backend host`. No container runtime, no image pull, no isolation. Use for fast iteration on trusted machines. See [Host mode](#host-mode) below.
+
+Plus:
+
 - **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (configured after install)
 - **Git** — recommended; non-git directories work as workspaces but git features (worktrees, diff, auto-push) are unavailable
 
@@ -95,10 +101,32 @@ Common `run` flags:
 |------|---------|-------------|
 | `-addr` | `:8080` | Listen address |
 | `-no-browser` | `false` | Skip auto-opening the browser |
-| `-container` | auto-detected | Container runtime (`podman` or `docker`) |
+| `--backend` | `container` | Sandbox backend: `container` (podman/docker) or `host` (exec claude/codex directly) |
+| `-container` | auto-detected | Container runtime (`podman` or `docker`) — container backend only |
 | `-log-format` | `text` | Log format: `text` or `json` |
 
 Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, etc.), see [Configuration](configuration.md).
+
+## Host mode
+
+Don't want to install podman or docker? If you already have `claude` (and optionally `codex`) on your machine, you can skip the container stack entirely:
+
+```bash
+npm i -g @anthropic-ai/claude-code    # required
+npm i -g @openai/codex                # optional, for Codex tasks
+make build-host                        # or download the prebuilt binary
+./wallfacer run --backend host
+```
+
+Or check readiness first:
+
+```bash
+wallfacer doctor --backend host
+```
+
+**Tradeoff:** host mode has **no filesystem isolation** — tasks run with your user's permissions and can touch any file your account can. Recommended only on trusted machines. A warning banner appears in **Settings → Sandbox** whenever host mode is active.
+
+See [Configuration → Host mode](configuration.md#host-mode) for env var overrides, known limitations, and details on how host mode translates codex's CLI output to the Claude-compatible event stream the runner expects.
 
 ## Windows
 
