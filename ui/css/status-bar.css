@@ -2,96 +2,111 @@
 .status-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 16px;
-  height: 26px;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4);
+  height: var(--h-status);
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
-  font-size: 11px;
-  color: var(--text-muted);
+  border-top: 1px solid var(--rule);
+  background: var(--bg-sunk);
+  font-size: var(--fs-9);
+  color: var(--ink-3);
   user-select: none;
 }
 .status-bar__left,
 .status-bar__center,
 .status-bar__right {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+.status-bar__center {
+  margin-left: var(--sp-3);
 }
 .status-bar__right {
   margin-left: auto;
+  gap: 4px;
 }
 .status-bar-conn-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--text-muted);
+  background: var(--ink-4);
   transition: background 0.3s;
 }
 .status-bar-conn-dot--ok {
-  background: #45b87a;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 20%, transparent);
 }
 .status-bar-conn-dot--reconnecting {
-  background: #e0a020;
+  background: var(--warn);
 }
 .status-bar-conn-dot--closed {
-  background: var(--text-muted);
+  background: var(--ink-4);
 }
 .status-bar-conn-label {
-  font-size: 11px;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 .status-bar-workspace {
-  font-size: 11px;
-  color: var(--text-muted);
+  color: var(--ink-3);
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0 5px;
-  line-height: 16px;
+  font-family: var(--font-mono);
+  padding: 0 6px;
+  border-left: 1px solid var(--rule);
+  margin-left: 2px;
+  line-height: 14px;
 }
 .status-bar-count {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
+  color: var(--ink-3);
+  padding: 0 4px;
+}
+.status-bar-count[title="In Progress"] #status-bar-in-progress {
+  color: var(--info);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.status-bar-count[title="Waiting"] #status-bar-waiting {
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-weight: 500;
 }
 .status-bar-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 1px 6px;
-  font-size: 11px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--ink-3);
   cursor: pointer;
-  line-height: 18px;
+  line-height: 16px;
 }
 .status-bar-btn:hover {
-  background: var(--bg-raised);
-  color: var(--text);
+  background: var(--bg-hover);
+  color: var(--ink);
 }
 .status-bar-btn[aria-expanded="true"] {
-  background: var(--accent, #4e8cff);
-  color: #fff;
-  border-color: var(--accent, #4e8cff);
+  background: var(--bg-card);
+  color: var(--ink);
+  box-shadow: var(--sh-1);
 }
 .status-bar-kbd {
-  font-family: inherit;
+  font-family: var(--font-mono);
   font-size: 10px;
-  opacity: 0.7;
-  border: none;
-  background: none;
-  padding: 0;
+  color: var(--ink-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  padding: 0 4px;
+  background: var(--bg-card);
+  margin-left: 2px;
 }
 .status-bar-panel-resize {
   flex-shrink: 0;
