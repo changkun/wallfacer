@@ -726,6 +726,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	if req.Status != nil {
+		// Routine cards are schedule templates, not executable work. They
+		// live outside the normal lifecycle and must stay in backlog; any
+		// attempt to move them via the generic PATCH is a programmer
+		// error on the client.
+		if task.IsRoutine() {
+			http.Error(w, "routine tasks cannot change status; use /api/routines endpoints", http.StatusUnprocessableEntity)
+			return
+		}
 		oldStatus := task.Status
 		newStatus := *req.Status
 
