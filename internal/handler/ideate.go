@@ -3,183 +3,160 @@ package handler
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
-// StartIdeationWatcher subscribes to store change notifications and, whenever
-// an idea-agent task transitions out of active states, schedules the next
-// brainstorm run according to the configured interval.
-// It also kicks off an initial schedule immediately so that ideation begins
-// as soon as the server starts (when enabled by default).
-func (h *Handler) StartIdeationWatcher(ctx context.Context) {
-	watcher.Start(ctx, watcher.Config{
-		Wake:   h.store,
-		Init:   h.maybeScheduleNextIdeation,
-		Action: h.maybeScheduleNextIdeation,
-	})
+// systemIdeationTag identifies the routine card that stands in for the
+// legacy ideation singleton. Exactly one such card should exist per
+// workspace store; ensureSystemIdeationRoutine is idempotent.
+const systemIdeationTag = "system:ideation"
+
+// ideationSeed is the per-startup configuration snapshot used to
+// materialize the system:ideation routine on first boot in a store
+// that does not already have one. Subsequent config writes (via
+// SetIdeation / SetIdeationInterval) route through the routine's
+// own fields, so legacy envconfig becomes read-only for ideation.
+type ideationSeed struct {
+	enabled  bool
+	interval time.Duration
 }
 
-// maybeScheduleNextIdeation checks whether ideation is enabled and no
-// idea-agent task is already active (backlogged or in progress). If so, it
-// schedules the next brainstorm run — either immediately (interval == 0) or
-// via a delayed timer.
-func (h *Handler) maybeScheduleNextIdeation(ctx context.Context) {
-	if !h.IdeationEnabled() {
+// ensureSystemIdeationRoutine is invoked from the engine's
+// reconcileRoutines loop. It creates the system:ideation routine
+// card in the supplied store when none exists yet, seeding it from
+// legacyIdeationSeed. On subsequent reconciles (or after restarts)
+// the existing routine is found and left alone, so the bootstrap is
+// safe to call repeatedly.
+func (h *Handler) ensureSystemIdeationRoutine(ctx context.Context, s *store.Store) {
+	if s == nil {
 		return
 	}
-
-	tasks, err := h.store.ListTasks(ctx, false)
+	tasks, err := s.ListTasks(ctx, true) // include archived to avoid duplicates
 	if err != nil {
 		return
 	}
-
 	for _, t := range tasks {
-		if t.Kind == store.TaskKindIdeaAgent {
-			switch t.Status {
-			case store.TaskStatusBacklog, store.TaskStatusInProgress:
-				// Already queued or running — nothing to do.
-				return
-			}
+		if t.IsRoutine() && slices.Contains(t.Tags, systemIdeationTag) {
+			return // already exists
 		}
 	}
 
-	// No active idea-agent task: schedule the next one.
-	h.scheduleIdeation(ctx)
-}
-
-// scheduleIdeation enqueues the next brainstorm run. If the interval is zero
-// it creates the task immediately; otherwise it arms a one-shot timer.
-// If a timer is already pending it is left in place (avoid double-scheduling).
-func (h *Handler) scheduleIdeation(ctx context.Context) {
-	h.ideationMu.Lock()
-
-	// If a timer is already waiting, do not create a second one.
-	if h.ideationTimer != nil {
-		h.ideationMu.Unlock()
-		return
+	seed := h.legacyIdeationSeed
+	intervalSeconds := int(seed.interval / time.Second)
+	if intervalSeconds <= 0 {
+		intervalSeconds = int(constants.DefaultIdeationInterval / time.Second)
 	}
 
-	interval := h.ideationInterval
-
-	if interval == 0 {
-		h.ideationMu.Unlock()
-		h.createIdeaAgentTask(ctx)
-		return
-	}
-
-	nextRun := time.Now().Add(interval)
-	h.ideationNextRun = nextRun
-	h.ideationTimer = time.AfterFunc(interval, func() {
-		h.ideationMu.Lock()
-		enabled := h.ideationEnabled
-		h.ideationTimer = nil
-		h.ideationNextRun = time.Time{}
-		h.ideationMu.Unlock()
-
-		if enabled {
-			h.createIdeaAgentTask(h.runner.ShutdownCtx())
-		}
+	_, err = s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:                 "Ideation routine",
+		Goal:                   "Brainstorm new task ideas at a scheduled cadence.",
+		Kind:                   store.TaskKindRoutine,
+		Tags:                   []string{systemIdeationTag},
+		Timeout:                constants.IdeaAgentDefaultTimeout,
+		RoutineIntervalSeconds: intervalSeconds,
+		RoutineEnabled:         seed.enabled,
+		RoutineSpawnKind:       store.TaskKindIdeaAgent,
 	})
-	h.ideationMu.Unlock()
-	logger.Handler.Info("ideation: next run scheduled", "at", nextRun.Format(time.RFC3339))
+	if err != nil {
+		return
+	}
 }
 
-// createIdeaAgentTask creates a new idea-agent task card and immediately
-// promotes it to in_progress, starting the runner. Returns nil if creation
-// or promotion fails.
-func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		logger.Handler.Warn("ideation: list tasks for execution prompt", "error", err)
+// findSystemIdeationRoutine returns the system:ideation routine card from
+// the active workspace store, or nil if none exists yet (e.g. before the
+// first reconcile tick). Callers treat nil as "use defaults".
+func (h *Handler) findSystemIdeationRoutine(ctx context.Context) *store.Task {
+	s, ok := h.currentStore()
+	if !ok {
 		return nil
 	}
-
-	activeTasks := make([]store.Task, 0, len(tasks))
-	for _, t := range tasks {
-		if t.Kind == store.TaskKindIdeaAgent {
-			continue
-		}
-		switch t.Status {
-		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
-			activeTasks = append(activeTasks, t)
-		}
-	}
-
-	ideaPrompt := h.runner.BuildIdeationPrompt(activeTasks)
-	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt:  ideaPrompt,
-		Timeout: constants.IdeaAgentDefaultTimeout,
-		Kind:    store.TaskKindIdeaAgent,
-	})
+	tasks, err := s.ListTasks(ctx, true)
 	if err != nil {
-		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
 		return nil
 	}
-	if err := h.store.UpdateTaskExecutionPrompt(ctx, task.ID, ideaPrompt); err != nil {
-		logger.Handler.Warn("ideation: persist idea-agent execution prompt", "task", task.ID, "error", err)
+	for _, t := range tasks {
+		if t.IsRoutine() && slices.Contains(t.Tags, systemIdeationTag) {
+			tCopy := t
+			return &tCopy
+		}
 	}
-
-	// Set the title immediately so the card always shows the date/time.
-	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
-	_ = h.store.UpdateTaskTitle(ctx, task.ID, title)
-	// Brainstorm tasks skip the backlog queue and go straight to in_progress.
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		logger.Handler.Error("ideation: promote idea-agent task", "task", task.ID, "error", err)
-		h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange,
-			store.NewStateChangeData("", store.TaskStatusBacklog, "", nil))
-		return task
-	}
-	h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange,
-		store.NewStateChangeData("", store.TaskStatusInProgress, "", nil))
-	h.runner.RunBackground(task.ID, task.Prompt, "", false)
-	logger.Handler.Info("ideation: started idea-agent task", "task", task.ID)
-	return task
+	return nil
 }
 
 // TriggerIdeation handles POST /api/ideate.
-// Creates an idea-agent task card and immediately starts it regardless of
-// whether autopilot is enabled.
+// Fires the system:ideation routine immediately. The routine card is
+// created on demand here if the engine has not yet reconciled it, so
+// the legacy shim never returns 503 under normal boot timing.
 func (h *Handler) TriggerIdeation(w http.ResponseWriter, r *http.Request) {
-	task := h.createIdeaAgentTask(r.Context())
-	resp := map[string]any{"queued": true}
-	if task != nil {
-		resp["task_id"] = task.ID.String()
+	routineTask := h.findSystemIdeationRoutine(r.Context())
+	if routineTask == nil {
+		if s, ok := h.currentStore(); ok {
+			h.ensureSystemIdeationRoutine(r.Context(), s)
+			routineTask = h.findSystemIdeationRoutine(r.Context())
+		}
 	}
-	httpjson.Write(w, http.StatusAccepted, resp)
+	if routineTask == nil {
+		http.Error(w, "ideation routine not initialized yet", http.StatusServiceUnavailable)
+		return
+	}
+
+	h.routineMu.Lock()
+	eng := h.routineEngine
+	h.routineMu.Unlock()
+
+	// If the engine exists and has already registered this routine, let
+	// it drive the fire (so the scheduled cycle re-arms). Otherwise fall
+	// back to firing inline — this covers the window between bootstrap
+	// and the first reconcile tick.
+	if eng != nil {
+		if _, registered := eng.NextRuns()[routineTask.ID]; registered {
+			eng.Trigger(routineTask.ID)
+		} else {
+			go h.fireRoutine(r.Context(), routineTask.ID)
+		}
+	} else {
+		go h.fireRoutine(r.Context(), routineTask.ID)
+	}
+
+	httpjson.Write(w, http.StatusAccepted, map[string]any{
+		"queued":     true,
+		"routine_id": routineTask.ID.String(),
+	})
 }
 
 // CancelIdeation handles DELETE /api/ideate.
-// Cancels the currently running or backlogged idea-agent task (if any).
+// Cancels any currently running or backlogged idea-agent instance task.
+// The routine card itself is unaffected — the next scheduled fire will
+// spawn a new instance.
 func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.store.ListTasks(r.Context(), false)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	tasks, err := s.ListTasks(r.Context(), false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	cancelled := false
 	for _, t := range tasks {
-		if t.Kind != store.TaskKindIdeaAgent {
+		if !t.IsIdeaAgent() {
 			continue
 		}
 		switch t.Status {
 		case store.TaskStatusInProgress:
 			h.runner.KillContainer(t.ID)
-			// Status will be set to cancelled by the cancel handler's
-			// UpdateTaskStatus call; just kill the container here.
-			_ = h.store.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
-
+			_ = s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
 			h.insertEventOrLog(r.Context(), t.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusCancelled, "", nil))
 			cancelled = true
 		case store.TaskStatusBacklog:
-			_ = h.store.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
-
+			_ = s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
 			h.insertEventOrLog(r.Context(), t.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusCancelled, "", nil))
 			cancelled = true
@@ -189,23 +166,28 @@ func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetIdeationStatus handles GET /api/ideate.
-// Returns the current brainstorm enabled/running state derived from the task list.
+// Returns the system routine's enabled flag, whether an instance task is
+// currently running, and the next-run timestamp. The shape mirrors the
+// legacy endpoint so existing clients keep working.
 func (h *Handler) GetIdeationStatus(w http.ResponseWriter, r *http.Request) {
-	tasks, _ := h.store.ListTasks(r.Context(), false)
+	routineTask := h.findSystemIdeationRoutine(r.Context())
 	running := false
-	for _, t := range tasks {
-		if t.Kind == store.TaskKindIdeaAgent && t.Status == store.TaskStatusInProgress {
-			running = true
-			break
+	if s, ok := h.currentStore(); ok {
+		tasks, _ := s.ListTasks(r.Context(), false)
+		for _, t := range tasks {
+			if t.IsIdeaAgent() && t.Status == store.TaskStatusInProgress {
+				running = true
+				break
+			}
 		}
 	}
 
 	resp := map[string]any{
-		"enabled": h.IdeationEnabled(),
+		"enabled": routineTask != nil && routineTask.RoutineEnabled,
 		"running": running,
 	}
-	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
-		resp["next_run_at"] = nextRun
+	if routineTask != nil && routineTask.RoutineNextRun != nil {
+		resp["next_run_at"] = *routineTask.RoutineNextRun
 	}
 	httpjson.Write(w, http.StatusOK, resp)
 }

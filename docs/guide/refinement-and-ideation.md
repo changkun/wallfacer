@@ -62,12 +62,23 @@ Click the **Cancel** button that appears while the agent is running. The sandbox
 
 The ideation agent analyzes your workspace -- reading source files, project manifests, recent git history, churn hotspots, TODO/FIXME comments, and failed task signals -- and proposes up to three high-impact improvement ideas as new backlog cards.
 
+#### How it works (after the routine-tasks rollout)
+
+Ideation is now one instance of the generic **routine task** primitive. The server materializes a `system:ideation`-tagged routine card on first boot; its schedule and enabled flag live on the card itself, and the scheduler engine fires it to spawn idea-agent instance tasks.
+
+Two control surfaces exist, and both edit the same underlying routine:
+
+- **Settings → Automation**: the legacy Brainstorm toggle and interval selector still work. Writes land on the system routine.
+- **Board**: the routine card appears in the backlog column with inline controls (interval picker, enabled toggle, Run now, countdown). See the *Routine tasks* section in *Board & Tasks* for the full UI.
+
 #### Enabling Ideation
 
 Ideation is **disabled by default**. To enable it:
 
 1. Click the **Automation** menu (lightning bolt icon) in the header bar.
 2. Toggle the **Brainstorm** checkbox on.
+
+Or edit the system:ideation routine card directly on the board.
 
 Once enabled, you can trigger runs manually or configure an automatic interval.
 

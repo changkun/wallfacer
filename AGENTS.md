@@ -216,9 +216,11 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `POST /api/tasks/{id}/refine/dismiss` — Dismiss refinement result without applying
 
 ### Ideation
-- `GET /api/ideate` — Get current ideation session state
-- `POST /api/ideate` — Launch brainstorm/ideation agent
-- `DELETE /api/ideate` — Cancel running ideation agent
+- `GET /api/ideate` — Get current ideation session state (reads from the system:ideation routine card)
+- `POST /api/ideate` — Fire the ideation routine immediately; auto-bootstraps the routine if missing
+- `DELETE /api/ideate` — Cancel the currently-running idea-agent instance task (routine card unaffected)
+
+Ideation is implemented as a routine task (`Kind=routine`, `Tags=["system:ideation"]`, `RoutineSpawnKind=idea-agent`) that the scheduler engine in `internal/routine/` fires on its configured cadence. See the Routines section above for the generic primitive.
 
 ### Routines
 - `GET /api/routines` — List routine cards with schedules and next-run times

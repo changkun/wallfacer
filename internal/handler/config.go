@@ -359,19 +359,12 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if mins < 0 {
 			mins = 0
 		}
+		// Writes land on the system:ideation routine; the engine's
+		// watcher reconciles the timer on the next store notification.
 		h.SetIdeationInterval(time.Duration(mins) * time.Minute)
-		// Reschedule with new interval if ideation is already active.
-		if h.IdeationEnabled() {
-			go h.maybeScheduleNextIdeation(r.Context())
-		}
 	}
 	if req.Ideation != nil {
 		h.SetIdeation(*req.Ideation)
-		if *req.Ideation {
-			// Enqueue or schedule a new idea-agent task card when enabled,
-			// unless one is already backlogged or running.
-			go h.maybeScheduleNextIdeation(r.Context())
-		}
 	}
 	resp := map[string]any{
 		"autopilot":              h.AutopilotEnabled(),

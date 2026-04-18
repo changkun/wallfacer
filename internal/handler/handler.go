@@ -147,17 +147,17 @@ type Handler struct {
 	cachedMaxParallel     *lazyval.Value[int]
 	cachedMaxTestParallel *lazyval.Value[int]
 
-	// ideationEnabled controls whether brainstorm auto-repeat is active.
-	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).
-	// ideationNextRun is when the pending timer will fire (zero if not scheduled).
-	// ideationTimer is a non-nil pending AfterFunc timer while a delayed run is waiting.
-	// All fields are serialised by ideationMu.
+	// ideationExploitRatio controls the exploitation fraction for the idea-
+	// agent prompt (0.0 = fully exploratory, 1.0 = fully exploitative). It
+	// is prompt-building state, not schedule state, so it stays on the
+	// handler instead of moving to the system:ideation routine card.
 	ideationMu           sync.Mutex
-	ideationEnabled      bool
-	ideationInterval     time.Duration
-	ideationNextRun      time.Time
-	ideationTimer        *time.Timer
-	ideationExploitRatio float64 // 0.0–1.0; default 0.8 (80% exploitation)
+	ideationExploitRatio float64
+
+	// legacyIdeationSeed is the config read once at startup and used by the
+	// per-store bootstrap to seed the system:ideation routine when none
+	// exists yet. Subsequent config writes route through the routine.
+	legacyIdeationSeed ideationSeed
 
 	planner         *planner.Planner
 	commandRegistry *planner.CommandRegistry
@@ -202,10 +202,12 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		fileIndex:            newFileIndex(),
 		pulls:                newPullTracker(),
 		startTime:            time.Now(),
-		ideationEnabled:      false,
-		ideationInterval:     constants.DefaultIdeationInterval,
 		ideationExploitRatio: constants.DefaultIdeationExploitRatio,
-		reg:                  reg,
+		legacyIdeationSeed: ideationSeed{
+			enabled:  false,
+			interval: constants.DefaultIdeationInterval,
+		},
+		reg: reg,
 		sandboxTestPassed: map[sandbox.Type]bool{
 			sandbox.Claude: false,
 			sandbox.Codex:  false,
@@ -516,46 +518,76 @@ func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) 
 	return h.openWatcherBreaker(watcher, taskID, reason)
 }
 
-// IdeationEnabled returns whether brainstorm auto-repeat is active.
+// IdeationEnabled returns whether brainstorm auto-repeat is active. The
+// value lives on the system:ideation routine card; pre-bootstrap (before
+// the engine's first reconcile has seeded the card) we fall back to the
+// legacy seed so config-read round-trips don't observe a transient
+// false.
 func (h *Handler) IdeationEnabled() bool {
+	if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
+		return r.RoutineEnabled
+	}
 	h.ideationMu.Lock()
 	defer h.ideationMu.Unlock()
-	return h.ideationEnabled
+	return h.legacyIdeationSeed.enabled
 }
 
-// SetIdeation enables or disables brainstorm auto-repeat.
-// Disabling cancels any pending scheduled run.
+// SetIdeation toggles the system:ideation routine's enabled flag. The
+// engine's reconciler picks up the change on its next wake, registering
+// or unregistering the timer as needed. Pre-bootstrap writes update the
+// legacy seed so the routine materializes with the desired state when
+// the engine first runs.
 func (h *Handler) SetIdeation(enabled bool) {
-	h.ideationMu.Lock()
-	h.ideationEnabled = enabled
-	if !enabled {
-		h.cancelIdeationTimerLocked()
+	s, ok := h.currentStore()
+	if ok {
+		if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
+			_ = s.UpdateRoutineEnabled(context.Background(), r.ID, enabled)
+			return
+		}
 	}
+	h.ideationMu.Lock()
+	h.legacyIdeationSeed.enabled = enabled
 	h.ideationMu.Unlock()
 }
 
-// IdeationInterval returns the delay between consecutive brainstorm runs.
+// IdeationInterval returns the interval between brainstorm fires, read
+// from the system:ideation routine card when it exists.
 func (h *Handler) IdeationInterval() time.Duration {
+	if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
+		return time.Duration(r.RoutineIntervalSeconds) * time.Second
+	}
 	h.ideationMu.Lock()
 	defer h.ideationMu.Unlock()
-	return h.ideationInterval
+	return h.legacyIdeationSeed.interval
 }
 
-// SetIdeationInterval updates the delay between brainstorm runs.
-// Any pending timer is cancelled; the caller is responsible for rescheduling.
+// SetIdeationInterval updates the schedule on the system:ideation
+// routine card. Pre-bootstrap writes update the seed so the routine
+// materializes with the right interval.
 func (h *Handler) SetIdeationInterval(d time.Duration) {
+	if d < 0 {
+		d = 0
+	}
+	s, ok := h.currentStore()
+	if ok {
+		if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
+			_ = s.UpdateRoutineSchedule(context.Background(), r.ID, int(d/time.Second))
+			return
+		}
+	}
 	h.ideationMu.Lock()
-	h.ideationInterval = d
-	h.cancelIdeationTimerLocked()
+	h.legacyIdeationSeed.interval = d
 	h.ideationMu.Unlock()
 }
 
 // IdeationNextRun returns the scheduled time of the next brainstorm run,
-// or a zero time if no run is pending.
+// or a zero time if no fire is pending. Sourced from the routine card's
+// RoutineNextRun, written by reconcileRoutines on every engine tick.
 func (h *Handler) IdeationNextRun() time.Time {
-	h.ideationMu.Lock()
-	defer h.ideationMu.Unlock()
-	return h.ideationNextRun
+	if r := h.findSystemIdeationRoutine(context.Background()); r != nil && r.RoutineNextRun != nil {
+		return *r.RoutineNextRun
+	}
+	return time.Time{}
 }
 
 // IdeationExploitRatio returns the exploitation fraction (0.0–1.0).
@@ -576,14 +608,4 @@ func (h *Handler) SetIdeationExploitRatio(r float64) {
 	h.ideationMu.Lock()
 	h.ideationExploitRatio = r
 	h.ideationMu.Unlock()
-}
-
-// cancelIdeationTimerLocked stops and clears the pending ideation timer.
-// Must be called with ideationMu held.
-func (h *Handler) cancelIdeationTimerLocked() {
-	if h.ideationTimer != nil {
-		h.ideationTimer.Stop()
-		h.ideationTimer = nil
-		h.ideationNextRun = time.Time{}
-	}
 }
