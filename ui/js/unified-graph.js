@@ -400,13 +400,363 @@
   // fixed anchors so unpinned nodes flow around them (incremental
   // relayout), then have their exact coords re-applied at the end. This
   // gives drag-then-relayout the feel of "only what I didn't touch moves."
-  function layoutSugiyama(graph, opts) {
+  // Vertical gap between stacked connected components.
+  var COMPONENT_GAP = 56;
+
+  // Force-directed layout tunables. K_IDEAL is the rest length of an
+  // edge spring; REPULSION is scaled so node bubbles of radius ~NODE_W/2
+  // don't overlap in equilibrium. ITERATIONS is a cap — the simulation
+  // exits early when total displacement falls below EPSILON.
+  var FORCE_K_IDEAL = 200;
+  var FORCE_REPULSION = 42000;
+  var FORCE_ITERATIONS = 260;
+  var FORCE_EPSILON = 0.35;
+  var FORCE_NODE_RADIUS = 140; // bubble radius used for anti-overlap
+
+  // layoutForce is the primary Map layout. It uses Fruchterman-Reingold
+  // with a hard minimum-separation repulsion so nodes don't overlap
+  // their rectangles. Each connected component is simulated in
+  // isolation then stacked on the canvas so disconnected clusters don't
+  // drift arbitrarily far from each other.
+  //
+  // We keep the `layoutSugiyama` name as an alias for callers/tests that
+  // already reach for it — the new algorithm is a drop-in replacement
+  // with the same return shape.
+  function layoutForce(graph, opts) {
     opts = opts || {};
     var pinnedPositions =
       opts.pinnedPositions && typeof opts.pinnedPositions.get === "function"
         ? opts.pinnedPositions
         : null;
 
+    var components = _connectedComponents(graph);
+    if (components.length === 0) {
+      return {
+        positions: new Map(),
+        edgePaths: [],
+        svgW: PAD * 2,
+        svgH: PAD * 2,
+        hasCycles: false,
+      };
+    }
+
+    var allPositions = new Map();
+    var yCursor = PAD;
+    var maxCompW = 0;
+    var layouts = [];
+    components.forEach(function (comp) {
+      var L = _forceLayoutComponent(comp, pinnedPositions);
+      layouts.push(L);
+      if (L.width > maxCompW) maxCompW = L.width;
+    });
+    layouts.forEach(function (L) {
+      var xOffset = Math.max(0, (maxCompW - L.width) / 2);
+      L.positions.forEach(function (p, id) {
+        p.x += xOffset;
+        p.y += yCursor;
+        allPositions.set(id, p);
+      });
+      yCursor += L.height + COMPONENT_GAP;
+    });
+    yCursor -= COMPONENT_GAP;
+
+    // Pinned positions: re-apply absolute coords after stacking so user
+    // drags land exactly where they were dropped. Pinned nodes were
+    // already locked during the simulation; this pass handles pins the
+    // simulation couldn't see (e.g. across components).
+    if (pinnedPositions) {
+      pinnedPositions.forEach(function (pos, id) {
+        var current = allPositions.get(id);
+        if (!current) return;
+        current.x = pos.x;
+        current.y = pos.y;
+      });
+    }
+
+    // Build a trivial edge-chain per edge (force-directed renders use
+    // straight-ish bezier curves; no dummy waypoints required).
+    var edgeChains = graph.edges.map(function (e) {
+      return { edge: e, chain: [e.from, e.to] };
+    });
+    var edgePaths = _routeEdges(graph, edgeChains, allPositions);
+
+    var maxX = 0;
+    var maxY = 0;
+    allPositions.forEach(function (p) {
+      var h = p.height || NODE_H;
+      if (p.x + NODE_W > maxX) maxX = p.x + NODE_W;
+      if (p.y + h > maxY) maxY = p.y + h;
+    });
+    var svgW = Math.max(PAD + maxCompW + PAD, maxX + PAD);
+    var svgH = Math.max(yCursor + PAD, maxY + PAD);
+
+    // Round to integer pixel coords — keeps the DOM diff small on
+    // re-renders and makes the SVG attributes tidy.
+    allPositions.forEach(function (p) {
+      p.x = Math.round(p.x);
+      p.y = Math.round(p.y);
+    });
+    edgePaths.forEach(function (routed) {
+      if (!routed || !routed.points) return;
+      routed.points.forEach(function (pt) {
+        pt.x = Math.round(pt.x);
+        pt.y = Math.round(pt.y);
+      });
+    });
+
+    return {
+      positions: allPositions,
+      edgePaths: edgePaths,
+      svgW: Math.round(svgW),
+      svgH: Math.round(svgH),
+      hasCycles: false,
+    };
+  }
+
+  // _forceLayoutComponent runs Fruchterman-Reingold on one connected
+  // component, origin-anchored. Positions carry node heights (labels
+  // drive variable vertical extent) so rendering math stays consistent.
+  function _forceLayoutComponent(graph, pinnedPositions) {
+    var nodes = graph.nodes;
+    var N = nodes.length;
+
+    // Deterministic initial layout: arrange nodes on a circle so every
+    // render starts from the same seed. For N=1 we keep the single node
+    // at origin.
+    var positions = new Map();
+    var radius = Math.max(120, Math.sqrt(N) * 120);
+    nodes.forEach(function (n, i) {
+      var angle = (i / Math.max(1, N)) * Math.PI * 2;
+      var h = _computeNodeHeight(n);
+      var cx = N === 1 ? 0 : Math.cos(angle) * radius;
+      var cy = N === 1 ? 0 : Math.sin(angle) * radius;
+      positions.set(n.id, {
+        x: cx - NODE_W / 2,
+        y: cy - h / 2,
+        node: n,
+        kind: "real",
+        height: h,
+      });
+    });
+
+    // Edge adjacency: every kind counts once (symmetric for the sim).
+    var adj = new Map();
+    nodes.forEach(function (n) {
+      adj.set(n.id, new Set());
+    });
+    graph.edges.forEach(function (e) {
+      if (!positions.has(e.from) || !positions.has(e.to)) return;
+      adj.get(e.from).add(e.to);
+      adj.get(e.to).add(e.from);
+    });
+
+    // Pinned nodes stay put during the simulation so user-placed nodes
+    // act as constraints the rest of the graph flows around.
+    function isPinned(id) {
+      return !!(pinnedPositions && pinnedPositions.has(id));
+    }
+    if (pinnedPositions) {
+      pinnedPositions.forEach(function (pos, id) {
+        var p = positions.get(id);
+        if (!p) return;
+        p.x = pos.x - NODE_W / 2; // caller stores top-left; we want centres
+        p.y = pos.y - (p.height || NODE_H) / 2;
+      });
+    }
+
+    if (N === 1) {
+      return _normaliseComponentLayout(positions);
+    }
+
+    // Main simulation loop. Temperature decays linearly so late
+    // iterations just fine-tune while early ones make big moves.
+    var temperature = Math.max(radius * 0.4, 80);
+    var coolRate = temperature / FORCE_ITERATIONS;
+    for (var iter = 0; iter < FORCE_ITERATIONS; iter++) {
+      var totalDisp = _forceStep(
+        positions,
+        adj,
+        temperature,
+        isPinned,
+      );
+      temperature = Math.max(0, temperature - coolRate);
+      if (totalDisp < FORCE_EPSILON * N) break;
+    }
+
+    return _normaliseComponentLayout(positions);
+  }
+
+  function _forceStep(positions, adj, temperature, isPinned) {
+    var ids = Array.from(positions.keys());
+    var disp = new Map();
+    ids.forEach(function (id) {
+      disp.set(id, { dx: 0, dy: 0 });
+    });
+
+    // Repulsion: every node pushes every other node. The bubble
+    // separation kick-in ensures nodes never overlap their rectangles.
+    for (var i = 0; i < ids.length; i++) {
+      var pa = positions.get(ids[i]);
+      var cxA = pa.x + NODE_W / 2;
+      var cyA = pa.y + (pa.height || NODE_H) / 2;
+      for (var j = i + 1; j < ids.length; j++) {
+        var pb = positions.get(ids[j]);
+        var cxB = pb.x + NODE_W / 2;
+        var cyB = pb.y + (pb.height || NODE_H) / 2;
+        var dx = cxA - cxB;
+        var dy = cyA - cyB;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < 1) {
+          // Random kick to break exact overlaps.
+          dx = (i - j) || 1;
+          dy = (j - i) || 1;
+          d2 = dx * dx + dy * dy;
+        }
+        var d = Math.sqrt(d2);
+        var f = FORCE_REPULSION / d2;
+        // Hard anti-overlap: if bubbles intersect, add a strong extra push.
+        var minSep = FORCE_NODE_RADIUS * 2;
+        if (d < minSep) {
+          f += (minSep - d) * 3.5;
+        }
+        var fx = (dx / d) * f;
+        var fy = (dy / d) * f;
+        var da = disp.get(ids[i]);
+        var db = disp.get(ids[j]);
+        da.dx += fx;
+        da.dy += fy;
+        db.dx -= fx;
+        db.dy -= fy;
+      }
+    }
+
+    // Attraction: spring along every edge.
+    adj.forEach(function (neighbours, id) {
+      neighbours.forEach(function (nid) {
+        if (nid <= id) return; // each edge once
+        var pa = positions.get(id);
+        var pb = positions.get(nid);
+        if (!pa || !pb) return;
+        var cxA = pa.x + NODE_W / 2;
+        var cyA = pa.y + (pa.height || NODE_H) / 2;
+        var cxB = pb.x + NODE_W / 2;
+        var cyB = pb.y + (pb.height || NODE_H) / 2;
+        var dx = cxA - cxB;
+        var dy = cyA - cyB;
+        var d = Math.sqrt(dx * dx + dy * dy) || 1;
+        var f = (d * d) / FORCE_K_IDEAL;
+        var fx = (dx / d) * f;
+        var fy = (dy / d) * f;
+        var da = disp.get(id);
+        var db = disp.get(nid);
+        da.dx -= fx;
+        da.dy -= fy;
+        db.dx += fx;
+        db.dy += fy;
+      });
+    });
+
+    // Apply, clamped by temperature.
+    var total = 0;
+    disp.forEach(function (d, id) {
+      if (isPinned(id)) return;
+      var mag = Math.sqrt(d.dx * d.dx + d.dy * d.dy);
+      if (mag < 1e-6) return;
+      var step = Math.min(mag, temperature);
+      var p = positions.get(id);
+      p.x += (d.dx / mag) * step;
+      p.y += (d.dy / mag) * step;
+      total += step;
+    });
+    return total;
+  }
+
+  function _normaliseComponentLayout(positions) {
+    var minX = Infinity;
+    var minY = Infinity;
+    positions.forEach(function (p) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+    });
+    if (minX === Infinity) minX = 0;
+    if (minY === Infinity) minY = 0;
+    var maxX = 0;
+    var maxY = 0;
+    positions.forEach(function (p) {
+      p.x -= minX;
+      p.y -= minY;
+      var h = p.height || NODE_H;
+      if (p.x + NODE_W > maxX) maxX = p.x + NODE_W;
+      if (p.y + h > maxY) maxY = p.y + h;
+    });
+    return { positions: positions, width: maxX, height: maxY };
+  }
+
+  // Backwards-compat alias: any caller/test that still reaches for
+  // layoutSugiyama gets the force-directed layout now. The returned
+  // shape is identical (positions + edgePaths + svgW + svgH + hasCycles).
+  var layoutSugiyama = layoutForce;
+
+  // _connectedComponents returns an Array<{nodes, edges}> where each
+  // component is reachable under undirected edges. Preserves the node/
+  // edge kind so each sub-layout renders identically to a stand-alone
+  // graph.
+  function _connectedComponents(graph) {
+    var nodeById = new Map();
+    graph.nodes.forEach(function (n) {
+      nodeById.set(n.id, n);
+    });
+    var adj = new Map();
+    graph.nodes.forEach(function (n) {
+      adj.set(n.id, []);
+    });
+    graph.edges.forEach(function (e) {
+      if (!nodeById.has(e.from) || !nodeById.has(e.to)) return;
+      adj.get(e.from).push(e.to);
+      adj.get(e.to).push(e.from);
+    });
+
+    var componentOf = new Map();
+    var components = [];
+    graph.nodes.forEach(function (n) {
+      if (componentOf.has(n.id)) return;
+      var compIdx = components.length;
+      var comp = { nodes: [], edges: [] };
+      components.push(comp);
+      // Iterative BFS to avoid call-stack limits on deep chains.
+      var stack = [n.id];
+      while (stack.length > 0) {
+        var id = stack.pop();
+        if (componentOf.has(id)) continue;
+        componentOf.set(id, compIdx);
+        comp.nodes.push(nodeById.get(id));
+        var neigh = adj.get(id) || [];
+        for (var i = 0; i < neigh.length; i++) {
+          if (!componentOf.has(neigh[i])) stack.push(neigh[i]);
+        }
+      }
+    });
+
+    graph.edges.forEach(function (e) {
+      var ci = componentOf.get(e.from);
+      if (ci === undefined) return;
+      if (componentOf.get(e.to) !== ci) return; // cross-component; drop
+      components[ci].edges.push(e);
+    });
+
+    // Sort: larger components first so the visual centre of gravity is
+    // at the top of the canvas.
+    components.sort(function (a, b) {
+      return b.nodes.length - a.nodes.length;
+    });
+    return components;
+  }
+
+  // _layoutComponent runs Sugiyama on a single connected component and
+  // returns normalised positions anchored at origin (0, 0). Caller is
+  // responsible for translating (x, y) when composing multiple
+  // components onto the canvas.
+  function _layoutComponent(graph) {
     var nodeById = new Map();
     graph.nodes.forEach(function (n) {
       nodeById.set(n.id, n);
@@ -426,56 +776,37 @@
 
     var layers = _groupByLayer(graph.nodes, layerOf);
     var expanded = _insertDummies(graph, layerOf, layers);
-
     _minimizeCrossings(expanded.layers, expanded.adjDown, expanded.adjUp);
-
     var positions = _assignCoordinates(
       expanded.layers,
       expanded.adjDown,
       expanded.adjUp,
     );
-    var edgePaths = _routeEdges(graph, expanded.edgeChains, positions);
 
-    // Apply pinned positions last so user-placed coords win over layout.
-    // Pinned positions may shift the overall SVG extents — track the
-    // maxima so the canvas still contains every pinned node.
+    // Normalise to origin (0, 0) so the caller can freely translate.
+    var minX = Infinity;
+    var minY = Infinity;
+    positions.forEach(function (p) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+    });
+    if (minX === Infinity) minX = 0;
+    if (minY === Infinity) minY = 0;
     var maxX = 0;
     var maxY = 0;
     positions.forEach(function (p) {
+      p.x -= minX;
+      p.y -= minY;
       var h = p.height || NODE_H;
       if (p.x + NODE_W > maxX) maxX = p.x + NODE_W;
       if (p.y + h > maxY) maxY = p.y + h;
     });
-    if (pinnedPositions) {
-      pinnedPositions.forEach(function (pos, id) {
-        var current = positions.get(id);
-        if (!current || current.kind !== "real") return;
-        current.x = pos.x;
-        current.y = pos.y;
-        var h = current.height || NODE_H;
-        if (pos.x + NODE_W > maxX) maxX = pos.x + NODE_W;
-        if (pos.y + h > maxY) maxY = pos.y + h;
-      });
-      // Recompute edge paths against the updated positions.
-      edgePaths = _routeEdges(graph, expanded.edgeChains, positions);
-    }
-
-    var autoW =
-      expanded.layers.length > 0
-        ? PAD +
-          expanded.layers.length * NODE_W +
-          Math.max(0, expanded.layers.length - 1) * H_GAP +
-          PAD
-        : PAD * 2;
-    var autoH = _layoutHeight(expanded.layers) + PAD * 2;
-    var svgW = Math.max(autoW, maxX + PAD);
-    var svgH = Math.max(autoH, maxY + PAD);
 
     return {
       positions: positions,
-      edgePaths: edgePaths,
-      svgW: svgW,
-      svgH: svgH,
+      edgeChains: expanded.edgeChains,
+      width: maxX,
+      height: maxY,
       hasCycles: cycleNodes.length > 0,
     };
   }
