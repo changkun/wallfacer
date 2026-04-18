@@ -109,3 +109,33 @@ func TestRunner_HostMode_LocalIsExplicit(t *testing.T) {
 	// Double-check the string wasn't coerced elsewhere.
 	_ = strings.ToLower("local")
 }
+
+// TestSandboxForTaskActivity_HostMode_CoercesCodexToClaude verifies the
+// routing-level override: when host mode is active, any activity that would
+// have gone to codex is silently redirected to claude. This keeps sub-agents
+// (title, oversight, etc.) working in host mode instead of failing at launch
+// when the user has codex configured for those activities.
+func TestSandboxForTaskActivity_HostMode_CoercesCodexToClaude(t *testing.T) {
+	s := newStoreForTest(t)
+	r := NewRunner(s, RunnerConfig{
+		Command: "echo",
+	})
+	t.Cleanup(func() { r.Shutdown() })
+
+	// Force host mode without constructing a real HostBackend (which would
+	// require a real claude binary on PATH for this test).
+	r.hostMode = true
+
+	task := &store.Task{Sandbox: "codex"}
+	got := r.sandboxForTaskActivity(task, activityTitle)
+	if string(got) != "claude" {
+		t.Errorf("host mode should coerce codex → claude; got %q", got)
+	}
+
+	// Non-host mode: the same resolution should pass codex through unchanged.
+	r.hostMode = false
+	got = r.sandboxForTaskActivity(task, activityTitle)
+	if string(got) != "codex" {
+		t.Errorf("non-host mode should preserve codex routing; got %q", got)
+	}
+}

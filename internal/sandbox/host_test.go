@@ -31,16 +31,50 @@ func buildFakeAgent(t *testing.T, name string) string {
 	return bin
 }
 
-func TestNewHostBackend_MissingBinary(t *testing.T) {
+func TestNewHostBackend_MissingClaudeFails(t *testing.T) {
+	// Claude is required at construction; an unresolved claude is a
+	// startup error so users get a clear message instead of a cryptic
+	// first-task failure.
 	_, err := NewHostBackend(HostBackendConfig{
 		ClaudeBinary: "/no/such/binary",
-		CodexBinary:  "/no/such/binary",
 	})
 	if err == nil {
-		t.Fatal("expected error for missing binary")
+		t.Fatal("expected error for missing claude")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error should mention not found; got: %v", err)
+	if !strings.Contains(err.Error(), "claude") || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error should mention missing claude; got: %v", err)
+	}
+}
+
+func TestNewHostBackend_MissingCodexIsTolerated(t *testing.T) {
+	// Codex is best-effort for now (Launch rejects it anyway). Missing
+	// codex must not block construction.
+	bin := buildFakeAgent(t, "fakeagent")
+	_, err := NewHostBackend(HostBackendConfig{
+		ClaudeBinary: bin,
+		CodexBinary:  "/no/such/binary",
+	})
+	if err != nil {
+		t.Errorf("construction should succeed without codex; got: %v", err)
+	}
+}
+
+func TestHostBackend_Launch_CodexRejected(t *testing.T) {
+	bin := buildFakeAgent(t, "fakeagent")
+	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+
+	spec := ContainerSpec{
+		Name:    "wallfacer-test-codex",
+		Env:     map[string]string{"WALLFACER_AGENT": "codex"},
+		Cmd:     []string{"-p", "hi"},
+		WorkDir: t.TempDir(),
+	}
+	_, err := b.Launch(context.Background(), spec)
+	if err == nil {
+		t.Fatal("expected error launching codex in host mode")
+	}
+	if !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "not supported") {
+		t.Errorf("error should explain codex is unsupported; got: %v", err)
 	}
 }
 
