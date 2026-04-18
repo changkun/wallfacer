@@ -218,9 +218,7 @@ function renderStatusBarBranches() {
             : "";
         extras = behindBadge + aheadBadge + syncBtn + pushBtn + rebaseBtn;
       }
-      return (
-        `<span class="status-bar-branch-group">${branchBtn}${extras}</span>`
-      );
+      return `<span class="status-bar-branch-group">${branchBtn}${extras}</span>`;
     })
     .join("");
 }
