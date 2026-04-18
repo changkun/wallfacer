@@ -76,6 +76,7 @@ type Interface interface {
 	Command() string
 	SandboxImage() string
 	SandboxBackend() sandbox.Backend
+	HostMode() bool
 	WorktreesDir() string
 	TmpDir() string
 	EnvFile() string

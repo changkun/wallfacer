@@ -1,6 +1,6 @@
 ---
 title: envconfig exposes host-binary path overrides
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/envconfig/envconfig.go

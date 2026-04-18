@@ -30,6 +30,7 @@ type MockRunner struct {
 	Image       string
 	WtDir       string
 	CodexPath   string
+	Host        bool // HostMode() return value
 
 	// Recorded call arguments (mutex-protected for race-safety).
 	RunBackgroundCalls          []uuid.UUID
@@ -211,6 +212,9 @@ func (m *MockRunner) SandboxImage() string { return m.Image }
 
 // SandboxBackend returns nil (mock does not provide a real backend).
 func (m *MockRunner) SandboxBackend() sandbox.Backend { return nil }
+
+// HostMode reports the mock's configured hostMode (defaults to false).
+func (m *MockRunner) HostMode() bool { return m.Host }
 
 // WorktreesDir returns the configured worktrees directory.
 func (m *MockRunner) WorktreesDir() string { return m.WtDir }

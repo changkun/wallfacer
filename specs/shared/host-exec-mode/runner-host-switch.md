@@ -1,6 +1,6 @@
 ---
 title: `wallfacer run --backend host` selects HostBackend
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-exec-mode/host-backend.md
   - specs/shared/host-exec-mode/envconfig-host-option.md

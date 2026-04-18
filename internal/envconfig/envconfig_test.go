@@ -99,6 +99,49 @@ func TestParseEmpty(t *testing.T) {
 	}
 }
 
+// TestParseHostBinaryOverrides verifies that the two optional host-mode
+// binary-path overrides are parsed into Config.
+func TestParseHostBinaryOverrides(t *testing.T) {
+	content := "WALLFACER_HOST_CLAUDE_BINARY=/usr/local/bin/claude\nWALLFACER_HOST_CODEX_BINARY=/opt/codex/bin/codex\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.HostClaudeBinary != "/usr/local/bin/claude" {
+		t.Errorf("HostClaudeBinary = %q", cfg.HostClaudeBinary)
+	}
+	if cfg.HostCodexBinary != "/opt/codex/bin/codex" {
+		t.Errorf("HostCodexBinary = %q", cfg.HostCodexBinary)
+	}
+}
+
+// TestParseHostBinaryOverrides_Empty verifies that absent keys yield zero-value fields.
+func TestParseHostBinaryOverrides_Empty(t *testing.T) {
+	path := writeEnvFile(t, "# nothing here\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.HostClaudeBinary != "" || cfg.HostCodexBinary != "" {
+		t.Errorf("expected empty overrides; got claude=%q codex=%q", cfg.HostClaudeBinary, cfg.HostCodexBinary)
+	}
+}
+
+// TestParse_IgnoresSandboxBackendEnv verifies that WALLFACER_SANDBOX_BACKEND is
+// no longer read from the env file — backend selection moved to the
+// --backend CLI flag. Parse must leave the field zero.
+func TestParse_IgnoresSandboxBackendEnv(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND=host\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.SandboxBackend != "" {
+		t.Errorf("SandboxBackend should not be populated from env file; got %q", cfg.SandboxBackend)
+	}
+}
+
 // TestParseServerAPIKey verifies parsing of the WALLFACER_SERVER_API_KEY field.
 func TestParseServerAPIKey(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SERVER_API_KEY=secret-key\n")
@@ -607,46 +650,6 @@ func TestMaskToken(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("MaskToken(%q) = %q; want %q", tc.input, got, tc.want)
 		}
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SandboxBackend
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestParseSandboxBackendLocal verifies that the "local" backend value is parsed correctly.
-func TestParseSandboxBackendLocal(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND=local\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.SandboxBackend != "local" {
-		t.Fatalf("SandboxBackend = %q; want %q", cfg.SandboxBackend, "local")
-	}
-}
-
-// TestParseSandboxBackendAbsent verifies that a missing backend key defaults to empty string.
-func TestParseSandboxBackendAbsent(t *testing.T) {
-	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.SandboxBackend != "" {
-		t.Fatalf("SandboxBackend = %q; want empty when absent", cfg.SandboxBackend)
-	}
-}
-
-// TestParseSandboxBackendNormalized verifies that the backend value is lowercased and trimmed.
-func TestParseSandboxBackendNormalized(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND= Local \n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.SandboxBackend != "local" {
-		t.Fatalf("SandboxBackend = %q; want %q (lowered+trimmed)", cfg.SandboxBackend, "local")
 	}
 }
 
