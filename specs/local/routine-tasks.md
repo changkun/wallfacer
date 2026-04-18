@@ -1,6 +1,6 @@
 ---
 title: Routine Tasks
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/routine/
@@ -16,7 +16,7 @@ affects:
   - ui/js/render.js
 effort: large
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
@@ -373,12 +373,12 @@ Legacy aliases (unchanged contract; now thin wrappers):
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Engine package](routine-tasks/engine-package.md) | — | medium | validated |
-| [Task kind and fields](routine-tasks/task-kind-and-fields.md) | — | medium | validated |
-| [Routines API](routine-tasks/routines-api.md) | task-kind-and-fields | medium | validated |
-| [Engine integration](routine-tasks/engine-integration.md) | engine-package, routines-api | large | validated |
-| [Routine card UI](routine-tasks/routine-card-ui.md) | routines-api | medium | validated |
-| [Ideation migration](routine-tasks/ideation-migration.md) | engine-integration, routine-card-ui | medium | validated |
+| [Engine package](routine-tasks/engine-package.md) | — | medium | complete  |
+| [Task kind and fields](routine-tasks/task-kind-and-fields.md) | — | medium | complete  |
+| [Routines API](routine-tasks/routines-api.md) | task-kind-and-fields | medium | complete  |
+| [Engine integration](routine-tasks/engine-integration.md) | engine-package, routines-api | large | complete  |
+| [Routine card UI](routine-tasks/routine-card-ui.md) | routines-api | medium | complete  |
+| [Ideation migration](routine-tasks/ideation-migration.md) | engine-integration, routine-card-ui | medium | complete  |
 
 ```mermaid
 graph LR

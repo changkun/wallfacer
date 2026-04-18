@@ -1,6 +1,6 @@
 ---
 title: Wire scheduler engine into the handler
-status: validated
+status: complete
 depends_on:
   - specs/local/routine-tasks/engine-package.md
   - specs/local/routine-tasks/routines-api.md
@@ -12,7 +12,7 @@ affects:
   - internal/prompts/
 effort: large
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---

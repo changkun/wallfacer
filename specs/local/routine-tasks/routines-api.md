@@ -1,6 +1,6 @@
 ---
 title: Routines HTTP API
-status: validated
+status: complete
 depends_on:
   - specs/local/routine-tasks/task-kind-and-fields.md
 affects:
@@ -12,7 +12,7 @@ affects:
   - AGENTS.md
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
