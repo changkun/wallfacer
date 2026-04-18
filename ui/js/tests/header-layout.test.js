@@ -47,7 +47,7 @@ describe("header layout", () => {
     const css = readAllCSS(join(repoRoot, "ui/css/styles.css"));
 
     expect(css).toContain(".app-sidebar");
-    expect(css).toContain(".sidebar-nav");
+    expect(css).toContain(".sb-nav-item");
     expect(css).toContain(".automation-menu");
     expect(css).toContain(".automation-menu-wrap");
     expect(css).toContain(".automation-active-count");
