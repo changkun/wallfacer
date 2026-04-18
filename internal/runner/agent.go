@@ -31,18 +31,6 @@ func taskIDString(task *store.Task) string {
 // referenced from the runner via this alias.
 type AgentRole = agents.Role
 
-// MountMode aliases agents.MountMode. See internal/agents for the full
-// semantics of each tier (MountNone, MountReadOnly, MountReadWrite).
-type MountMode = agents.MountMode
-
-// Mount-mode aliases so existing role descriptors and runAgent dispatch
-// keep their short names; the canonical constants live in internal/agents.
-const (
-	MountNone      = agents.MountNone
-	MountReadOnly  = agents.MountReadOnly
-	MountReadWrite = agents.MountReadWrite
-)
-
 // runAgentOpts carries per-invocation parameters that don't belong on
 // the role descriptor (they vary per call, not per role).
 type runAgentOpts struct {
@@ -70,7 +58,7 @@ type runAgentOpts struct {
 	// while sharing a single descriptor.
 	ActivityOverride store.SandboxActivity
 	// ContainerName, when non-empty, overrides the default
-	// wallfacer-<role.Name>-<uuid8> pattern. Refinement and ideation
+	// wallfacer-<role.Slug>-<uuid8> pattern. Refinement and ideation
 	// use this for slugged / disambiguated names that predate the
 	// migration. Prefer leaving it empty for new roles.
 	ContainerName string
@@ -86,18 +74,23 @@ type runAgentOpts struct {
 	// --resume <id>. Used by the multi-turn heavyweight roles so the
 	// second turn attaches to the first turn's conversation.
 	SessionID string
-	// ModelOverride, when non-empty, takes priority over the role's
-	// Model resolver and the env-derived default. Heavyweight roles
+	// ModelOverride, when non-empty, takes priority over
+	// ModelResolver and the env-derived default. Heavyweight roles
 	// use this for per-task model pinning.
 	ModelOverride string
+	// ModelResolver, when set, provides a per-call model lookup
+	// used when ModelOverride is empty. Title and oversight use this
+	// to route to the small-model env var without mutating the role
+	// descriptor.
+	ModelResolver func(sandbox.Type) string
 	// WorktreeOverrides maps workspace host paths to the task's
-	// worktree paths. MountReadWrite roles mount the worktrees in
+	// worktree paths. mountReadWrite roles mount the worktrees in
 	// place of the raw workspaces so commits land on the task's
 	// branch.
 	WorktreeOverrides map[string]string
 	// BoardDir is the host directory containing board.json, mounted
 	// read-only at /workspace/.tasks/ alongside any siblings. Only
-	// honoured for MountReadWrite roles with MountBoard=true.
+	// honoured for mountReadWrite roles with MountBoard=true.
 	BoardDir string
 	// SiblingMounts maps shortID → (repoPath → worktreePath) for
 	// read-only mounts of other in-progress task worktrees, so the
@@ -139,10 +132,10 @@ type agentResult struct {
 }
 
 // runAgent is the single launch primitive shared by every sub-agent
-// role in the runner. For MountNone roles it handles: sandbox
+// role in the runner. For mountNone roles it handles: sandbox
 // resolution, container spec construction, Launch, stdout/stderr
 // drain, wait, NDJSON parsing, usage accumulation, and token-limit
-// fallback. MountReadOnly and MountReadWrite support land in the
+// fallback. mountReadOnly and mountReadWrite support land in the
 // sibling inspector-roles and heavyweight-roles tasks; calling
 // runAgent with those modes today returns a "not yet implemented"
 // error so a mis-wired caller fails loudly.
@@ -153,11 +146,15 @@ func (r *Runner) runAgent(
 	prompt string,
 	opts runAgentOpts,
 ) (*agentResult, error) {
-	if role.Name == "" {
-		return nil, fmt.Errorf("runAgent: role.Name is required")
+	if role.Slug == "" {
+		return nil, fmt.Errorf("runAgent: role.Slug is required")
 	}
-	if role.ParseResult == nil {
-		return nil, fmt.Errorf("runAgent: role.ParseResult is required for %s", role.Name)
+	binding, ok := bindingFor(role.Slug)
+	if !ok {
+		return nil, fmt.Errorf("runAgent: no binding registered for agent %q", role.Slug)
+	}
+	if binding.ParseResult == nil {
+		return nil, fmt.Errorf("runAgent: binding for %s has no ParseResult", role.Slug)
 	}
 
 	// Resolve the sandbox for the task+activity using the existing 4-tier
@@ -165,7 +162,7 @@ func (r *Runner) runAgent(
 	// → Claude). Task-free callers pass task=nil and get Claude.
 	primary := sandbox.Claude
 	if task != nil {
-		primary = r.sandboxForTaskActivity(task, role.Activity)
+		primary = r.sandboxForTaskActivity(task, binding.Activity)
 	}
 
 	// Derive a per-call context with the role's timeout. Callers that
@@ -175,8 +172,8 @@ func (r *Runner) runAgent(
 	if runCtx == nil {
 		runCtx = r.shutdownCtx
 	}
-	if role.Timeout != nil {
-		if d := role.Timeout(task); d > 0 {
+	if binding.Timeout != nil {
+		if d := binding.Timeout(task); d > 0 {
 			runCtx, cancel = context.WithTimeout(runCtx, d)
 			defer cancel()
 		}
@@ -188,13 +185,13 @@ func (r *Runner) runAgent(
 	// slugged prompt in its name).
 	containerName := opts.ContainerName
 	if containerName == "" {
-		containerName = "wallfacer-" + role.Name + "-" + uuid.NewString()[:8]
+		containerName = "wallfacer-" + role.Slug + "-" + uuid.NewString()[:8]
 	}
 
 	// Activity used for sandbox resolution, label, span events, and
 	// usage attribution. Callers may override via opts to split
 	// sub-variants of the same role (oversight vs oversight-test).
-	activity := role.Activity
+	activity := binding.Activity
 	if opts.ActivityOverride != "" {
 		activity = opts.ActivityOverride
 	}
@@ -223,14 +220,14 @@ func (r *Runner) runAgent(
 					store.SpanData{Phase: "container_run", Label: string(activity)})
 			}()
 		}
-		return r.launchOne(runCtx, role, containerName, prompt, sb, labels, task, opts)
+		return r.launchOne(runCtx, role, binding, containerName, prompt, sb, labels, task, opts)
 	}
 
 	result, err := launchOnce(primary)
 	// Retry on token-limit-at-launch for Claude→Codex.
 	if err != nil && primary == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
 		logger.Runner.Warn("runAgent: claude token limit on launch; retrying with codex",
-			"role", role.Name, "container", containerName)
+			"role", role.Slug, "container", containerName)
 		if task != nil {
 			r.recordFallbackEvent(task.ID, activity)
 		}
@@ -246,7 +243,7 @@ func (r *Runner) runAgent(
 	if primary == sandbox.Claude && result.Output != nil && result.Output.IsError &&
 		isLikelyTokenLimitError(result.Output.Result, result.Output.Subtype) {
 		logger.Runner.Warn("runAgent: claude reported token limit in output; retrying with codex",
-			"role", role.Name, "container", containerName)
+			"role", role.Slug, "container", containerName)
 		if task != nil {
 			r.recordFallbackEvent(task.ID, activity)
 		}
@@ -268,9 +265,9 @@ func (r *Runner) runAgent(
 
 	// Parse the role-specific structured output.
 	if result.Output != nil {
-		parsed, parseErr := role.ParseResult(result.Output)
+		parsed, parseErr := binding.ParseResult(result.Output)
 		if parseErr != nil {
-			return nil, fmt.Errorf("%s: %w", role.Name, parseErr)
+			return nil, fmt.Errorf("%s: %w", role.Slug, parseErr)
 		}
 		result.Parsed = parsed
 	}
@@ -280,12 +277,13 @@ func (r *Runner) runAgent(
 
 // launchOne builds the container spec, invokes backend.Launch, drains
 // the streams, and parses the NDJSON result for a single sub-agent
-// invocation. It dispatches on role.MountMode to add the right volume
+// invocation. It dispatches on binding.MountMode to add the right volume
 // mounts and feeds optional heavyweight concerns (live-log tee,
 // circuit breaker) when supplied via opts.
 func (r *Runner) launchOne(
 	ctx context.Context,
 	role AgentRole,
+	binding agentBinding,
 	containerName, prompt string,
 	sb sandbox.Type,
 	labels map[string]string,
@@ -295,7 +293,7 @@ func (r *Runner) launchOne(
 	// Short-circuit on an open container-runtime circuit breaker. Only
 	// heavyweight callers wire this today; the header roles pass nil.
 	if opts.CircuitBreaker != nil && !opts.CircuitBreaker.Allow() {
-		return nil, fmt.Errorf("%s: container circuit breaker open: container runtime may be unavailable", role.Name)
+		return nil, fmt.Errorf("%s: container circuit breaker open: container runtime may be unavailable", role.Slug)
 	}
 
 	// Resolve the model with the explicit override > role-specific
@@ -303,8 +301,11 @@ func (r *Runner) launchOne(
 	// buildContainerSpecForSandbox applied before the migration.
 	model := opts.ModelOverride
 	if model == "" {
-		if role.Model != nil {
-			model = role.Model(sb)
+		if opts.ModelResolver != nil {
+			model = opts.ModelResolver(sb)
+		}
+		if model == "" && binding.Model != nil {
+			model = binding.Model(sb)
 		}
 		if model == "" {
 			model = r.modelFromEnvForSandbox(sb)
@@ -312,8 +313,8 @@ func (r *Runner) launchOne(
 	}
 
 	var spec sandbox.ContainerSpec
-	switch role.MountMode {
-	case MountReadWrite:
+	switch binding.MountMode {
+	case mountReadWrite:
 		// Heavyweight spec builder already handles worktree mounts,
 		// board + sibling context, and per-task labels.
 		spec = r.buildContainerSpecForSandbox(
@@ -328,7 +329,7 @@ func (r *Runner) launchOne(
 			sb,
 		)
 	default:
-		spec = r.buildInspectorSpec(containerName, model, sb, role.MountMode)
+		spec = r.buildInspectorSpec(containerName, model, sb, binding.MountMode)
 		spec.Cmd = buildAgentCmd(prompt, model)
 		if opts.SessionID != "" {
 			spec.Cmd = append(spec.Cmd, "--resume", opts.SessionID)
@@ -352,7 +353,7 @@ func (r *Runner) launchOne(
 		if opts.CircuitBreaker != nil {
 			opts.CircuitBreaker.RecordFailure()
 		}
-		return nil, fmt.Errorf("launch %s container: %w", role.Name, launchErr)
+		return nil, fmt.Errorf("launch %s container: %w", role.Slug, launchErr)
 	}
 	if opts.OnLaunch != nil {
 		opts.OnLaunch(containerName, handle)
@@ -391,7 +392,7 @@ func (r *Runner) launchOne(
 	// title/oversight/commit behaviour).
 	if ctx.Err() != nil {
 		_ = handle.Kill()
-		return nil, fmt.Errorf("%s container terminated: %w", role.Name, ctx.Err())
+		return nil, fmt.Errorf("%s container terminated: %w", role.Slug, ctx.Err())
 	}
 
 	raw := strings.TrimSpace(string(rawStdout))
@@ -403,7 +404,7 @@ func (r *Runner) launchOne(
 		if waitErr != nil {
 			// Wait error carries "exit status N" which classifyFailure
 			// keys on to bucket container crashes.
-			return nil, fmt.Errorf("%s: exec container: %w", role.Name, waitErr)
+			return nil, fmt.Errorf("%s: exec container: %w", role.Slug, waitErr)
 		}
 		if exitCode != 0 {
 			// No wait error: distinguish this from a crash so the
@@ -411,9 +412,9 @@ func (r *Runner) launchOne(
 			// Matches pre-migration behaviour in the heavyweight
 			// runContainer path.
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
-				role.Name, exitCode, truncate(string(rawStderr), 200))
+				role.Slug, exitCode, truncate(string(rawStderr), 200))
 		}
-		return nil, fmt.Errorf("%s: empty output", role.Name)
+		return nil, fmt.Errorf("%s: empty output", role.Slug)
 	}
 
 	// Parse first so a non-zero exit with a valid final NDJSON payload
@@ -424,14 +425,14 @@ func (r *Runner) launchOne(
 	if err != nil {
 		if exitCode != 0 {
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s stdout=%s",
-				role.Name, exitCode, truncate(string(rawStderr), 200), truncate(raw, 200))
+				role.Slug, exitCode, truncate(string(rawStderr), 200), truncate(raw, 200))
 		}
 		// Wording matches the pre-migration message so callers that
 		// grep on "parse output" (some tests do) still match.
-		return nil, fmt.Errorf("%s: parse output: %w (raw: %s)", role.Name, err, truncate(raw, 200))
+		return nil, fmt.Errorf("%s: parse output: %w (raw: %s)", role.Slug, err, truncate(raw, 200))
 	}
 	if exitCode != 0 {
-		logger.Runner.Warn(role.Name+": container exited non-zero but produced valid output",
+		logger.Runner.Warn(role.Slug+": container exited non-zero but produced valid output",
 			"code", exitCode, "sandbox", sb, "model", model)
 	}
 	// Successful happy-path → mark the circuit breaker healthy if one
@@ -450,8 +451,8 @@ func (r *Runner) launchOne(
 }
 
 // buildInspectorSpec produces a ContainerSpec for headless or read-only
-// inspector roles. For MountNone it returns the same spec
-// buildBaseContainerSpec produces. For MountReadOnly it layers every
+// inspector roles. For mountNone it returns the same spec
+// buildBaseContainerSpec produces. For mountReadOnly it layers every
 // configured workspace as a read-only volume plus the workspace
 // instructions file (CLAUDE.md / AGENTS.md) and sets WorkDir so the
 // agent has a natural CWD to inspect from. Worker-container mode is
@@ -460,10 +461,10 @@ func (r *Runner) launchOne(
 func (r *Runner) buildInspectorSpec(
 	containerName, model string,
 	sb sandbox.Type,
-	mode MountMode,
+	mode mountMode,
 ) sandbox.ContainerSpec {
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
-	if mode != MountReadOnly {
+	if mode != mountReadOnly {
 		return spec
 	}
 

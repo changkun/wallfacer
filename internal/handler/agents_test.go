@@ -10,7 +10,8 @@ import (
 )
 
 // TestListAgents_ReturnsBuiltins asserts every built-in role shows up
-// with a non-empty slug, Activity, and a plausible MountMode string.
+// with a non-empty slug and title, and that heavy-weight agents declare
+// the workspace.write capability so UI consumers can warn users.
 func TestListAgents_ReturnsBuiltins(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/agents", nil)
@@ -27,29 +28,42 @@ func TestListAgents_ReturnsBuiltins(t *testing.T) {
 	if len(got) != len(agents.BuiltinAgents) {
 		t.Fatalf("len = %d, want %d", len(got), len(agents.BuiltinAgents))
 	}
-	for i, a := range got {
+
+	bySlug := map[string]AgentResponse{}
+	for _, a := range got {
 		if a.Slug == "" {
-			t.Errorf("[%d] empty slug", i)
+			t.Errorf("empty slug in response")
 		}
-		if a.Activity == "" {
-			t.Errorf("%s: empty activity", a.Slug)
-		}
-		switch a.MountMode {
-		case "none", "read-only", "read-write":
-			// ok
-		default:
-			t.Errorf("%s: unexpected mount_mode %q", a.Slug, a.MountMode)
-		}
-		if a.PromptTmpl != "" {
-			t.Errorf("%s: ListAgents must omit prompt_tmpl", a.Slug)
+		if a.Title == "" {
+			t.Errorf("%s: empty title", a.Slug)
 		}
 		if !a.Builtin {
 			t.Errorf("%s: expected builtin=true", a.Slug)
 		}
+		if a.PromptTmpl != "" {
+			t.Errorf("%s: ListAgents must omit prompt_tmpl", a.Slug)
+		}
+		bySlug[a.Slug] = a
+	}
+	for _, slug := range []string{"impl", "test"} {
+		row, ok := bySlug[slug]
+		if !ok {
+			t.Fatalf("%s missing from list", slug)
+		}
+		hasWrite := false
+		for _, c := range row.Capabilities {
+			if c == agents.CapWorkspaceWrite {
+				hasWrite = true
+			}
+		}
+		if !hasWrite {
+			t.Errorf("%s: expected %q in capabilities, got %v",
+				slug, agents.CapWorkspaceWrite, row.Capabilities)
+		}
 	}
 }
 
-// TestGetAgent_ReturnsPromptBody asserts the single-agent endpoint
+// TestGetAgent_ReturnsPromptBody checks that the single-agent endpoint
 // populates the prompt template body for a role that owns one.
 func TestGetAgent_ReturnsPromptBody(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
@@ -87,8 +101,7 @@ func TestGetAgent_UnknownReturns404(t *testing.T) {
 }
 
 // TestGetAgent_ImplementationHasNoPromptBody confirms roles without a
-// standalone template (implementation) return an empty prompt_tmpl
-// rather than leaking an unrelated template body.
+// standalone template (implementation) return an empty prompt_tmpl.
 func TestGetAgent_ImplementationHasNoPromptBody(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/agents/impl", nil)

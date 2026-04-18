@@ -8,15 +8,25 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
-// newAgentTestRunner builds a runner wired to a MockSandboxBackend so
-// tests can drive runAgent without launching real containers. Sibling
-// migration tasks will reuse this helper as they migrate their role
-// call sites onto runAgent.
+// registerTestBinding installs a binding under a test-only slug and
+// clears it at the end of the test. Tests register their own bindings
+// so they can drive custom parse / mount-mode behaviour without
+// mutating package-level state across tests.
+func registerTestBinding(t *testing.T, slug string, b agentBinding) {
+	t.Helper()
+	if _, exists := agentBindings[slug]; exists {
+		t.Fatalf("registerTestBinding: slug %q already in use", slug)
+	}
+	agentBindings[slug] = b
+	t.Cleanup(func() { delete(agentBindings, slug) })
+}
+
 func newAgentTestRunner(t *testing.T) (*Runner, *MockSandboxBackend, *store.Store) {
 	t.Helper()
 	dir := t.TempDir()
@@ -38,33 +48,33 @@ func newAgentTestRunner(t *testing.T) (*Runner, *MockSandboxBackend, *store.Stor
 	return r, backend, s
 }
 
-// happyHeadlessStdout is a minimal agentOutput NDJSON payload that the
-// parser accepts. The final line carries the result, session_id, and
-// usage fields runAgent propagates.
 const happyHeadlessStdout = `{"type":"result","subtype":"success","is_error":false,"result":"hello world","session_id":"s-1","stop_reason":"end_turn","total_cost_usd":0.01,"usage":{"input_tokens":10,"output_tokens":5}}
 `
 
-// tokenLimitStdout emulates Claude's in-output token-limit signal so
-// the retry path can be exercised.
 const tokenLimitStdout = `{"type":"result","subtype":"error","is_error":true,"result":"rate limit exceeded","session_id":"s-1","stop_reason":"","total_cost_usd":0,"usage":{"input_tokens":0,"output_tokens":0}}
 `
 
-func makeRole(name string) AgentRole {
-	return AgentRole{
+// makeTestRole installs a headless-profile binding under a unique slug
+// and returns the matching agents.Role descriptor. Tests use this
+// instead of building AgentRole literals.
+func makeTestRole(t *testing.T, slug string, mode mountMode) agents.Role {
+	t.Helper()
+	registerTestBinding(t, slug, agentBinding{
 		Activity:    store.SandboxActivityTitle,
-		Name:        name,
 		Timeout:     func(*store.Task) time.Duration { return 5 * time.Second },
-		MountMode:   MountNone,
+		MountMode:   mode,
 		SingleTurn:  true,
 		ParseResult: func(o *agentOutput) (any, error) { return o.Result, nil },
-	}
+	})
+	return agents.Role{Slug: slug, Title: slug}
 }
 
 func TestRunAgent_ContainerNameHasUUIDSuffix(t *testing.T) {
 	r, backend, _ := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
 
-	res, err := r.runAgent(context.Background(), makeRole("title"), nil, "hi", runAgentOpts{})
+	role := makeTestRole(t, "t-title", mountNone)
+	res, err := r.runAgent(context.Background(), role, nil, "hi", runAgentOpts{})
 	if err != nil {
 		t.Fatalf("runAgent: %v", err)
 	}
@@ -76,10 +86,9 @@ func TestRunAgent_ContainerNameHasUUIDSuffix(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("expected 1 Launch call, got %d", len(calls))
 	}
-	// Name shape: wallfacer-<role>-<8 hex chars>.
-	re := regexp.MustCompile(`^wallfacer-title-[0-9a-f]{8}$`)
+	re := regexp.MustCompile(`^wallfacer-t-title-[0-9a-f]{8}$`)
 	if !re.MatchString(calls[0].Name) {
-		t.Fatalf("container name = %q, want wallfacer-title-<uuid8>", calls[0].Name)
+		t.Fatalf("container name = %q, want wallfacer-t-title-<uuid8>", calls[0].Name)
 	}
 }
 
@@ -87,7 +96,6 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
 
-	// Create a task so TrackUsage can attribute the invocation.
 	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
 		Prompt: "write a title please", Timeout: 10,
 	})
@@ -95,9 +103,10 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
+	role := makeTestRole(t, "t-happy", mountNone)
 	res, err := r.runAgent(
 		context.Background(),
-		makeRole("title"),
+		role,
 		task,
 		"prompt body",
 		runAgentOpts{TrackUsage: true, Turn: 1},
@@ -115,8 +124,6 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 		t.Errorf("ActualSandbox = %q, want claude", res.Output.ActualSandbox)
 	}
 
-	// Usage was attributed: the persisted turn-usage slice holds one
-	// record with the role's activity tag.
 	records, err := s.GetTurnUsages(task.ID)
 	if err != nil {
 		t.Fatalf("GetTurnUsages: %v", err)
@@ -126,20 +133,16 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	}
 }
 
-// TestRunAgent_MountReadOnly_AddsWorkspaceMounts verifies that a
-// read-only inspector role's container spec picks up every configured
-// workspace as a read-only volume. Regression guard against silently
-// reverting to MountNone when the refinement / ideation roles call
-// into runAgent.
+// TestRunAgent_MountReadOnly_AddsWorkspaceMounts verifies the inspector
+// mount profile picks up every configured workspace as a read-only
+// volume.
 func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	ws := t.TempDir()
 	r.workspaces = []string{ws}
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
 
-	role := makeRole("ro")
-	role.MountMode = MountReadOnly
-
+	role := makeTestRole(t, "t-ro", mountReadOnly)
 	task, _ := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "p", Timeout: 5})
 	if _, err := r.runAgent(context.Background(), role, task, "hi", runAgentOpts{}); err != nil {
 		t.Fatalf("runAgent: %v", err)
@@ -154,21 +157,8 @@ func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
 	}
 }
 
-func TestRunAgent_RejectsMountReadWrite(t *testing.T) {
-	r, _, _ := newAgentTestRunner(t)
-	role := makeRole("rw")
-	role.MountMode = MountReadWrite
-
-	_, err := r.runAgent(context.Background(), role, nil, "hi", runAgentOpts{})
-	if err == nil {
-		t.Fatal("expected mount-not-implemented error for MountReadWrite")
-	}
-}
-
 func TestRunAgent_TokenLimitFallback(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
-	// First response: claude returns token-limit in output.
-	// Second response: codex returns a clean result.
 	backend.responses = []ContainerResponse{
 		{Stdout: []byte(tokenLimitStdout)},
 		{Stdout: []byte(happyHeadlessStdout)},
@@ -181,7 +171,8 @@ func TestRunAgent_TokenLimitFallback(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	res, err := r.runAgent(context.Background(), makeRole("title"), task, "p", runAgentOpts{})
+	role := makeTestRole(t, "t-tok", mountNone)
+	res, err := r.runAgent(context.Background(), role, task, "p", runAgentOpts{})
 	if err != nil {
 		t.Fatalf("runAgent: %v", err)
 	}
@@ -198,7 +189,8 @@ func TestRunAgent_LaunchErrorNoFallbackOnNonTokenLimit(t *testing.T) {
 	backend.responses = []ContainerResponse{
 		{Err: errors.New("some unrelated failure")},
 	}
-	_, err := r.runAgent(context.Background(), makeRole("title"), nil, "p", runAgentOpts{})
+	role := makeTestRole(t, "t-err", mountNone)
+	_, err := r.runAgent(context.Background(), role, nil, "p", runAgentOpts{})
 	if err == nil {
 		t.Fatal("expected launch failure to surface")
 	}
@@ -207,21 +199,21 @@ func TestRunAgent_LaunchErrorNoFallbackOnNonTokenLimit(t *testing.T) {
 	}
 }
 
-func TestRunAgent_RequiresRoleName(t *testing.T) {
+func TestRunAgent_RequiresRoleSlug(t *testing.T) {
 	r, _, _ := newAgentTestRunner(t)
-	role := makeRole("")
-	_, err := r.runAgent(context.Background(), role, nil, "p", runAgentOpts{})
+	_, err := r.runAgent(context.Background(), agents.Role{}, nil, "p", runAgentOpts{})
 	if err == nil {
-		t.Fatal("expected error when role.Name is empty")
+		t.Fatal("expected error when role.Slug is empty")
 	}
 }
 
-func TestRunAgent_RequiresParseResult(t *testing.T) {
+func TestRunAgent_RequiresBindingRegistered(t *testing.T) {
 	r, _, _ := newAgentTestRunner(t)
-	role := makeRole("title")
-	role.ParseResult = nil
-	_, err := r.runAgent(context.Background(), role, nil, "p", runAgentOpts{})
+	_, err := r.runAgent(context.Background(), agents.Role{Slug: "definitely-not-registered"}, nil, "p", runAgentOpts{})
 	if err == nil {
-		t.Fatal("expected error when role.ParseResult is nil")
+		t.Fatal("expected error when no binding is registered for slug")
+	}
+	if !strings.Contains(err.Error(), "no binding") {
+		t.Errorf("error = %q, want one mentioning 'no binding'", err)
 	}
 }

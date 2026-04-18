@@ -441,15 +441,20 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 The **Agents** entry in the left sidebar opens a read-only catalogue of
 the built-in sub-agent roles that power wallfacer: Title, Oversight,
 Commit message, Refinement, Brainstorm (ideation), Implementation, and
-Testing. Each row shows the activity bucket, mount profile (none /
-workspace read-only / worktree read-write), and whether the role is
-single-turn or multi-turn. Clicking a row expands an inline panel with
-the role's prompt template, timeout, and a disabled **Clone** button —
-editable and user-authored agents will ship in a follow-up. The tab is
-a window into what the runner has available; it does not affect task
-execution.
+Testing. Each row shows the agent's **capabilities** (what it needs
+from its environment: `workspace.read`, `workspace.write`,
+`board.context`) and whether it is single-turn or multi-turn. Clicking
+a row expands an inline panel with the prompt template and a disabled
+**Clone** button — editable and user-authored agents will ship in a
+follow-up.
 
-Backing APIs: `GET /api/agents` and `GET /api/agents/{slug}`.
+Backing APIs: `GET /api/agents` and `GET /api/agents/{slug}`. Response
+fields are intentionally neutral (slug, title, description,
+capabilities, multiturn, prompt_template_name) — runner-side dispatch
+plumbing (container mount profiles, sandbox-routing activity buckets,
+parse functions) lives behind a private binding table in
+`internal/runner` so a future Flow composer can compose agents without
+pulling in container-orchestration knowledge.
 
 ---
 

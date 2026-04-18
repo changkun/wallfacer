@@ -7,51 +7,40 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
-// AgentResponse is the JSON shape for a single sub-agent role surfaced
-// on the Agents tab. ListAgents returns a slice of these; GetAgent adds
-// the rendered prompt-template body.
+// AgentResponse is the wire shape for an agent descriptor surfaced on
+// the Agents tab. The fields mirror the neutral descriptor in
+// internal/agents; runner-side dispatch plumbing (mount profile, parse
+// function, sandbox-routing activity) is intentionally NOT exposed
+// because it is orchestration detail that a Flow composer should not
+// need to know.
+//
+// Design note: an earlier version of this endpoint returned
+// `mount_mode` / `single_turn` / `activity`. Those were runner plumbing
+// leaking through the wire and were replaced by `capabilities` (a
+// stable vocabulary of what the agent needs) and `multiturn` (advisory
+// metadata). Clients that rendered mount_mode should read capabilities
+// instead.
 type AgentResponse struct {
-	Slug        string `json:"slug"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Activity    string `json:"activity"`
-	MountMode   string `json:"mount_mode"`
-	SingleTurn  bool   `json:"single_turn"`
-	TimeoutSec  int    `json:"timeout_sec,omitempty"`
-	Builtin     bool   `json:"builtin"`
-	PromptTmpl  string `json:"prompt_tmpl,omitempty"` // only populated by GetAgent
+	Slug               string   `json:"slug"`
+	Title              string   `json:"title"`
+	Description        string   `json:"description,omitempty"`
+	Capabilities       []string `json:"capabilities,omitempty"`
+	Multiturn          bool     `json:"multiturn"`
+	PromptTemplateName string   `json:"prompt_template_name,omitempty"`
+	Builtin            bool     `json:"builtin"`
+	PromptTmpl         string   `json:"prompt_tmpl,omitempty"` // only populated by GetAgent
 }
 
-// agentSlugToPromptAPI maps an agent's Name (kebab slug) to the
-// prompts-package API name of the template it renders. The empty
-// string means the role does not own a standalone template (e.g.
-// implementation consumes the user's task prompt verbatim).
-var agentSlugToPromptAPI = map[string]string{
-	"title":      "title",
-	"oversight":  "oversight",
-	"commit-msg": "commit_message",
-	"refine":     "refinement",
-	"ideate":     "ideation",
-	"impl":       "",
-	"test":       "test_verification",
-}
-
-// describeAgent converts a descriptor to the wire shape without the
-// prompt body. Callers that want the body call resolvePromptBody.
 func describeAgent(role agents.Role) AgentResponse {
-	resp := AgentResponse{
-		Slug:        role.Name,
-		Name:        role.Name,
-		Description: role.Description,
-		Activity:    string(role.Activity),
-		MountMode:   role.MountMode.String(),
-		SingleTurn:  role.SingleTurn,
-		Builtin:     true,
+	return AgentResponse{
+		Slug:               role.Slug,
+		Title:              role.Title,
+		Description:        role.Description,
+		Capabilities:       role.Capabilities,
+		Multiturn:          role.Multiturn,
+		PromptTemplateName: role.PromptTemplateName,
+		Builtin:            true,
 	}
-	if role.Timeout != nil {
-		resp.TimeoutSec = int(role.Timeout(nil).Seconds())
-	}
-	return resp
 }
 
 // ListAgents returns the full built-in agent catalog in registration
@@ -72,7 +61,7 @@ func (h *Handler) GetAgent(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	var match *agents.Role
 	for i := range agents.BuiltinAgents {
-		if agents.BuiltinAgents[i].Name == slug {
+		if agents.BuiltinAgents[i].Slug == slug {
 			match = &agents.BuiltinAgents[i]
 			break
 		}
@@ -83,8 +72,8 @@ func (h *Handler) GetAgent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := describeAgent(*match)
-	if apiName := agentSlugToPromptAPI[slug]; apiName != "" {
-		content, _, err := h.runner.Prompts().Content(apiName)
+	if match.PromptTemplateName != "" {
+		content, _, err := h.runner.Prompts().Content(match.PromptTemplateName)
 		if err == nil {
 			resp.PromptTmpl = content
 		}

@@ -72,10 +72,9 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	}
 	resultStr, _ := res.Parsed.(string)
 	cleaned := cleanRefinementResult(resultStr)
-	goal, spec := extractGoalFromRefinement(cleaned)
+	_, spec := extractGoalFromRefinement(cleaned)
 	cur.CurrentRefinement.Status = store.RefinementJobStatusDone
 	cur.CurrentRefinement.Result = spec
-	cur.CurrentRefinement.Goal = goal
 	_ = r.taskStore(taskID).UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
 	logger.Runner.Info("refinement complete", "task", taskID)

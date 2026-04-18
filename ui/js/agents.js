@@ -60,15 +60,13 @@
 
     var name = document.createElement("div");
     name.className = "agents-row__name";
-    name.textContent = agent.name;
+    name.textContent = agent.title || agent.slug;
 
     var meta = document.createElement("div");
     meta.className = "agents-row__meta";
-    meta.textContent =
-      agent.activity +
-      " · " +
-      mountLabel(agent.mount_mode) +
-      (agent.single_turn ? " · single-turn" : " · multi-turn");
+    var capLabel = capabilitiesLabel(agent.capabilities);
+    var turnLabel = agent.multiturn ? "multi-turn" : "single-turn";
+    meta.textContent = capLabel ? capLabel + " · " + turnLabel : turnLabel;
 
     var desc = document.createElement("p");
     desc.className = "agents-row__desc";
@@ -138,13 +136,12 @@
             pre.textContent = full.prompt_tmpl;
             body.appendChild(pre);
           }
-          var timeout = full.timeout_sec
-            ? full.timeout_sec + "s timeout"
-            : "caller-owned timeout";
-          var foot = document.createElement("div");
-          foot.className = "agents-row__foot";
-          foot.textContent = timeout;
-          body.appendChild(foot);
+          if (full.capabilities && full.capabilities.length) {
+            var foot = document.createElement("div");
+            foot.className = "agents-row__foot";
+            foot.textContent = "Capabilities: " + full.capabilities.join(", ");
+            body.appendChild(foot);
+          }
         })
         .catch(function (err) {
           body.innerHTML =
@@ -158,17 +155,22 @@
     }
   }
 
-  function mountLabel(mode) {
-    switch (mode) {
-      case "none":
-        return "no mounts";
-      case "read-only":
-        return "workspace read-only";
-      case "read-write":
-        return "worktree read-write";
-      default:
-        return mode || "unknown mount";
-    }
+  function capabilitiesLabel(caps) {
+    if (!caps || caps.length === 0) return "no workspace access";
+    return caps
+      .map(function (c) {
+        switch (c) {
+          case "workspace.read":
+            return "workspace read";
+          case "workspace.write":
+            return "workspace write";
+          case "board.context":
+            return "board context";
+          default:
+            return c;
+        }
+      })
+      .join(" · ");
   }
 
   function authHeaders() {

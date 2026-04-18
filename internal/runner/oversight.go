@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -685,19 +686,9 @@ type oversightResult struct {
 // test-run oversight share this descriptor; callers pass the
 // activity-specific label via runAgentOpts.ActivityOverride so usage
 // is split correctly in the cost dashboard.
-var roleOversight = AgentRole{
-	Activity:    store.SandboxActivityOversight,
-	Name:        "oversight",
-	Timeout:     func(*store.Task) time.Duration { return constants.OversightAgentTimeout },
-	MountMode:   MountNone,
-	SingleTurn:  true,
-	ParseResult: parseOversightAgentResult,
-}
-
 // parseOversightAgentResult decodes the structured JSON the oversight
-// agent emits into a typed phase list. Adapter around the existing
-// free-function parseOversightResult so the descriptor can reference
-// it without changing callers.
+// agent emits into a typed store.OversightPhase list. The runner-side
+// binding wires this in agent_bindings.go.
 func parseOversightAgentResult(o *agentOutput) (any, error) {
 	phases, err := parseOversightResult(o.Result)
 	if err != nil {
@@ -724,17 +715,14 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)
 	}
 
-	// Bind the model resolver (oversight historically uses the same
-	// "small model" env var as title) so roleOversight stays a pure
-	// descriptor.
-	role := roleOversight
-	role.Model = func(sb sandbox.Type) string { return r.titleModelFromEnvForSandbox(sb) }
-
-	res, err := r.runAgent(r.shutdownCtx, role, task, prompt, runAgentOpts{
+	res, err := r.runAgent(r.shutdownCtx, agents.Oversight, task, prompt, runAgentOpts{
 		EmitSpanEvents:   true,
 		TrackUsage:       true,
 		Turn:             1,
 		ActivityOverride: agent,
+		// Oversight historically uses the same "small model" env var
+		// as title so operators can route both to a cheaper model.
+		ModelResolver: func(sb sandbox.Type) string { return r.titleModelFromEnvForSandbox(sb) },
 	})
 	if err != nil {
 		logger.Runner.Warn("oversight: agent container failed",

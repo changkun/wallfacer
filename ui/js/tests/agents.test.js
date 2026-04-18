@@ -119,20 +119,18 @@ describe("agents.js", () => {
     expect(typeof ctx.window.loadAgents).toBe("function");
   });
 
-  it("renderRow builds a card with name, meta, and disabled Clone button", () => {
+  it("renderRow builds a card with title, capabilities meta, and disabled Clone button", () => {
     const row = ctx.window.__agents_test.renderRow({
       slug: "impl",
-      name: "impl",
+      title: "Implementation",
       description: "runs implementation",
-      activity: "implementation",
-      mount_mode: "read-write",
-      single_turn: false,
+      capabilities: ["workspace.write", "board.context"],
+      multiturn: true,
     });
     expect(row.attributes["data-slug"]).toBe("impl");
-    // Header row has name, meta, and clone button.
     const header = row.children[0];
-    expect(header.children[0].textContent).toBe("impl");
-    expect(header.children[1].textContent).toContain("implementation");
+    expect(header.children[0].textContent).toBe("Implementation");
+    expect(header.children[1].textContent).toContain("workspace write");
     expect(header.children[1].textContent).toContain("multi-turn");
     const clone = header.children[2];
     expect(clone.textContent).toBe("Clone");
@@ -146,10 +144,9 @@ describe("agents.js", () => {
         Promise.resolve([
           {
             slug: "title",
-            name: "title",
-            activity: "title",
-            mount_mode: "none",
-            single_turn: true,
+            title: "Title",
+            capabilities: [],
+            multiturn: false,
           },
         ]),
     });
@@ -170,10 +167,9 @@ describe("agents.js", () => {
       json: () =>
         Promise.resolve({
           slug: "title",
-          name: "title",
-          activity: "title",
-          mount_mode: "none",
-          single_turn: true,
+          title: "Title",
+          capabilities: [],
+          multiturn: false,
           prompt_tmpl: "hello {{.Prompt}}",
         }),
     });
