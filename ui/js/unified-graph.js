@@ -365,7 +365,11 @@
 
     _minimizeCrossings(expanded.layers, expanded.adjDown, expanded.adjUp);
 
-    var positions = _assignCoordinates(expanded.layers);
+    var positions = _assignCoordinates(
+      expanded.layers,
+      expanded.adjDown,
+      expanded.adjUp,
+    );
     var edgePaths = _routeEdges(graph, expanded.edgeChains, positions);
 
     // Apply pinned positions last so user-placed coords win over layout.
@@ -410,39 +414,100 @@
     };
   }
 
+  // _assignLayers returns a Map<nodeId, layerIndex>. We use *median*
+  // layering: each node's layer is the midpoint of its ASAP (earliest
+  // layer it could legally sit in) and ALAP (latest layer it could
+  // legally sit in). The midpoint spreads nodes evenly across columns
+  // instead of piling every zero-in-degree node at layer 0 — critical
+  // when a workspace has many standalone tasks that share "layer 0"
+  // with every root spec under longest-path-from-source layering.
+  //
+  // Edge invariant (for all edges a→b, layer[a] < layer[b]) is preserved
+  // because ASAP/ALAP respect the invariant independently, so their
+  // midpoints do too (proof: asap[b] ≥ asap[a]+1 and alap[b] ≥ alap[a]+1
+  // imply asap[b]+alap[b] ≥ asap[a]+alap[a]+2).
   function _assignLayers(graph, nodeById) {
-    var inDegree = new Map();
-    var adj = new Map();
+    var adjDown = new Map();
+    var adjUp = new Map();
     graph.nodes.forEach(function (n) {
-      inDegree.set(n.id, 0);
-      adj.set(n.id, []);
+      adjDown.set(n.id, []);
+      adjUp.set(n.id, []);
     });
     graph.edges.forEach(function (e) {
       if (!nodeById.has(e.from) || !nodeById.has(e.to)) return;
-      inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1);
-      adj.get(e.from).push(e.to);
+      adjDown.get(e.from).push(e.to);
+      adjUp.get(e.to).push(e.from);
     });
-    var layer = new Map();
-    var queue = [];
-    inDegree.forEach(function (deg, id) {
-      if (deg === 0) {
-        queue.push(id);
-        layer.set(id, 0);
+
+    // Topological order via DFS. Nodes in cycles get skipped; the caller
+    // places them in a trailing cycle column.
+    var topo = _topologicalOrder(graph.nodes, adjDown);
+    if (!topo) return new Map(); // cycle-only graph; caller handles
+
+    // ASAP: layer[a] = max(layer[pred]+1), default 0.
+    var asap = new Map();
+    topo.forEach(function (id) {
+      var preds = adjUp.get(id) || [];
+      var m = 0;
+      for (var i = 0; i < preds.length; i++) {
+        if (!asap.has(preds[i])) continue;
+        if (asap.get(preds[i]) + 1 > m) m = asap.get(preds[i]) + 1;
       }
+      asap.set(id, m);
     });
-    while (queue.length > 0) {
-      var id = queue.shift();
-      var myLayer = layer.get(id);
-      (adj.get(id) || []).forEach(function (neighbor) {
-        var current = layer.has(neighbor) ? layer.get(neighbor) : -1;
-        var want = myLayer + 1;
-        if (want > current) layer.set(neighbor, want);
-        var newDeg = inDegree.get(neighbor) - 1;
-        inDegree.set(neighbor, newDeg);
-        if (newDeg === 0) queue.push(neighbor);
-      });
+    var maxLayer = 0;
+    asap.forEach(function (v) {
+      if (v > maxLayer) maxLayer = v;
+    });
+
+    // ALAP: layer[a] = min(layer[succ]-1), default maxLayer.
+    var alap = new Map();
+    for (var i = topo.length - 1; i >= 0; i--) {
+      var id = topo[i];
+      var succs = adjDown.get(id) || [];
+      var m = maxLayer;
+      var hasSucc = false;
+      for (var j = 0; j < succs.length; j++) {
+        if (!alap.has(succs[j])) continue;
+        hasSucc = true;
+        if (alap.get(succs[j]) - 1 < m) m = alap.get(succs[j]) - 1;
+      }
+      alap.set(id, hasSucc ? m : maxLayer);
     }
+
+    // Median (round toward source so shorter edges are preferred).
+    var layer = new Map();
+    asap.forEach(function (a, id) {
+      var b = alap.has(id) ? alap.get(id) : a;
+      layer.set(id, Math.floor((a + b) / 2));
+    });
     return layer;
+  }
+
+  // _topologicalOrder returns an Array<nodeId> in topological order, or
+  // null if the graph has a cycle reachable from this traversal.
+  function _topologicalOrder(nodes, adjDown) {
+    var visited = new Map(); // 0 = unseen, 1 = on stack, 2 = done
+    var order = [];
+    var hadCycle = false;
+    function visit(id) {
+      if (hadCycle) return;
+      var state = visited.get(id);
+      if (state === 2) return;
+      if (state === 1) {
+        hadCycle = true;
+        return;
+      }
+      visited.set(id, 1);
+      var nexts = adjDown.get(id) || [];
+      for (var i = 0; i < nexts.length; i++) visit(nexts[i]);
+      visited.set(id, 2);
+      order.push(id);
+    }
+    for (var k = 0; k < nodes.length; k++) visit(nodes[k].id);
+    if (hadCycle) return null;
+    order.reverse();
+    return order;
   }
 
   function _groupByLayer(nodes, layerOf) {
@@ -557,40 +622,89 @@
     });
   }
 
-  function _assignCoordinates(layers) {
+  // _assignCoordinates turns the per-layer ordering into (x, y) coords.
+  // We run a two-pass coordinate assignment so edges read straight:
+  //   1. Seed y by the node's position in its layer (naïve top-align).
+  //   2. Alternate down/up sweeps that set each node's desired y to the
+  //      mean y of its neighbours in the adjacent layer, then resolve
+  //      overlaps by packing the column top-to-bottom with at least
+  //      NODE_H + V_GAP between successive nodes.
+  //
+  // The result is that nodes with a shared predecessor cluster at
+  // similar heights across columns — edges read as mostly-straight
+  // lines instead of zig-zagging between arbitrary slots.
+  function _assignCoordinates(layers, adjDown, adjUp) {
     var positions = new Map();
-    var rowHeights = layers.map(function (layer) {
-      return layer.reduce(function (sum, item) {
-        return sum + (item.kind === "dummy" ? DUMMY_H : NODE_H) + V_GAP;
-      }, 0);
-    });
-    var maxRowH = rowHeights.reduce(function (acc, h) {
-      return Math.max(acc, h);
-    }, 0);
+    var STEP = NODE_H + V_GAP;
 
+    function baseY(layer, idx) {
+      return PAD + idx * STEP;
+    }
+
+    // Seed: top-align each column.
     layers.forEach(function (layer, L) {
       var x = PAD + L * (NODE_W + H_GAP);
-      var colH = rowHeights[L];
-      var y = PAD + Math.max(0, (maxRowH - colH) / 2);
-      layer.forEach(function (item) {
-        if (item.kind === "dummy") {
-          positions.set(item.id, {
-            x: x + NODE_W / 2,
-            y: y,
-            kind: "dummy",
-          });
-          y += DUMMY_H + V_GAP;
-          return;
-        }
+      layer.forEach(function (item, idx) {
         positions.set(item.id, {
-          x: x,
-          y: y,
-          node: item.node,
-          kind: "real",
+          x: item.kind === "dummy" ? x + NODE_W / 2 : x,
+          y: baseY(L, idx),
+          node: item.node || null,
+          kind: item.kind,
         });
-        y += NODE_H + V_GAP;
       });
     });
+
+    if (!adjDown || !adjUp) return positions;
+
+    // Sweep helper: push each node toward the mean y of its neighbours
+    // in the *reference* layer, preserving the order in the current
+    // layer and packing to prevent overlaps.
+    function sweep(layerIdx, refLayerIdx, neighborMap) {
+      var layer = layers[layerIdx];
+      if (!layer || layer.length === 0) return;
+      var refLayer = layers[refLayerIdx];
+      if (!refLayer) return;
+
+      var x = positions.get(layer[0].id).x; // column x stays fixed
+
+      // Compute desired y for each node.
+      var desired = layer.map(function (item, idx) {
+        var ns = neighborMap.get(item.id) || [];
+        var sum = 0;
+        var count = 0;
+        for (var i = 0; i < ns.length; i++) {
+          var p = positions.get(ns[i]);
+          if (!p) continue;
+          sum += p.y;
+          count++;
+        }
+        return {
+          item: item,
+          idx: idx,
+          desired: count > 0 ? sum / count : positions.get(item.id).y,
+        };
+      });
+
+      // Pack top-to-bottom in the current layer's order (already
+      // optimised by barycenter sweeps). For each node, its final y is
+      // max(desired, prev_y + STEP).
+      var cursor = PAD;
+      for (var i = 0; i < desired.length; i++) {
+        var d = desired[i];
+        var y = Math.max(d.desired, cursor);
+        var pos = positions.get(d.item.id);
+        pos.y = y;
+        cursor = y + (d.item.kind === "dummy" ? DUMMY_H : STEP);
+      }
+    }
+
+    // Alternate down and up passes; a handful of iterations is enough
+    // for the positions to settle on a quasi-fixed point.
+    for (var iter = 0; iter < 6; iter++) {
+      for (var L = 1; L < layers.length; L++) sweep(L, L - 1, adjUp);
+      for (var M = layers.length - 2; M >= 0; M--) sweep(M, M + 1, adjDown);
+    }
+
     return positions;
   }
 
