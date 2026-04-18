@@ -249,8 +249,13 @@ function getTagValues(containerId) {
 
 async function createTask() {
   const textarea = document.getElementById("new-prompt");
+  const kindEl = document.getElementById("new-task-kind");
+  const kind = kindEl ? kindEl.value : "";
   const prompt = textarea.value.trim();
-  if (!prompt) {
+  // Idea-agent tasks build their own prompt from workspace signals at
+  // execution time; the composer field is optional for that type.
+  // For any other task kind the prompt must be non-empty.
+  if (!prompt && kind !== "idea-agent") {
     textarea.focus();
     textarea.style.borderColor = "#dc2626";
     setTimeout(() => (textarea.style.borderColor = ""), 2000);
@@ -287,13 +292,20 @@ async function createTask() {
     if (makeRoutine) {
       const interval_minutes =
         (repeatMinutesEl && parseInt(repeatMinutesEl.value, 10)) || 60;
+      // Routines for the ideation type get spawn_kind=idea-agent so
+      // every fire spawns a brainstorm task. For regular routines the
+      // server defaults spawn_kind to "".
+      const spawn_kind = kind === "idea-agent" ? "idea-agent" : "";
+      const routinePrompt =
+        prompt || "Brainstorm improvement ideas for the current workspace.";
       const routine = await api(Routes.routines.create(), {
         method: "POST",
         body: JSON.stringify({
-          prompt,
+          prompt: routinePrompt,
           timeout,
           tags,
           interval_minutes,
+          spawn_kind,
         }),
       });
       localStorage.removeItem("wallfacer-new-task-draft");
@@ -311,6 +323,7 @@ async function createTask() {
       method: "POST",
       body: JSON.stringify({
         prompt,
+        kind,
         timeout,
         mount_worktrees,
         sandbox,
@@ -412,6 +425,8 @@ function hideNewTaskForm() {
   if (maxTokensEl) maxTokensEl.value = "";
   const scheduledAtEl = document.getElementById("new-scheduled-at");
   if (scheduledAtEl) scheduledAtEl.value = "";
+  const kindEl = document.getElementById("new-task-kind");
+  if (kindEl) kindEl.value = "";
   const repeatToggle = document.getElementById("new-repeat-toggle");
   const repeatMinutesEl = document.getElementById("new-repeat-minutes");
   const repeatMinutesRow = document.getElementById("new-repeat-minutes-row");

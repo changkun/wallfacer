@@ -44,6 +44,20 @@
         + New Task
       </button>
       <div id="new-task-form" class="hidden mb-2">
+        <div
+          style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"
+        >
+          <label for="new-task-kind" class="text-xs text-v-muted">Type</label>
+          <select
+            id="new-task-kind"
+            class="field text-xs"
+            style="width: auto"
+            title="Task type. Ideation runs the brainstorm agent and proposes new backlog cards; the prompt is optional for this type."
+          >
+            <option value="">Task</option>
+            <option value="idea-agent">Ideation (brainstorm agent)</option>
+          </select>
+        </div>
         <textarea
           id="new-prompt"
           rows="6"
