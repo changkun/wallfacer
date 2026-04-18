@@ -1,6 +1,6 @@
 # 📋 Board & Tasks
 
-Wallfacer organizes work on a four-column kanban board. You create tasks as cards in the Backlog, move them to In Progress to trigger agent execution inside an isolated sandbox container, review results when the agent pauses or finishes, and accept completed work into your repository. This guide covers every aspect of the task board, from creating and configuring tasks to inspecting results and managing the full task lifecycle.
+Wallfacer organizes work on a four-column task board. You create tasks as cards in the Backlog, move them to In Progress to trigger agent execution inside an isolated sandbox container, review results when the agent pauses or finishes, and accept completed work into your repository. This guide covers every aspect of the task board, from creating and configuring tasks to inspecting results and managing the full task lifecycle.
 
 ---
 

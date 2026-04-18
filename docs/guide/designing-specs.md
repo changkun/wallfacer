@@ -73,7 +73,7 @@ flowchart LR
   breakdown -->|tasks mode| leaves["leaf specs<br/>(validated)"]
   sub --> refine
   leaves --> dispatch["/dispatch"]
-  dispatch --> board["Kanban task"]
+  dispatch --> board["Board task"]
   board --> reviewimpl["/review-impl"]
   reviewimpl --> diff["/diff"]
   diff --> wrapup["/wrapup"]
@@ -104,7 +104,7 @@ specs/
 
 ### Dispatching to the Board
 
-When a leaf spec is validated and ready for implementation, press **D** or use `/dispatch` in the chat. This creates a task on the kanban board with the spec's content as the prompt. The spec's `dispatched_task_id` field is updated to link back to the created task.
+When a leaf spec is validated and ready for implementation, press **D** or use `/dispatch` in the chat. This creates a task on the board with the spec's content as the prompt. The spec's `dispatched_task_id` field is updated to link back to the created task.
 
 On a successful dispatch, a small "Dispatched N task(s) to the Board." toast appears at the bottom-right with a **View on Board →** action. Clicking it switches to the Board without altering your saved mode preference, scrolls the Backlog to the freshly created card, and gives it a one-second pulse so you can pick up where you left off. If you stay in Plan, a subtle unread dot lights up on the sidebar Board nav button until you visit the Board. When the board has zero tasks, a focused task-creation composer takes over the Board view with a prompt field, an **Advanced** disclosure (sandbox / timeout / goal), and a link back to Plan — once you create your first task the composer fades out for the rest of the session, even if the task is later archived.
 

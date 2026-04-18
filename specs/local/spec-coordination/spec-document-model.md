@@ -38,7 +38,7 @@ effort: large              # small | medium | large | xlarge
 created: 2026-01-15
 updated: 2026-03-28
 author: changkun
-dispatched_task_id: null   # UUID of kanban task (leaf specs only, set on dispatch)
+dispatched_task_id: null   # UUID of board task (leaf specs only, set on dispatch)
 ---
 ```
 
@@ -58,7 +58,7 @@ These are independent. A spec can depend on any other spec regardless of where t
 | Property | Non-leaf spec | Leaf spec |
 |----------|---------------|-----------|
 | Subdirectory | Has a `<name>/` directory with child specs | No subdirectory (or empty) |
-| `dispatched_task_id` | Always null | Set when dispatched to kanban board |
+| `dispatched_task_id` | Always null | Set when dispatched to board |
 | Content focus | Problem, motivation, design decisions, cross-cutting concerns | Which files to change, acceptance criteria, test plan |
 | Granularity | Any size | Small enough for one agent task (2-5 files, one clear goal) |
 
@@ -239,7 +239,7 @@ define-interface.md ──────────────▶ local-backend.
 - **Across depths**: `refactor-launch.md` depends on `local-backend.md` (child depends on parent's sibling)
 - **Across subtrees**: `container-reuse.md` depends on `update-registry.md` (different track entirely)
 
-When leaf specs are dispatched, `depends_on` becomes `DependsOn` on the kanban board.
+When leaf specs are dispatched, `depends_on` becomes `DependsOn` on the board.
 
 **Only leaf specs are dispatched.** When a non-leaf spec has `depends_on`, it means "all leaves in this subtree are blocked until the dependency is complete." This allows expressing ordering between groups of work without listing every individual leaf dependency.
 

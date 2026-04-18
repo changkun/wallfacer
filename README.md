@@ -13,7 +13,7 @@ Wallfacer is an autonomous engineering platform that works across multiple level
 
 Open source. Runs locally. No IDE lock-in. No cloud dependency. Bring your own LLM provider.
 
-| ![Task board](./assets/overview-kanban.png) |
+| ![Task board](./assets/overview-board.png) |
 |:--:|
 | *Task board — coordinate parallel agent execution* |
 
@@ -146,9 +146,9 @@ Read more: [Designing Specs](docs/guide/designing-specs.md) and [Exploring Ideas
 
 ### Task Board — Managed Execution
 
-![Wallfacer board overview](./assets/overview-kanban.png)
+![Wallfacer board overview](./assets/overview-board.png)
 
-Coordinate many agent tasks on a kanban board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs in an isolated container with its own git worktree.
+Coordinate many agent tasks on a task board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs in an isolated container with its own git worktree.
 
 ### Plan Mode — Structured Design
 

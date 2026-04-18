@@ -1,7 +1,7 @@
 /**
  * Tests for buildPhaseListHTML (oversight-shared.js).
  *
- * The card-level oversight accordion was removed from the kanban overview;
+ * The card-level oversight accordion was removed from the board overview;
  * oversight is only accessible from the task detail modal.
  */
 import { describe, it, expect, beforeEach } from "vitest";
@@ -273,9 +273,9 @@ describe("buildPhaseListHTML", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Card oversight no longer shown in kanban overview (only in modal)
+// Card oversight no longer shown in board overview (only in modal)
 // ---------------------------------------------------------------------------
-describe("kanban card — no card-oversight element", () => {
+describe("board card — no card-oversight element", () => {
   it("does not inject card-oversight for a done task", () => {
     const { ctx, cardEl } = makeRenderContext();
     ctx.createCard(makeTask({ status: "done" }));

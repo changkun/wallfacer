@@ -461,7 +461,7 @@ func (r *Runner) runCommitContainer(
 // GenerateCommitMessage runs the commit-message agent on the given inputs
 // (a task-free flavor of generateCommitMessage). Used by callers that do
 // not have a task ID in scope — notably the planning pipeline, which fires
-// this after each planning round to produce a kanban-style commit message.
+// this after each planning round to produce a scope-prefixed commit message.
 // Applies a 90-second sub-deadline and retries once with codex on a
 // claude token-limit hit. Does not record span events or sub-agent usage,
 // since there is no task to attribute them to.

@@ -439,7 +439,7 @@
 /* Empty-Board composer — mounted by ui/js/board-composer.js when the
    workspace has no tasks. The slot spans the whole board grid so the
    composer can be centred (horizontally AND vertically) over the now-
-   hidden kanban columns. */
+   hidden board columns. */
 .board-empty-composer {
   grid-column: 1 / -1;
   display: flex;
@@ -453,7 +453,7 @@
 }
 
 /* When the composer is mounted, collapse the board grid to a single
-   full-height row and hide the kanban columns so the empty board
+   full-height row and hide the board columns so the empty board
    shows only the composer — not a composer floating above four empty
    column headers. The single 1fr row is what lets the flex slot above
    resolve its `min-height: 100%` into real vertical space. */

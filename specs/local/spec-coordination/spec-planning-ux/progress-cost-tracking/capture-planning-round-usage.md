@@ -76,7 +76,7 @@ Extend or create `internal/handler/planning_test.go`:
   `internal/sandbox/`.
 - Do not add fields to `TurnUsageRecord`.
 - Do not wire capture into any handler other than planning.
-- Do not touch kanban task execution, commit pipeline, or their usage
+- Do not touch board task execution, commit pipeline, or their usage
   tracking.
 
 ## Implementation notes

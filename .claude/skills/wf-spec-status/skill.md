@@ -45,7 +45,7 @@ truth:
    - An archived non-leaf masks its entire subtree from progress — ancestors
      aggregate nothing from an archived branch.
 3. **For leaf specs**, check `dispatched_task_id` to see if the spec has been
-   dispatched to the kanban board. If dispatched, cross-reference the task
+   dispatched to the board. If dispatched, cross-reference the task
    status if possible.
 4. **Cross-check with codebase** — for specs that claim `complete`, optionally
    verify the `affects` paths exist and look implemented. For specs that claim

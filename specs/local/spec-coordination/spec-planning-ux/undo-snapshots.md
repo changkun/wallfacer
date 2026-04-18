@@ -83,7 +83,7 @@ for manual resolution.
 
 **Dispatch-aware undo.** After `git reset --hard HEAD~1`, inspect the reverted diff
 (`git diff HEAD HEAD@{1} -- specs/`) for `dispatched_task_id:` lines that were added.
-For each task UUID found, call `UndispatchSpecs` — this cancels the kanban task and
+For each task UUID found, call `UndispatchSpecs` — this cancels the board task and
 clears the frontmatter link atomically from the user's perspective.
 
 **No practical stack limit.** Planning commits accumulate in the git log; all of them

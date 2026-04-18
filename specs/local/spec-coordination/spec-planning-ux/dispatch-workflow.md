@@ -20,12 +20,12 @@ dispatched_task_id: null
 
 ## Design Problem
 
-How does a validated spec become a kanban task, and how do the two views (spec mode and board mode) stay linked? Dispatch must translate spec content into a task prompt, wire `depends_on` edges from spec dependencies to task dependencies (via `dispatched_task_id`), and maintain bidirectional links so clicking a task navigates to its source spec and vice versa.
+How does a validated spec become a board task, and how do the two views (spec mode and board mode) stay linked? Dispatch must translate spec content into a task prompt, wire `depends_on` edges from spec dependencies to task dependencies (via `dispatched_task_id`), and maintain bidirectional links so clicking a task navigates to its source spec and vice versa.
 
 Key constraints:
 - **Only validated leaf specs are dispatchable.** Non-leaf (design) specs must be broken down into child specs first. This preserves the integrity of progress tracking, drift propagation, and impact analysis — all of which assume leaf-level dispatch granularity. Dispatching a non-leaf would leave its children as orphaned specs with no connection to the executed work.
 - **Dispatch and Break Down are complementary, not alternatives.** The focused view offers **Break Down** for specs that need decomposition and **Dispatch** for leaf specs that are ready for execution. A design spec goes through Break Down → child specs → Dispatch on each child.
-- Dispatch creates a kanban task where `prompt = spec body` and `DependsOn` maps from spec `depends_on` to `dispatched_task_id` of sibling specs
+- Dispatch creates a board task where `prompt = spec body` and `DependsOn` maps from spec `depends_on` to `dispatched_task_id` of sibling specs
 - Multi-select dispatch (batch) must wire dependencies atomically
 - Undispatch (cancel) clears `dispatched_task_id` and returns spec to `validated`
 - Mode switching preserves context: board highlights tasks from focused spec's subtree; clicking a task's spec badge navigates to spec mode
@@ -48,7 +48,7 @@ The following infrastructure already exists:
 Combines the reuse benefits of Option A (direct API call using existing `POST /api/tasks/batch`) with the atomicity of Option B (dedicated server-side endpoint that coordinates both task creation and spec update).
 
 **Architecture**: A dedicated `POST /api/specs/dispatch` endpoint that performs two operations atomically:
-1. **Create the kanban task** — reads the spec body, resolves dependency `dispatched_task_id` values, and calls into the existing task creation logic (reusing `POST /api/tasks/batch` internals)
+1. **Create the board task** — reads the spec body, resolves dependency `dispatched_task_id` values, and calls into the existing task creation logic (reusing `POST /api/tasks/batch` internals)
 2. **Update the spec file** — writes `dispatched_task_id` back into the spec's YAML frontmatter
 
 Both succeed or both fail. The UI dispatch button calls this endpoint directly. The planning agent can also trigger the same endpoint via chat (nice-to-have), providing a conversational alternative where the agent can validate, check dependencies, and provide feedback before dispatching.
@@ -99,7 +99,7 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
    - Writes `dispatched_task_id` back to each spec file atomically
    - Returns created task IDs and any errors
 
-3. **Undispatch API route** — Add `POST /api/specs/undispatch` (or `DELETE /api/specs/{path}/dispatch`). Cancels the linked kanban task, clears `dispatched_task_id`, and returns the spec to `validated` status.
+3. **Undispatch API route** — Add `POST /api/specs/undispatch` (or `DELETE /api/specs/{path}/dispatch`). Cancels the linked board task, clears `dispatched_task_id`, and returns the spec to `validated` status.
 
 4. **Spec-to-task metadata linkage** — Store the source spec path on the task so the reverse link (task → spec) works. Options: a label field on the Task model (`SpecSourcePath string`), or task metadata. This must survive task archival and soft-delete.
 
@@ -130,7 +130,7 @@ The three-layer split ensures specs always get timely metadata (layer 1), drift 
 
 ## Outcome
 
-The dispatch & board integration is fully implemented with layer 1 completion feedback. Validated leaf specs can be dispatched as kanban tasks via the UI or batch API, with bidirectional navigation (task → spec badge, spec → board highlight) and automatic spec status updates on task completion.
+The dispatch & board integration is fully implemented with layer 1 completion feedback. Validated leaf specs can be dispatched as board tasks via the UI or batch API, with bidirectional navigation (task → spec badge, spec → board highlight) and automatic spec status updates on task completion.
 
 ### What Shipped
 
@@ -157,7 +157,7 @@ The dispatch & board integration is fully implemented with layer 1 completion fe
 ## Open Questions
 
 1. Should the dispatch button be visible only on the focused view, or also available as a context menu action in the spec explorer?
-2. When multi-dispatching, should the system enforce that all selected specs' dependencies are either also being dispatched or already have `dispatched_task_id` set? Or allow dispatching specs with unresolved dependencies (the kanban task will block on unmet deps)?
+2. When multi-dispatching, should the system enforce that all selected specs' dependencies are either also being dispatched or already have `dispatched_task_id` set? Or allow dispatching specs with unresolved dependencies (the board task will block on unmet deps)?
 3. When a dispatched task fails and is retried, does the spec stay linked to the same task UUID or get re-dispatched as a new task?
 
 ## Task Breakdown

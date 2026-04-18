@@ -111,7 +111,7 @@ any status write to avoid forgotten-flag hazards.
 | Explorer plumbing | simple (one more status icon) | needs task cross-reference | simple (one more badge) |
 | External edit hazard | `testing` in frontmatter by hand is a weird edge case | none | forgotten `testing: true` sticks around |
 | Coupling to task state | none | strong (spec explorer depends on task store) | weak |
-| Extensibility (spec tested without a kanban task) | supported | broken | supported |
+| Extensibility (spec tested without a board task) | supported | broken | supported |
 
 ---
 
@@ -125,7 +125,7 @@ Rationale:
   implementation is already on disk is not waiting for execution.
 - Option B couples the spec explorer to the task store; today they're
   decoupled. The coupling propagates into every status report and query.
-- External extensibility: manual testing without a kanban task (e.g.,
+- External extensibility: manual testing without a board task (e.g.,
   "someone tested this by hand, mark it") requires a state the
   lifecycle already recognizes. Option A gives it for free.
 - Migration cost is one-time; the ongoing cost of the other options

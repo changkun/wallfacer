@@ -17,7 +17,7 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer's flat kanban board (backlog → in_progress → waiting → done) works well for independent tasks but cannot coordinate large, multi-step engineering work. A single "implement feature X" task is too large for one agent turn, but splitting into many small tasks loses coherence — each agent starts fresh with no knowledge of what previous agents decided.
+Wallfacer's flat board (backlog → in_progress → waiting → done) works well for independent tasks but cannot coordinate large, multi-step engineering work. A single "implement feature X" task is too large for one agent turn, but splitting into many small tasks loses coherence — each agent starts fresh with no knowledge of what previous agents decided.
 
 Concrete gaps:
 
@@ -28,7 +28,7 @@ Concrete gaps:
 
 ## Design Principle
 
-**Specs are the only organizing artifact.** There are no epics, phases, or gates as separate concepts. All planning, decomposition, and coordination happens through a recursive tree of spec documents. Leaf specs are dispatched directly as kanban tasks. Non-leaf specs are organizational — they contain motivation, design, and links to children.
+**Specs are the only organizing artifact.** There are no epics, phases, or gates as separate concepts. All planning, decomposition, and coordination happens through a recursive tree of spec documents. Leaf specs are dispatched directly as board tasks. Non-leaf specs are organizational — they contain motivation, design, and links to children.
 
 The workflow mirrors what humans naturally do: start with a vague idea, write it down, break it into smaller pieces, iterate on each piece, and eventually execute the pieces that are small enough.
 
@@ -61,7 +61,7 @@ Spec (too big to execute directly)
 2. Agent drafts a spec: structures the idea, identifies sub-problems
 3. Human reviews, iterates via chat ("this section is wrong", "add X")
 4. When a spec is too big → break down into sub-specs (agent proposes, human reviews)
-5. When a spec is small enough → dispatch as a kanban task
+5. When a spec is small enough → dispatch as a board task
 6. Task executes, results feed back into the spec (implementation notes)
 7. Repeat until the tree is fully executed
 ```
@@ -70,11 +70,11 @@ The human's role is **idea provider and steering** — they describe what they w
 
 ### Dispatch and Execution
 
-A leaf spec is dispatched to the kanban board as a regular task. The spec's content becomes the task prompt. Dependencies between leaf specs (declared in frontmatter) become `DependsOn` on the kanban board. The auto-promoter runs them in dependency order.
+A leaf spec is dispatched to the board as a regular task. The spec's content becomes the task prompt. Dependencies between leaf specs (declared in frontmatter) become `DependsOn` on the board. The auto-promoter runs them in dependency order.
 
 When a dispatched task completes, the leaf spec is updated:
 - Status moves to `done`
-- The `dispatched_task_id` links to the completed kanban task
+- The `dispatched_task_id` links to the completed board task
 - Implementation notes are added if the result diverged from the plan
 
 Non-leaf specs track progress by recursively aggregating all leaves in their subtree: "4/6 leaves done." A non-leaf child contributes its own subtree's leaf counts, not a single count. When all leaves in a subtree are done, the root of that subtree can be marked complete (after reviewing whether the implementation matches the design).
@@ -101,7 +101,7 @@ This replaces the tiered truncation policy from the previous design without need
 | Epic filter bar | Spec explorer with tree navigation |
 | Epic progress panel | Spec tree progress view (aggregate children) |
 
-The kanban board stays flat — it shows dispatched leaf specs as tasks. All structure lives in the spec tree, visible in the spec explorer.
+The board stays flat — it shows dispatched leaf specs as tasks. All structure lives in the spec tree, visible in the spec explorer.
 
 ---
 
@@ -131,7 +131,7 @@ Step 2: Spec Explorer + Chat Iteration
   → Builds on the existing file explorer infrastructure
 
 Step 3: Dispatch Workflow
-  → Dispatch leaf specs as kanban tasks
+  → Dispatch leaf specs as board tasks
   → Link dispatched tasks back to their spec
   → Progress tracking via tree aggregation
 

@@ -91,4 +91,4 @@ Introduce a `currentMode` state variable (`"board"` | `"spec"`) and add `[Board]
 - Do NOT create the spec mode three-pane layout containers — that's the `spec-mode-layout` task.
 - Do NOT implement explorer root switching logic — that's the spec-explorer spec. The `switchExplorerRoot` call is a forward reference that's a no-op until wired.
 - Do NOT implement the focused markdown view or chat stream.
-- Do NOT change the kanban board rendering logic.
+- Do NOT change the board rendering logic.

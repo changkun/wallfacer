@@ -1,13 +1,13 @@
 ---
 name: wf-spec-dispatch
-description: Dispatch a validated spec to the kanban task board. Validates prerequisites, resolves dependency wiring, creates the task, and updates the spec's dispatched_task_id atomically. Also supports undispatching (cancel + clear link). Use when a spec is ready for execution.
+description: Dispatch a validated spec to the task board. Validates prerequisites, resolves dependency wiring, creates the task, and updates the spec's dispatched_task_id atomically. Also supports undispatching (cancel + clear link). Use when a spec is ready for execution.
 argument-hint: <spec-file.md> [undispatch]
 allowed-tools: Read, Grep, Glob, Edit, Agent, Bash(ls *), Bash(curl *)
 ---
 
 # Dispatch Spec to Task Board
 
-Send a validated spec to the kanban board as a task, or undispatch a previously
+Send a validated spec to the board as a task, or undispatch a previously
 dispatched spec.
 
 ## Step 0: Parse arguments
@@ -36,7 +36,7 @@ $ARGUMENTS has the form: `<spec-file.md> [undispatch]`
    frontmatter:
    - If the dependency has `status: complete`, it's satisfied.
    - If the dependency has `dispatched_task_id` set (task in progress), note it
-     — the kanban task will block on the dependency's task via `DependsOn`.
+     — the board task will block on the dependency's task via `DependsOn`.
    - If the dependency is neither complete nor dispatched, warn: the spec has
      unresolved dependencies. The user can proceed (the task will block) or
      resolve dependencies first.

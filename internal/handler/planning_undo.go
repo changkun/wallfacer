@@ -23,7 +23,7 @@ type undoResult struct {
 	Workspace     string   `json:"workspace"`
 }
 
-// planCommitSubject parses a kanban-style planning commit subject like
+// planCommitSubject parses a scope-prefixed planning commit subject like
 // "specs/local/auth(plan): add OAuth breakdown" as written by
 // commitPlanningRound. Group 1 is the primary-path scope, group 2 is the
 // imperative summary. A missing summary yields an empty group rather than
@@ -58,7 +58,7 @@ var addedDispatchLine = regexp.MustCompile(
 // keeps round numbering monotonic.
 //
 // The `?thread=<id>` query parameter selects the caller's thread; when
-// omitted, the active thread is used. Dispatched kanban tasks referenced
+// omitted, the active thread is used. Dispatched board tasks referenced
 // by the reverted commit are cancelled (same behaviour as the pre-revert
 // design). Dirty user edits are stashed across the revert.
 //
@@ -213,7 +213,7 @@ func findLatestThreadPlanCommit(ctx context.Context, ws, threadID string) (hash,
 
 	// Walk newest-first. A revert commit has a `Revert "…"` subject
 	// that the buildRevertSubject helper does NOT produce (we strip
-	// that and use a kanban-style subject), but we DO write the word
+	// that and use a scope-prefixed subject), but we DO write the word
 	// "Revert" into our subject. Reverts carry `revertRoundPrefix` in
 	// their subject for easy detection. See buildRevertSubject.
 	applied := map[int]bool{}
@@ -348,7 +348,7 @@ func extractDispatchedTaskIDs(diff string) []uuid.UUID {
 	return ids
 }
 
-// cancelDispatchedTask cancels the kanban task linked to a dispatched spec
+// cancelDispatchedTask cancels the board task linked to a dispatched spec
 // when that dispatch is being reverted by undo. Best-effort: logs and
 // returns without error on any failure (missing task, already terminal,
 // cancel error). The spec file's dispatched_task_id is not touched here —

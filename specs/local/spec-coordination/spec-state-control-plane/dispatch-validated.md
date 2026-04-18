@@ -69,7 +69,7 @@ to its leaves:
 4. Validate each leaf individually under the existing pre-dispatch
    rules (not archived, not already dispatched, dependencies `complete`
    or `archived`).
-5. Create one kanban task per leaf in a single batch.
+5. Create one board task per leaf in a single batch.
 6. Write each leaf's `dispatched_task_id` and `status: validated`.
 7. Additionally, write `status: validated` on **every non-leaf
    ancestor in the subtree** (including the dispatched non-leaf
@@ -128,7 +128,7 @@ Under folder dispatch:
 - Dispatching a `drafted` leaf writes `status: validated` +
   `dispatched_task_id`.
 - Dispatching a leaf already at `validated` is idempotent.
-- Dispatching a non-leaf subtree creates one kanban task per leaf,
+- Dispatching a non-leaf subtree creates one board task per leaf,
   marks every leaf `validated`, and marks every `drafted` non-leaf
   ancestor in the subtree `validated`.
 - Partial failure in the batch rolls back all frontmatter writes and

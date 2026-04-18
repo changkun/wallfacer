@@ -30,7 +30,7 @@ The user's workflow is a loop:
 1. Propose an idea (natural language, any level of vagueness)
 2. Agent drafts a spec
 3. Review and iterate ("this is wrong", "add X", "break this down")
-4. When small enough → dispatch leaf specs to the kanban board
+4. When small enough → dispatch leaf specs to the board
 5. Monitor execution, feed results back into specs
 6. Repeat for the next piece
 ```
@@ -64,7 +64,7 @@ The system has two views of the same underlying work:
 └────────┘           └────────┘
  Planning              Execution
  Iteration             Monitoring
- Tree navigation       Flat kanban
+ Tree navigation       Flat board
 ```
 
 ### Spec Mode
@@ -107,7 +107,7 @@ A split-pane view for planning work:
 
 ### Board Mode
 
-The existing kanban board, unchanged. Shows dispatched leaf specs as tasks. The board stays flat — all structure lives in the spec tree.
+The existing board, unchanged. Shows dispatched leaf specs as tasks. The board stays flat — all structure lives in the spec tree.
 
 When clicking a task that was dispatched from a spec, the task detail shows a link back to its source spec. Clicking it switches to Spec Mode focused on that spec.
 
@@ -127,7 +127,7 @@ The chat stream is the primary interaction channel. Examples of what the user ca
 | "This section is too vague" | Expands the section with specifics from the codebase |
 | "Break this into sub-specs" | Proposes child specs with acceptance criteria and dependencies |
 | "The interface needs a fourth method" | Updates the spec, flags affected children as potentially stale |
-| "Dispatch the first two sub-specs" | Creates kanban tasks from the leaf specs, links them back |
+| "Dispatch the first two sub-specs" | Creates board tasks from the leaf specs, links them back |
 | "What's the status of this spec?" | Summarizes: children progress, drift warnings, dispatched tasks |
 
 The agent always has context: the focused spec, the spec tree, the codebase, and board state. It can read sibling specs, check existing implementations, and propose changes that account for the broader picture.
@@ -189,7 +189,7 @@ The focused view for a `validated` leaf spec shows a dispatch button:
 └──────────────────────────────────────────────────┘
 ```
 
-**Dispatch** creates a kanban task:
+**Dispatch** creates a board task:
 - Prompt = spec content (the full markdown body)
 - `DependsOn` = resolved from the spec's `depends_on` field (matching other dispatched specs' `dispatched_task_id`)
 - The spec's `dispatched_task_id` is set to the new task's UUID
@@ -197,7 +197,7 @@ The focused view for a `validated` leaf spec shows a dispatch button:
 
 ### Dispatching Multiple Specs
 
-The spec explorer supports multi-select. Select several leaf specs and click "Dispatch Selected." This creates a batch of kanban tasks with proper dependency wiring.
+The spec explorer supports multi-select. Select several leaf specs and click "Dispatch Selected." This creates a batch of board tasks with proper dependency wiring.
 
 Alternatively, in the chat: "Dispatch all validated leaf specs under sandbox-backends." The agent does the multi-dispatch.
 
@@ -426,7 +426,7 @@ Additional mitigations:
 
 ## Outcome
 
-The planning UX shipped as a complete spec-driven workflow environment integrated into the existing Wallfacer SPA. A three-pane spec mode (explorer, focused markdown view, chat stream) sits alongside the board kanban, switchable with a single click or `S` shortcut. The planning agent runs inside a long-lived workspace-scoped container, iterates on specs via natural-language chat, and dispatches validated leaf specs directly as kanban tasks with dependency wiring and bidirectional navigation — all without permission prompts or approval gates.
+The planning UX shipped as a complete spec-driven workflow environment integrated into the existing Wallfacer SPA. A three-pane spec mode (explorer, focused markdown view, chat stream) sits alongside the task board, switchable with a single click or `S` shortcut. The planning agent runs inside a long-lived workspace-scoped container, iterates on specs via natural-language chat, and dispatches validated leaf specs directly as board tasks with dependency wiring and bidirectional navigation — all without permission prompts or approval gates.
 
 ### What Shipped
 
@@ -460,7 +460,7 @@ The planning UX shipped as a complete spec-driven workflow environment integrate
 | 2 | [Spec Mode UI Shell](spec-planning-ux/spec-mode-ui-shell.md) | Three-pane layout integration with the existing SPA, mode switching, keyboard routing | — | large | complete |
 | 3 | [Spec Explorer & Dependency Minimap](spec-planning-ux/spec-explorer.md) | Spec-aware tree rendering with status badges, progress indicators, and dependency graph overlay | spec-mode-ui-shell | large | complete |
 | 4 | [Planning Chat Agent](spec-planning-ux/planning-chat-agent.md) | Interactive conversational agent model for spec iteration, skills, and session persistence | spec-mode-ui-shell, planning-sandbox | xlarge | complete |
-| 5 | [Dispatch & Board Integration](spec-planning-ux/dispatch-workflow.md) | Translating validated leaf specs into kanban tasks with bidirectional links and dependency wiring | spec-mode-ui-shell | medium | complete |
+| 5 | [Dispatch & Board Integration](spec-planning-ux/dispatch-workflow.md) | Translating validated leaf specs into board tasks with bidirectional links and dependency wiring | spec-mode-ui-shell | medium | complete |
 | 6 | [Undo & Snapshot System](spec-planning-ux/undo-snapshots.md) | Per-round implicit snapshots for reversible agent writes | planning-sandbox | medium | complete |
 | 7 | [Planning Cost Tracking](spec-planning-ux/progress-cost-tracking.md) | Per-round planning cost capture, per-group aggregation, and surfacing in the existing usage analytics (recursive progress was already shipped separately) | planning-sandbox | medium | complete |
 | 8 | [Planning Codex Compatibility](spec-planning-ux/planning-codex-compat.md) | Codex sandbox support for the planning chat agent (CLI flags, session resumption, output format) | planning-chat-agent | medium | drafted — deferred |

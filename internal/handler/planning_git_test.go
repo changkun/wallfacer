@@ -304,7 +304,7 @@ func TestCommitPlanningRound_AgentGeneratedMessage(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
-	// Stub generator returns a kanban-style message as the commit agent
+	// Stub generator returns a scope-prefixed message as the commit agent
 	// would. commitPlanningRound should use it verbatim (plus trailer).
 	gen := func(_ context.Context, data prompts.CommitData) (string, error) {
 		// Sanity-check the prompt carries the scope instruction.
@@ -340,7 +340,7 @@ func TestCommitPlanningRound_AgentMissingScopeGetsSpliced(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
-	// Agent produced a correct kanban subject but forgot the (plan) scope.
+	// Agent produced a correct scope-prefixed subject but forgot the (plan) scope.
 	// ensurePlanScope should splice it in before the colon.
 	gen := func(_ context.Context, _ prompts.CommitData) (string, error) {
 		return "specs/local/auth: add OAuth breakdown\n\nwhy body", nil
@@ -417,7 +417,7 @@ func TestCommitPlanningRound_SanitizesAgentFencedOutput(t *testing.T) {
 }
 
 func TestCommitPlanningRound_AgentPreambleOnlyFallsBack(t *testing.T) {
-	// Agent returned prose with no kanban-style line anywhere — cannot be
+	// Agent returned prose with no scope-prefixed line anywhere — cannot be
 	// rescued, must fall back to the deterministic path.
 	ws := initPlanningTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
@@ -492,7 +492,7 @@ func TestEnsurePlanScope(t *testing.T) {
 		want    string
 	}{
 		{"already has scope", "specs/local(plan): foo", "specs/local", "specs/local(plan): foo"},
-		{"kanban style missing scope", "specs/local/auth: foo", "specs/local/auth", "specs/local/auth(plan): foo"},
+		{"scope-prefixed missing plan scope", "specs/local/auth: foo", "specs/local/auth", "specs/local/auth(plan): foo"},
 		{"no colon at all", "bare subject", "specs/local", "specs/local(plan): bare subject"},
 	}
 	for _, c := range cases {

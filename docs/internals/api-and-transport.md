@@ -123,7 +123,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `DELETE /api/planning/messages` | Clear a thread's conversation history and session (`?thread=<id>`). |
 | `GET /api/planning/messages/stream` | Stream agent response tokens for the in-flight thread. Returns 204 when `?thread=<id>` does not match the thread that owns the exec. |
 | `POST /api/planning/messages/interrupt` | Interrupt current agent turn. `?thread=<id>` must match the in-flight thread or 409. |
-| `POST /api/planning/undo` | Undo the caller thread's most recent planning round via a forward `git revert` commit (original commit stays in history; revert commit carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread. Cancels dispatched kanban tasks whose linkage was added by the reverted commit. 409 on revert conflict. |
+| `POST /api/planning/undo` | Undo the caller thread's most recent planning round via a forward `git revert` commit (original commit stays in history; revert commit carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread. Cancels dispatched board tasks whose linkage was added by the reverted commit. 409 on revert conflict. |
 | `GET /api/planning/commands` | List available slash commands |
 | **Planning chat threads** | |
 | `GET /api/planning/threads` | List non-archived threads; `?includeArchived=true` includes archived ones. Returns `{threads, active_id}`. |

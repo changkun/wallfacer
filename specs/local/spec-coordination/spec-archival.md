@@ -152,7 +152,7 @@ Net effect: archiving a spec immediately silences every drift channel that could
 In `internal/handler/specs_dispatch.go`:
 
 - The existing `status == validated` check already excludes archived specs; this is now explicit in the error message ("spec status is `archived`, must be `validated` — unarchive first if you want to dispatch").
-- When dispatching a batch with `depends_on` edges pointing to archived specs, treat the archived dependency as **already satisfied**: it contributes no `DependsOn` edge on the resulting kanban task. This matches the "below glass" semantics — the archived design is locked, so nothing downstream needs to wait on it.
+- When dispatching a batch with `depends_on` edges pointing to archived specs, treat the archived dependency as **already satisfied**: it contributes no `DependsOn` edge on the resulting board task. This matches the "below glass" semantics — the archived design is locked, so nothing downstream needs to wait on it.
 - **Undispatch** on an archived spec is a no-op (there is no dispatched task to cancel). Manual frontmatter edits to set `dispatched_task_id` while archived are caught by per-spec validation.
 
 ---
@@ -245,7 +245,7 @@ archived 8 completed top-level specs using the shipped UI.
   falls back to single-spec `archived → drafted` when no commit is found).
 - **`internal/handler/specs_dispatch.go`**: archived specs rejected with
   "unarchive the spec first"; archived `depends_on` targets skipped (no
-  blocker edge on the resulting kanban task).
+  blocker edge on the resulting board task).
 - **`internal/handler/planning.go`**: `archivedSpecGuard()` prepends a
   "do not modify archived spec" instruction to the planning chat prompt
   when the focused spec is archived.

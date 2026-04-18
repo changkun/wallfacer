@@ -18,7 +18,7 @@ dispatched_task_id: null
 
 ## Goal
 
-Implement `POST /api/specs/undispatch` — cancels the linked kanban task, clears `dispatched_task_id` from the spec file, and returns the spec to `validated` status. This allows users to undo a dispatch and refine the spec before re-dispatching.
+Implement `POST /api/specs/undispatch` — cancels the linked board task, clears `dispatched_task_id` from the spec file, and returns the spec to `validated` status. This allows users to undo a dispatch and refine the spec before re-dispatching.
 
 ## What to do
 

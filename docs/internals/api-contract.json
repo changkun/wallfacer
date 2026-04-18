@@ -206,7 +206,7 @@
       "method": "POST",
       "pattern": "/api/specs/dispatch",
       "name": "DispatchSpecs",
-      "description": "Dispatch validated specs to create kanban tasks atomically.",
+      "description": "Dispatch validated specs to create board tasks atomically.",
       "tags": [
         "specs"
       ]

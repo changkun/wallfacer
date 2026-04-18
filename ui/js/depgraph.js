@@ -4,7 +4,7 @@
 // overriding the bezier-overlay implementation from dep-graph.js.
 //
 // The panel is inserted as a block element after the #board container so it
-// does not disturb the Kanban column layout.
+// does not disturb the board column layout.
 
 (function () {
   "use strict";

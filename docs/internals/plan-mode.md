@@ -1,6 +1,6 @@
 # Plan Mode
 
-Plan Mode is the specification-coordination subsystem that turns free-form design discussions into structured, validated specs, and turns validated specs into kanban tasks. It is built around three components: the `internal/spec` package (the document model), the `internal/planner` package (the long-lived planning sandbox and per-thread chat persistence), and a set of `internal/handler` endpoints that wire them together and surface them through the UI.
+Plan Mode is the specification-coordination subsystem that turns free-form design discussions into structured, validated specs, and turns validated specs into board tasks. It is built around three components: the `internal/spec` package (the document model), the `internal/planner` package (the long-lived planning sandbox and per-thread chat persistence), and a set of `internal/handler` endpoints that wire them together and surface them through the UI.
 
 ## System Overview
 
@@ -36,7 +36,7 @@ flowchart TB
   Box -->|reads/writes| specsDir
 ```
 
-Plan Mode layers strictly on top of the task board. The planning container writes only to `specs/` in the mounted workspace; task dispatch is the hand-off point at which a validated spec becomes a first-class kanban task with its own worktree and container. Everything upstream of dispatch is the responsibility of this subsystem.
+Plan Mode layers strictly on top of the task board. The planning container writes only to `specs/` in the mounted workspace; task dispatch is the hand-off point at which a validated spec becomes a first-class board task with its own worktree and container. Everything upstream of dispatch is the responsibility of this subsystem.
 
 ## Package: internal/spec
 
@@ -249,7 +249,7 @@ The planner enforces a **global FIFO**: `IsBusy` is a single boolean guarding th
 
 ### Dispatch Pipeline
 
-`internal/handler/specs_dispatch.go` turns a set of validated specs into kanban tasks atomically. Per the handler comment, each spec reaches `dispatched_task_id` or is rolled back — the frontmatter write and task creation are mutually-recoverable.
+`internal/handler/specs_dispatch.go` turns a set of validated specs into board tasks atomically. Per the handler comment, each spec reaches `dispatched_task_id` or is rolled back — the frontmatter write and task creation are mutually-recoverable.
 
 ```mermaid
 flowchart LR
@@ -290,7 +290,7 @@ After a successful round, the handler:
 4. Appends the assistant message with `PlanRound = max(round)` so the UI can attach an "Undo" affordance.
 5. Touches the thread so recent-activity sort works.
 
-Commits write kanban-style subjects `<primary-path>(plan): <imperative>` plus the `Plan-Round: N` and `Plan-Thread: <id>` trailers. `hostGitIdentityOverrides` forces the host's global `user.name`/`user.email` so a sandbox-polluted repo-local config never poisons the author.
+Commits write scope-prefixed subjects `<primary-path>(plan): <imperative>` plus the `Plan-Round: N` and `Plan-Thread: <id>` trailers. `hostGitIdentityOverrides` forces the host's global `user.name`/`user.email` so a sandbox-polluted repo-local config never poisons the author.
 
 ### /spec-new Directive Scanner
 

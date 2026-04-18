@@ -26,7 +26,7 @@ dispatched_task_id: null
 
 The specs UI chat currently has one conversation thread per workspace group. Users who plan multiple initiatives in parallel (for example, "auth refactor" and "CI cleanup") have to either interleave unrelated messages in a single thread — polluting Claude Code's session context — or clear the thread and lose history every time they switch topics. There's no way to park a line of thinking and come back to it later.
 
-At the same time, unlike kanban tasks (where per-task isolation is essential), planning conversations share the same read-only workspace and the same `specs/` write overlay. There's no isolation benefit to running each thread in its own container; the cost (container startup, RAM, session management) is pure overhead.
+At the same time, unlike board tasks (where per-task isolation is essential), planning conversations share the same read-only workspace and the same `specs/` write overlay. There's no isolation benefit to running each thread in its own container; the cost (container startup, RAM, session management) is pure overhead.
 
 **Goal:** let users maintain any number of named conversation threads per workspace group, each with its own Claude Code session and history, while all threads share the single planner sandbox container.
 
@@ -199,5 +199,5 @@ Promote today's module-scoped chat state (`_streaming`, `_activeStream`, `_queue
 
 - **Cross-thread messaging.** Threads do not reference each other. If a user wants context from another thread, they copy-paste.
 - **Per-thread sandbox isolation.** Threads share the same container and the same read-only workspace mount. This is intentional — the whole point of threads is to reuse the container.
-- **Per-thread dispatched-task tracking.** Threads own commits via `Plan-Thread` trailer, but dispatched kanban tasks remain workspace-group scoped (same as today). A thread's undo cancels tasks it dispatched, nothing more.
+- **Per-thread dispatched-task tracking.** Threads own commits via `Plan-Thread` trailer, but dispatched board tasks remain workspace-group scoped (same as today). A thread's undo cancels tasks it dispatched, nothing more.
 - **Soft-delete / tombstone retention.** This spec uses archive-only (no hard delete) to match user preference. Files on disk are retained indefinitely; a future spec can add a purge action if threads accumulate.

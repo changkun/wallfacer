@@ -167,7 +167,7 @@ export async function createTask(page: Page, prompt: string, priority = 50) {
 
 // Wait for the board to finish rendering.
 export async function waitForBoard(page: Page) {
-  await page.waitForSelector('.kanban-col', { timeout: 5000 });
+  await page.waitForSelector('.board-col', { timeout: 5000 });
 }
 ```
 
@@ -201,7 +201,7 @@ import { test, expect } from '@playwright/test';
 import { createTask, waitForBoard } from './helpers';
 
 test.describe('board', () => {
-  test('kanban columns with tasks', async ({ page }) => {
+  test('board columns with tasks', async ({ page }) => {
     await createTask(page, 'Test task alpha');
     await createTask(page, 'Test task beta');
     await page.goto('/');

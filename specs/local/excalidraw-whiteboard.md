@@ -20,7 +20,7 @@ dispatched_task_id: null
 
 ## Overview
 
-Add an Excalidraw-based whiteboard as a peer view alongside the kanban board,
+Add an Excalidraw-based whiteboard as a peer view alongside the task board,
 spec tree, and docs views. Users can draft architecture diagrams, brainstorm
 ideas, and sketch designs on an infinite canvas that persists per workspace.
 This is a focused integration — embed Excalidraw as a drawing tool, not a
