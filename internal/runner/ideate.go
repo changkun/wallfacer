@@ -112,7 +112,10 @@ func pickCategoriesForInspiration() []string {
 // propose multiple ideas in the same domain.
 // existingTasks lists tasks currently in backlog, in_progress, or waiting state
 // so the agent can avoid proposing duplicates or conflicting ideas.
-func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext) string {
+// userFocus is an optional free-form hint the user typed in the composer
+// prompt field; when non-empty it is surfaced prominently in the prompt
+// so the agent biases every candidate toward the stated direction.
+func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, userFocus string, contexts ...ideationContext) string {
 	var signals ideationContext
 	if len(contexts) > 0 {
 		signals = contexts[0]
@@ -160,6 +163,7 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 		FilteredTodoCount:  signals.FilteredTodoCount,
 		RejectedTitles:     rejectedTitles,
 		ExploitRatio:       effectiveRatio,
+		UserFocus:          strings.TrimSpace(userFocus),
 	})
 }
 
@@ -391,10 +395,13 @@ func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, pro
 	return ideas, rejections, output, rawStdout, rawStderr, nil
 }
 
-// BuildIdeationPrompt exposes the ideation prompt construction used by the
-// idea-agent runner for testability and for handler-side task bootstrap.
+// BuildIdeationPrompt exposes the ideation prompt construction used by
+// the idea-agent runner for testability and for handler-side task
+// bootstrap. The user-focus slot is left empty here; callers that want
+// to surface a user hint should go through runIdeationTask, which
+// reads it from the task's Prompt field.
 func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
-	return r.buildIdeationPrompt(existingTasks, r.collectIdeationContext(r.shutdownCtx))
+	return r.buildIdeationPrompt(existingTasks, "", r.collectIdeationContext(r.shutdownCtx))
 }
 
 // buildIdeationContainerSpec builds a ContainerSpec for the ideation agent.
@@ -460,11 +467,17 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		}
 	}
 
-	// Generate the ideation prompt (prefer the prebuilt execution prompt stored on
-	// the idea-agent card for consistency).
+	// Generate the ideation prompt (prefer the prebuilt execution prompt
+	// stored on the idea-agent card for consistency). When the user typed
+	// text into the composer's prompt field we surface it to the agent
+	// as a focus hint — the card's Prompt holds the raw user input and
+	// is never passed verbatim as the full prompt; the runner always
+	// wraps it with the brainstorm template so the agent still gets the
+	// workspace signals and the output schema.
 	ideationPrompt := strings.TrimSpace(task.ExecutionPrompt)
 	if ideationPrompt == "" {
-		ideationPrompt = r.buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(bgCtx, allTasks))
+		userFocus := strings.TrimSpace(task.Prompt)
+		ideationPrompt = r.buildIdeationPrompt(activeTasks, userFocus, r.collectIdeationContextFromTasks(bgCtx, allTasks))
 		if err := r.taskStore(taskID).UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
 		}
