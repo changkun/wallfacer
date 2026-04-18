@@ -25,11 +25,12 @@ Local Product — 5 done, 1 in progress, 20 pending
   ○ Scoped Command Registry        ○ Routine Tasks
   ○ Data Boundary Enforcement
 
-Cloud Platform — 0/8
+Cloud Platform — 0/9
   ○ Tenant Filesystem              ○ K8s Sandbox Backend
   ○ Sandbox Isolation              ○ Cloud Infrastructure
   ○ Multi-Tenant (capstone)        ○ Tenant API
-  ○ Billing Idempotency            ○ Telemetry Queue Backpressure
+  ○ Multi-User Collaboration       ○ Billing Idempotency
+  ○ Telemetry Queue Backpressure
 
 Shared Design — 0/19
   ○ Authentication                 ○ Agent Abstraction
@@ -125,6 +126,7 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 | [sandbox-isolation.md](cloud/sandbox-isolation.md) | Not started | Policy engine — network allow/deny + observability, FS isolation, action log |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
 | [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning, policy-controlled sandbox model |
+| [multi-user-collaboration.md](cloud/multi-user-collaboration.md) | Drafted | Blocker for cloud: reframes tenant as org (not user), adds actor fields across the store, RBAC role matrix, presence/focus, audit log, optimistic concurrency, private planning threads |
 | [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
 | [billing-idempotency.md](cloud/billing-idempotency.md) | Drafted | Stripe idempotency keys on every charge operation — prevents double-billing under retry, single-charge guarantee for cost-visibility trust story |
 | [telemetry-queue-backpressure.md](cloud/telemetry-queue-backpressure.md) | Drafted | Cap on the local telemetry queue when the cloud is unreachable — bounded disk use, defined drop policy, keeps the local UI responsive under long outages |
@@ -145,6 +147,8 @@ graph LR
   AUTH[Authentication] --> MT
   CI[Cloud Infrastructure] --> MT
   MT --> TA[Tenant API]
+  AUTH --> MUC[Multi-User Collaboration]
+  MT --> MUC
 
   style SBI fill:#d4edda,stroke:#28a745
   style STI fill:#d4edda,stroke:#28a745
