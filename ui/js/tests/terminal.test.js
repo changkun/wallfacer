@@ -157,7 +157,8 @@ function makeContext(overrides = {}) {
     getComputedStyle: () => ({
       getPropertyValue: (name) => {
         if (name === "--bg-card") return "#1e1e1e";
-        if (name === "--text") return "#cccccc";
+        if (name === "--ink") return "#1a1917";
+        if (name === "--bg") return "#f4f1ea";
         if (name === "--accent") return "#4e8cff";
         return "";
       },
@@ -201,7 +202,7 @@ describe("initTerminal", () => {
     expect(ctx.Terminal).toHaveBeenCalledOnce();
     const args = ctx.Terminal.mock.calls[0][0];
     expect(args.theme.background).toBe("#1a1917");
-    expect(args.theme.foreground).toBe("#cccccc");
+    expect(args.theme.foreground).toBe("#f4f1ea");
     expect(args.theme.cursor).toBe("#4e8cff");
   });
 

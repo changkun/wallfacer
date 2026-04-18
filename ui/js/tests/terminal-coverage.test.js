@@ -303,98 +303,32 @@ describe("_desktopServerHost IIFE", () => {
   });
 });
 
-describe("_isLightColor", () => {
-  it("returns true for white (#ffffff)", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    expect(vm.runInContext('_isLightColor("#ffffff")', ctx)).toBe(true);
-  });
-
-  it("returns false for black (#000000)", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    expect(vm.runInContext('_isLightColor("#000000")', ctx)).toBe(false);
-  });
-
-  it("returns true for a light gray (#cccccc)", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    expect(vm.runInContext('_isLightColor("#cccccc")', ctx)).toBe(true);
-  });
-
-  it("returns false for dark gray (#333333)", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    expect(vm.runInContext('_isLightColor("#333333")', ctx)).toBe(false);
-  });
-
-  it("handles hex without # prefix", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    expect(vm.runInContext('_isLightColor("ffffff")', ctx)).toBe(true);
-    expect(vm.runInContext('_isLightColor("000000")', ctx)).toBe(false);
-  });
-
-  it("detects a medium-light color (#90a0b0)", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    // 0.299*144 + 0.587*160 + 0.114*176 = 43.056 + 93.92 + 20.064 = 157.04 > 128
-    expect(vm.runInContext('_isLightColor("#90a0b0")', ctx)).toBe(true);
-  });
-
-  it("detects a medium-dark color (#404040)", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    // 0.299*64 + 0.587*64 + 0.114*64 = 64 > 128? No → false
-    expect(vm.runInContext('_isLightColor("#404040")', ctx)).toBe(false);
-  });
-});
-
 describe("_buildTermTheme", () => {
-  it("returns dark theme when background is dark", () => {
+  it("always renders dark (ink bg, paper fg) regardless of app theme", () => {
     const ctx = makeContext({
       cssVars: {
-        "--bg": "#1a1917",
-        "--text": "#cccccc",
-        "--accent": "#d97757",
+        "--ink": "#1b1916",
+        "--bg": "#f4f1ea",
+        "--accent": "#c45a33",
       },
     });
     loadTerminal(ctx);
     const theme = vm.runInContext("_buildTermTheme()", ctx);
-    expect(theme.background).toBe("#1a1917");
-    expect(theme.foreground).toBe("#cccccc");
-    expect(theme.cursor).toBe("#d97757");
-    expect(theme.selectionBackground).toBe("rgba(78,140,255,0.3)");
-    // Dark palette colors
+    expect(theme.background).toBe("#1b1916");
+    expect(theme.foreground).toBe("#f4f1ea");
+    expect(theme.cursor).toBe("#c45a33");
+    // Dark ANSI palette is always used
     expect(theme.red).toBe("#f14c4c");
     expect(theme.green).toBe("#23d18b");
-  });
-
-  it("returns light theme when background is light", () => {
-    const ctx = makeContext({
-      cssVars: {
-        "--bg": "#f5f5f5",
-        "--text": "#333333",
-        "--accent": "#0078d4",
-      },
-    });
-    loadTerminal(ctx);
-    const theme = vm.runInContext("_buildTermTheme()", ctx);
-    expect(theme.background).toBe("#f5f5f5");
-    expect(theme.foreground).toBe("#333333");
-    expect(theme.selectionBackground).toBe("rgba(0,0,0,0.15)");
-    // Light palette colors
-    expect(theme.red).toBe("#cd3131");
-    expect(theme.green).toBe("#00bc70");
   });
 
   it("uses fallback values when CSS vars are empty", () => {
     const ctx = makeContext({ cssVars: {} });
     loadTerminal(ctx);
     const theme = vm.runInContext("_buildTermTheme()", ctx);
-    expect(theme.background).toBe("#1a1917");
-    expect(theme.foreground).toBe("#cccccc");
-    expect(theme.cursor).toBe("#d97757");
+    expect(theme.background).toBe("#1b1916");
+    expect(theme.foreground).toBe("#f4f1ea");
+    expect(theme.cursor).toBe("#c45a33");
   });
 });
 
@@ -427,14 +361,6 @@ describe("ANSI color palettes", () => {
     }
   });
 
-  it("_lightAnsiColors has all 16 entries", () => {
-    const ctx = makeContext();
-    loadTerminal(ctx);
-    const colors = vm.runInContext("_lightAnsiColors", ctx);
-    expect(colors).toHaveProperty("black");
-    expect(colors).toHaveProperty("brightWhite");
-    expect(Object.keys(colors)).toHaveLength(16);
-  });
 });
 
 describe("_getCSSVar", () => {
