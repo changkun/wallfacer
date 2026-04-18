@@ -1,6 +1,6 @@
 ---
 title: Routine scheduler engine package
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/routine/
@@ -10,6 +10,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Routine scheduler engine package
 

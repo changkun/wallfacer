@@ -1,6 +1,6 @@
 ---
 title: Wire scheduler engine into the handler
-status: complete
+status: archived
 depends_on:
   - specs/local/routine-tasks/engine-package.md
   - specs/local/routine-tasks/routines-api.md
@@ -16,6 +16,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Wire scheduler engine into the handler
 
