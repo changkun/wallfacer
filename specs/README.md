@@ -10,7 +10,7 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 5 done, 1 in progress, 20 pending
+Local Product — 5 done, 1 in progress, 21 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
@@ -23,7 +23,7 @@ Local Product — 5 done, 1 in progress, 20 pending
   ○ TypeScript Migration           ○ Typed DOM Hooks
   ○ Rebrand Module Path            ○ Spatial Canvas
   ○ Scoped Command Registry        ○ Routine Tasks
-  ○ Data Boundary Enforcement
+  ○ Data Boundary Enforcement      ○ Agents & Flows
 
 Cloud Platform — 0/9
   ○ Tenant Filesystem              ○ K8s Sandbox Backend
@@ -78,6 +78,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [data-boundary-enforcement.md](local/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the planning-only slash command registry to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting). Task board and other UI surfaces can then trigger their own `/` commands via the shared autocomplete widget. |
 | [routine-tasks.md](local/routine-tasks.md) | Drafted | Promote the ideation agent's "cronjob" scheduler into a generic primitive: routines are board cards (`Kind=routine`) with a schedule that spawn fresh instance tasks when they fire. Users create, edit, and toggle routines on the board; ideation migrates to a `system:ideation`-tagged routine. |
+| [agents-and-flows.md](local/agents-and-flows.md) | Drafted | Promote agent role + pipeline to first-class user-facing primitives. Sidebar gains Agents and Flows tabs; the composer simplifies to "pick a Flow, write a prompt". Seeded built-in flows (`implement`, `brainstorm`, `refine-only`, `test-only`) replace the current TaskKind + Agent-overrides surface. Depends on the backend abstraction in `shared/agent-abstraction.md`. |
 
 ### Local product dependencies
 
