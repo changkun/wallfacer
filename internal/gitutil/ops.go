@@ -1,6 +1,7 @@
 package gitutil
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -9,6 +10,24 @@ import (
 
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
+
+// GlobalIdentityOverrides returns git `-c user.name=... -c user.email=...`
+// flags sourced from the caller's global git config. Attach them to a `git`
+// invocation (before the subcommand) to force the global identity even when a
+// per-repo or per-worktree config sets different values — for example, when a
+// sandbox container has written its own user.name / user.email into a
+// worktree's .git/config. Returns an empty slice when no global identity is
+// set.
+func GlobalIdentityOverrides(ctx context.Context) []string {
+	var overrides []string
+	if n, err := cmdexec.New("git", "config", "--global", "user.name").WithContext(ctx).Output(); err == nil && n != "" {
+		overrides = append(overrides, "-c", "user.name="+n)
+	}
+	if e, err := cmdexec.New("git", "config", "--global", "user.email").WithContext(ctx).Output(); err == nil && e != "" {
+		overrides = append(overrides, "-c", "user.email="+e)
+	}
+	return overrides
+}
 
 // RebaseOntoDefault rebases the task branch (currently checked out in worktreePath)
 // onto the default branch of repoPath. On conflict it aborts the rebase and returns

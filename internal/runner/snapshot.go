@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
+	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/dircp"
@@ -27,25 +27,11 @@ func setupNonGitSnapshot(ws, snapshotPath string) error {
 		}
 		return fmt.Errorf("cp workspace to snapshot: %w", err)
 	}
-	// Initialise a git repo so Phase 1 (hostStageAndCommit) can commit changes.
-	if out, err := cmdexec.Git(snapshotPath, "init").Combined(); err != nil {
+	if err := gitutil.InitLocalRepo(snapshotPath, "wallfacer@local", "Wallfacer", "wallfacer: initial snapshot"); err != nil {
 		if rmErr := os.RemoveAll(snapshotPath); rmErr != nil {
 			logger.Runner.Warn("snapshot cleanup failed after git init error", "path", snapshotPath, "error", rmErr)
 		}
-		return fmt.Errorf("git init snapshot: %w\n%s", err, out)
-	}
-	if err := cmdexec.Git(snapshotPath, "config", "user.email", "wallfacer@local").Run(); err != nil {
-		logger.Runner.Warn("snapshot git config user.email", "path", snapshotPath, "error", err)
-	}
-	if err := cmdexec.Git(snapshotPath, "config", "user.name", "Wallfacer").Run(); err != nil {
-		logger.Runner.Warn("snapshot git config user.name", "path", snapshotPath, "error", err)
-	}
-	if err := cmdexec.Git(snapshotPath, "add", "-A").Run(); err != nil {
-		logger.Runner.Warn("snapshot git add", "path", snapshotPath, "error", err)
-	}
-	// --allow-empty handles the edge case of an empty workspace.
-	if err := cmdexec.Git(snapshotPath, "commit", "--allow-empty", "-m", "wallfacer: initial snapshot").Run(); err != nil {
-		logger.Runner.Warn("snapshot git commit", "path", snapshotPath, "error", err)
+		return fmt.Errorf("init snapshot repo: %w", err)
 	}
 	return nil
 }
@@ -84,31 +70,8 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 	return nil
 }
 
-// computeSnapshotDiff computes a unified diff of all changes in a snapshot
-// directory relative to its initial commit. The snapshot has an initial commit
-// containing the original workspace files, and the agent's changes are committed
-// on top. This produces a diff showing what the agent changed.
+// computeSnapshotDiff is a thin wrapper around [gitutil.SnapshotDiff] kept for
+// call-site readability at the commit pipeline boundary.
 func computeSnapshotDiff(ctx context.Context, snapshotPath string) string {
-	// Diff the initial commit against the current working tree (HEAD + uncommitted).
-	// HEAD~1 is the initial snapshot commit created by setupNonGitSnapshot.
-	out, err := cmdexec.Git(snapshotPath, "diff", "HEAD~1").WithContext(ctx).Output()
-	if err != nil {
-		// If HEAD~1 doesn't exist (only one commit), diff against the empty tree.
-		out, _ = cmdexec.Git(snapshotPath, "diff", "4b825dc642cb6eb9a060e54bf899d69f82623700", "HEAD").WithContext(ctx).Output()
-	}
-
-	// Include untracked files as new-file diffs.
-	if untrackedRaw, err := cmdexec.Git(snapshotPath,
-		"ls-files", "--others", "--exclude-standard").WithContext(ctx).Output(); err == nil {
-		for _, file := range strings.Split(untrackedRaw, "\n") {
-			if file == "" {
-				continue
-			}
-			fd, _ := cmdexec.Git(snapshotPath,
-				"diff", "--no-index", "/dev/null", file).WithContext(ctx).Output()
-			out += fd
-		}
-	}
-
-	return out
+	return gitutil.SnapshotDiff(ctx, snapshotPath)
 }
