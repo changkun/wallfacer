@@ -392,7 +392,69 @@ This is where the spec touches the most surfaces. The plan is:
    registry + runAgent extraction), then this spec layers the Flow engine
    + UI on top. Recommend **(b)** — agent abstraction unblocks several
    other specs (multi-agent consensus, debate, observability) that don't
-   need the Flow UI.
+   need the Flow UI. **Resolved: option (b).** agent-abstraction landed
+   in 2026-04-19 (commits c99bdc61..948dcd06); this spec layers on top.
+
+6. **Should agent descriptors stay in `internal/runner/` or move to a
+   dedicated `internal/agents/`?** **Resolved: move to
+   `internal/agents/`** — the first child task extracts the package so
+   the runner stays focused on execution machinery and future consumers
+   (flow engine, handler API, observability agents) don't have to
+   depend on the full runner.
+
+## Task Breakdown
+
+Implementation lands in eight commits across five dependency layers.
+Each task preserves the green-tree acceptance criterion:
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Extract internal/agents](agents-and-flows/extract-agents-package.md) | — | medium | validated |
+| [Agents API + tab (read-only)](agents-and-flows/agents-api-and-tab.md) | extract-agents-package | medium | validated |
+| [Flow data model](agents-and-flows/flow-data-model.md) | extract-agents-package | medium | validated |
+| [Task.FlowID + resolver](agents-and-flows/task-flow-field.md) | flow-data-model | small | validated |
+| [Flow engine](agents-and-flows/flow-engine.md) | flow-data-model, task-flow-field | large | validated |
+| [Flows API + tab (read-only)](agents-and-flows/flows-api-and-tab.md) | flow-data-model, agents-api-and-tab | medium | validated |
+| [Composer flow picker](agents-and-flows/composer-flow-picker.md) | flows-api-and-tab, task-flow-field | medium | validated |
+| [Runner → flow-engine wiring](agents-and-flows/runner-flow-integration.md) | flow-engine, composer-flow-picker | large | validated |
+| [Editable agents + flows (follow-up)](agents-and-flows/editable-agents-and-flows.md) | runner-flow-integration | large | validated |
+| [Routine.SpawnFlow migration (follow-up)](agents-and-flows/routine-spawn-flow-migration.md) | runner-flow-integration | small | validated |
+
+```mermaid
+graph LR
+  EX[Extract agents pkg] --> AAT[Agents API + tab]
+  EX --> FDM[Flow data model]
+  FDM --> TFF[Task.FlowID]
+  FDM --> FAT[Flows API + tab]
+  AAT --> FAT
+  FDM --> FE[Flow engine]
+  TFF --> FE
+  FAT --> CFP[Composer picker]
+  TFF --> CFP
+  FE --> RFI[Runner integration]
+  CFP --> RFI
+  RFI --> EAF[Editable agents/flows]
+  RFI --> RSM[Routine.SpawnFlow]
+```
+
+**Recommended execution order:**
+
+1. **extract-agents-package** — refactor only, no behaviour change.
+   Unblocks everything else.
+2. **agents-api-and-tab** — ships the user-visible Agents tab first,
+   as a standalone deliverable. Validates the data contract.
+3. **flow-data-model** + **task-flow-field** in parallel — both depend
+   only on the agents extraction and are independent of each other.
+4. **flow-engine** — consumes the data model and task field; no UI
+   yet.
+5. **flows-api-and-tab** — read-only Flows tab; requires the agents
+   tab and the flow data model only.
+6. **composer-flow-picker** — Flow dropdown + drop Agent overrides.
+   Requires flows endpoint + Task.FlowID.
+7. **runner-flow-integration** — final MVP piece. After this the
+   composer, runner, and UI are all Flow-aware end-to-end.
+8. **Follow-ups** ship independently when the MVP is stable:
+   editable agents/flows and routine.SpawnFlow migration.
 
 ## Testing Strategy
 
