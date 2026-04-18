@@ -610,7 +610,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Goal, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
+		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
