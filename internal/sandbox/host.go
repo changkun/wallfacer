@@ -45,26 +45,28 @@ type HostBackend struct {
 	claudeBinary string
 	codexBinary  string
 
-	probeMu        sync.Mutex
-	probedOnce     map[Type]bool
-	probedSupport  map[Type]bool
+	probeMu       sync.Mutex
+	probedOnce    map[Type]bool
+	probedSupport map[Type]bool
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
 }
 
 // NewHostBackend resolves binaries and returns a HostBackend ready to
-// Launch. An unresolved binary is a startup error — failing here surfaces a
-// clear message instead of a cryptic first-task failure.
+// Launch. Claude is required — failing here surfaces a clear message
+// instead of a cryptic first-task failure. Codex is optional for now
+// (host mode rejects codex launches anyway, see Launch); its binary is
+// resolved best-effort so the backend can still report a path to
+// `wallfacer doctor` but an unresolved codex does not block startup.
 func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	claude, err := resolveBinary(cfg.ClaudeBinary, "claude")
 	if err != nil {
 		return nil, err
 	}
-	codex, err := resolveBinary(cfg.CodexBinary, "codex")
-	if err != nil {
-		return nil, err
-	}
+	// Best-effort: unresolved codex becomes an empty path; Launch rejects
+	// codex anyway until host-mode codex support lands.
+	codex, _ := resolveBinary(cfg.CodexBinary, "codex")
 	return &HostBackend{
 		claudeBinary:  claude,
 		codexBinary:   codex,
@@ -92,11 +94,19 @@ func resolveBinary(explicit, name string) (string, error) {
 }
 
 // binaryFor returns the resolved binary path for the given agent type.
+// Returns an error when the type is unknown or when the binary for a known
+// type was not resolvable at construction time.
 func (b *HostBackend) binaryFor(t Type) (string, error) {
 	switch t {
 	case Claude:
+		if b.claudeBinary == "" {
+			return "", fmt.Errorf("claude binary not resolved")
+		}
 		return b.claudeBinary, nil
 	case Codex:
+		if b.codexBinary == "" {
+			return "", fmt.Errorf("codex binary not resolved")
+		}
 		return b.codexBinary, nil
 	default:
 		return "", fmt.Errorf("unknown sandbox type %q", t)
@@ -145,6 +155,15 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 	agent, ok := Parse(agentStr)
 	if !ok {
 		return nil, fmt.Errorf("host backend: spec.Env[WALLFACER_AGENT] is missing or unknown (got %q)", agentStr)
+	}
+	// Codex CLI does not accept the Claude-style `-p ... --verbose
+	// --output-format stream-json` argv that the runner generates. In
+	// container mode, the sandbox-agents image's `codex-agent.sh` script
+	// translates the argv and wraps the output; host mode has no such
+	// wrapper yet. Refuse codex launches cleanly rather than passing
+	// incompatible flags through and getting a confusing CLI error.
+	if agent == Codex {
+		return nil, fmt.Errorf("host backend: the codex CLI is not supported yet in host mode; route all activities to claude (WALLFACER_SANDBOX_*=claude) or use container mode")
 	}
 	bin, err := b.binaryFor(agent)
 	if err != nil {
@@ -338,10 +357,10 @@ func newHostHandle(name string, cmd *exec.Cmd, stdout, stderr io.ReadCloser, tas
 	return h
 }
 
-func (h *hostHandle) State() BackendState    { return BackendState(h.state.Load()) }
-func (h *hostHandle) Stdout() io.ReadCloser  { return h.stdout }
-func (h *hostHandle) Stderr() io.ReadCloser  { return h.stderr }
-func (h *hostHandle) Name() string           { return h.name }
+func (h *hostHandle) State() BackendState   { return BackendState(h.state.Load()) }
+func (h *hostHandle) Stdout() io.ReadCloser { return h.stdout }
+func (h *hostHandle) Stderr() io.ReadCloser { return h.stderr }
+func (h *hostHandle) Name() string          { return h.name }
 
 // Wait blocks on cmd.Wait, transitions state, and unregisters the handle
 // from the backend's map. A non-zero exit returns (code, nil) to match

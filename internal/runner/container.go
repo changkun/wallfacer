@@ -490,7 +490,24 @@ func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
 // Resolution priority: per-task per-activity override → per-task sandbox → env-file
 // per-activity setting → env-file default sandbox → Claude (hardcoded fallback).
+//
+// Host mode coerces the result to Claude regardless of configuration, because
+// the host backend does not yet support codex (see HostBackend.Launch). Doing
+// the coercion here — at the resolution boundary — means sub-agent activities
+// (title, oversight, commit-message, etc.) that would normally route to codex
+// via env vars silently fall through to claude in host mode instead of
+// failing at launch.
 func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
+	resolved := r.resolveSandboxForActivity(task, activity)
+	if r.HostMode() && resolved == sandbox.Codex {
+		return sandbox.Claude
+	}
+	return resolved
+}
+
+// resolveSandboxForActivity is the raw resolution (no host-mode coercion).
+// Extracted so host-mode can apply a post-resolution override.
+func (r *Runner) resolveSandboxForActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
 	if task == nil {
 		return sandbox.Claude
 	}
@@ -748,9 +765,10 @@ func (r *Runner) runContainer(
 	// Primary attempt with the configured sandbox, followed by automatic
 	// claude→codex fallback on token/rate limit errors (checked twice:
 	// once for launch/exec errors, once for is_error in the parsed output).
+	// Host mode disables the fallback because it does not support codex.
 	output, rawStdout, rawStderr, err := runWithSandbox(sb)
 	if err != nil {
-		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
+		if !r.HostMode() && sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
 			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
@@ -762,7 +780,7 @@ func (r *Runner) runContainer(
 		return nil, rawStdout, rawStderr, err
 	}
 
-	if sb == sandbox.Claude && output != nil && output.IsError &&
+	if !r.HostMode() && sb == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)

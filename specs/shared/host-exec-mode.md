@@ -23,7 +23,9 @@ dispatched_task_id: null
 
 ## Overview
 
-Add an opt-in `WALLFACER_SANDBOX_BACKEND=host` that runs `claude` / `codex` directly on the host machine — no podman, no docker, no image pull. The image ergonomics are the top onboarding friction: pulling `ghcr.io/latere-ai/sandbox-agents` fails on flaky networks, triggers GHCR rate limits, drifts from the user's locally-built tag, and forces a container runtime on machines that already have the CLIs installed. Host mode is the escape hatch that lets wallfacer work as a pure orchestrator over the host-installed CLIs, trading filesystem isolation for zero install friction.
+Add an opt-in `wallfacer run --backend host` that runs `claude` directly on the host machine — no podman, no docker, no image pull. The image ergonomics are the top onboarding friction: pulling `ghcr.io/latere-ai/sandbox-agents` fails on flaky networks, triggers GHCR rate limits, drifts from the user's locally-built tag, and forces a container runtime on machines that already have the CLIs installed. Host mode is the escape hatch that lets wallfacer work as a pure orchestrator over the host-installed CLIs, trading filesystem isolation for zero install friction.
+
+**v1 scope:** host mode supports the Claude CLI only. Codex launches are rejected with a clear error because the Claude-style argv the runner emits (`-p … --verbose --output-format stream-json`) is not compatible with `codex exec`, and the container path's `codex-agent.sh` wrapper has not yet been ported to the host backend. Activities routed to codex via env vars are silently coerced to claude in host mode so sub-agents (title, oversight, commit-message, etc.) keep working. Codex host-mode support is a follow-up spec.
 
 This spec is **not** a replacement for `specs/shared/native-sandbox-{linux,macos,windows}.md`, which describe *sandboxed* host execution via Bubblewrap / Landlock / `sandbox_init`. Those specs treat host execution as a platform for adding a new isolation layer. This spec owns the simpler "no isolation at all" case those specs mention as "Option C: Local CLI" but do not implement.
 
