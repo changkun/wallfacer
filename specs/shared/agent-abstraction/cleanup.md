@@ -1,6 +1,6 @@
 ---
 title: Dead-code cleanup after runAgent migration
-status: complete
+status: archived
 depends_on:
   - specs/shared/agent-abstraction/headless-roles.md
   - specs/shared/agent-abstraction/inspector-roles.md
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Dead-code cleanup after runAgent migration
 

@@ -1,6 +1,6 @@
 ---
 title: Agent Role Abstraction & Multi-Agent Communication
-status: complete
+status: archived
 depends_on: []
 affects: [internal/runner/, internal/store/, internal/prompts/]
 effort: xlarge
@@ -9,6 +9,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Agent Role Abstraction & Multi-Agent Communication
 
