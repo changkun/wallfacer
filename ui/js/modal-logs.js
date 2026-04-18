@@ -250,6 +250,21 @@ var _switchRightTab = createTabSwitcher({
 });
 
 function setRightTab(tab) {
+  // Route legacy callers (command palette, hash deeplinks) to the new main-tab
+  // hierarchy. Implementation/testing both live inside Activity; changes,
+  // spans, timeline each have their own top-level tab. Existing right-tab-*/
+  // right-panel-* toggling below still runs so Impl/Testing sub-switch and the
+  // modal-logs.js test suite stay green.
+  const mainTabMap = {
+    implementation: "activity",
+    testing: "activity",
+    changes: "changes",
+    spans: "flamegraph",
+    timeline: "timeline",
+  };
+  if (mainTabMap[tab] && typeof setMainTab === "function") {
+    setMainTab(mainTabMap[tab]);
+  }
   _switchRightTab(tab);
 }
 
