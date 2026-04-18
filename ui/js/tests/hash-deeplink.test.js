@@ -204,6 +204,28 @@ describe("openModal hash update", () => {
   });
 });
 
+describe("openModal activity section visibility", () => {
+  it("keeps modal-summary-section visible for in-progress tasks without a final result", async () => {
+    const { ctx, elements, task } = makeModalContext();
+    task.status = "in_progress";
+    task.result = null;
+    // Ensure the initial state is hidden so passing the assertion proves
+    // openModal actively revealed the section (not just left it alone).
+    const summaryEl = elements["modal-summary-section"] || {
+      classList: { add: () => {}, remove: () => {}, contains: () => true },
+    };
+    if (summaryEl.classList && summaryEl.classList._classes) {
+      summaryEl.classList._classes.add("hidden");
+    } else {
+      summaryEl.classList.add("hidden");
+    }
+    await vm.runInContext(`openModal('${TASK_ID}')`, ctx);
+    const after = elements["modal-summary-section"];
+    expect(after).toBeTruthy();
+    expect(after.classList.contains("hidden")).toBe(false);
+  });
+});
+
 describe("closeModal hash clear", () => {
   it("calls history.replaceState with pathname+search (no hash) when closing", async () => {
     const { ctx, replaceStateCalls } = makeModalContext();
