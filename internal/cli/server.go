@@ -83,6 +83,11 @@ type ServerConfig struct {
 	// instead of the embedded filesystem. Used during frontend development
 	// so edits under ui/ take effect on reload without rebuilding the binary.
 	UIDir string
+	// SandboxBackend selects the sandbox implementation. Valid values:
+	// "" / "local" (podman/docker container; default) and "host" (exec the
+	// host-installed claude/codex CLIs directly; no isolation). Populated
+	// from the `wallfacer run --backend` flag.
+	SandboxBackend string
 }
 
 // ServerComponents holds the initialized server components returned by initServer.
@@ -190,7 +195,9 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		TmpDir:           tmpDir,
 		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,
-		SandboxBackend:   envCfg.SandboxBackend,
+		SandboxBackend:   cfg.SandboxBackend,
+		HostClaudeBinary: envCfg.HostClaudeBinary,
+		HostCodexBinary:  envCfg.HostCodexBinary,
 		ContainerNetwork: envCfg.ContainerNetwork,
 		ContainerCPUs:    envCfg.ContainerCPUs,
 		ContainerMemory:  envCfg.ContainerMemory,
@@ -251,6 +258,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
 	h.StartIdeationWatcher(ctx)
+	h.StartRoutineEngine(ctx)
 	h.StartWaitingSyncWatcher(ctx)
 	h.StartAutoTester(ctx)
 	h.StartAutoSubmitter(ctx)
@@ -442,6 +450,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
 	uiDir := fs.String("ui-dir", envOrDefault("UI_DIR", ""), "serve UI from this on-disk directory (dev mode; disables caching and reloads templates on every request)")
+	backend := fs.String("backend", "container", `sandbox backend: "container" (podman/docker; default) or "host" (exec host-installed claude/codex directly — no isolation, trusted machines only)`)
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
@@ -451,14 +460,21 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	}
 	_ = fs.Parse(args)
 
+	sandboxBackend, err := resolveBackendFlag(*backend)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "wallfacer run:", err)
+		os.Exit(2)
+	}
+
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    *logFormat,
-		Addr:         *addr,
-		DataDir:      *dataDir,
-		ContainerCmd: *containerCmd,
-		SandboxImage: *sandboxImage,
-		EnvFile:      *envFile,
-		UIDir:        *uiDir,
+		LogFormat:      *logFormat,
+		Addr:           *addr,
+		DataDir:        *dataDir,
+		ContainerCmd:   *containerCmd,
+		SandboxImage:   *sandboxImage,
+		EnvFile:        *envFile,
+		UIDir:          *uiDir,
+		SandboxBackend: sandboxBackend,
 	}, uiFS, docsFS)
 	defer sc.Stop()
 
@@ -489,6 +505,22 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	}
 
 	sc.Shutdown()
+}
+
+// resolveBackendFlag translates a user-facing --backend value into the
+// runner's internal backend identifier. The user-facing alias "container"
+// maps to the historical internal name "local"; "host" passes through;
+// anything else is an error.
+func resolveBackendFlag(raw string) (string, error) {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	switch v {
+	case "", "container", "local":
+		return "local", nil
+	case "host":
+		return "host", nil
+	default:
+		return "", fmt.Errorf(`unknown --backend value %q: want "container" or "host"`, raw)
+	}
 }
 
 // BuildMux constructs the HTTP request router.

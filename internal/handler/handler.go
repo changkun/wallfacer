@@ -19,6 +19,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/lazyval"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
+	"changkun.de/x/wallfacer/internal/routine"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -160,6 +161,12 @@ type Handler struct {
 
 	planner         *planner.Planner
 	commandRegistry *planner.CommandRegistry
+
+	// routineEngine multiplexes per-routine scheduled fires. Nil until
+	// StartRoutineEngine runs at server start; guarded by routineMu so
+	// tests that reinitialize the engine don't race with reconcile calls.
+	routineMu     sync.Mutex
+	routineEngine *routine.Engine
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[sandbox.Type]bool
