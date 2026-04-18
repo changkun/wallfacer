@@ -770,6 +770,10 @@ html.wails-desktop .app-sidebar {
   display: flex;
   flex-direction: column;
   contain: layout paint style;
+  /* Reserve equal gutter on both sides so the 6px scrollbar doesn't
+     eat into the right padding when content overflows — keeps cards
+     visually centred within the column regardless of scroll state. */
+  scrollbar-gutter: stable both-edges;
 }
 /* Each column body reads as a soft tray — subtle enough to not compete
    with cards, distinct enough that an empty column still reads as a

@@ -200,11 +200,21 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 | `WALLFACER_MAX_PARALLEL` | `5` | Maximum concurrent tasks auto-promoted to In Progress |
 | `WALLFACER_MAX_TEST_PARALLEL` | (inherits from `WALLFACER_MAX_PARALLEL`) | Maximum concurrent test runs |
 
+#### Sandbox backend
+
+Wallfacer runs tasks through one of two backends, selected at server start via the `--backend` flag on `wallfacer run`:
+
+| Backend | Flag | How it runs | When to use |
+|---|---|---|---|
+| Container (default) | `--backend container` | `podman run` / `docker run` against the unified `sandbox-agents` image | You want filesystem isolation; you have a container runtime installed |
+| Host | `--backend host` | Execs `claude` (and optionally `codex`) directly on the host | You already have the CLIs installed and don't want to install a container runtime or pull the sandbox image |
+
+> **Host mode has no isolation.** Tasks run with your user's permissions and can touch any file your account can. Recommended for trusted machines only. The Settings → Sandbox tab surfaces a warning banner while host mode is active. See [Host mode](#host-mode) below.
+
 #### Container
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_SANDBOX_BACKEND` | `local` | Sandbox backend selection (`local` for podman/docker) |
 | `WALLFACER_CONTAINER_NETWORK` | -- | Container network name |
 | `WALLFACER_CONTAINER_CPUS` | (no limit) | CPU limit per container, e.g. `"2.0"` |
 | `WALLFACER_CONTAINER_MEMORY` | (no limit) | Memory limit per container, e.g. `"4g"` |
@@ -212,6 +222,42 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 | `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
 | `WALLFACER_TASK_WORKERS` | `true` | Enable per-task worker containers for container reuse. Each task gets a long-lived container that is reused across agent invocations (implementation turns, title, oversight, commit message). Set to `false` to always use ephemeral containers. |
 | `WALLFACER_DEPENDENCY_CACHES` | `false` | Mount named volumes for dependency caches (`~/.npm`, `~/.cache/pip`, `~/.cargo/registry`, `~/.cache/go-build`) that persist across container restarts. Scoped per workspace group. |
+
+#### Host mode
+
+Set when running `wallfacer run --backend host`. These variables are optional; defaults resolve via `$PATH`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `WALLFACER_HOST_CLAUDE_BINARY` | `exec.LookPath("claude")` | Explicit path to the Claude CLI binary |
+| `WALLFACER_HOST_CODEX_BINARY` | `exec.LookPath("codex")` | Explicit path to the Codex CLI binary (optional; codex-typed tasks require it) |
+
+**Install requirements:**
+
+- `npm i -g @anthropic-ai/claude-code` for Claude.
+- `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
+
+**Build the server for host mode:**
+
+```bash
+make build-host   # fmt + lint + ts build + binary, no image pull
+./wallfacer run --backend host
+```
+
+**Verify readiness:**
+
+```bash
+wallfacer doctor --backend host
+```
+
+Reports the resolved binary paths and `--version` output for each CLI. Missing codex is a soft warning (tasks routed to codex will fail; claude-only workflows still work).
+
+**Known limitations:**
+
+- `--resume` is a no-op for codex (codex's `exec` subcommand has no stable resume flag).
+- Concurrent tasks default to `WALLFACER_MAX_PARALLEL=1` in host mode to avoid races on `~/.claude/__store.db` and `~/.codex/` shared state. Override with an explicit value to opt in.
+- Windows is not supported natively — use container mode with Docker/Podman Desktop, or run wallfacer inside WSL2.
+- No write containment: an agent can touch any file your user account can.
 
 #### Automation
 
