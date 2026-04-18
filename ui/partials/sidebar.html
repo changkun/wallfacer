@@ -182,6 +182,31 @@
 
     <button
       type="button"
+      id="sidebar-nav-agents"
+      class="sb-nav-item"
+      onclick="switchMode('agents', { persist: true })"
+      title="Agents"
+    >
+      <span class="sb-icon">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="8" r="4"></circle>
+          <path d="M4 21c0-4 4-7 8-7s8 3 8 7"></path>
+        </svg>
+      </span>
+      <span>Agents</span>
+    </button>
+
+    <button
+      type="button"
       id="sidebar-nav-depgraph"
       class="sb-nav-item"
       onclick="switchMode('depgraph', { persist: true })"

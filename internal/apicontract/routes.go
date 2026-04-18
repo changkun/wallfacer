@@ -206,6 +206,21 @@ var Routes = []Route{
 		Tags:        []string{"routines"},
 	},
 
+	// --- Agents ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/agents", Name: "ListAgents",
+		JSName:      "list",
+		Description: "List all registered sub-agent roles (built-in catalog).",
+		Tags:        []string{"agents"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/agents/{slug}", Name: "GetAgent",
+		JSName:      "get",
+		Description: "Get one agent's full descriptor including its prompt template body.",
+		Tags:        []string{"agents"},
+	},
+
 	// --- Spec tree ---
 
 	{

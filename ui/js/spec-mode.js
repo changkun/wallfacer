@@ -5,7 +5,13 @@
 // "spec" and "plan" refer to the same mode — "spec" is the long-standing
 // internal identifier, "plan" is the user-facing label introduced by the
 // chat-first-mode rename.
-var _validModes = { board: true, spec: true, depgraph: true, docs: true };
+var _validModes = {
+  board: true,
+  spec: true,
+  depgraph: true,
+  agents: true,
+  docs: true,
+};
 
 // resolveDefaultMode chooses the initial mode at app open. Priority:
 //   1. Brand-new workspace → "plan"
@@ -282,22 +288,31 @@ function _applyMode(mode) {
   var boardNav = document.getElementById("sidebar-nav-board");
   var specNav = document.getElementById("sidebar-nav-spec");
   var depgraphNav = document.getElementById("sidebar-nav-depgraph");
+  var agentsNav = document.getElementById("sidebar-nav-agents");
   var docsNav = document.getElementById("sidebar-nav-docs");
   if (boardNav) boardNav.classList.toggle("active", mode === "board");
   if (specNav) specNav.classList.toggle("active", mode === "spec");
   if (depgraphNav) depgraphNav.classList.toggle("active", mode === "depgraph");
+  if (agentsNav) agentsNav.classList.toggle("active", mode === "agents");
   if (docsNav) docsNav.classList.toggle("active", mode === "docs");
 
   // Toggle main content areas.
   var board = document.getElementById("board");
   var specView = document.getElementById("spec-mode-container");
   var depgraphView = document.getElementById("depgraph-mode-container");
+  var agentsView = document.getElementById("agents-mode-container");
   var docsView = document.getElementById("docs-mode-container");
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
   if (depgraphView)
     depgraphView.style.display = mode === "depgraph" ? "" : "none";
+  if (agentsView) agentsView.style.display = mode === "agents" ? "" : "none";
   if (docsView) docsView.style.display = mode === "docs" ? "" : "none";
+
+  // Load agents list when entering agents mode for the first time.
+  if (mode === "agents" && typeof window.loadAgents === "function") {
+    window.loadAgents();
+  }
 
   // Toggle the dep-graph rendering flag so the existing panel renders into
   // #depgraph-mode-container while this mode is active. The panel is mounted
@@ -829,11 +844,12 @@ function _loadAndRenderSpec() {
         };
       }
 
-      // Archive button: visible for drafted/complete/stale (status machine
-      // allows those three transitions into archived).
+      // Archive button: visible for vague/drafted/complete/stale (status
+      // machine allows those four transitions into archived).
       var archiveBtn = document.getElementById("spec-archive-btn");
       if (archiveBtn) {
         var canArchive =
+          parsed.frontmatter.status === "vague" ||
           parsed.frontmatter.status === "drafted" ||
           parsed.frontmatter.status === "complete" ||
           parsed.frontmatter.status === "stale";

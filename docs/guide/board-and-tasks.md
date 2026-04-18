@@ -436,6 +436,23 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 
 ---
 
+## Agents Tab
+
+The **Agents** entry in the left sidebar opens a read-only catalogue of
+the built-in sub-agent roles that power wallfacer: Title, Oversight,
+Commit message, Refinement, Brainstorm (ideation), Implementation, and
+Testing. Each row shows the activity bucket, mount profile (none /
+workspace read-only / worktree read-write), and whether the role is
+single-turn or multi-turn. Clicking a row expands an inline panel with
+the role's prompt template, timeout, and a disabled **Clone** button —
+editable and user-authored agents will ship in a follow-up. The tab is
+a window into what the runner has available; it does not affect task
+execution.
+
+Backing APIs: `GET /api/agents` and `GET /api/agents/{slug}`.
+
+---
+
 ## See Also
 
 - [Workspaces](workspaces.md) -- workspace management, git branches, and multi-repo setups
