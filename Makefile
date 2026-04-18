@@ -69,12 +69,18 @@ build-desktop-linux:
 
 # Pull the unified sandbox image from GHCR and tag locally.
 # Image source: https://github.com/latere-ai/images
-# Skips the pull when the expected local tag already exists — useful when
-# building the image from source in a sibling checkout of latere-ai/images.
+# Skip order — useful when building the image from source in a sibling checkout
+# of latere-ai/images that tags only `:latest`:
+#   1. If the resolved tag ($(IMAGE)) already exists locally, do nothing.
+#   2. Else if `sandbox-agents:latest` exists locally, retag it as $(IMAGE).
+#   3. Else pull from GHCR.
 # Force a refresh with `make pull-images-force` or `podman rmi` first.
 pull-images:
 	@if $(PODMAN) image exists $(IMAGE); then \
 		echo "Image $(IMAGE) present locally; skipping pull. Run 'make pull-images-force' to refresh."; \
+	elif $(PODMAN) image exists sandbox-agents:latest; then \
+		echo "Image $(IMAGE) missing but sandbox-agents:latest present; retagging locally."; \
+		$(PODMAN) tag sandbox-agents:latest $(IMAGE); \
 	else \
 		$(PODMAN) pull $(GHCR_IMAGE) && $(PODMAN) tag $(GHCR_IMAGE) $(IMAGE); \
 	fi
