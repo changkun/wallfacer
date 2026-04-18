@@ -105,7 +105,8 @@ html.wails-desktop .app-sidebar {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sb-search .kbd {
+.sb-search .kbd,
+.sb-nav-item .kbd {
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: 10px;
