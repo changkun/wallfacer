@@ -126,17 +126,31 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	}
 }
 
-func TestRunAgent_RejectsMountReadOnly(t *testing.T) {
-	r, _, _ := newAgentTestRunner(t)
+// TestRunAgent_MountReadOnly_AddsWorkspaceMounts verifies that a
+// read-only inspector role's container spec picks up every configured
+// workspace as a read-only volume. Regression guard against silently
+// reverting to MountNone when the refinement / ideation roles call
+// into runAgent.
+func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
+	r, backend, s := newAgentTestRunner(t)
+	ws := t.TempDir()
+	r.workspaces = []string{ws}
+	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
+
 	role := makeRole("ro")
 	role.MountMode = MountReadOnly
 
-	_, err := r.runAgent(context.Background(), role, nil, "hi", runAgentOpts{})
-	if err == nil {
-		t.Fatal("expected mount-not-implemented error for MountReadOnly")
+	task, _ := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "p", Timeout: 5})
+	if _, err := r.runAgent(context.Background(), role, task, "hi", runAgentOpts{}); err != nil {
+		t.Fatalf("runAgent: %v", err)
 	}
-	if got := err.Error(); got == "" || !strings.Contains(got, "not yet implemented") {
-		t.Errorf("error = %q, want contains 'not yet implemented'", got)
+	calls := backend.RunArgsCalls()
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 Launch call, got %d", len(calls))
+	}
+	joined := strings.Join(calls[0].Args, " ")
+	if !strings.Contains(joined, ws) {
+		t.Errorf("expected workspace path %q in launch args, got %q", ws, joined)
 	}
 }
 
@@ -211,4 +225,3 @@ func TestRunAgent_RequiresParseResult(t *testing.T) {
 		t.Fatal("expected error when role.ParseResult is nil")
 	}
 }
-

@@ -286,96 +286,67 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 	return ideas, rejections, output, rawStdout, rawStderr, nil
 }
 
+// roleIdeaAgentEphemeral is the inspector-tier descriptor used by the
+// ephemeral (non-planner) ideation path. The parsed result returned by
+// the agent is the raw JSON-embedded list of ideas; the caller unpacks
+// it via extractIdeas so the rejection/recovery heuristics live close
+// to the ideation-specific parsing logic.
+var roleIdeaAgentEphemeral = AgentRole{
+	Activity:    store.SandboxActivityIdeaAgent,
+	Name:        "ideate",
+	Timeout:     nil, // driven by the caller's ctx (RunIdeation sets up its own deadline)
+	MountMode:   MountReadOnly,
+	SingleTurn:  true,
+	ParseResult: func(o *agentOutput) (any, error) { return o.Result, nil },
+}
+
 // runIdeationEphemeral is the legacy path that launches an ephemeral container
 // per ideation run. Used when no planner is configured.
 func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
+	containerName := "wallfacer-ideate-" + uuid.NewString()[:8]
 
-	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
-
+	var task *store.Task
 	if taskID != uuid.Nil {
-		r.taskContainers.Set(taskID, containerName)
-		defer r.taskContainers.Delete(taskID)
-	}
-	r.ideateContainer.SetSingleton(containerName)
-	defer r.ideateContainer.DeleteSingleton()
-
-	sb := sandbox.Claude
-	if taskID != uuid.Nil {
-		if task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
-			sb = r.sandboxForTaskActivity(task, activityIdeaAgent)
+		if t, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
+			task = t
 		}
 	}
-	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		spec := r.buildIdeationContainerSpec(containerName, prompt, selectedSandbox)
 
-		logger.Runner.Debug("ideate exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
+	onLaunch := func(name string, handle sandbox.Handle) {
 		if taskID != uuid.Nil {
-			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
-		}
-
-		handle, launchErr := r.backend.Launch(ctx, spec)
-		if launchErr != nil {
-			if taskID != uuid.Nil {
-				_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
-			}
-			return nil, nil, nil, fmt.Errorf("launch ideation container: %w", launchErr)
-		}
-		// Upgrade registry entries with the handle so kill goes through it.
-		if taskID != uuid.Nil {
+			r.taskContainers.Set(taskID, name)
 			r.taskContainers.SetHandle(taskID, handle, nil)
 		}
+		r.ideateContainer.SetSingleton(name)
 		r.ideateContainer.SetSingletonHandle(handle, nil)
-
-		rawStdout, _ := io.ReadAll(handle.Stdout())
-		rawStderr, _ := io.ReadAll(handle.Stderr())
-		exitCode, waitErr := handle.Wait()
+	}
+	cleanup := func() {
 		if taskID != uuid.Nil {
-			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+			r.taskContainers.Delete(taskID)
 		}
-
-		if ctx.Err() != nil {
-			_ = handle.Kill()
-			return nil, rawStdout, rawStderr, fmt.Errorf("ideation container terminated: %w", ctx.Err())
-		}
-
-		raw := strings.TrimSpace(string(rawStdout))
-		if raw == "" {
-			if waitErr != nil || exitCode != 0 {
-				return nil, rawStdout, rawStderr, fmt.Errorf("container exited %d: stderr=%s", exitCode, string(rawStderr))
-			}
-			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from ideation container")
-		}
-
-		output, parseErr := parseOutput(raw)
-		if parseErr != nil {
-			return nil, rawStdout, rawStderr, fmt.Errorf("parse ideation output: %w", parseErr)
-		}
-		if output == nil || output.Result == "" {
-			return nil, rawStdout, rawStderr, fmt.Errorf("no result in ideation output")
-		}
-		return output, rawStdout, rawStderr, nil
+		r.ideateContainer.DeleteSingleton()
 	}
 
-	output, rawStdout, rawStderr, err := runWithSandbox(sb)
+	res, err := r.runAgent(ctx, roleIdeaAgentEphemeral, task, prompt, runAgentOpts{
+		ContainerName:  containerName,
+		EmitSpanEvents: taskID != uuid.Nil,
+		TrackUsage:     taskID != uuid.Nil,
+		Turn:           1,
+		OnLaunch:       onLaunch,
+	})
+	cleanup()
+
+	var rawStdout, rawStderr []byte
+	if res != nil {
+		rawStdout = res.RawStdout
+		rawStderr = res.RawStderr
+	}
 	if err != nil {
-		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
-			logger.Runner.Warn("ideation: claude token limit hit; retrying with codex", "task", taskID)
-			output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
-		}
-		if err != nil {
-			return nil, nil, nil, rawStdout, rawStderr, err
-		}
+		return nil, nil, nil, rawStdout, rawStderr, err
 	}
-
-	if sb == sandbox.Claude && output != nil && output.IsError &&
-		isLikelyTokenLimitError(output.Result, output.Subtype) {
-		logger.Runner.Warn("ideation: claude output reported token limit; retrying with codex", "task", taskID)
-		retryOutput, retryStdout, retryStderr, retryErr := runWithSandbox(sandbox.Codex)
-		if retryErr == nil {
-			output = retryOutput
-			rawStdout = retryStdout
-			rawStderr = retryStderr
-		}
+	output := res.Output
+	if output == nil || strings.TrimSpace(output.Result) == "" {
+		return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("no result in ideation output")
 	}
 
 	ideas, rejections, err := extractIdeas(output.Result)
@@ -384,7 +355,6 @@ func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, pro
 		if recoverErr == nil {
 			ideas = recovered
 			rejections = recoveredRejections
-			err = nil
 		} else {
 			if looksLikeNoCodebaseOutput(output.Result) {
 				return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("no source code found in workspace — the ideation agent cannot propose improvements for an empty project")
