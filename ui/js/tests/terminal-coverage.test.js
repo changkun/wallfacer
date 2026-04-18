@@ -307,8 +307,8 @@ describe("_buildTermTheme", () => {
   it("always renders dark (ink bg, paper fg) regardless of app theme", () => {
     const ctx = makeContext({
       cssVars: {
-        "--ink": "#1b1916",
-        "--bg": "#f4f1ea",
+        "--terminal-bg": "#1b1916",
+        "--terminal-fg": "#f4f1ea",
         "--accent": "#c45a33",
       },
     });
@@ -320,6 +320,24 @@ describe("_buildTermTheme", () => {
     // Dark ANSI palette is always used
     expect(theme.red).toBe("#f14c4c");
     expect(theme.green).toBe("#23d18b");
+  });
+
+  it("keeps dark terminal even when app is in dark mode (ink/bg are swapped)", () => {
+    // In dark mode, --ink is light and --bg is dark — the terminal must NOT
+    // flip. Using fixed --terminal-bg / --terminal-fg prevents that.
+    const ctx = makeContext({
+      cssVars: {
+        "--ink": "#ece6d6",
+        "--bg": "#15140f",
+        "--terminal-bg": "#1b1916",
+        "--terminal-fg": "#f4f1ea",
+        "--accent": "#e07a51",
+      },
+    });
+    loadTerminal(ctx);
+    const theme = vm.runInContext("_buildTermTheme()", ctx);
+    expect(theme.background).toBe("#1b1916");
+    expect(theme.foreground).toBe("#f4f1ea");
   });
 
   it("uses fallback values when CSS vars are empty", () => {
@@ -360,7 +378,6 @@ describe("ANSI color palettes", () => {
       expect(typeof colors[k]).toBe("string");
     }
   });
-
 });
 
 describe("_getCSSVar", () => {

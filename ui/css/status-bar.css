@@ -221,8 +221,8 @@
 .status-bar-panel {
   flex-shrink: 0;
   height: 260px;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
   font-family: var(--font-mono);
   font-size: 12px;
   overflow: hidden;
@@ -237,8 +237,8 @@
 .terminal-tab-bar {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid color-mix(in oklab, var(--ink), var(--bg) 12%);
-  background: var(--ink);
+  border-bottom: 1px solid var(--terminal-rule);
+  background: var(--terminal-bg);
   flex-shrink: 0;
   min-height: 26px;
   padding: 0 4px;
@@ -259,19 +259,19 @@
   gap: 4px;
   padding: 3px 10px;
   font-size: 11px;
-  color: color-mix(in oklab, var(--bg), transparent 45%);
+  color: var(--terminal-ink-muted);
   cursor: pointer;
   border-radius: var(--r-sm) var(--r-sm) 0 0;
   white-space: nowrap;
   user-select: none;
 }
 .terminal-tab:hover {
-  color: var(--bg);
-  background: color-mix(in oklab, var(--ink), var(--bg) 6%);
+  color: var(--terminal-fg);
+  background: var(--terminal-tab-hover);
 }
 .terminal-tab[aria-selected="true"] {
-  color: var(--bg);
-  background: color-mix(in oklab, var(--ink), var(--bg) 10%);
+  color: var(--terminal-fg);
+  background: var(--terminal-tab-active);
 }
 .terminal-tab__close {
   background: none;
@@ -289,14 +289,14 @@
 .terminal-tab-add {
   background: none;
   border: none;
-  color: color-mix(in oklab, var(--bg), transparent 55%);
+  color: var(--terminal-ink-dim);
   cursor: pointer;
   font-size: 14px;
   padding: 2px 8px;
   flex-shrink: 0;
 }
 .terminal-tab-add:hover {
-  color: var(--bg);
+  color: var(--terminal-fg);
 }
 .terminal-container-picker {
   position: fixed;
@@ -340,14 +340,14 @@
 #status-bar-panel .xterm {
   height: 100%;
   padding: 0 10px;
-  background: var(--ink);
+  background: var(--terminal-bg);
 }
 #status-bar-panel .xterm-viewport {
   overflow-y: auto;
-  background: var(--ink) !important;
+  background: var(--terminal-bg) !important;
 }
 #status-bar-panel .xterm-screen {
-  background: var(--ink);
+  background: var(--terminal-bg);
 }
 .terminal-reconnecting {
   position: absolute;
@@ -355,9 +355,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink);
+  background: var(--terminal-bg);
   opacity: 0.9;
-  color: color-mix(in oklab, var(--bg), transparent 35%);
+  color: var(--terminal-ink-muted);
   font-size: 0.875rem;
   z-index: 10;
   font-family: var(--font-mono);
