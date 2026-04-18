@@ -33,7 +33,10 @@
     <button
       type="button"
       class="sb-collapse"
-      onclick="event.stopPropagation(); toggleSidebar();"
+      onclick="
+        event.stopPropagation();
+        toggleSidebar();
+      "
       title="Collapse sidebar"
     >
       <svg
@@ -164,6 +167,90 @@
         </svg>
       </span>
       <span>Docs</span>
+    </button>
+  </div>
+
+  <!-- Inspect section -->
+  <div class="sb-section">Inspect</div>
+  <div class="sb-nav">
+    <button
+      type="button"
+      id="sidebar-nav-terminal"
+      class="sb-nav-item"
+      onclick="toggleTerminalPanel()"
+      title="Toggle terminal (Ctrl+`)"
+    >
+      <span class="sb-icon">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="4 17 10 11 4 5"></polyline>
+          <line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+      </span>
+      <span>Terminal</span>
+      <span class="kbd">⌃`</span>
+    </button>
+
+    <button
+      type="button"
+      id="sidebar-nav-depgraph"
+      class="sb-nav-item"
+      onclick="toggleDependencyGraph()"
+      title="Toggle dependency graph"
+    >
+      <span class="sb-icon">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="5" cy="6" r="2"></circle>
+          <circle cx="19" cy="6" r="2"></circle>
+          <circle cx="12" cy="18" r="2"></circle>
+          <line x1="5" y1="8" x2="12" y2="16"></line>
+          <line x1="19" y1="8" x2="12" y2="16"></line>
+        </svg>
+      </span>
+      <span>Dep graph</span>
+    </button>
+
+    <button
+      type="button"
+      id="sidebar-nav-usage"
+      class="sb-nav-item"
+      onclick="showUsageStats()"
+      title="Usage analytics"
+    >
+      <span class="sb-icon">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="18" y="3" width="4" height="18"></rect>
+          <rect x="10" y="8" width="4" height="13"></rect>
+          <rect x="2" y="13" width="4" height="8"></rect>
+        </svg>
+      </span>
+      <span>Usage</span>
     </button>
   </div>
 

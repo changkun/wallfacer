@@ -601,17 +601,3 @@
     transition: none;
   }
 }
-
-/* Sidebar unread dot (Board nav) — mirrors spec-chat-tab__unread. */
-.sidebar-nav__unread-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent, #6366f1);
-  display: inline-block;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-.sidebar-nav__unread-dot[hidden] {
-  display: none;
-}
