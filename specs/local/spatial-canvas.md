@@ -1,6 +1,6 @@
 ---
 title: Spatial Canvas
-status: vague
+status: archived
 depends_on: []
 affects:
   - ui/js/
@@ -10,10 +10,11 @@ affects:
   - internal/store/
 effort: xlarge
 created: 2026-04-03
-updated: 2026-04-03
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Spatial Canvas
 
