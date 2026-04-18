@@ -150,73 +150,79 @@ async function openWorkspaceFolder(path) {
 }
 
 function renderWorkspaces() {
-  const el = document.getElementById("workspace-git-bar");
-  if (!el) return;
+  renderStatusBarBranches();
+  updateDocumentTitle();
+  if (typeof updateStatusBar === "function") updateStatusBar();
+}
+
+function updateDocumentTitle() {
   if (!gitStatuses || gitStatuses.length === 0) {
-    el.innerHTML = (activeWorkspaces || [])
-      .map((path) => {
-        const parts = String(path || "")
-          .replace(/[\\/]+$/, "")
-          .split(/[\\/]/);
-        const name = parts[parts.length - 1] || path;
-        return `<span title="${escapeHtml(path)}" style="font-size:11px;padding:2px 8px;border-radius:999px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);">${escapeHtml(name)}</span>`;
-      })
-      .join("");
     if (activeWorkspaces && activeWorkspaces.length > 0) {
       document.title = "Wallfacer";
     }
     return;
   }
-  // Update browser tab title with workspace names
   const names = gitStatuses.map((ws) => ws.name).filter(Boolean);
   if (names.length > 0) {
     document.title = "Wallfacer \u2014 " + names.join(", ");
   }
+}
+
+// renderStatusBarBranches — one group per workspace in the status bar's
+// left slot: `⎇ branch` pill (opens branch dropdown) followed by ahead/
+// behind badges and sync/push/rebase actions when relevant.
+function renderStatusBarBranches() {
+  const el = document.getElementById("status-bar-branches");
+  if (!el) return;
+  if (!gitStatuses || gitStatuses.length === 0) {
+    el.innerHTML = "";
+    return;
+  }
   el.innerHTML = gitStatuses
     .map((ws, i) => {
-      const httpsUrl = remoteUrlToHttps(ws.remote_url);
-      const nameEl = httpsUrl
-        ? `<a href="${escapeHtml(httpsUrl)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="Open ${escapeHtml(httpsUrl)}">${escapeHtml(ws.name)}</a>`
-        : `<button onclick="openWorkspaceFolder(${escapeHtml(JSON.stringify(ws.path))})" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;font:inherit;" title="Open in file manager">${escapeHtml(ws.name)}</button>`;
+      if (!ws.is_git_repo || !ws.branch) return "";
+      const multi = gitStatuses.length > 1;
+      const label = multi
+        ? `${escapeHtml(ws.name)}:${escapeHtml(ws.branch)}`
+        : escapeHtml(ws.branch);
+      const title = `${ws.path || ws.name}\nBranch: ${ws.branch}`;
+      const branchBtn =
+        `<button type="button" class="status-bar-branch" data-ws-idx="${i}" ` +
+        `onclick="toggleBranchDropdown(this, event)" title="${escapeHtml(title)}">` +
+        `<span class="status-bar-branch__glyph">⎇</span>` +
+        `<span class="status-bar-branch__name">${label}</span>` +
+        `</button>`;
 
-      if (!ws.is_git_repo) {
-        return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${nameEl} <span style="font-size:9px;opacity:0.7;">(not a git repo)</span></span>`;
+      // Upstream status + actions are only meaningful when there's a remote.
+      let extras = "";
+      if (ws.has_remote) {
+        const behindBadge =
+          ws.behind_count > 0
+            ? `<span class="status-bar-branch__badge status-bar-branch__badge--behind" title="${ws.behind_count} commits behind upstream">${ws.behind_count}↓</span>`
+            : "";
+        const aheadBadge =
+          ws.ahead_count > 0
+            ? `<span class="status-bar-branch__badge status-bar-branch__badge--ahead" title="${ws.ahead_count} commits ahead of upstream">${ws.ahead_count}↑</span>`
+            : "";
+        const syncBtn =
+          ws.behind_count > 0
+            ? `<button type="button" data-ws-idx="${i}" onclick="syncWorkspace(this)" class="status-bar-branch__action status-bar-branch__action--sync" title="Pull ${ws.behind_count} commits from upstream">Sync</button>`
+            : "";
+        const pushBtn =
+          ws.ahead_count > 0
+            ? `<button type="button" data-ws-idx="${i}" onclick="pushWorkspace(this)" class="status-bar-branch__action status-bar-branch__action--push" title="Push ${ws.ahead_count} commits to upstream">Push</button>`
+            : "";
+        const rebaseBtn =
+          ws.main_branch && ws.branch !== ws.main_branch
+            ? `<button type="button" data-ws-idx="${i}" onclick="rebaseOnMain(this)" class="status-bar-branch__action status-bar-branch__action--rebase" title="Fetch origin/${escapeHtml(ws.main_branch)} and rebase current branch on top">${ws.behind_main_count > 0 ? ws.behind_main_count + "↓ " : ""}Rebase on ${escapeHtml(ws.main_branch)}</button>`
+            : "";
+        extras = behindBadge + aheadBadge + syncBtn + pushBtn + rebaseBtn;
       }
-      if (!ws.has_remote) {
-        return `<span title="${escapeHtml(ws.path)}" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${nameEl}</span>`;
-      }
-      const branchBtn = ws.branch
-        ? ` <button class="branch-switcher-btn" data-ws-idx="${i}" onclick="toggleBranchDropdown(this, event)" title="Switch branch">` +
-          `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Z"></path></svg>` +
-          `<span class="branch-name">${escapeHtml(ws.branch)}</span>` +
-          `<svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor" style="flex-shrink:0;opacity:0.6;"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>` +
-          `</button>`
-        : "";
-      const aheadBadge =
-        ws.ahead_count > 0
-          ? `<span style="background:var(--accent);color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:600;line-height:17px;">${ws.ahead_count}↑</span>`
-          : "";
-      const behindBadge =
-        ws.behind_count > 0
-          ? `<span style="background:var(--text-muted);color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:600;line-height:17px;">${ws.behind_count}↓</span>`
-          : "";
-      const syncBtn =
-        ws.behind_count > 0
-          ? `<button data-ws-idx="${i}" onclick="syncWorkspace(this)" style="background:var(--text-muted);color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:500;cursor:pointer;line-height:17px;">Sync</button>`
-          : "";
-      const pushBtn =
-        ws.ahead_count > 0
-          ? `<button data-ws-idx="${i}" onclick="pushWorkspace(this)" style="background:var(--accent);color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:500;cursor:pointer;line-height:17px;">Push</button>`
-          : "";
-      const rebaseMainBtn =
-        ws.branch && ws.main_branch && ws.branch !== ws.main_branch
-          ? `<button data-ws-idx="${i}" onclick="rebaseOnMain(this)" style="background:#7c3aed;color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:500;cursor:pointer;line-height:17px;" title="Fetch origin/${escapeHtml(ws.main_branch)} and rebase current branch on top">${ws.behind_main_count > 0 ? ws.behind_main_count + "↓ " : ""}Rebase on ${escapeHtml(ws.main_branch)}</button>`
-          : "";
-      return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px 2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);position:relative;">${nameEl}${branchBtn}${behindBadge}${aheadBadge}${syncBtn}${pushBtn}${rebaseMainBtn}</span>`;
+      return (
+        `<span class="status-bar-branch-group">${branchBtn}${extras}</span>`
+      );
     })
     .join("");
-
-  if (typeof updateStatusBar === "function") updateStatusBar();
 }
 
 // --- Branch dropdown ---

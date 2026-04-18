@@ -424,144 +424,172 @@ function updateWorkspaceGroupBadges() {
   }
 }
 
-var _tabOverflowObserver = null;
+// Active popover state (set when the sidebar ws-switch is open).
+var _wsPopoverOpen = false;
 
+// Retained for back-compat: some call sites (tests, legacy modules) still read
+// these. The sidebar popover doesn't need auto-collapse.
+var _autoCollapsedGroupIndices = [];
+
+// renderHeaderWorkspaceGroupTabs — legacy name kept because many callers still
+// reference it. The group switcher now lives in the sidebar (a single button
+// that opens a popover); the header exposes branch tabs instead.
 function renderHeaderWorkspaceGroupTabs() {
-  var el = document.getElementById("workspace-group-tabs");
-  if (!el) return;
-  // Ensure the active group is never hidden.
-  workspaceGroups.forEach(function (group, index) {
+  renderSidebarWorkspaceSwitch();
+}
+
+function renderSidebarWorkspaceSwitch() {
+  var nameEl = document.getElementById("sidebar-ws-name");
+  var dotEl = document.getElementById("sidebar-ws-dot");
+  var switchBtn = document.getElementById("sidebar-ws-switch");
+  if (!switchBtn) return;
+  // Locate the active group; fall back to basename of first workspace.
+  var activeGroup = null;
+  workspaceGroups.forEach(function (group) {
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
-    if (workspaceGroupsEqual(paths, activeWorkspaces)) {
-      hiddenGroupIndices.delete(index);
-    }
+    if (workspaceGroupsEqual(paths, activeWorkspaces)) activeGroup = group;
   });
-  var tabs = "";
+  var label = activeGroup
+    ? workspaceGroupLabel(activeGroup)
+    : activeWorkspaces && activeWorkspaces.length
+      ? (function () {
+          var clean = String(activeWorkspaces[0] || "").replace(/[\\/]+$/, "");
+          var parts = clean.split(/[\\/]/);
+          return parts[parts.length - 1] || clean;
+        })()
+      : "workspace";
+  if (nameEl) nameEl.textContent = label;
+  if (dotEl) dotEl.textContent = (label.charAt(0) || "W").toUpperCase();
+  switchBtn.title = label;
+
+  // If the popover is open, rebuild its contents so live badges and the
+  // active highlight stay in sync.
+  if (_wsPopoverOpen) _renderWorkspaceGroupPopover();
+}
+
+function toggleWorkspaceGroupPopover(event) {
+  if (event) event.stopPropagation();
+  if (_wsPopoverOpen) {
+    closeWorkspaceGroupPopover();
+    return;
+  }
+  _openWorkspaceGroupPopover();
+}
+
+function _openWorkspaceGroupPopover() {
+  var pop = document.getElementById("sidebar-ws-popover");
+  var btn = document.getElementById("sidebar-ws-switch");
+  if (!pop || !btn) return;
+  _wsPopoverOpen = true;
+  btn.setAttribute("aria-expanded", "true");
+  pop.removeAttribute("hidden");
+  _renderWorkspaceGroupPopover();
+  _positionWorkspaceGroupPopover();
+  // Outside-click dismisses. Defer registration so the triggering click
+  // doesn't immediately close it.
+  setTimeout(function () {
+    document.addEventListener("click", _wsPopoverOutsideClick, true);
+    document.addEventListener("keydown", _wsPopoverEscapeKey, true);
+    if (typeof window !== "undefined" && window.addEventListener) {
+      window.addEventListener("resize", _positionWorkspaceGroupPopover, true);
+    }
+  }, 0);
+}
+
+// _positionWorkspaceGroupPopover anchors the fixed-position popover directly
+// below the ws-switch button. Width tracks the button when the sidebar is
+// expanded; falls back to 220px when collapsed so it stays readable.
+function _positionWorkspaceGroupPopover() {
+  var pop = document.getElementById("sidebar-ws-popover");
+  var btn = document.getElementById("sidebar-ws-switch");
+  if (!pop || !btn) return;
+  if (typeof btn.getBoundingClientRect !== "function") return;
+  var rect = btn.getBoundingClientRect();
+  var collapsed = rect.width < 80;
+  var width = collapsed ? 220 : rect.width;
+  pop.style.top = Math.round(rect.bottom + 4) + "px";
+  pop.style.left = Math.round(rect.left) + "px";
+  pop.style.width = width + "px";
+}
+
+function closeWorkspaceGroupPopover() {
+  var pop = document.getElementById("sidebar-ws-popover");
+  var btn = document.getElementById("sidebar-ws-switch");
+  _wsPopoverOpen = false;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+  if (pop) pop.setAttribute("hidden", "");
+  document.removeEventListener("click", _wsPopoverOutsideClick, true);
+  document.removeEventListener("keydown", _wsPopoverEscapeKey, true);
+  if (typeof window !== "undefined" && window.removeEventListener) {
+    window.removeEventListener("resize", _positionWorkspaceGroupPopover, true);
+  }
+}
+
+function _wsPopoverOutsideClick(e) {
+  var pop = document.getElementById("sidebar-ws-popover");
+  var btn = document.getElementById("sidebar-ws-switch");
+  if (!pop) return;
+  if (pop.contains(e.target)) return;
+  if (btn && btn.contains(e.target)) return;
+  closeWorkspaceGroupPopover();
+}
+
+function _wsPopoverEscapeKey(e) {
+  if (e.key === "Escape") closeWorkspaceGroupPopover();
+}
+
+function _renderWorkspaceGroupPopover() {
+  var pop = document.getElementById("sidebar-ws-popover");
+  if (!pop) return;
+  var rows = "";
   workspaceGroups.forEach(function (group, index) {
-    if (hiddenGroupIndices.has(index)) return;
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
     var active = workspaceGroupsEqual(paths, activeWorkspaces);
     var switching =
       workspaceGroupSwitching && workspaceGroupSwitchingIndex === index;
-    var cls = "workspace-group-tab";
-    if (active) cls += " workspace-group-tab--active";
-    if (switching) cls += " workspace-group-tab--switching";
+    var cls = "sb-ws-popover__item" + (active ? " active" : "");
     var badgeHtml =
       '<span class="wg-badge" data-wg-key="' +
       escapeHtml(group.key || "") +
       '">' +
       activeGroupBadgeHtml(group) +
       "</span>";
-    var label = switching
-      ? workspaceSwitchSpinnerHtml() +
-        " " +
-        escapeHtml(workspaceGroupLabel(group))
-      : escapeHtml(workspaceGroupLabel(group)) + badgeHtml;
+    var icon = switching
+      ? workspaceSwitchSpinnerHtml()
+      : active
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+        : '<span class="sb-ws-popover__spacer"></span>';
     var title = paths.join("\n");
-    var closeBtn = active
-      ? ""
-      : '<span class="workspace-group-tab__close" onclick="event.stopPropagation();hideWorkspaceGroupTab(' +
-        index +
-        ')" title="Hide tab">&times;</span>';
-    if (active) {
-      tabs +=
-        '<div class="' +
-        cls +
-        '" data-group-index="' +
-        index +
-        '" title="' +
-        escapeHtml(title) +
-        '" ondblclick="startInlineTabRename(this,' +
-        index +
-        ')">' +
-        label +
-        '<span class="workspace-group-tab__edit" onclick="event.stopPropagation();startInlineTabRename(this.parentElement,' +
-        index +
-        ')" title="Rename group">&#9998;</span>' +
-        "</div>";
-    } else {
-      tabs +=
-        '<button type="button" class="' +
-        cls +
-        '" data-group-index="' +
-        index +
-        '" title="' +
-        escapeHtml(title) +
-        '" onclick="useWorkspaceGroup(' +
-        index +
-        ')"' +
-        (workspaceGroupSwitching ? " disabled" : "") +
-        ">" +
-        label +
-        closeBtn +
-        "</button>";
-    }
+    rows +=
+      '<button type="button" class="' +
+      cls +
+      '" data-group-index="' +
+      index +
+      '" title="' +
+      escapeHtml(title) +
+      '" onclick="' +
+      (active
+        ? "closeWorkspaceGroupPopover()"
+        : "closeWorkspaceGroupPopover();useWorkspaceGroup(" + index + ")") +
+      '"' +
+      (workspaceGroupSwitching && !active ? " disabled" : "") +
+      ">" +
+      '<span class="sb-ws-popover__check">' +
+      icon +
+      "</span>" +
+      '<span class="sb-ws-popover__label">' +
+      escapeHtml(workspaceGroupLabel(group)) +
+      badgeHtml +
+      "</span>" +
+      "</button>";
   });
-  // "+" button to add a workspace group tab.
-  tabs +=
-    '<button type="button" class="workspace-group-tab workspace-group-tab--add" onclick="addWorkspaceGroupTab(event)" title="Add workspace group">+</button>';
-  el.innerHTML = tabs;
-  // Auto-collapse overflowing tabs after layout.
-  requestAnimationFrame(function () {
-    _collapseOverflowingTabs();
-  });
-  _setupTabOverflowObserver();
-}
-
-// Detect and auto-hide tabs that overflow the container width.
-function _collapseOverflowingTabs() {
-  var el = document.getElementById("workspace-group-tabs");
-  if (!el) return;
-  if (!el.children) return;
-  var children = Array.from(el.children);
-  if (children.length <= 1) return;
-
-  _tabCollapseRunning = true;
-
-  // First, reset all non-manually-hidden tabs to visible.
-  children.forEach(function (child) {
-    child.style.display = "";
-  });
-
-  if (typeof el.getBoundingClientRect !== "function") {
-    _tabCollapseRunning = false;
-    return;
-  }
-  var containerRight = el.getBoundingClientRect().right;
-  // The "+" button is always the last child; it must remain visible.
-  var addBtn = children[children.length - 1];
-  var collapsedIndices = [];
-
-  // Walk tabs in reverse (excluding active and "+") and hide those that overflow.
-  for (var i = children.length - 2; i >= 0; i--) {
-    var tab = children[i];
-    // Never hide the active tab.
-    if (tab.classList.contains("workspace-group-tab--active")) continue;
-    // Check if the "+" button overflows — if so, this tab needs to go.
-    if (addBtn.getBoundingClientRect().right <= containerRight + 1) break;
-    tab.style.display = "none";
-    var idx = tab.dataset.groupIndex;
-    if (idx !== undefined) collapsedIndices.push(parseInt(idx, 10));
-  }
-
-  // Store auto-collapsed indices so the "+" menu can show them.
-  _autoCollapsedGroupIndices = collapsedIndices;
-  _tabCollapseRunning = false;
-}
-
-var _autoCollapsedGroupIndices = [];
-var _tabCollapseRunning = false;
-
-function _setupTabOverflowObserver() {
-  var el = document.getElementById("workspace-group-tabs");
-  if (!el) return;
-  if (_tabOverflowObserver) _tabOverflowObserver.disconnect();
-  if (typeof ResizeObserver === "undefined") return;
-  _tabOverflowObserver = new ResizeObserver(function () {
-    if (_tabCollapseRunning) return;
-    _collapseOverflowingTabs();
-  });
-  _tabOverflowObserver.observe(el);
+  rows +=
+    '<div class="sb-ws-popover__divider"></div>' +
+    '<button type="button" class="sb-ws-popover__item sb-ws-popover__add" onclick="closeWorkspaceGroupPopover();showWorkspacePicker(false)">' +
+    '<span class="sb-ws-popover__check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>' +
+    '<span class="sb-ws-popover__label">Add workspace group…</span>' +
+    "</button>";
+  pop.innerHTML = rows;
 }
 
 function hideWorkspaceGroupTab(index) {

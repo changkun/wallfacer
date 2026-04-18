@@ -59,6 +59,101 @@
   margin-left: 2px;
   line-height: 14px;
 }
+.status-bar-branches {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 60vw;
+  overflow: hidden;
+}
+.status-bar-branches:empty {
+  display: none;
+}
+.status-bar-branch-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding-left: 6px;
+  border-left: 1px solid var(--rule);
+}
+.status-bar-branch-group:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+.status-bar-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-9);
+  font-family: var(--font-mono);
+  line-height: 18px;
+  cursor: pointer;
+  max-width: 200px;
+  overflow: hidden;
+}
+.status-bar-branch:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+.status-bar-branch__glyph {
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.status-bar-branch__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-bar-branch__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: var(--r-sm);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  color: #fff;
+}
+.status-bar-branch__badge--ahead {
+  background: var(--accent);
+}
+.status-bar-branch__badge--behind {
+  background: var(--ink-3);
+}
+.status-bar-branch__action {
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 0 6px;
+  font-size: 9px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  line-height: 15px;
+  color: #fff;
+  cursor: pointer;
+}
+.status-bar-branch__action--sync {
+  background: var(--ink-3);
+}
+.status-bar-branch__action--push {
+  background: var(--accent);
+}
+.status-bar-branch__action--rebase {
+  background: var(--purple);
+}
+.status-bar-branch__action:hover {
+  filter: brightness(1.1);
+}
 .status-bar-count {
   display: inline-flex;
   align-items: center;
