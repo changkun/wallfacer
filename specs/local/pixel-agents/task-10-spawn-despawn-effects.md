@@ -1,15 +1,16 @@
 ---
 title: Spawn and Despawn Effects
-status: complete
+status: archived
 depends_on:
   - specs/local/pixel-agents/task-07-character-state-machine.md
 affects: []
 effort: small
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 10: Spawn and Despawn Effects
 

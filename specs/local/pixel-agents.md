@@ -1,6 +1,6 @@
 ---
 title: Pixel Agent Avatars
-status: complete
+status: archived
 depends_on: []
 affects:
   - ui/js/office/
@@ -8,10 +8,11 @@ affects:
   - ui/index.html
 effort: xlarge
 created: 2026-03-29
-updated: 2026-03-30
+updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Plan: Pixel Agent Avatars
 

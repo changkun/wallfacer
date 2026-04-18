@@ -1,6 +1,6 @@
 ---
 title: Renderer and View Toggle
-status: complete
+status: archived
 depends_on:
   - specs/local/pixel-agents/task-02-tilemap-and-layout.md
   - specs/local/pixel-agents/task-03-sprite-cache.md
@@ -8,10 +8,11 @@ depends_on:
 affects: []
 effort: large
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 5: Renderer and View Toggle
 

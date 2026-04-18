@@ -1,15 +1,16 @@
 ---
 title: Art Integration and Asset Detection
-status: complete
+status: archived
 depends_on:
   - specs/local/pixel-agents/task-03-sprite-cache.md
 affects: []
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task 13: Art Integration and Asset Detection
 
