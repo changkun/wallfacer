@@ -1,4 +1,26 @@
 <div class="settings-tab-content" data-settings-tab="sandbox">
+  <div
+    class="settings-card"
+    data-js-host-mode-banner
+    hidden
+    style="
+      margin-bottom: 12px;
+      border-left: 3px solid var(--warn, #a56a12);
+      background: var(--tint-amber, #f1e7cf);
+      color: var(--tint-amber-ink, #7a5418);
+    "
+  >
+    <div class="settings-card-head">
+      <h4 style="margin: 0">Host mode active</h4>
+      <p style="margin: 4px 0 0 0">
+        Tasks run directly on your machine with your user's permissions.
+        Wallfacer cannot prevent an agent from writing outside the worktree.
+        Recommended only on trusted machines. Start with
+        <code>wallfacer run --backend container</code> to restore container
+        isolation.
+      </p>
+    </div>
+  </div>
   <div class="settings-card" style="margin-bottom: 12px">
     <div class="settings-card-head">
       <h4>Container Images</h4>

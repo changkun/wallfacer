@@ -71,6 +71,9 @@ function makeContext(overrides = {}) {
         pullStream: () => "/api/images/pull/stream",
         remove: () => "/api/images",
       },
+      config: {
+        get: () => "/api/config",
+      },
     },
     escapeHtml: (s) => String(s),
     showAlert: vi.fn(),
@@ -274,6 +277,47 @@ describe("images.js", () => {
       const ctx = makeContext({ elements: [] });
       loadScript(ctx);
       await ctx.pullSandboxImage("claude"); // should not throw
+    });
+  });
+
+  describe("updateHostModeBanner", () => {
+    function makeBannerContext(cfg) {
+      const banner = makeElement({ hidden: true });
+      const ctx = makeContext({
+        api: vi.fn(async (route) => {
+          if (route === "/api/config") return cfg;
+          return null;
+        }),
+      });
+      ctx.document.querySelector = (sel) =>
+        sel === "[data-js-host-mode-banner]" ? banner : null;
+      return { ctx, banner };
+    }
+
+    it("shows banner when host_mode is true", async () => {
+      const { ctx, banner } = makeBannerContext({ host_mode: true });
+      loadScript(ctx);
+      await ctx.updateHostModeBanner();
+      // Allow the microtask queue to drain so the .then() resolves.
+      await Promise.resolve();
+      expect(banner.hidden).toBe(false);
+    });
+
+    it("hides banner when host_mode is false", async () => {
+      const { ctx, banner } = makeBannerContext({ host_mode: false });
+      banner.hidden = false; // pretend it was shown, assert we hide it
+      loadScript(ctx);
+      await ctx.updateHostModeBanner();
+      await Promise.resolve();
+      expect(banner.hidden).toBe(true);
+    });
+
+    it("is a no-op when banner is absent", async () => {
+      const ctx = makeContext();
+      ctx.document.querySelector = () => null;
+      loadScript(ctx);
+      // Should not throw even though no banner exists.
+      await ctx.updateHostModeBanner();
     });
   });
 });
