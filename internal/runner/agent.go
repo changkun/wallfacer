@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,16 @@ import (
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
+
+// taskIDString returns the task's UUID as a string, or empty when the
+// caller supplied a nil task (task-free invocations like the planning
+// commit-message helper).
+func taskIDString(task *store.Task) string {
+	if task == nil {
+		return ""
+	}
+	return task.ID.String()
+}
 
 // MountMode enumerates the three fundamental container-mount profiles the
 // sub-agent roles in this package fall into. The parent spec's audit
@@ -115,6 +126,49 @@ type runAgentOpts struct {
 	// attach to the in-flight container. Called for every launch
 	// attempt, including the codex fallback.
 	OnLaunch func(containerName string, handle sandbox.Handle)
+
+	// SessionID, when non-empty, is threaded into buildAgentCmd as
+	// --resume <id>. Used by the multi-turn heavyweight roles so the
+	// second turn attaches to the first turn's conversation.
+	SessionID string
+	// ModelOverride, when non-empty, takes priority over the role's
+	// Model resolver and the env-derived default. Heavyweight roles
+	// use this for per-task model pinning.
+	ModelOverride string
+	// WorktreeOverrides maps workspace host paths to the task's
+	// worktree paths. MountReadWrite roles mount the worktrees in
+	// place of the raw workspaces so commits land on the task's
+	// branch.
+	WorktreeOverrides map[string]string
+	// BoardDir is the host directory containing board.json, mounted
+	// read-only at /workspace/.tasks/ alongside any siblings. Only
+	// honoured for MountReadWrite roles with MountBoard=true.
+	BoardDir string
+	// SiblingMounts maps shortID → (repoPath → worktreePath) for
+	// read-only mounts of other in-progress task worktrees, so the
+	// agent can reference sibling work without modifying it.
+	SiblingMounts map[string]map[string]string
+	// LiveLogWriter, when set, is tee'd alongside stdout and stderr
+	// during the container run so callers can stream output while the
+	// container is still alive. Heavyweight roles wire this to their
+	// liveLogs registry.
+	LiveLogWriter io.Writer
+	// CircuitBreaker, when set, is consulted before every launch
+	// attempt (Allow returning false short-circuits to an error) and
+	// notified of failures (RecordFailure) and successes
+	// (RecordSuccess). Only the heavyweight container-runtime CB is
+	// currently wired.
+	CircuitBreaker runAgentCircuitBreaker
+}
+
+// runAgentCircuitBreaker is the narrow surface runAgent needs from the
+// container-runtime circuit breaker. Defined as an interface so tests
+// and future backends can substitute a fake without importing the
+// circuitbreaker package.
+type runAgentCircuitBreaker interface {
+	Allow() bool
+	RecordFailure()
+	RecordSuccess()
 }
 
 // agentResult is runAgent's return envelope. It bundles the parsed
@@ -144,9 +198,6 @@ func (r *Runner) runAgent(
 	prompt string,
 	opts runAgentOpts,
 ) (*agentResult, error) {
-	if role.MountMode == MountReadWrite {
-		return nil, fmt.Errorf("runAgent: mount mode %v not yet implemented", role.MountMode)
-	}
 	if role.Name == "" {
 		return nil, fmt.Errorf("runAgent: role.Name is required")
 	}
@@ -217,7 +268,7 @@ func (r *Runner) runAgent(
 					store.SpanData{Phase: "container_run", Label: string(activity)})
 			}()
 		}
-		return r.launchOne(runCtx, role, containerName, prompt, sb, labels, opts.OnLaunch)
+		return r.launchOne(runCtx, role, containerName, prompt, sb, labels, task, opts)
 	}
 
 	result, err := launchOnce(primary)
@@ -275,43 +326,111 @@ func (r *Runner) runAgent(
 // launchOne builds the container spec, invokes backend.Launch, drains
 // the streams, and parses the NDJSON result for a single sub-agent
 // invocation. It dispatches on role.MountMode to add the right volume
-// mounts: MountNone is a minimal headless launch, MountReadOnly layers
-// read-only workspace + instructions mounts on top so the agent can
-// inspect the code without modifying it.
+// mounts and feeds optional heavyweight concerns (live-log tee,
+// circuit breaker) when supplied via opts.
 func (r *Runner) launchOne(
 	ctx context.Context,
 	role AgentRole,
 	containerName, prompt string,
 	sb sandbox.Type,
 	labels map[string]string,
-	onLaunch func(string, sandbox.Handle),
+	task *store.Task,
+	opts runAgentOpts,
 ) (*agentResult, error) {
-	model := r.modelFromEnvForSandbox(sb)
-	if role.Model != nil {
-		if m := role.Model(sb); m != "" {
-			model = m
+	// Short-circuit on an open container-runtime circuit breaker. Only
+	// heavyweight callers wire this today; the header roles pass nil.
+	if opts.CircuitBreaker != nil && !opts.CircuitBreaker.Allow() {
+		return nil, fmt.Errorf("%s: container circuit breaker open: container runtime may be unavailable", role.Name)
+	}
+
+	// Resolve the model with the explicit override > role-specific
+	// resolver > env-derived default. This mirrors the priority
+	// buildContainerSpecForSandbox applied before the migration.
+	model := opts.ModelOverride
+	if model == "" {
+		if role.Model != nil {
+			model = role.Model(sb)
+		}
+		if model == "" {
+			model = r.modelFromEnvForSandbox(sb)
 		}
 	}
-	spec := r.buildInspectorSpec(containerName, model, sb, role.MountMode)
+
+	var spec sandbox.ContainerSpec
+	switch role.MountMode {
+	case MountReadWrite:
+		// Heavyweight spec builder already handles worktree mounts,
+		// board + sibling context, and per-task labels.
+		spec = r.buildContainerSpecForSandbox(
+			containerName,
+			taskIDString(task),
+			prompt,
+			opts.SessionID,
+			opts.WorktreeOverrides,
+			opts.BoardDir,
+			opts.SiblingMounts,
+			opts.ModelOverride,
+			sb,
+		)
+	default:
+		spec = r.buildInspectorSpec(containerName, model, sb, role.MountMode)
+		spec.Cmd = buildAgentCmd(prompt, model)
+		if opts.SessionID != "" {
+			spec.Cmd = append(spec.Cmd, "--resume", opts.SessionID)
+		}
+	}
+
 	// Clone the labels map so a caller that hands us a shared map (the
 	// migrated title/oversight/commit call sites do) cannot be mutated
 	// by the backend or by a later retry.
-	spec.Labels = make(map[string]string, len(labels))
-	for k, v := range labels {
-		spec.Labels[k] = v
+	merged := make(map[string]string, len(spec.Labels)+len(labels))
+	for k, v := range spec.Labels {
+		merged[k] = v
 	}
-	spec.Cmd = buildAgentCmd(prompt, model)
+	for k, v := range labels {
+		merged[k] = v
+	}
+	spec.Labels = merged
 
 	handle, launchErr := r.backend.Launch(ctx, spec)
 	if launchErr != nil {
+		if opts.CircuitBreaker != nil {
+			opts.CircuitBreaker.RecordFailure()
+		}
 		return nil, fmt.Errorf("launch %s container: %w", role.Name, launchErr)
 	}
-	if onLaunch != nil {
-		onLaunch(containerName, handle)
+	if opts.OnLaunch != nil {
+		opts.OnLaunch(containerName, handle)
 	}
-	rawStdout, _ := io.ReadAll(handle.Stdout())
-	rawStderr, _ := io.ReadAll(handle.Stderr())
-	exitCode, _ := handle.Wait()
+
+	// Stdout / stderr are tee'd into the optional live-log writer so
+	// callers can stream output while the container is still alive.
+	// When no writer is supplied we fall back to a direct ReadAll.
+	var rawStdout, rawStderr []byte
+	if opts.LiveLogWriter != nil {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			rawStdout, _ = io.ReadAll(io.TeeReader(handle.Stdout(), opts.LiveLogWriter))
+		}()
+		go func() {
+			defer wg.Done()
+			rawStderr, _ = io.ReadAll(io.TeeReader(handle.Stderr(), opts.LiveLogWriter))
+		}()
+		wg.Wait()
+	} else {
+		rawStdout, _ = io.ReadAll(handle.Stdout())
+		rawStderr, _ = io.ReadAll(handle.Stderr())
+	}
+	exitCode, waitErr := handle.Wait()
+
+	// Exit code 125 is the container runtime's "engine error" signal
+	// (podman / docker). Record it against the circuit breaker even
+	// when ctx is still alive so repeated engine failures trip it.
+	if exitCode == 125 && ctx.Err() == nil && opts.CircuitBreaker != nil {
+		opts.CircuitBreaker.RecordFailure()
+	}
 
 	// Context cancellation → report as terminated (matches the legacy
 	// title/oversight/commit behaviour).
@@ -322,7 +441,20 @@ func (r *Runner) launchOne(
 
 	raw := strings.TrimSpace(string(rawStdout))
 	if raw == "" {
+		// Surface the wait error when present — classifyFailure keys
+		// on "exit status" or "empty output" to bucket container
+		// crashes into the retry-eligible category, so keep those
+		// phrases in the message verbatim.
+		if waitErr != nil {
+			// Wait error carries "exit status N" which classifyFailure
+			// keys on to bucket container crashes.
+			return nil, fmt.Errorf("%s: exec container: %w", role.Name, waitErr)
+		}
 		if exitCode != 0 {
+			// No wait error: distinguish this from a crash so the
+			// auto-retry classifier treats it as Unknown (no retry).
+			// Matches pre-migration behaviour in the heavyweight
+			// runContainer path.
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
 				role.Name, exitCode, truncate(string(rawStderr), 200))
 		}
@@ -339,11 +471,19 @@ func (r *Runner) launchOne(
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s stdout=%s",
 				role.Name, exitCode, truncate(string(rawStderr), 200), truncate(raw, 200))
 		}
-		return nil, fmt.Errorf("%s parse failure: raw=%s", role.Name, truncate(raw, 200))
+		// Wording matches the pre-migration message so callers that
+		// grep on "parse output" (some tests do) still match.
+		return nil, fmt.Errorf("%s: parse output: %w (raw: %s)", role.Name, err, truncate(raw, 200))
 	}
 	if exitCode != 0 {
 		logger.Runner.Warn(role.Name+": container exited non-zero but produced valid output",
 			"code", exitCode, "sandbox", sb, "model", model)
+	}
+	// Successful happy-path → mark the circuit breaker healthy if one
+	// is configured. Opening-then-closing tracks runtime state when a
+	// transient engine issue resolved itself.
+	if opts.CircuitBreaker != nil {
+		opts.CircuitBreaker.RecordSuccess()
 	}
 	output.ActualSandbox = sb
 	return &agentResult{

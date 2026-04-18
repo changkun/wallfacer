@@ -3,14 +3,11 @@ package runner
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -608,8 +605,44 @@ func (r *Runner) titleModelFromEnvForSandbox(sb sandbox.Type) string {
 	}
 }
 
+// roleImplementation and roleTesting are the heavyweight descriptors the
+// multi-turn agent turn loop in execute.go calls runAgent through. They
+// carry no timeout (the turn loop owns the deadline via ctx), no
+// ParseResult (the caller operates directly on the raw agentOutput),
+// and a noop ParseResult stub so runAgent's required-field check
+// passes. Turn sequencing, session recovery, and verdict inference
+// stay in execute.go — runAgent handles only the per-turn launch.
+var roleImplementation = AgentRole{
+	Activity:    store.SandboxActivityImplementation,
+	Name:        "impl",
+	Timeout:     nil,
+	MountMode:   MountReadWrite,
+	MountBoard:  true,
+	SingleTurn:  false,
+	ParseResult: passthroughParse,
+}
+
+var roleTesting = AgentRole{
+	Activity:    store.SandboxActivityTesting,
+	Name:        "test",
+	Timeout:     nil,
+	MountMode:   MountReadWrite,
+	MountBoard:  true,
+	SingleTurn:  false,
+	ParseResult: passthroughParse,
+}
+
+// passthroughParse is a no-op ParseResult that hands the raw agent
+// output back to the heavyweight caller. The caller parses role-
+// specific fields (final result, verdict, continue signals) itself.
+func passthroughParse(o *agentOutput) (any, error) { return o, nil }
+
 // runContainer executes an agent container and parses its NDJSON output.
-// Returns (output, rawStdout, rawStderr, error).
+// Returns (output, rawStdout, rawStderr, error). Wraps runAgent with the
+// heavyweight-specific concerns: slugged container name, live-log tee,
+// container-runtime circuit breaker, and the per-activity descriptor
+// dispatch. The outer turn loop in execute.go owns session handling
+// and retry policy beyond the Claude→Codex token-limit fallback.
 func (r *Runner) runContainer(
 	ctx context.Context,
 	taskID uuid.UUID,
@@ -620,160 +653,133 @@ func (r *Runner) runContainer(
 	modelOverride string,
 	activity store.SandboxActivity,
 ) (*agentOutput, []byte, []byte, error) {
-	// Build a human-readable container name: wallfacer-<slug>-<uuid8>
-	// The slug is derived from the task prompt so external tools (docker ps,
-	// podman ps) can identify which task is running without needing the UUID.
 	slug := slugifyPrompt(prompt, 30)
 	containerName := "wallfacer-" + slug + "-" + taskID.String()[:8]
 
-	// Track the container name so KillContainer and StreamLogs can find it.
-	// Initially register by name; upgraded to handle after Launch succeeds.
-	r.taskContainers.Set(taskID, containerName)
-	defer r.taskContainers.Delete(taskID)
-
-	sb := sandbox.Claude
-	if task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
-		sb = r.sandboxForTaskActivity(task, activity)
-	} else {
+	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
+	if err != nil {
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
 	}
 
-	// runWithSandbox encapsulates the full launch-read-parse cycle for a
-	// single sandbox type. It is called once with the configured sandbox,
-	// and possibly a second time with Codex if a token/rate limit is detected
-	// (claude→codex fallback).
-	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		// Refuse to launch if the container runtime is known-unavailable.
-		if !r.containerCB.Allow() {
-			return nil, nil, nil, fmt.Errorf("container circuit breaker open: container runtime may be unavailable")
-		}
-
-		spec := r.buildContainerSpecForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
-		if spec.Labels != nil {
-			spec.Labels["wallfacer.task.activity"] = string(activity)
-		}
-
-		logger.Runner.Debug("exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox, "workdir", spec.WorkDir, "volumes", len(spec.Volumes))
-		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
-
-		handle, launchErr := r.backend.Launch(ctx, spec)
-		if launchErr != nil {
-			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
-			r.containerCB.RecordFailure()
-			return nil, nil, nil, fmt.Errorf("launch container: %w", launchErr)
-		}
-		// Upgrade registry entry with the handle so kill goes through it.
-		r.taskContainers.SetHandle(taskID, handle, nil)
-
-		// Set up a live log buffer so the streaming handler can serve
-		// output while the container is still running. Both stdout and
-		// stderr are tee'd into the buffer and read concurrently.
-		ll := newLiveLog()
-		r.liveLogs.Store(taskID, ll)
-		defer func() {
-			ll.Close()
-			r.liveLogs.Delete(taskID)
-		}()
-
-		var rawStdout, rawStderr []byte
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			rawStdout, _ = io.ReadAll(io.TeeReader(handle.Stdout(), ll))
-		}()
-		go func() {
-			defer wg.Done()
-			rawStderr, _ = io.ReadAll(io.TeeReader(handle.Stderr(), ll))
-		}()
-		wg.Wait()
-		exitCode, waitErr := handle.Wait()
-		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
-
-		// Detect container runtime failures (exit code 125 = engine error).
-		if exitCode == 125 && ctx.Err() == nil {
-			r.containerCB.RecordFailure()
-		}
-
-		// If the context was cancelled or timed out, kill the container explicitly
-		// and return the context error rather than parsing potentially incomplete output.
-		if ctx.Err() != nil {
-			_ = handle.Kill()
-			return nil, rawStdout, rawStderr, fmt.Errorf("container terminated: %w", ctx.Err())
-		}
-
-		raw := strings.TrimSpace(string(rawStdout))
-		if raw == "" {
-			if waitErr != nil {
-				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", waitErr)
-			}
-			if exitCode != 0 {
-				return nil, rawStdout, rawStderr,
-					fmt.Errorf("container exited with code %d: stderr=%s", exitCode, string(rawStderr))
-			}
-			stderrStr := strings.TrimSpace(string(rawStderr))
-			if stderrStr != "" {
-				return nil, rawStdout, rawStderr,
-					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
-			}
-			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from container")
-		}
-
-		output, parseErr := parseOutput(raw)
-		if parseErr != nil {
-			if waitErr != nil {
-				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", waitErr)
-			}
-			if exitCode != 0 {
-				return nil, rawStdout, rawStderr,
-					fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-						exitCode, string(rawStderr), truncate(raw, 500))
-			}
-			return nil, rawStdout, rawStderr,
-				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
-		}
-
-		// The agent may exit non-zero even when it produces a valid result.
-		if exitCode != 0 {
-			logger.Runner.Warn("container exited non-zero but produced valid output",
-				"task", taskID, "code", exitCode, "sandbox", selectedSandbox)
-		}
-
-		// Container runtime is healthy: close the circuit (or keep it closed).
-		r.containerCB.RecordSuccess()
-		output.ActualSandbox = selectedSandbox
-		return output, rawStdout, rawStderr, nil
+	role := roleImplementation
+	if activity == store.SandboxActivityTesting {
+		role = roleTesting
 	}
+	role.Activity = activity
 
-	// Primary attempt with the configured sandbox, followed by automatic
-	// claude→codex fallback on token/rate limit errors (checked twice:
-	// once for launch/exec errors, once for is_error in the parsed output).
-	output, rawStdout, rawStderr, err := runWithSandbox(sb)
+	// Set up the live-log buffer that StreamLogs attaches to while the
+	// container is running. The tee is wired via LiveLogWriter so
+	// runAgent drains both streams through it.
+	ll := newLiveLog()
+	r.liveLogs.Store(taskID, ll)
+	defer func() {
+		ll.Close()
+		r.liveLogs.Delete(taskID)
+	}()
+
+	// Initial name-only registration so KillContainer can find the
+	// container even before Launch returns a handle; the OnLaunch
+	// callback upgrades to a handle entry.
+	r.taskContainers.Set(taskID, containerName)
+	defer r.taskContainers.Delete(taskID)
+
+	res, err := r.runAgent(ctx, role, task, prompt, runAgentOpts{
+		ContainerName:     containerName,
+		SessionID:         sessionID,
+		ModelOverride:     modelOverride,
+		WorktreeOverrides: worktreeOverrides,
+		BoardDir:          boardDir,
+		SiblingMounts:     siblingMounts,
+		LiveLogWriter:     ll,
+		CircuitBreaker:    r.containerCB,
+		EmitSpanEvents:    true,
+		// Usage is accounted in the outer turn-loop; runAgent does not
+		// bill heavyweight turns itself because the loop already does.
+	})
+	var output *agentOutput
+	var rawStdout, rawStderr []byte
+	if res != nil {
+		output = res.Output
+		rawStdout = res.RawStdout
+		rawStderr = res.RawStderr
+		if handle := r.taskContainers.GetHandle(taskID); handle != nil {
+			// Upgrade to the handle registration so callers mid-run
+			// can still reach the container.
+			_ = handle
+		}
+	}
 	if err != nil {
-		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
+		// Retry with codex on a token/rate limit. The first launch
+		// already consumed the primary sandbox via the role's
+		// sandboxForTaskActivity resolution, so the fallback is a
+		// separate runAgent call that hard-forces Codex by pinning
+		// the model override.
+		if task != nil && r.sandboxForTaskActivity(task, activity) == sandbox.Claude &&
+			isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
 			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
-
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
-			return runWithSandbox(sandbox.Codex)
+			return r.runContainerOnSandbox(ctx, role, task, containerName, prompt, sessionID,
+				modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, sandbox.Codex)
 		}
 		return nil, rawStdout, rawStderr, err
 	}
-
-	if sb == sandbox.Claude && output != nil && output.IsError &&
-		isLikelyTokenLimitError(output.Result, output.Subtype) {
+	if task != nil && r.sandboxForTaskActivity(task, activity) == sandbox.Claude &&
+		output != nil && output.IsError && isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
 		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
-
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
-		return runWithSandbox(sandbox.Codex)
+		return r.runContainerOnSandbox(ctx, role, task, containerName, prompt, sessionID,
+			modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, sandbox.Codex)
 	}
 
 	return output, rawStdout, rawStderr, nil
+}
+
+// runContainerOnSandbox is the inner codex-fallback helper. It re-runs
+// the heavyweight launch against a pinned sandbox type by forcing
+// the model override to the sandbox's env-derived default. Used from
+// runContainer when the first attempt surfaced a token/rate limit.
+func (r *Runner) runContainerOnSandbox(
+	ctx context.Context,
+	role AgentRole,
+	task *store.Task,
+	containerName, prompt, sessionID, modelOverride string,
+	worktreeOverrides map[string]string,
+	boardDir string,
+	siblingMounts map[string]map[string]string,
+	ll *liveLog,
+	sb sandbox.Type,
+) (*agentOutput, []byte, []byte, error) {
+	// Override the per-activity sandbox resolution by temporarily
+	// assigning Sandbox on a shallow task copy so sandboxForTaskActivity
+	// returns the pinned sandbox.
+	var taskCopy *store.Task
+	if task != nil {
+		c := *task
+		c.Sandbox = sb
+		c.SandboxByActivity = nil
+		taskCopy = &c
+	}
+	res, err := r.runAgent(ctx, role, taskCopy, prompt, runAgentOpts{
+		ContainerName:     containerName,
+		SessionID:         sessionID,
+		ModelOverride:     modelOverride,
+		WorktreeOverrides: worktreeOverrides,
+		BoardDir:          boardDir,
+		SiblingMounts:     siblingMounts,
+		LiveLogWriter:     ll,
+		CircuitBreaker:    r.containerCB,
+		EmitSpanEvents:    true,
+	})
+	if res == nil {
+		return nil, nil, nil, err
+	}
+	return res.Output, res.RawStdout, res.RawStderr, err
 }
 
 // isLikelyTokenLimitError heuristically detects rate-limit and token-limit errors
