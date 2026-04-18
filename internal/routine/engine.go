@@ -2,6 +2,7 @@ package routine
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"time"
 
@@ -93,17 +94,28 @@ func NewEngine(ctx context.Context, clock Clock, fire FireFunc) *Engine {
 	}
 }
 
-// Register installs or updates a routine. Any previously-armed timer for
-// the same id is stopped first, then a fresh timer is armed based on the
-// supplied schedule's next fire time. Registering a disabled schedule
-// (one whose Next returns the zero time) keeps the entry but leaves it
-// un-armed — the id still appears in [Engine.NextRuns] with a zero time.
+// Register installs or updates a routine. If the id is already registered
+// with a schedule equal (by reflect.DeepEqual) to s, Register is a no-op —
+// existing timers are preserved. Otherwise any previously-armed timer for
+// the same id is stopped and a fresh timer is armed based on s's next
+// fire time. Registering a disabled schedule (one whose Next returns the
+// zero time) keeps the entry but leaves it un-armed — the id still
+// appears in [Engine.NextRuns] with a zero time.
+//
+// Idempotence matters: callers like the handler's routine reconciler run
+// on every store change, so Register is invoked repeatedly with the same
+// schedule for every routine. Without the equality check, each call would
+// stop and re-arm the timer, resetting NextRun and creating a cascade as
+// the NextRun write fans out through the watcher.
 func (e *Engine) Register(id uuid.UUID, s Schedule) {
 	if s == nil {
 		s = disabled{}
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if ent, ok := e.entries[id]; ok && reflect.DeepEqual(ent.schedule, s) {
+		return
+	}
 	e.armLocked(id, s)
 }
 
@@ -130,7 +142,6 @@ func (e *Engine) Trigger(id uuid.UUID) {
 		e.mu.Unlock()
 		return
 	}
-	schedule := ent.schedule
 	// Stop the pending scheduled timer — Trigger supersedes this cycle.
 	if ent.timer != nil {
 		ent.timer.Stop()
@@ -143,14 +154,7 @@ func (e *Engine) Trigger(id uuid.UUID) {
 		go e.fire(e.ctx, id)
 	}
 
-	// Re-arm the next scheduled cycle so cadence continues from now.
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	// The routine may have been unregistered between the fire dispatch and
-	// this re-lock; only re-arm if the entry is still present.
-	if _, stillRegistered := e.entries[id]; stillRegistered {
-		e.armLocked(id, schedule)
-	}
+	e.reArmAfterFire(id)
 }
 
 // NextRuns returns a snapshot of each registered routine's next-run
@@ -201,7 +205,6 @@ func (e *Engine) onFire(id uuid.UUID) {
 		e.mu.Unlock()
 		return
 	}
-	schedule := ent.schedule
 	ent.timer = nil
 	ent.nextRun = time.Time{}
 	e.mu.Unlock()
@@ -210,9 +213,29 @@ func (e *Engine) onFire(id uuid.UUID) {
 		go e.fire(e.ctx, id)
 	}
 
+	e.reArmAfterFire(id)
+}
+
+// reArmAfterFire installs the next scheduled cycle after a fire or manual
+// Trigger completes. It re-reads the current schedule under the lock so
+// that a Register call issued during the fire (for example, by the
+// handler's reconciler writing back state) is not overwritten by the
+// stale schedule captured before the fire dispatched. It also skips the
+// re-arm when another goroutine already installed a timer in the
+// meantime, preventing the double-arm race the earlier implementation
+// had when Register and fire interleaved.
+func (e *Engine) reArmAfterFire(id uuid.UUID) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if _, stillRegistered := e.entries[id]; stillRegistered {
-		e.armLocked(id, schedule)
+	ent, ok := e.entries[id]
+	if !ok {
+		return
 	}
+	if ent.timer != nil {
+		// Another caller (typically Register invoked from a reconcile
+		// callback triggered by state written during the fire) already
+		// armed a fresh timer. Respect their decision.
+		return
+	}
+	e.armLocked(id, ent.schedule)
 }
