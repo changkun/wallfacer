@@ -148,7 +148,7 @@ sequenceDiagram
     participant C as Container
     participant G as Git
 
-    B->>H: POST /api/tasks {prompt, goal}
+    B->>H: POST /api/tasks {prompt}
     H->>S: CreateTaskWithOptions()
     S->>S: saveTask() + notify()
     S-->>SSE: SequencedDelta (new task)

@@ -84,11 +84,6 @@ var BoardComposer = (function () {
       "<span>Timeout (min)</span>" +
       '<input type="number" id="board-composer-timeout" class="field" min="1" max="600" />' +
       "</label>" +
-      '<label class="board-composer__field board-composer__field--wide">' +
-      "<span>Goal (optional)</span>" +
-      '<input type="text" id="board-composer-goal" class="field" ' +
-      'placeholder="What does success look like?" />' +
-      "</label>" +
       '<div class="board-composer__field board-composer__field--wide">' +
       '<button type="button" class="btn-icon board-composer__templates">' +
       "Insert from template" +
@@ -238,15 +233,12 @@ var BoardComposer = (function () {
           : 60;
     var sandboxEl = el.querySelector("#board-composer-sandbox");
     var sandbox = sandboxEl ? sandboxEl.value : "";
-    var goalEl = el.querySelector("#board-composer-goal");
-    var goal = goalEl ? goalEl.value.trim() : "";
 
     // Body shape mirrors the existing task-create flow (see tasks.js
     // createTask). Fields not surfaced in the composer use sensible
     // defaults that match the wider UI.
     var body = {
       prompt: text,
-      goal: goal,
       timeout: timeout,
       mount_worktrees: true,
       sandbox: sandbox,

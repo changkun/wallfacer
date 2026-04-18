@@ -170,9 +170,9 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### Tasks
 - `GET /api/tasks` — List all tasks (optionally including archived)
-- `POST /api/tasks` — Create task (JSON: `{prompt, goal, timeout}`)
+- `POST /api/tasks` — Create task (JSON: `{prompt, timeout}`)
 - `POST /api/tasks/batch` — Create multiple tasks atomically with symbolic dependency wiring
-- `PATCH /api/tasks/{id}` — Update status/position/prompt/goal/timeout/sandbox/dependencies/fresh_start
+- `PATCH /api/tasks/{id}` — Update status/position/prompt/timeout/sandbox/dependencies/fresh_start
 - `DELETE /api/tasks/{id}` — Soft-delete task (tombstone); data retained within retention window
 - `POST /api/tasks/{id}/feedback` — Submit feedback for waiting tasks
 - `POST /api/tasks/{id}/done` — Mark waiting task as done (triggers commit-and-push)
@@ -228,7 +228,7 @@ Ideation is implemented as a routine task (`Kind=routine`, `Tags=["system:ideati
 
 ### Routines
 - `GET /api/routines` — List routine cards with schedules and next-run times
-- `POST /api/routines` — Create a routine (JSON: `{prompt, interval_minutes, spawn_kind?, enabled?, goal?, tags?, timeout?}`)
+- `POST /api/routines` — Create a routine (JSON: `{prompt, interval_minutes, spawn_kind?, enabled?, tags?, timeout?}`)
 - `PATCH /api/routines/{id}/schedule` — Update interval and/or enabled flag (JSON: `{interval_minutes?, enabled?}`); omitted fields left unchanged
 - `POST /api/routines/{id}/trigger` — Fire immediately; scheduled cycle continues unchanged
 - Deletion uses `DELETE /api/tasks/{id}` (routine cards are tasks)

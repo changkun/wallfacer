@@ -116,7 +116,6 @@ function makeContext(overrides = {}) {
   // These elements are required at script load time (top-level addEventListener calls).
   const baseElements = new Map([
     ["modal-edit-prompt", makeEl("TEXTAREA", { id: "modal-edit-prompt" })],
-    ["modal-edit-goal", makeEl("TEXTAREA", { id: "modal-edit-goal" })],
     ["modal-edit-timeout", makeEl("INPUT", { id: "modal-edit-timeout" })],
   ]);
   for (const [k, v] of overrides.elements || []) {

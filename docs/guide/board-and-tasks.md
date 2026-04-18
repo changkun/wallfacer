@@ -65,7 +65,7 @@ Click **+ New Task** in the Backlog column header to expand the creation form. T
 
 Click **Add** to create the task. It appears in the Backlog column with an auto-generated title.
 
-Each task has three text fields that form a hierarchy: **Title** (2-5 word label), **Goal** (1-3 sentence summary shown on the card), and **Prompt** (full spec for the agent). At creation, the goal defaults to the prompt text. After refinement, the goal is updated to a concise summary while the prompt becomes the detailed implementation spec. You can edit the goal independently in the task detail modal.
+Each task has two text fields: **Title** (2-5 word label) and **Prompt** (the full spec for the agent, shown on the card). After refinement, the prompt becomes the detailed implementation spec.
 
 For advanced creation options (templates, batch creation, dependencies, budgets, scheduling, per-activity sandbox overrides, and share-code), see the [Advanced Topics](#advanced-topics) section below.
 
@@ -186,7 +186,7 @@ Routine tasks are board cards that run on a schedule. The card itself never exec
 
 A routine card carries:
 
-- **Prompt / goal** — what the spawned instance should do.
+- **Prompt** — what the spawned instance should do.
 - **Interval (minutes)** — the fixed schedule; minimum of 1 minute. Editable anytime.
 - **Enabled toggle** — pauses the schedule without losing the interval.
 - **Spawn kind** — usually blank (spawns a normal task); `idea-agent` is reserved for the system ideation routine.
@@ -194,7 +194,7 @@ A routine card carries:
 The interactive controls live on the routine card (a dedicated UI ships alongside this feature). Programmatic access is exposed via the `/api/routines` endpoints:
 
 - `GET /api/routines` — list routine cards with their schedules and next-run times.
-- `POST /api/routines` — create a routine: `{prompt, interval_minutes, spawn_kind?, enabled?, goal?, tags?, timeout?}`.
+- `POST /api/routines` — create a routine: `{prompt, interval_minutes, spawn_kind?, enabled?, tags?, timeout?}`.
 - `PATCH /api/routines/{id}/schedule` — update interval and/or enabled flag; fields omitted from the body are left unchanged.
 - `POST /api/routines/{id}/trigger` — fire immediately; the scheduled cycle continues unchanged afterwards.
 
@@ -391,7 +391,7 @@ For backlog tasks, the right panel shows the AI refinement interface instead:
 Each card on the board displays:
 
 - **Title** -- auto-generated from the prompt after creation, or set manually
-- **Goal / Prompt preview** -- the card body shows the task's goal (a concise 1-3 sentence summary). If no goal is set, it falls back to the full prompt. For idea-agent tasks, the execution prompt is shown instead.
+- **Prompt preview** -- the card body shows the task's prompt. For idea-agent tasks, the execution prompt is shown instead.
 - **Status badge** -- color-coded indicator of the current state (backlog, in progress, waiting, done, failed, cancelled)
 - **Tags** -- user-defined labels for categorization; special tag styles exist for `idea-agent`, `priority:N`, `impact:N`, and brainstorm categories
 - **Dependency badge** -- for backlog tasks with dependencies: amber "blocked" badge (with unmet count) or green "ready" badge when all prerequisites are done

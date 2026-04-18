@@ -72,7 +72,6 @@ function makeRefineContext(overrides = {}) {
     "refine-error-section",
     "refine-error-msg",
     "refine-result-prompt",
-    "refine-result-goal",
     "refine-dismiss-btn",
     "refine-idle-desc",
     "refine-instructions-section",
@@ -262,20 +261,6 @@ describe("updateRefineUI — done state", () => {
     expect(ctx._elements["refine-dismiss-btn"].classList.has("hidden")).toBe(
       false,
     );
-  });
-
-  it("populates goal textarea when goal is present", () => {
-    ctx.updateRefineUI({
-      id: "t1",
-      status: "backlog",
-      current_refinement: {
-        id: "job-1",
-        status: "done",
-        result: "r",
-        goal: "the goal",
-      },
-    });
-    expect(ctx._elements["refine-result-goal"].value).toBe("the goal");
   });
 
   it("does not re-populate result if job id matches", () => {

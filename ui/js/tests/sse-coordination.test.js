@@ -430,8 +430,6 @@ describe("openRaiseLimitInline — uses task(id).update() route helper", () => {
       if (id === "modal-budget-exceeded-banner") return banner;
       if (id === "modal-edit-prompt")
         return makeElement({ addEventListener: vi.fn() });
-      if (id === "modal-edit-goal")
-        return makeElement({ addEventListener: vi.fn() });
       if (id === "modal-edit-timeout")
         return makeElement({ addEventListener: vi.fn() });
       return null;
@@ -484,8 +482,6 @@ describe("syncTask — calls waitForTaskDelta so the UI reflects sync progress",
     ctx.document.getElementById = (id) => {
       if (id === "modal-edit-prompt")
         return makeElement({ addEventListener: vi.fn() });
-      if (id === "modal-edit-goal")
-        return makeElement({ addEventListener: vi.fn() });
       if (id === "modal-edit-timeout")
         return makeElement({ addEventListener: vi.fn() });
       return null;
@@ -526,8 +522,6 @@ describe("syncTask — calls waitForTaskDelta so the UI reflects sync progress",
 
     ctx.document.getElementById = (id) => {
       if (id === "modal-edit-prompt")
-        return makeElement({ addEventListener: vi.fn() });
-      if (id === "modal-edit-goal")
         return makeElement({ addEventListener: vi.fn() });
       if (id === "modal-edit-timeout")
         return makeElement({ addEventListener: vi.fn() });

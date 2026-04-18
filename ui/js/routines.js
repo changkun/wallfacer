@@ -172,14 +172,12 @@ async function createRoutineFromPrompt(
     spawnKind = "",
     enabled = true,
     tags = [],
-    goal = "",
   } = {},
 ) {
   return api(Routes.routines.create(), {
     method: "POST",
     body: JSON.stringify({
       prompt,
-      goal,
       interval_minutes: intervalMinutes,
       spawn_kind: spawnKind,
       enabled,

@@ -65,8 +65,6 @@ function updateRefineUI(task) {
     if (resultTA.dataset.jobId !== job.id) {
       resultTA.value = job.result || "";
       resultTA.dataset.jobId = job.id;
-      const goalTA = document.getElementById("refine-result-goal");
-      if (goalTA) goalTA.value = job.goal || "";
     }
 
     // Show the dismiss button so user can skip applying the refinement.
@@ -330,9 +328,6 @@ async function applyRefinement() {
     showAlert("The refined prompt cannot be empty.");
     return;
   }
-  const goalTA = document.getElementById("refine-result-goal");
-  const newGoal = goalTA ? goalTA.value.trim() : "";
-
   const taskId = getOpenModalTaskId();
   const applyBtn = document.getElementById("refine-apply-btn");
   if (applyBtn) {
@@ -360,7 +355,7 @@ async function applyRefinement() {
       }),
       api(task(taskId).refineApply(), {
         method: "POST",
-        body: JSON.stringify({ prompt: newPrompt, goal: newGoal }),
+        body: JSON.stringify({ prompt: newPrompt }),
       }),
     ]);
 

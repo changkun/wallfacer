@@ -677,7 +677,6 @@ function scheduleBacklogSave() {
     if (!getOpenModalTaskId()) return;
     const prompt = document.getElementById("modal-edit-prompt").value.trim();
     if (!prompt) return;
-    const goal = document.getElementById("modal-edit-goal").value.trim();
     const timeout =
       parseInt(document.getElementById("modal-edit-timeout").value, 10) ||
       DEFAULT_TASK_TIMEOUT;
@@ -708,7 +707,6 @@ function scheduleBacklogSave() {
     const model = modelOverrideEl ? modelOverrideEl.value.trim() : undefined;
     const patchBody = {
       prompt,
-      goal,
       timeout,
       mount_worktrees,
       sandbox,
@@ -743,9 +741,6 @@ function scheduleBacklogSave() {
 
 document
   .getElementById("modal-edit-prompt")
-  .addEventListener("input", scheduleBacklogSave);
-document
-  .getElementById("modal-edit-goal")
   .addEventListener("input", scheduleBacklogSave);
 document
   .getElementById("modal-edit-timeout")

@@ -89,13 +89,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (5) Backfill Goal from Prompt for pre-existing tasks.
-	if task.Goal == "" && task.Prompt != "" {
-		task.Goal = task.Prompt
-		changed = true
-	}
-
-	// (6) Guarantee SchemaVersion is current.
+	// (5) Guarantee SchemaVersion is current.
 	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
 		task.SchemaVersion = constants.CurrentTaskSchemaVersion
 		changed = true

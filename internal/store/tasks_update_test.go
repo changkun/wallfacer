@@ -447,7 +447,7 @@ func TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart(t *testing.T) {
 		StartPrompt: "original prompt",
 		Result:      "refined spec",
 	}
-	if err := s.ApplyRefinement(bg(), task.ID, "refined prompt", "", session); err != nil {
+	if err := s.ApplyRefinement(bg(), task.ID, "refined prompt", session); err != nil {
 		t.Fatalf("ApplyRefinement: %v", err)
 	}
 
@@ -459,7 +459,7 @@ func TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart(t *testing.T) {
 	t.Run("freshStart=false preserves sessions", func(t *testing.T) {
 		s2 := newTestStore(t)
 		task2, _ := s2.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt", Timeout: 15, Kind: TaskKindTask})
-		s2.ApplyRefinement(bg(), task2.ID, "refined prompt", "", session) //nolint:errcheck
+		s2.ApplyRefinement(bg(), task2.ID, "refined prompt", session) //nolint:errcheck
 
 		if err := s2.ResetTaskForRetry(bg(), task2.ID, "same prompt", false); err != nil {
 			t.Fatalf("ResetTaskForRetry(freshStart=false): %v", err)

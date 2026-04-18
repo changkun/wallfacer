@@ -33,7 +33,6 @@ const minRoutineIntervalMinutes = 1
 type RoutineResponse struct {
 	ID                     uuid.UUID      `json:"id"`
 	Prompt                 string         `json:"prompt"`
-	Goal                   string         `json:"goal,omitempty"`
 	Tags                   []string       `json:"tags,omitempty"`
 	Kind                   store.TaskKind `json:"kind"`
 	RoutineIntervalSeconds int            `json:"routine_interval_seconds"`
@@ -49,7 +48,6 @@ func toRoutineResponse(t store.Task) RoutineResponse {
 	return RoutineResponse{
 		ID:                     t.ID,
 		Prompt:                 t.Prompt,
-		Goal:                   t.Goal,
 		Tags:                   slices.Clone(t.Tags),
 		Kind:                   t.Kind,
 		RoutineIntervalSeconds: t.RoutineIntervalSeconds,
@@ -93,7 +91,6 @@ func (h *Handler) ListRoutines(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Prompt          string   `json:"prompt"`
-		Goal            string   `json:"goal"`
 		IntervalMinutes int      `json:"interval_minutes"`
 		SpawnKind       string   `json:"spawn_kind"`
 		Enabled         *bool    `json:"enabled"`
@@ -131,7 +128,6 @@ func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 
 	task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 		Prompt:                 req.Prompt,
-		Goal:                   req.Goal,
 		Timeout:                req.Timeout,
 		Kind:                   store.TaskKindRoutine,
 		Tags:                   req.Tags,
