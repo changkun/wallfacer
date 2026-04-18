@@ -43,7 +43,7 @@ func main() {
 	// aliases that both run the prerequisite/config check.
 	switch subcmd {
 	case "doctor", "env":
-		cli.RunDoctor(configDir)
+		cli.RunDoctor(configDir, args)
 	case "exec":
 		cli.RunExec(configDir, args)
 	case "run":

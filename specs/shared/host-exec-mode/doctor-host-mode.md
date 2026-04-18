@@ -1,6 +1,6 @@
 ---
 title: wallfacer doctor reports host-mode readiness
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-exec-mode/envconfig-host-option.md
 affects:

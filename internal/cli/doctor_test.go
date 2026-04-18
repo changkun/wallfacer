@@ -18,7 +18,7 @@ func TestRunDoctor_AllGood(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[ok] Config directory") {
@@ -38,7 +38,7 @@ func TestRunDoctor_MissingConfigDir(t *testing.T) {
 	configDir := filepath.Join(t.TempDir(), "nonexistent")
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[!] Config directory missing") {
@@ -59,7 +59,7 @@ func TestRunDoctor_NoCredentials(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[!] No Claude credential") {
@@ -77,7 +77,7 @@ func TestRunDoctor_PlaceholderTokenIgnored(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[!] No Claude credential") {
@@ -95,7 +95,7 @@ func TestRunDoctor_OAuthTokenWorks(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[ok] CLAUDE_CODE_OAUTH_TOKEN is set") {
@@ -113,7 +113,7 @@ func TestRunDoctor_OpenAIOptional(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[ok] OPENAI_API_KEY is set") {
@@ -134,7 +134,7 @@ func TestRunDoctor_ContainerRuntimeNotFound(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", "/nonexistent/container-runtime")
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[!] Container runtime not found") {
@@ -164,7 +164,7 @@ func TestRunDoctor_RuntimeRespondingWithVersion(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", fakeRuntime)
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[ok] Container runtime") {
@@ -194,7 +194,7 @@ func TestRunDoctor_RuntimeNotResponding(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", fakeRuntime)
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "not responding") {
@@ -218,7 +218,7 @@ func TestRunDoctor_ConfigDirIsFile(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", "/nonexistent/runtime")
 
 	out := captureStdout(func() {
-		RunDoctor(configPath)
+		RunDoctor(configPath, nil)
 	})
 
 	if !strings.Contains(out, "is not a directory") {
@@ -237,7 +237,7 @@ func TestRunDoctor_MalformedEnvLine(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[ok] ANTHROPIC_API_KEY is set") {
@@ -273,7 +273,7 @@ func TestRunDoctor_SandboxImageFallback(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "ghcr.io/latere-ai/sandbox-agents:v99")
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "not cached (fallback") {
@@ -302,7 +302,7 @@ func TestRunDoctor_SandboxImageCached(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", fakeRuntime)
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[ok] Sandbox image") {
@@ -320,7 +320,7 @@ func TestRunDoctor_GitCheck(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 
 	// Git should be found in CI and dev environments.

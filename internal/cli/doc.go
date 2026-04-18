@@ -21,6 +21,6 @@
 //
 //	cli.RunServer(configDir, args, uiFS, docsFS)  // start HTTP server
 //	cli.RunStatus(configDir, args)                 // print board state
-//	cli.RunDoctor(configDir)                       // check prerequisites
+//	cli.RunDoctor(configDir, args)                 // check prerequisites
 //	cli.RunExec(configDir, args)                   // attach to container
 package cli
