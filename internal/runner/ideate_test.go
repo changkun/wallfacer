@@ -404,7 +404,7 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 // tasks the prompt does not include the "Existing active tasks" section, and
 // that it still contains suggested focus areas for the agent.
 func TestBuildIdeationPromptNoExistingTasks(t *testing.T) {
-	prompt := testRunnerForPrompts().buildIdeationPrompt(nil)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(nil, "")
 	if strings.Contains(prompt, "Existing active tasks") {
 		t.Fatal("prompt should not mention existing tasks when none are provided")
 	}
@@ -421,7 +421,7 @@ func TestBuildIdeationPromptIncludesActiveTasks(t *testing.T) {
 		{Title: "Fix login bug", Status: store.TaskStatusInProgress, Prompt: "Resolve the authentication error on the login page."},
 		{Title: "Write API docs", Status: store.TaskStatusWaiting, Prompt: "Document all REST endpoints."},
 	}
-	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks, "")
 
 	if !strings.Contains(prompt, "Existing active tasks") {
 		t.Fatal("prompt must include the 'Existing active tasks' section")
@@ -456,7 +456,7 @@ func TestBuildIdeationPromptTruncatesLongPrompts(t *testing.T) {
 	tasks := []store.Task{
 		{Title: "Long task", Status: store.TaskStatusBacklog, Prompt: longPrompt},
 	}
-	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks, "")
 	if strings.Contains(prompt, longPrompt) {
 		t.Fatal("long prompt should be truncated in ideation context")
 	}
@@ -471,7 +471,7 @@ func TestBuildIdeationPromptUntitledTask(t *testing.T) {
 	tasks := []store.Task{
 		{Title: "", Status: store.TaskStatusBacklog, Prompt: "Some work."},
 	}
-	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks, "")
 	if !strings.Contains(prompt, "(untitled)") {
 		t.Fatal("prompt must show '(untitled)' for tasks without a title")
 	}
@@ -1045,7 +1045,7 @@ func TestBuildIdeationPromptIncludesRejectedTitles(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := &Runner{store: s, promptsMgr: prompts.Default}
-	prompt := r.buildIdeationPrompt(nil)
+	prompt := r.buildIdeationPrompt(nil, "")
 
 	if !strings.Contains(prompt, "Rejected Alpha") {
 		t.Errorf("prompt should contain rejected title 'Rejected Alpha'; prompt excerpt: %q",
@@ -1090,9 +1090,43 @@ func TestModulateExploitRatio(t *testing.T) {
 func TestBuildIdeationPromptIncludesExploitRatio(t *testing.T) {
 	r := testRunnerForPrompts()
 	r.ideationExploitRatioFn = func() float64 { return 0.7 }
-	prompt := r.buildIdeationPrompt(nil)
+	prompt := r.buildIdeationPrompt(nil, "")
 	if !strings.Contains(prompt, "exploitation") {
 		t.Error("prompt should contain exploitation/exploration guidance")
+	}
+}
+
+// TestBuildIdeationPromptSurfacesUserFocus verifies that when a user
+// types text into the composer's prompt field, that text is visible
+// in the resulting ideation prompt so the agent biases its brainstorm
+// toward the stated direction instead of silently ignoring it.
+// Regression test for: "typing something then moving the brainstorm
+// task to in_progress replaced my prompt with the agent's own" — the
+// replacement was correct (the card stores the user hint, the agent
+// receives the wrapped brainstorm template) but the user's text was
+// being dropped on the floor.
+func TestBuildIdeationPromptSurfacesUserFocus(t *testing.T) {
+	r := testRunnerForPrompts()
+	prompt := r.buildIdeationPrompt(nil, "focus on performance regressions")
+
+	if !strings.Contains(prompt, "User focus") {
+		t.Error("prompt must include a 'User focus' section when a hint is supplied")
+	}
+	if !strings.Contains(prompt, "focus on performance regressions") {
+		t.Errorf("prompt must surface the user's literal hint; got: %q",
+			prompt[:min(len(prompt), 400)])
+	}
+}
+
+// TestBuildIdeationPromptOmitsUserFocusWhenEmpty verifies the focus
+// section is absent when the user left the composer's prompt blank,
+// so the agent scans the full workspace unbiased.
+func TestBuildIdeationPromptOmitsUserFocusWhenEmpty(t *testing.T) {
+	r := testRunnerForPrompts()
+	prompt := r.buildIdeationPrompt(nil, "")
+
+	if strings.Contains(prompt, "User focus") {
+		t.Error("prompt must not include a 'User focus' section when the hint is empty")
 	}
 }
 

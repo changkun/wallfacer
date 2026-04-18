@@ -397,6 +397,13 @@ type IdeationData struct {
 	// exploitation-style (improve existing code) vs exploration-style (new
 	// features / new directions). Default 0.8 means 80% exploitation.
 	ExploitRatio float64
+
+	// UserFocus is an optional free-form hint the user typed into the
+	// composer's prompt field when creating a Brainstorm task. Empty
+	// when the user left the prompt blank, in which case the agent
+	// scans the full workspace unbiased. When non-empty the template
+	// surfaces it prominently so the agent narrows its search.
+	UserFocus string
 }
 
 // CommitData holds template variables for the commit message prompt.
