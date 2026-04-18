@@ -272,7 +272,6 @@ function makeContext(overrides = {}) {
     },
     buildFloatingToc: overrides.buildFloatingToc || vi.fn(),
     teardownFloatingToc: overrides.teardownFloatingToc || vi.fn(),
-    renderMinimap: overrides.renderMinimap || vi.fn(),
     activeWorkspaces: overrides.activeWorkspaces || ["/home/user/project"],
     _specTreeData: overrides._specTreeData || null,
     switchExplorerRoot: overrides.switchExplorerRoot || vi.fn(),

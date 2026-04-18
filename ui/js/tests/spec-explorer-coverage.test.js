@@ -145,9 +145,7 @@ function makeContext(opts = {}) {
     _loadExplorerRoots: opts._loadExplorerRoots || (() => {}),
     _startExplorerRefreshPoll: opts._startExplorerRefreshPoll || (() => {}),
     _stopExplorerRefreshPoll: opts._stopExplorerRefreshPoll || (() => {}),
-    _hideMinimap: opts._hideMinimap || (() => {}),
     _updateSpecPaneVisibility: opts._updateSpecPaneVisibility || (() => {}),
-    renderMinimap: opts.renderMinimap || (() => {}),
     setInterval: (fn, _ms) => {
       ctx._lastIntervalFn = fn;
       return 99;
@@ -449,12 +447,15 @@ describe("spec-explorer coverage", () => {
       expect(loadRoots).not.toHaveBeenCalled();
     });
 
-    it("hides minimap when switching away from specs", () => {
-      const hideMinimap = vi.fn();
-      const ctx2 = makeContext({ _hideMinimap: hideMinimap });
+    it("reloads workspace roots when switching back from specs", () => {
+      // Regression: switchExplorerRoot used to call the removed _hideMinimap,
+      // which threw a ReferenceError and aborted before _loadExplorerRoots
+      // ran. The result was an empty explorer tree after switching plan→board.
+      const loadRoots = vi.fn();
+      const ctx2 = makeContext({ _loadExplorerRoots: loadRoots });
       ctx2.switchExplorerRoot("specs");
       ctx2.switchExplorerRoot("workspace");
-      expect(hideMinimap).toHaveBeenCalled();
+      expect(loadRoots).toHaveBeenCalled();
     });
 
     it("shows spec-status-filter when switching to specs", () => {

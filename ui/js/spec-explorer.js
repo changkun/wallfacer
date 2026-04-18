@@ -133,9 +133,6 @@ function switchExplorerRoot(mode) {
   if (dispatchBar) {
     dispatchBar.classList.toggle("hidden", mode !== "specs");
   }
-  if (mode !== "specs") {
-    _hideMinimap();
-  }
 
   if (mode === "specs") {
     // Stop the workspace explorer's refresh poll so it doesn't overwrite
