@@ -35,6 +35,19 @@
   flex: 1;
   min-height: 0;
 }
+.modal-wide #modal-main-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.modal-wide #modal-main-content {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
 .modal-wide #modal-left {
   flex: 2;
   min-width: 0;
@@ -73,6 +86,60 @@
 }
 .modal-wide .logs-block {
   max-height: none;
+}
+
+/* --- Main tab bar (Spec / Activity / Changes / Flamegraph / Timeline / Events) --- */
+.modal-wide #main-tabs {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+.main-tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.main-tab:hover:not(.active) {
+  color: var(--text-secondary);
+}
+.main-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* --- Main-tab section visibility ---
+   Each section declares the main tab(s) it belongs to via
+   data-main-tab-section="spec" (or "activity events" for multi-tab). The modal
+   carries data-main-tab on the outer container; non-matching sections hide. */
+#modal[data-main-tab="spec"] [data-main-tab-section]:not([data-main-tab-section~="spec"]),
+#modal[data-main-tab="activity"] [data-main-tab-section]:not([data-main-tab-section~="activity"]),
+#modal[data-main-tab="changes"] [data-main-tab-section]:not([data-main-tab-section~="changes"]),
+#modal[data-main-tab="flamegraph"] [data-main-tab-section]:not([data-main-tab-section~="flamegraph"]),
+#modal[data-main-tab="timeline"] [data-main-tab-section]:not([data-main-tab-section~="timeline"]),
+#modal[data-main-tab="events"] [data-main-tab-section]:not([data-main-tab-section~="events"]) {
+  display: none !important;
+}
+
+/* Hide the whole column when the active tab has no content in it. */
+#modal[data-main-tab="spec"] #modal-right,
+#modal[data-main-tab="events"] #modal-right {
+  display: none;
+}
+#modal[data-main-tab="changes"] #modal-left,
+#modal[data-main-tab="flamegraph"] #modal-left,
+#modal[data-main-tab="timeline"] #modal-left {
+  display: none;
 }
 
 /* --- Right-side aside (agent / budget / git / links) --- */

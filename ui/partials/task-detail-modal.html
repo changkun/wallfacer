@@ -51,7 +51,66 @@
       ></h2>
 
       <div id="modal-body">
+        <div id="modal-main-pane">
+          <div id="main-tabs" class="main-tabs" role="tablist">
+            <button
+              type="button"
+              id="main-tab-spec"
+              class="main-tab active"
+              data-main-tab="spec"
+              onclick="setMainTab('spec')"
+            >
+              Spec
+            </button>
+            <button
+              type="button"
+              id="main-tab-activity"
+              class="main-tab"
+              data-main-tab="activity"
+              onclick="setMainTab('activity')"
+            >
+              Activity
+            </button>
+            <button
+              type="button"
+              id="main-tab-changes"
+              class="main-tab hidden"
+              data-main-tab="changes"
+              onclick="setMainTab('changes')"
+            >
+              Changes
+            </button>
+            <button
+              type="button"
+              id="main-tab-flamegraph"
+              class="main-tab hidden"
+              data-main-tab="flamegraph"
+              onclick="setMainTab('flamegraph')"
+            >
+              Flamegraph
+            </button>
+            <button
+              type="button"
+              id="main-tab-timeline"
+              class="main-tab hidden"
+              data-main-tab="timeline"
+              onclick="setMainTab('timeline')"
+            >
+              Timeline
+            </button>
+            <button
+              type="button"
+              id="main-tab-events"
+              class="main-tab"
+              data-main-tab="events"
+              onclick="setMainTab('events')"
+            >
+              Events
+            </button>
+          </div>
+          <div id="modal-main-content">
         <div id="modal-left">
+          <div data-main-tab-section="spec">
           <!-- Goal section -->
           <div id="modal-goal-section" class="hidden mb-4">
             <div class="flex items-center justify-between mb-1">
@@ -598,7 +657,9 @@
               </select>
             </div>
           </div>
+          </div><!-- end spec section A -->
 
+          <div data-main-tab-section="activity">
           <div id="modal-summary-section" class="hidden mb-4">
             <div class="left-panel-tabs">
               <button
@@ -625,7 +686,9 @@
               <div id="modal-test-results-list"></div>
             </div>
           </div>
+          </div><!-- end activity section (left) -->
 
+          <div data-main-tab-section="events">
           <!-- Usage stats -->
           <div id="modal-usage-section" class="hidden mb-4">
             <h3 class="section-title">Usage</h3>
@@ -719,7 +782,9 @@
               ></dl>
             </details>
           </div>
+          </div><!-- end events section A (usage/env) -->
 
+          <div data-main-tab-section="spec">
           <!-- Budget-exceeded banner (shown when task is waiting due to budget limit) -->
           <div
             id="modal-budget-exceeded-banner"
@@ -887,11 +952,15 @@
               Move to Backlog
             </button>
           </div>
+          </div><!-- end spec section B (banner/feedback/retry) -->
 
+          <div data-main-tab-section="events">
           <!-- Events timeline -->
           <h3 class="section-title">Events</h3>
           <div id="modal-events" class="space-y-2"></div>
+          </div><!-- end events section B (timeline) -->
 
+          <div data-main-tab-section="spec">
           <!-- Archive section (done tasks only, not yet archived) -->
           <div id="modal-archive-section" class="hidden mb-4">
             <h3 class="section-title">Archive</h3>
@@ -953,11 +1022,12 @@
               Delete task
             </button>
           </div>
+          </div><!-- end spec section C (archive/cancel/delete) -->
         </div>
 
         <!-- Right panel: tabbed view for non-backlog tasks -->
         <div id="modal-right" class="hidden">
-          <div class="right-panel-tabs">
+          <div class="right-panel-tabs" data-main-tab-section="activity">
             <button
               type="button"
               id="right-tab-implementation"
@@ -999,7 +1069,7 @@
               Timeline
             </button>
           </div>
-          <div id="right-panel-implementation">
+          <div id="right-panel-implementation" data-main-tab-section="activity">
             <div id="modal-logs-section" class="mb-4">
               <div class="flex items-center justify-end mb-2">
                 <div class="logs-tabs">
@@ -1064,7 +1134,7 @@
               <pre id="modal-logs" class="logs-block"></pre>
             </div>
           </div>
-          <div id="right-panel-testing" class="hidden">
+          <div id="right-panel-testing" class="hidden" data-main-tab-section="activity">
             <div id="modal-test-logs-section" class="mb-4">
               <div class="flex items-center justify-end mb-2">
                 <div class="logs-tabs">
@@ -1097,18 +1167,20 @@
               <pre id="modal-test-logs" class="logs-block"></pre>
             </div>
           </div>
-          <div id="right-panel-changes" class="hidden">
+          <div id="right-panel-changes" class="hidden" data-main-tab-section="changes">
             <div id="modal-diff-behind" class="hidden"></div>
             <div id="modal-commit-message" class="hidden"></div>
             <div id="modal-diff-files"></div>
           </div>
-          <div id="right-panel-spans" class="hidden">
+          <div id="right-panel-spans" class="hidden" data-main-tab-section="flamegraph">
             <div id="modal-flamegraph-container" style="padding: 8px"></div>
           </div>
-          <div id="right-panel-timeline" class="hidden">
+          <div id="right-panel-timeline" class="hidden" data-main-tab-section="timeline">
             <div id="modal-timeline-chart" style="padding: 8px"></div>
           </div>
         </div>
+        </div><!-- end modal-main-content -->
+        </div><!-- end modal-main-pane -->
 
         <!-- Right panel: refinement monitor for backlog tasks -->
         <div id="modal-backlog-right" class="hidden">

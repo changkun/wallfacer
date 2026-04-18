@@ -319,6 +319,38 @@ function renderModalDependencies(task) {
   }
 }
 
+// setMainTab switches the top-level task detail view between the six
+// logical tabs — Spec, Activity, Changes, Flamegraph, Timeline, Events.
+// CSS keyed on `#modal[data-main-tab=X]` hides non-matching sections tagged
+// with `data-main-tab-section`; this function updates that attribute plus
+// the active-state on the tab buttons, and fires any per-tab hooks.
+function setMainTab(tab) {
+  const modalEl = document.getElementById("modal");
+  if (modalEl && modalEl.dataset) modalEl.dataset.mainTab = tab;
+  document.querySelectorAll(".main-tab").forEach(function (btn) {
+    btn.classList.toggle("active", btn.dataset.mainTab === tab);
+  });
+  if (tab === "flamegraph" && typeof loadFlamegraph === "function") {
+    const tid = getOpenModalTaskId();
+    if (tid) loadFlamegraph(tid);
+  }
+  if (tab === "timeline") {
+    const tid = getOpenModalTaskId();
+    if (tid && typeof renderTimeline === "function") {
+      renderTimeline(tid);
+      if (typeof _startTimelineRefresh === "function")
+        _startTimelineRefresh(tid);
+    }
+  } else if (typeof _stopTimelineRefresh === "function") {
+    _stopTimelineRefresh();
+  }
+  const tid = getOpenModalTaskId();
+  if (tid) {
+    // Deep-link to the active main tab so reload / share returns to it.
+    history.replaceState(null, "", "#" + tid + "/" + tab);
+  }
+}
+
 // _renderModalAside populates the right-side summary rail (agent, budget,
 // git, links). Keeps values in sync with what the main panes already show —
 // this is a compact mirror, not an alternate data source.
@@ -378,13 +410,14 @@ function _renderModalAside(task) {
   setText("aside-budget-tokens", tokenText);
   let costText = u.cost_usd ? "$" + u.cost_usd.toFixed(4) : "—";
   if (task.max_cost_usd > 0) {
-    costText = "$" + (u.cost_usd || 0).toFixed(4) + " / $" + task.max_cost_usd.toFixed(2);
+    costText =
+      "$" +
+      (u.cost_usd || 0).toFixed(4) +
+      " / $" +
+      task.max_cost_usd.toFixed(2);
   }
   setText("aside-budget-cost", costText);
-  setText(
-    "aside-budget-timeout",
-    task.timeout ? task.timeout + " min" : "—",
-  );
+  setText("aside-budget-timeout", task.timeout ? task.timeout + " min" : "—");
 
   const bar = document.getElementById("aside-budget-bar");
   const barFill = document.getElementById("aside-budget-bar-fill");
@@ -413,7 +446,9 @@ function _renderModalAside(task) {
   );
   setText(
     "aside-git-worktrees",
-    repos.length ? repos.length + (repos.length === 1 ? " repo" : " repos") : "none",
+    repos.length
+      ? repos.length + (repos.length === 1 ? " repo" : " repos")
+      : "none",
   );
 
   // Links
@@ -423,9 +458,12 @@ function _renderModalAside(task) {
       const name = task.spec_source_path
         .replace(/^.*\//, "")
         .replace(/\.md$/, "");
-      specEl.innerHTML = '<a href="#" data-spec-path="' +
+      specEl.innerHTML =
+        '<a href="#" data-spec-path="' +
         escapeHtml(task.spec_source_path) +
-        '">' + escapeHtml(name) + "</a>";
+        '">' +
+        escapeHtml(name) +
+        "</a>";
       const link = specEl.querySelector("a");
       if (link) {
         link.onclick = function (e) {
@@ -449,7 +487,9 @@ function _renderModalAside(task) {
   const deps = Array.isArray(task.depends_on) ? task.depends_on : [];
   setText(
     "aside-link-deps",
-    deps.length ? deps.length + (deps.length === 1 ? " task" : " tasks") : "none",
+    deps.length
+      ? deps.length + (deps.length === 1 ? " task" : " tasks")
+      : "none",
   );
 }
 
@@ -924,14 +964,24 @@ async function openModal(id) {
     const _searchCount = document.getElementById("log-search-count");
     if (_searchCount) _searchCount.textContent = "";
 
-    // Show Spans and Timeline tabs for tasks with at least one turn.
+    // Show Flamegraph and Timeline main tabs for tasks with at least one turn.
+    // The legacy right-tab-spans/timeline buttons stay hidden (they duplicate
+    // main tabs) but we still toggle them for tests that assert on them.
     const spansTabBtn = document.getElementById("right-tab-spans");
     if (spansTabBtn) {
       spansTabBtn.classList.toggle("hidden", !(task.turns > 0));
     }
+    const flamegraphMainTab = document.getElementById("main-tab-flamegraph");
+    if (flamegraphMainTab) {
+      flamegraphMainTab.classList.toggle("hidden", !(task.turns > 0));
+    }
     const timelineTabBtn = document.getElementById("right-tab-timeline");
     if (timelineTabBtn) {
       timelineTabBtn.classList.toggle("hidden", !(task.turns > 0));
+    }
+    const timelineMainTab = document.getElementById("main-tab-timeline");
+    if (timelineMainTab) {
+      timelineMainTab.classList.toggle("hidden", !(task.turns > 0));
     }
 
     // Start log streaming; show Testing tab when test data exists
@@ -951,8 +1001,10 @@ async function openModal(id) {
 
     // Changes tab: show for any non-backlog task that has worktrees
     const changesTab = document.getElementById("right-tab-changes");
+    const changesMainTab = document.getElementById("main-tab-changes");
     if (hasWorktrees) {
       if (changesTab) changesTab.classList.remove("hidden");
+      if (changesMainTab) changesMainTab.classList.remove("hidden");
       const filesEl = document.getElementById("modal-diff-files");
       const behindEl = document.getElementById("modal-diff-behind");
       filesEl.innerHTML =
@@ -1010,14 +1062,19 @@ async function openModal(id) {
         });
     } else {
       if (changesTab) changesTab.classList.add("hidden");
+      if (changesMainTab) changesMainTab.classList.add("hidden");
     }
 
-    // Default to Implementation tab
+    // Default: Implementation sub-tab + Activity main tab so the user lands on
+    // turn results + live logs.
     setRightTab("implementation");
+    setMainTab("activity");
   } else {
     // Backlog tasks: modal-wide and layout already set in the backlog branch above.
     // Just ensure the non-backlog right panel stays hidden.
     modalRight.classList.add("hidden");
+    // Backlog only surfaces the Spec view (alongside the refinement panel).
+    setMainTab("spec");
   }
 
   // Resume section (failed with session_id only)
@@ -1435,6 +1492,12 @@ function closeModal() {
   if (spansTabBtn) spansTabBtn.classList.add("hidden");
   const timelineTabBtn = document.getElementById("right-tab-timeline");
   if (timelineTabBtn) timelineTabBtn.classList.add("hidden");
+  const flamegraphMainTab = document.getElementById("main-tab-flamegraph");
+  if (flamegraphMainTab) flamegraphMainTab.classList.add("hidden");
+  const timelineMainTab = document.getElementById("main-tab-timeline");
+  if (timelineMainTab) timelineMainTab.classList.add("hidden");
+  const changesMainTab = document.getElementById("main-tab-changes");
+  if (changesMainTab) changesMainTab.classList.add("hidden");
   resetRefinePanel();
   const _depsSection = document.getElementById("modal-dependencies");
   if (_depsSection) _depsSection.classList.add("hidden");
