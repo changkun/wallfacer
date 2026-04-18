@@ -103,6 +103,18 @@ type runAgentOpts struct {
 	// split regular-run oversight and test-run oversight accounting
 	// while sharing a single descriptor.
 	ActivityOverride store.SandboxActivity
+	// ContainerName, when non-empty, overrides the default
+	// wallfacer-<role.Name>-<uuid8> pattern. Refinement and ideation
+	// use this for slugged / disambiguated names that predate the
+	// migration. Prefer leaving it empty for new roles.
+	ContainerName string
+	// OnLaunch, when set, is invoked immediately after a successful
+	// backend.Launch and before Stdout/Stderr are drained. Callers use
+	// it to register the container handle in their per-role registries
+	// (e.g. refineContainers) so log streams and kill commands can
+	// attach to the in-flight container. Called for every launch
+	// attempt, including the codex fallback.
+	OnLaunch func(containerName string, handle sandbox.Handle)
 }
 
 // agentResult is runAgent's return envelope. It bundles the parsed
@@ -132,7 +144,7 @@ func (r *Runner) runAgent(
 	prompt string,
 	opts runAgentOpts,
 ) (*agentResult, error) {
-	if role.MountMode != MountNone {
+	if role.MountMode == MountReadWrite {
 		return nil, fmt.Errorf("runAgent: mount mode %v not yet implemented", role.MountMode)
 	}
 	if role.Name == "" {
@@ -166,8 +178,12 @@ func (r *Runner) runAgent(
 
 	// Compose the container name once; the retry reuses it so users
 	// watching logs see the original name rather than two unrelated
-	// containers.
-	containerName := "wallfacer-" + role.Name + "-" + uuid.NewString()[:8]
+	// containers. Callers can provide an override (refinement uses a
+	// slugged prompt in its name).
+	containerName := opts.ContainerName
+	if containerName == "" {
+		containerName = "wallfacer-" + role.Name + "-" + uuid.NewString()[:8]
+	}
 
 	// Activity used for sandbox resolution, label, span events, and
 	// usage attribution. Callers may override via opts to split
@@ -201,7 +217,7 @@ func (r *Runner) runAgent(
 					store.SpanData{Phase: "container_run", Label: string(activity)})
 			}()
 		}
-		return r.launchHeadless(runCtx, role, containerName, prompt, sb, labels)
+		return r.launchOne(runCtx, role, containerName, prompt, sb, labels, opts.OnLaunch)
 	}
 
 	result, err := launchOnce(primary)
@@ -256,15 +272,19 @@ func (r *Runner) runAgent(
 	return result, nil
 }
 
-// launchHeadless builds the container spec and runs the launch for a
-// MountNone role. Kept as a separate function so the retry path reuses
-// it without duplicating the spec construction.
-func (r *Runner) launchHeadless(
+// launchOne builds the container spec, invokes backend.Launch, drains
+// the streams, and parses the NDJSON result for a single sub-agent
+// invocation. It dispatches on role.MountMode to add the right volume
+// mounts: MountNone is a minimal headless launch, MountReadOnly layers
+// read-only workspace + instructions mounts on top so the agent can
+// inspect the code without modifying it.
+func (r *Runner) launchOne(
 	ctx context.Context,
 	role AgentRole,
 	containerName, prompt string,
 	sb sandbox.Type,
 	labels map[string]string,
+	onLaunch func(string, sandbox.Handle),
 ) (*agentResult, error) {
 	model := r.modelFromEnvForSandbox(sb)
 	if role.Model != nil {
@@ -272,7 +292,7 @@ func (r *Runner) launchHeadless(
 			model = m
 		}
 	}
-	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	spec := r.buildInspectorSpec(containerName, model, sb, role.MountMode)
 	// Clone the labels map so a caller that hands us a shared map (the
 	// migrated title/oversight/commit call sites do) cannot be mutated
 	// by the backend or by a later retry.
@@ -285,6 +305,9 @@ func (r *Runner) launchHeadless(
 	handle, launchErr := r.backend.Launch(ctx, spec)
 	if launchErr != nil {
 		return nil, fmt.Errorf("launch %s container: %w", role.Name, launchErr)
+	}
+	if onLaunch != nil {
+		onLaunch(containerName, handle)
 	}
 	rawStdout, _ := io.ReadAll(handle.Stdout())
 	rawStderr, _ := io.ReadAll(handle.Stderr())
@@ -329,6 +352,49 @@ func (r *Runner) launchHeadless(
 		RawStderr:   rawStderr,
 		SandboxUsed: sb,
 	}, nil
+}
+
+// buildInspectorSpec produces a ContainerSpec for headless or read-only
+// inspector roles. For MountNone it returns the same spec
+// buildBaseContainerSpec produces. For MountReadOnly it layers every
+// configured workspace as a read-only volume plus the workspace
+// instructions file (CLAUDE.md / AGENTS.md) and sets WorkDir so the
+// agent has a natural CWD to inspect from. Worker-container mode is
+// intentionally not involved — inspector roles are short-lived and
+// cheap to spin up ephemerally.
+func (r *Runner) buildInspectorSpec(
+	containerName, model string,
+	sb sandbox.Type,
+	mode MountMode,
+) sandbox.ContainerSpec {
+	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	if mode != MountReadOnly {
+		return spec
+	}
+
+	workspaces := r.currentWorkspaces()
+	var basenames []string
+	for _, ws := range workspaces {
+		ws = strings.TrimSpace(ws)
+		if ws == "" {
+			continue
+		}
+		basename := sanitizeBasename(ws)
+		basenames = append(basenames, basename)
+		spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+			Host:      ws,
+			Container: "/workspace/" + basename,
+			Options:   mountOpts("z", "ro"),
+		})
+	}
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
+
+	workdir := "/workspace"
+	if len(basenames) == 1 {
+		workdir = "/workspace/" + basenames[0]
+	}
+	spec.WorkDir = workdir
+	return spec
 }
 
 // recordFallbackEvent writes a system event noting that the runner fell

@@ -1,19 +1,31 @@
 package runner
 
 import (
-	"context"
-	"fmt"
-	"io"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
+
+// roleRefinement is the inspector-tier descriptor for the refinement
+// sub-agent. Reads the workspace read-only, produces a detailed spec
+// from the task's current prompt. Parsed result is the raw result
+// string — refine.go's caller then cleans it and splits the goal /
+// spec sections.
+var roleRefinement = AgentRole{
+	Activity:    store.SandboxActivityRefinement,
+	Name:        "refine",
+	Timeout:     func(*store.Task) time.Duration { return constants.RefinementTimeout },
+	MountMode:   MountReadOnly,
+	SingleTurn:  true,
+	ParseResult: func(o *agentOutput) (any, error) { return o.Result, nil },
+}
 
 // RunRefinement runs the sandbox agent in read-only mode to produce a
 // detailed implementation spec for the task's current prompt. The task
@@ -22,8 +34,6 @@ import (
 // agent's focus (e.g. "keep backward compatibility").
 func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	bgCtx := r.shutdownCtx
-	ctx, cancel := context.WithTimeout(r.shutdownCtx, constants.RefinementTimeout)
-	defer cancel()
 
 	task, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if err != nil {
@@ -33,14 +43,28 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 
 	prompt := r.buildRefinementPrompt(task, userInstructions, time.Now())
 
-	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
+	// Preserve the legacy slugged container name so in-flight log
+	// consumers that filter by prefix still match.
+	slug := slugifyPrompt(prompt, 20)
+	containerName := "wallfacer-refine-" + slug + "-" + taskID.String()[:8]
 
-	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", r.sandboxForTaskActivity(task, activityRefinement))
-	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "refinement", Label: "refinement"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart,
+		store.SpanData{Phase: "refinement", Label: "refinement"})
+	res, err := r.runAgent(bgCtx, roleRefinement, task, prompt, runAgentOpts{
+		ContainerName: containerName,
+		TrackUsage:    true,
+		Turn:          1,
+		OnLaunch: func(name string, handle sandbox.Handle) {
+			r.refineContainers.Set(taskID, name)
+			r.refineContainers.SetHandle(taskID, handle, nil)
+		},
+	})
+	r.refineContainers.Delete(taskID)
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd,
+		store.SpanData{Phase: "refinement", Label: "refinement"})
 
 	if err != nil {
 		logger.Runner.Error("refinement container error", "task", taskID, "error", err)
-
 		// Don't overwrite a cleared job (task may have been reset).
 		cur, getErr := r.taskStore(taskID).GetTask(bgCtx, taskID)
 		if getErr != nil || cur.CurrentRefinement == nil {
@@ -49,7 +73,6 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		cur.CurrentRefinement.Status = store.RefinementJobStatusFailed
 		cur.CurrentRefinement.Error = err.Error()
 		_ = r.taskStore(taskID).UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
-
 		return
 	}
 
@@ -57,7 +80,8 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	if getErr != nil || cur.CurrentRefinement == nil {
 		return
 	}
-	cleaned := cleanRefinementResult(output.Result)
+	resultStr, _ := res.Parsed.(string)
+	cleaned := cleanRefinementResult(resultStr)
 	goal, spec := extractGoalFromRefinement(cleaned)
 	cur.CurrentRefinement.Status = store.RefinementJobStatusDone
 	cur.CurrentRefinement.Result = spec
@@ -84,202 +108,6 @@ func (r *Runner) buildRefinementPrompt(task *store.Task, userInstructions string
 		Prompt:           task.Prompt,
 		UserInstructions: strings.TrimSpace(userInstructions),
 	})
-}
-
-// buildRefinementContainerSpec builds a ContainerSpec for a read-only refinement
-// run. Workspaces are mounted read-only; no worktrees, board context, or sibling
-// mounts are used since the agent should only read, not commit.
-func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, modelOverride string, sb sandbox.Type) sandbox.ContainerSpec {
-	model := modelOverride
-	if model == "" {
-		model = r.modelFromEnvForSandbox(sb)
-	}
-
-	spec := sandbox.ContainerSpec{
-		Runtime: r.command,
-		Name:    containerName,
-		Image:   strings.TrimSpace(r.sandboxImage),
-	}
-
-	if taskID != "" {
-		spec.Labels = map[string]string{
-			"wallfacer.task.id":     taskID,
-			"wallfacer.task.refine": "true",
-		}
-	}
-
-	if r.envFile != "" {
-		spec.EnvFile = r.envFile
-	}
-
-	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
-	if model != "" {
-		spec.Env["CLAUDE_CODE_MODEL"] = model
-	}
-
-	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
-		Host:      "claude-config",
-		Container: "/home/agent/.claude",
-		Named:     true,
-	})
-	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
-
-	workspaces := r.currentWorkspaces()
-	var basenames []string
-	if len(workspaces) > 0 {
-		for _, ws := range workspaces {
-			ws = strings.TrimSpace(ws)
-			if ws == "" {
-				continue
-			}
-			basename := sanitizeBasename(ws)
-			basenames = append(basenames, basename)
-			// Mount read-only: refinement should inspect, not modify.
-			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
-				Host:      ws,
-				Container: "/workspace/" + basename,
-				Options:   mountOpts("z", "ro"),
-			})
-		}
-	}
-
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
-
-	workdir := "/workspace"
-	if len(basenames) == 1 {
-		workdir = "/workspace/" + basenames[0]
-	}
-	spec.WorkDir = workdir
-
-	spec.Cmd = []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
-	if model != "" {
-		spec.Cmd = append(spec.Cmd, "--model", model)
-	}
-
-	return spec
-}
-
-// runRefinementContainer executes a refinement container and parses its output.
-// The container name is tracked in refineContainerNames so StreamRefineLogs can
-// attach to it for live log streaming.
-func (r *Runner) runRefinementContainer(
-	ctx context.Context,
-	taskID uuid.UUID,
-	prompt, modelOverride string, sb sandbox.Type,
-) (*agentOutput, []byte, []byte, error) {
-	slug := slugifyPrompt(prompt, 20)
-	containerName := "wallfacer-refine-" + slug + "-" + taskID.String()[:8]
-
-	r.refineContainers.Set(taskID, containerName)
-	defer r.refineContainers.Delete(taskID)
-
-	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		spec := r.buildRefinementContainerSpec(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
-
-		logger.Runner.Debug("refine exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
-
-		handle, launchErr := r.backend.Launch(ctx, spec)
-		if launchErr != nil {
-			return nil, nil, nil, fmt.Errorf("launch refinement container: %w", launchErr)
-		}
-		r.refineContainers.SetHandle(taskID, handle, nil)
-
-		rawStdout, _ := io.ReadAll(handle.Stdout())
-		rawStderr, _ := io.ReadAll(handle.Stderr())
-		exitCode, _ := handle.Wait()
-
-		if ctx.Err() != nil {
-			_ = handle.Kill()
-			return nil, rawStdout, rawStderr, fmt.Errorf("refinement container terminated: %w", ctx.Err())
-		}
-
-		raw := strings.TrimSpace(string(rawStdout))
-		if raw == "" {
-			if exitCode != 0 {
-				return nil, rawStdout, rawStderr,
-					fmt.Errorf("container exited with code %d: stderr=%s", exitCode, string(rawStderr))
-			}
-			stderrStr := strings.TrimSpace(string(rawStderr))
-			if stderrStr != "" {
-				return nil, rawStdout, rawStderr,
-					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
-			}
-			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from container")
-		}
-
-		output, parseErr := parseOutput(raw)
-		if parseErr != nil {
-			if exitCode != 0 {
-				return nil, rawStdout, rawStderr,
-					fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-						exitCode, string(rawStderr), truncate(raw, 500))
-			}
-			return nil, rawStdout, rawStderr,
-				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
-		}
-
-		if exitCode != 0 {
-			logger.Runner.Warn("refinement container exited non-zero but produced valid output",
-				"task", taskID, "code", exitCode, "sandbox", selectedSandbox)
-		}
-		output.ActualSandbox = selectedSandbox
-		return output, rawStdout, rawStderr, nil
-	}
-
-	initialSandbox := sb
-	output, rawStdout, rawStderr, err := runWithSandbox(initialSandbox)
-	if err != nil {
-		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
-			logger.Runner.Warn("refinement: claude token limit hit; retrying with codex", "task", taskID)
-			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-				"result": "Sandbox fallback: claude → codex (token/rate limit hit during refinement)",
-			})
-			output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
-		}
-		if err != nil {
-			return nil, rawStdout, rawStderr, err
-		}
-	}
-	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
-		isLikelyTokenLimitError(output.Result, output.Subtype) {
-		logger.Runner.Warn("refinement: claude output reported token limit; retrying with codex", "task", taskID)
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"result": "Sandbox fallback: claude → codex (token/rate limit in refinement output)",
-		})
-		output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
-		if err != nil {
-			return nil, rawStdout, rawStderr, err
-		}
-	}
-
-	// Accumulate usage attributed to refinement sub-agent.
-	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 {
-		_ = r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityRefinement, store.TaskUsage{
-
-			InputTokens:          output.Usage.InputTokens,
-			OutputTokens:         output.Usage.OutputTokens,
-			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
-			CostUSD:              output.TotalCostUSD,
-		})
-		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
-			Turn:                 1,
-			Timestamp:            time.Now().UTC(),
-			InputTokens:          output.Usage.InputTokens,
-			OutputTokens:         output.Usage.OutputTokens,
-			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
-			CostUSD:              output.TotalCostUSD,
-			Sandbox:              output.ActualSandbox,
-			SubAgent:             store.SandboxActivityRefinement,
-		}); appErr != nil {
-			logger.Runner.Warn("refinement: append turn usage failed", "task", taskID, "error", appErr)
-		}
-	}
-
-	return output, rawStdout, rawStderr, nil
 }
 
 // cleanRefinementResult strips any agent preamble (internal monologue,

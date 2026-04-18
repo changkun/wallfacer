@@ -61,9 +61,14 @@ func TestRunRefinement_NoopsAfterTaskReset(t *testing.T) {
 	}
 }
 
-func TestRunRefinementContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
+// TestRunRefinementFallsBackToCodexOnTokenLimit drives the public
+// RunRefinement flow with two fake responses — the first is a Claude
+// token-limit signal, the second is a clean refinement from codex.
+// After migration to runAgent the fallback still runs and the
+// persisted usage record is attributed to codex + refinement.
+func TestRunRefinementFallsBackToCodexOnTokenLimit(t *testing.T) {
 	tokenLimit := `{"result":"rate limit exceeded: token limit reached","session_id":"s1","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
-	refinementOutput := `{"result":"Detailed implementation plan","session_id":"s2","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001,"usage":{"input_tokens":111,"output_tokens":22}}`
+	refinementOutput := `{"result":"# Goal\nShip it\n## Objective\nDetailed plan","session_id":"s2","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001,"usage":{"input_tokens":111,"output_tokens":22}}`
 	cmd := fakeStatefulCmd(t, []string{tokenLimit, refinementOutput})
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 
@@ -71,16 +76,25 @@ func TestRunRefinementContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// RunRefinement expects CurrentRefinement to be initialised so it
+	// has somewhere to persist the result.
+	if err := s.UpdateRefinementJob(context.Background(), task.ID, &store.RefinementJob{
+		Status: store.RefinementJobStatusRunning,
+	}); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
 
-	output, _, _, err := r.runRefinementContainer(context.Background(), task.ID, "Refine prompt", "", "claude")
+	r.RunRefinement(task.ID, "")
+
+	got, err := s.GetTask(context.Background(), task.ID)
 	if err != nil {
-		t.Fatalf("expected codex fallback success, got error: %v", err)
+		t.Fatalf("GetTask: %v", err)
 	}
-	if output == nil {
-		t.Fatal("expected refinement output")
+	if got.CurrentRefinement == nil {
+		t.Fatal("expected CurrentRefinement set after refinement")
 	}
-	if output.ActualSandbox != "codex" {
-		t.Fatalf("expected actual sandbox codex, got %q", output.ActualSandbox)
+	if got.CurrentRefinement.Status != store.RefinementJobStatusDone {
+		t.Fatalf("status = %q, want done", got.CurrentRefinement.Status)
 	}
 
 	usages, err := s.GetTurnUsages(task.ID)
@@ -90,10 +104,11 @@ func TestRunRefinementContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 	if len(usages) == 0 {
 		t.Fatal("expected refinement usage record after fallback")
 	}
-	if usages[len(usages)-1].Sandbox != "codex" {
-		t.Fatalf("expected refinement usage sandbox codex, got %q", usages[len(usages)-1].Sandbox)
+	last := usages[len(usages)-1]
+	if last.Sandbox != "codex" {
+		t.Fatalf("expected refinement usage sandbox codex, got %q", last.Sandbox)
 	}
-	if usages[len(usages)-1].SubAgent != "refinement" {
-		t.Fatalf("expected refinement sub-agent, got %q", usages[len(usages)-1].SubAgent)
+	if last.SubAgent != "refinement" {
+		t.Fatalf("expected refinement sub-agent, got %q", last.SubAgent)
 	}
 }
