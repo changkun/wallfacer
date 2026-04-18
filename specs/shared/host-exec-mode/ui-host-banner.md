@@ -1,6 +1,6 @@
 ---
 title: Settings UI shows host-mode isolation warning
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-exec-mode/runner-host-switch.md
 affects:

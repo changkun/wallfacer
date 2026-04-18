@@ -21,8 +21,28 @@ function _pullPhaseText(phase, layersDone) {
   }
 }
 
+// updateHostModeBanner shows or hides the host-mode warning banner in the
+// Sandbox settings tab based on whether the server is running with
+// --backend host. Piggybacks on the /api/config fetch so we don't add a
+// second round-trip.
+function updateHostModeBanner() {
+  var banner = document.querySelector("[data-js-host-mode-banner]");
+  if (!banner) return;
+  api(Routes.config.get())
+    .then(function (cfg) {
+      banner.hidden = !(cfg && cfg.host_mode === true);
+    })
+    .catch(function () {
+      banner.hidden = true;
+    });
+}
+
 // Loads and renders sandbox image status in Settings > Sandbox > Container Images.
 async function loadImageStatus() {
+  // Cheap cross-section: show / hide the host-mode banner whenever the
+  // sandbox tab loads. Fires once per open, matches the banner's scope.
+  updateHostModeBanner();
+
   var container = document.getElementById("sandbox-images-list");
   if (!container) return;
 
