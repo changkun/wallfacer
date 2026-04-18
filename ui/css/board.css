@@ -169,7 +169,7 @@
   font-size: var(--fs-10);
   padding: 1px 4px;
   background: var(--bg-card);
-  color: var(--ink-1);
+  color: var(--ink);
   border: 1px solid var(--rule);
   border-radius: var(--r-sm);
 }
@@ -197,7 +197,7 @@
 }
 .routine-trigger-btn:hover {
   background: var(--tint-blue, var(--bg-sunk));
-  color: var(--tint-blue-ink, var(--ink-1));
+  color: var(--tint-blue-ink, var(--ink));
   border-color: color-mix(in oklab, var(--accent) 40%, var(--rule));
 }
 .routine-last-fired {
@@ -638,4 +638,266 @@
   .board-composer-host {
     transition: none;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   New-task composer (inline, backlog column)
+
+   Goal: high information density in a narrow column. One flat surface
+   instead of stacked rounded cards, a single font size rhythm (11px),
+   thin chevron disclosures for advanced sections, and a right-aligned
+   action row. The IDs inside are referenced by ui/js/tasks.js; only the
+   visual chrome changes here.
+   ──────────────────────────────────────────────────────────────────── */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  font-size: var(--fs-10);
+  color: var(--ink-2);
+}
+
+.composer__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.composer__type {
+  flex: 0 0 auto;
+  font-size: var(--fs-10);
+  padding: 3px 22px 3px 8px;
+  background: var(--bg-card);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) 50%,
+    calc(100% - 8px) 50%;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+}
+.composer__templates {
+  margin-left: auto;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.composer__templates:hover {
+  color: var(--ink);
+  border-color: var(--rule);
+  background: var(--bg-sunk);
+}
+
+.composer__prompt {
+  width: 100%;
+  resize: vertical;
+  min-height: 72px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  font-family: inherit;
+}
+.composer__prompt:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.composer__prompt::placeholder {
+  color: var(--ink-4);
+}
+
+.composer__tags {
+  /* Tag widget sits flush with the prompt — no extra header row. The
+     widget itself renders its placeholder input; we just tighten the
+     outer spacing. */
+  min-height: 22px;
+}
+
+.composer__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.composer__row--wrap {
+  flex-wrap: wrap;
+}
+
+.composer__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: var(--fs-10);
+  min-width: 0;
+}
+.composer__field--grow {
+  flex: 1 1 0;
+}
+.composer__field--compact {
+  flex: 0 0 auto;
+}
+.composer__field-label {
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.composer__input {
+  font-size: var(--fs-10);
+  color: var(--ink);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  padding: 3px 6px;
+  min-width: 0;
+  width: 100%;
+  font-family: inherit;
+}
+.composer__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent);
+}
+.composer__input--num {
+  width: 56px;
+  text-align: right;
+}
+select.composer__input {
+  padding-right: 22px;
+  appearance: none;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) 50%,
+    calc(100% - 8px) 50%;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+}
+
+.composer__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-10);
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.composer__checkbox input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+
+.composer__more {
+  border-top: 1px dashed var(--rule);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.composer__more > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-10);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 2px 0;
+  user-select: none;
+}
+.composer__more > summary::-webkit-details-marker {
+  display: none;
+}
+.composer__more > summary:hover {
+  color: var(--ink);
+}
+.composer__more[open] > summary .composer__chev {
+  transform: rotate(180deg);
+}
+.composer__chev {
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.composer__nested {
+  margin-top: 6px;
+}
+.composer__overrides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+.composer__override {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.composer__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+}
+.composer__btn {
+  font-size: var(--fs-10);
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  line-height: 1.4;
+  font-family: inherit;
+}
+.composer__btn--ghost {
+  background: transparent;
+  color: var(--ink-3);
+  border-color: transparent;
+}
+.composer__btn--ghost:hover {
+  color: var(--ink);
+  background: var(--bg-sunk);
+  border-color: var(--rule);
+}
+.composer__btn--primary {
+  background: var(--accent);
+  color: var(--accent-fg, white);
+  border-color: var(--accent);
+}
+.composer__btn--primary:hover {
+  filter: brightness(1.04);
 }
