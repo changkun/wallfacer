@@ -31,16 +31,17 @@ Cloud Platform — 0/8
   ○ Multi-Tenant (capstone)        ○ Tenant API
   ○ Billing Idempotency            ○ Telemetry Queue Backpressure
 
-Shared Design — 0/18
+Shared Design — 0/19
   ○ Authentication                 ○ Agent Abstraction
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
-  ○ Telemetry & Observability      ○ Information Inbox
-  ○ Multi-Agent Consensus          ○ Multi-Agent Debate
-  ○ Token & Cost Optimization      ○ Extensible Prompts
-  ○ Intent-Driven Commits          ○ Sandbox Hooks
-  ○ Defense in Depth               ○ Agent Memory & Identity
-  ○ Intelligence System            ○ Eval Pipeline & Benchmark
+  ○ Host Exec Mode                 ○ Telemetry & Observability
+  ○ Information Inbox              ○ Multi-Agent Consensus
+  ○ Multi-Agent Debate             ○ Token & Cost Optimization
+  ○ Extensible Prompts             ○ Intent-Driven Commits
+  ○ Sandbox Hooks                  ○ Defense in Depth
+  ○ Agent Memory & Identity        ○ Intelligence System
+  ○ Eval Pipeline & Benchmark
 ```
 
 ---
@@ -172,6 +173,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
 | [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
+| [host-exec-mode.md](shared/host-exec-mode.md) | Drafted | Local | `HostBackend` — opt-in `WALLFACER_SANDBOX_BACKEND=host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 | [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
