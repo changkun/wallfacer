@@ -876,6 +876,227 @@ describe("renderUnifiedGraph", () => {
       expect(pinB).toBeUndefined();
     });
 
+    it("dims nodes that don't match searchQuery (case-insensitive label/path)", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const tasks = [
+        { id: "a", title: "Alpha", depends_on: [] },
+        { id: "b", title: "Beta", depends_on: [] },
+      ];
+      const graph = buildUnifiedGraph(tasks, []);
+      const svg = makeEl("svg");
+      renderUnifiedGraph(graph, svg, { searchQuery: "alph" });
+      const { group: groupA } = pickNode(svg, "task:a");
+      const { group: groupB } = pickNode(svg, "task:b");
+      expect(groupA.getAttribute("opacity")).toBeNull();
+      expect(groupB.getAttribute("opacity")).toBe("0.28");
+    });
+
+    it("drag delta is divided by scale so pins land at correct graph coords", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let pinned = null;
+      renderUnifiedGraph(graph, svg, {
+        onPinNode: (id, x, y) => {
+          pinned = { id, x, y };
+        },
+        getScale: () => 2,
+      });
+      const { body } = pickNode(svg, "task:a");
+      const { body: _ignore } = { body };
+      void _ignore;
+      // Capture pre-drag origin to verify the delta-in-graph-coords math.
+      const rect = body.children.find((c) => c.tagName === "rect");
+      const originX = Number(rect.getAttribute("x"));
+      const originY = Number(rect.getAttribute("y"));
+      fire(body, "mousedown", {
+        button: 0,
+        clientX: 0,
+        clientY: 0,
+        stopPropagation: () => {},
+      });
+      // 200 screen pixels at scale 2 → 100 graph units.
+      fire(body, "mousemove", { clientX: 200, clientY: 80 });
+      fire(body, "mouseup", { clientX: 200, clientY: 80 });
+      expect(pinned).not.toBeNull();
+      expect(pinned.x).toBeCloseTo(originX + 100, 5);
+      expect(pinned.y).toBeCloseTo(originY + 40, 5);
+    });
+
+    it("invokes onHoverNode on mouseenter and null on mouseleave", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      const calls = [];
+      renderUnifiedGraph(graph, svg, {
+        onHoverNode: (id) => calls.push(id),
+      });
+      const { body } = pickNode(svg, "task:a");
+      fire(body, "mouseenter", {});
+      fire(body, "mouseleave", {});
+      expect(calls).toEqual(["task:a", null]);
+    });
+
+    it("annotates edge paths with data-from / data-to for hover lookup", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [
+          { id: "a", title: "A", depends_on: [] },
+          { id: "b", title: "B", depends_on: ["a"] },
+        ],
+        [],
+      );
+      const svg = makeEl("svg");
+      renderUnifiedGraph(graph, svg);
+      const path = svg.children.find(
+        (c) =>
+          c.tagName === "path" && c.getAttribute("data-kind") === "task_dep",
+      );
+      expect(path).toBeDefined();
+      expect(path.getAttribute("data-from")).toBe("task:a");
+      expect(path.getAttribute("data-to")).toBe("task:b");
+    });
+
+    it("renders edges as straight line segments (polyline)", () => {
+      // With the straight-line routing, the path must use only M (move)
+      // and L (lineto) commands — no Q (quadratic) or C (cubic).
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [
+          { id: "a", title: "A", depends_on: [] },
+          { id: "b", title: "B", depends_on: ["a"] },
+        ],
+        [],
+      );
+      const svg = makeEl("svg");
+      renderUnifiedGraph(graph, svg);
+      const edge = svg.children.find(
+        (el) =>
+          el.tagName === "path" && el.getAttribute("data-kind") === "task_dep",
+      );
+      expect(edge).toBeDefined();
+      const d = edge.getAttribute("d") || "";
+      expect(d).toMatch(/^M[\d.,-]+ L[\d.,-]+$/);
+      expect(d).not.toMatch(/[QC]/);
+    });
+
+    it("live-updates incident edges during drag (no lag behind the node)", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [
+          { id: "a", title: "A", depends_on: [] },
+          { id: "b", title: "B", depends_on: ["a"] },
+        ],
+        [],
+      );
+      const svg = makeEl("svg");
+      renderUnifiedGraph(graph, svg, {
+        pinnedPositions: new Map([
+          ["task:a", { x: 0, y: 0 }],
+          ["task:b", { x: 600, y: 0 }],
+        ]),
+      });
+      const path = svg.children.find(
+        (c) =>
+          c.tagName === "path" && c.getAttribute("data-kind") === "task_dep",
+      );
+      const initialD = path.getAttribute("d");
+      const { body } = pickNode(svg, "task:a");
+      fire(body, "mousedown", {
+        button: 0,
+        clientX: 0,
+        clientY: 0,
+        stopPropagation: () => {},
+      });
+      fire(body, "mousemove", { clientX: 40, clientY: 120 });
+      // The path d must have changed during the drag — if it's still the
+      // initial shape, edges are lagging (the old behaviour).
+      const liveD = path.getAttribute("d");
+      expect(liveD).not.toBe(initialD);
+      fire(body, "mouseup", { clientX: 40, clientY: 120 });
+    });
+
+    it("committed drag persists in DOM so a second drag starts from the new baseline", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      const pins = [];
+      renderUnifiedGraph(graph, svg, {
+        pinnedPositions: new Map([["task:a", { x: 100, y: 100 }]]),
+        onPinNode: (id, newX, newY) => pins.push({ id, x: newX, y: newY }),
+      });
+      const { body, group } = pickNode(svg, "task:a");
+      // First drag: +50 x
+      fire(body, "mousedown", {
+        button: 0,
+        clientX: 0,
+        clientY: 0,
+        stopPropagation: () => {},
+      });
+      fire(body, "mousemove", { clientX: 50, clientY: 0 });
+      fire(body, "mouseup", { clientX: 50, clientY: 0 });
+      expect(pins[0].x).toBe(150);
+      // Transform must be cleared after mouseup (delta committed to attrs).
+      expect(group.getAttribute("transform")).toBeNull();
+      // Second drag: +50 x — must land at 200, not 150 (no snap-back).
+      fire(body, "mousedown", {
+        button: 0,
+        clientX: 0,
+        clientY: 0,
+        stopPropagation: () => {},
+      });
+      fire(body, "mousemove", { clientX: 50, clientY: 0 });
+      fire(body, "mouseup", { clientX: 50, clientY: 0 });
+      expect(pins[1].x).toBe(200);
+    });
+
+    it("attaches edges to the node rectangle perimeter, not the centre", () => {
+      // With two nodes pinned at known positions, the edge must begin at
+      // the border of the source rectangle (facing the destination) and
+      // end at the border of the destination rectangle (facing the
+      // source). This is what prevents multiple edges from collapsing to
+      // one point when many parallel edges converge on the same node.
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [
+          { id: "a", title: "A", depends_on: [] },
+          { id: "b", title: "B", depends_on: ["a"] },
+        ],
+        [],
+      );
+      const svg = makeEl("svg");
+      // Pin A at (0, 0) and B at (600, 0) so the edge goes L→R horizontally.
+      const pinnedPositions = new Map([
+        ["task:a", { x: 0, y: 0 }],
+        ["task:b", { x: 600, y: 0 }],
+      ]);
+      renderUnifiedGraph(graph, svg, { pinnedPositions });
+      const path = svg.children.find(
+        (c) =>
+          c.tagName === "path" && c.getAttribute("data-kind") === "task_dep",
+      );
+      expect(path).toBeDefined();
+      const d = path.getAttribute("d") || "";
+      const m = d.match(/^M(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+      const tail = d.match(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
+      expect(m).not.toBeNull();
+      expect(tail).not.toBeNull();
+      // NODE_W = 220 in unified-graph.js; the source at x=0 → right
+      // border at 220. The destination at x=600 → left border at 600.
+      // Edges must attach at the border, not at the centres (110 / 710).
+      expect(parseFloat(m[1])).toBe(220);
+      expect(parseFloat(tail[1])).toBe(600);
+    });
+
     it("honours pinnedPositions — a pinned node renders at exact (x, y)", () => {
       const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
       const graph = buildUnifiedGraph(

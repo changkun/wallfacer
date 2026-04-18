@@ -422,12 +422,88 @@
   // We keep the `layoutSugiyama` name as an alias for callers/tests that
   // already reach for it — the new algorithm is a drop-in replacement
   // with the same return shape.
+  // Module-level cache of the last computed layout, keyed by graph
+  // structure fingerprint. Re-render with the same structure (the common
+  // case: a pin was added, hover fired, search query changed) skips the
+  // 260-iteration Fruchterman-Reingold simulation entirely. Only the
+  // pinned node moves; every other node keeps its previous position so
+  // the user sees zero unrelated jitter.
+  var _layoutCache = { fingerprint: null, positions: null, maxCompW: 0 };
+
+  function _structureFingerprint(graph) {
+    var ns = [];
+    for (var i = 0; i < graph.nodes.length; i++) {
+      var n = graph.nodes[i];
+      // Node heights drive layout too (label wrapping), so include them.
+      ns.push(n.id + "@" + (n.label || "").length);
+    }
+    ns.sort();
+    var es = [];
+    for (var j = 0; j < graph.edges.length; j++) {
+      var e = graph.edges[j];
+      es.push(e.from + ">" + e.to + ":" + e.kind);
+    }
+    es.sort();
+    return ns.join("|") + "##" + es.join("|");
+  }
+
   function layoutForce(graph, opts) {
     opts = opts || {};
     var pinnedPositions =
       opts.pinnedPositions && typeof opts.pinnedPositions.get === "function"
         ? opts.pinnedPositions
         : null;
+
+    // Fast path: structure unchanged → reuse cached positions + apply pins.
+    // This is what makes a pin drag not shuffle the rest of the graph.
+    var fp = _structureFingerprint(graph);
+    if (_layoutCache.fingerprint === fp && _layoutCache.positions) {
+      var cached = new Map();
+      _layoutCache.positions.forEach(function (p, id) {
+        cached.set(id, {
+          x: p.x,
+          y: p.y,
+          node: p.node,
+          kind: p.kind || "real",
+          height: p.height,
+        });
+      });
+      if (pinnedPositions) {
+        pinnedPositions.forEach(function (pos, id) {
+          var c = cached.get(id);
+          if (!c) return;
+          c.x = pos.x;
+          c.y = pos.y;
+        });
+      }
+      var edgeChainsFast = graph.edges.map(function (e) {
+        return { edge: e, chain: [e.from, e.to] };
+      });
+      var edgePathsFast = _routeEdges(graph, edgeChainsFast, cached);
+      var maxXF = 0;
+      var maxYF = 0;
+      cached.forEach(function (p) {
+        var h = p.height || NODE_H;
+        if (p.x + NODE_W > maxXF) maxXF = p.x + NODE_W;
+        if (p.y + h > maxYF) maxYF = p.y + h;
+      });
+      var svgWF = Math.max(PAD + _layoutCache.maxCompW + PAD, maxXF + PAD);
+      var svgHF = maxYF + PAD;
+      edgePathsFast.forEach(function (routed) {
+        if (!routed || !routed.points) return;
+        routed.points.forEach(function (pt) {
+          pt.x = Math.round(pt.x);
+          pt.y = Math.round(pt.y);
+        });
+      });
+      return {
+        positions: cached,
+        edgePaths: edgePathsFast,
+        svgW: Math.round(svgWF),
+        svgH: Math.round(svgHF),
+        hasCycles: false,
+      };
+    }
 
     var components = _connectedComponents(graph);
     if (components.length === 0) {
@@ -504,6 +580,21 @@
       });
     });
 
+    // Save for the fast path — subsequent calls with the same structure
+    // reuse these positions. We snapshot, not alias, so pin-overrides on
+    // future calls don't leak back into the cache.
+    var snap = new Map();
+    allPositions.forEach(function (p, id) {
+      snap.set(id, {
+        x: p.x,
+        y: p.y,
+        node: p.node,
+        kind: p.kind || "real",
+        height: p.height,
+      });
+    });
+    _layoutCache = { fingerprint: fp, positions: snap, maxCompW: maxCompW };
+
     return {
       positions: allPositions,
       edgePaths: edgePaths,
@@ -573,12 +664,7 @@
     var temperature = Math.max(radius * 0.4, 80);
     var coolRate = temperature / FORCE_ITERATIONS;
     for (var iter = 0; iter < FORCE_ITERATIONS; iter++) {
-      var totalDisp = _forceStep(
-        positions,
-        adj,
-        temperature,
-        isPinned,
-      );
+      var totalDisp = _forceStep(positions, adj, temperature, isPinned);
       temperature = Math.max(0, temperature - coolRate);
       if (totalDisp < FORCE_EPSILON * N) break;
     }
@@ -608,8 +694,8 @@
         var d2 = dx * dx + dy * dy;
         if (d2 < 1) {
           // Random kick to break exact overlaps.
-          dx = (i - j) || 1;
-          dy = (j - i) || 1;
+          dx = i - j || 1;
+          dy = j - i || 1;
           d2 = dx * dx + dy * dy;
         }
         var d = Math.sqrt(d2);
@@ -656,6 +742,67 @@
       });
     });
 
+    // Node-edge repulsion: when a non-endpoint node sits close to an
+    // edge's straight line, push it perpendicular to the line so the
+    // final layout doesn't have edges slicing through unrelated nodes.
+    // The clearance threshold matches EDGE_CLEARANCE_PAD in the router
+    // so the force nudges nodes *just* far enough for the straight line
+    // to clear them — detour routing picks up the rest.
+    var NODE_EDGE_CLEARANCE = FORCE_NODE_RADIUS + 30;
+    var NODE_EDGE_STRENGTH = 420;
+    adj.forEach(function (neighbours, fromId) {
+      neighbours.forEach(function (toId) {
+        if (toId <= fromId) return;
+        var pa = positions.get(fromId);
+        var pb = positions.get(toId);
+        if (!pa || !pb) return;
+        var aCx = pa.x + NODE_W / 2;
+        var aCy = pa.y + (pa.height || NODE_H) / 2;
+        var bCx = pb.x + NODE_W / 2;
+        var bCy = pb.y + (pb.height || NODE_H) / 2;
+        var ex = bCx - aCx;
+        var ey = bCy - aCy;
+        var elen = Math.sqrt(ex * ex + ey * ey);
+        if (elen < 1) return;
+        var eux = ex / elen;
+        var euy = ey / elen;
+        var enx = -euy;
+        var eny = eux;
+        for (var k = 0; k < ids.length; k++) {
+          var nid = ids[k];
+          if (nid === fromId || nid === toId) continue;
+          var pn = positions.get(nid);
+          var ncx = pn.x + NODE_W / 2;
+          var ncy = pn.y + (pn.height || NODE_H) / 2;
+          var rx = ncx - aCx;
+          var ry = ncy - aCy;
+          var t = (rx * eux + ry * euy) / elen;
+          if (t < 0.05 || t > 0.95) continue;
+          var d = rx * enx + ry * eny; // signed perp distance
+          var absD = Math.abs(d);
+          if (absD > NODE_EDGE_CLEARANCE) continue;
+          var push = (NODE_EDGE_CLEARANCE - absD) / NODE_EDGE_CLEARANCE;
+          // Scale with the squared deficit so the force drops off
+          // quickly once the node has moved out of the corridor.
+          var mag = NODE_EDGE_STRENGTH * push * push;
+          var sign = d >= 0 ? 1 : -1;
+          var pfx = enx * sign * mag;
+          var pfy = eny * sign * mag;
+          var dn = disp.get(nid);
+          dn.dx += pfx;
+          dn.dy += pfy;
+          // Equal-and-opposite split over the two endpoints so the
+          // edge itself also shifts out of the node's way.
+          var da2 = disp.get(fromId);
+          var db2 = disp.get(toId);
+          da2.dx -= pfx * 0.5;
+          da2.dy -= pfy * 0.5;
+          db2.dx -= pfx * 0.5;
+          db2.dy -= pfy * 0.5;
+        }
+      });
+    });
+
     // Apply, clamped by temperature.
     var total = 0;
     disp.forEach(function (d, id) {
@@ -692,10 +839,176 @@
     return { positions: positions, width: maxX, height: maxY };
   }
 
-  // Backwards-compat alias: any caller/test that still reaches for
-  // layoutSugiyama gets the force-directed layout now. The returned
-  // shape is identical (positions + edgePaths + svgW + svgH + hasCycles).
-  var layoutSugiyama = layoutForce;
+  // layoutSugiyama — real layered (Sugiyama) layout, the primary Map
+  // layout. For DAG-shaped graphs (spec containment + task deps) a
+  // layered layout produces clean columns where edges flow left→right
+  // without slicing through unrelated nodes. Force-directed got used
+  // for a while but visibly tangles on DAGs.
+  //
+  // Pipeline:
+  //   1. Split the graph into connected components.
+  //   2. Run `_layoutComponent` on each (layers → dummies → crossing
+  //      minimisation → coordinate assignment).
+  //   3. Stack components vertically.
+  //   4. Apply any user-pinned positions as absolute overrides.
+  //   5. Route edges (including detours around any non-endpoint nodes
+  //      that end up in a direct-line's path — rare under Sugiyama,
+  //      common when pins displace nodes off the layer grid).
+  //
+  // Cache structure fingerprint so pin-only changes skip the
+  // recomputation — matches the fast path the renderer expects.
+  function layoutSugiyama(graph, opts) {
+    opts = opts || {};
+    var pinnedPositions =
+      opts.pinnedPositions && typeof opts.pinnedPositions.get === "function"
+        ? opts.pinnedPositions
+        : null;
+
+    var fp = _structureFingerprint(graph);
+    if (_layoutCache.fingerprint === fp && _layoutCache.positions) {
+      var cached = new Map();
+      _layoutCache.positions.forEach(function (p, id) {
+        cached.set(id, {
+          x: p.x,
+          y: p.y,
+          node: p.node,
+          kind: p.kind || "real",
+          height: p.height,
+        });
+      });
+      if (pinnedPositions) {
+        pinnedPositions.forEach(function (pos, id) {
+          var c = cached.get(id);
+          if (!c) return;
+          c.x = pos.x;
+          c.y = pos.y;
+        });
+      }
+      var chainsFast = _layoutCache.edgeChains || [];
+      var edgePathsFast = _routeEdges(graph, chainsFast, cached);
+      var maxXF = 0;
+      var maxYF = 0;
+      cached.forEach(function (p) {
+        var h = p.height || NODE_H;
+        if (p.x + NODE_W > maxXF) maxXF = p.x + NODE_W;
+        if (p.y + h > maxYF) maxYF = p.y + h;
+      });
+      edgePathsFast.forEach(function (routed) {
+        if (!routed || !routed.points) return;
+        routed.points.forEach(function (pt) {
+          pt.x = Math.round(pt.x);
+          pt.y = Math.round(pt.y);
+        });
+      });
+      return {
+        positions: cached,
+        edgePaths: edgePathsFast,
+        svgW: Math.round(maxXF + PAD),
+        svgH: Math.round(maxYF + PAD),
+        hasCycles: false,
+      };
+    }
+
+    var components = _connectedComponents(graph);
+    if (components.length === 0) {
+      return {
+        positions: new Map(),
+        edgePaths: [],
+        svgW: PAD * 2,
+        svgH: PAD * 2,
+        hasCycles: false,
+      };
+    }
+
+    var allPositions = new Map();
+    var allEdgeChains = [];
+    var yCursor = PAD;
+    var maxCompW = 0;
+    var layouts = [];
+    components.forEach(function (comp) {
+      var L = _layoutComponent(comp);
+      layouts.push(L);
+      if (L.width > maxCompW) maxCompW = L.width;
+    });
+    layouts.forEach(function (L) {
+      var xOffset = Math.max(PAD, PAD + (maxCompW - L.width) / 2);
+      L.positions.forEach(function (p, id) {
+        p.x += xOffset;
+        p.y += yCursor;
+        allPositions.set(id, p);
+      });
+      // Component edge chains use node ids which are already globally
+      // unique, so they can be merged directly once positions are
+      // translated into the global canvas.
+      for (var i = 0; i < L.edgeChains.length; i++) {
+        allEdgeChains.push(L.edgeChains[i]);
+      }
+      yCursor += L.height + COMPONENT_GAP;
+    });
+    yCursor -= COMPONENT_GAP;
+
+    if (pinnedPositions) {
+      pinnedPositions.forEach(function (pos, id) {
+        var current = allPositions.get(id);
+        if (!current) return;
+        current.x = pos.x;
+        current.y = pos.y;
+      });
+    }
+
+    var edgePaths = _routeEdges(graph, allEdgeChains, allPositions);
+
+    var maxX = 0;
+    var maxY = 0;
+    allPositions.forEach(function (p) {
+      var h = p.height || NODE_H;
+      if (p.x + NODE_W > maxX) maxX = p.x + NODE_W;
+      if (p.y + h > maxY) maxY = p.y + h;
+    });
+    var svgW = Math.max(PAD + maxCompW + PAD, maxX + PAD);
+    var svgH = Math.max(yCursor + PAD, maxY + PAD);
+
+    allPositions.forEach(function (p) {
+      p.x = Math.round(p.x);
+      p.y = Math.round(p.y);
+    });
+    edgePaths.forEach(function (routed) {
+      if (!routed || !routed.points) return;
+      routed.points.forEach(function (pt) {
+        pt.x = Math.round(pt.x);
+        pt.y = Math.round(pt.y);
+      });
+    });
+
+    // Snapshot for the fast path on subsequent calls with the same
+    // structure (pin-only changes, hover, search).
+    var snap = new Map();
+    allPositions.forEach(function (p, id) {
+      snap.set(id, {
+        x: p.x,
+        y: p.y,
+        node: p.node,
+        kind: p.kind || "real",
+        height: p.height,
+      });
+    });
+    _layoutCache = {
+      fingerprint: fp,
+      positions: snap,
+      maxCompW: maxCompW,
+      edgeChains: allEdgeChains,
+    };
+
+    return {
+      positions: allPositions,
+      edgePaths: edgePaths,
+      svgW: Math.round(svgW),
+      svgH: Math.round(svgH),
+      hasCycles: layouts.some(function (L) {
+        return L.hasCycles;
+      }),
+    };
+  }
 
   // _connectedComponents returns an Array<{nodes, edges}> where each
   // component is reachable under undirected edges. Preserves the node/
@@ -1083,11 +1396,11 @@
           count++;
         }
         var currentPos = positions.get(item.id);
-        var h = currentPos ? currentPos.height || _itemHeight(item) : _itemHeight(item);
+        var h = currentPos
+          ? currentPos.height || _itemHeight(item)
+          : _itemHeight(item);
         var centre =
-          count > 0
-            ? sum / count
-            : (currentPos ? currentPos.y : 0) + h / 2;
+          count > 0 ? sum / count : (currentPos ? currentPos.y : 0) + h / 2;
         return {
           item: item,
           idx: idx,
@@ -1125,23 +1438,173 @@
     return max;
   }
 
+  // _rectPerimeterPoint returns the point where the ray from the node
+  // centre toward (targetX, targetY) intersects the node's rectangle
+  // border. This is what attaches edges to the *edge* of a node
+  // rectangle instead of its centre, so multiple edges fan out around
+  // the perimeter rather than converging at one point.
+  //
+  // Geometry: clamp the parameter t so that |dx|*t ≤ halfW and
+  // |dy|*t ≤ halfH, pick the smaller t. A tiny inset avoids the stroke
+  // of the rectangle overlapping the edge line at the join.
+  function _rectPerimeterPoint(pos, targetX, targetY) {
+    var halfW = NODE_W / 2;
+    var halfH = (pos.height || NODE_H) / 2;
+    var cx = pos.x + halfW;
+    var cy = pos.y + halfH;
+    var dx = targetX - cx;
+    var dy = targetY - cy;
+    if (dx === 0 && dy === 0) return { x: cx + halfW, y: cy };
+    var absDx = Math.abs(dx);
+    var absDy = Math.abs(dy);
+    // Ray scale: how far we travel along (dx, dy) before hitting the
+    // rectangle border. Either side or top/bottom, whichever we reach
+    // first.
+    var tx = absDx > 0 ? halfW / absDx : Infinity;
+    var ty = absDy > 0 ? halfH / absDy : Infinity;
+    var t = Math.min(tx, ty);
+    return { x: cx + dx * t, y: cy + dy * t };
+  }
+
+  // _edgeDetourWaypoints inspects the straight line between startPt and
+  // endPt and returns an array of detour waypoints needed to route the
+  // edge around any non-endpoint nodes that sit in the direct path.
+  //
+  // Return shapes:
+  //   []              → the straight line is clear; draw a plain cubic.
+  //   [w]             → one side has blockers; draw a quadratic bowing
+  //                     to the opposite side through w.
+  //   [w1, w2]        → blockers on both sides; draw a cubic S-curve
+  //                     with control points at w1 (early t) and w2 (late t).
+  //
+  // The apex for each side covers the *worst* blocker on that side, so
+  // a single waypoint pushes the curve far enough to dodge every node
+  // in that half-plane.
+  var EDGE_CLEARANCE_PAD = 28;
+  function _edgeDetourWaypoints(startPt, endPt, positions, excludeIds) {
+    var dx = endPt.x - startPt.x;
+    var dy = endPt.y - startPt.y;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 60) return []; // very short edges can't route around anything
+    var ux = dx / len;
+    var uy = dy / len;
+    var nx = -uy;
+    var ny = ux;
+    var posSide = null; // worst blocker with d > 0
+    var negSide = null; // worst blocker with d < 0
+    positions.forEach(function (pos, id) {
+      if (excludeIds.has(id)) return;
+      if (pos.kind === "dummy" || !pos.node) return;
+      var halfW = NODE_W / 2;
+      var halfH = (pos.height || NODE_H) / 2;
+      var cx = pos.x + halfW;
+      var cy = pos.y + halfH;
+      var t = ((cx - startPt.x) * ux + (cy - startPt.y) * uy) / len;
+      if (t < 0.1 || t > 0.9) return;
+      var d = (cx - startPt.x) * nx + (cy - startPt.y) * ny;
+      var rPerp = Math.abs(nx) * halfW + Math.abs(ny) * halfH;
+      var clearance = rPerp + EDGE_CLEARANCE_PAD;
+      if (Math.abs(d) > clearance) return;
+      var deficit = clearance - Math.abs(d);
+      var rec = { d: d, deficit: deficit, clearance: clearance, t: t };
+      if (d >= 0) {
+        if (!posSide || deficit > posSide.deficit) posSide = rec;
+      } else {
+        if (!negSide || deficit > negSide.deficit) negSide = rec;
+      }
+    });
+    if (!posSide && !negSide) return [];
+
+    var mx = (startPt.x + endPt.x) / 2;
+    var my = (startPt.y + endPt.y) / 2;
+
+    // Helper: for a blocker at (t, d) on one side, produce a waypoint on
+    // the opposite side sized to clear it.
+    function wpForBlocker(b, signForWaypoint) {
+      // Quadratic: curve peak = waypoint_offset / 2. Cubic S-curve with
+      // two CPs: peak ≈ waypoint_offset / 2.6 on each side. We size for
+      // the more conservative case so single-side curves bow a bit more
+      // than strictly required; slightly roomier is more legible.
+      var apex = 2.2 * (b.clearance + Math.abs(b.d));
+      var baseX = startPt.x + (endPt.x - startPt.x) * b.t;
+      var baseY = startPt.y + (endPt.y - startPt.y) * b.t;
+      return {
+        x: baseX + signForWaypoint * nx * apex,
+        y: baseY + signForWaypoint * ny * apex,
+        t: b.t,
+      };
+    }
+
+    if (posSide && !negSide) {
+      // Bend to -n side (opposite of the +n blocker). Waypoint at
+      // midpoint rather than blocker's t so a quadratic centres its
+      // apex over the line's middle.
+      var w = {
+        x: mx - nx * 2 * (posSide.clearance + Math.abs(posSide.d)),
+        y: my - ny * 2 * (posSide.clearance + Math.abs(posSide.d)),
+      };
+      return [w];
+    }
+    if (negSide && !posSide) {
+      var w2 = {
+        x: mx + nx * 2 * (negSide.clearance + Math.abs(negSide.d)),
+        y: my + ny * 2 * (negSide.clearance + Math.abs(negSide.d)),
+      };
+      return [w2];
+    }
+    // Both sides. Build an S-curve: dodge +n blocker by bending toward
+    // -n, then dodge -n blocker by bending toward +n. Order the two
+    // waypoints along the chord so the S forms naturally.
+    var wpPos = wpForBlocker(posSide, -1); // bend to -n
+    var wpNeg = wpForBlocker(negSide, +1); // bend to +n
+    return wpPos.t <= wpNeg.t ? [wpPos, wpNeg] : [wpNeg, wpPos];
+  }
+
   function _routeEdges(graph, edgeChains, positions) {
     return edgeChains
       .map(function (entry) {
-        var points = [];
-        for (var i = 0; i < entry.chain.length; i++) {
-          var id = entry.chain[i];
-          var p = positions.get(id);
+        var chain = entry.chain;
+        if (!chain || chain.length < 2) return null;
+        var pts = [];
+        // Collect intermediate (dummy) waypoints as their stored coords.
+        // The source and destination points are computed against the
+        // rectangle perimeter so parallel edges fan around the node.
+        for (var i = 0; i < chain.length; i++) {
+          var p = positions.get(chain[i]);
           if (!p) return null;
-          var h = p.height || NODE_H;
-          if (i === 0) {
-            points.push({ x: p.x + NODE_W, y: p.y + h / 2 });
-          } else if (i === entry.chain.length - 1) {
-            points.push({ x: p.x, y: p.y + h / 2 });
-          } else {
-            points.push({ x: p.x, y: p.y });
-          }
+          pts.push(p);
         }
+        var first = pts[0];
+        var last = pts[pts.length - 1];
+        // Aim-from point for the source: the next waypoint after it.
+        var aimFromNext = pts[1];
+        var nextX =
+          aimFromNext.kind === "dummy"
+            ? aimFromNext.x
+            : aimFromNext.x + NODE_W / 2;
+        var nextY =
+          aimFromNext.kind === "dummy"
+            ? aimFromNext.y
+            : aimFromNext.y + (aimFromNext.height || NODE_H) / 2;
+        // Aim-from point for the destination: the waypoint before it.
+        var aimToPrev = pts[pts.length - 2];
+        var prevX =
+          aimToPrev.kind === "dummy" ? aimToPrev.x : aimToPrev.x + NODE_W / 2;
+        var prevY =
+          aimToPrev.kind === "dummy"
+            ? aimToPrev.y
+            : aimToPrev.y + (aimToPrev.height || NODE_H) / 2;
+
+        var startPt = _rectPerimeterPoint(first, nextX, nextY);
+        var endPt = _rectPerimeterPoint(last, prevX, prevY);
+        var points = [startPt];
+        for (var j = 1; j < pts.length - 1; j++) {
+          points.push({ x: pts[j].x, y: pts[j].y });
+        }
+        // Straight-line routing: no detour waypoints. Edges go in a
+        // direct polyline from source perimeter to destination
+        // perimeter (with any Sugiyama dummy waypoints along the way).
+        points.push(endPt);
         return { edge: entry.edge, points: points };
       })
       .filter(Boolean);
@@ -1154,23 +1617,100 @@
   // and dummy waypoint. With just two points this reduces to the classic
   // horizontally-symmetric "C-shape" bezier the flat layout used before.
   function _smoothPath(points) {
+    if (!points || points.length < 2) return "";
+    // Straight-line routing: polyline through every waypoint. Simple
+    // and readable — what the user explicitly asked for after trying
+    // curved detour routing.
+    var d = "M" + points[0].x + "," + points[0].y;
+    for (var si = 1; si < points.length; si++) {
+      d += " L" + points[si].x + "," + points[si].y;
+    }
+    return d;
+  }
+
+  // Retained for reference but no longer reached — kept inside this
+  // fallback-name wrapper in case a future iteration wants the curved
+  // routing back without re-deriving the maths.
+  function _smoothPathCurved(points) {
     if (!points || points.length === 0) return "";
+    // Detour routing — the interior points are *control points*, not
+    // waypoints the curve passes through:
+    //
+    //   3 points: quadratic bezier; curve bows toward the control.
+    //   4 points: cubic bezier with two controls; produces a smooth
+    //             S-curve, used when blockers exist on both sides of
+    //             the direct chord.
+    //
+    // In both cases the curve stays inside the convex hull of the
+    // control polygon, so a waypoint placed well clear of a blocker
+    // keeps the curve clear too — no V-kinks, no passes-through.
+    if (points.length === 3) {
+      var s = points[0];
+      var w = points[1];
+      var e = points[2];
+      return (
+        "M" +
+        s.x +
+        "," +
+        s.y +
+        " Q" +
+        w.x +
+        "," +
+        w.y +
+        " " +
+        e.x +
+        "," +
+        e.y
+      );
+    }
+    if (points.length === 4) {
+      var s2 = points[0];
+      var c1 = points[1];
+      var c2 = points[2];
+      var e2 = points[3];
+      return (
+        "M" +
+        s2.x +
+        "," +
+        s2.y +
+        " C" +
+        c1.x +
+        "," +
+        c1.y +
+        " " +
+        c2.x +
+        "," +
+        c2.y +
+        " " +
+        e2.x +
+        "," +
+        e2.y
+      );
+    }
     var d = "M" + points[0].x + "," + points[0].y;
     for (var i = 1; i < points.length; i++) {
       var a = points[i - 1];
       var b = points[i];
       var dx = b.x - a.x;
-      // Half of the horizontal distance → smooth S-curve through waypoints.
-      var cp = Math.max(20, dx / 2);
+      var dy = b.y - a.y;
+      // Control-point offset is a fraction of the full segment length,
+      // so edges that travel vertically or diagonally get a smooth
+      // bow-out instead of a horizontal-only C-curve that would cut
+      // through the node at steep angles.
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var cpLen = Math.max(20, dist * 0.35);
+      // Direction of the segment for the tangent at each endpoint.
+      var nx = dist > 0 ? dx / dist : 1;
+      var ny = dist > 0 ? dy / dist : 0;
       d +=
         " C" +
-        (a.x + cp) +
+        (a.x + nx * cpLen) +
         "," +
-        a.y +
+        (a.y + ny * cpLen) +
         " " +
-        (b.x - cp) +
+        (b.x - nx * cpLen) +
         "," +
-        b.y +
+        (b.y - ny * cpLen) +
         " " +
         b.x +
         "," +
@@ -1190,11 +1730,19 @@
   //   onFocusNode(id | null)          — user clicked a node (id) or empty
   //                                     canvas (null) to focus/unfocus.
   //   onNavigateNode(id)              — shift+click navigation.
+  //   onHoverNode(id | null)          — hover enter/leave; transient highlight.
   //   pinnedIds (Set<string>)         — nodes currently pinned; used to
   //                                     draw the pin corner marker.
   //   focusedNodeId (string | null)   — when set, non-neighbourhood nodes
   //                                     and edges are dimmed so the user
   //                                     can zero in on one topic.
+  //   searchQuery (string)            — when non-empty, nodes whose label
+  //                                     does not contain it (case-insensitive)
+  //                                     are dimmed alongside their edges.
+  //   getScale()                      — returns current zoom scale; drag
+  //                                     deltas are divided by it so pins
+  //                                     land at the intended graph coords
+  //                                     regardless of zoom level.
   function renderUnifiedGraph(graph, svg, opts) {
     opts = opts || {};
     if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
@@ -1233,6 +1781,43 @@
       });
     }
 
+    // Search filter: dim nodes whose label doesn't match the query
+    // (case-insensitive). Spec paths count too so users can find by path
+    // fragment. Matching is the intersection with focusSet when both are
+    // active — focus narrows, search further narrows.
+    var rawQuery = typeof opts.searchQuery === "string" ? opts.searchQuery : "";
+    var query = rawQuery.trim().toLowerCase();
+    var searchSet = null;
+    if (query) {
+      searchSet = new Set();
+      graph.nodes.forEach(function (n) {
+        var label = (n.label || "").toLowerCase();
+        var path = (n.extra && n.extra.path ? n.extra.path : "").toLowerCase();
+        if (
+          label.indexOf(query) !== -1 ||
+          (path && path.indexOf(query) !== -1)
+        ) {
+          searchSet.add(n.id);
+        }
+      });
+    }
+
+    // inFocus combines focus and search: a node is visible (full opacity)
+    // only when it satisfies *both* filters. null means no filter.
+    function inFocus(id) {
+      if (focusSet && !focusSet.has(id)) return false;
+      if (searchSet && !searchSet.has(id)) return false;
+      return true;
+    }
+    var anyDim = !!(focusSet || searchSet);
+
+    var getScale =
+      typeof opts.getScale === "function"
+        ? opts.getScale
+        : function () {
+            return 1;
+          };
+
     var pinnedIds =
       opts.pinnedIds && typeof opts.pinnedIds.has === "function"
         ? opts.pinnedIds
@@ -1252,6 +1837,32 @@
       if (typeof opts.onFocusNode === "function") opts.onFocusNode(null);
     });
     svg.appendChild(backdrop);
+
+    // Per-node mutable position index — live-updated during drag so
+    // incident edges can be re-routed without touching the layout cache.
+    // Each value points to the SAME object stored on the DOM-backed
+    // render so a live update is a single field write.
+    var nodePosRef = new Map();
+    layout.positions.forEach(function (pos) {
+      if (pos.kind === "dummy" || !pos.node) return;
+      nodePosRef.set(pos.node.id, {
+        x: pos.x,
+        y: pos.y,
+        height: pos.height || NODE_H,
+      });
+    });
+
+    // Index of edges incident on each node. Populated as we create the
+    // <path> elements so the drag handler can iterate them cheaply.
+    var edgesByNode = new Map();
+    function _addIncident(nodeId, record) {
+      var arr = edgesByNode.get(nodeId);
+      if (!arr) {
+        arr = [];
+        edgesByNode.set(nodeId, arr);
+      }
+      arr.push(record);
+    }
 
     // --- Edges first so nodes sit on top ---
     layout.edgePaths.forEach(function (routed) {
@@ -1275,12 +1886,76 @@
       path.setAttribute("fill", "none");
       if (style.dash) path.setAttribute("stroke-dasharray", style.dash);
       path.setAttribute("data-kind", e.kind);
-      if (focusSet) {
-        var edgeInFocus = focusSet.has(e.from) && focusSet.has(e.to);
+      path.setAttribute("data-from", e.from);
+      path.setAttribute("data-to", e.to);
+      if (anyDim) {
+        var edgeInFocus = inFocus(e.from) && inFocus(e.to);
         if (!edgeInFocus) path.setAttribute("opacity", "0.18");
       }
       svg.appendChild(path);
+
+      // Store incident records for both endpoints. Only direct (2-point)
+      // routed edges get live-updates; dummy-chained edges stay static
+      // since recomputing their waypoints requires the layout engine.
+      if (pts.length === 2) {
+        _addIncident(e.from, { pathEl: path, otherId: e.to });
+        _addIncident(e.to, { pathEl: path, otherId: e.from });
+      }
     });
+
+    // livePositions: a positions-like Map that _edgeDetourWaypoint can
+    // scan while the drag is in progress. Stored separately from
+    // nodePosRef because the detour function reads `pos.kind` and
+    // `pos.node` and returns positions keyed by id.
+    var livePositions = new Map();
+    nodePosRef.forEach(function (p, id) {
+      livePositions.set(id, {
+        x: p.x,
+        y: p.y,
+        height: p.height,
+        kind: "real",
+        node: nodeById.get(id),
+      });
+    });
+
+    // liveUpdateNode re-routes every edge incident on `nodeId` using the
+    // node's current nodePosRef entry (updated by the drag handler) and
+    // the other endpoint's stored position. Detours around other nodes
+    // are re-evaluated each call so the curve dodges obstacles as the
+    // dragged node passes over them.
+    function liveUpdateNode(nodeId) {
+      var incident = edgesByNode.get(nodeId);
+      if (!incident) return;
+      var self = nodePosRef.get(nodeId);
+      if (!self) return;
+      // Mirror the drag into livePositions so detour detection uses the
+      // current visual position, not the stale render-time one.
+      var live = livePositions.get(nodeId);
+      if (live) {
+        live.x = self.x;
+        live.y = self.y;
+      }
+      for (var i = 0; i < incident.length; i++) {
+        var rec = incident[i];
+        var other = nodePosRef.get(rec.otherId);
+        if (!other) continue;
+        var selfCx = self.x + NODE_W / 2;
+        var selfCy = self.y + self.height / 2;
+        var otherCx = other.x + NODE_W / 2;
+        var otherCy = other.y + other.height / 2;
+        // Determine source vs dest from the path's data-from.
+        var fromId = rec.pathEl.getAttribute("data-from");
+        var srcPos = fromId === nodeId ? self : other;
+        var dstPos = fromId === nodeId ? other : self;
+        var srcCx = srcPos === self ? selfCx : otherCx;
+        var srcCy = srcPos === self ? selfCy : otherCy;
+        var dstCx = dstPos === self ? selfCx : otherCx;
+        var dstCy = dstPos === self ? selfCy : otherCy;
+        var startPt = _rectPerimeterPoint(srcPos, dstCx, dstCy);
+        var endPt = _rectPerimeterPoint(dstPos, srcCx, srcCy);
+        rec.pathEl.setAttribute("d", _smoothPath([startPt, endPt]));
+      }
+    }
 
     // --- Nodes ---
     layout.positions.forEach(function (pos) {
@@ -1293,7 +1968,7 @@
       var g = svgNs("g");
       g.setAttribute("data-kind", n.kind);
       g.setAttribute("data-id", n.id);
-      if (focusSet && !focusSet.has(n.id)) {
+      if (anyDim && !inFocus(n.id)) {
         g.setAttribute("opacity", "0.28");
       }
 
@@ -1340,7 +2015,9 @@
       var labelCenterX = hasToggle ? x + (NODE_W - 28) / 2 : x + NODE_W / 2;
       var totalLabelH = lines.length * LABEL_LINE_H;
       var labelStartY =
-        y + LABEL_TOP_PAD + Math.max(0, (h - LABEL_TOP_PAD - LABEL_BOTTOM_PAD - totalLabelH) / 2);
+        y +
+        LABEL_TOP_PAD +
+        Math.max(0, (h - LABEL_TOP_PAD - LABEL_BOTTOM_PAD - totalLabelH) / 2);
       var label = svgNs("text");
       label.setAttribute("x", String(labelCenterX));
       label.setAttribute("y", String(labelStartY));
@@ -1367,7 +2044,10 @@
         body.appendChild(pin);
       }
 
-      _wireNodeInteractions(g, body, n, x, y, opts);
+      _wireNodeInteractions(g, body, n, x, y, opts, getScale, {
+        nodePosRef: nodePosRef,
+        liveUpdateNode: liveUpdateNode,
+      });
       g.appendChild(body);
 
       if (hasToggle) {
@@ -1381,24 +2061,79 @@
     return true;
   }
 
+  // _shiftGroupCoords walks every descendant of `g` and adds (dx, dy) to
+  // their positional attributes (x/y for rect/text/tspan, cx/cy for
+  // circle). Used on drag-end to commit the transform delta to the
+  // nodes' coordinate space so the next drag starts from the new
+  // baseline instead of snapping back.
+  function _shiftGroupCoords(g, dx, dy) {
+    if (!g || (!dx && !dy)) return;
+    var queue = [];
+    // Seed with direct children — `g.children` may be a live NodeList or
+    // a plain array depending on the DOM stub. Support both.
+    var kids = g.children || [];
+    for (var i = 0; i < kids.length; i++) queue.push(kids[i]);
+    while (queue.length > 0) {
+      var el = queue.shift();
+      var tag = el.tagName;
+      if (tag === "circle") {
+        var cx = el.getAttribute("cx");
+        var cy = el.getAttribute("cy");
+        if (cx !== null) el.setAttribute("cx", String(parseFloat(cx) + dx));
+        if (cy !== null) el.setAttribute("cy", String(parseFloat(cy) + dy));
+      } else {
+        var ax = el.getAttribute("x");
+        var ay = el.getAttribute("y");
+        if (ax !== null) el.setAttribute("x", String(parseFloat(ax) + dx));
+        if (ay !== null) el.setAttribute("y", String(parseFloat(ay) + dy));
+      }
+      var sub = el.children || [];
+      for (var j = 0; j < sub.length; j++) queue.push(sub[j]);
+    }
+  }
+
   // _wireNodeInteractions binds drag / click / dblclick / shift+click on
   // a single node group. The drag state machine lives here so it can
   // distinguish drags from clicks via a movement threshold, preventing
   // a normal click from triggering both focus and pin.
   var DRAG_THRESHOLD = 4;
 
-  function _wireNodeInteractions(g, body, n, x, y, opts) {
+  function _wireNodeInteractions(g, body, n, x, y, opts, getScale, drag) {
     var dragState = null;
+    drag = drag || {};
+    var nodePosRef = drag.nodePosRef || null;
+    var liveUpdateNode =
+      typeof drag.liveUpdateNode === "function" ? drag.liveUpdateNode : null;
+    // Scale divider: when the mount is zoomed, a screen-pixel drag
+    // corresponds to a smaller graph-coord move. Without this division,
+    // pinning at 2× zoom would land at double the intended position.
+    function currentScale() {
+      if (typeof getScale !== "function") return 1;
+      var s = getScale();
+      return typeof s === "number" && s > 0 ? s : 1;
+    }
 
     body.addEventListener("mousedown", function (e) {
       // Let space+drag (canvas pan) win over node drag so the user can
       // pan over a node. Also ignore right-click / middle-click.
       if (e.button !== undefined && e.button !== 0) return;
+      // Baseline x/y come from the nodePosRef so a second consecutive
+      // drag (without any intervening render) starts from the latest
+      // committed position, not the node's original render coords.
+      var baselineX = x;
+      var baselineY = y;
+      if (nodePosRef) {
+        var ref = nodePosRef.get(n.id);
+        if (ref) {
+          baselineX = ref.x;
+          baselineY = ref.y;
+        }
+      }
       dragState = {
         startX: e.clientX,
         startY: e.clientY,
-        originX: x,
-        originY: y,
+        baselineX: baselineX,
+        baselineY: baselineY,
         moved: false,
       };
       body.style.cursor = "grabbing";
@@ -1409,27 +2144,77 @@
 
     body.addEventListener("mousemove", function (e) {
       if (!dragState) return;
-      var dx = e.clientX - dragState.startX;
-      var dy = e.clientY - dragState.startY;
-      if (!dragState.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+      var s = currentScale();
+      var dx = (e.clientX - dragState.startX) / s;
+      var dy = (e.clientY - dragState.startY) / s;
+      if (!dragState.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD / s) {
         return;
       }
       dragState.moved = true;
-      g.setAttribute("transform", "translate(" + dx + "," + dy + ")");
+      // Visual: move the node's group via transform relative to the
+      // node's render origin (x, y). We use (targetX - x) as the
+      // translate so second-drag cases work even when the DOM children
+      // have already been shifted from their initial render positions.
+      var targetX = dragState.baselineX + dx;
+      var targetY = dragState.baselineY + dy;
+      g.setAttribute(
+        "transform",
+        "translate(" + (targetX - x) + "," + (targetY - y) + ")",
+      );
+      // Live edges: mutate the nodePosRef so _smoothPath traces the
+      // current visual position, then redraw incident edges. This is
+      // what stops the "edges lag behind the node while dragging" feel.
+      if (nodePosRef && liveUpdateNode) {
+        var ref = nodePosRef.get(n.id);
+        if (ref) {
+          ref.x = targetX;
+          ref.y = targetY;
+          liveUpdateNode(n.id);
+        }
+      }
     });
 
     function finishDrag(e) {
       if (!dragState) return;
       var wasMoved = dragState.moved;
-      var dx = e.clientX - dragState.startX;
-      var dy = e.clientY - dragState.startY;
+      var s = currentScale();
+      var dx = (e.clientX - dragState.startX) / s;
+      var dy = (e.clientY - dragState.startY) / s;
+      var targetX = dragState.baselineX + dx;
+      var targetY = dragState.baselineY + dy;
       dragState = null;
       body.style.cursor = "grab";
       if (!wasMoved) return;
+      // Commit the translation into each child's own coordinate attrs
+      // and clear the transform. Without this, a second drag would
+      // overwrite the transform (snapping the node back to its
+      // rendered-baseline-plus-new-delta instead of stacking).
+      var totalDx = targetX - x;
+      var totalDy = targetY - y;
+      _shiftGroupCoords(g, totalDx, totalDy);
       g.removeAttribute("transform");
-      if (typeof opts.onPinNode === "function") {
-        opts.onPinNode(n.id, x + dx, y + dy);
+      if (nodePosRef) {
+        var ref2 = nodePosRef.get(n.id);
+        if (ref2) {
+          ref2.x = targetX;
+          ref2.y = targetY;
+        }
       }
+      if (typeof opts.onPinNode === "function") {
+        opts.onPinNode(n.id, targetX, targetY);
+      }
+    }
+
+    // Hover dispatch — transient, no state change. The parent module can
+    // translate these into in-place highlight without re-rendering.
+    if (typeof opts.onHoverNode === "function") {
+      body.addEventListener("mouseenter", function () {
+        if (dragState) return;
+        opts.onHoverNode(n.id);
+      });
+      body.addEventListener("mouseleave", function () {
+        opts.onHoverNode(null);
+      });
     }
 
     body.addEventListener("mouseup", finishDrag);
