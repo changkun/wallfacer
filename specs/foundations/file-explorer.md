@@ -69,7 +69,7 @@ The file explorer is a collapsible panel on the left side of the board, between 
 | [Explorer toggle] ... [other buttons]                |
 +------+-----------------------------------------------+
 |      |                                               |
-| File |  board-grid (4 kanban columns)                |
+| File |  board-grid (4 board columns)                 |
 | Tree |                                               |
 |      |                                               |
 +------+-----------------------------------------------+
@@ -143,7 +143,7 @@ The explorer (left side panel) and terminal (bottom panel) are independent and c
 | [Explorer] ... [other buttons]                       |
 +------+-----------------------------------------------+
 |      |                                               |
-| File |  board-grid (4 kanban columns)                |
+| File |  board-grid (4 board columns)                 |
 | Tree |                                               |
 |      |                                               |
 +------+-----------------------------------------------+

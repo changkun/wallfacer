@@ -397,9 +397,9 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `planning_git.go` | Staging/committing planning rounds on the workspace branch with `Plan-Thread` and `Plan-Round` trailers so undo can target the caller's thread | — (internal) |
 | `planning_system_prompt.go` | Per-turn selection of the planning-agent system prompt (empty vs non-empty workspace variants) and archived-spec guard | — (internal) |
 | `planning_threads.go` | Planning chat thread CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/planning/threads`, `PATCH /api/planning/threads/{id}`, `POST /api/planning/threads/{id}/archive|unarchive|activate` |
-| `planning_undo.go` | Undo the caller thread's most recent planning round via `git revert`; cancels kanban tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/planning/undo` |
+| `planning_undo.go` | Undo the caller thread's most recent planning round via `git revert`; cancels board tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/planning/undo` |
 | `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/archive`, `POST /api/specs/unarchive` |
-| `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates kanban tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter (rollback on partial failure) | `POST /api/specs/dispatch`, `POST /api/specs/undispatch` |
+| `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter (rollback on partial failure) | `POST /api/specs/dispatch`, `POST /api/specs/undispatch` |
 | `terminal.go` | WebSocket terminal relay for host shell and container exec | `GET /api/terminal/ws` |
 
 ## Structured Logging

@@ -990,7 +990,7 @@ function _showSpecReadme() {
 // No-op until spec explorer is wired.
 function openSelectedSpec() {}
 
-// dispatchFocusedSpec dispatches the focused spec as a kanban task via the
+// dispatchFocusedSpec dispatches the focused spec as a board task via the
 // dispatch API. Shows a confirmation prompt, loading state, and refreshes
 // the spec view on success.
 function dispatchFocusedSpec() {

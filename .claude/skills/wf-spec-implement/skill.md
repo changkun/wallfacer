@@ -134,7 +134,7 @@ were given), update the spec file, related specs, and the epic index:
    and add a note if only focused items were implemented).
 2. **Update `updated` date** — set to today's date.
 3. **Update `dispatched_task_id`** — if this is a leaf spec dispatched to the
-   kanban board, ensure the task ID is recorded.
+   board, ensure the task ID is recorded.
 4. **Document deviations** — if the implementation differs from what the spec
    prescribed (different signatures, renamed fields, extra/fewer methods,
    reordered steps, skipped items, etc.), add an `## Implementation notes`

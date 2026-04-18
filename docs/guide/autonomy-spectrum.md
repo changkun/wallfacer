@@ -29,7 +29,7 @@ At this level, agents iterate on design rather than code. They break large specs
 
 ### Task (Managed Execution)
 
-Specs break into executable tasks on a kanban board. Each task runs an agent in an isolated sandbox container. The agent implements, tests, and commits changes on a dedicated branch. You review diffs, oversight summaries, and test verdicts before accepting the work.
+Specs break into executable tasks on a task board. Each task runs an agent in an isolated sandbox container. The agent implements, tests, and commits changes on a dedicated branch. You review diffs, oversight summaries, and test verdicts before accepting the work.
 
 This is where most day-to-day work happens. Tasks are concrete, trackable, and independently testable.
 

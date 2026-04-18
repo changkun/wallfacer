@@ -9,7 +9,7 @@ allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(ls *), Bash(mkdir *)
 
 Decompose a spec into smaller child specs. The output is either **design specs**
 (sub-design problems that need further iteration) or **implementation tasks**
-(leaf specs ready to dispatch to the kanban board).
+(leaf specs ready to dispatch to the board).
 
 ## Step 0: Parse arguments and determine mode
 

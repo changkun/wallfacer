@@ -20,7 +20,7 @@ dispatched_task_id: null
 
 ## Goal
 
-Implement `POST /api/specs/dispatch` — the atomic dispatch endpoint that creates kanban tasks from validated specs and writes `dispatched_task_id` back to spec files. This is the core backend for the dispatch workflow: both single-spec and multi-spec dispatch use this endpoint.
+Implement `POST /api/specs/dispatch` — the atomic dispatch endpoint that creates board tasks from validated specs and writes `dispatched_task_id` back to spec files. This is the core backend for the dispatch workflow: both single-spec and multi-spec dispatch use this endpoint.
 
 ## What to do
 

@@ -194,7 +194,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/specs/dispatch", Name: "DispatchSpecs",
-		Description: "Dispatch validated specs to create kanban tasks atomically.",
+		Description: "Dispatch validated specs to create board tasks atomically.",
 		Tags:        []string{"specs"},
 	},
 	{

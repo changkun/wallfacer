@@ -37,7 +37,7 @@ type resolvedSpec struct {
 	taskDeps []string // resolved task dependency UUIDs
 }
 
-// DispatchSpecs creates kanban tasks from validated specs atomically.
+// DispatchSpecs creates board tasks from validated specs atomically.
 // For each spec path, it reads and validates the spec, creates a task with
 // the spec body as the prompt, and writes the task ID back to the spec's
 // YAML frontmatter. Both task creation and frontmatter update succeed or
@@ -143,7 +143,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			// Archived dependencies are considered already satisfied — they
-			// contribute no blocker edge to the resulting kanban task.
+			// contribute no blocker edge to the resulting board task.
 			if depSpec.Status == spec.StatusArchived {
 				continue
 			}
@@ -246,7 +246,7 @@ type undispatchResult struct {
 	TaskID   string `json:"task_id"`
 }
 
-// UndispatchSpecs cancels the kanban tasks linked to dispatched specs and
+// UndispatchSpecs cancels the board tasks linked to dispatched specs and
 // clears each spec's dispatched_task_id, returning the spec to validated status.
 func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[undispatchRequest](w, r)

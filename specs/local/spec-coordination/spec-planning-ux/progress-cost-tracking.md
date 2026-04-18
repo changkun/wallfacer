@@ -24,9 +24,9 @@ dispatched_task_id: null
 
 How is planning sandbox cost recorded and surfaced alongside the existing
 board execution cost analytics? Planning is a separate, orthogonal cost
-dimension from kanban task execution:
+dimension from board task execution:
 
-- **Board execution cost is already tracked and solved.** Kanban tasks accrue
+- **Board execution cost is already tracked and solved.** Board tasks accrue
   per-turn `TurnUsageRecord`s and per-activity `UsageBreakdown` rows;
   `GET /api/stats` aggregates these by workspace, activity, status, and
   failure category; `modal-stats.js` renders it. This spec does not change any

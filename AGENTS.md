@@ -223,7 +223,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 ### Spec Tree
 - `GET /api/specs/tree` — Full spec tree with metadata, progress, and dependency edges
 - `GET /api/specs/stream` — SSE: spec tree change notifications (sends snapshot on change)
-- `POST /api/specs/dispatch` — Dispatch validated specs to create kanban tasks atomically (JSON: `{paths, run}`)
+- `POST /api/specs/dispatch` — Dispatch validated specs to create board tasks atomically (JSON: `{paths, run}`)
 - `POST /api/specs/undispatch` — Cancel dispatched tasks and clear spec dispatch linkage (JSON: `{paths}`)
 - `POST /api/specs/archive` — Archive a spec: transition status to `archived` (JSON: `{path}`). 409 if a dispatched task is still linked; 422 on invalid transition.
 - `POST /api/specs/unarchive` — Unarchive a spec: transition status from `archived` back to `drafted` (JSON: `{path}`).
@@ -237,7 +237,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `DELETE /api/planning/messages` — Clear a thread's conversation history and session (`?thread=<id>`; defaults to active)
 - `GET /api/planning/messages/stream` — SSE: stream agent response tokens. Returns 204 if no exec in flight or `?thread=<id>` does not match the in-flight thread
 - `POST /api/planning/messages/interrupt` — Interrupt current agent turn. `?thread=<id>` must match the in-flight thread (409 otherwise)
-- `POST /api/planning/undo` — Undo the caller thread's most recent planning round via `git revert` (history keeps the original commit and the revert; the revert carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread; defaults to the active. Dispatched kanban tasks whose `dispatched_task_id` was added in the reverted commit are cancelled. 409 on revert conflict (aborts the revert, leaves the tree clean) or stash-pop conflict.
+- `POST /api/planning/undo` — Undo the caller thread's most recent planning round via `git revert` (history keeps the original commit and the revert; the revert carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread; defaults to the active. Dispatched board tasks whose `dispatched_task_id` was added in the reverted commit are cancelled. 409 on revert conflict (aborts the revert, leaves the tree clean) or stash-pop conflict.
 - `GET /api/planning/commands` — List available slash commands for UI autocomplete
 
 ### Planning Chat Threads

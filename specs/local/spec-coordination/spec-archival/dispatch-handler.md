@@ -20,7 +20,7 @@ dispatched_task_id: null
 Make `internal/handler/specs_dispatch.go` explicitly aware of `StatusArchived`:
 (1) reject dispatch attempts on archived specs with a clear error message, and
 (2) treat archived `depends_on` targets as already satisfied so they contribute
-no `DependsOn` edge to the resulting kanban task.
+no `DependsOn` edge to the resulting board task.
 
 ## What to do
 

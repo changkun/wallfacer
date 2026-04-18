@@ -32,7 +32,7 @@ tree + planning chat already provides sufficient structure.
 
 ## Motivation
 
-The current board uses a Kanban-style column layout (Backlog → In Progress →
+The current board uses a column-based layout (Backlog → In Progress →
 Done). This works well for sequential task tracking but has friction points:
 
 1. **Dependency visualization** — task dependencies are invisible on the board;
@@ -64,7 +64,7 @@ nodes are — tasks? Agent sessions? Arbitrary notes? All of the above?
 
 Possible positions:
 - **Canvas replaces the board** — tasks are free-form nodes, columns disappear.
-  Risk: loses the at-a-glance status overview that Kanban provides.
+  Risk: loses the at-a-glance status overview that a column board provides.
 - **Canvas augments the board** — a separate "canvas mode" for planning and
   multi-task inspection, while the board remains the primary execution view.
   Lower risk but adds another mode to an already multi-modal UI.

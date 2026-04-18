@@ -324,7 +324,7 @@ function setupContext() {
   return { ctx, elements, document };
 }
 
-describe("keyboard navigation on kanban cards", () => {
+describe("keyboard navigation on board cards", () => {
   let ctx;
   let elements;
   let document;

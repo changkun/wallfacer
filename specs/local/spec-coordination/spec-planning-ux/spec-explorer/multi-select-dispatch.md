@@ -16,7 +16,7 @@ dispatched_task_id: null
 
 ## Goal
 
-Add checkbox multi-select to leaf specs in the spec explorer for batch dispatch. When multiple validated leaf specs are selected, a "Dispatch Selected" button appears that dispatches all selected specs as kanban tasks in one batch.
+Add checkbox multi-select to leaf specs in the spec explorer for batch dispatch. When multiple validated leaf specs are selected, a "Dispatch Selected" button appears that dispatches all selected specs as board tasks in one batch.
 
 ## What to do
 

@@ -313,7 +313,7 @@ var BoardComposer = (function () {
 
     // Pin the composer to its current viewport rect on document.body so
     // the slot goes :empty and the #board:has(...) rule disengages —
-    // the kanban columns reappear behind us and get faded in via the
+    // the board columns reappear behind us and get faded in via the
     // board--columns-entering class. Reparenting avoids clipping and
     // stacking-context surprises from the grid cell.
     el.style.position = "fixed";

@@ -16,7 +16,7 @@ dispatched_task_id: null
 
 ## Design Problem
 
-How should the spec mode three-pane layout integrate with the existing single-page application? The current UI is a kanban board with a file explorer sidebar, header, status bar, and modal system. Spec mode introduces a fundamentally different layout (explorer + focused markdown view + chat stream) that coexists with the board view. The design must handle mode switching, layout persistence, and keyboard shortcut routing without breaking the existing board experience.
+How should the spec mode three-pane layout integrate with the existing single-page application? The current UI is a task board with a file explorer sidebar, header, status bar, and modal system. Spec mode introduces a fundamentally different layout (explorer + focused markdown view + chat stream) that coexists with the board view. The design must handle mode switching, layout persistence, and keyboard shortcut routing without breaking the existing board experience.
 
 Key constraints:
 - Zero-cost mode switching (single click or `S` key), with context preservation
@@ -28,7 +28,7 @@ Key constraints:
 ## Context
 
 The current UI architecture (`ui/js/`) is component-based vanilla JS with SSE streaming. Key patterns:
-- `render.js` — kanban board rendering via `scheduleRender()` + `requestAnimationFrame` coalescing
+- `render.js` — board rendering via `scheduleRender()` + `requestAnimationFrame` coalescing
 - `explorer.js` — left sidebar file tree with lazy-load, resize, localStorage persistence
 - `modal.js` / `modal-core.js` — task detail modal system with focus trap
 - `api.js` + `tab-leader.js` — SSE streaming with cross-tab leader/follower

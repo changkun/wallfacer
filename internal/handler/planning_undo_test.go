@@ -16,7 +16,7 @@ import (
 )
 
 // seedPlanningCommit stages all changes under specs/ and creates a
-// kanban-style planning commit carrying the Plan-Round trailer. Used by the
+// scope-prefixed planning commit carrying the Plan-Round trailer. Used by the
 // undo tests to hand-craft a history that matches what commitPlanningRound
 // produces without going through the whole planning pipeline.
 func seedPlanningCommit(t *testing.T, ws string, n int, summary string) {
