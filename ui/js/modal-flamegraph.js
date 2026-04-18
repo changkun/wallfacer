@@ -265,9 +265,13 @@
     var padding = 4;
     var innerH = chartH - padding * 2;
 
+    // SVG <polyline> requires numeric points, so we drive everything through a
+    // viewBox of 100 × chartH and emit raw (0-100, 0-chartH) coordinates. The
+    // outer <svg width="100%"> with preserveAspectRatio="none" stretches x to
+    // the container width while y stays in pixel units.
     var polyPoints = points
       .map(function (p) {
-        var x = p.xPct.toFixed(3) + "%";
+        var x = p.xPct.toFixed(3);
         var y = (padding + innerH * (1 - p.cost / maxCost)).toFixed(1);
         return x + "," + y;
       })
@@ -275,28 +279,29 @@
 
     var totalLabel = "$" + maxCost.toFixed(4);
     var lastPt = points[points.length - 1];
-    var lastX = lastPt.xPct.toFixed(3) + "%";
+    var lastX = lastPt.xPct.toFixed(3);
     var lastY = padding.toFixed(1);
 
-    // Build per-activity dot markers on the polyline.
+    // Dots and the trailing total label sit on top as absolutely-positioned
+    // HTML — keeping them outside the stretched SVG preserves round dots and
+    // readable text regardless of container width.
     var dotsHtml = "";
     points.slice(1).forEach(function (p) {
       var hue = labelHue(p.activity);
-      var cx = p.xPct.toFixed(3) + "%";
-      var cy = (padding + innerH * (1 - p.cost / maxCost)).toFixed(1);
+      var leftPct = p.xPct.toFixed(3);
+      var topPx = (padding + innerH * (1 - p.cost / maxCost)).toFixed(1);
       var actLabel = ACTIVITY_LABELS[p.activity] || p.activity;
       dotsHtml +=
-        '<circle cx="' +
-        escapeHtml(cx) +
-        '" cy="' +
-        cy +
-        '" r="3" ' +
-        'fill="hsl(' +
+        '<span style="position:absolute;left:' +
+        leftPct +
+        "%;top:" +
+        topPx +
+        "px;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;" +
+        "background:hsl(" +
         hue +
-        ',55%,55%)" ' +
-        'title="' +
+        ',55%,55%);pointer-events:none;" title="' +
         escapeHtml(actLabel + ": $" + p.cost.toFixed(4)) +
-        '"/>';
+        '"></span>';
     });
 
     return (
@@ -308,21 +313,24 @@
       '">' +
       '<svg width="100%" height="' +
       chartH +
-      '" style="display:block;overflow:visible;">' +
+      '" viewBox="0 0 100 ' +
+      chartH +
+      '" preserveAspectRatio="none" style="display:block;overflow:visible;">' +
       '<polyline points="' +
       escapeHtml(polyPoints) +
       '" ' +
-      'fill="none" stroke="hsl(200,60%,55%)" stroke-width="1.5" stroke-linejoin="round"/>' +
-      dotsHtml +
-      '<text x="' +
-      escapeHtml(lastX) +
-      '" y="' +
-      lastY +
-      '" ' +
-      'font-size="9" fill="hsl(200,60%,65%)" text-anchor="end" dy="-2">' +
-      escapeHtml(totalLabel) +
-      "</text>" +
+      'fill="none" stroke="hsl(200,60%,55%)" stroke-width="1.5" ' +
+      'vector-effect="non-scaling-stroke" stroke-linejoin="round"/>' +
       "</svg>" +
+      dotsHtml +
+      '<span style="position:absolute;left:' +
+      lastX +
+      "%;top:" +
+      lastY +
+      "px;transform:translate(-100%,-2px);font-size:9px;" +
+      'color:hsl(200,60%,65%);pointer-events:none;">' +
+      escapeHtml(totalLabel) +
+      "</span>" +
       '<span style="position:absolute;left:0;top:' +
       padding +
       "px;font-size:9px;" +
