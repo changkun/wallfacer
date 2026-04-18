@@ -60,6 +60,7 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 | `make build-binary` | Build just the Go binary (accepts optional `VERSION=`) |
 | `make pull-images` | Pull Claude and Codex sandbox images |
 | `make server` | Build and run the server |
+| `make server-dev` | Build and run the server with `-ui-dir ./ui` so UI edits reload without rebuilding |
 | `make shell` | Open a bash shell in a sandbox container |
 | `make clean` | Remove all sandbox images |
 | `make ui-css` | Regenerate Tailwind CSS |
@@ -67,6 +68,22 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 | `make run PROMPT="…"` | Headless one-shot Claude execution |
 | `make release-notes` | Generate an LLM prompt for release notes (requires `RELEASE_VERSION=`) |
 | `make release` | Commit release notes, tag, push, create GitHub release (requires `RELEASE_VERSION=` and `RELEASE_NOTES=`) |
+
+## Frontend Dev Mode
+
+UI assets (HTML, CSS, JS) are normally embedded into the binary via `go:embed`, so a frontend edit usually requires a rebuild. During active frontend work, use the `-ui-dir` flag to serve `ui/` from disk instead:
+
+```bash
+wallfacer run -ui-dir ./ui
+# or equivalently:
+make server-dev
+# or via environment variable:
+UI_DIR=./ui wallfacer run
+```
+
+In this mode the server re-parses `index.html` and `partials/*.html` on every request and emits `Cache-Control: no-store` for `/css/`, `/js/`, and `/assets/`. Reloading the browser is enough to see edits — no binary rebuild, no server restart.
+
+Do not use this flag in production: it disables template caching and browser caching, and points the server at a mutable directory.
 
 ## Sandbox Images
 
@@ -85,7 +102,7 @@ make                   # Build the unified sandbox-agents image
 make RUNTIME=docker    # Use Docker instead of Podman
 ```
 
-Local builds are tagged as `sandbox-agents:latest`, which wallfacer picks up automatically as the fallback when the GHCR image is unavailable.
+Local builds are tagged as `sandbox-agents:latest`. Wallfacer prefers this local image over a network pull whenever the versioned GHCR tag (e.g. `ghcr.io/latere-ai/sandbox-agents:v0.0.6`) is not yet cached, and still uses it as a fallback if a pull fails. This keeps `wallfacer run` in sync with the Makefile's `pull-images` target, so a sibling latere-ai/images checkout works without network round-trips.
 
 ## Release Workflow
 
