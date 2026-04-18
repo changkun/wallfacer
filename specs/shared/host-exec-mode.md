@@ -272,3 +272,35 @@ Use a fake agent binary compiled into the test (`go build -o <tmp>/fake ./testda
 
 - `make build` with `WALLFACER_SANDBOX_BACKEND=host` succeeds without pulling images.
 - `make lint` passes (new backend gets the same golangci-lint coverage as `local.go`).
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [host-backend](host-exec-mode/host-backend.md) | — | medium | validated |
+| [envconfig-host-option](host-exec-mode/envconfig-host-option.md) | — | small | validated |
+| [makefile-host-gate](host-exec-mode/makefile-host-gate.md) | — | small | validated |
+| [runner-host-switch](host-exec-mode/runner-host-switch.md) | host-backend, envconfig-host-option | small | validated |
+| [container-spec-host-mode](host-exec-mode/container-spec-host-mode.md) | runner-host-switch | medium | validated |
+| [doctor-host-mode](host-exec-mode/doctor-host-mode.md) | envconfig-host-option | small | validated |
+| [host-parallel-cap](host-exec-mode/host-parallel-cap.md) | runner-host-switch | small | validated |
+| [ui-host-banner](host-exec-mode/ui-host-banner.md) | runner-host-switch | small | validated |
+| [e2e-host-lifecycle](host-exec-mode/e2e-host-lifecycle.md) | host-backend, container-spec-host-mode, host-parallel-cap | small | validated |
+
+```mermaid
+graph LR
+  HB[host-backend] --> RS[runner-host-switch]
+  EN[envconfig-host-option] --> RS
+  EN --> DR[doctor-host-mode]
+  MF[makefile-host-gate]
+  RS --> CS[container-spec-host-mode]
+  RS --> PC[host-parallel-cap]
+  RS --> UB[ui-host-banner]
+  HB --> E2E[e2e-host-lifecycle]
+  CS --> E2E
+  PC --> E2E
+```
+
+**Parallel execution.** The three roots — `host-backend`, `envconfig-host-option`, `makefile-host-gate` — have no shared files and can be implemented in parallel. Once both `host-backend` and `envconfig-host-option` are merged, `runner-host-switch` unblocks four children (`container-spec-host-mode`, `host-parallel-cap`, `ui-host-banner`, `doctor-host-mode`) that can also land in parallel since they touch disjoint files. `e2e-host-lifecycle` is the final gate — it exercises the full pipeline.
+
+**Docs updates.** Per the project's implementation checklist, each task updates `docs/guide/configuration.md` and related docs for the behavior it ships. There is intentionally no separate "docs" task — coupling docs to code keeps them from drifting.
