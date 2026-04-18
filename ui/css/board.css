@@ -1,26 +1,32 @@
 /* --- Cards --- */
 .card {
   cursor: grab;
-  transition:
-    transform 0.15s,
-    box-shadow 0.15s;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  box-shadow: var(--sh-1);
+  position: relative;
+  transition:
+    box-shadow 0.12s,
+    border-color 0.12s;
   contain: layout paint style;
   content-visibility: auto;
-  contain-intrinsic-size: 280px;
+  contain-intrinsic-size: 240px;
 }
 .card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--sh-2);
+  border-color: var(--rule-2);
+}
+.card:active {
+  cursor: grabbing;
 }
 .card.sortable-ghost {
   opacity: 0.4;
 }
 .card.sortable-chosen {
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--sh-pop);
+  border-color: var(--accent);
 }
 .card-actions {
   display: flex;
@@ -34,219 +40,219 @@
   min-width: 0;
 }
 .card-action-btn {
-  padding: 3px 9px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  font-size: 10px;
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
   line-height: 1.5;
-  transition: opacity 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    opacity 0.1s;
 }
 .card-action-btn:hover {
-  opacity: 0.75;
+  filter: brightness(1.04);
 }
 .card-action-btn:disabled {
-  background: var(--bg-raised);
-  color: var(--text-muted);
-  border-color: var(--border);
+  background: var(--bg-sunk);
+  color: var(--ink-4);
+  border-color: var(--rule);
   cursor: not-allowed;
   opacity: 1;
+  filter: none;
 }
-.card-action-start {
-  background: #d0ebdc;
-  color: #1a6030;
-  border-color: #a8d9bb;
-}
+.card-action-start,
 .card-action-done {
-  background: #d0ebdc;
-  color: #1a6030;
-  border-color: #a8d9bb;
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
+  border-color: color-mix(in oklab, var(--tint-green-ink), transparent 70%);
 }
 .card-action-resume {
-  background: #dceaf7;
-  color: #2c5f98;
-  border-color: #a8c8ef;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+  border-color: color-mix(in oklab, var(--tint-blue-ink), transparent 70%);
 }
 .card-action-retry {
-  background: var(--bg-raised);
-  color: var(--text-secondary);
-  border-color: var(--border);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  border-color: var(--rule);
 }
 .card-action-test {
-  background: #ede8f7;
-  color: #5a3fa0;
-  border-color: #c4b0e8;
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
+  border-color: color-mix(in oklab, var(--tint-plum-ink), transparent 70%);
 }
-[data-theme="dark"] .card-action-start {
-  background: #0e2a1a;
-  color: #45b87a;
-  border-color: #1e4a2e;
-}
-[data-theme="dark"] .card-action-done {
-  background: #0e2a1a;
-  color: #45b87a;
-  border-color: #1e4a2e;
-}
-[data-theme="dark"] .card-action-resume {
-  background: #1a2d42;
-  color: #6da0dc;
-  border-color: #2a4460;
-}
-[data-theme="dark"] .card-action-test {
-  background: #1e1535;
-  color: #a07fe0;
-  border-color: #3a2860;
+.card-action-refine {
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
+  border-color: color-mix(in oklab, var(--tint-amber-ink), transparent 70%);
 }
 
-/* --- Column headers --- */
-.col-header {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+/* --- Status accents (left border) ---
+   Applied per task.status so every card reads its state at a glance. */
+.card-in_progress {
+  border-left: 3px solid var(--col-progress);
 }
-.col-header-backlog {
+.card-committing {
+  border-left: 3px solid var(--col-progress);
+}
+.card-waiting {
+  border-left: 3px solid var(--col-waiting);
+}
+.card-done {
+  opacity: 0.82;
+}
+.card-done .card-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+  text-decoration-thickness: 1px;
+}
+.card-failed {
+  border-left: 3px solid var(--err);
+  background: color-mix(in oklab, var(--bg-card) 94%, var(--err));
+}
+
+/* --- Status accents (scoped secondary signals) --- */
+.card-idea-agent {
+  border-left: 3px solid var(--ok);
+}
+.card-routine {
+  border-left: 3px solid var(--info, var(--accent));
+  background: color-mix(in oklab, var(--bg-card) 96%, var(--accent));
+}
+.routine-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-11);
+}
+.routine-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.routine-next-run {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.routine-interval-label,
+.routine-enabled-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-muted);
 }
-.col-header-progress {
-  color: #3a6db3;
+.routine-interval-select {
+  font-size: var(--fs-11);
+  padding: 1px 4px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
 }
-.col-header-waiting {
-  color: #a07020;
+.routine-trigger-btn {
+  font-size: var(--fs-10);
+  padding: 2px 8px;
+  background: var(--accent);
+  color: var(--accent-fg, white);
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
 }
-.col-header-done {
-  color: #28804a;
+.routine-trigger-btn:hover {
+  filter: brightness(1.1);
 }
-.col-header-failed {
-  color: #a02828;
+.routine-last-fired {
+  color: var(--text-muted);
+  font-size: var(--fs-10);
 }
-.col-header-cancelled {
-  color: #5a3d8a;
+.badge-routine {
+  background: color-mix(in oklab, var(--accent) 20%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
 }
-[data-theme="dark"] .col-header-progress {
-  color: #6da0dc;
+.badge-routine-spawn {
+  background: var(--bg-subtle, var(--bg-card));
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--fs-9);
 }
-[data-theme="dark"] .col-header-waiting {
-  color: #d4a030;
-}
-[data-theme="dark"] .col-header-done {
-  color: #45b87a;
-}
-[data-theme="dark"] .col-header-failed {
-  color: #d46868;
-}
-[data-theme="dark"] .col-header-cancelled {
-  color: #a07ad4;
-}
-
-/* --- Failed tasks displayed in Waiting column --- */
-/* --- Idea-agent task cards --- */
-.card-idea-agent {
-  border-left: 3px solid #1a7a4a;
-}
-[data-theme="dark"] .card-idea-agent {
-  border-left-color: #3db87a;
-}
-
 .card-failed-waiting {
-  border-left: 3px solid #a02828;
+  border-left: 3px solid var(--err);
+  background: color-mix(in oklab, var(--bg-card) 94%, var(--err));
 }
-[data-theme="dark"] .card-failed-waiting {
-  border-left-color: #d46868;
-}
-
-/* --- Cancelled tasks displayed in Done column --- */
 .card-cancelled-done {
-  border-left: 3px solid #5a3d8a;
+  border-left: 3px solid var(--purple);
 }
-[data-theme="dark"] .card-cancelled-done {
-  border-left-color: #a07ad4;
-}
-
-/* --- In-progress tasks with a pending cancel request --- */
 .card-cancelling {
-  border-left: 3px solid #d4621a;
+  border-left: 3px solid var(--warn);
   opacity: 0.8;
-}
-[data-theme="dark"] .card-cancelling {
-  border-left-color: #e0824a;
 }
 .card-error-reason {
   margin-top: 6px;
   padding: 4px 6px;
-  background: rgba(140, 32, 32, 0.07);
-  border-radius: 4px;
-  font-size: 11px;
+  background: var(--tint-red);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-10);
   line-height: 1.4;
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-family: var(--font-mono);
   word-break: break-word;
-}
-[data-theme="dark"] .card-error-reason {
-  background: rgba(212, 104, 104, 0.1);
 }
 .card-error-label {
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #8c2020;
+  color: var(--tint-red-ink);
   margin-right: 6px;
 }
-[data-theme="dark"] .card-error-label {
-  color: #d46868;
-}
 .card-error-text {
-  color: #7a2c2c;
-}
-[data-theme="dark"] .card-error-text {
-  color: #c47070;
+  color: var(--tint-red-ink);
 }
 
 /* --- Output reason (waiting tasks) --- */
 .card-output-reason {
   margin-top: 6px;
   padding: 4px 6px;
-  background: rgba(100, 100, 140, 0.07);
-  border-radius: 4px;
-  font-size: 11px;
+  background: var(--bg-sunk);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-10);
   line-height: 1.4;
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-family: var(--font-mono);
   word-break: break-word;
-}
-[data-theme="dark"] .card-output-reason {
-  background: rgba(160, 160, 200, 0.1);
 }
 .card-output-label {
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #555;
+  color: var(--ink-3);
   margin-right: 6px;
 }
-[data-theme="dark"] .card-output-label {
-  color: #aaa;
-}
 .card-output-text {
-  color: #444;
-}
-[data-theme="dark"] .card-output-text {
-  color: #bbb;
+  color: var(--ink-2);
 }
 
 /* --- Error result in live output --- */
 .cc-final-error {
-  color: #d46868;
-  border-top-color: #341414;
+  color: var(--err);
+  border-top-color: var(--rule);
 }
 
 /* --- Task title (auto-generated 2-5 word summary) --- */
 .card-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 3px;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.35;
+  margin: 0 0 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
