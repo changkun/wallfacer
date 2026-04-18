@@ -331,7 +331,18 @@
 
   var BARYCENTER_ITERATIONS = 24;
 
-  function layoutSugiyama(graph) {
+  // opts.pinnedPositions — Map<nodeId, {x, y}> of positions the user has
+  // dragged. Pinned nodes are fed back into the barycenter sweeps as
+  // fixed anchors so unpinned nodes flow around them (incremental
+  // relayout), then have their exact coords re-applied at the end. This
+  // gives drag-then-relayout the feel of "only what I didn't touch moves."
+  function layoutSugiyama(graph, opts) {
+    opts = opts || {};
+    var pinnedPositions =
+      opts.pinnedPositions && typeof opts.pinnedPositions.get === "function"
+        ? opts.pinnedPositions
+        : null;
+
     var nodeById = new Map();
     graph.nodes.forEach(function (n) {
       nodeById.set(n.id, n);
@@ -357,14 +368,38 @@
     var positions = _assignCoordinates(expanded.layers);
     var edgePaths = _routeEdges(graph, expanded.edgeChains, positions);
 
-    var svgW =
+    // Apply pinned positions last so user-placed coords win over layout.
+    // Pinned positions may shift the overall SVG extents — track the
+    // maxima so the canvas still contains every pinned node.
+    var maxX = 0;
+    var maxY = 0;
+    positions.forEach(function (p) {
+      if (p.x + NODE_W > maxX) maxX = p.x + NODE_W;
+      if (p.y + NODE_H > maxY) maxY = p.y + NODE_H;
+    });
+    if (pinnedPositions) {
+      pinnedPositions.forEach(function (pos, id) {
+        var current = positions.get(id);
+        if (!current || current.kind !== "real") return;
+        current.x = pos.x;
+        current.y = pos.y;
+        if (pos.x + NODE_W > maxX) maxX = pos.x + NODE_W;
+        if (pos.y + NODE_H > maxY) maxY = pos.y + NODE_H;
+      });
+      // Recompute edge paths against the updated positions.
+      edgePaths = _routeEdges(graph, expanded.edgeChains, positions);
+    }
+
+    var autoW =
       expanded.layers.length > 0
         ? PAD +
           expanded.layers.length * NODE_W +
           Math.max(0, expanded.layers.length - 1) * H_GAP +
           PAD
         : PAD * 2;
-    var svgH = _layoutHeight(expanded.layers) + PAD * 2;
+    var autoH = _layoutHeight(expanded.layers) + PAD * 2;
+    var svgW = Math.max(autoW, maxX + PAD);
+    var svgH = Math.max(autoH, maxY + PAD);
 
     return {
       positions: positions,
@@ -621,9 +656,18 @@
   // element. Returns true when anything was rendered, false on empty graph.
   //
   // Options:
-  //   onToggleSpec(path): invoked when a user clicks the +/- handle on a
-  //     spec node that has children. Callers wire this to their collapse
-  //     state store and re-render.
+  //   onToggleSpec(path)              — user clicked the +/- handle.
+  //   onPinNode(id, x, y)             — user dragged a node; commit the new
+  //                                     position to the pin store.
+  //   onUnpinNode(id)                 — user double-clicked a pinned node.
+  //   onFocusNode(id | null)          — user clicked a node (id) or empty
+  //                                     canvas (null) to focus/unfocus.
+  //   onNavigateNode(id)              — shift+click navigation.
+  //   pinnedIds (Set<string>)         — nodes currently pinned; used to
+  //                                     draw the pin corner marker.
+  //   focusedNodeId (string | null)   — when set, non-neighbourhood nodes
+  //                                     and edges are dimmed so the user
+  //                                     can zero in on one topic.
   function renderUnifiedGraph(graph, svg, opts) {
     opts = opts || {};
     if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
@@ -632,7 +676,9 @@
     }
     if (!svg) return false;
 
-    var layout = layoutSugiyama(graph);
+    var layout = layoutSugiyama(graph, {
+      pinnedPositions: opts.pinnedPositions,
+    });
 
     svg.setAttribute("viewBox", "0 0 " + layout.svgW + " " + layout.svgH);
     svg.setAttribute("width", layout.svgW);
@@ -640,12 +686,45 @@
 
     clearChildren(svg);
 
-    // Index nodes by id so edge styling can consult the source's status
-    // (used for the task_dep "satisfied" cue).
     var nodeById = new Map();
     graph.nodes.forEach(function (n) {
       nodeById.set(n.id, n);
     });
+
+    // Build a focus neighbourhood so the renderer can dim everything
+    // outside of it. Includes the focused node itself plus every direct
+    // neighbour reachable along any edge kind (up or down). 1-hop is
+    // intentional: 2-hop tends to re-include most of the graph and
+    // defeats the "zero in on one topic" goal.
+    var focusedId = opts.focusedNodeId || null;
+    var focusSet = null;
+    if (focusedId && nodeById.has(focusedId)) {
+      focusSet = new Set([focusedId]);
+      graph.edges.forEach(function (e) {
+        if (e.from === focusedId) focusSet.add(e.to);
+        if (e.to === focusedId) focusSet.add(e.from);
+      });
+    }
+
+    var pinnedIds =
+      opts.pinnedIds && typeof opts.pinnedIds.has === "function"
+        ? opts.pinnedIds
+        : null;
+
+    // Let the canvas swallow clicks on empty space → clear focus. Placed
+    // as the first child (behind everything) so a click that hits a node
+    // still fires the node's handler first.
+    var backdrop = svgNs("rect");
+    backdrop.setAttribute("x", "0");
+    backdrop.setAttribute("y", "0");
+    backdrop.setAttribute("width", String(layout.svgW));
+    backdrop.setAttribute("height", String(layout.svgH));
+    backdrop.setAttribute("fill", "transparent");
+    backdrop.setAttribute("data-role", "canvas-backdrop");
+    backdrop.addEventListener("click", function () {
+      if (typeof opts.onFocusNode === "function") opts.onFocusNode(null);
+    });
+    svg.appendChild(backdrop);
 
     // --- Edges first so nodes sit on top ---
     layout.edgePaths.forEach(function (routed) {
@@ -669,6 +748,10 @@
       path.setAttribute("fill", "none");
       if (style.dash) path.setAttribute("stroke-dasharray", style.dash);
       path.setAttribute("data-kind", e.kind);
+      if (focusSet) {
+        var edgeInFocus = focusSet.has(e.from) && focusSet.has(e.to);
+        if (!edgeInFocus) path.setAttribute("opacity", "0.18");
+      }
       svg.appendChild(path);
     });
 
@@ -682,22 +765,18 @@
       var g = svgNs("g");
       g.setAttribute("data-kind", n.kind);
       g.setAttribute("data-id", n.id);
+      if (focusSet && !focusSet.has(n.id)) {
+        g.setAttribute("opacity", "0.28");
+      }
 
-      // The main body (rect + type chip + label) navigates on click;
-      // for specs with children, a separate toggle handle on the right
-      // edge stops event propagation so clicking "+" doesn't also focus
-      // the spec in Plan mode.
       var body = svgNs("g");
-      body.style.cursor = "pointer";
-      _wireClick(body, n);
+      body.style.cursor = "grab";
 
       var rect = svgNs("rect");
       rect.setAttribute("x", String(x));
       rect.setAttribute("y", String(y));
       rect.setAttribute("width", String(NODE_W));
       rect.setAttribute("height", String(NODE_H));
-      // Specs use a larger corner radius to read as rounded rectangles;
-      // tasks use a tighter radius for a "card" feel.
       rect.setAttribute("rx", n.kind === "spec" ? "12" : "6");
       rect.setAttribute(
         "fill",
@@ -705,15 +784,16 @@
           ? SPEC_STATUS_COLORS[n.status] || "#4a4540"
           : TASK_STATUS_COLORS[n.status] || "#4B5563",
       );
-      // Outline only for dispatched tasks so the spec→task linkage reads.
       if (n.kind === "task" && n.extra && n.extra.dispatched) {
         rect.setAttribute("stroke", "#3b82c4");
         rect.setAttribute("stroke-width", "1.5");
       }
+      if (focusedId === n.id) {
+        rect.setAttribute("stroke", "#f7c466");
+        rect.setAttribute("stroke-width", "2");
+      }
       body.appendChild(rect);
 
-      // Type chip (top-left corner): a small indicator so you can scan
-      // the graph for specs vs tasks without relying on shape alone.
       var chip = svgNs("text");
       chip.setAttribute("x", String(x + 8));
       chip.setAttribute("y", String(y + 14));
@@ -723,8 +803,6 @@
       chip.textContent = n.kind === "spec" ? "SPEC" : "TASK";
       body.appendChild(chip);
 
-      // Label (truncated to fit, leaves room on the right for the toggle
-      // handle when the spec has children).
       var hasToggle =
         n.kind === "spec" && n.extra && n.extra.hasChildren;
       var labelMaxChars = hasToggle ? 22 : 26;
@@ -746,9 +824,19 @@
       label.textContent = truncated;
       body.appendChild(label);
 
+      // Pin marker on the top-left corner for user-pinned nodes.
+      if (pinnedIds && pinnedIds.has(n.id)) {
+        var pin = svgNs("circle");
+        pin.setAttribute("cx", String(x + 4));
+        pin.setAttribute("cy", String(y + 4));
+        pin.setAttribute("r", "3");
+        pin.setAttribute("fill", "#f7c466");
+        body.appendChild(pin);
+      }
+
+      _wireNodeInteractions(g, body, n, x, y, opts);
       g.appendChild(body);
 
-      // Toggle handle on the right edge for specs with children.
       if (hasToggle) {
         var handle = _makeToggleHandle(n, x, y, opts);
         if (handle) g.appendChild(handle);
@@ -760,22 +848,91 @@
     return true;
   }
 
-  function _wireClick(g, n) {
-    g.addEventListener("click", function () {
-      if (n.kind === "task") {
-        if (typeof window.openTaskModal === "function")
-          window.openTaskModal(n.id.replace(/^task:/, ""));
-        else if (typeof window.openModal === "function")
-          window.openModal(n.id.replace(/^task:/, ""));
-      } else if (n.kind === "spec") {
-        var path = n.extra && n.extra.path;
-        if (!path) return;
-        if (typeof window.focusSpec === "function") {
-          if (typeof window.switchMode === "function")
-            window.switchMode("spec", { persist: true });
-          window.focusSpec(path);
+  // _wireNodeInteractions binds drag / click / dblclick / shift+click on
+  // a single node group. The drag state machine lives here so it can
+  // distinguish drags from clicks via a movement threshold, preventing
+  // a normal click from triggering both focus and pin.
+  var DRAG_THRESHOLD = 4;
+
+  function _wireNodeInteractions(g, body, n, x, y, opts) {
+    var dragState = null;
+
+    body.addEventListener("mousedown", function (e) {
+      // Let space+drag (canvas pan) win over node drag so the user can
+      // pan over a node. Also ignore right-click / middle-click.
+      if (e.button !== undefined && e.button !== 0) return;
+      dragState = {
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: x,
+        originY: y,
+        moved: false,
+      };
+      body.style.cursor = "grabbing";
+      // Stop propagation so the SVG backdrop's click handler doesn't
+      // fire on mouseup-after-drag.
+      if (typeof e.stopPropagation === "function") e.stopPropagation();
+    });
+
+    body.addEventListener("mousemove", function (e) {
+      if (!dragState) return;
+      var dx = e.clientX - dragState.startX;
+      var dy = e.clientY - dragState.startY;
+      if (
+        !dragState.moved &&
+        Math.hypot(dx, dy) < DRAG_THRESHOLD
+      ) {
+        return;
+      }
+      dragState.moved = true;
+      g.setAttribute("transform", "translate(" + dx + "," + dy + ")");
+    });
+
+    function finishDrag(e) {
+      if (!dragState) return;
+      var wasMoved = dragState.moved;
+      var dx = e.clientX - dragState.startX;
+      var dy = e.clientY - dragState.startY;
+      dragState = null;
+      body.style.cursor = "grab";
+      if (!wasMoved) return;
+      g.removeAttribute("transform");
+      if (typeof opts.onPinNode === "function") {
+        opts.onPinNode(n.id, x + dx, y + dy);
+      }
+    }
+
+    body.addEventListener("mouseup", finishDrag);
+    // If the mouse leaves the body mid-drag, fall back to a document
+    // mouseup so we don't lose the drag release.
+    body.addEventListener("mouseleave", function () {
+      if (!dragState) return;
+      var releasedOnce = false;
+      var onDocUp = function (e2) {
+        if (releasedOnce) return;
+        releasedOnce = true;
+        document.removeEventListener("mouseup", onDocUp);
+        finishDrag(e2);
+      };
+      document.addEventListener("mouseup", onDocUp);
+    });
+
+    body.addEventListener("click", function (e) {
+      // A click fires after mouseup; suppress it if the mouseup was the
+      // tail end of a drag.
+      if (g.getAttribute("transform")) return;
+      if (e.shiftKey) {
+        if (typeof opts.onNavigateNode === "function") {
+          opts.onNavigateNode(n.id, n);
+          return;
         }
       }
+      if (typeof opts.onFocusNode === "function") opts.onFocusNode(n.id);
+    });
+
+    body.addEventListener("dblclick", function (e) {
+      if (typeof e.stopPropagation === "function") e.stopPropagation();
+      if (typeof opts.onUnpinNode === "function") opts.onUnpinNode(n.id);
     });
   }
 
