@@ -168,7 +168,6 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Prompt             string                                 `json:"prompt"`
-		Goal               string                                 `json:"goal"`
 		Timeout            int                                    `json:"timeout"`
 		MountWorktrees     bool                                   `json:"mount_worktrees"`
 		Sandbox            sandbox.Type                           `json:"sandbox"`
@@ -204,7 +203,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 		Prompt:             req.Prompt,
-		Goal:               req.Goal,
 		Timeout:            req.Timeout,
 		Tags:               req.Tags,
 		MountWorktrees:     req.MountWorktrees,
@@ -562,7 +560,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Status            *store.TaskStatus                       `json:"status"`
 		Position          *int                                    `json:"position"`
 		Prompt            *string                                 `json:"prompt"`
-		Goal              *string                                 `json:"goal"`
 		Timeout           *int                                    `json:"timeout"`
 		FreshStart        *bool                                   `json:"fresh_start"`
 		MountWorktrees    *bool                                   `json:"mount_worktrees"`
@@ -595,8 +592,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, goal, timeout, fresh_start, mount_worktrees, sandbox, model, budget, and custom patterns for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Goal != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
+	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, model, budget, and custom patterns for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox

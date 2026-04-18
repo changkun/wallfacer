@@ -45,8 +45,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
 | `Title` | `string` | `title` | Display title (auto-generated or user-set) |
-| `Goal` | `string` | `goal` | 1-3 sentence human-readable summary for card display |
-| `GoalManuallySet` | `bool` | `goal_manually_set` | True when user explicitly edited the goal |
 | `Kind` | `TaskKind` | `kind` | Execution mode: `""` (standard task) or `"idea-agent"` |
 | `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"idea-agent"`) |
 
@@ -286,7 +284,6 @@ type RefinementJob struct {
     CreatedAt time.Time           `json:"created_at"`
     Status    RefinementJobStatus `json:"status"`    // "running", "done", "failed"
     Result    string              `json:"result,omitempty"`
-    Goal      string              `json:"goal,omitempty"`
     Error     string              `json:"error,omitempty"`
     Source    string              `json:"source,omitempty"` // "runner" for UI-triggered
 }
@@ -511,7 +508,6 @@ Each task entry holds pre-lowercased copies of searchable text:
 | Field | Source |
 |---|---|
 | `title` | `Task.Title` |
-| `goal` | `Task.Goal` |
 | `prompt` | `Task.Prompt` |
 | `tags` | `strings.Join(Task.Tags, " ")` |
 | `oversight` | Concatenated phase titles and summaries from `oversight.json` |
@@ -526,7 +522,7 @@ Each task entry holds pre-lowercased copies of searchable text:
 
 ### Search Execution
 
-`SearchTasks()` performs case-insensitive substring matching under a single `RLock`, checking fields in cheapest-first order (title, goal, prompt, tags, oversight). Each task produces at most one result (first matching field). Results are capped at 50 entries with HTML-escaped snippet context.
+`SearchTasks()` performs case-insensitive substring matching under a single `RLock`, checking fields in cheapest-first order (title, prompt, tags, oversight). Each task produces at most one result (first matching field). Results are capped at 50 entries with HTML-escaped snippet context.
 
 ## Payload Pruning
 
@@ -548,8 +544,7 @@ The store uses a forward-only migration system in `internal/store/migrate.go`. E
 2. Canonicalize `DependsOn`: trim whitespace, validate UUIDs, deduplicate, sort.
 3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
 4. Backfill `AutoRetryBudget` for tasks created before schema version 2.
-5. Backfill `Goal` from `Prompt` for pre-existing tasks.
-6. Stamp `SchemaVersion = CurrentTaskSchemaVersion`.
+5. Stamp `SchemaVersion = CurrentTaskSchemaVersion`.
 
 If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant (currently `2`) is incremented whenever a new migration step is added.
 

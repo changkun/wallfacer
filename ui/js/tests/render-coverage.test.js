@@ -513,16 +513,9 @@ describe("render.js cardDisplayPrompt", () => {
       ctx.cardDisplayPrompt({
         kind: "idea-agent",
         execution_prompt: "exec",
-        goal: "g",
         prompt: "p",
       }),
     ).toBe("exec");
-  });
-
-  it("returns goal when present and not idea-agent", () => {
-    expect(ctx.cardDisplayPrompt({ goal: "the goal", prompt: "p" })).toBe(
-      "the goal",
-    );
   });
 
   it("returns prompt as fallback", () => {

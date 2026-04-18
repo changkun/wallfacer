@@ -433,7 +433,6 @@ describe("populateDependsOnPicker status ordering", () => {
             return { addEventListener: () => {} };
           // tasks.js attaches event listeners to these at module load time
           if (id === "modal-edit-prompt") return { addEventListener: () => {} };
-          if (id === "modal-edit-goal") return { addEventListener: () => {} };
           if (id === "modal-edit-timeout")
             return { addEventListener: () => {} };
           return null;

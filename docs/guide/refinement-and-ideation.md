@@ -32,18 +32,16 @@ Switch between them using the tabs above the log area. The view auto-scrolls to 
 
 #### 🔬 Reviewing the Result
 
-When the agent finishes, the result appears in two editable fields:
+When the agent finishes, the result appears as an editable spec, which typically includes:
 
-- **Goal summary** -- a 1-3 sentence human-readable summary of what the task achieves. This is shown on the task card for quick scanning.
-- **Spec** -- the full implementation specification, which typically includes:
-  - **Backlog Outcome** -- whether the task should be kept, rewritten, or closed
-  - **Objective** -- what the task should achieve and why
-  - **Background** -- relevant codebase context discovered by the agent
-  - **Implementation Plan** -- numbered steps
-  - **Files to Change** -- specific files and required modifications
-  - **Edge Cases and Considerations** -- things to watch for
+- **Backlog Outcome** -- whether the task should be kept, rewritten, or closed
+- **Objective** -- what the task should achieve and why
+- **Background** -- relevant codebase context discovered by the agent
+- **Implementation Plan** -- numbered steps
+- **Files to Change** -- specific files and required modifications
+- **Edge Cases and Considerations** -- things to watch for
 
-You can freely edit both the goal and spec before deciding what to do with them.
+You can freely edit the spec before deciding what to do with it.
 
 #### ✅ Applying or Dismissing
 
@@ -51,8 +49,8 @@ After reviewing (and optionally editing) the refined prompt, choose one of two a
 
 | Action | Effect |
 |---|---|
-| **Apply as Prompt** | Replaces the task's prompt with the refined spec and updates the goal with the refined summary (unless you have manually edited the goal). The task title is regenerated to match. The original prompt is saved to the refinement history. |
-| **Dismiss** | Discards the refinement result. The task prompt and goal remain unchanged and you can start a new refinement or run the task as-is. |
+| **Apply as Prompt** | Replaces the task's prompt with the refined spec. The task title is regenerated to match. The original prompt is saved to the refinement history. |
+| **Dismiss** | Discards the refinement result. The task prompt remains unchanged and you can start a new refinement or run the task as-is. |
 
 #### ❌ Canceling a Running Refinement
 

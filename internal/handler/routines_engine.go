@@ -168,7 +168,6 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 
 	instance, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  prompt,
-		Goal:    routineTask.Goal,
 		Kind:    routineTask.RoutineSpawnKind,
 		Tags:    tags,
 		Timeout: routineTask.Timeout,

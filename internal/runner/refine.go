@@ -6,26 +6,16 @@ import (
 
 	"github.com/google/uuid"
 
-	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
-// roleRefinement is the inspector-tier descriptor for the refinement
-// sub-agent. Reads the workspace read-only, produces a detailed spec
-// from the task's current prompt. Parsed result is the raw result
-// string — refine.go's caller then cleans it and splits the goal /
-// spec sections.
-var roleRefinement = AgentRole{
-	Activity:    store.SandboxActivityRefinement,
-	Name:        "refine",
-	Timeout:     func(*store.Task) time.Duration { return constants.RefinementTimeout },
-	MountMode:   MountReadOnly,
-	SingleTurn:  true,
-	ParseResult: func(o *agentOutput) (any, error) { return o.Result, nil },
-}
+// roleRefinement binds to the agents.Refinement descriptor; the
+// runner's dispatch plumbing lives in agent_bindings.go.
+var roleRefinement = agents.Refinement
 
 // RunRefinement runs the sandbox agent in read-only mode to produce a
 // detailed implementation spec for the task's current prompt. The task

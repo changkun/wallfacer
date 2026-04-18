@@ -19,7 +19,7 @@ function getOpenModalTaskId() {
 //   textarea:        id = "<textareaId>"
 //   preview div:     id = "<textareaId>-preview"
 //
-// Usage from HTML: onclick="switchEditTab('goal','edit')"
+// Usage from HTML: onclick="switchEditTab('spec','edit')"
 // The mapping from section name → element IDs is in _editTabSections.
 // Call registerEditTabSection(name, tabsId, textareaId) to register new sections.
 
@@ -30,7 +30,6 @@ function registerEditTabSection(name, tabsId, textareaId) {
 }
 
 // Register built-in sections.
-registerEditTabSection("goal", "modal-goal-tabs", "modal-edit-goal");
 registerEditTabSection("spec", "modal-spec-tabs", "modal-edit-prompt");
 registerEditTabSection("retry", "modal-retry-tabs", "modal-retry-prompt");
 registerEditTabSection(
@@ -330,6 +329,31 @@ function setMainTab(tab) {
   document.querySelectorAll(".main-tab").forEach(function (btn) {
     btn.classList.toggle("active", btn.dataset.mainTab === tab);
   });
+
+  // Reveal the corresponding legacy right-panel-* div. Without this step the
+  // panel stays `.hidden` from its initial HTML state and the tab renders as
+  // an empty column. _switchRightTab is defined in modal-logs.js and flips
+  // the .hidden class across all right-panel-* siblings.
+  const rightPanelMap = {
+    changes: "changes",
+    flamegraph: "spans",
+    timeline: "timeline",
+  };
+  if (rightPanelMap[tab] && typeof _switchRightTab === "function") {
+    _switchRightTab(rightPanelMap[tab]);
+  } else if (tab === "activity") {
+    // Activity has Impl/Testing sub-tabs; preserve the user's last choice
+    // if one is currently shown, otherwise default to Impl.
+    const impl = document.getElementById("left-panel-implementation");
+    const test = document.getElementById("left-panel-testing");
+    const anyVisible =
+      (impl && !impl.classList.contains("hidden")) ||
+      (test && !test.classList.contains("hidden"));
+    if (!anyVisible && typeof setLeftTab === "function") {
+      setLeftTab("implementation");
+    }
+  }
+
   if (tab === "flamegraph" && typeof loadFlamegraph === "function") {
     const tid = getOpenModalTaskId();
     if (tid) loadFlamegraph(tid);
@@ -344,11 +368,9 @@ function setMainTab(tab) {
   } else if (typeof _stopTimelineRefresh === "function") {
     _stopTimelineRefresh();
   }
-  const tid = getOpenModalTaskId();
-  if (tid) {
-    // Deep-link to the active main tab so reload / share returns to it.
-    history.replaceState(null, "", "#" + tid + "/" + tab);
-  }
+  // URL hash is driven by setRightTab / setLeftTab where applicable; keeping
+  // setMainTab free of history side-effects preserves openModal's base hash
+  // (`#<task-id>`) when no sub-tab owns the view.
 }
 
 // _renderModalAside populates the right-side summary rail (agent, budget,
@@ -588,22 +610,14 @@ async function openModal(id) {
   const backlogSettings = document.getElementById("modal-backlog-settings");
   const backlogTags = document.getElementById("modal-backlog-tags");
 
-  // --- Goal + Spec sections ---
-  const goalSection = document.getElementById("modal-goal-section");
-  const goalRendered = document.getElementById("modal-goal-rendered");
-  const goalTextarea = document.getElementById("modal-edit-goal");
+  // --- Spec section ---
   const promptRaw = document.getElementById("modal-prompt");
   const promptRendered = document.getElementById("modal-prompt-rendered");
   const promptTextarea = document.getElementById("modal-edit-prompt");
   const promptActions = document.getElementById("modal-prompt-actions");
 
   if (task.status === "backlog") {
-    // Backlog: show goal + spec with Edit/Preview tabs (default: preview)
-    const goalVal = task.goal || "";
-    goalSection.classList.remove("hidden");
-    goalRendered.classList.add("hidden");
-    goalTextarea.value = goalVal;
-
+    // Backlog: show spec with Edit/Preview tabs (default: preview)
     promptRendered.classList.add("hidden");
     promptRaw.classList.add("hidden");
     promptActions.classList.add("hidden");
@@ -611,11 +625,8 @@ async function openModal(id) {
     promptTextarea.classList.add("spec-field");
 
     // Show Edit/Preview tabs and default to preview (rendered markdown)
-    var goalTabs = document.getElementById("modal-goal-tabs");
     var specTabs = document.getElementById("modal-spec-tabs");
-    if (goalTabs) goalTabs.classList.remove("hidden");
     if (specTabs) specTabs.classList.remove("hidden");
-    switchEditTab("goal", "preview");
     switchEditTab("spec", "preview");
 
     // Show right refinement panel and left backlog-specific sections
@@ -701,29 +712,14 @@ async function openModal(id) {
     modalBody.style.gap = "0";
   } else {
     // Non-backlog: hide backlog-only Edit/Preview tabs immediately
-    ["modal-goal-tabs", "modal-spec-tabs"].forEach(function (tid) {
-      var el = document.getElementById(tid);
-      if (el) el.classList.add("hidden");
-    });
+    var specTabsEl = document.getElementById("modal-spec-tabs");
+    if (specTabsEl) specTabsEl.classList.add("hidden");
 
-    // Show rendered goal (if distinct) + rendered spec (read-only)
-    const goalVal = task.goal || "";
+    // Show rendered spec (read-only)
     const specVal =
       typeof taskDisplayPrompt === "function"
         ? taskDisplayPrompt(task)
         : task.prompt || "";
-    const hasDistinctGoal = goalVal && goalVal !== task.prompt;
-
-    if (hasDistinctGoal) {
-      goalSection.classList.remove("hidden");
-      goalRendered.innerHTML = renderMarkdown(goalVal);
-      _mdRender.enhanceMarkdown(goalRendered);
-      goalRendered.classList.remove("hidden");
-    } else {
-      goalSection.classList.add("hidden");
-      goalRendered.classList.add("hidden");
-    }
-    goalTextarea.classList.add("hidden");
 
     promptRaw.textContent = specVal;
     promptRendered.innerHTML = renderMarkdown(specVal);
@@ -733,12 +729,8 @@ async function openModal(id) {
     promptActions.classList.remove("hidden");
     document.getElementById("toggle-prompt-btn").textContent = "Raw";
     promptTextarea.classList.add("hidden");
-    ["modal-edit-goal-preview", "modal-edit-prompt-preview"].forEach(
-      function (pid) {
-        var el = document.getElementById(pid);
-        if (el) el.classList.add("hidden");
-      },
-    );
+    var specPreviewEl = document.getElementById("modal-edit-prompt-preview");
+    if (specPreviewEl) specPreviewEl.classList.add("hidden");
 
     backlogRight.classList.add("hidden");
     backlogSettings.classList.add("hidden");
@@ -751,7 +743,12 @@ async function openModal(id) {
   if (task.result) {
     renderResultsFromEvents([task.result]);
   } else {
-    document.getElementById("modal-summary-section").classList.add("hidden");
+    // Keep the Activity section visible for executed tasks without a final
+    // result yet (in-progress, waiting, failed mid-turn) so streaming
+    // oversight / pretty / raw logs render as they arrive. Turn entries
+    // populate later via renderResultsFromEvents once events stream in.
+    const summary = document.getElementById("modal-summary-section");
+    if (summary) summary.classList.remove("hidden");
   }
 
   // Usage stats (show when any tokens have been used)
@@ -984,18 +981,19 @@ async function openModal(id) {
       timelineMainTab.classList.toggle("hidden", !(task.turns > 0));
     }
 
-    // Start log streaming; show Testing tab when test data exists
+    // Reveal the Testing sub-tab inside Activity whenever a test run
+    // exists (in-flight or completed). Impl sub-tab stays the default.
+    const leftTestingBtn = document.getElementById("left-tab-testing");
     if (task.is_test_run || task.last_test_result) {
-      // Shown both while the test is running (is_test_run) and after it
-      // completes (last_test_result set, is_test_run cleared), so done/verified
-      // tasks still expose test traces.
       const testTab = document.getElementById("right-tab-testing");
       if (testTab) testTab.classList.remove("hidden");
+      if (leftTestingBtn) leftTestingBtn.classList.remove("hidden");
       startImplLogFetch(id, seq);
       startTestLogStream(id, seq);
     } else {
       const testTab = document.getElementById("right-tab-testing");
       if (testTab) testTab.classList.add("hidden");
+      if (leftTestingBtn) leftTestingBtn.classList.add("hidden");
       startLogStream(id, seq);
     }
 
@@ -1065,6 +1063,14 @@ async function openModal(id) {
       if (changesMainTab) changesMainTab.classList.add("hidden");
     }
 
+    // Ensure main tabs suppressed for backlog are visible again, and the
+    // Refine tab (backlog-only) is hidden for executed tasks.
+    ["activity", "events"].forEach(function (t) {
+      const btn = document.getElementById("main-tab-" + t);
+      if (btn) btn.classList.remove("hidden");
+    });
+    const refineTabBtn = document.getElementById("main-tab-refine");
+    if (refineTabBtn) refineTabBtn.classList.add("hidden");
     // Default: Implementation sub-tab + Activity main tab so the user lands on
     // turn results + live logs.
     setRightTab("implementation");
@@ -1073,7 +1079,14 @@ async function openModal(id) {
     // Backlog tasks: modal-wide and layout already set in the backlog branch above.
     // Just ensure the non-backlog right panel stays hidden.
     modalRight.classList.add("hidden");
-    // Backlog only surfaces the Spec view (alongside the refinement panel).
+    // Backlog: Spec + Refine are the only meaningful tabs. Hide the tabs
+    // that require an executed run; expose Refine next to Spec.
+    ["activity", "events"].forEach(function (t) {
+      const btn = document.getElementById("main-tab-" + t);
+      if (btn) btn.classList.add("hidden");
+    });
+    const refineTabBtn = document.getElementById("main-tab-refine");
+    if (refineTabBtn) refineTabBtn.classList.remove("hidden");
     setMainTab("spec");
   }
 
@@ -1505,15 +1518,9 @@ function closeModal() {
   document.getElementById("modal-backlog-settings").classList.add("hidden");
   var _backlogTags = document.getElementById("modal-backlog-tags");
   if (_backlogTags) _backlogTags.classList.add("hidden");
-  document.getElementById("modal-goal-section").classList.add("hidden");
-  document.getElementById("modal-edit-goal").classList.add("hidden");
   document.getElementById("modal-edit-prompt").classList.add("hidden");
-  var _goalPreview = document.getElementById("modal-edit-goal-preview");
-  if (_goalPreview) _goalPreview.classList.add("hidden");
   var _specPreview = document.getElementById("modal-edit-prompt-preview");
   if (_specPreview) _specPreview.classList.add("hidden");
-  var _goalTabs = document.getElementById("modal-goal-tabs");
-  if (_goalTabs) _goalTabs.classList.add("hidden");
   var _specTabs = document.getElementById("modal-spec-tabs");
   if (_specTabs) _specTabs.classList.add("hidden");
   document.querySelector("#modal .modal-card").classList.remove("modal-wide");

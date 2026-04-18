@@ -131,7 +131,6 @@ func (h *Handler) RefineDismiss(w http.ResponseWriter, r *http.Request, id uuid.
 // RefineApplyRequest is the body for POST /api/tasks/{id}/refine/apply.
 type RefineApplyRequest struct {
 	Prompt string `json:"prompt"`
-	Goal   string `json:"goal"`
 }
 
 // RefineApply persists the refined prompt, recording the session in
@@ -157,12 +156,6 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 		return
 	}
 
-	// Default goal from the refinement job if the user didn't provide one.
-	goal := req.Goal
-	if goal == "" && task.CurrentRefinement != nil {
-		goal = task.CurrentRefinement.Goal
-	}
-
 	// Build a session recording what the sandbox produced vs what the user applied.
 	sandboxResult := ""
 	if task.CurrentRefinement != nil {
@@ -175,7 +168,7 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 		Result:      sandboxResult,
 	}
 
-	if err := h.store.ApplyRefinement(r.Context(), id, req.Prompt, goal, session); err != nil {
+	if err := h.store.ApplyRefinement(r.Context(), id, req.Prompt, session); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

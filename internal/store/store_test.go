@@ -391,31 +391,6 @@ func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
 	}
 }
 
-func TestMigrateTaskJSON_BackfillGoal(t *testing.T) {
-	id := uuid.New()
-	now := time.Now().UTC().Truncate(time.Second)
-	raw := fmt.Appendf(nil, `{
-		"schema_version": %d,
-		"id": %q,
-		"prompt": "my task prompt",
-		"status": "backlog",
-		"timeout": 30,
-		"created_at": %q,
-		"updated_at": %q,
-		"auto_retry_budget": {"container_crash": 2, "sync_error": 2, "worktree_setup": 1}
-	}`, constants.CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339))
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true when goal is backfilled")
-	}
-	if task.Goal != "my task prompt" {
-		t.Errorf("Goal = %q, want %q", task.Goal, "my task prompt")
-	}
-}
 
 // TestMigrateTaskJSON_CanonicalizeDependsOn verifies that DependsOn entries
 // are trimmed, UUID-validated, deduplicated, and sorted.

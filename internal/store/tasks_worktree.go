@@ -167,26 +167,16 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 // ApplyRefinement saves a refinement session and updates the task prompt.
 // The current prompt is pushed into PromptHistory before being replaced.
 // The CurrentRefinement job is cleared after applying.
-func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt, newGoal string, session RefinementSession) error {
-	// Compute the lowercased fields before acquiring the lock so that
-	// strings.ToLower does not extend the critical section.
+func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt string, session RefinementSession) error {
 	loweredPrompt := strings.ToLower(newPrompt)
-	loweredGoal := strings.ToLower(newGoal)
 	return s.mutateTask(id, func(t *Task) error {
 		session.ResultPrompt = newPrompt
 		t.PromptHistory = append(t.PromptHistory, t.Prompt)
 		t.RefineSessions = append(t.RefineSessions, session)
 		t.Prompt = newPrompt
 		t.CurrentRefinement = nil
-		// Update goal only if the user has not manually set it.
-		if newGoal != "" && !t.GoalManuallySet {
-			t.Goal = newGoal
-		}
 		if entry, ok := s.searchIndex[id]; ok {
 			entry.prompt = loweredPrompt
-			if newGoal != "" && !t.GoalManuallySet {
-				entry.goal = loweredGoal
-			}
 			s.searchIndex[id] = entry
 		}
 		return nil
@@ -255,9 +245,6 @@ func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult
 func matchTask(t *Task, entry indexedTaskText, q string) (field, snippet string, ok bool) {
 	if idx := strings.Index(entry.title, q); idx != -1 {
 		return "title", buildSnippet(t.Title, idx, len(q)), true
-	}
-	if idx := strings.Index(entry.goal, q); idx != -1 {
-		return "goal", buildSnippet(t.Goal, idx, len(q)), true
 	}
 	if idx := strings.Index(entry.prompt, q); idx != -1 {
 		return "prompt", buildSnippet(t.Prompt, idx, len(q)), true

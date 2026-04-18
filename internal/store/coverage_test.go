@@ -1015,7 +1015,6 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	scheduled := time.Now().Add(time.Hour)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
 		Prompt:             "full opts",
-		Goal:               "custom goal",
 		Timeout:            30,
 		MountWorktrees:     true,
 		Kind:               TaskKindIdeaAgent,
@@ -1032,12 +1031,6 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
-	}
-	if task.Goal != "custom goal" {
-		t.Errorf("Goal = %q, want custom goal", task.Goal)
-	}
-	if task.GoalManuallySet != true {
-		t.Error("GoalManuallySet should be true when goal is provided")
 	}
 	if task.Kind != TaskKindIdeaAgent {
 		t.Errorf("Kind = %q, want idea_agent", task.Kind)
@@ -1439,23 +1432,16 @@ func TestUpdateTaskBacklog_PartialUpdate(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
 	newPrompt := "updated prompt"
-	newGoal := "updated goal"
 	newTimeout := 30
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newGoal, &newTimeout, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newTimeout, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Prompt != "updated prompt" {
 		t.Errorf("Prompt = %q, want %q", got.Prompt, "updated prompt")
 	}
-	if got.Goal != "updated goal" {
-		t.Errorf("Goal = %q, want %q", got.Goal, "updated goal")
-	}
 	if got.Timeout != 30 {
 		t.Errorf("Timeout = %d, want 30", got.Timeout)
-	}
-	if !got.GoalManuallySet {
-		t.Error("GoalManuallySet should be true after goal update")
 	}
 }
 
@@ -1464,7 +1450,7 @@ func TestUpdateTaskBacklog_SandboxByActivity(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "sandbox", Timeout: 5})
 
 	sba := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude}
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, &sba, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &sba, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1479,7 +1465,7 @@ func TestUpdateTaskBacklog_BudgetClamp(t *testing.T) {
 
 	negCost := -1.0
 	negTokens := -100
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, &negCost, &negTokens); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, &negCost, &negTokens); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1497,7 +1483,7 @@ func TestUpdateTaskBacklog_FreshStartAndMount(t *testing.T) {
 
 	fs := true
 	mw := true
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &fs, &mw, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fs, &mw, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -2186,15 +2172,6 @@ func TestRebuildSearchIndex_RepairsChangedEntriesCoverage(t *testing.T) {
 	repaired, _ := s.RebuildSearchIndex(bg())
 	if repaired == 0 {
 		t.Error("expected at least 1 repaired entry")
-	}
-}
-
-func TestSearchTasks_MatchOnGoalCoverage(t *testing.T) {
-	s := newTestStore(t)
-	s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "anything", Goal: "implement authentication", Timeout: 5}) //nolint:errcheck
-	results, _ := s.SearchTasks(bg(), "authentication")
-	if len(results) == 0 || results[0].MatchedField != "goal" {
-		t.Error("expected goal match")
 	}
 }
 
