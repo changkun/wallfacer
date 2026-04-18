@@ -1,6 +1,6 @@
 ---
 title: Migrate inspector roles (refinement, ideation) to runAgent
-status: complete
+status: archived
 depends_on:
   - specs/shared/agent-abstraction/descriptor-and-runagent.md
   - specs/shared/agent-abstraction/headless-roles.md
@@ -15,6 +15,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Migrate inspector roles to runAgent
 
