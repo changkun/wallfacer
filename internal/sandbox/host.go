@@ -364,7 +364,8 @@ type hostHandle struct {
 	state   atomic.Int32
 	backend *HostBackend
 
-	killOnce sync.Once // ensures SIGTERM→SIGKILL escalation runs at most once
+	killOnce sync.Once     // ensures SIGTERM→SIGKILL escalation runs at most once
+	done     chan struct{} // closed after cmd.Wait() returns
 }
 
 // newHostHandle constructs a hostHandle with state initialised to Creating.
@@ -373,6 +374,7 @@ func newHostHandle(name string, cmd *exec.Cmd, stdout, stderr io.ReadCloser, tas
 	h := &hostHandle{
 		name:    name,
 		cmd:     cmd,
+		done:    make(chan struct{}),
 		stdout:  stdout,
 		stderr:  stderr,
 		taskID:  taskID,
@@ -392,6 +394,7 @@ func (h *hostHandle) Name() string          { return h.name }
 // LocalBackend's convention — only unexpected errors surface as non-nil.
 func (h *hostHandle) Wait() (int, error) {
 	err := h.cmd.Wait()
+	close(h.done)
 	defer h.removeFromBackend()
 
 	terminal := func() bool {
@@ -436,17 +439,18 @@ func (h *hostHandle) signalAndEscalate() {
 	if h.cmd.Process == nil {
 		return
 	}
-	pid := h.cmd.Process.Pid
 	_ = h.cmd.Process.Signal(syscall.SIGTERM)
 	go func() {
 		timer := time.NewTimer(5 * time.Second)
 		defer timer.Stop()
-		<-timer.C
-		// ProcessState is nil until Wait() reaps the child. If it's still nil
-		// after the grace period, escalate. syscall.Kill on a reaped pid is a
-		// no-op on Unix (or returns ESRCH) so it's safe against a race with Wait.
-		if h.cmd.ProcessState == nil {
-			_ = syscall.Kill(pid, syscall.SIGKILL)
+		select {
+		case <-h.done:
+			// Wait() returned — process already reaped, nothing to escalate.
+		case <-timer.C:
+			// Grace period elapsed without the process exiting. os.Process.Kill
+			// is cross-platform and safe against a race with Wait reaping the
+			// child (the os package guards the Pid with an internal mutex).
+			_ = h.cmd.Process.Kill()
 		}
 	}()
 }
