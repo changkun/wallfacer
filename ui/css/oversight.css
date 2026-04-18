@@ -11,13 +11,18 @@
   font-size: 13px;
   white-space: normal;
 }
+/* Phase row: flat, separated by a hairline. Accent lives on the phase
+   number/label, not a wrapping filled box. */
 .oversight-phase {
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  background: var(--bg-raised);
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 10px 0;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+.oversight-phase:last-child {
+  border-bottom: none;
 }
 .oversight-phase-header {
   display: flex;

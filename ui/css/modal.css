@@ -31,8 +31,19 @@
 }
 .modal-wide #modal-body {
   display: flex;
+  flex-direction: column;
   gap: 0;
   flex: 1;
+  min-height: 0;
+}
+.modal-wide #main-tabs {
+  flex: 0 0 auto;
+}
+.modal-wide #modal-row {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 .modal-wide #modal-main-pane {
@@ -64,11 +75,12 @@
   flex-direction: column;
 }
 .modal-wide #modal-backlog-right {
-  flex: 3;
+  flex: 1;
   min-width: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  padding-top: 12px;
 }
 .modal-wide #modal-right.hidden {
   display: none;
@@ -84,8 +96,153 @@
   flex-direction: column;
   padding-top: 12px;
 }
+/* Refine main tab: backlog-right fills the whole content row; the usual
+   spec/activity main-pane collapses. */
+#modal[data-main-tab="refine"] #modal-main-pane {
+  display: none;
+}
+/* modal-right is empty in Activity (logs live in modal-left now). */
+#modal[data-main-tab="activity"] #modal-right {
+  display: none;
+}
+/* Right-panel sub-tab bar (legacy) stays hidden — only Impl/Testing
+   buttons inside .right-panel-tabs were needed, and they're replaced by
+   the top-level main tabs. */
+.modal-wide .right-panel-tabs {
+  display: none !important;
+}
+
+/* ---------- Activity tab: full-width vertical stack, Impl | Testing sub-tabs ----------
+   Selecting a sub-tab shows one agent (turns then oversight, full width).
+   Typography-driven; no rounded wrapping cards. */
+.activity-sub-tabs {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 2px;
+  margin-bottom: 16px;
+}
+.activity-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 4px 0 16px;
+}
+/* Tailwind's `.hidden { display: none }` loads before this sheet, so the
+   class alone wouldn't win over `.activity-agent { display: flex }` (same
+   specificity, later rule wins). Explicit combined selector restores the
+   expected hide behavior for the Impl/Testing sub-tab switch. */
+.activity-agent.hidden {
+  display: none;
+}
+.activity-block {
+  min-width: 0;
+}
+.activity-block__label,
+.activity-block__label-row {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.activity-block__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.activity-block--oversight {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+/* Higher specificity (id + class) to override the `#modal-logs-section`
+   rule in task-detail.css that would otherwise force `overflow: hidden`
+   + `display: flex` (that rule was written for the old modal-right layout
+   where the section filled a flex column). */
+#modal-logs-section.activity-oversight-box,
+#modal-test-logs-section.activity-oversight-box {
+  display: block;
+  flex: none;
+  min-height: 0;
+  max-height: 420px;
+  overflow-y: auto;
+  background: transparent;
+  font-size: 12px;
+}
+#modal-logs-section.activity-oversight-box .logs-block,
+#modal-test-logs-section.activity-oversight-box .logs-block {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: none;
+  min-height: 0;
+  flex: none;
+  border-radius: 4px;
+  /* background / color inherit from .logs-block (terminal) or
+     .logs-block.oversight-mode (prose) based on the active mode. */
+}
+/* Tone down the Impl oversight's search bar — remove its standalone
+   dark strip so it sits flush with the scrolling region below. */
+#modal-logs-section.activity-oversight-box #log-search-bar {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 !important;
+  padding: 4px 0 !important;
+}
+#modal-logs-section.activity-oversight-box #log-search-input {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.activity-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+  height: 0;
+}
 .modal-wide .logs-block {
   max-height: none;
+}
+
+/* ---------- Design refresh: flatten modal content chrome ----------
+   Many modal sections used to sit in rounded/filled boxes (.code-block,
+   .usage-grid, bordered sandbox-override panels). The redesign lets the
+   content sit directly on the modal canvas, separated by typography and
+   thin 1px rules — no nested card backgrounds. */
+#modal .section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+#modal .code-block:not(pre):not(.logs-block) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+#modal pre.code-block:not(.logs-block) {
+  background: transparent;
+  border-radius: 0;
+  padding: 8px 0;
+  color: var(--text);
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+}
+#modal .usage-grid {
+  background: transparent;
+  padding: 0;
+  gap: 4px 24px;
+  font-size: 12px;
+}
+/* Compress the "Per-activity sandbox overrides" sub-panel — the filled
+   bordered box was the heaviest chrome in the Spec tab. */
+#modal details > div[style*="border"] {
+  border: none !important;
+  padding: 8px 0 !important;
 }
 
 /* --- Main tab bar (Spec / Activity / Changes / Flamegraph / Timeline / Events) --- */
@@ -107,7 +264,9 @@
   padding: 6px 12px;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 .main-tab:hover:not(.active) {
   color: var(--text-secondary);
@@ -122,12 +281,18 @@
    Each section declares the main tab(s) it belongs to via
    data-main-tab-section="spec" (or "activity events" for multi-tab). The modal
    carries data-main-tab on the outer container; non-matching sections hide. */
-#modal[data-main-tab="spec"] [data-main-tab-section]:not([data-main-tab-section~="spec"]),
-#modal[data-main-tab="activity"] [data-main-tab-section]:not([data-main-tab-section~="activity"]),
-#modal[data-main-tab="changes"] [data-main-tab-section]:not([data-main-tab-section~="changes"]),
-#modal[data-main-tab="flamegraph"] [data-main-tab-section]:not([data-main-tab-section~="flamegraph"]),
-#modal[data-main-tab="timeline"] [data-main-tab-section]:not([data-main-tab-section~="timeline"]),
-#modal[data-main-tab="events"] [data-main-tab-section]:not([data-main-tab-section~="events"]) {
+#modal[data-main-tab="spec"]
+  [data-main-tab-section]:not([data-main-tab-section~="spec"]),
+#modal[data-main-tab="activity"]
+  [data-main-tab-section]:not([data-main-tab-section~="activity"]),
+#modal[data-main-tab="changes"]
+  [data-main-tab-section]:not([data-main-tab-section~="changes"]),
+#modal[data-main-tab="flamegraph"]
+  [data-main-tab-section]:not([data-main-tab-section~="flamegraph"]),
+#modal[data-main-tab="timeline"]
+  [data-main-tab-section]:not([data-main-tab-section~="timeline"]),
+#modal[data-main-tab="events"]
+  [data-main-tab-section]:not([data-main-tab-section~="events"]) {
   display: none !important;
 }
 
@@ -213,6 +378,37 @@
   background: var(--accent);
   border-radius: 999px;
   transition: width 0.2s ease;
+}
+
+/* Environment section — uses dt/dd grid emitted by _renderModalEnvironment */
+.modal-aside__env {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  font-size: 11px;
+  align-items: baseline;
+}
+.modal-aside__env dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.modal-aside__env dd {
+  margin: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.modal-aside__env dd code {
+  background: transparent;
+  padding: 0;
 }
 
 /* Collapse aside on narrow viewports — the main split already competes for

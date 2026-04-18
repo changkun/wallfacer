@@ -1649,18 +1649,7 @@
       var w = points[1];
       var e = points[2];
       return (
-        "M" +
-        s.x +
-        "," +
-        s.y +
-        " Q" +
-        w.x +
-        "," +
-        w.y +
-        " " +
-        e.x +
-        "," +
-        e.y
+        "M" + s.x + "," + s.y + " Q" + w.x + "," + w.y + " " + e.x + "," + e.y
       );
     }
     if (points.length === 4) {
