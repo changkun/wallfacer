@@ -42,6 +42,8 @@ func main() {
 	appendSys := fs.String("append-system-prompt", "", "append system prompt file")
 	verbose := fs.Bool("verbose", false, "verbose")
 	outputFormat := fs.String("output-format", "", "output format")
+	// Accept and ignore the claude-agent.sh wrapper's stability flag.
+	_ = fs.Bool("dangerously-skip-permissions", false, "")
 	// Ignore unknown flags quietly so real CLI args pass through without fuss.
 	fs.SetOutput(os.Stderr)
 	if err := fs.Parse(os.Args[1:]); err != nil {
