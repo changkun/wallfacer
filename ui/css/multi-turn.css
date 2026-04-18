@@ -1,49 +1,93 @@
-/* --- Multi-turn result entries --- */
+/* --- Multi-turn result entries ---
+   Flat typography-driven layout: no wrapping card, no filled header
+   strip. Each entry separates from the next with a hairline rule and a
+   compact label row. */
 .result-entry {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 8px;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
 }
 .result-entry:last-child {
   margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .result-entry-header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--bg-input);
-  border-bottom: 1px solid var(--border);
+  padding: 0 0 8px;
+  background: transparent;
+  border-bottom: none;
 }
 .result-entry-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--bg-input);
+  padding: 4px 6px 4px 4px;
+  background: transparent;
   cursor: pointer;
   list-style: none;
   user-select: none;
+  border-radius: 4px;
+  transition: background 0.12s;
+}
+.result-entry-summary:hover {
+  background: var(--bg-hover);
 }
 .result-entry-summary::-webkit-details-marker {
   display: none;
 }
+.result-entry-summary .result-entry-labels::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-right: 8px;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--text-muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  align-self: center;
+}
+details.result-entry[open] .result-entry-summary .result-entry-labels::before {
+  transform: rotate(90deg);
+}
+.result-entry-summary::after {
+  content: "Click to expand";
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.result-entry-summary:hover::after {
+  opacity: 0.75;
+}
+details.result-entry[open] .result-entry-summary::after {
+  content: "Click to collapse";
+}
 details.result-entry[open] .result-entry-summary {
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  margin-bottom: 4px;
 }
 .result-entry-actions {
   display: flex;
   justify-content: flex-end;
-  padding: 6px 12px;
-  background: var(--bg-input);
-  border-bottom: 1px solid var(--border);
+  padding: 0 0 6px;
+  background: transparent;
+  border-bottom: none;
 }
 .result-entry-body {
-  padding: 16px;
-  font-size: 14px;
-  color: var(--text-secondary);
+  padding: 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.55;
 }
 pre.result-entry-body {
   white-space: pre-wrap;
