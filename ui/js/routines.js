@@ -56,7 +56,10 @@ function currentIntervalOptions(currentMinutes) {
 // renderRoutineFooter returns the HTML fragment that render.js appends
 // inside a routine card below the usual prompt/tags block.
 function renderRoutineFooter(t) {
-  const minutes = Math.max(1, Math.round((t.routine_interval_seconds || 0) / 60));
+  const minutes = Math.max(
+    1,
+    Math.round((t.routine_interval_seconds || 0) / 60),
+  );
   const enabled = !!t.routine_enabled;
   const nextRun = t.routine_next_run || null;
   const lastFired = t.routine_last_fired_at || null;
@@ -164,7 +167,13 @@ async function onRoutineTrigger(id) {
 // command-palette / composer integrations that ship in follow-ups.
 async function createRoutineFromPrompt(
   prompt,
-  { intervalMinutes, spawnKind = "", enabled = true, tags = [], goal = "" } = {},
+  {
+    intervalMinutes,
+    spawnKind = "",
+    enabled = true,
+    tags = [],
+    goal = "",
+  } = {},
 ) {
   return api(Routes.routines.create(), {
     method: "POST",

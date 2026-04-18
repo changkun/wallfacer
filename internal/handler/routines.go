@@ -273,4 +273,3 @@ func parsePathID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID
 	}
 	return id, true
 }
-
