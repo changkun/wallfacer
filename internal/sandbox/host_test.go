@@ -271,6 +271,10 @@ func TestHostBackend_AppendSystemPrompt_Supported(t *testing.T) {
 		Env: map[string]string{
 			"WALLFACER_AGENT":             "claude",
 			"WALLFACER_INSTRUCTIONS_PATH": instr,
+			// Disable fast mode so --append-system-prompt only carries the
+			// instructions path (not the /fast shortcut the launcher also
+			// appends when fast mode is active).
+			"WALLFACER_SANDBOX_FAST": "false",
 		},
 		Cmd:     []string{"-p", "run"},
 		WorkDir: t.TempDir(),
@@ -305,6 +309,10 @@ func TestHostBackend_AppendSystemPrompt_Fallback(t *testing.T) {
 		Env: map[string]string{
 			"WALLFACER_AGENT":             "claude",
 			"WALLFACER_INSTRUCTIONS_PATH": instr,
+			// Disable fast mode so the --append-system-prompt flag is NOT
+			// added by the launcher itself; this isolates the fallback
+			// behaviour we're asserting.
+			"WALLFACER_SANDBOX_FAST": "false",
 		},
 		Cmd:     []string{"-p", "the-task"},
 		WorkDir: t.TempDir(),

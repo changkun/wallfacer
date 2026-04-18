@@ -190,8 +190,17 @@ func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Han
 
 	env := b.buildChildEnv(spec)
 
-	argv := make([]string, len(spec.Cmd))
-	copy(argv, spec.Cmd)
+	// Mirror the container's claude-agent.sh wrapper: without
+	// --dangerously-skip-permissions claude waits for interactive
+	// permission prompts in a piped non-TTY context, which buffers all
+	// stream-json output until the task ends. --append-system-prompt "/fast"
+	// activates the Claude Code fast mode when WALLFACER_SANDBOX_FAST is
+	// enabled (the default).
+	argv := []string{"--dangerously-skip-permissions"}
+	if sandboxFast(spec.Env, env) {
+		argv = append(argv, "--append-system-prompt", "/fast")
+	}
+	argv = append(argv, spec.Cmd...)
 	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
 		if b.SupportsAppendSystemPrompt(Claude) {
 			argv = append(argv, "--append-system-prompt", instrPath)
