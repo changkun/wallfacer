@@ -26,6 +26,15 @@ func main() {
 		return
 	}
 
+	// Codex-mode simulation: when invoked as `fakeagent exec ...` mimic
+	// codex exec --json, writing the last message to --output-last-message
+	// and emitting codex-style NDJSON events on stdout. Used by the
+	// HostBackend codex-launch tests.
+	if len(os.Args) >= 2 && os.Args[1] == "exec" {
+		runFakeCodex()
+		return
+	}
+
 	fs := flag.NewFlagSet("fakeagent", flag.ContinueOnError)
 	prompt := fs.String("p", "", "prompt")
 	model := fs.String("model", "", "model")
@@ -103,3 +112,75 @@ func envEcho() map[string]string {
 
 // Silence unused-import complaints when stripping flags in future edits.
 var _ = strings.TrimSpace
+
+// runFakeCodex mimics enough of `codex exec --json` for HostBackend tests:
+// parses --output-last-message / --model / --config / the trailing prompt,
+// writes the prompt back as the "last message", and emits two NDJSON
+// events (an item + a turn.completed with usage and session_id).
+func runFakeCodex() {
+	args := os.Args[2:] // strip the leading "exec" subcommand
+	var lastMsgFile, model, prompt string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--output-last-message" && i+1 < len(args):
+			lastMsgFile = args[i+1]
+			i++
+		case a == "--model" && i+1 < len(args):
+			model = args[i+1]
+			i++
+		case a == "--config" && i+1 < len(args):
+			// skip config value
+			i++
+		case a == "--full-auto" || a == "--skip-git-repo-check" || a == "--json":
+			// no arg
+		case a == "--sandbox" && i+1 < len(args):
+			i++
+		case a == "--color" && i+1 < len(args):
+			i++
+		default:
+			if !strings.HasPrefix(a, "--") && !strings.HasPrefix(a, "-") {
+				// Positional: the prompt (takes the last positional so a
+				// preamble + "---\n\n" + task is captured as a single arg).
+				prompt = a
+			}
+		}
+	}
+
+	if s := os.Getenv("FAKEAGENT_SLEEP"); s != "" {
+		if secs, err := strconv.Atoi(s); err == nil && secs > 0 {
+			time.Sleep(time.Duration(secs) * time.Second)
+		}
+	}
+
+	// Emit a codex-style item event (ignored by HostBackend's event tracker
+	// but forwarded to the caller).
+	enc := json.NewEncoder(os.Stdout)
+	_ = enc.Encode(map[string]any{
+		"type":  "item.completed",
+		"model": model,
+	})
+	// Emit the turn.completed event with usage and session_id.
+	_ = enc.Encode(map[string]any{
+		"type":           "turn.completed",
+		"session_id":     "fake-codex-session",
+		"stop_reason":    "end_turn",
+		"total_cost_usd": 0.0,
+		"usage": map[string]int{
+			"input_tokens":                7,
+			"output_tokens":               11,
+			"cached_input_tokens":         3,
+			"cache_creation_input_tokens": 0,
+		},
+	})
+
+	// Write the prompt back verbatim as the "final assistant message" so
+	// tests can assert that prompt wiring round-tripped.
+	if lastMsgFile != "" {
+		_ = os.WriteFile(lastMsgFile, []byte("fake codex replied to: "+prompt), 0o600)
+	}
+
+	if os.Getenv("FAKEAGENT_EXIT_1") == "1" {
+		os.Exit(1)
+	}
+}

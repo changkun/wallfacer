@@ -490,35 +490,20 @@ func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
 // Resolution priority: per-task per-activity override → per-task sandbox → env-file
 // per-activity setting → env-file default sandbox → Claude (hardcoded fallback).
-//
-// Host mode coerces codex → claude ONLY when the codex choice came from an
-// env-file default (a passive configuration, not user intent). Explicit
-// per-task choices — `task.Sandbox` or `task.SandboxByActivity` — are passed
-// through unchanged; if the user explicitly chose codex, the host backend's
-// Launch rejects it with an actionable error rather than silently running
-// claude and producing misleading output.
 func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
+	if task == nil {
+		return sandbox.Claude
+	}
 	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
-
-	// Explicit per-task choices win, including in host mode — the backend
-	// reports an honest error if the choice is not supported.
-	if task != nil {
-		if task.SandboxByActivity != nil {
-			if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
-				return sb
-			}
-		}
-		if task.Sandbox.IsValid() {
-			return task.Sandbox
+	if task.SandboxByActivity != nil {
+		if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
+			return sb
 		}
 	}
-
-	// Env-file-derived default: in host mode, swap codex for claude so
-	// sub-agent activities don't fail on a default the user never asked for.
+	if task.Sandbox.IsValid() {
+		return task.Sandbox
+	}
 	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
-		if r.HostMode() && sb == sandbox.Codex {
-			return sandbox.Claude
-		}
 		return sb
 	}
 	return sandbox.Claude
@@ -763,10 +748,9 @@ func (r *Runner) runContainer(
 	// Primary attempt with the configured sandbox, followed by automatic
 	// claude→codex fallback on token/rate limit errors (checked twice:
 	// once for launch/exec errors, once for is_error in the parsed output).
-	// Host mode disables the fallback because it does not support codex.
 	output, rawStdout, rawStderr, err := runWithSandbox(sb)
 	if err != nil {
-		if !r.HostMode() && sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
+		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
 			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
@@ -778,7 +762,7 @@ func (r *Runner) runContainer(
 		return nil, rawStdout, rawStderr, err
 	}
 
-	if !r.HostMode() && sb == sandbox.Claude && output != nil && output.IsError &&
+	if sb == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)

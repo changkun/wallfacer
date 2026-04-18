@@ -59,24 +59,7 @@ func TestNewHostBackend_MissingCodexIsTolerated(t *testing.T) {
 	}
 }
 
-func TestHostBackend_Launch_CodexRejected(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-test-codex",
-		Env:     map[string]string{"WALLFACER_AGENT": "codex"},
-		Cmd:     []string{"-p", "hi"},
-		WorkDir: t.TempDir(),
-	}
-	_, err := b.Launch(context.Background(), spec)
-	if err == nil {
-		t.Fatal("expected error launching codex in host mode")
-	}
-	if !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "not supported") {
-		t.Errorf("error should explain codex is unsupported; got: %v", err)
-	}
-}
+// Codex-mode tests live in host_codex_test.go.
 
 func TestNewHostBackend_UsesLookupWhenEmpty(t *testing.T) {
 	// With explicit valid paths, construction succeeds.
