@@ -666,6 +666,14 @@
 .composer.hidden {
   display: none;
 }
+/* Host execution mode strips the container sandbox, so controls that
+   only make sense with mounted worktrees (e.g. "Share siblings") are
+   hidden. Marker attribute + parent class keeps the decision
+   declarative — tasks.js flips .composer--host based on /api/config's
+   host_mode field. */
+.composer--host [data-host-hidden] {
+  display: none !important;
+}
 
 .composer__head {
   display: flex;

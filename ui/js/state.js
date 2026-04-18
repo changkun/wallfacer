@@ -69,6 +69,12 @@ let autopush = false;
 // Terminal feature gate (set by fetchConfig from server)
 let terminalEnabled = false;
 
+// Host execution mode flag (set by fetchConfig from server). True when
+// the runner is configured with the HostBackend — no container, the
+// agent CLI runs directly as a host process. UI surfaces that only
+// apply to containerised execution read this to hide themselves.
+let hostMode = false;
+
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
 

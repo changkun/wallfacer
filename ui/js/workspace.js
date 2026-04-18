@@ -181,6 +181,12 @@ async function fetchConfig() {
     if (typeof applyTerminalVisibility === "function")
       applyTerminalVisibility();
     if (terminalEnabled && typeof initTerminal === "function") initTerminal();
+    // Surface host_mode so UI surfaces that only make sense with a
+    // container backend (e.g. "Share siblings" in the composer) can
+    // hide themselves declaratively.
+    hostMode = !!cfg.host_mode;
+    if (typeof applyHostModeToComposer === "function")
+      applyHostModeToComposer();
   } catch (e) {
     console.error("fetchConfig:", e);
   }

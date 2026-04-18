@@ -80,14 +80,17 @@
         <!-- Tags row: inline, no dedicated label row -->
         <div class="composer__tags" id="new-task-tag-input"></div>
 
-        <!-- Primary execution row: sandbox, timeout, share-code, all inline -->
+        <!-- Primary execution row: agent, timeout, share-code, all inline.
+             "Agent" replaces the older "Sandbox" label — the user-facing
+             choice is really Claude vs Codex (vs future backends), which
+             carries across container-sandbox and host execution modes. -->
         <div class="composer__row composer__row--wrap">
           <label class="composer__field">
-            <span class="composer__field-label">Sandbox</span>
+            <span class="composer__field-label">Agent</span>
             <select
               id="new-sandbox"
               class="composer__input"
-              title="Sandbox"
+              title="Agent CLI used for this task (Claude, Codex, …)."
               data-sandbox-select="true"
             >
               <option value="">Default</option>
@@ -106,7 +109,11 @@
               <option value="1440">24 hours</option>
             </select>
           </label>
-          <label class="composer__checkbox" title="Mount other in-progress worktrees into this task's container as read-only paths.">
+          <label
+            class="composer__checkbox"
+            data-host-hidden
+            title="Mount other in-progress worktrees into this task's container as read-only paths. Not applicable in host execution mode — there are no container mounts to share."
+          >
             <input type="checkbox" id="new-mount-worktrees" />
             <span>Share siblings</span>
           </label>
@@ -180,7 +187,7 @@
         <details class="composer__more">
           <summary class="composer__more-summary">
             <svg class="composer__chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            Sandbox overrides
+            Agent overrides
           </summary>
           <div class="composer__nested composer__overrides">
             <label class="composer__override">
