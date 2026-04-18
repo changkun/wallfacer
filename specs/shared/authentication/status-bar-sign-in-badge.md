@@ -1,0 +1,77 @@
+---
+title: Status-bar sign-in badge and front-channel logout iframe
+status: validated
+depends_on:
+  - specs/shared/authentication/http-routes-and-api-config.md
+affects:
+  - ui/partials/status-bar.html
+  - ui/js/
+  - ui/css/
+  - ui/js/tests/status-bar.test.js
+effort: medium
+created: 2026-04-19
+updated: 2026-04-19
+author: changkun
+dispatched_task_id: null
+---
+
+# Status-bar sign-in badge and front-channel logout iframe
+
+## Goal
+
+Render a sign-in badge on the trailing edge of the bottom status bar when
+`config.cloud === true`. Signed-in state shows avatar + username with a
+Sign-out dropdown; signed-out shows a "Sign in" link. Install a hidden
+iframe targeting `{auth_url}/logout` when signed in so cross-tab logout
+broadcasts reach `/logout/notify`.
+
+## What to do
+
+1. **Markup** — In `ui/partials/status-bar.html`, add a trailing-edge
+   container (e.g. `<div id="status-auth"></div>`). Leave it empty by
+   default; JS decides what to inject.
+2. **Renderer** — In the appropriate ui/js module (there's likely an
+   existing `ui/js/status-bar.js` or similar; grep for the partial's
+   current wiring), after `/api/config` has loaded:
+   - If `config.cloud !== true`, do nothing — no element is mounted.
+   - Else fetch `/api/auth/me`:
+     - `204` → inject a plain `<a href="/login" class="status-signin-link">Sign in</a>`.
+     - `200 {sub,email,name,picture}` → inject avatar `<img src="${picture}" referrerpolicy="no-referrer" alt="">` + display name (`name || email`) + a small dropdown trigger. Dropdown contains a single **Sign out** link to `/logout`.
+     - Also inject a hidden iframe:
+       `<iframe src="${config.auth_url}/logout" name="latere-logout-iframe" style="display:none" sandbox="allow-scripts allow-same-origin"></iframe>`
+       (only in the signed-in branch).
+   - All user-supplied strings (`name`, `email`) go through the project's
+     existing HTML-escape helper — never inject raw.
+3. **Styling** — Minimal CSS in `ui/css/` (reuse existing status-bar tokens).
+   Avatar ~20px round, dropdown follows existing dropdown styling. No new
+   design tokens.
+4. **CSS build** — Run `make ui-css` if Tailwind classes are used.
+
+## Tests
+
+Extend `ui/js/tests/status-bar.test.js`:
+
+- `renders nothing when config.cloud is false` — even if `/api/auth/me`
+  returns 200, nothing is injected into `#status-auth`.
+- `renders Sign in link when cloud && /api/auth/me → 204` — asserts
+  `a[href="/login"]` is present, no avatar, no iframe.
+- `renders avatar and name when cloud && /api/auth/me → 200` — asserts
+  `img` with the `picture` URL and `referrerpolicy="no-referrer"`, the
+  `name` text is visible, dropdown has a `a[href="/logout"]`, hidden
+  iframe `src` matches `${auth_url}/logout`.
+- `falls back to email when name is empty` — `{name: "", email: "a@b"}`
+  renders `"a@b"`.
+- `escapes user-controlled strings` — `{name: "<script>"}` is rendered
+  as text, not as DOM.
+
+Mock `fetch` with the existing test harness pattern. If tests currently
+stub `/api/config`, extend the stub to include `cloud` and `auth_url`.
+
+## Boundaries
+
+- Do not force-redirect unauthenticated users to `/login`. The badge is
+  a visible link, nothing more.
+- Do not add any other cloud UI surfaces. This task is one badge, one
+  iframe.
+- Do not change any other status-bar content.
+- Do not touch the backend.
