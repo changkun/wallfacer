@@ -1,17 +1,24 @@
 ---
 title: Host Exec Mode
-status: drafted
+status: complete
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects:
   - internal/sandbox/host.go
-  - internal/sandbox/spec.go
+  - internal/sandbox/host_codex.go
   - internal/runner/container.go
   - internal/runner/runner.go
+  - internal/runner/interface.go
+  - internal/runner/mock.go
+  - internal/cli/server.go
   - internal/cli/doctor.go
-  - internal/envconfig/
+  - internal/envconfig/envconfig.go
+  - internal/handler/handler.go
+  - internal/handler/config.go
+  - ui/partials/settings-tab-sandbox.html
+  - ui/js/images.js
+  - scripts/e2e-lifecycle.sh
   - Makefile
-  - docs/guide/configuration.md
 effort: medium
 created: 2026-04-18
 updated: 2026-04-18
@@ -285,15 +292,15 @@ Use a fake agent binary compiled into the test (`go build -o <tmp>/fake ./testda
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [host-backend](host-exec-mode/host-backend.md) | — | medium | validated |
-| [envconfig-host-option](host-exec-mode/envconfig-host-option.md) | — | small | validated |
-| [makefile-host-gate](host-exec-mode/makefile-host-gate.md) | — | small | validated |
-| [runner-host-switch](host-exec-mode/runner-host-switch.md) | host-backend, envconfig-host-option | small | validated |
-| [container-spec-host-mode](host-exec-mode/container-spec-host-mode.md) | runner-host-switch | medium | validated |
-| [doctor-host-mode](host-exec-mode/doctor-host-mode.md) | envconfig-host-option | small | validated |
-| [host-parallel-cap](host-exec-mode/host-parallel-cap.md) | runner-host-switch | small | validated |
-| [ui-host-banner](host-exec-mode/ui-host-banner.md) | runner-host-switch | small | validated |
-| [e2e-host-lifecycle](host-exec-mode/e2e-host-lifecycle.md) | host-backend, container-spec-host-mode, host-parallel-cap | small | validated |
+| [host-backend](host-exec-mode/host-backend.md) | — | medium | complete |
+| [envconfig-host-option](host-exec-mode/envconfig-host-option.md) | — | small | complete |
+| [makefile-host-gate](host-exec-mode/makefile-host-gate.md) | — | small | complete |
+| [runner-host-switch](host-exec-mode/runner-host-switch.md) | host-backend, envconfig-host-option | small | complete |
+| [container-spec-host-mode](host-exec-mode/container-spec-host-mode.md) | runner-host-switch | medium | complete |
+| [doctor-host-mode](host-exec-mode/doctor-host-mode.md) | envconfig-host-option | small | complete |
+| [host-parallel-cap](host-exec-mode/host-parallel-cap.md) | runner-host-switch | small | complete |
+| [ui-host-banner](host-exec-mode/ui-host-banner.md) | runner-host-switch | small | complete |
+| [e2e-host-lifecycle](host-exec-mode/e2e-host-lifecycle.md) | host-backend, container-spec-host-mode, host-parallel-cap | small | complete |
 
 ```mermaid
 graph LR
@@ -312,3 +319,46 @@ graph LR
 **Parallel execution.** The three roots — `host-backend`, `envconfig-host-option`, `makefile-host-gate` — have no shared files and can be implemented in parallel. Once both `host-backend` and `envconfig-host-option` are merged, `runner-host-switch` unblocks four children (`container-spec-host-mode`, `host-parallel-cap`, `ui-host-banner`, `doctor-host-mode`) that can also land in parallel since they touch disjoint files. `e2e-host-lifecycle` is the final gate — it exercises the full pipeline.
 
 **Docs updates.** Per the project's implementation checklist, each task updates `docs/guide/configuration.md` and related docs for the behavior it ships. There is intentionally no separate "docs" task — coupling docs to code keeps them from drifting.
+
+## Outcome
+
+Host mode shipped as an opt-in alternative to the container backend, selected via `wallfacer run --backend host`. Users who already have `claude` (and optionally `codex`) installed can now run wallfacer with zero container runtime, no image pull, and no `/workspace/*` path remapping — the agent CLI is exec'd directly against the real host worktree.
+
+### What Shipped
+
+- **`HostBackend` + `hostHandle`** in `internal/sandbox/host.go` (~420 LOC): construction-time binary resolution (with helpful install hints on failure), `Launch` that execs claude with `--dangerously-skip-permissions` + `/fast` to match the container wrapper, lazy `--append-system-prompt` probing cached per agent type, SIGTERM→SIGKILL escalation on `Kill`, PID-map tracking for `List`.
+- **Codex host-mode adapter** in `internal/sandbox/host_codex.go` (~310 LOC): translates the runner's Claude-style argv to `codex exec --full-auto --sandbox workspace-write --skip-git-repo-check --json --output-last-message …`, tees codex's native NDJSON events live to the runner while tracking `session_id` / `turn.completed` usage / `stop_reason` / `total_cost_usd`, and appends a synthesized Claude-compatible result record as the final NDJSON line so the existing runner parser picks it up unchanged.
+- **CLI flag `--backend {container|host}`** on `wallfacer run` and `wallfacer doctor` (`internal/cli/server.go`, `internal/cli/doctor.go`). Single shared `resolveBackendFlag` translates user-facing names to the runner's internal `"local"` / `"host"` identifiers.
+- **Runner wiring** (`internal/runner/runner.go`, `interface.go`, `mock.go`): backend switch grows a `"host"` case, `Runner.HostMode()` accessor exposes the mode to handlers, `MockRunner` gains a `Host` field for tests.
+- **Container-spec translation** (`internal/runner/container.go`): `buildContainerSpecForSandbox` branches early to `buildHostSpec`, which drops all container volumes and surfaces instructions / board JSON / sibling worktrees via `WALLFACER_INSTRUCTIONS_PATH` / `WALLFACER_BOARD_JSON` / `WALLFACER_SIBLING_WORKTREES_JSON` env vars.
+- **Doctor readiness branching** (`internal/cli/doctor.go`): `--backend host` replaces the container-runtime + image checks with `claude --version` / `codex --version` probes, keeps credential + git checks unchanged.
+- **Parallel cap** (`internal/handler/handler.go`): when host mode is active and `WALLFACER_MAX_PARALLEL` is unset, autopilot promotion caps to 1 to avoid races on shared `~/.claude` / `~/.codex` state; explicit env overrides wins.
+- **Settings UI banner** (`ui/partials/settings-tab-sandbox.html`, `ui/js/images.js`): prominent "Host mode active" warning card at the top of the Sandbox tab when `/api/config` returns `host_mode: true`.
+- **Build + tooling**: `make build-host` sibling target (full fmt + lint + ts-build, no pull), `make pull-images` retag fallback for a locally-built `sandbox-agents:latest`.
+- **E2E harness**: `scripts/e2e-lifecycle.sh` accepts `BACKEND=host`, preflight verifies the server is actually running with `--backend host` via `/api/config`, swaps container-cleanup assertions for host-mode PID checks.
+- **Tests** (~30 new): 20 in `internal/sandbox/` (argv, env merge, WorkDir, Kill escalation, List, codex argv translation, result envelope wrapping, usage field remapping, instructions preamble, `WALLFACER_SANDBOX_FAST`), 8 in `internal/runner/` (backend switch, host-mode spec translation, codex passthrough), 3 in `internal/handler/` (max-parallel cap, `host_mode` config field), 3 in `internal/cli/` (backend-flag resolution, doctor host-mode output), 3 vitest cases (banner show/hide).
+
+### Design Evolution
+
+1. **Backend selection moved from env var to CLI flag.** The initial draft used `WALLFACER_SANDBOX_BACKEND=host` in `.env`. Mid-design the user asked for a CLI flag (`wallfacer run --backend {container|host}`), replacing the env var entirely. The envconfig field stays as internal plumbing — populated by the flag, never read from disk. The `wallfacer doctor` subcommand now accepts `args []string` so it can parse its own `--backend` flag symmetrically.
+
+2. **Codex shipped in v1, not as follow-up.** The first live test surfaced `codex: unexpected argument '--verbose'` — the runner emits Claude-style argv that `codex exec` doesn't accept, and the container path's `codex-agent.sh` wrapper hadn't been ported to host mode. We initially gated codex with a clear error and documented v1 as claude-only; the user then asked to port properly. The result (`host_codex.go`) reproduces the wrapper's behaviour in Go: argv translation, event tee'ing, final-record synthesis with `cached_input_tokens → cache_read_input_tokens` remapping. Session resume is still a no-op because `codex exec` has no stable resume flag (matching the container wrapper).
+
+3. **Missing `--dangerously-skip-permissions` broke live streaming.** The original host-backend implementation passed `spec.Cmd` through verbatim, omitting the two flags the container wrapper prepends (`--dangerously-skip-permissions` + `--append-system-prompt "/fast"` when fast mode is on). Without `--dangerously-skip-permissions`, claude waits for interactive permission prompts in a piped non-TTY context; it eventually completes the task but buffers all stream-json output until exit, making the UI's live-log view appear broken. Fix was to prepend both flags inside `launchClaude`, matching the container wrapper exactly.
+
+4. **Parallel-cap coercion moved from envconfig to the handler.** The spec suggested exposing `MaxParallelExplicit` through envconfig so the runner could conditionally cap. The actual implementation is simpler: the handler's `cachedMaxParallel` lazyval checks `h.runner.HostMode()` and the parsed `cfg.MaxParallelTasks <= 0` condition (which is already "value not set" semantically). Single read site, no new envconfig field needed.
+
+5. **Per-task codex coercion added then reverted.** While codex was gated, `sandboxForTaskActivity` silently coerced any codex resolution to claude so sub-agents kept working. After the first real run, a task explicitly set to codex answered "who are you" as Claude, which was misleading. We narrowed coercion to env-file defaults only (passive configuration, not user intent), leaving explicit per-task codex choices to surface the honest "codex not supported" error. Once codex host support shipped, the coercion became unnecessary and was removed entirely — codex routing now passes through to the backend's codex launcher in all modes.
+
+6. **`ContainerSpec.PathMap` was spec'd but never added.** The initial spec proposed a new map field on `ContainerSpec` so `HostBackend` could translate `/workspace/*` paths back to host paths. The actual path translation moved upstream into `buildHostSpec` — by the time the spec reaches the backend, `WorkDir` is already a host path and `Volumes` is nil. The host backend only needs to *reject* leftover container paths (defense in depth). No struct change.
+
+7. **`--append-system-prompt` probe became lazy.** The spec said probe at construction time. The advisor flagged that this pays the probe cost on every server start even when host mode is never used; we moved it to first-Launch-per-agent, cached thereafter. Same observable behaviour, zero cost on the idle path.
+
+8. **`ContainerSpec.AgentArgv()` accessor never added.** The spec proposed extracting the agent argv as an accessor so the host backend could reuse it without calling `Build()`. In practice, the host backend just reads `spec.Cmd` directly — it's already the agent argv — so the accessor would have been a one-line wrapper. Dropped.
+
+### Known Limitations
+
+- **Windows**: out of scope. Users on Windows should either use container mode with Docker Desktop / Podman Desktop, or run wallfacer itself inside WSL2.
+- **Codex session resume**: a no-op (codex `exec` has no stable resume flag; matches the container path).
+- **No write containment**: intentional. The Settings UI banner, doctor output, and commit messages all make this explicit. Users who need containment should use container mode or the in-progress `specs/shared/native-sandbox-*` specs.
+- **Parallel tasks in host mode**: default cap of 1 to avoid `~/.claude/__store.db` races. Users who have verified their CLI tolerates parallelism can override with `WALLFACER_MAX_PARALLEL=N`.

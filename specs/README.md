@@ -32,11 +32,11 @@ Cloud Platform — 0/9
   ○ Multi-User Collaboration       ○ Billing Idempotency
   ○ Telemetry Queue Backpressure
 
-Shared Design — 0/19
+Shared Design — 1/19 complete
   ○ Authentication                 ○ Agent Abstraction
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
-  ○ Host Exec Mode                 ○ Telemetry & Observability
+  ✅ Host Exec Mode                ○ Telemetry & Observability
   ○ Information Inbox              ○ Multi-Agent Consensus
   ○ Multi-Agent Debate             ○ Token & Cost Optimization
   ○ Extensible Prompts             ○ Intent-Driven Commits
@@ -178,7 +178,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
 | [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
-| [host-exec-mode.md](shared/host-exec-mode.md) | Drafted | Local | `HostBackend` — opt-in `WALLFACER_SANDBOX_BACKEND=host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. |
+| [host-exec-mode.md](shared/host-exec-mode.md) | **Complete** | Local | `HostBackend` — opt-in `wallfacer run --backend host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. Covers both agents, live NDJSON streaming, parallel-cap default, Settings UI warning, `make build-host` target, and host-mode E2E harness. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 | [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |

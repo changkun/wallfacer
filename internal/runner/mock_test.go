@@ -229,8 +229,10 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 		t.Errorf("EnvFile = %q, want %q", got, m.EnvFilePath)
 	}
 
-	if got := m.Prompts(); got != nil {
-		t.Errorf("Prompts = %v, want nil", got)
+	// Prompts returns a non-nil default manager so callers that chain
+	// .PromptsDir() don't panic in tests.
+	if got := m.Prompts(); got == nil {
+		t.Errorf("Prompts = nil, want non-nil default manager")
 	}
 	if got := m.WorkspaceManager(); got != nil {
 		t.Errorf("WorkspaceManager = %v, want nil", got)
