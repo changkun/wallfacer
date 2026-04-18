@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
 	"time"
@@ -679,6 +678,34 @@ type oversightResult struct {
 	Phases []oversightPhaseRaw `json:"phases"`
 }
 
+// roleOversight is the headless-tier descriptor for the oversight-
+// summary sub-agent. Parses the post-run event timeline and returns a
+// structured []OversightPhase; the caller then fills in missing phase
+// timestamps from the real activity log. Both the regular and the
+// test-run oversight share this descriptor; callers pass the
+// activity-specific label via runAgentOpts.ActivityOverride so usage
+// is split correctly in the cost dashboard.
+var roleOversight = AgentRole{
+	Activity:    store.SandboxActivityOversight,
+	Name:        "oversight",
+	Timeout:     func(*store.Task) time.Duration { return constants.OversightAgentTimeout },
+	MountMode:   MountNone,
+	SingleTurn:  true,
+	ParseResult: parseOversightAgentResult,
+}
+
+// parseOversightAgentResult decodes the structured JSON the oversight
+// agent emits into a typed phase list. Adapter around the existing
+// free-function parseOversightResult so the descriptor can reference
+// it without changing callers.
+func parseOversightAgentResult(o *agentOutput) (any, error) {
+	phases, err := parseOversightResult(o.Result)
+	if err != nil {
+		return nil, fmt.Errorf("parse oversight JSON: %w (raw: %s)", err, truncate(o.Result, 400))
+	}
+	return phases, nil
+}
+
 // runOversightAgent runs a lightweight agent container with the activity log and
 // parses the structured JSON it produces. agent is the sub-agent activity used for
 // usage attribution (SandboxActivityOversight or SandboxActivityOversightTest).
@@ -692,156 +719,29 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 	prompt := r.promptsMgr.Oversight(log)
 
-	runCtx, cancel := context.WithTimeout(r.shutdownCtx, 3*time.Minute)
-	defer cancel()
-
-	containerName := "wallfacer-oversight-" + taskID.String()[:8]
-	// Note: oversight intentionally does NOT register in r.taskContainers.
-	// That registry is used by StreamLogs to locate the main execution
-	// container; writing here would replace the implementation logs with
-	// oversight container output.
-
 	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)
 	}
-	sb := sandbox.Claude
-	if task != nil {
-		sb = r.sandboxForTaskActivity(task, activityOversight)
-	}
-	type oversightRunResult struct {
-		output *agentOutput
-		err    error
-		model  string
-		sb     sandbox.Type
-	}
-	runWithSandbox := func(selectedSandbox sandbox.Type) oversightRunResult {
-		model := r.titleModelFromEnvForSandbox(selectedSandbox)
-		spec := r.buildBaseContainerSpec(containerName, model, selectedSandbox)
-		spec.Labels = map[string]string{"wallfacer.task.id": taskID.String(), "wallfacer.task.activity": "oversight"}
-		// Note: oversight agent uses no workspace mounts, no instructions mount,
-		// no -w workdir, and the Cmd order is --output-format before --verbose.
-		spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
-		if model != "" {
-			spec.Cmd = append(spec.Cmd, "--model", model)
-		}
 
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
+	// Bind the model resolver (oversight historically uses the same
+	// "small model" env var as title) so roleOversight stays a pure
+	// descriptor.
+	role := roleOversight
+	role.Model = func(sb sandbox.Type) string { return r.titleModelFromEnvForSandbox(sb) }
 
-		handle, launchErr := r.backend.Launch(runCtx, spec)
-		if launchErr != nil {
-			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
-			return oversightRunResult{err: fmt.Errorf("launch oversight container: %w", launchErr), model: model, sb: selectedSandbox}
-		}
-		rawStdout, _ := io.ReadAll(handle.Stdout())
-		rawStderr, _ := io.ReadAll(handle.Stderr())
-		exitCode, _ := handle.Wait()
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
-
-		if runCtx.Err() != nil {
-			_ = handle.Kill()
-			return oversightRunResult{
-				err:   fmt.Errorf("container terminated: %w", runCtx.Err()),
-				model: model,
-				sb:    selectedSandbox,
-			}
-		}
-
-		raw := strings.TrimSpace(string(rawStdout))
-		if raw == "" {
-			if exitCode != 0 {
-				return oversightRunResult{
-					err:   fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 300)),
-					model: model,
-					sb:    selectedSandbox,
-				}
-			}
-			return oversightRunResult{err: fmt.Errorf("empty output from oversight agent"), model: model, sb: selectedSandbox}
-		}
-
-		output, err := parseOutput(raw)
-		if err != nil {
-			if exitCode != 0 {
-				return oversightRunResult{
-					err:   fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitCode, truncate(string(rawStderr), 300), truncate(raw, 300)),
-					model: model,
-					sb:    selectedSandbox,
-				}
-			}
-			return oversightRunResult{err: fmt.Errorf("parse output: %w", err), model: model, sb: selectedSandbox}
-		}
-		if exitCode != 0 {
-			logger.Runner.Warn("oversight: container exited non-zero but produced valid output",
-				"task", taskID, "agent", agent, "code", exitCode, "sandbox", selectedSandbox, "model", model)
-		}
-		output.ActualSandbox = selectedSandbox
-		return oversightRunResult{output: output, model: model, sb: selectedSandbox}
-	}
-
-	initialSandbox := sb
-	res := runWithSandbox(initialSandbox)
-	if res.err != nil {
-		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(res.err.Error()) {
-			logger.Runner.Warn("oversight: claude token limit hit; retrying with codex", "task", taskID, "agent", agent)
-			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-				"result": "Sandbox fallback: claude → codex (token/rate limit hit during oversight)",
-			})
-			res = runWithSandbox(sandbox.Codex)
-		}
-		if res.err != nil {
-			logger.Runner.Warn("oversight: agent container failed",
-				"task", taskID, "agent", agent, "sandbox", res.sb, "model", res.model, "error", res.err)
-			return nil, res.err
-		}
-	}
-	output := res.output
-	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
-		isLikelyTokenLimitError(output.Result, output.Subtype) {
-		logger.Runner.Warn("oversight: claude output reported token limit; retrying with codex", "task", taskID, "agent", agent)
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"result": "Sandbox fallback: claude → codex (token/rate limit in oversight output)",
-		})
-		res = runWithSandbox(sandbox.Codex)
-		if res.err != nil {
-			logger.Runner.Warn("oversight: codex fallback failed",
-				"task", taskID, "agent", agent, "sandbox", res.sb, "model", res.model, "error", res.err)
-			return nil, res.err
-		}
-		output = res.output
-	}
-
-	// Accumulate token/cost usage for this oversight sub-agent.
-	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		if accErr := r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, agent, store.TaskUsage{
-			InputTokens:          output.Usage.InputTokens,
-			OutputTokens:         output.Usage.OutputTokens,
-			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
-			CostUSD:              output.TotalCostUSD,
-		}); accErr != nil {
-			logger.Runner.Warn("oversight: accumulate usage failed", "task", taskID, "agent", agent, "error", accErr)
-		}
-		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
-			Turn:                 1,
-			Timestamp:            time.Now().UTC(),
-			InputTokens:          output.Usage.InputTokens,
-			OutputTokens:         output.Usage.OutputTokens,
-			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
-			CostUSD:              output.TotalCostUSD,
-			Sandbox:              output.ActualSandbox,
-			SubAgent:             agent,
-		}); appErr != nil {
-			logger.Runner.Warn("oversight: append turn usage failed", "task", taskID, "agent", agent, "error", appErr)
-		}
-	}
-
-	phases, err := parseOversightResult(output.Result)
+	res, err := r.runAgent(r.shutdownCtx, role, task, prompt, runAgentOpts{
+		EmitSpanEvents:   true,
+		TrackUsage:       true,
+		Turn:             1,
+		ActivityOverride: agent,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("parse oversight JSON: %w (raw: %s)", err, truncate(output.Result, 400))
+		logger.Runner.Warn("oversight: agent container failed",
+			"task", taskID, "agent", agent, "error", err)
+		return nil, err
 	}
+	phases, _ := res.Parsed.([]store.OversightPhase)
 	phases = fillMissingPhaseTimestamps(phases, activities)
 	return phases, nil
 }
