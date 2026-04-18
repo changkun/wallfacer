@@ -31,6 +31,8 @@ describe("status-bar layout", () => {
     expect(html).toContain("switchMode('depgraph'");
     expect(html).toContain('id="status-bar-terminal-btn"');
     expect(html).toContain("toggleTerminalPanel");
+    expect(html).toContain('id="status-bar-shortcuts-btn"');
+    expect(html).toContain("openKeyboardShortcuts");
   });
 
   it("status-bar is included in index.html", () => {
