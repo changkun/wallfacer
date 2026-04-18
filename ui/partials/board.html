@@ -132,7 +132,10 @@
               title="Leave empty to run immediately"
             />
           </label>
-          <label class="composer__checkbox" title="Create a routine that spawns a fresh task every interval instead of running once.">
+          <label
+            class="composer__checkbox"
+            title="Create a routine that spawns a fresh task every interval instead of running once."
+          >
             <input type="checkbox" id="new-repeat-toggle" />
             <span>Repeat every</span>
           </label>
@@ -157,7 +160,19 @@
         <!-- Advanced disclosures: thin chevron rows, no card chrome -->
         <details class="composer__more">
           <summary class="composer__more-summary">
-            <svg class="composer__chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            <svg
+              class="composer__chev"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
             Budget
           </summary>
           <div class="composer__row composer__row--wrap composer__nested">
@@ -188,7 +203,19 @@
 
         <details class="composer__more">
           <summary class="composer__more-summary">
-            <svg class="composer__chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            <svg
+              class="composer__chev"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
             Agent overrides
           </summary>
           <!-- The override rows are scoped by data-activity-role so the
@@ -198,31 +225,59 @@
           <div class="composer__nested composer__overrides">
             <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Impl</span>
-              <select id="new-sandbox-implementation" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-implementation"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
             <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Test</span>
-              <select id="new-sandbox-testing" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-testing"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
             <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Refine</span>
-              <select id="new-sandbox-refinement" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-refinement"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
             <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Title</span>
-              <select id="new-sandbox-title" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-title"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
             <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Oversight</span>
-              <select id="new-sandbox-oversight" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-oversight"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
             <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Commit</span>
-              <select id="new-sandbox-commit_message" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-commit_message"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
             <label class="composer__override" data-activity-role="ideation">
               <span class="composer__field-label">Ideas</span>
-              <select id="new-sandbox-idea_agent" class="composer__input" data-sandbox-select="true"></select>
+              <select
+                id="new-sandbox-idea_agent"
+                class="composer__input"
+                data-sandbox-select="true"
+              ></select>
             </label>
           </div>
         </details>
@@ -234,7 +289,19 @@
           style="display: none"
         >
           <summary class="composer__more-summary">
-            <svg class="composer__chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            <svg
+              class="composer__chev"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
             Depends on
           </summary>
           <div class="composer__nested">
@@ -276,10 +343,18 @@
 
         <!-- Actions: right-aligned, primary + secondary -->
         <div class="composer__actions">
-          <button type="button" onclick="hideNewTaskForm()" class="composer__btn composer__btn--ghost">
+          <button
+            type="button"
+            onclick="hideNewTaskForm()"
+            class="composer__btn composer__btn--ghost"
+          >
             Cancel
           </button>
-          <button type="button" onclick="createTask()" class="composer__btn composer__btn--primary">
+          <button
+            type="button"
+            onclick="createTask()"
+            class="composer__btn composer__btn--primary"
+          >
             Save
           </button>
         </div>
