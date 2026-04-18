@@ -359,15 +359,55 @@ describe("renderWorkspaceGroups", () => {
 });
 
 // ---------------------------------------------------------------------------
-// renderHeaderWorkspaceGroupTabs — tab rendering and switching state
+// renderSidebarWorkspaceSwitch — sidebar group-switch label and popover
+// (renderHeaderWorkspaceGroupTabs is a shim that delegates here so existing
+//  call sites keep working).
 // ---------------------------------------------------------------------------
 
-describe("renderHeaderWorkspaceGroupTabs", () => {
-  it("renders saved groups as tabs with active group highlighted", () => {
-    const tabsEl = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-group-tabs", tabsEl]],
-    });
+function makeSwitchElements() {
+  return {
+    nameEl: { textContent: "" },
+    dotEl: { textContent: "" },
+    switchEl: {
+      title: "",
+      _attrs: {},
+      setAttribute: function (k, v) {
+        this._attrs[k] = v;
+      },
+      getAttribute: function (k) {
+        return this._attrs[k];
+      },
+    },
+    popEl: {
+      innerHTML: "",
+      _attrs: { hidden: "" },
+      setAttribute: function (k, v) {
+        this._attrs[k] = v;
+      },
+      removeAttribute: function (k) {
+        delete this._attrs[k];
+      },
+      contains: () => false,
+    },
+  };
+}
+
+function makeSwitchContext() {
+  const els = makeSwitchElements();
+  const ctx = makeContext({
+    elements: [
+      ["sidebar-ws-name", els.nameEl],
+      ["sidebar-ws-dot", els.dotEl],
+      ["sidebar-ws-switch", els.switchEl],
+      ["sidebar-ws-popover", els.popEl],
+    ],
+  });
+  return { ctx, els };
+}
+
+describe("renderSidebarWorkspaceSwitch", () => {
+  it("shows the active group name and first-letter dot", () => {
+    const { ctx, els } = makeSwitchContext();
     loadScript(ctx, "state.js");
     loadScript(ctx, "utils.js");
     loadScript(ctx, "workspace.js");
@@ -382,75 +422,33 @@ describe("renderHeaderWorkspaceGroupTabs", () => {
 
     ctx.renderHeaderWorkspaceGroupTabs();
 
-    expect(tabsEl.innerHTML).toContain("repo-a + repo-b");
-    expect(tabsEl.innerHTML).toContain("workspace-group-tab--active");
+    expect(els.nameEl.textContent).toBe("repo-a + repo-b");
+    expect(els.dotEl.textContent).toBe("R");
+    expect(els.switchEl.title).toBe("repo-a + repo-b");
   });
 
-  it("shows a loading spinner on the switching tab", () => {
-    const tabsEl = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-group-tabs", tabsEl]],
-    });
+  it("falls back to the first workspace basename when no group matches", () => {
+    const { ctx, els } = makeSwitchContext();
     loadScript(ctx, "state.js");
     loadScript(ctx, "utils.js");
     loadScript(ctx, "workspace.js");
 
     vm.runInContext(
       `
-      activeWorkspaces = ["/Users/test/repo-a"];
-      workspaceGroups = [
-        { workspaces: ["/Users/test/repo-a"] },
-        { workspaces: ["/Users/test/repo-b"] }
-      ];
-      workspaceGroupSwitching = true;
-      workspaceGroupSwitchingIndex = 1;
+      activeWorkspaces = ["/Users/test/lone"];
+      workspaceGroups = [];
     `,
       ctx,
     );
 
     ctx.renderHeaderWorkspaceGroupTabs();
 
-    expect(tabsEl.innerHTML).toContain("workspace-group-tab--switching");
-    expect(tabsEl.innerHTML).toContain("spinner");
+    expect(els.nameEl.textContent).toBe("lone");
+    expect(els.dotEl.textContent).toBe("L");
   });
 
-  it("hides a tab and restores it", () => {
-    const tabsEl = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-group-tabs", tabsEl]],
-    });
-    loadScript(ctx, "state.js");
-    loadScript(ctx, "utils.js");
-    loadScript(ctx, "workspace.js");
-
-    vm.runInContext(
-      `
-      activeWorkspaces = ["/Users/test/repo-a"];
-      workspaceGroups = [
-        { workspaces: ["/Users/test/repo-a"] },
-        { workspaces: ["/Users/test/repo-b"] }
-      ];
-    `,
-      ctx,
-    );
-
-    ctx.renderHeaderWorkspaceGroupTabs();
-    expect(tabsEl.innerHTML).toContain("repo-b");
-
-    // Hide the second tab.
-    ctx.hideWorkspaceGroupTab(1);
-    expect(tabsEl.innerHTML).not.toContain("repo-b");
-
-    // Restore it.
-    ctx.restoreWorkspaceGroupTab(1);
-    expect(tabsEl.innerHTML).toContain("repo-b");
-  });
-
-  it("does not show close button on active tab", () => {
-    const tabsEl = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-group-tabs", tabsEl]],
-    });
+  it("popover lists each group with the active entry flagged", () => {
+    const { ctx, els } = makeSwitchContext();
     loadScript(ctx, "state.js");
     loadScript(ctx, "utils.js");
     loadScript(ctx, "workspace.js");
@@ -466,15 +464,34 @@ describe("renderHeaderWorkspaceGroupTabs", () => {
       ctx,
     );
 
-    ctx.renderHeaderWorkspaceGroupTabs();
+    ctx.toggleWorkspaceGroupPopover({ stopPropagation: () => {} });
 
-    // Active tab should not have a close button, inactive should.
-    const activeMatch = tabsEl.innerHTML.match(
-      /workspace-group-tab--active[^>]*>.*?<\/div>/,
+    expect(els.popEl.innerHTML).toContain("repo-a");
+    expect(els.popEl.innerHTML).toContain("repo-b");
+    expect(els.popEl.innerHTML).toContain("sb-ws-popover__item active");
+    // Inactive entries get a useWorkspaceGroup click handler.
+    expect(els.popEl.innerHTML).toContain("useWorkspaceGroup(1)");
+    expect(els.switchEl.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("popover shows an add-workspace-group entry", () => {
+    const { ctx, els } = makeSwitchContext();
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+
+    vm.runInContext(
+      `
+      activeWorkspaces = [];
+      workspaceGroups = [];
+    `,
+      ctx,
     );
-    expect(activeMatch[0]).not.toContain("workspace-group-tab__close");
-    // Inactive tab should have close button.
-    expect(tabsEl.innerHTML).toContain("workspace-group-tab__close");
+
+    ctx.toggleWorkspaceGroupPopover({ stopPropagation: () => {} });
+
+    expect(els.popEl.innerHTML).toContain("Add workspace group");
+    expect(els.popEl.innerHTML).toContain("showWorkspacePicker(false)");
   });
 
   it("includes auto-collapsed groups in the + menu", () => {
@@ -526,26 +543,6 @@ describe("renderHeaderWorkspaceGroupTabs", () => {
     expect(menuHtml).toContain("useWorkspaceGroup(2)");
   });
 
-  it("always renders the + button", () => {
-    const tabsEl = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-group-tabs", tabsEl]],
-    });
-    loadScript(ctx, "state.js");
-    loadScript(ctx, "utils.js");
-    loadScript(ctx, "workspace.js");
-
-    vm.runInContext(
-      `
-      activeWorkspaces = [];
-      workspaceGroups = [];
-    `,
-      ctx,
-    );
-
-    ctx.renderHeaderWorkspaceGroupTabs();
-    expect(tabsEl.innerHTML).toContain("workspace-group-tab--add");
-  });
 });
 
 // ---------------------------------------------------------------------------

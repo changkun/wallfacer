@@ -448,30 +448,30 @@ describe("requestGitWorkspaceMutation", () => {
 // renderWorkspaces
 // ---------------------------------------------------------------------------
 describe("renderWorkspaces", () => {
-  it("returns early when #workspace-git-bar element is missing", () => {
+  it("returns early when #status-bar-branches element is missing", () => {
     const ctx = makeContext();
     loadScript(ctx);
-    // Should not throw
+    // Should not throw even without any target element.
     ctx.renderWorkspaces();
   });
 
-  it("renders fallback pills when gitStatuses is empty", () => {
-    const el = { innerHTML: "" };
+  it("clears the status-bar branches when gitStatuses is empty", () => {
+    const el = { innerHTML: "existing" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       activeWorkspaces: ["/home/user/project"],
       gitStatuses: null,
     });
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("project");
+    expect(el.innerHTML).toBe("");
   });
 
-  it("sets document.title to 'Wallfacer' when gitStatuses is empty but workspaces exist", () => {
+  it("resets document.title to 'Wallfacer' when gitStatuses is empty but workspaces exist", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       activeWorkspaces: ["/home/user/myrepo"],
       gitStatuses: null,
     });
@@ -481,11 +481,11 @@ describe("renderWorkspaces", () => {
     expect(ctx.document.title).toBe("Wallfacer");
   });
 
-  it("renders workspace names from gitStatuses and updates document.title", () => {
+  it("renders a branch pill and updates document.title from gitStatuses", () => {
     const el = { innerHTML: "" };
     const updateStatusBar = vi.fn();
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "my-repo",
@@ -505,15 +505,16 @@ describe("renderWorkspaces", () => {
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("my-repo");
+    expect(el.innerHTML).toContain("main");
+    expect(el.innerHTML).toContain("status-bar-branch");
     expect(ctx.document.title).toContain("my-repo");
     expect(updateStatusBar).toHaveBeenCalled();
   });
 
-  it("renders push button when ahead_count > 0", () => {
+  it("renders a push action and ahead badge when ahead_count > 0", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "repo",
@@ -533,14 +534,14 @@ describe("renderWorkspaces", () => {
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("Push");
-    expect(el.innerHTML).toContain("3");
+    expect(el.innerHTML).toContain(">Push<");
+    expect(el.innerHTML).toContain("3↑");
   });
 
-  it("renders sync button when behind_count > 0", () => {
+  it("renders a sync action and behind badge when behind_count > 0", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "repo",
@@ -560,14 +561,14 @@ describe("renderWorkspaces", () => {
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("Sync");
-    expect(el.innerHTML).toContain("5");
+    expect(el.innerHTML).toContain(">Sync<");
+    expect(el.innerHTML).toContain("5↓");
   });
 
-  it("renders rebase-on-main button when branch differs from main_branch", () => {
+  it("renders rebase-on-main when branch differs from main_branch", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "repo",
@@ -588,13 +589,13 @@ describe("renderWorkspaces", () => {
 
     ctx.renderWorkspaces();
     expect(el.innerHTML).toContain("Rebase on main");
-    expect(el.innerHTML).toContain("2");
+    expect(el.innerHTML).toContain("2↓ Rebase");
   });
 
-  it("does not render rebase-on-main when on main branch", () => {
+  it("does not render rebase when already on main branch", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "repo",
@@ -617,10 +618,10 @@ describe("renderWorkspaces", () => {
     expect(el.innerHTML).not.toContain("Rebase on");
   });
 
-  it("renders (not a git repo) label", () => {
+  it("skips non-git workspaces (nothing to render in the branch slot)", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "plain-dir",
@@ -634,48 +635,20 @@ describe("renderWorkspaces", () => {
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("not a git repo");
+    expect(el.innerHTML).toBe("");
   });
 
-  it("renders plain name when is_git_repo but no remote", () => {
+  it("renders the branch pill without actions when there is no remote", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "local-repo",
           path: "/local-repo",
           is_git_repo: true,
           has_remote: false,
-        },
-      ],
-      updateStatusBar: vi.fn(),
-    });
-    loadScript(ctx);
-
-    ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("local-repo");
-    expect(el.innerHTML).not.toContain("not a git repo");
-    expect(el.innerHTML).not.toContain("Push");
-    expect(el.innerHTML).not.toContain("Sync");
-  });
-
-  it("renders clickable link for workspace with convertible remote URL", () => {
-    const el = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
-      gitStatuses: [
-        {
-          name: "repo",
-          path: "/repo",
-          is_git_repo: true,
-          has_remote: true,
-          remote_url: "git@github.com:user/repo.git",
           branch: "main",
-          main_branch: "main",
-          ahead_count: 0,
-          behind_count: 0,
-          behind_main_count: 0,
         },
       ],
       updateStatusBar: vi.fn(),
@@ -683,39 +656,16 @@ describe("renderWorkspaces", () => {
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain('href="https://github.com/user/repo"');
+    expect(el.innerHTML).toContain("main");
+    expect(el.innerHTML).not.toContain(">Push<");
+    expect(el.innerHTML).not.toContain(">Sync<");
+    expect(el.innerHTML).not.toContain("Rebase on");
   });
 
-  it("renders openWorkspaceFolder button when remote URL cannot be converted", () => {
+  it("renders multiple workspaces with name:branch labels", () => {
     const el = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
-      gitStatuses: [
-        {
-          name: "repo",
-          path: "/repo",
-          is_git_repo: true,
-          has_remote: true,
-          remote_url: "",
-          branch: "main",
-          main_branch: "main",
-          ahead_count: 0,
-          behind_count: 0,
-          behind_main_count: 0,
-        },
-      ],
-      updateStatusBar: vi.fn(),
-    });
-    loadScript(ctx);
-
-    ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("openWorkspaceFolder");
-  });
-
-  it("renders multiple workspaces", () => {
-    const el = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
+      elements: [["status-bar-branches", el]],
       gitStatuses: [
         {
           name: "repo-a",
@@ -734,6 +684,7 @@ describe("renderWorkspaces", () => {
           path: "/b",
           is_git_repo: true,
           has_remote: false,
+          branch: "feat",
         },
       ],
       updateStatusBar: vi.fn(),
@@ -741,23 +692,10 @@ describe("renderWorkspaces", () => {
     loadScript(ctx);
 
     ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("repo-a");
-    expect(el.innerHTML).toContain("repo-b");
+    expect(el.innerHTML).toContain("repo-a:main");
+    expect(el.innerHTML).toContain("repo-b:feat");
     expect(ctx.document.title).toContain("repo-a");
     expect(ctx.document.title).toContain("repo-b");
-  });
-
-  it("extracts folder name from path with trailing slash", () => {
-    const el = { innerHTML: "" };
-    const ctx = makeContext({
-      elements: [["workspace-git-bar", el]],
-      activeWorkspaces: ["/home/user/project/"],
-      gitStatuses: null,
-    });
-    loadScript(ctx);
-
-    ctx.renderWorkspaces();
-    expect(el.innerHTML).toContain("project");
   });
 });
 

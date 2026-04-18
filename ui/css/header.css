@@ -77,6 +77,150 @@ html.wails-desktop .app-sidebar {
   background: var(--bg-hover);
 }
 
+/* Workspace group switcher */
+.sb-ws-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--bg-elevated);
+  color: var(--ink-2);
+  font-size: var(--fs-10);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.sb-ws-switch:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+.sb-ws-switch .ws-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sb-ws-switch .ws-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-weight: 500;
+  font-size: var(--fs-base);
+}
+.sb-ws-switch .ws-caret {
+  color: var(--ink-3);
+  flex-shrink: 0;
+  display: inline-flex;
+}
+.sb-ws-switch[aria-expanded="true"] .ws-caret {
+  transform: rotate(180deg);
+}
+
+.sb-ws-popover {
+  position: fixed;
+  z-index: 60;
+  max-height: 50vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-pop);
+  padding: 4px;
+}
+.sb-ws-popover[hidden] {
+  display: none;
+}
+.sb-ws-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+  cursor: pointer;
+}
+.sb-ws-popover__item:hover,
+.sb-ws-popover__item:focus-visible {
+  background: var(--bg-hover);
+  color: var(--ink);
+  outline: none;
+}
+.sb-ws-popover__item.active {
+  background: var(--accent-tint);
+  color: var(--ink);
+  font-weight: 500;
+}
+.sb-ws-popover__item[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sb-ws-popover__check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.sb-ws-popover__spacer {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+}
+.sb-ws-popover__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-ws-popover__divider {
+  height: 1px;
+  background: var(--rule);
+  margin: 4px 2px;
+}
+.sb-ws-popover__add {
+  color: var(--ink-3);
+}
+.sb-ws-popover__add .sb-ws-popover__check {
+  color: var(--ink-3);
+}
+.sb-ws-popover__add:hover .sb-ws-popover__check {
+  color: var(--accent);
+}
+
+.app-sidebar.collapsed .sb-ws-switch .ws-name,
+.app-sidebar.collapsed .sb-ws-switch .ws-caret {
+  display: none;
+}
+.app-sidebar.collapsed .sb-ws-switch {
+  margin: 0 8px 6px;
+  justify-content: center;
+  padding: 6px;
+}
+
 /* Search trigger */
 .sb-search {
   display: flex;
@@ -254,159 +398,16 @@ html.wails-desktop .app-sidebar {
 .app-header input,
 .app-header a,
 .app-header select,
-.app-header [role="button"],
-.app-header .workspace-group-tab {
+.app-header [role="button"] {
   --wails-draggable: no-drag;
 }
-
-.workspace-group-tabs {
-  display: flex;
-  align-items: flex-end;
-  align-self: stretch;
-  flex-wrap: nowrap;
+/* Spacer takes the place of the old workspace-group-tabs div so the search
+   and action buttons stay right-aligned. */
+.app-header__spacer {
   flex: 1 1 0;
   min-width: 0;
-  gap: 2px;
-  margin-bottom: -1px;
-  overflow: hidden;
 }
 
-.workspace-group-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px 6px;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition:
-    color 0.12s,
-    border-color 0.12s,
-    background 0.12s;
-  flex-shrink: 1;
-  min-width: 60px;
-  max-width: 240px;
-}
-.workspace-group-tab:hover {
-  color: var(--text-primary);
-  background: color-mix(in oklab, var(--bg-input) 50%, transparent);
-}
-.workspace-group-tab--active {
-  color: var(--text-primary);
-  border-color: var(--border);
-  background: var(--bg);
-  font-weight: 600;
-  cursor: default;
-}
-.workspace-group-tab--switching {
-  opacity: 0.6;
-  cursor: wait;
-}
-.workspace-group-tab__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity 0.12s,
-    background 0.12s;
-  padding: 0;
-  flex-shrink: 0;
-}
-.workspace-group-tab:hover .workspace-group-tab__close,
-.workspace-group-tab--active .workspace-group-tab__close {
-  opacity: 0.6;
-}
-.workspace-group-tab__close:hover {
-  opacity: 1;
-  background: var(--bg-input);
-}
-.workspace-group-tab--add {
-  color: var(--text-muted);
-  padding: 4px 8px;
-  font-size: 14px;
-  font-weight: 400;
-  flex-shrink: 0;
-  min-width: 0;
-  max-width: none;
-  overflow: visible;
-}
-.workspace-group-tab--add:focus-visible {
-  outline: none;
-}
-.workspace-group-tab--add:hover {
-  color: var(--text-primary);
-}
-.workspace-group-tab__edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0.45;
-  transition:
-    opacity 0.12s,
-    background 0.12s;
-  padding: 0;
-  flex-shrink: 0;
-}
-.workspace-group-tab__edit:hover {
-  opacity: 1;
-  background: var(--bg-input);
-}
-.workspace-group-tab__rename-input {
-  all: unset;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
-  background: var(--bg-input);
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  padding: 0 4px;
-  width: 100%;
-  min-width: 40px;
-  max-width: 200px;
-  box-sizing: border-box;
-}
-.workspace-git-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 16px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
-  min-height: 0;
-  flex-wrap: wrap;
-  font-size: 11px;
-}
-.workspace-git-bar:empty {
-  display: none;
-}
 
 .app-header__actions {
   display: flex;

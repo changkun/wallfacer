@@ -55,6 +55,42 @@
     </button>
   </div>
 
+  <!-- Workspace group switcher -->
+  <button
+    type="button"
+    id="sidebar-ws-switch"
+    class="sb-ws-switch"
+    onclick="toggleWorkspaceGroupPopover(event)"
+    title="Switch workspace group"
+    aria-haspopup="menu"
+    aria-expanded="false"
+    aria-controls="sidebar-ws-popover"
+  >
+    <span id="sidebar-ws-dot" class="ws-dot">W</span>
+    <span id="sidebar-ws-name" class="ws-name">workspace</span>
+    <span class="ws-caret">
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </span>
+  </button>
+  <div
+    id="sidebar-ws-popover"
+    class="sb-ws-popover"
+    role="menu"
+    aria-labelledby="sidebar-ws-switch"
+    hidden
+  ></div>
+
   <!-- Search -->
   <button
     type="button"
