@@ -183,13 +183,13 @@ func sandboxFast(specEnv map[string]string, childEnv []string) bool {
 // codexResultRecord is the Claude-compatible envelope the runner expects as
 // the last NDJSON line. Fields mirror agentOutput in internal/runner.
 type codexResultRecord struct {
-	Result       string      `json:"result"`
-	SessionID    string      `json:"session_id"`
-	StopReason   string      `json:"stop_reason"`
-	IsError      bool        `json:"is_error"`
-	TotalCostUSD float64     `json:"total_cost_usd"`
-	Usage        codexUsage  `json:"usage"`
-	Subtype      string      `json:"subtype,omitempty"`
+	Result       string     `json:"result"`
+	SessionID    string     `json:"session_id"`
+	StopReason   string     `json:"stop_reason"`
+	IsError      bool       `json:"is_error"`
+	TotalCostUSD float64    `json:"total_cost_usd"`
+	Usage        codexUsage `json:"usage"`
+	Subtype      string     `json:"subtype,omitempty"`
 }
 
 type codexUsage struct {
@@ -202,9 +202,9 @@ type codexUsage struct {
 // codexEvent captures the union of fields we sniff from codex's JSON events.
 // Unknown fields are ignored by json.Unmarshal, so this is forward-compatible.
 type codexEvent struct {
-	Type         string `json:"type"`
-	SessionID    string `json:"session_id,omitempty"`
-	StopReason   string `json:"stop_reason,omitempty"`
+	Type         string   `json:"type"`
+	SessionID    string   `json:"session_id,omitempty"`
+	StopReason   string   `json:"stop_reason,omitempty"`
 	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
 	Usage        *struct {
 		InputTokens              int `json:"input_tokens"`
@@ -304,4 +304,3 @@ func teeCodexAndAppendResult(codexStdout io.Reader, out *io.PipeWriter, lastMsgF
 	_, _ = out.Write([]byte("\n"))
 	_ = out.Close()
 }
-
