@@ -98,7 +98,7 @@ func TestRunDoctor_MissingEnvFile(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 	for _, want := range []string{"Config directory:  " + configDir, "Env file:          " + envFile, "[!] Env file not found"} {
 		if !strings.Contains(out, want) {
@@ -127,7 +127,7 @@ func TestRunDoctor_WithCredentials(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
-		RunDoctor(configDir)
+		RunDoctor(configDir, nil)
 	})
 	for _, want := range []string{"[ok] CLAUDE_CODE_OAUTH_TOKEN is set", "[ok] OPENAI_API_KEY is set", "[ok] ANTHROPIC_BASE_URL = https://api.anthropic.com", "[ok] OPENAI_BASE_URL = https://api.openai.com/v1"} {
 		if !strings.Contains(out, want) {
@@ -145,7 +145,7 @@ func TestRunDoctor_ConfigDirMissing(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", "printf")
 
 	out := captureStdout(func() {
-		RunDoctor(missing)
+		RunDoctor(missing, nil)
 	})
 	if !strings.Contains(out, "[!] Config directory missing") {
 		t.Fatalf("expected config dir warning, got: %s", out)
