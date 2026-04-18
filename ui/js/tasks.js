@@ -260,6 +260,29 @@ function applyHostModeToComposer() {
   }
 }
 
+// applyTaskKindToComposer mirrors the current Type select value onto
+// the composer root's data-task-kind attribute and updates the prompt
+// placeholder. The CSS reads data-task-kind to show only the activity
+// overrides that actually execute for the selected kind (Implement
+// uses every stage except Ideas; Brainstorm runs only Ideas), so the
+// single source of truth for "which controls are relevant" lives in
+// the attribute rather than duplicated show/hide JS.
+function applyTaskKindToComposer() {
+  var form = document.getElementById("new-task-form");
+  var kindEl = document.getElementById("new-task-kind");
+  if (!form || !kindEl) return;
+  var kind = kindEl.value || "";
+  form.setAttribute("data-task-kind", kind);
+  var textarea = document.getElementById("new-prompt");
+  if (textarea) {
+    var placeholder =
+      kind === "idea-agent"
+        ? textarea.getAttribute("data-prompt-placeholder-ideation")
+        : textarea.getAttribute("data-prompt-placeholder-task");
+    if (placeholder) textarea.placeholder = placeholder;
+  }
+}
+
 // --- Task creation ---
 
 async function createTask() {
@@ -424,6 +447,15 @@ function showNewTaskForm() {
   // sandbox is in play. Idempotent: called again on every open.
   applyHostModeToComposer();
 
+  // Sync task-kind-driven visibility (which override rows show, which
+  // prompt placeholder) and wire the select's change event once.
+  applyTaskKindToComposer();
+  var kindEl = document.getElementById("new-task-kind");
+  if (kindEl && !kindEl._composerKindBound) {
+    kindEl._composerKindBound = true;
+    kindEl.addEventListener("change", applyTaskKindToComposer);
+  }
+
   // Wire the "Repeat on a schedule" toggle once per form open so the
   // interval input row (hidden by default) follows the checkbox state.
   var repeatToggle = document.getElementById("new-repeat-toggle");
@@ -462,6 +494,9 @@ function hideNewTaskForm() {
   if (scheduledAtEl) scheduledAtEl.value = "";
   const kindEl = document.getElementById("new-task-kind");
   if (kindEl) kindEl.value = "";
+  // Resync the composer's data-task-kind so the next open starts in
+  // the Implement state regardless of what was selected last time.
+  applyTaskKindToComposer();
   const repeatToggle = document.getElementById("new-repeat-toggle");
   const repeatMinutesEl = document.getElementById("new-repeat-minutes");
   const repeatMinutesRow = document.getElementById("new-repeat-minutes-row");
