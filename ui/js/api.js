@@ -37,6 +37,14 @@ function _handleInitialHash() {
   if (!task) return;
   openModal(taskId).then(function () {
     if (tabName) {
+      const mainTabs = [
+        "spec",
+        "activity",
+        "changes",
+        "flamegraph",
+        "timeline",
+        "events",
+      ];
       const rightTabs = [
         "implementation",
         "testing",
@@ -45,7 +53,9 @@ function _handleInitialHash() {
         "timeline",
       ];
       const leftTabs = ["implementation", "testing"];
-      if (rightTabs.includes(tabName)) {
+      if (mainTabs.includes(tabName) && typeof setMainTab === "function") {
+        setMainTab(tabName);
+      } else if (rightTabs.includes(tabName)) {
         setRightTab(tabName);
       } else if (leftTabs.includes(tabName)) {
         setLeftTab(tabName);
