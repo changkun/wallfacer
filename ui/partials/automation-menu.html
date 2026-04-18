@@ -31,37 +31,6 @@
       role="group"
       aria-label="Automation controls"
     >
-      <label class="header-toggle-chip" for="ideation-header-toggle">
-        <span class="header-toggle-chip__meta">
-          <span class="header-toggle-chip__label">Ideate</span>
-          <span class="hint-trigger header-toggle-chip__hint"
-            >?<span class="hint-tooltip"
-              >When enabled, the brainstorm agent automatically generates new
-              task ideas on a recurring schedule.</span
-            ></span
-          >
-        </span>
-        <span class="header-toggle-chip__switch">
-          <input
-            type="checkbox"
-            id="ideation-header-toggle"
-            onchange="toggleIdeationHeader()"
-          />
-          <span class="header-toggle-chip__track" aria-hidden="true"></span>
-        </span>
-        <button
-          type="button"
-          onclick="
-            event.preventDefault();
-            triggerIdeation();
-          "
-          class="btn-icon"
-          style="font-size: 11px; padding: 2px 8px; margin-left: 4px"
-        >
-          Run now
-        </button>
-      </label>
-
       <label class="header-toggle-chip" for="autorefine-toggle">
         <span class="header-toggle-chip__meta">
           <span class="header-toggle-chip__label">Refine</span>
@@ -186,11 +155,6 @@
         </span>
       </label>
     </div>
-    <span
-      id="ideation-next-run"
-      class="app-header__next-run"
-      style="display: none"
-    ></span>
     <div id="watcher-health-section" class="watcher-health-section"></div>
   </div>
 </div>
