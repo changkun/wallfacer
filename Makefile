@@ -27,7 +27,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary pull-images install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-binary pull-images pull-images-force install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Build the wallfacer binary and pull sandbox images.
 build: fmt lint ui-ts build-binary pull-images
@@ -69,7 +69,17 @@ build-desktop-linux:
 
 # Pull the unified sandbox image from GHCR and tag locally.
 # Image source: https://github.com/latere-ai/images
+# Skips the pull when the expected local tag already exists — useful when
+# building the image from source in a sibling checkout of latere-ai/images.
+# Force a refresh with `make pull-images-force` or `podman rmi` first.
 pull-images:
+	@if $(PODMAN) image exists $(IMAGE); then \
+		echo "Image $(IMAGE) present locally; skipping pull. Run 'make pull-images-force' to refresh."; \
+	else \
+		$(PODMAN) pull $(GHCR_IMAGE) && $(PODMAN) tag $(GHCR_IMAGE) $(IMAGE); \
+	fi
+
+pull-images-force:
 	$(PODMAN) pull $(GHCR_IMAGE)
 	$(PODMAN) tag $(GHCR_IMAGE) $(IMAGE)
 
