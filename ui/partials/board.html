@@ -43,16 +43,16 @@
       >
         + New Task
       </button>
-      <div id="new-task-form" class="composer hidden mb-2">
+      <div id="new-task-form" class="composer hidden mb-2" data-task-kind="">
         <!-- Header: type + templates share a single compact row. -->
         <div class="composer__head">
           <select
             id="new-task-kind"
             class="composer__type"
-            title="Task type. Ideation runs the brainstorm agent; the prompt is optional for that type."
+            title="Implement: agent executes a prompt you write. Brainstorm: agent scans the workspace and proposes new task ideas — prompt optional."
           >
-            <option value="">Task</option>
-            <option value="idea-agent">Ideation</option>
+            <option value="">Implement</option>
+            <option value="idea-agent">Brainstorm</option>
           </select>
           <button
             type="button"
@@ -74,6 +74,8 @@
           id="new-prompt"
           rows="4"
           placeholder="Describe the task… (Markdown supported, ⌘↵ to save)"
+          data-prompt-placeholder-task="Describe the task… (Markdown supported, ⌘↵ to save)"
+          data-prompt-placeholder-ideation="Optional: narrow the brainstorm focus… (leave empty to scan the whole workspace)"
           class="composer__prompt"
         ></textarea>
 
@@ -189,32 +191,36 @@
             <svg class="composer__chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             Agent overrides
           </summary>
+          <!-- The override rows are scoped by data-activity-role so the
+               composer can show only the stages that actually run for the
+               selected task kind: Implement uses every stage except
+               Ideas; Brainstorm runs a single Ideas stage. -->
           <div class="composer__nested composer__overrides">
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Impl</span>
               <select id="new-sandbox-implementation" class="composer__input" data-sandbox-select="true"></select>
             </label>
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Test</span>
               <select id="new-sandbox-testing" class="composer__input" data-sandbox-select="true"></select>
             </label>
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Refine</span>
               <select id="new-sandbox-refinement" class="composer__input" data-sandbox-select="true"></select>
             </label>
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Title</span>
               <select id="new-sandbox-title" class="composer__input" data-sandbox-select="true"></select>
             </label>
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Oversight</span>
               <select id="new-sandbox-oversight" class="composer__input" data-sandbox-select="true"></select>
             </label>
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="implement">
               <span class="composer__field-label">Commit</span>
               <select id="new-sandbox-commit_message" class="composer__input" data-sandbox-select="true"></select>
             </label>
-            <label class="composer__override">
+            <label class="composer__override" data-activity-role="ideation">
               <span class="composer__field-label">Ideas</span>
               <select id="new-sandbox-idea_agent" class="composer__input" data-sandbox-select="true"></select>
             </label>
