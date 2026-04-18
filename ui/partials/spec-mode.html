@@ -6,53 +6,56 @@
 >
   <div id="spec-focused-view" class="spec-focused-view">
     <div class="spec-focused-view__header">
+      <div class="spec-focused-view__chrome">
+        <span id="spec-focused-path" class="spec-focused-view__path"></span>
+        <span id="spec-focused-status" class="spec-focused-view__status"></span>
+        <span id="spec-focused-kind" class="spec-focused-view__kind"></span>
+        <span id="spec-focused-effort" class="spec-focused-view__effort"></span>
+        <span class="spec-focused-view__spacer"></span>
+        <button
+          type="button"
+          id="spec-archive-btn"
+          class="spec-summarize-btn hidden"
+          onclick="archiveFocusedSpec()"
+          title="Archive this spec (hide from live graph)"
+        >
+          Archive
+        </button>
+        <button
+          type="button"
+          id="spec-unarchive-btn"
+          class="spec-summarize-btn hidden"
+          onclick="unarchiveFocusedSpec()"
+          title="Unarchive this spec (return to drafted)"
+        >
+          Unarchive
+        </button>
+        <button
+          type="button"
+          id="spec-summarize-btn"
+          class="spec-summarize-btn hidden"
+        >
+          Summarize
+        </button>
+        <button
+          id="spec-chat-toggle-btn"
+          class="spec-chat-toggle-btn"
+          type="button"
+          onclick="toggleSpecChat()"
+          title="Toggle chat pane (C)"
+          aria-pressed="true"
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          id="spec-dispatch-btn"
+          class="spec-dispatch-btn hidden"
+        >
+          Dispatch
+        </button>
+      </div>
       <span id="spec-focused-title" class="spec-focused-view__title"></span>
-      <span id="spec-focused-status" class="spec-focused-view__status"></span>
-      <span id="spec-focused-kind" class="spec-focused-view__kind"></span>
-      <span id="spec-focused-effort" class="spec-focused-view__effort"></span>
-      <span class="spec-focused-view__spacer"></span>
-      <button
-        type="button"
-        id="spec-dispatch-btn"
-        class="spec-dispatch-btn hidden"
-      >
-        Dispatch
-      </button>
-      <button
-        type="button"
-        id="spec-summarize-btn"
-        class="spec-summarize-btn hidden"
-      >
-        Summarize
-      </button>
-      <button
-        type="button"
-        id="spec-archive-btn"
-        class="spec-summarize-btn hidden"
-        onclick="archiveFocusedSpec()"
-        title="Archive this spec (hide from live graph)"
-      >
-        Archive
-      </button>
-      <button
-        type="button"
-        id="spec-unarchive-btn"
-        class="spec-summarize-btn hidden"
-        onclick="unarchiveFocusedSpec()"
-        title="Unarchive this spec (return to drafted)"
-      >
-        Unarchive
-      </button>
-      <button
-        id="spec-chat-toggle-btn"
-        class="spec-chat-toggle-btn"
-        type="button"
-        onclick="toggleSpecChat()"
-        title="Toggle chat pane (C)"
-        aria-pressed="true"
-      >
-        Chat
-      </button>
     </div>
     <div id="spec-focused-meta" class="spec-focused-view__meta"></div>
     <div

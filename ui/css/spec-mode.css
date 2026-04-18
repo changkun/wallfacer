@@ -115,56 +115,98 @@
   position: relative;
 }
 
+/* Header adopts the mockup's two-row layout: a slim chrome bar (path,
+   tags, actions) and a display title rendered as huge italic serif. */
 .spec-focused-view__header {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  height: 44px;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 28px 18px;
+  border-bottom: 1px solid var(--rule);
   flex-shrink: 0;
+  background: var(--bg);
 }
 
-.spec-focused-view__title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text);
+.spec-focused-view__chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+}
+
+.spec-focused-view__path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__title {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: 52em;
+  word-break: break-word;
 }
 
 .spec-focused-view__status {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
+  text-transform: lowercase;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
 }
 
 .spec-focused-view__kind {
   font-size: 10px;
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
+  text-transform: lowercase;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+/* Collapse tag/path chips entirely when there is no content — the
+   Roadmap index has no frontmatter, so the chrome should not render
+   empty pills as solid shapes. */
+.spec-focused-view__path:empty,
+.spec-focused-view__status:empty,
+.spec-focused-view__kind:empty,
+.spec-focused-view__effort:empty {
+  display: none;
 }
 
 .spec-kind--design {
-  background: #e8daef;
-  color: #6c3483;
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
 }
 
 .spec-kind--impl {
-  background: #d5f5e3;
-  color: #1e8449;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
 }
 
 .spec-focused-view__effort {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--ink-3);
   flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
 
 .spec-focused-view__spacer {
@@ -179,6 +221,7 @@
    Roadmap marker class (.spec-focused-view--index) slides them out
    with a subtle translateY + opacity dissolve rather than snapping.
    Honouring reduced motion collapses the transition to zero. */
+.spec-focused-view__path,
 .spec-focused-view__status,
 .spec-focused-view__kind,
 .spec-focused-view__effort,
@@ -192,6 +235,7 @@
     opacity 220ms cubic-bezier(0.2, 0, 0, 1),
     transform 220ms cubic-bezier(0.2, 0, 0, 1);
 }
+.spec-focused-view--index .spec-focused-view__path,
 .spec-focused-view--index .spec-focused-view__status,
 .spec-focused-view--index .spec-focused-view__kind,
 .spec-focused-view--index .spec-focused-view__effort,
@@ -213,6 +257,7 @@
   overflow: hidden;
 }
 @media (prefers-reduced-motion: reduce) {
+  .spec-focused-view__path,
   .spec-focused-view__status,
   .spec-focused-view__kind,
   .spec-focused-view__effort,
@@ -290,41 +335,46 @@
 }
 
 .spec-focused-view__meta {
-  padding: 2px 16px 4px;
-  font-size: 10px;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
+  padding: 8px 28px 10px;
+  font-size: 11px;
+  color: var(--ink-4);
   flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__meta:empty {
+  display: none;
 }
 
 .spec-status--complete {
-  background: #d4edda;
-  color: #155724;
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
 }
 
 .spec-status--validated {
-  background: #cce5ff;
-  color: #004085;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
 }
 
 .spec-status--drafted {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
 }
 
 .spec-status--vague {
-  background: #e2e3e5;
-  color: #383d41;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
 }
 
 .spec-status--stale {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
 }
 
 .spec-status--archived {
-  background: #e2e3e5;
-  color: #6c757d;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+  opacity: 0.7;
 }
 
 .spec-archived-banner {
@@ -482,52 +532,63 @@
   padding-left: 24px;
 }
 
-.spec-dispatch-btn,
+/* Secondary header actions — muted text links, no border, no fill.
+   Dispatch stands out as the dark primary call-to-action. */
 .spec-summarize-btn,
 .spec-chat-toggle-btn {
-  padding: 4px 12px;
-  font-size: 11px;
+  padding: 4px 8px;
+  font-size: 12px;
   font-weight: 500;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
   cursor: pointer;
   flex-shrink: 0;
   transition:
     background 0.12s,
-    border-color 0.12s;
+    color 0.12s;
 }
 
+.spec-summarize-btn:hover,
 .spec-chat-toggle-btn:hover {
   background: var(--bg-hover);
-  border-color: var(--text-muted);
+  color: var(--ink);
 }
 
 /* When the chat pane is folded, emphasise the toggle so the user
    can easily find their way back to the chat. */
 .spec-chat-toggle-btn--folded {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--accent-tint);
+  color: var(--accent);
 }
 
 .spec-chat-toggle-btn--folded:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  opacity: 0.9;
+  background: var(--accent-tint);
+  color: var(--accent-2);
+}
+
+.spec-dispatch-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--r-md);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 .spec-dispatch-btn:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.spec-summarize-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--text-muted);
+  background: color-mix(in oklab, var(--ink) 85%, var(--accent) 15%);
+  border-color: color-mix(in oklab, var(--ink) 85%, var(--accent) 15%);
+  color: var(--bg);
 }
 
 .spec-focused-view__body {
@@ -538,124 +599,212 @@
 
 .spec-focused-view__body-inner {
   max-width: 52em;
-  padding: 16px;
-  font-size: 13px;
+  padding: 20px 28px 80px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Mockup's drop cap: first letter of the first paragraph rendered as a
+   large italic serif in the clay accent colour. Only applied to the spec
+   body — docs and chat retain flat paragraph starts. */
+.spec-focused-view__body-inner.prose-content > p:first-of-type::first-letter {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 3em;
+  line-height: 0.9;
+  float: left;
+  padding: 4px 10px 0 0;
+  color: var(--accent);
+}
+
+.spec-focused-view__body-inner.prose-content > p:first-of-type {
+  font-size: 15px;
+  line-height: 1.72;
+}
+
+/* Section headings inside the spec body — sans for legibility. Serif
+   italic is reserved for the display title above so long-form reading
+   stays comfortable. */
+.spec-focused-view__body-inner.prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.005em;
+  margin: 28px 0 10px;
+}
+.spec-focused-view__body-inner.prose-content h3 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--ink);
+  text-transform: none;
+  margin: 22px 0 8px;
 }
 
 /* Reusable prose class — single source of truth for markdown rendering.
-   Used by spec body, docs content, and chat assistant bubbles. */
+   Paper-ink style: Instrument Serif italic headings, Inter body, clay accent.
+   Canonical tier is compact (modal / chat scale). The .docs-mode__content
+   scope in docs.css scales up to display sizes with inverted code blocks. */
 .prose-content {
-  line-height: 1.7;
-  color: var(--text);
+  color: var(--ink);
+  font-size: var(--fs-md);
+  line-height: 1.65;
 }
 
+/* Headings default to sans for legibility. Serif italic is only used on
+   display titles (the spec header title, docs h1 hero) — those are opted
+   in by scoped overrides, not by default. */
+.prose-content h1,
+.prose-content h2,
+.prose-content h3,
+.prose-content h4,
+.prose-content h5,
+.prose-content h6 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  color: var(--ink);
+  line-height: 1.3;
+}
 .prose-content h1 {
   font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 16px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 10px;
 }
-
 .prose-content h2 {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 24px 0 12px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  margin: 22px 0 8px;
 }
-
 .prose-content h3 {
   font-size: 14px;
   font-weight: 600;
-  margin: 20px 0 8px;
+  margin: 18px 0 6px;
 }
-
 .prose-content h4 {
   font-size: 13px;
   font-weight: 600;
-  margin: 16px 0 6px;
+  margin: 14px 0 4px;
+}
+.prose-content h5,
+.prose-content h6 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin: 12px 0 4px;
 }
 
 .prose-content p {
   margin: 0 0 12px;
 }
+.prose-content p:first-child {
+  margin-top: 0;
+}
+.prose-content p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-content strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose-content em {
+  font-style: italic;
+}
 
 .prose-content ul,
 .prose-content ol {
   margin: 0 0 12px;
-  padding-left: 24px;
+  padding-left: 22px;
 }
-
+.prose-content ul {
+  list-style-type: disc;
+}
+.prose-content ol {
+  list-style-type: decimal;
+}
 .prose-content ul ul {
   list-style-type: circle;
 }
-
 .prose-content li {
-  margin-bottom: 4px;
+  margin: 2px 0;
 }
-
 .prose-content li > p {
-  margin: 4px 0;
-}
-
-.prose-content pre {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px 16px;
-  font-size: 12px;
-  line-height: 1.5;
-  overflow-x: auto;
-  margin: 0 0 12px;
+  margin: 2px 0;
 }
 
 .prose-content code {
-  background: color-mix(in oklab, var(--bg) 70%, var(--text-muted));
-  border-radius: 3px;
-  padding: 2px 5px;
+  background: var(--bg-input);
+  color: var(--ink);
+  font-family: var(--font-mono);
   font-size: 0.9em;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
-
+.prose-content pre {
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  margin: 0 0 14px;
+  color: var(--ink-2);
+}
 .prose-content pre code {
   background: none;
   padding: 0;
   font-size: inherit;
+  color: inherit;
   border-radius: 0;
 }
 
 .prose-content blockquote {
-  border-left: 3px solid var(--accent);
-  padding: 4px 12px;
-  margin: 0 0 12px;
-  color: var(--text-muted);
-  background: color-mix(in oklab, var(--bg) 95%, var(--accent));
-  border-radius: 0 4px 4px 0;
+  border-left: 2px solid var(--accent);
+  margin: 0 0 14px;
+  padding: 2px 0 2px 14px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 1em;
+  line-height: 1.55;
+}
+
+/* Emphasis (markdown *italic*) stays italic but uses the default sans —
+   the italic variant of Inter is easier to read than Instrument Serif
+   italic for inline emphasis. */
+.prose-content em {
+  font-family: var(--font-sans);
+  font-style: italic;
 }
 
 .prose-content table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-size: 12px;
 }
-
+.prose-content th,
+.prose-content td {
+  border: 1px solid var(--rule);
+  padding: 6px 12px;
+  text-align: left;
+}
 .prose-content th {
   background: var(--bg-input);
   font-weight: 600;
-}
-
-.prose-content th,
-.prose-content td {
-  border: 1px solid var(--border);
-  padding: 6px 12px;
+  color: var(--ink);
 }
 
 .prose-content a {
   color: var(--accent);
   text-decoration: none;
 }
-
 .prose-content a:hover {
   text-decoration: underline;
 }
@@ -667,7 +816,7 @@
 
 .prose-content hr {
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rule);
   margin: 20px 0;
 }
 
@@ -1116,16 +1265,6 @@
   color: #6c757d;
 }
 
-.spec-minimap__node--archived {
-  outline: 2px dashed #adb5bd;
-  opacity: 0.6;
-}
-
-.spec-minimap__edge--archived {
-  stroke-dasharray: 4 3;
-  opacity: 0.5;
-}
-
 .spec-show-archived {
   font-size: 11px;
   color: var(--text-muted);
@@ -1225,110 +1364,102 @@
   margin-left: auto;
 }
 
-/* ===== Spec Minimap ===== */
-
-.spec-minimap {
-  flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  height: 160px;
-  min-height: 80px;
-  max-height: 400px;
-}
-
-.spec-minimap__header {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 4px 8px 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-
-.spec-minimap__body {
-  flex: 1;
-  overflow: hidden;
-  padding: 4px 8px 6px;
-  cursor: grab;
-}
-
-.spec-minimap__body:active {
-  cursor: grabbing;
-}
-
-.spec-minimap__svg {
-  display: block;
-}
-
-.spec-minimap__resize {
-  height: 4px;
-  cursor: row-resize;
-  background: transparent;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.spec-minimap__resize:hover {
-  background: var(--accent);
-}
-
 /* ===== Planning Chat Bubbles ===== */
 
 .planning-chat-bubble {
-  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
   max-width: 100%;
+  position: relative;
+  font-size: 13px;
 }
 
-.planning-chat-bubble--user {
-  text-align: right;
+.planning-chat-bubble__av {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--bg-sunk);
+  color: var(--text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
-.planning-chat-bubble--user .planning-chat-bubble__content {
-  display: inline-block;
-  text-align: left;
-  background: var(--accent);
-  color: #fff;
-  padding: 6px 10px;
-  border-radius: 8px 8px 2px 8px;
+.planning-chat-bubble--user .planning-chat-bubble__av {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.planning-chat-bubble--assistant .planning-chat-bubble__av {
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-card));
+  color: var(--accent);
+}
+
+.planning-chat-bubble__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.planning-chat-bubble__meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.planning-chat-bubble__time {
+  font-weight: 500;
+}
+
+.planning-chat-bubble__time:not(:empty)::before {
+  content: "·";
+  margin: 0 4px;
+}
+
+.planning-chat-bubble__content {
+  color: var(--text);
+  line-height: 1.55;
   font-size: 13px;
   word-break: break-word;
 }
 
-.planning-chat-bubble--assistant .planning-chat-bubble__content {
-  background: var(--bg-card);
-  padding: 10px 14px;
-  border-radius: 8px 8px 8px 2px;
-  font-size: 13px;
-  line-height: 1.6;
-  border: 1px solid var(--border);
-  word-break: break-word;
-}
-
-.planning-chat-bubble--assistant .planning-chat-bubble__content > :first-child {
+.planning-chat-bubble__content > :first-child {
   margin-top: 0;
 }
 
-.planning-chat-bubble--assistant .planning-chat-bubble__content > :last-child {
+.planning-chat-bubble__content > :last-child {
   margin-bottom: 0;
 }
 
-/* Scale down prose headings inside chat bubbles so they don't dominate. */
+/* Scale down prose headings inside chat bubbles so they don't dominate.
+   Chat flow reads more naturally with sans headings — override the serif
+   italic from the canonical .prose-content. */
+.planning-chat-bubble--assistant .prose-content h1,
+.planning-chat-bubble--assistant .prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
 .planning-chat-bubble--assistant .prose-content h1 {
   font-size: 15px;
-  border-bottom: none;
   margin: 8px 0 6px;
-  padding-bottom: 0;
 }
 .planning-chat-bubble--assistant .prose-content h2 {
   font-size: 14px;
-  border-bottom: none;
   margin: 8px 0 6px;
-  padding-bottom: 0;
 }
 .planning-chat-bubble--assistant .prose-content h3 {
-  font-size: 13px;
+  font-size: 12px;
   margin: 6px 0 4px;
 }
 .planning-chat-bubble--assistant .prose-content h4 {
@@ -1339,20 +1470,10 @@
   margin: 0 0 8px;
 }
 
-.planning-chat-bubble__time {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.planning-chat-bubble {
-  position: relative;
-}
-
 .planning-chat-bubble__actions {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 0;
+  right: 0;
   display: flex;
   gap: 2px;
   opacity: 0;
