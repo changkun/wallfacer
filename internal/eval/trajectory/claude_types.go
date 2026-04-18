@@ -23,15 +23,15 @@ const (
 // Discriminator values for StreamEvent.Subtype on Claude Code system
 // and result messages.
 const (
-	ClaudeSubtypeInit                     = "init"
-	ClaudeSubtypeCompactBoundary          = "compact_boundary"
-	ClaudeSubtypeStatus                   = "status"
-	ClaudeSubtypePostTurnSummary          = "post_turn_summary"
-	ClaudeSubtypeSuccess                  = "success"
-	ClaudeSubtypeErrorDuringExecution     = "error_during_execution"
-	ClaudeSubtypeErrorMaxTurns            = "error_max_turns"
-	ClaudeSubtypeErrorMaxBudgetUSD        = "error_max_budget_usd"
-	ClaudeSubtypeErrorMaxStructuredRetry  = "error_max_structured_output_retries"
+	ClaudeSubtypeInit                    = "init"
+	ClaudeSubtypeCompactBoundary         = "compact_boundary"
+	ClaudeSubtypeStatus                  = "status"
+	ClaudeSubtypePostTurnSummary         = "post_turn_summary"
+	ClaudeSubtypeSuccess                 = "success"
+	ClaudeSubtypeErrorDuringExecution    = "error_during_execution"
+	ClaudeSubtypeErrorMaxTurns           = "error_max_turns"
+	ClaudeSubtypeErrorMaxBudgetUSD       = "error_max_budget_usd"
+	ClaudeSubtypeErrorMaxStructuredRetry = "error_max_structured_output_retries"
 )
 
 // SDKAssistantMessage is the assistant turn — model output. The inner
