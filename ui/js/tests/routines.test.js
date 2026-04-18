@@ -81,7 +81,9 @@ describe("routines.js", () => {
     });
 
     it("formats hour countdowns", () => {
-      const future = new Date(Date.now() + 2 * 3600 * 1000 + 30 * 60 * 1000).toISOString();
+      const future = new Date(
+        Date.now() + 2 * 3600 * 1000 + 30 * 60 * 1000,
+      ).toISOString();
       const got = ctx.formatRoutineCountdown(future, true);
       expect(got).toMatch(/^in 2h \d{1,2}m$/);
     });
@@ -147,7 +149,7 @@ describe("routines.js", () => {
         routine_spawn_kind: "",
       });
       expect(html).toContain('<option value="30" selected');
-      expect(html).toContain('checked');
+      expect(html).toContain("checked");
       expect(html).toContain("Run now");
       expect(html).toContain('data-routine-id="abc"');
     });
