@@ -79,7 +79,9 @@ type RunnerConfig struct {
 	WorktreesDir     string
 	InstructionsPath string
 	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
-	SandboxBackend   string           // "local" (default) — selects the SandboxBackend implementation
+	SandboxBackend   string           // "local" (default, podman/docker) or "host" (exec claude/codex directly)
+	HostClaudeBinary string           // optional override for the `claude` binary path (host backend only)
+	HostCodexBinary  string           // optional override for the `codex` binary path  (host backend only)
 	ContainerNetwork string           // --network value for task containers (empty = read from env file, fallback "host")
 	ContainerCPUs    string           // --cpus value for task containers (empty = read from env file, no limit)
 	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
@@ -117,7 +119,8 @@ type Runner struct {
 	liveLogs               syncmap.Map[uuid.UUID, *liveLog] // live log buffers for in-progress turns
 	oversightMu            keyedmu.Map[string]              // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker          // circuit breaker for container launch operations
-	backend                sandbox.Backend                  // pluggable sandbox backend (local podman/docker, future: k8s)
+	backend                sandbox.Backend                  // pluggable sandbox backend (local podman/docker, host, future: k8s)
+	hostMode               bool                             // true when backend is a HostBackend (no container, no /workspace/* paths)
 	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
@@ -416,6 +419,19 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	switch cfg.SandboxBackend {
 	case "", "local":
 		r.backend = sandbox.NewLocalBackend(r.command, localCfg)
+	case "host":
+		hb, err := sandbox.NewHostBackend(sandbox.HostBackendConfig{
+			ClaudeBinary: cfg.HostClaudeBinary,
+			CodexBinary:  cfg.HostCodexBinary,
+		})
+		if err != nil {
+			// Startup-time failure: fail fast with an actionable message rather
+			// than limping along with a half-configured runner.
+			logger.Fatal("host sandbox backend", "error", err)
+		}
+		r.backend = hb
+		r.hostMode = true
+		logger.Runner.Info("host sandbox backend active — tasks run directly on this machine with no container isolation")
 	default:
 		logger.Runner.Warn("unknown sandbox backend, falling back to local", "backend", cfg.SandboxBackend)
 		r.backend = sandbox.NewLocalBackend(r.command, localCfg)
@@ -644,6 +660,14 @@ func (r *Runner) SandboxImage() string {
 // SandboxBackend returns the sandbox backend used for container operations.
 func (r *Runner) SandboxBackend() sandbox.Backend {
 	return r.backend
+}
+
+// HostMode reports whether the runner is running in host-process mode — i.e.
+// the sandbox backend is a HostBackend that execs claude/codex directly.
+// Callers use this to skip container-only setup (e.g. /workspace/* path
+// rewrites, named-volume mounts) that is meaningless in host mode.
+func (r *Runner) HostMode() bool {
+	return r.hostMode
 }
 
 // HasHostCodexAuth reports whether a usable host Codex auth cache exists.
