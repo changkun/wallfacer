@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/prompts"
@@ -32,31 +33,9 @@ func mountOpts(opts ...string) string {
 	return strings.Join(opts, ",")
 }
 
-// agentUsage mirrors the token-usage JSON object emitted by the agent container.
-// Fields map directly to the Anthropic API usage response.
-type agentUsage struct {
-	InputTokens              int `json:"input_tokens"`
-	OutputTokens             int `json:"output_tokens"`
-	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-}
-
-// agentOutput is the top-level result object emitted by the agent container
-// (either as a single JSON blob or as the last line of NDJSON stream-json).
-type agentOutput struct {
-	Result       string     `json:"result"`
-	SessionID    string     `json:"session_id"`
-	ThreadID     string     `json:"thread_id,omitempty"`
-	StopReason   string     `json:"stop_reason"`
-	Subtype      string     `json:"subtype"`
-	IsError      bool       `json:"is_error"`
-	TotalCostUSD float64    `json:"total_cost_usd"`
-	Usage        agentUsage `json:"usage"`
-
-	// ActualSandbox is set by runContainer (not parsed from JSON) to record
-	// which sandbox actually executed this turn, including fallback scenarios.
-	ActualSandbox sandbox.Type `json:"-"`
-}
+// agentOutput aliases agents.Output, the canonical container-result
+// type. The runner keeps the short name for historical call sites.
+type agentOutput = agents.Output
 
 // Package-level aliases for SandboxActivity constants to reduce verbosity
 // in sandbox routing call sites throughout the runner package.
