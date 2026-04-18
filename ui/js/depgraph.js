@@ -88,10 +88,25 @@
   // Each node's pinned (x, y) is persisted so dragged layouts survive a
   // reload. We store the full Map as an array of [id, {x,y}] pairs for
   // JSON compatibility.
+  // Version stamp stored next to the pinned-positions blob. The Map
+  // layout engine changed from force-directed to layered (Sugiyama), so
+  // positions pinned under the old layout reference coords that make no
+  // sense under the new layout (they all cluster in the force sim's
+  // equilibrium region and visibly clash with the new column grid).
+  // Bump this whenever a layout change invalidates the coordinate space.
+  var PINNED_LAYOUT_VERSION = "sugiyama-v1";
   var _pinnedPositions = _loadPinnedPositions();
 
   function _loadPinnedPositions() {
     try {
+      var version = localStorage.getItem("depgraph-pinned-version");
+      if (version !== PINNED_LAYOUT_VERSION) {
+        // Old pins were computed against a different layout — drop
+        // them so the fresh layout gets a clean canvas.
+        localStorage.removeItem("depgraph-pinned-positions");
+        localStorage.setItem("depgraph-pinned-version", PINNED_LAYOUT_VERSION);
+        return new Map();
+      }
       var raw = localStorage.getItem("depgraph-pinned-positions");
       if (!raw) return new Map();
       var arr = JSON.parse(raw);
@@ -127,8 +142,12 @@
     if (!id || typeof x !== "number" || typeof y !== "number") return;
     _pinnedPositions.set(id, { x: x, y: y });
     _savePinnedPositions();
+    // Invalidate fingerprint so the next data-driven render applies the
+    // pin. Don't schedule a render here — drag already committed the
+    // new coords to the DOM via _shiftGroupCoords and re-routed every
+    // incident edge through liveUpdateNode, so an immediate re-render
+    // would just wipe and rebuild the SVG for zero visual change.
     _lastFingerprint = null;
-    _scheduleMapRender();
   }
 
   function _unpinNode(id) {
@@ -222,10 +241,17 @@
   // globally so the "Reset layout" button in the Map header can call it
   // directly.
   function resetMapLayout() {
-    if (_pinnedPositions.size === 0 && !_focusedNodeId) return;
+    var hasState =
+      _pinnedPositions.size !== 0 ||
+      !!_focusedNodeId ||
+      Math.abs(_zoomLevel - 1) > 1e-4 ||
+      _searchQuery !== "";
+    if (!hasState) return;
     _pinnedPositions = new Map();
     _focusedNodeId = null;
+    _searchQuery = "";
     _savePinnedPositions();
+    resetMapZoom();
     _lastFingerprint = null;
     _scheduleMapRender();
   }
@@ -252,10 +278,7 @@
   function setMapShowArchived(checked) {
     _showArchived = !!checked;
     try {
-      localStorage.setItem(
-        "depgraph-show-archived",
-        _showArchived ? "1" : "0",
-      );
+      localStorage.setItem("depgraph-show-archived", _showArchived ? "1" : "0");
     } catch (_e) {
       // localStorage full/disabled — the toggle only lives for this session.
     }
@@ -322,6 +345,213 @@
 
   if (typeof window !== "undefined") {
     window.setMapShowArchived = setMapShowArchived;
+  }
+
+  // --- Zoom ----------------------------------------------------------------
+  //
+  // Zoom is a multiplier applied to the rendered SVG's width/height
+  // attributes. The internal viewBox stays at the graph's layout coords
+  // so node positions, drag math, and pinned coordinates all remain in
+  // graph space. Scroll-based pan (overflow:auto + space-drag) keeps
+  // working because the SVG simply becomes physically larger inside the
+  // mount. The drag handler in unified-graph reads the scale via
+  // opts.getScale() so a screen-pixel drag maps to dx/scale graph units.
+  var ZOOM_MIN = 0.25;
+  var ZOOM_MAX = 3.0;
+  var _zoomLevel = _loadZoom();
+  var _zoomInstalled = false;
+
+  function _loadZoom() {
+    try {
+      var raw = localStorage.getItem("depgraph-zoom");
+      var v = raw ? parseFloat(raw) : 1;
+      if (!Number.isFinite(v) || v <= 0) return 1;
+      return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v));
+    } catch (_e) {
+      return 1;
+    }
+  }
+
+  function _saveZoom() {
+    try {
+      localStorage.setItem("depgraph-zoom", String(_zoomLevel));
+    } catch (_e) {
+      // disabled — zoom only lives for this session.
+    }
+  }
+
+  function _getZoom() {
+    return _zoomLevel;
+  }
+
+  function _setZoom(next, anchorX, anchorY) {
+    var clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
+    if (Math.abs(clamped - _zoomLevel) < 1e-4) return;
+    var prev = _zoomLevel;
+    var mount = document.getElementById("depgraph-mount");
+    var svg = document.getElementById("depgraph-svg");
+    // Anchor the zoom so the point under the cursor (or viewport centre
+    // when anchors are missing) stays fixed on screen.
+    var localX = 0;
+    var localY = 0;
+    if (mount && typeof mount.getBoundingClientRect === "function") {
+      var r = mount.getBoundingClientRect();
+      if (
+        typeof anchorX === "number" &&
+        typeof anchorY === "number" &&
+        anchorX >= r.left &&
+        anchorX <= r.right &&
+        anchorY >= r.top &&
+        anchorY <= r.bottom
+      ) {
+        localX = anchorX - r.left;
+        localY = anchorY - r.top;
+      } else {
+        localX = mount.clientWidth / 2;
+        localY = mount.clientHeight / 2;
+      }
+    }
+    var graphX = mount ? (mount.scrollLeft + localX) / prev : 0;
+    var graphY = mount ? (mount.scrollTop + localY) / prev : 0;
+
+    _zoomLevel = clamped;
+    _saveZoom();
+    _applyZoomToSvg(svg);
+    if (mount) {
+      mount.scrollLeft = Math.max(0, graphX * clamped - localX);
+      mount.scrollTop = Math.max(0, graphY * clamped - localY);
+    }
+  }
+
+  function _applyZoomToSvg(svg) {
+    if (!svg) return;
+    var vb = svg.getAttribute("viewBox");
+    if (!vb) return;
+    var parts = vb.split(/\s+/);
+    if (parts.length !== 4) return;
+    var w = parseFloat(parts[2]);
+    var h = parseFloat(parts[3]);
+    if (!Number.isFinite(w) || !Number.isFinite(h)) return;
+    svg.setAttribute("width", String(Math.round(w * _zoomLevel)));
+    svg.setAttribute("height", String(Math.round(h * _zoomLevel)));
+  }
+
+  function _installZoom() {
+    if (_zoomInstalled) return;
+    if (typeof document === "undefined" || !document.addEventListener) return;
+    _zoomInstalled = true;
+
+    document.addEventListener(
+      "wheel",
+      function (e) {
+        if (!_panActive()) return;
+        var mount = _panMount();
+        if (!mount || !mount.contains(e.target)) return;
+        // Zoom on plain wheel + Cmd/Ctrl (standard trackpad pinch). A
+        // plain wheel scrolls as usual so mousewheel navigation still
+        // works for users who prefer it.
+        if (!(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        // deltaY-scaled factor so trackpad pinch (many small events) and
+        // mouse wheel (fewer large events) both feel smooth. The exponent
+        // keeps multiplications commutative so repeated events compose
+        // cleanly.
+        var factor = Math.exp(-e.deltaY * 0.01);
+        _setZoom(_zoomLevel * factor, e.clientX, e.clientY);
+      },
+      { passive: false },
+    );
+  }
+
+  function resetMapZoom() {
+    if (Math.abs(_zoomLevel - 1) < 1e-4) return;
+    _zoomLevel = 1;
+    _saveZoom();
+    _applyZoomToSvg(document.getElementById("depgraph-svg"));
+  }
+
+  // --- Search filter -------------------------------------------------------
+  //
+  // The search box in the Map header filters nodes by label substring.
+  // State is kept in-memory for the session (no localStorage — users
+  // want to clear on reload). Queue a re-render so the dim opacity is
+  // reapplied across the SVG.
+  var _searchQuery = "";
+
+  function setMapSearch(q) {
+    var v = (q == null ? "" : String(q)).trim();
+    if (v === _searchQuery) return;
+    _searchQuery = v;
+    _lastFingerprint = null;
+    _scheduleMapRender();
+  }
+  if (typeof window !== "undefined") {
+    window.setMapSearch = setMapSearch;
+  }
+
+  // --- Hover highlight -----------------------------------------------------
+  //
+  // Hover is transient: enter raises the opacity of neighbour nodes and
+  // edges while dimming the rest, leave restores. We mutate the DOM
+  // in-place so hovering doesn't trigger a full re-render. Focus state
+  // takes precedence — if a node is focused, the hover overlay yields.
+  function _applyHoverHighlight(id) {
+    var svg = document.getElementById("depgraph-svg");
+    if (!svg) return;
+    // Skip hover highlight while focus is active — focus is sticky.
+    if (_focusedNodeId) return;
+    var nodes = svg.querySelectorAll("g[data-id]");
+    var edges = svg.querySelectorAll("path[data-kind]");
+    if (!id) {
+      nodes.forEach(function (n) {
+        if (n.dataset.hoverDimmed === "1") {
+          n.removeAttribute("opacity");
+          delete n.dataset.hoverDimmed;
+        }
+      });
+      edges.forEach(function (e) {
+        if (e.dataset.hoverDimmed === "1") {
+          e.removeAttribute("opacity");
+          delete e.dataset.hoverDimmed;
+        }
+      });
+      return;
+    }
+    // Derive neighbour set from the rendered DOM so we don't need the
+    // graph object here.
+    var neighbourSet = new Set([id]);
+    edges.forEach(function (e) {
+      var from = e.getAttribute("data-from");
+      var to = e.getAttribute("data-to");
+      if (from === id) neighbourSet.add(to);
+      if (to === id) neighbourSet.add(from);
+    });
+    nodes.forEach(function (n) {
+      var nid = n.getAttribute("data-id");
+      if (neighbourSet.has(nid)) {
+        if (n.dataset.hoverDimmed === "1") {
+          n.removeAttribute("opacity");
+          delete n.dataset.hoverDimmed;
+        }
+      } else if (!n.getAttribute("opacity")) {
+        n.setAttribute("opacity", "0.35");
+        n.dataset.hoverDimmed = "1";
+      }
+    });
+    edges.forEach(function (e) {
+      var from = e.getAttribute("data-from");
+      var to = e.getAttribute("data-to");
+      var inNeigh = neighbourSet.has(from) && neighbourSet.has(to);
+      if (inNeigh) {
+        if (e.dataset.hoverDimmed === "1") {
+          e.removeAttribute("opacity");
+          delete e.dataset.hoverDimmed;
+        }
+      } else if (!e.getAttribute("opacity")) {
+        e.setAttribute("opacity", "0.2");
+        e.dataset.hoverDimmed = "1";
+      }
+    });
   }
 
   // --- Canvas pan (hold Space + drag) --------------------------------------
@@ -874,11 +1104,16 @@
         onUnpinNode: _unpinNode,
         onFocusNode: _focusNode,
         onNavigateNode: _navigateNode,
+        onHoverNode: _applyHoverHighlight,
         pinnedIds: _pinnedIds(),
         pinnedPositions: _pinnedPositions,
         focusedNodeId: _focusedNodeId,
+        searchQuery: _searchQuery,
+        getScale: _getZoom,
       });
+      _applyZoomToSvg(svg);
       _installPan();
+      _installZoom();
       _centerIntoViewIfUntouched();
       return;
     }

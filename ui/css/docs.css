@@ -313,6 +313,16 @@
   cursor: pointer;
 }
 
+/* Smooth hover dim — works in place because hover toggles opacity via DOM
+ * mutation (no re-render kills the transition). Focus and search still
+ * snap because each change re-creates the SVG children. */
+#depgraph-svg g[data-id] {
+  transition: opacity 160ms ease;
+}
+#depgraph-svg path[data-kind] {
+  transition: opacity 160ms ease;
+}
+
 .depgraph-mode__empty {
   color: var(--text-muted);
   font-size: 13px;

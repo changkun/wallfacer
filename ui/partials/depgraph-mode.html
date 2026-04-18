@@ -8,10 +8,11 @@
       <div>
         <h2 class="depgraph-mode__title">Map</h2>
         <p class="depgraph-mode__subtitle">
-          Specs and tasks by dependency. Click a node to focus it;
-          <kbd>Shift</kbd>+click to open. Drag a node to pin it; double-click to
-          un-pin. <kbd>+</kbd> unfolds a spec; hold <kbd>Space</kbd> and drag to
-          pan.
+          Specs and tasks by dependency. Hover to emphasise neighbours; click a
+          node to focus it; <kbd>Shift</kbd>+click to open. Drag a node to pin
+          it; double-click to un-pin. <kbd>+</kbd> unfolds a spec; hold
+          <kbd>Space</kbd> and drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+scroll
+          to zoom. Use the <kbd>/</kbd> search bar above to filter nodes.
           <label
             class="depgraph-mode__option"
             title="Include archived specs and tasks"
@@ -28,7 +29,7 @@
             id="depgraph-reset-btn"
             class="depgraph-mode__reset-btn"
             onclick="resetMapLayout()"
-            title="Clear all pinned node positions"
+            title="Clear pinned positions, focus, zoom and search"
           >
             Reset layout
           </button>
