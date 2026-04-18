@@ -324,9 +324,6 @@ describe("toggleTerminalPanel", () => {
     const btn = makeEl();
     const tabBar = makeEl();
     const depBtn = makeEl();
-    const officePanel = makeEl();
-    officePanel.classList.add("hidden");
-    const officeBtn = makeEl();
     const connectTerminal = vi.fn();
     const scheduleRender = vi.fn();
 
@@ -341,8 +338,6 @@ describe("toggleTerminalPanel", () => {
         ["status-bar-in-progress", makeEl()],
         ["status-bar-waiting", makeEl()],
         ["status-bar-depgraph-btn", depBtn],
-        ["office-container", officePanel],
-        ["status-bar-office-btn", officeBtn],
       ],
       terminalEnabled: termEnabled,
       connectTerminal,
@@ -381,62 +376,6 @@ describe("toggleTerminalPanel", () => {
 });
 
 // ---------------------------------------------------------------------------
-// toggleOfficePanel
-// ---------------------------------------------------------------------------
-describe("toggleOfficePanel", () => {
-  function setup(officeHidden) {
-    const officePanel = makeEl();
-    if (officeHidden) officePanel.classList.add("hidden");
-    const officeBtn = makeEl();
-    const termPanel = makeEl();
-    termPanel.classList.add("hidden");
-    const termHandle = makeEl();
-    termHandle.classList.add("hidden");
-    const termBtn = makeEl();
-    const tabBar = makeEl();
-    const depBtn = makeEl();
-    const officeShow = vi.fn();
-    const officeHideFn = vi.fn();
-    const scheduleRender = vi.fn();
-
-    const ctx = makeContext({
-      elements: [
-        ["office-container", officePanel],
-        ["status-bar-office-btn", officeBtn],
-        ["status-bar-panel", termPanel],
-        ["status-bar-panel-resize", termHandle],
-        ["status-bar-terminal-btn", termBtn],
-        ["terminal-tab-bar", tabBar],
-        ["status-bar-depgraph-btn", depBtn],
-        ["status-bar-conn-dot", makeEl()],
-        ["status-bar-conn-label", makeEl()],
-        ["status-bar-in-progress", makeEl()],
-        ["status-bar-waiting", makeEl()],
-      ],
-      _officeShow: officeShow,
-      _officeHide: officeHideFn,
-      scheduleRender,
-    });
-    loadScript(ctx);
-    return { ctx, officePanel, officeBtn, officeShow, officeHideFn };
-  }
-
-  it("opens office panel when hidden", () => {
-    const { ctx, officePanel, officeShow } = setup(true);
-    ctx.toggleOfficePanel();
-    expect(officePanel.classList.contains("hidden")).toBe(false);
-    expect(officeShow).toHaveBeenCalled();
-  });
-
-  it("closes office panel when visible", () => {
-    const { ctx, officePanel, officeHideFn } = setup(false);
-    ctx.toggleOfficePanel();
-    expect(officePanel.classList.contains("hidden")).toBe(true);
-    expect(officeHideFn).toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
 // _cycleBottomPanel
 // ---------------------------------------------------------------------------
 describe("_cycleBottomPanel", () => {
@@ -452,17 +391,8 @@ describe("_cycleBottomPanel", () => {
     const termBtn = makeEl();
     const tabBar = makeEl();
     const depBtn = makeEl();
-    const officePanel = makeEl();
-    if (opts.officeOpen) {
-      /* leave unhidden */
-    } else {
-      officePanel.classList.add("hidden");
-    }
-    const officeBtn = makeEl();
     const connectTerminal = vi.fn();
     const scheduleRender = vi.fn();
-    const officeShow = vi.fn();
-    const officeHideFn = vi.fn();
 
     const overrides = {
       elements: [
@@ -471,8 +401,6 @@ describe("_cycleBottomPanel", () => {
         ["status-bar-terminal-btn", termBtn],
         ["terminal-tab-bar", tabBar],
         ["status-bar-depgraph-btn", depBtn],
-        ["office-container", officePanel],
-        ["status-bar-office-btn", officeBtn],
         ["status-bar-conn-dot", makeEl()],
         ["status-bar-conn-label", makeEl()],
         ["status-bar-in-progress", makeEl()],
@@ -480,30 +408,17 @@ describe("_cycleBottomPanel", () => {
       ],
       connectTerminal,
       scheduleRender,
-      _officeShow: officeShow,
-      _officeHide: officeHideFn,
-      _officeAssetAvailable: opts.officeAvailable ? () => true : undefined,
     };
     if (opts.termEnabled !== undefined)
       overrides.terminalEnabled = opts.termEnabled;
-    if (opts.depOpen) overrides.depGraphEnabled = true;
 
     const ctx = makeContext(overrides);
     loadScript(ctx);
-    return {
-      ctx,
-      termPanel,
-      officePanel,
-      connectTerminal,
-      scheduleRender,
-      officeShow,
-      officeHideFn,
-    };
+    return { ctx, termPanel, connectTerminal, scheduleRender };
   }
 
-  it("opens terminal when nothing is open and terminal available", () => {
+  it("opens terminal when closed and terminal available", () => {
     const { ctx, termPanel, connectTerminal } = setup({ termEnabled: true });
-    // Invoke via keydown
     const handler = ctx._listeners["keydown"][0];
     handler({
       key: "`",
@@ -517,30 +432,8 @@ describe("_cycleBottomPanel", () => {
     expect(connectTerminal).toHaveBeenCalled();
   });
 
-  it("opens office when nothing is open, terminal unavailable, office available", () => {
-    const { ctx, officePanel, officeShow } = setup({
-      termEnabled: false,
-      officeAvailable: true,
-    });
-    const handler = ctx._listeners["keydown"][0];
-    handler({
-      key: "`",
-      ctrlKey: true,
-      metaKey: false,
-      altKey: false,
-      shiftKey: false,
-      preventDefault: vi.fn(),
-    });
-    expect(officePanel.classList.contains("hidden")).toBe(false);
-    expect(officeShow).toHaveBeenCalled();
-  });
-
-  it("closes terminal and opens office when terminal is open and office available", () => {
-    const { ctx, termPanel, officePanel, officeShow } = setup({
-      termEnabled: true,
-      termOpen: true,
-      officeAvailable: true,
-    });
+  it("closes terminal when it is open", () => {
+    const { ctx, termPanel } = setup({ termEnabled: true, termOpen: true });
     const handler = ctx._listeners["keydown"][0];
     handler({
       key: "`",
@@ -551,16 +444,10 @@ describe("_cycleBottomPanel", () => {
       preventDefault: vi.fn(),
     });
     expect(termPanel.classList.contains("hidden")).toBe(true);
-    expect(officePanel.classList.contains("hidden")).toBe(false);
-    expect(officeShow).toHaveBeenCalled();
   });
 
-  it("closes terminal without opening office when office not available", () => {
-    const { ctx, termPanel, officePanel } = setup({
-      termEnabled: true,
-      termOpen: true,
-      officeAvailable: false,
-    });
+  it("does nothing when terminal unavailable and closed", () => {
+    const { ctx, termPanel, connectTerminal } = setup({ termEnabled: false });
     const handler = ctx._listeners["keydown"][0];
     handler({
       key: "`",
@@ -571,22 +458,7 @@ describe("_cycleBottomPanel", () => {
       preventDefault: vi.fn(),
     });
     expect(termPanel.classList.contains("hidden")).toBe(true);
-    expect(officePanel.classList.contains("hidden")).toBe(true);
-  });
-
-  it("closes office panel when office is open", () => {
-    const { ctx, officePanel, officeHideFn } = setup({ officeOpen: true });
-    const handler = ctx._listeners["keydown"][0];
-    handler({
-      key: "`",
-      ctrlKey: true,
-      metaKey: false,
-      altKey: false,
-      shiftKey: false,
-      preventDefault: vi.fn(),
-    });
-    expect(officePanel.classList.contains("hidden")).toBe(true);
-    expect(officeHideFn).toHaveBeenCalled();
+    expect(connectTerminal).not.toHaveBeenCalled();
   });
 
   it("ignores non-backtick keys", () => {
@@ -600,7 +472,6 @@ describe("_cycleBottomPanel", () => {
       shiftKey: false,
       preventDefault: vi.fn(),
     });
-    // Panel should still be hidden (nothing happened)
     expect(termPanel.classList.contains("hidden")).toBe(true);
   });
 
