@@ -4,135 +4,100 @@ import (
 	"context"
 	"net/http"
 	"slices"
-	"time"
+	"strings"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
-// systemIdeationTag identifies the routine card that stands in for the
-// legacy ideation singleton. Exactly one such card should exist per
-// workspace store; ensureSystemIdeationRoutine is idempotent.
+// systemIdeationTag identifies legacy ideation routine cards left
+// behind by earlier code paths. The tag is retained as a lookup key so
+// cleanupLegacyIdeationRoutine can find and delete them; new cards are
+// never created with this tag.
 const systemIdeationTag = "system:ideation"
 
-// ideationSeed is the per-startup configuration snapshot used to
-// materialize the system:ideation routine on first boot in a store
-// that does not already have one. Subsequent config writes (via
-// SetIdeation / SetIdeationInterval) route through the routine's
-// own fields, so legacy envconfig becomes read-only for ideation.
-type ideationSeed struct {
-	enabled  bool
-	interval time.Duration
-}
-
-// ensureSystemIdeationRoutine is invoked from the engine's
-// reconcileRoutines loop. It creates the system:ideation routine
-// card in the supplied store when none exists yet, seeding it from
-// legacyIdeationSeed. On subsequent reconciles (or after restarts)
-// the existing routine is found and left alone, so the bootstrap is
-// safe to call repeatedly.
-func (h *Handler) ensureSystemIdeationRoutine(ctx context.Context, s *store.Store) {
+// cleanupLegacyIdeationRoutine deletes any routine card tagged
+// system:ideation from the supplied store. The hidden "always-on"
+// ideation routine has been retired in favour of letting users create
+// Kind=idea-agent tasks from the standard composer (optionally ticked
+// as recurring). Without this cleanup, users upgrading from the earlier
+// migration would keep a ghost routine firing in the background.
+func (h *Handler) cleanupLegacyIdeationRoutine(ctx context.Context, s *store.Store) {
 	if s == nil {
 		return
 	}
-	tasks, err := s.ListTasks(ctx, true) // include archived to avoid duplicates
+	tasks, err := s.ListTasks(ctx, true) // include archived so we don't miss any
 	if err != nil {
 		return
 	}
 	for _, t := range tasks {
-		if t.IsRoutine() && slices.Contains(t.Tags, systemIdeationTag) {
-			return // already exists
+		if !t.IsRoutine() || !slices.Contains(t.Tags, systemIdeationTag) {
+			continue
 		}
-	}
-
-	seed := h.legacyIdeationSeed
-	intervalSeconds := int(seed.interval / time.Second)
-	if intervalSeconds <= 0 {
-		intervalSeconds = int(constants.DefaultIdeationInterval / time.Second)
-	}
-
-	_, err = s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt:                 "Ideation routine",
-		Goal:                   "Brainstorm new task ideas at a scheduled cadence.",
-		Kind:                   store.TaskKindRoutine,
-		Tags:                   []string{systemIdeationTag},
-		Timeout:                constants.IdeaAgentDefaultTimeout,
-		RoutineIntervalSeconds: intervalSeconds,
-		RoutineEnabled:         seed.enabled,
-		RoutineSpawnKind:       store.TaskKindIdeaAgent,
-	})
-	if err != nil {
-		return
-	}
-}
-
-// findSystemIdeationRoutine returns the system:ideation routine card from
-// the active workspace store, or nil if none exists yet (e.g. before the
-// first reconcile tick). Callers treat nil as "use defaults".
-func (h *Handler) findSystemIdeationRoutine(ctx context.Context) *store.Task {
-	s, ok := h.currentStore()
-	if !ok {
-		return nil
-	}
-	tasks, err := s.ListTasks(ctx, true)
-	if err != nil {
-		return nil
-	}
-	for _, t := range tasks {
-		if t.IsRoutine() && slices.Contains(t.Tags, systemIdeationTag) {
-			tCopy := t
-			return &tCopy
+		if err := s.DeleteTask(ctx, t.ID, "legacy system:ideation routine removed"); err != nil {
+			logger.Handler.Warn("ideation cleanup: delete routine", "routine", t.ID, "error", err)
+			continue
 		}
+		logger.Handler.Info("ideation cleanup: removed legacy routine", "routine", t.ID)
 	}
-	return nil
 }
 
 // TriggerIdeation handles POST /api/ideate.
-// Fires the system:ideation routine immediately. The routine card is
-// created on demand here if the engine has not yet reconciled it, so
-// the legacy shim never returns 503 under normal boot timing.
+// Creates a one-shot idea-agent task and kicks off its runner. This
+// replaces the old toggle-based ideation scheduler — the task is a
+// normal card that goes through the regular execute path, and users
+// can make it recurring by creating it from the composer with the
+// Repeat-on-a-schedule option.
 func (h *Handler) TriggerIdeation(w http.ResponseWriter, r *http.Request) {
-	routineTask := h.findSystemIdeationRoutine(r.Context())
-	if routineTask == nil {
-		if s, ok := h.currentStore(); ok {
-			h.ensureSystemIdeationRoutine(r.Context(), s)
-			routineTask = h.findSystemIdeationRoutine(r.Context())
-		}
-	}
-	if routineTask == nil {
-		http.Error(w, "ideation routine not initialized yet", http.StatusServiceUnavailable)
+	s, ok := h.requireStore(w)
+	if !ok {
 		return
 	}
 
-	h.routineMu.Lock()
-	eng := h.routineEngine
-	h.routineMu.Unlock()
-
-	// If the engine exists and has already registered this routine, let
-	// it drive the fire (so the scheduled cycle re-arms). Otherwise fall
-	// back to firing inline — this covers the window between bootstrap
-	// and the first reconcile tick.
-	if eng != nil {
-		if _, registered := eng.NextRuns()[routineTask.ID]; registered {
-			eng.Trigger(routineTask.ID)
-		} else {
-			go h.fireRoutine(r.Context(), routineTask.ID)
+	// Prevent runaway triggers: if an idea-agent task is already
+	// in-flight we surface 409 so callers can show a stale-state hint
+	// rather than queue a parallel run.
+	if existing, _ := s.ListTasks(r.Context(), false); existing != nil {
+		for _, t := range existing {
+			if !t.IsIdeaAgent() {
+				continue
+			}
+			if t.Status == store.TaskStatusBacklog || t.Status == store.TaskStatusInProgress {
+				http.Error(w, "ideation task is already in flight", http.StatusConflict)
+				return
+			}
 		}
-	} else {
-		go h.fireRoutine(r.Context(), routineTask.ID)
 	}
 
+	task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+		Prompt:  strings.TrimSpace("Brainstorm improvement ideas for the current workspace."),
+		Kind:    store.TaskKindIdeaAgent,
+		Timeout: constants.IdeaAgentDefaultTimeout,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusInProgress); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData("", store.TaskStatusInProgress, store.TriggerUser, nil))
+	h.runner.RunBackground(task.ID, task.Prompt, "", false)
+
 	httpjson.Write(w, http.StatusAccepted, map[string]any{
-		"queued":     true,
-		"routine_id": routineTask.ID.String(),
+		"queued":  true,
+		"task_id": task.ID.String(),
 	})
 }
 
 // CancelIdeation handles DELETE /api/ideate.
-// Cancels any currently running or backlogged idea-agent instance task.
-// The routine card itself is unaffected — the next scheduled fire will
-// spawn a new instance.
+// Cancels any currently-running or backlogged idea-agent task. The
+// endpoint is retained for CLI and back-compat; the Automation toggle
+// that called it has been removed from the UI.
 func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 	s, ok := h.requireStore(w)
 	if !ok {
@@ -166,11 +131,11 @@ func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetIdeationStatus handles GET /api/ideate.
-// Returns the system routine's enabled flag, whether an instance task is
-// currently running, and the next-run timestamp. The shape mirrors the
-// legacy endpoint so existing clients keep working.
+// Reports whether an idea-agent task is currently running. The "enabled"
+// and "next_run_at" fields are retained in the response shape for
+// clients that still read them, but they are always false / absent now
+// that the always-on toggle is gone.
 func (h *Handler) GetIdeationStatus(w http.ResponseWriter, r *http.Request) {
-	routineTask := h.findSystemIdeationRoutine(r.Context())
 	running := false
 	if s, ok := h.currentStore(); ok {
 		tasks, _ := s.ListTasks(r.Context(), false)
@@ -181,13 +146,8 @@ func (h *Handler) GetIdeationStatus(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	resp := map[string]any{
-		"enabled": routineTask != nil && routineTask.RoutineEnabled,
+	httpjson.Write(w, http.StatusOK, map[string]any{
+		"enabled": false,
 		"running": running,
-	}
-	if routineTask != nil && routineTask.RoutineNextRun != nil {
-		resp["next_run_at"] = *routineTask.RoutineNextRun
-	}
-	httpjson.Write(w, http.StatusOK, resp)
+	})
 }

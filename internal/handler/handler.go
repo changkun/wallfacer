@@ -149,15 +149,12 @@ type Handler struct {
 
 	// ideationExploitRatio controls the exploitation fraction for the idea-
 	// agent prompt (0.0 = fully exploratory, 1.0 = fully exploitative). It
-	// is prompt-building state, not schedule state, so it stays on the
-	// handler instead of moving to the system:ideation routine card.
+	// is prompt-building state used by runner.BuildIdeationPrompt, not a
+	// user-facing toggle — the Automation menu and settings panel both
+	// dropped their ideation controls when ideation moved to the standard
+	// composer + optional routine flow.
 	ideationMu           sync.Mutex
 	ideationExploitRatio float64
-
-	// legacyIdeationSeed is the config read once at startup and used by the
-	// per-store bootstrap to seed the system:ideation routine when none
-	// exists yet. Subsequent config writes route through the routine.
-	legacyIdeationSeed ideationSeed
 
 	planner         *planner.Planner
 	commandRegistry *planner.CommandRegistry
@@ -203,11 +200,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		pulls:                newPullTracker(),
 		startTime:            time.Now(),
 		ideationExploitRatio: constants.DefaultIdeationExploitRatio,
-		legacyIdeationSeed: ideationSeed{
-			enabled:  false,
-			interval: constants.DefaultIdeationInterval,
-		},
-		reg: reg,
+		reg:                  reg,
 		sandboxTestPassed: map[sandbox.Type]bool{
 			sandbox.Claude: false,
 			sandbox.Codex:  false,
@@ -226,9 +219,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	h.oauthManager = oauthMgr
 	h.cachedMaxParallel = lazyval.New(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
-		max := constants.DefaultMaxConcurrentTasks
+		limit := constants.DefaultMaxConcurrentTasks
 		if err == nil && cfg.MaxParallelTasks > 0 {
-			max = cfg.MaxParallelTasks
+			limit = cfg.MaxParallelTasks
 		}
 		// Host mode caps parallelism to 1 unless the user explicitly
 		// opted into more. The claude/codex CLIs share ~/.claude and
@@ -240,7 +233,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		if h.runner != nil && h.runner.HostMode() && cfg.MaxParallelTasks <= 0 {
 			return 1
 		}
-		return max
+		return limit
 	})
 	h.cachedMaxTestParallel = lazyval.New(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
@@ -529,77 +522,28 @@ func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) 
 	return h.openWatcherBreaker(watcher, taskID, reason)
 }
 
-// IdeationEnabled returns whether brainstorm auto-repeat is active. The
-// value lives on the system:ideation routine card; pre-bootstrap (before
-// the engine's first reconcile has seeded the card) we fall back to the
-// legacy seed so config-read round-trips don't observe a transient
-// false.
-func (h *Handler) IdeationEnabled() bool {
-	if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
-		return r.RoutineEnabled
-	}
-	h.ideationMu.Lock()
-	defer h.ideationMu.Unlock()
-	return h.legacyIdeationSeed.enabled
-}
+// IdeationEnabled always returns false. The toggle-based ideation flow
+// was retired when ideation moved to a regular task the user creates
+// from the composer. The accessor is retained so callers threading the
+// old config shape keep compiling.
+func (h *Handler) IdeationEnabled() bool { return false }
 
-// SetIdeation toggles the system:ideation routine's enabled flag. The
-// engine's reconciler picks up the change on its next wake, registering
-// or unregistering the timer as needed. Pre-bootstrap writes update the
-// legacy seed so the routine materializes with the desired state when
-// the engine first runs.
-func (h *Handler) SetIdeation(enabled bool) {
-	s, ok := h.currentStore()
-	if ok {
-		if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
-			_ = s.UpdateRoutineEnabled(context.Background(), r.ID, enabled)
-			return
-		}
-	}
-	h.ideationMu.Lock()
-	h.legacyIdeationSeed.enabled = enabled
-	h.ideationMu.Unlock()
-}
+// SetIdeation is a no-op. Kept for call-site compatibility while the
+// remaining references migrate off the legacy toggle.
+func (h *Handler) SetIdeation(bool) {}
 
-// IdeationInterval returns the interval between brainstorm fires, read
-// from the system:ideation routine card when it exists.
-func (h *Handler) IdeationInterval() time.Duration {
-	if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
-		return time.Duration(r.RoutineIntervalSeconds) * time.Second
-	}
-	h.ideationMu.Lock()
-	defer h.ideationMu.Unlock()
-	return h.legacyIdeationSeed.interval
-}
+// IdeationInterval always returns zero. Recurring ideation is now
+// expressed as a user-created routine, not a global config knob.
+func (h *Handler) IdeationInterval() time.Duration { return 0 }
 
-// SetIdeationInterval updates the schedule on the system:ideation
-// routine card. Pre-bootstrap writes update the seed so the routine
-// materializes with the right interval.
-func (h *Handler) SetIdeationInterval(d time.Duration) {
-	if d < 0 {
-		d = 0
-	}
-	s, ok := h.currentStore()
-	if ok {
-		if r := h.findSystemIdeationRoutine(context.Background()); r != nil {
-			_ = s.UpdateRoutineSchedule(context.Background(), r.ID, int(d/time.Second))
-			return
-		}
-	}
-	h.ideationMu.Lock()
-	h.legacyIdeationSeed.interval = d
-	h.ideationMu.Unlock()
-}
+// SetIdeationInterval is a no-op, retained for the same reason as the
+// other ideation shims above.
+func (h *Handler) SetIdeationInterval(time.Duration) {}
 
-// IdeationNextRun returns the scheduled time of the next brainstorm run,
-// or a zero time if no fire is pending. Sourced from the routine card's
-// RoutineNextRun, written by reconcileRoutines on every engine tick.
-func (h *Handler) IdeationNextRun() time.Time {
-	if r := h.findSystemIdeationRoutine(context.Background()); r != nil && r.RoutineNextRun != nil {
-		return *r.RoutineNextRun
-	}
-	return time.Time{}
-}
+// IdeationNextRun always returns the zero time. There is no longer a
+// system-wide pending ideation fire; each user-created idea-agent task
+// is scheduled individually.
+func (h *Handler) IdeationNextRun() time.Time { return time.Time{} }
 
 // IdeationExploitRatio returns the exploitation fraction (0.0–1.0).
 func (h *Handler) IdeationExploitRatio() float64 {
