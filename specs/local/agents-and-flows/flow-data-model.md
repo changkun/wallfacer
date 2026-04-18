@@ -1,6 +1,6 @@
 ---
 title: internal/flow package with data model and seeded built-ins
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/extract-agents-package.md
 affects:
