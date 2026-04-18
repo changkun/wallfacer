@@ -660,6 +660,12 @@
   font-size: var(--fs-10);
   color: var(--ink-2);
 }
+/* .composer sets display:flex which comes later in the cascade than
+   tailwind.css's .hidden { display: none }, so without this specific
+   override the form stays visible after hideNewTaskForm(). */
+.composer.hidden {
+  display: none;
+}
 
 .composer__head {
   display: flex;
