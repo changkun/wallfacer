@@ -1,11 +1,23 @@
 package gitutil
 
 import (
+	"context"
 	"path/filepath"
 	"strconv"
 
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
+
+// HasChanges reports whether worktreePath has any staged, unstaged, or untracked
+// changes. Errors from `git status` are surfaced so callers can distinguish
+// "clean tree" from "status check failed".
+func HasChanges(ctx context.Context, worktreePath string) (bool, error) {
+	out, err := cmdexec.Git(worktreePath, "status", "--porcelain").WithContext(ctx).Output()
+	if err != nil {
+		return false, err
+	}
+	return len(out) > 0, nil
+}
 
 // WorkspaceGitStatus holds the git state for a single workspace directory.
 // It is serialized to JSON for the UI's git status panel.

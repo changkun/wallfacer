@@ -140,6 +140,30 @@ func RemoteDefaultBranch(repoPath string) string {
 	return "main"
 }
 
+// InitLocalRepo initialises a git repository at path, sets a local
+// user.email / user.name identity, stages all files, and creates an initial
+// commit with the given message. The commit uses --allow-empty so it succeeds
+// even when path is empty. Used to track changes inside non-git workspace
+// snapshots so the standard commit pipeline can operate on them.
+func InitLocalRepo(path, email, name, initialCommitMsg string) error {
+	if out, err := cmdexec.Git(path, "init").Combined(); err != nil {
+		return fmt.Errorf("git init %s: %w\n%s", path, err, out)
+	}
+	if err := cmdexec.Git(path, "config", "user.email", email).Run(); err != nil {
+		return fmt.Errorf("git config user.email in %s: %w", path, err)
+	}
+	if err := cmdexec.Git(path, "config", "user.name", name).Run(); err != nil {
+		return fmt.Errorf("git config user.name in %s: %w", path, err)
+	}
+	if err := cmdexec.Git(path, "add", "-A").Run(); err != nil {
+		return fmt.Errorf("git add in %s: %w", path, err)
+	}
+	if out, err := cmdexec.Git(path, "commit", "--allow-empty", "-m", initialCommitMsg).Combined(); err != nil {
+		return fmt.Errorf("git commit in %s: %w\n%s", path, err, out)
+	}
+	return nil
+}
+
 // GetCommitHash returns the current HEAD commit hash in repoPath.
 func GetCommitHash(repoPath string) (string, error) {
 	out, err := cmdexec.Git(repoPath, "rev-parse", "HEAD").Output()
