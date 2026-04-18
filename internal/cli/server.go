@@ -802,6 +802,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TriggerIdeation":   h.TriggerIdeation,
 		"CancelIdeation":    h.CancelIdeation,
 
+		// Agents catalog (read-only for v1).
+		"ListAgents": h.ListAgents,
+		"GetAgent":   h.GetAgent,
+
 		// Routines.
 		"ListRoutines":          h.ListRoutines,
 		"CreateRoutine":         h.CreateRoutine,

@@ -1,0 +1,138 @@
+/* Agents mode: catalog of built-in sub-agent roles. */
+
+.agents-mode-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px 32px;
+}
+
+.agents-mode__inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.agents-mode__header {
+  margin-bottom: 20px;
+}
+
+.agents-mode__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink-primary, #111);
+}
+
+.agents-mode__subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted, #666);
+  line-height: 1.5;
+}
+
+.agents-mode__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agents-mode__empty {
+  font-size: 12px;
+  color: var(--ink-muted, #666);
+  padding: 12px 0;
+}
+
+.agents-row {
+  border: 1px solid var(--rule, #e5e5e5);
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.agents-row:hover {
+  border-color: var(--rule-strong, #c7c7c7);
+}
+
+.agents-row--open {
+  border-color: var(--ink-accent, #2563eb);
+}
+
+.agents-row__header {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) 1.2fr auto;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.agents-row__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-primary, #111);
+}
+
+.agents-row__meta {
+  font-size: 11px;
+  color: var(--ink-muted, #666);
+  font-variant-numeric: tabular-nums;
+}
+
+.agents-row__clone {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--rule, #e5e5e5);
+  background: transparent;
+  border-radius: 4px;
+  color: var(--ink-muted, #999);
+  cursor: not-allowed;
+}
+
+.agents-row__desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-secondary, #444);
+  line-height: 1.5;
+}
+
+.agents-row__body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule, #e5e5e5);
+}
+
+.agents-row__tmpl-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted, #666);
+  margin-bottom: 6px;
+}
+
+.agents-row__tmpl {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 10px 12px;
+  background: var(--surface-muted, #f7f7f7);
+  border: 1px solid var(--rule, #e5e5e5);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+}
+
+.agents-row__foot {
+  font-size: 11px;
+  color: var(--ink-muted, #666);
+  margin-top: 8px;
+}
+
+.agents-row__loading {
+  font-size: 12px;
+  color: var(--ink-muted, #666);
+  margin: 6px 0 0;
+}

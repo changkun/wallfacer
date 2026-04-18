@@ -126,6 +126,17 @@ var Routes = {
     },
   },
 
+  agents: {
+    // GET /api/agents
+    list: function () {
+      return "/api/agents";
+    },
+    // GET /api/agents/{slug}
+    get: function () {
+      return "/api/agents/{slug}";
+    },
+  },
+
   specs: {
     // GET /api/specs/tree
     tree: function () {

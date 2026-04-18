@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 112,
+  "route_count": 114,
   "routes": [
     {
       "method": "GET",
@@ -217,6 +217,24 @@
       "description": "Fire a routine immediately, bypassing the schedule; the scheduled cycle continues.",
       "tags": [
         "routines"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/agents",
+      "name": "ListAgents",
+      "description": "List all registered sub-agent roles (built-in catalog).",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/agents/{slug}",
+      "name": "GetAgent",
+      "description": "Get one agent's full descriptor including its prompt template body.",
+      "tags": [
+        "agents"
       ]
     },
     {
