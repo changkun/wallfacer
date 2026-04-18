@@ -83,6 +83,157 @@
     else if (typeof render === "function") render();
   }
 
+  // --- Pinned positions (drag-to-reposition) -------------------------------
+  //
+  // Each node's pinned (x, y) is persisted so dragged layouts survive a
+  // reload. We store the full Map as an array of [id, {x,y}] pairs for
+  // JSON compatibility.
+  var _pinnedPositions = _loadPinnedPositions();
+
+  function _loadPinnedPositions() {
+    try {
+      var raw = localStorage.getItem("depgraph-pinned-positions");
+      if (!raw) return new Map();
+      var arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return new Map();
+      return new Map(
+        arr.filter(function (e) {
+          return (
+            Array.isArray(e) &&
+            e.length === 2 &&
+            e[1] &&
+            typeof e[1].x === "number" &&
+            typeof e[1].y === "number"
+          );
+        }),
+      );
+    } catch (_e) {
+      return new Map();
+    }
+  }
+
+  function _savePinnedPositions() {
+    try {
+      localStorage.setItem(
+        "depgraph-pinned-positions",
+        JSON.stringify(Array.from(_pinnedPositions.entries())),
+      );
+    } catch (_e) {
+      // localStorage full or disabled — pin only lives for this session.
+    }
+  }
+
+  function _pinNode(id, x, y) {
+    if (!id || typeof x !== "number" || typeof y !== "number") return;
+    _pinnedPositions.set(id, { x: x, y: y });
+    _savePinnedPositions();
+    _lastFingerprint = null;
+    _scheduleMapRender();
+  }
+
+  function _unpinNode(id) {
+    if (!id || !_pinnedPositions.has(id)) return;
+    _pinnedPositions.delete(id);
+    _savePinnedPositions();
+    _lastFingerprint = null;
+    _scheduleMapRender();
+  }
+
+  function _pinnedIds() {
+    return new Set(_pinnedPositions.keys());
+  }
+
+  // --- Focus state ---------------------------------------------------------
+  //
+  // Focus is a session-only attention lens. Clicking a node sets it as the
+  // focus: the renderer dims everything outside its 1-hop neighbourhood
+  // and the viewport recentres on the focused node. Click the empty
+  // canvas (or the same node again) to clear.
+  var _focusedNodeId = null;
+
+  function _focusNode(id) {
+    // Toggle off if clicking the already-focused node (cheap "escape").
+    if (id && id === _focusedNodeId) {
+      _focusedNodeId = null;
+    } else {
+      _focusedNodeId = id || null;
+    }
+    _lastFingerprint = null;
+    _scheduleMapRender();
+    if (_focusedNodeId) _scrollFocusedIntoView(_focusedNodeId);
+  }
+
+  // Delegate navigation to the legacy click target (spec → Plan mode,
+  // task → modal). Called by the renderer on shift+click.
+  function _navigateNode(id, node) {
+    if (!id) return;
+    if (node && node.kind === "task") {
+      var taskId = id.replace(/^task:/, "");
+      if (typeof window.openTaskModal === "function")
+        window.openTaskModal(taskId);
+      else if (typeof window.openModal === "function") window.openModal(taskId);
+      return;
+    }
+    if (node && node.kind === "spec") {
+      var path = (node.extra && node.extra.path) || id.replace(/^spec:/, "");
+      if (!path) return;
+      if (typeof window.focusSpec === "function") {
+        if (typeof window.switchMode === "function")
+          window.switchMode("spec", { persist: true });
+        window.focusSpec(path);
+      }
+    }
+  }
+
+  function _scheduleMapRender() {
+    if (typeof scheduleRender === "function") scheduleRender();
+    else if (typeof render === "function") render();
+  }
+
+  // _scrollFocusedIntoView brings the focused node's node group into the
+  // visible viewport of #depgraph-mount on the next paint. The SVG has
+  // been (re)rendered by the time this runs because scheduleRender also
+  // goes through the RAF scheduler.
+  function _scrollFocusedIntoView(id) {
+    if (typeof requestAnimationFrame !== "function") return;
+    requestAnimationFrame(function () {
+      var mount = document.getElementById("depgraph-mount");
+      if (!mount) return;
+      var group = mount.querySelector('g[data-id="' + _escapeAttr(id) + '"]');
+      if (!group) return;
+      var rect =
+        typeof group.getBBox === "function" ? group.getBBox() : null;
+      if (!rect) return;
+      // Centre the focused node in the mount's viewport by scrolling to
+      // its top-left minus half the viewport size.
+      mount.scrollTo({
+        left: Math.max(0, rect.x + rect.width / 2 - mount.clientWidth / 2),
+        top: Math.max(0, rect.y + rect.height / 2 - mount.clientHeight / 2),
+        behavior: "smooth",
+      });
+    });
+  }
+
+  function _escapeAttr(s) {
+    return String(s).replace(/"/g, '\\"');
+  }
+
+  // resetMapLayout clears every user-pinned position and the focus state
+  // so the Map falls back to the auto-computed Sugiyama layout. Exposed
+  // globally so the "Reset layout" button in the Map header can call it
+  // directly.
+  function resetMapLayout() {
+    if (_pinnedPositions.size === 0 && !_focusedNodeId) return;
+    _pinnedPositions = new Map();
+    _focusedNodeId = null;
+    _savePinnedPositions();
+    _lastFingerprint = null;
+    _scheduleMapRender();
+  }
+  if (typeof window !== "undefined") {
+    window.resetMapLayout = resetMapLayout;
+  }
+
   // --- Canvas pan (hold Space + drag) --------------------------------------
   //
   // The Dep Graph canvas is an overflow:auto container with a potentially
@@ -626,6 +777,13 @@
       svg.style.display = "block";
       renderUnifiedGraph(graph, svg, {
         onToggleSpec: _toggleSpecExpanded,
+        onPinNode: _pinNode,
+        onUnpinNode: _unpinNode,
+        onFocusNode: _focusNode,
+        onNavigateNode: _navigateNode,
+        pinnedIds: _pinnedIds(),
+        pinnedPositions: _pinnedPositions,
+        focusedNodeId: _focusedNodeId,
       });
       _installPan();
       return;

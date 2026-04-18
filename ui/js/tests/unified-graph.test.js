@@ -49,6 +49,9 @@ function loadRenderer() {
       getAttribute(k) {
         return Object.hasOwn(_attrs, k) ? _attrs[k] : null;
       },
+      removeAttribute(k) {
+        delete _attrs[k];
+      },
       appendChild(child) {
         _children.push(child);
         return child;
@@ -651,5 +654,234 @@ describe("renderUnifiedGraph", () => {
     const xA = getX(byId.get("task:a"));
     const xB = getX(byId.get("task:b"));
     expect(xA).toBeLessThan(xB);
+  });
+
+  describe("interactions", () => {
+    // Helper to grab the node <g> and its inner body <g> for a given id.
+    function pickNode(svg, id) {
+      const group = svg.children.find(
+        (c) => c.tagName === "g" && c.getAttribute("data-id") === id,
+      );
+      const body = group && group.children.find((c) => c.tagName === "g");
+      return { group, body };
+    }
+
+    function fire(el, ev, payload) {
+      const ls = el._listeners[ev] || [];
+      for (const fn of ls) fn(payload || {});
+    }
+
+    it("invokes onFocusNode(id) on a plain click", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let focused = "unset";
+      renderUnifiedGraph(graph, svg, {
+        onFocusNode: (id) => {
+          focused = id;
+        },
+      });
+      const { body, group } = pickNode(svg, "task:a");
+      expect(body).toBeDefined();
+      // No transform set → treated as a click, not a drag.
+      expect(group.getAttribute("transform")).toBeNull();
+      fire(body, "click", { shiftKey: false });
+      expect(focused).toBe("task:a");
+    });
+
+    it("invokes onNavigateNode on shift+click", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let navigated = null;
+      let focused = "unset";
+      renderUnifiedGraph(graph, svg, {
+        onFocusNode: (id) => {
+          focused = id;
+        },
+        onNavigateNode: (id) => {
+          navigated = id;
+        },
+      });
+      const { body } = pickNode(svg, "task:a");
+      fire(body, "click", { shiftKey: true });
+      expect(navigated).toBe("task:a");
+      // Shift+click skips focus.
+      expect(focused).toBe("unset");
+    });
+
+    it("invokes onFocusNode(null) when the backdrop is clicked", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let focused = "unset";
+      renderUnifiedGraph(graph, svg, {
+        onFocusNode: (id) => {
+          focused = id;
+        },
+      });
+      const backdrop = svg.children.find(
+        (c) =>
+          c.tagName === "rect" &&
+          c.getAttribute("data-role") === "canvas-backdrop",
+      );
+      expect(backdrop).toBeDefined();
+      fire(backdrop, "click", {});
+      expect(focused).toBeNull();
+    });
+
+    it("invokes onPinNode(id, x, y) after a drag past the threshold", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let pinned = null;
+      renderUnifiedGraph(graph, svg, {
+        onPinNode: (id, x, y) => {
+          pinned = { id, x, y };
+        },
+      });
+      const { body } = pickNode(svg, "task:a");
+      fire(body, "mousedown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        stopPropagation: () => {},
+      });
+      fire(body, "mousemove", { clientX: 180, clientY: 140 });
+      fire(body, "mouseup", { clientX: 180, clientY: 140 });
+      expect(pinned).not.toBeNull();
+      expect(pinned.id).toBe("task:a");
+      // Drag delta (80, 40) applied to the node's original coords.
+      // Original x was set by layout (>0); the pin call adds the delta.
+      expect(pinned.x).toBeGreaterThan(0);
+      expect(pinned.y).toBeGreaterThan(0);
+    });
+
+    it("does not invoke onPinNode when movement stays under the drag threshold", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let pinned = null;
+      let focused = null;
+      renderUnifiedGraph(graph, svg, {
+        onPinNode: (id, x, y) => {
+          pinned = { id, x, y };
+        },
+        onFocusNode: (id) => {
+          focused = id;
+        },
+      });
+      const { body } = pickNode(svg, "task:a");
+      fire(body, "mousedown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        stopPropagation: () => {},
+      });
+      fire(body, "mousemove", { clientX: 101, clientY: 101 });
+      fire(body, "mouseup", { clientX: 101, clientY: 101 });
+      fire(body, "click", { shiftKey: false });
+      expect(pinned).toBeNull();
+      // A tap registered as a click, not a drag → focus fires.
+      expect(focused).toBe("task:a");
+    });
+
+    it("invokes onUnpinNode on dblclick", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [{ id: "a", title: "A", depends_on: [] }],
+        [],
+      );
+      const svg = makeEl("svg");
+      let unpinned = null;
+      renderUnifiedGraph(graph, svg, {
+        onUnpinNode: (id) => {
+          unpinned = id;
+        },
+      });
+      const { body } = pickNode(svg, "task:a");
+      fire(body, "dblclick", { stopPropagation: () => {} });
+      expect(unpinned).toBe("task:a");
+    });
+
+    it("dims nodes outside the focused node's 1-hop neighbourhood", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const tasks = [
+        { id: "a", title: "A", depends_on: [] },
+        { id: "b", title: "B", depends_on: ["a"] },
+        { id: "c", title: "C", depends_on: [] },
+      ];
+      const graph = buildUnifiedGraph(tasks, []);
+      const svg = makeEl("svg");
+      renderUnifiedGraph(graph, svg, { focusedNodeId: "task:a" });
+      const { group: groupA } = pickNode(svg, "task:a");
+      const { group: groupB } = pickNode(svg, "task:b");
+      const { group: groupC } = pickNode(svg, "task:c");
+      // Focused node + neighbour retain full opacity.
+      expect(groupA.getAttribute("opacity")).toBeNull();
+      expect(groupB.getAttribute("opacity")).toBeNull();
+      // Unrelated node is dimmed.
+      expect(groupC.getAttribute("opacity")).toBe("0.28");
+    });
+
+    it("draws a pin marker on nodes whose id is in pinnedIds", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [
+          { id: "a", title: "A", depends_on: [] },
+          { id: "b", title: "B", depends_on: [] },
+        ],
+        [],
+      );
+      const svg = makeEl("svg");
+      renderUnifiedGraph(graph, svg, { pinnedIds: new Set(["task:a"]) });
+      const { body: bodyA } = pickNode(svg, "task:a");
+      const { body: bodyB } = pickNode(svg, "task:b");
+      const pinA = bodyA.children.find(
+        (c) =>
+          c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
+      );
+      const pinB = bodyB.children.find(
+        (c) =>
+          c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
+      );
+      expect(pinA).toBeDefined();
+      expect(pinB).toBeUndefined();
+    });
+
+    it("honours pinnedPositions — a pinned node renders at exact (x, y)", () => {
+      const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
+      const graph = buildUnifiedGraph(
+        [
+          { id: "a", title: "A", depends_on: [] },
+          { id: "b", title: "B", depends_on: ["a"] },
+        ],
+        [],
+      );
+      const svg = makeEl("svg");
+      const pinnedPositions = new Map([
+        ["task:a", { x: 999, y: 555 }],
+      ]);
+      renderUnifiedGraph(graph, svg, { pinnedPositions });
+      const { body } = pickNode(svg, "task:a");
+      const rect = body.children.find((c) => c.tagName === "rect");
+      expect(Number(rect.getAttribute("x"))).toBe(999);
+      expect(Number(rect.getAttribute("y"))).toBe(555);
+    });
   });
 });

@@ -281,6 +281,22 @@
   color: var(--text-muted);
 }
 
+.depgraph-mode__reset-btn {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.depgraph-mode__reset-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
 .depgraph-mode__empty {
   color: var(--text-muted);
   font-size: 13px;

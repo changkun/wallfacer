@@ -8,9 +8,19 @@
       <div>
         <h2 class="depgraph-mode__title">Map</h2>
         <p class="depgraph-mode__subtitle">
-          Specs and tasks laid out by dependency. Prerequisites appear to
-          the left of what they enable. Click the <kbd>+</kbd> on a spec to
-          unfold its children; hold <kbd>Space</kbd> and drag to pan.
+          Specs and tasks by dependency.
+          Click a node to focus it; <kbd>Shift</kbd>+click to open.
+          Drag a node to pin it; double-click to un-pin.
+          <kbd>+</kbd> unfolds a spec; hold <kbd>Space</kbd> and drag to pan.
+          <button
+            type="button"
+            id="depgraph-reset-btn"
+            class="depgraph-mode__reset-btn"
+            onclick="resetMapLayout()"
+            title="Clear all pinned node positions"
+          >
+            Reset layout
+          </button>
         </p>
       </div>
       <ul class="depgraph-mode__legend" aria-label="Legend">
