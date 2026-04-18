@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -107,6 +108,12 @@ func (r *Runner) buildContainerSpecForSandbox(
 			"wallfacer.task.id":     taskID,
 			"wallfacer.task.prompt": truncate(prompt, 80),
 		}
+	}
+
+	// Host mode takes a separate path: no mounts, host paths verbatim,
+	// context surfaced via env vars instead of /workspace/.tasks/ mounts.
+	if r.HostMode() {
+		return r.buildHostSpec(spec, prompt, model, sessionID, sb, worktreeOverrides, boardDir, siblingMounts)
 	}
 
 	// Mount workspaces, substituting per-task worktree paths where available.
@@ -215,6 +222,99 @@ func (r *Runner) buildContainerSpecForSandbox(
 
 	spec.Network = r.resolvedContainerNetwork()
 	return spec
+}
+
+// buildHostSpec fills in the fields of a base ContainerSpec for host-mode
+// execution. It deliberately does NOT append to spec.Volumes — host mode has
+// no mounts. Instead, the composed workspace instructions, the board
+// manifest, and the sibling-worktree table are surfaced to the agent via
+// WALLFACER_* environment variables the HostBackend and agents can consult.
+//
+// CWD:
+//   - Single workspace: CWD is the host path of that workspace (worktree
+//     override applied when available).
+//   - Multi-workspace: pick the first; the agent can reach the others via
+//     the manifest file referenced by WALLFACER_SIBLING_WORKTREES_JSON. No
+//     pseudo-root like /workspace exists on the host.
+//
+// The returned spec has Entrypoint cleared (the host binary is the CLI
+// itself — no dispatcher entrypoint to invoke).
+func (r *Runner) buildHostSpec(
+	spec sandbox.ContainerSpec,
+	prompt, model, sessionID string,
+	_ sandbox.Type,
+	worktreeOverrides map[string]string,
+	boardDir string,
+	siblingMounts map[string]map[string]string,
+) sandbox.ContainerSpec {
+	// The agents-image entrypoint is meaningless on the host — we invoke
+	// the CLI binary directly.
+	spec.Entrypoint = ""
+	// Drop any base-spec mounts that describe container-only artifacts.
+	// HostBackend ignores spec.Volumes anyway, but dropping them here keeps
+	// tests that snapshot the spec readable.
+	spec.Volumes = nil
+
+	// Resolve CWD from the workspace list, preferring the worktree override.
+	workspaces := r.currentWorkspaces()
+	workDir := ""
+	for _, ws := range workspaces {
+		ws = strings.TrimSpace(ws)
+		if ws == "" {
+			continue
+		}
+		if wt, ok := worktreeOverrides[ws]; ok {
+			workDir = wt
+		} else {
+			workDir = ws
+		}
+		break
+	}
+	spec.WorkDir = workDir
+
+	// Surface instructions / board / siblings via env vars. HostBackend reads
+	// WALLFACER_INSTRUCTIONS_PATH to decide between --append-system-prompt
+	// and prompt-prepend fallback.
+	if instr := r.currentInstructionsPath(); instr != "" {
+		if _, err := os.Stat(instr); err == nil {
+			spec.Env["WALLFACER_INSTRUCTIONS_PATH"] = instr
+		}
+	}
+	if boardDir != "" {
+		boardPath := filepath.Join(boardDir, "board.json")
+		if _, err := os.Stat(boardPath); err == nil {
+			spec.Env["WALLFACER_BOARD_JSON"] = boardPath
+		}
+		if manifestPath, err := writeSiblingManifest(boardDir, siblingMounts); err == nil && manifestPath != "" {
+			spec.Env["WALLFACER_SIBLING_WORKTREES_JSON"] = manifestPath
+		} else if err != nil {
+			logger.Runner.Warn("host mode: write sibling manifest", "error", err)
+		}
+	}
+
+	spec.Cmd = buildAgentCmd(prompt, model)
+	if sessionID != "" {
+		spec.Cmd = append(spec.Cmd, "--resume", sessionID)
+	}
+	return spec
+}
+
+// writeSiblingManifest serializes the siblingMounts map to
+// boardDir/sibling_worktrees.json. Returns the absolute path and nil on
+// success, or "" and nil when the map is empty (nothing to write).
+func writeSiblingManifest(boardDir string, siblingMounts map[string]map[string]string) (string, error) {
+	if len(siblingMounts) == 0 {
+		return "", nil
+	}
+	path := filepath.Join(boardDir, "sibling_worktrees.json")
+	data, err := json.MarshalIndent(siblingMounts, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // instructionsFilenameForSandbox returns the container-side filename for

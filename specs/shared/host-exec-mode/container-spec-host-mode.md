@@ -1,6 +1,6 @@
 ---
 title: buildContainerSpecForSandbox respects host mode
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-exec-mode/runner-host-switch.md
 affects:
