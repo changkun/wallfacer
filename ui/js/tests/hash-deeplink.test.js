@@ -182,19 +182,25 @@ function makeModalContext() {
 }
 
 describe("openModal hash update", () => {
-  it('calls history.replaceState with "#<taskId>" after opening the modal', async () => {
+  it("calls history.replaceState with a task-scoped hash after opening the modal", async () => {
     const { ctx, replaceStateCalls } = makeModalContext();
     await vm.runInContext(`openModal('${TASK_ID}')`, ctx);
-    expect(replaceStateCalls[replaceStateCalls.length - 1]).toBe("#" + TASK_ID);
+    const last = replaceStateCalls[replaceStateCalls.length - 1];
+    // openModal writes "#<id>"; setMainTab then refines to "#<id>/<main-tab>".
+    // Either form is acceptable — we only care the hash is task-scoped.
+    expect(last).toMatch(new RegExp("^#" + TASK_ID + "(/[\\w-]+)?$"));
   });
 
-  it('last replaceState call is "#taskId" even when internal setRightTab is called first', async () => {
+  it("last replaceState call references the task id even when internal setRightTab is stubbed", async () => {
     const { ctx, replaceStateCalls } = makeModalContext();
-    // setRightTab is stubbed so it won't push to replaceStateCalls;
-    // the only call comes from openModal itself.
+    // setRightTab is stubbed so it won't push to replaceStateCalls; the
+    // remaining calls come from openModal's baseline and setMainTab's main-tab
+    // suffix. Both should carry the task id.
     await vm.runInContext(`openModal('${TASK_ID}')`, ctx);
-    expect(replaceStateCalls).toHaveLength(1);
-    expect(replaceStateCalls[0]).toBe("#" + TASK_ID);
+    expect(replaceStateCalls.length).toBeGreaterThanOrEqual(1);
+    replaceStateCalls.forEach((url) => {
+      expect(url).toMatch(new RegExp("^#" + TASK_ID + "(/[\\w-]+)?$"));
+    });
   });
 });
 
