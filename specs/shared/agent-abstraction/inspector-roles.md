@@ -1,6 +1,6 @@
 ---
 title: Migrate inspector roles (refinement, ideation) to runAgent
-status: validated
+status: complete
 depends_on:
   - specs/shared/agent-abstraction/descriptor-and-runagent.md
   - specs/shared/agent-abstraction/headless-roles.md
@@ -11,7 +11,7 @@ affects:
   - internal/runner/ideate_workspace.go
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---

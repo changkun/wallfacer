@@ -1,6 +1,6 @@
 ---
 title: Migrate heavyweight roles (implementation, testing) to runAgent
-status: validated
+status: complete
 depends_on:
   - specs/shared/agent-abstraction/inspector-roles.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - internal/runner/execute_testrun.go
 effort: large
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
