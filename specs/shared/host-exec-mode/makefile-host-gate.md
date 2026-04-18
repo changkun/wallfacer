@@ -1,6 +1,6 @@
 ---
 title: Document `make build-binary` as the host-mode build
-status: validated
+status: complete
 depends_on: []
 affects:
   - Makefile
