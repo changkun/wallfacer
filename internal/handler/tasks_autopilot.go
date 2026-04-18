@@ -295,7 +295,11 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					}
 					for i := range backlogTasks {
 						t := &backlogTasks[i]
-						if t.Kind == store.TaskKindIdeaAgent {
+						// Skip task-kinds that the auto-promoter must not touch:
+						// idea-agent runs are scheduled by their own watcher, and
+						// routine cards are schedule templates driven by the
+						// routine engine rather than the board lifecycle.
+						if t.IsIdeaAgent() || t.IsRoutine() {
 							continue
 						}
 						if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
@@ -1046,7 +1050,10 @@ func (h *Handler) tryAutoRefine(ctx context.Context) {
 
 		for i := range backlogTasks {
 			t := &backlogTasks[i]
-			if t.Kind == store.TaskKindIdeaAgent {
+			// Auto-refine targets human-authored prompts only. Idea-agent
+			// tasks already have an agent-authored prompt; routine cards are
+			// templates, not executable work.
+			if t.IsIdeaAgent() || t.IsRoutine() {
 				continue
 			}
 			if t.CurrentRefinement != nil {

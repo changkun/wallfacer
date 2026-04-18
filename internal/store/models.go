@@ -121,6 +121,7 @@ const (
 	TaskKindTask      TaskKind = ""           // default; regular implementation task
 	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
 	TaskKindPlanning  TaskKind = "planning"   // spec planning session task
+	TaskKindRoutine   TaskKind = "routine"    // scheduler template; spawns instance tasks on its interval
 )
 
 // SandboxActivity identifies which phase of a task a container run belongs to.
@@ -360,6 +361,29 @@ type Task struct {
 	LastFetchError string `json:"last_fetch_error,omitempty"`
 	// LastFetchErrorAt is when the last fetch failure was recorded.
 	LastFetchErrorAt *time.Time `json:"last_fetch_error_at,omitempty"`
+
+	// Routine fields — only set when Kind == TaskKindRoutine. A routine card is
+	// a schedule template, not an executable task; the scheduler engine in
+	// internal/routine fires it at RoutineNextRun and spawns a fresh instance
+	// task of RoutineSpawnKind with the routine's prompt.
+
+	// RoutineIntervalSeconds is the fixed interval between scheduled fires.
+	// Zero means the routine is paused. Must be >= 60 when set via the API.
+	RoutineIntervalSeconds int `json:"routine_interval_seconds,omitempty"`
+	// RoutineEnabled toggles the schedule without discarding the interval, so
+	// users can pause and resume a routine without re-entering its config.
+	RoutineEnabled bool `json:"routine_enabled,omitempty"`
+	// RoutineNextRun is the next scheduled fire time. Written by the handler
+	// whenever the engine re-arms; displayed in the UI as a countdown. Nil
+	// when the routine is disabled or paused.
+	RoutineNextRun *time.Time `json:"routine_next_run,omitempty"`
+	// RoutineLastFiredAt records when the routine most recently spawned an
+	// instance task (successful or not). Used by the UI to show "fired Xm ago".
+	RoutineLastFiredAt *time.Time `json:"routine_last_fired_at,omitempty"`
+	// RoutineSpawnKind is the Kind assigned to tasks spawned by this routine.
+	// Empty string spawns regular implementation tasks; "idea-agent" is used
+	// by the migrated ideation routine. Whitelisted at the API boundary.
+	RoutineSpawnKind TaskKind `json:"routine_spawn_kind,omitempty"`
 }
 
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry
@@ -375,6 +399,19 @@ func IsAutoRetryEligible(t Task, category FailureCategory) bool {
 // HasTag reports whether the task has the given tag.
 func (t *Task) HasTag(tag string) bool {
 	return slices.Contains(t.Tags, tag)
+}
+
+// IsRoutine reports whether the task is a routine schedule template.
+// Routine cards live outside the normal lifecycle — they stay in backlog
+// forever and are filtered out of autopilot, archiving, and dep-graph walks.
+func (t *Task) IsRoutine() bool {
+	return t.Kind == TaskKindRoutine
+}
+
+// IsIdeaAgent reports whether the task is a brainstorm/ideation task.
+// Provided as a counterpart to IsRoutine so autopilot checks stay readable.
+func (t *Task) IsIdeaAgent() bool {
+	return t.Kind == TaskKindIdeaAgent
 }
 
 // cloneRefinementSessionSlice deep-copies a []RefinementSession, duplicating

@@ -591,3 +591,82 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 	s.notify(t, false)
 	return nil
 }
+
+// UpdateRoutineSchedule sets the routine's fixed-interval schedule. A
+// non-positive intervalSeconds pauses the routine without altering its
+// enabled flag. Returns an error if the task is not a routine card.
+func (s *Store) UpdateRoutineSchedule(_ context.Context, id uuid.UUID, intervalSeconds int) error {
+	return s.mutateTask(id, func(t *Task) error {
+		if !t.IsRoutine() {
+			return fmt.Errorf("task %s is not a routine", id)
+		}
+		if intervalSeconds < 0 {
+			intervalSeconds = 0
+		}
+		t.RoutineIntervalSeconds = intervalSeconds
+		return nil
+	})
+}
+
+// UpdateRoutineEnabled toggles whether the scheduler engine should arm a
+// timer for this routine. Disabling clears RoutineNextRun so the UI does
+// not show a stale countdown.
+func (s *Store) UpdateRoutineEnabled(_ context.Context, id uuid.UUID, enabled bool) error {
+	return s.mutateTask(id, func(t *Task) error {
+		if !t.IsRoutine() {
+			return fmt.Errorf("task %s is not a routine", id)
+		}
+		t.RoutineEnabled = enabled
+		if !enabled {
+			t.RoutineNextRun = nil
+		}
+		return nil
+	})
+}
+
+// UpdateRoutineNextRun records the engine's computed next-fire time. nil
+// clears the field (used when disabling or between stop and re-arm).
+func (s *Store) UpdateRoutineNextRun(_ context.Context, id uuid.UUID, next *time.Time) error {
+	return s.mutateTask(id, func(t *Task) error {
+		if !t.IsRoutine() {
+			return fmt.Errorf("task %s is not a routine", id)
+		}
+		if next == nil || next.IsZero() {
+			t.RoutineNextRun = nil
+			return nil
+		}
+		ts := *next
+		t.RoutineNextRun = &ts
+		return nil
+	})
+}
+
+// UpdateRoutineLastFiredAt records the timestamp of the most recent fire
+// (successful or failed) so the UI can display "fired Nm ago".
+func (s *Store) UpdateRoutineLastFiredAt(_ context.Context, id uuid.UUID, fired *time.Time) error {
+	return s.mutateTask(id, func(t *Task) error {
+		if !t.IsRoutine() {
+			return fmt.Errorf("task %s is not a routine", id)
+		}
+		if fired == nil || fired.IsZero() {
+			t.RoutineLastFiredAt = nil
+			return nil
+		}
+		ts := *fired
+		t.RoutineLastFiredAt = &ts
+		return nil
+	})
+}
+
+// UpdateRoutineSpawnKind changes which Kind the routine's instance tasks
+// are created with. Callers must restrict the value to the whitelist
+// enforced at the API boundary ("", TaskKindIdeaAgent for v1).
+func (s *Store) UpdateRoutineSpawnKind(_ context.Context, id uuid.UUID, kind TaskKind) error {
+	return s.mutateTask(id, func(t *Task) error {
+		if !t.IsRoutine() {
+			return fmt.Errorf("task %s is not a routine", id)
+		}
+		t.RoutineSpawnKind = kind
+		return nil
+	})
+}

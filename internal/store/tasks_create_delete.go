@@ -46,6 +46,12 @@ type TaskCreateOptions struct {
 	ModelOverride      string
 	CustomPassPatterns []string
 	CustomFailPatterns []string
+
+	// Routine fields — only meaningful when Kind == TaskKindRoutine. Ignored
+	// for any other Kind.
+	RoutineIntervalSeconds int
+	RoutineEnabled         bool
+	RoutineSpawnKind       TaskKind
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
@@ -144,6 +150,15 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	}
 	if len(opts.CustomFailPatterns) > 0 {
 		task.CustomFailPatterns = append([]string(nil), opts.CustomFailPatterns...)
+	}
+
+	// Routine fields: only persisted when the kind matches so a misuse of
+	// the options struct for a non-routine task doesn't accidentally set
+	// schedule metadata that the engine would then try to act on.
+	if opts.Kind == TaskKindRoutine {
+		task.RoutineIntervalSeconds = opts.RoutineIntervalSeconds
+		task.RoutineEnabled = opts.RoutineEnabled
+		task.RoutineSpawnKind = opts.RoutineSpawnKind
 	}
 
 	// Build the search index entry before acquiring the lock.  Position is not
