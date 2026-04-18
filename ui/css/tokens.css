@@ -117,6 +117,15 @@
   --accent-hover: var(--accent-2);
   --shadow: var(--sh-2);
   --shadow-lg: var(--sh-pop);
+
+  /* Terminal surface — always dark, does not swap with theme. */
+  --terminal-bg: #1b1916;
+  --terminal-fg: #f4f1ea;
+  --terminal-rule: #2a2720;
+  --terminal-ink-muted: rgba(244, 241, 234, 0.55);
+  --terminal-ink-dim: rgba(244, 241, 234, 0.45);
+  --terminal-tab-hover: #24221d;
+  --terminal-tab-active: #2a2823;
 }
 
 [data-theme="dark"] {

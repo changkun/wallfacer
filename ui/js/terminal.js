@@ -59,8 +59,9 @@ var _darkAnsiColors = {
 };
 function _buildTermTheme() {
   // Terminal always renders on dark ink regardless of app theme (mock parity).
-  var bg = _getCSSVar("--ink") || "#1b1916";
-  var fg = _getCSSVar("--bg") || "#f4f1ea";
+  // Use fixed values rather than --ink/--bg, which swap under dark mode.
+  var bg = _getCSSVar("--terminal-bg") || "#1b1916";
+  var fg = _getCSSVar("--terminal-fg") || "#f4f1ea";
   var ansi = _darkAnsiColors;
   return {
     background: bg,
