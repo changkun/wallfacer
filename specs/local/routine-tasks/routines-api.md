@@ -1,6 +1,6 @@
 ---
 title: Routines HTTP API
-status: complete
+status: archived
 depends_on:
   - specs/local/routine-tasks/task-kind-and-fields.md
 affects:
@@ -16,6 +16,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Routines HTTP API
 

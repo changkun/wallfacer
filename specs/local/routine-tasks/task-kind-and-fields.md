@@ -1,6 +1,6 @@
 ---
 title: Routine task kind, fields, and store writers
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/store/models.go
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Routine task kind, fields, and store writers
 

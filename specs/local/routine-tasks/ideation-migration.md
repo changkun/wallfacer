@@ -1,6 +1,6 @@
 ---
 title: Migrate ideation to a system routine
-status: complete
+status: archived
 depends_on:
   - specs/local/routine-tasks/engine-integration.md
   - specs/local/routine-tasks/routine-card-ui.md
@@ -19,6 +19,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Migrate ideation to a system routine
 
