@@ -1,16 +1,17 @@
 ---
 title: "Native Containerization: Windows"
-status: drafted
+status: archived
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/foundations/windows-support.md
 affects: [internal/sandbox/]
 effort: large
 created: 2026-03-22
-updated: 2026-03-30
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Native Containerization: Windows
 
