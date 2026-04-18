@@ -201,8 +201,7 @@
       if (!mount) return;
       var group = mount.querySelector('g[data-id="' + _escapeAttr(id) + '"]');
       if (!group) return;
-      var rect =
-        typeof group.getBBox === "function" ? group.getBBox() : null;
+      var rect = typeof group.getBBox === "function" ? group.getBBox() : null;
       if (!rect) return;
       // Centre the focused node in the mount's viewport by scrolling to
       // its top-left minus half the viewport size.
@@ -232,6 +231,97 @@
   }
   if (typeof window !== "undefined") {
     window.resetMapLayout = resetMapLayout;
+  }
+
+  // --- Show archived toggle -------------------------------------------------
+  //
+  // Archived specs and tasks are hidden by default (matches the explorer's
+  // default). Flip the #depgraph-show-archived checkbox in the Map header
+  // to include them; the state persists in localStorage so the next reload
+  // honours the user's preference.
+  var _showArchived = _loadShowArchived();
+
+  function _loadShowArchived() {
+    try {
+      return localStorage.getItem("depgraph-show-archived") === "1";
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function setMapShowArchived(checked) {
+    _showArchived = !!checked;
+    try {
+      localStorage.setItem(
+        "depgraph-show-archived",
+        _showArchived ? "1" : "0",
+      );
+    } catch (_e) {
+      // localStorage full/disabled — the toggle only lives for this session.
+    }
+    _lastFingerprint = null;
+    _scheduleMapRender();
+  }
+
+  function _syncShowArchivedCheckbox() {
+    var cb = document.getElementById("depgraph-show-archived");
+    if (cb && cb.checked !== _showArchived) cb.checked = _showArchived;
+  }
+
+  // --- First-open centering -------------------------------------------------
+  //
+  // The Map's SVG can extend far past the visible viewport, and a fresh
+  // page load starts the scroll at (0, 0). If node coords happen to sit
+  // away from the top-left corner (common after layout sweeps push
+  // barycentres into the middle of the canvas) the user sees blank space
+  // and has to hunt for the graph.
+  //
+  // On the first render of a given Map-open session, and only while the
+  // user hasn't scrolled yet, bring the content's bounding box into
+  // view by scrolling to the content's centroid minus half the viewport.
+  // Subsequent renders keep whatever scroll the user has set.
+  var _centeredThisSession = false;
+
+  function _centerIntoViewIfUntouched() {
+    var mount = document.getElementById("depgraph-mount");
+    if (!mount) return;
+    if (_centeredThisSession) return;
+    if (mount.scrollLeft !== 0 || mount.scrollTop !== 0) {
+      _centeredThisSession = true;
+      return;
+    }
+    if (typeof requestAnimationFrame !== "function") return;
+    requestAnimationFrame(function () {
+      var svg = document.getElementById("depgraph-svg");
+      if (!svg || typeof svg.getBBox !== "function") return;
+      var bbox;
+      try {
+        bbox = svg.getBBox();
+      } catch (_e) {
+        return;
+      }
+      if (!bbox || bbox.width <= 0) return;
+      var centerX = bbox.x + bbox.width / 2;
+      var centerY = bbox.y + bbox.height / 2;
+      var targetX = Math.max(0, centerX - mount.clientWidth / 2);
+      var targetY = Math.max(0, centerY - mount.clientHeight / 2);
+      mount.scrollTo({ left: targetX, top: targetY, behavior: "instant" });
+      _centeredThisSession = true;
+    });
+  }
+
+  // Reset the centering flag whenever the user leaves Map mode so the
+  // next open re-anchors the content. Called from _applyMode transitions
+  // via window, since those live in a different module.
+  function _resetMapCentering() {
+    _centeredThisSession = false;
+  }
+  if (typeof window !== "undefined") {
+    window._resetMapCentering = _resetMapCentering;
+  }
+
+  if (typeof window !== "undefined") {
+    window.setMapShowArchived = setMapShowArchived;
   }
 
   // --- Canvas pan (hold Space + drag) --------------------------------------
@@ -753,8 +843,11 @@
       specNodes.length > 0;
 
     if (useUnified) {
+      _syncShowArchivedCheckbox();
       var graph = buildUnifiedGraph(tasks, specNodes, {
         collapsedSpecs: _collapsedSetFor(specNodes),
+        includeArchivedSpecs: _showArchived,
+        includeArchivedTasks: _showArchived,
       });
       // Always make the panel visible — returning early without doing so
       // leaves it hidden after Dep Graph → Board → Dep Graph round-trips.
@@ -786,6 +879,7 @@
         focusedNodeId: _focusedNodeId,
       });
       _installPan();
+      _centerIntoViewIfUntouched();
       return;
     }
 

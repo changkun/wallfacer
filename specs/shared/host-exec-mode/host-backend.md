@@ -1,6 +1,6 @@
 ---
 title: HostBackend implementation
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/sandbox/host.go
@@ -12,6 +12,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # HostBackend implementation
 

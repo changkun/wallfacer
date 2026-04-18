@@ -1,6 +1,6 @@
 ---
-title: `wallfacer run --backend host` selects HostBackend
-status: complete
+title: "`wallfacer run --backend host` selects HostBackend"
+status: archived
 depends_on:
   - specs/shared/host-exec-mode/host-backend.md
   - specs/shared/host-exec-mode/envconfig-host-option.md
@@ -15,6 +15,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # `wallfacer run --backend host` selects HostBackend
 

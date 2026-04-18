@@ -303,7 +303,15 @@ function _applyMode(mode) {
   // #depgraph-mode-container while this mode is active. The panel is mounted
   // on first render (see depgraph.js getOrCreatePanel).
   if (typeof window !== "undefined") {
+    var leavingDepgraph =
+      window.depGraphEnabled && mode !== "depgraph";
     window.depGraphEnabled = mode === "depgraph";
+    if (leavingDepgraph && typeof window._resetMapCentering === "function") {
+      // Re-anchor the content on the next Map open — user was working in
+      // a different mode, so it's fair to show them the graph's centroid
+      // again when they come back.
+      window._resetMapCentering();
+    }
   }
   if (mode === "depgraph") {
     // Populate the spec tree so the unified renderer has both sides of the

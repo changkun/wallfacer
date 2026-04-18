@@ -151,9 +151,7 @@ describe("buildUnifiedGraph", () => {
     expect(nodes).toHaveLength(2);
     expect(nodes.every((n) => n.kind === "task")).toBe(true);
     // b.depends_on = [a] → a must come first, edge is a → b.
-    expect(edges).toEqual([
-      { from: "task:a", to: "task:b", kind: "task_dep" },
-    ]);
+    expect(edges).toEqual([{ from: "task:a", to: "task:b", kind: "task_dep" }]);
   });
 
   it("skips archived tasks by default", () => {
@@ -168,9 +166,7 @@ describe("buildUnifiedGraph", () => {
 
   it("includes archived tasks when opts.includeArchivedTasks is true", () => {
     const buildUnifiedGraph = loadModule();
-    const tasks = [
-      { id: "a", title: "A", archived: true, depends_on: [] },
-    ];
+    const tasks = [{ id: "a", title: "A", archived: true, depends_on: [] }];
     const { nodes } = buildUnifiedGraph(tasks, [], {
       includeArchivedTasks: true,
     });
@@ -181,12 +177,7 @@ describe("buildUnifiedGraph", () => {
   it("emits spec nodes and containment edges from the spec tree", () => {
     const buildUnifiedGraph = loadModule();
     const nodes = [
-      specNode(
-        "specs/foo.md",
-        spec({ title: "Foo" }),
-        ["specs/foo/bar.md"],
-        0,
-      ),
+      specNode("specs/foo.md", spec({ title: "Foo" }), ["specs/foo/bar.md"], 0),
       specNode("specs/foo/bar.md", spec({ title: "Bar" }), [], 1),
     ];
     const result = buildUnifiedGraph([], nodes);
@@ -286,7 +277,9 @@ describe("buildUnifiedGraph", () => {
         1,
       ),
     ];
-    const tasks = [{ id: "task-123", title: "Dispatched task", depends_on: [] }];
+    const tasks = [
+      { id: "task-123", title: "Dispatched task", depends_on: [] },
+    ];
     const result = buildUnifiedGraph(tasks, specNodes);
 
     const dispatchEdge = result.edges.find((e) => e.kind === "dispatch");
@@ -330,9 +323,7 @@ describe("buildUnifiedGraph", () => {
 
   it("keeps standalone tasks (no spec dispatches to them) in the graph", () => {
     const buildUnifiedGraph = loadModule();
-    const tasks = [
-      { id: "orphan", title: "Orphan task", depends_on: [] },
-    ];
+    const tasks = [{ id: "orphan", title: "Orphan task", depends_on: [] }];
     const result = buildUnifiedGraph(tasks, []);
     const taskNode = result.nodes.find((n) => n.id === "task:orphan");
     expect(taskNode).toBeDefined();
@@ -380,18 +371,14 @@ describe("buildUnifiedGraph", () => {
 
   it("uses the basename as a fallback label when spec.title is empty", () => {
     const buildUnifiedGraph = loadModule();
-    const nodes = [
-      specNode("specs/foo/bar.md", spec({ title: "" }), [], 1),
-    ];
+    const nodes = [specNode("specs/foo/bar.md", spec({ title: "" }), [], 1)];
     const result = buildUnifiedGraph([], nodes);
     expect(result.nodes[0].label).toBe("bar.md");
   });
 
   it("uses a short id as a fallback label when task.title is empty", () => {
     const buildUnifiedGraph = loadModule();
-    const tasks = [
-      { id: "abcdef1234", title: "", depends_on: [] },
-    ];
+    const tasks = [{ id: "abcdef1234", title: "", depends_on: [] }];
     const { nodes } = buildUnifiedGraph(tasks, []);
     expect(nodes[0].label).toBe("abcdef12");
   });
@@ -567,8 +554,20 @@ describe("renderUnifiedGraph", () => {
   it("draws a toggle handle on spec nodes with children and invokes onToggleSpec on click", () => {
     const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
     const specNodes = [
-      { path: "p.md", spec: spec({ title: "P" }), children: ["p/c.md"], is_leaf: false, depth: 0 },
-      { path: "p/c.md", spec: spec({ title: "C" }), children: [], is_leaf: true, depth: 1 },
+      {
+        path: "p.md",
+        spec: spec({ title: "P" }),
+        children: ["p/c.md"],
+        is_leaf: false,
+        depth: 0,
+      },
+      {
+        path: "p/c.md",
+        spec: spec({ title: "C" }),
+        children: [],
+        is_leaf: true,
+        depth: 1,
+      },
     ];
     const graph = buildUnifiedGraph([], specNodes);
     const svg = makeEl("svg");
@@ -597,7 +596,13 @@ describe("renderUnifiedGraph", () => {
   it("omits the toggle handle for leaf specs (no children)", () => {
     const { buildUnifiedGraph, renderUnifiedGraph, makeEl } = loadRenderer();
     const specNodes = [
-      { path: "leaf.md", spec: spec({ title: "L" }), children: [], is_leaf: true, depth: 0 },
+      {
+        path: "leaf.md",
+        spec: spec({ title: "L" }),
+        children: [],
+        is_leaf: true,
+        depth: 0,
+      },
     ];
     const graph = buildUnifiedGraph([], specNodes);
     const svg = makeEl("svg");
@@ -853,12 +858,10 @@ describe("renderUnifiedGraph", () => {
       const { body: bodyA } = pickNode(svg, "task:a");
       const { body: bodyB } = pickNode(svg, "task:b");
       const pinA = bodyA.children.find(
-        (c) =>
-          c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
+        (c) => c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
       );
       const pinB = bodyB.children.find(
-        (c) =>
-          c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
+        (c) => c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
       );
       expect(pinA).toBeDefined();
       expect(pinB).toBeUndefined();
@@ -874,9 +877,7 @@ describe("renderUnifiedGraph", () => {
         [],
       );
       const svg = makeEl("svg");
-      const pinnedPositions = new Map([
-        ["task:a", { x: 999, y: 555 }],
-      ]);
+      const pinnedPositions = new Map([["task:a", { x: 999, y: 555 }]]);
       renderUnifiedGraph(graph, svg, { pinnedPositions });
       const { body } = pickNode(svg, "task:a");
       const rect = body.children.find((c) => c.tagName === "rect");

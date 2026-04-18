@@ -1,6 +1,6 @@
 ---
 title: E2E lifecycle test covers host backend
-status: complete
+status: archived
 depends_on:
   - specs/shared/host-exec-mode/host-backend.md
   - specs/shared/host-exec-mode/container-spec-host-mode.md
@@ -15,6 +15,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # E2E lifecycle test covers host backend
 

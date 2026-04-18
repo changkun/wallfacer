@@ -162,7 +162,9 @@
     for (var depPath in specByPath) {
       if (hiddenSpecs[depPath]) continue;
       var depSpec = specByPath[depPath].spec;
-      var dependsOn = Array.isArray(depSpec.depends_on) ? depSpec.depends_on : [];
+      var dependsOn = Array.isArray(depSpec.depends_on)
+        ? depSpec.depends_on
+        : [];
       for (var d = 0; d < dependsOn.length; d++) {
         var target = dependsOn[d];
         if (!specByPath[target]) continue;
@@ -214,8 +216,7 @@
       if (hiddenSpecs[ldPath]) continue;
       var leafSpec = specByPath[ldPath].spec;
       var dtid =
-        leafSpec.dispatched_task_id &&
-        leafSpec.dispatched_task_id !== "null"
+        leafSpec.dispatched_task_id && leafSpec.dispatched_task_id !== "null"
           ? leafSpec.dispatched_task_id
           : null;
       if (!dtid) continue;
@@ -252,15 +253,78 @@
   // ---------------------------------------------------------------------------
 
   var PAD = 24;
-  var NODE_W = 200;
+  var NODE_W = 220;
+  // NODE_H is a floor only; labels that wrap to multiple lines grow the
+  // node vertically via _computeNodeHeight.
   var NODE_H = 52;
   var H_GAP = 80;
   var V_GAP = 18;
+
+  // Label wrap tuning. Characters per line at 12px system fonts inside a
+  // 220px-wide node leaves room for the 8px inset and the right-side
+  // toggle chip on specs with children. Each line past the first adds
+  // LABEL_LINE_H to the node height.
+  var LABEL_CHARS_PER_LINE = 26;
+  var LABEL_CHARS_PER_LINE_WITH_TOGGLE = 22;
+  var LABEL_LINE_H = 15;
+  var LABEL_TOP_PAD = 24; // vertical space reserved above the label
+  var LABEL_BOTTOM_PAD = 12;
 
   // Dummy-node rail: intermediate waypoints for long edges take up far less
   // vertical space than full nodes so the resulting polyline reads as a
   // smooth curve rather than as discrete stepped segments.
   var DUMMY_H = 0;
+
+  // _wrapLabel splits a label into lines of at most `maxChars` characters,
+  // breaking on whitespace where possible and hard-wrapping runs that
+  // exceed the limit (e.g. a long spec path). Returns an array of strings.
+  function _wrapLabel(label, maxChars) {
+    if (!label) return [""];
+    var lines = [];
+    var words = String(label).split(/\s+/);
+    var current = "";
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (w.length === 0) continue;
+      // Hard-break runs longer than the line length (URLs, long paths).
+      while (w.length > maxChars) {
+        if (current) {
+          lines.push(current);
+          current = "";
+        }
+        lines.push(w.slice(0, maxChars));
+        w = w.slice(maxChars);
+      }
+      if (!current) {
+        current = w;
+      } else if (current.length + 1 + w.length <= maxChars) {
+        current += " " + w;
+      } else {
+        lines.push(current);
+        current = w;
+      }
+    }
+    if (current) lines.push(current);
+    if (lines.length === 0) lines.push("");
+    return lines;
+  }
+
+  function _nodeLabelLines(node) {
+    var hasToggle = node && node.extra && node.extra.hasChildren;
+    var maxChars = hasToggle
+      ? LABEL_CHARS_PER_LINE_WITH_TOGGLE
+      : LABEL_CHARS_PER_LINE;
+    return _wrapLabel(node.label || "", maxChars);
+  }
+
+  // _computeNodeHeight returns the total pixel height for a node, driven
+  // by how many lines its label wraps to.
+  function _computeNodeHeight(node) {
+    var lines = _nodeLabelLines(node);
+    var contentH =
+      LABEL_TOP_PAD + lines.length * LABEL_LINE_H + LABEL_BOTTOM_PAD;
+    return Math.max(NODE_H, contentH);
+  }
 
   // Task status → background colour (matches depgraph.js).
   var TASK_STATUS_COLORS = {
@@ -297,9 +361,9 @@
   // tweaking the palette; a future theme refactor should consolidate them.
   var EDGE_STYLES = {
     containment: { color: "#7a7570", width: 1.2, dash: null },
-    dispatch:    { color: "#3b82c4", width: 1.5, dash: null },
-    spec_dep:    { color: "#b07045", width: 1.5, dash: "6 3" },
-    task_dep:    { color: "#5a9058", width: 1.5, dash: "4 2" },
+    dispatch: { color: "#3b82c4", width: 1.5, dash: null },
+    spec_dep: { color: "#b07045", width: 1.5, dash: "6 3" },
+    task_dep: { color: "#5a9058", width: 1.5, dash: "4 2" },
   };
 
   function svgNs(tag) {
@@ -378,8 +442,9 @@
     var maxX = 0;
     var maxY = 0;
     positions.forEach(function (p) {
+      var h = p.height || NODE_H;
       if (p.x + NODE_W > maxX) maxX = p.x + NODE_W;
-      if (p.y + NODE_H > maxY) maxY = p.y + NODE_H;
+      if (p.y + h > maxY) maxY = p.y + h;
     });
     if (pinnedPositions) {
       pinnedPositions.forEach(function (pos, id) {
@@ -387,8 +452,9 @@
         if (!current || current.kind !== "real") return;
         current.x = pos.x;
         current.y = pos.y;
+        var h = current.height || NODE_H;
         if (pos.x + NODE_W > maxX) maxX = pos.x + NODE_W;
-        if (pos.y + NODE_H > maxY) maxY = pos.y + NODE_H;
+        if (pos.y + h > maxY) maxY = pos.y + h;
       });
       // Recompute edge paths against the updated positions.
       edgePaths = _routeEdges(graph, expanded.edgeChains, positions);
@@ -633,41 +699,48 @@
   // The result is that nodes with a shared predecessor cluster at
   // similar heights across columns — edges read as mostly-straight
   // lines instead of zig-zagging between arbitrary slots.
+  // _itemHeight returns the pixel height of a layer item. Real nodes can
+  // grow beyond NODE_H when their label wraps to multiple lines; dummies
+  // are zero-height rails between real nodes.
+  function _itemHeight(item) {
+    if (item.kind === "dummy") return DUMMY_H;
+    return item.node ? _computeNodeHeight(item.node) : NODE_H;
+  }
+
   function _assignCoordinates(layers, adjDown, adjUp) {
     var positions = new Map();
-    var STEP = NODE_H + V_GAP;
 
-    function baseY(layer, idx) {
-      return PAD + idx * STEP;
-    }
-
-    // Seed: top-align each column.
+    // Seed: top-align each column, letting taller (wrapped) nodes push
+    // subsequent nodes further down.
     layers.forEach(function (layer, L) {
       var x = PAD + L * (NODE_W + H_GAP);
-      layer.forEach(function (item, idx) {
+      var y = PAD;
+      layer.forEach(function (item) {
+        var h = _itemHeight(item);
         positions.set(item.id, {
           x: item.kind === "dummy" ? x + NODE_W / 2 : x,
-          y: baseY(L, idx),
+          y: y,
           node: item.node || null,
           kind: item.kind,
+          height: h,
         });
+        y += h + V_GAP;
       });
     });
 
     if (!adjDown || !adjUp) return positions;
 
-    // Sweep helper: push each node toward the mean y of its neighbours
-    // in the *reference* layer, preserving the order in the current
-    // layer and packing to prevent overlaps.
+    // Sweep helper: push each node toward the mean y of its neighbours'
+    // centres in the reference layer, preserving order and packing to
+    // prevent overlaps. Desired y for the current node is the mean
+    // reference centre minus the current node's half-height, so centres
+    // line up across columns regardless of node height.
     function sweep(layerIdx, refLayerIdx, neighborMap) {
       var layer = layers[layerIdx];
       if (!layer || layer.length === 0) return;
       var refLayer = layers[refLayerIdx];
       if (!refLayer) return;
 
-      var x = positions.get(layer[0].id).x; // column x stays fixed
-
-      // Compute desired y for each node.
       var desired = layer.map(function (item, idx) {
         var ns = neighborMap.get(item.id) || [];
         var sum = 0;
@@ -675,31 +748,33 @@
         for (var i = 0; i < ns.length; i++) {
           var p = positions.get(ns[i]);
           if (!p) continue;
-          sum += p.y;
+          sum += p.y + (p.height || 0) / 2;
           count++;
         }
+        var currentPos = positions.get(item.id);
+        var h = currentPos ? currentPos.height || _itemHeight(item) : _itemHeight(item);
+        var centre =
+          count > 0
+            ? sum / count
+            : (currentPos ? currentPos.y : 0) + h / 2;
         return {
           item: item,
           idx: idx,
-          desired: count > 0 ? sum / count : positions.get(item.id).y,
+          height: h,
+          desired: centre - h / 2,
         };
       });
 
-      // Pack top-to-bottom in the current layer's order (already
-      // optimised by barycenter sweeps). For each node, its final y is
-      // max(desired, prev_y + STEP).
       var cursor = PAD;
       for (var i = 0; i < desired.length; i++) {
         var d = desired[i];
         var y = Math.max(d.desired, cursor);
         var pos = positions.get(d.item.id);
         pos.y = y;
-        cursor = y + (d.item.kind === "dummy" ? DUMMY_H : STEP);
+        cursor = y + d.height + V_GAP;
       }
     }
 
-    // Alternate down and up passes; a handful of iterations is enough
-    // for the positions to settle on a quasi-fixed point.
     for (var iter = 0; iter < 6; iter++) {
       for (var L = 1; L < layers.length; L++) sweep(L, L - 1, adjUp);
       for (var M = layers.length - 2; M >= 0; M--) sweep(M, M + 1, adjDown);
@@ -712,7 +787,7 @@
     var max = 0;
     layers.forEach(function (layer) {
       var h = layer.reduce(function (sum, item) {
-        return sum + (item.kind === "dummy" ? DUMMY_H : NODE_H) + V_GAP;
+        return sum + _itemHeight(item) + V_GAP;
       }, 0);
       if (h > max) max = h;
     });
@@ -727,10 +802,11 @@
           var id = entry.chain[i];
           var p = positions.get(id);
           if (!p) return null;
+          var h = p.height || NODE_H;
           if (i === 0) {
-            points.push({ x: p.x + NODE_W, y: p.y + NODE_H / 2 });
+            points.push({ x: p.x + NODE_W, y: p.y + h / 2 });
           } else if (i === entry.chain.length - 1) {
-            points.push({ x: p.x, y: p.y + NODE_H / 2 });
+            points.push({ x: p.x, y: p.y + h / 2 });
           } else {
             points.push({ x: p.x, y: p.y });
           }
@@ -757,11 +833,17 @@
       var cp = Math.max(20, dx / 2);
       d +=
         " C" +
-        (a.x + cp) + "," + a.y +
+        (a.x + cp) +
+        "," +
+        a.y +
         " " +
-        (b.x - cp) + "," + b.y +
+        (b.x - cp) +
+        "," +
+        b.y +
         " " +
-        b.x + "," + b.y;
+        b.x +
+        "," +
+        b.y;
     }
     return d;
   }
@@ -875,6 +957,7 @@
       var n = pos.node;
       var x = pos.x;
       var y = pos.y;
+      var h = pos.height || NODE_H;
 
       var g = svgNs("g");
       g.setAttribute("data-kind", n.kind);
@@ -890,7 +973,7 @@
       rect.setAttribute("x", String(x));
       rect.setAttribute("y", String(y));
       rect.setAttribute("width", String(NODE_W));
-      rect.setAttribute("height", String(NODE_H));
+      rect.setAttribute("height", String(h));
       rect.setAttribute("rx", n.kind === "spec" ? "12" : "6");
       rect.setAttribute(
         "fill",
@@ -917,25 +1000,30 @@
       chip.textContent = n.kind === "spec" ? "SPEC" : "TASK";
       body.appendChild(chip);
 
-      var hasToggle =
-        n.kind === "spec" && n.extra && n.extra.hasChildren;
-      var labelMaxChars = hasToggle ? 22 : 26;
-      var rawLabel = n.label || "";
-      var truncated =
-        rawLabel.length > labelMaxChars
-          ? rawLabel.slice(0, labelMaxChars) + "\u2026"
-          : rawLabel;
-      var labelCenterX = hasToggle
-        ? x + (NODE_W - 28) / 2
-        : x + NODE_W / 2;
+      // Label wraps to multiple lines — no truncation. Each line is a
+      // <tspan> with dy stepping by LABEL_LINE_H. The label block is
+      // vertically centred within the node's content area (below the
+      // type chip).
+      var hasToggle = n.kind === "spec" && n.extra && n.extra.hasChildren;
+      var lines = _nodeLabelLines(n);
+      var labelCenterX = hasToggle ? x + (NODE_W - 28) / 2 : x + NODE_W / 2;
+      var totalLabelH = lines.length * LABEL_LINE_H;
+      var labelStartY =
+        y + LABEL_TOP_PAD + Math.max(0, (h - LABEL_TOP_PAD - LABEL_BOTTOM_PAD - totalLabelH) / 2);
       var label = svgNs("text");
       label.setAttribute("x", String(labelCenterX));
-      label.setAttribute("y", String(y + NODE_H / 2 + 10));
+      label.setAttribute("y", String(labelStartY));
       label.setAttribute("text-anchor", "middle");
       label.setAttribute("font-size", "12");
       label.setAttribute("font-family", "system-ui, sans-serif");
       label.setAttribute("fill", "#ffffff");
-      label.textContent = truncated;
+      for (var li = 0; li < lines.length; li++) {
+        var tspan = svgNs("tspan");
+        tspan.setAttribute("x", String(labelCenterX));
+        tspan.setAttribute("dy", li === 0 ? "0" : String(LABEL_LINE_H));
+        tspan.textContent = lines[li];
+        label.appendChild(tspan);
+      }
       body.appendChild(label);
 
       // Pin marker on the top-left corner for user-pinned nodes.
@@ -952,7 +1040,7 @@
       g.appendChild(body);
 
       if (hasToggle) {
-        var handle = _makeToggleHandle(n, x, y, opts);
+        var handle = _makeToggleHandle(n, x, y, h, opts);
         if (handle) g.appendChild(handle);
       }
 
@@ -992,10 +1080,7 @@
       if (!dragState) return;
       var dx = e.clientX - dragState.startX;
       var dy = e.clientY - dragState.startY;
-      if (
-        !dragState.moved &&
-        Math.hypot(dx, dy) < DRAG_THRESHOLD
-      ) {
+      if (!dragState.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) {
         return;
       }
       dragState.moved = true;
@@ -1053,10 +1138,18 @@
   // _makeToggleHandle returns an <g> containing the +/- chip that
   // expands/collapses a spec's children. Click handler stops propagation
   // so the main body's spec-focus click doesn't also fire.
-  function _makeToggleHandle(n, x, y, opts) {
+  function _makeToggleHandle(n, x, y, h, opts) {
+    // Keep the toggle near the top of tall wrapped nodes so it stays
+    // within a comfortable click reach regardless of how many label
+    // lines the spec's title occupies.
+    if (typeof opts === "undefined" && typeof h === "object") {
+      opts = h;
+      h = NODE_H;
+    }
+    var nodeH = typeof h === "number" ? h : NODE_H;
     var collapsed = !!(n.extra && n.extra.collapsed);
     var cx = x + NODE_W - 16;
-    var cy = y + NODE_H / 2;
+    var cy = y + Math.min(26, nodeH / 2);
     var handle = svgNs("g");
     handle.style.cursor = "pointer";
     handle.setAttribute("data-role", "toggle");

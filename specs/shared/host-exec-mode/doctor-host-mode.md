@@ -1,6 +1,6 @@
 ---
 title: wallfacer doctor reports host-mode readiness
-status: complete
+status: archived
 depends_on:
   - specs/shared/host-exec-mode/envconfig-host-option.md
 affects:
@@ -13,6 +13,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # wallfacer doctor reports host-mode readiness
 

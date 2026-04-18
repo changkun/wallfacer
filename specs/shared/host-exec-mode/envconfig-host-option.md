@@ -1,6 +1,6 @@
 ---
 title: envconfig exposes host-binary path overrides
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/envconfig/envconfig.go
@@ -11,6 +11,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # envconfig exposes host-binary path overrides
 
