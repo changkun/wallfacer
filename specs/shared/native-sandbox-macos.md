@@ -1,15 +1,16 @@
 ---
 title: "Native Containerization: macOS"
-status: drafted
+status: archived
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects: [internal/sandbox/]
 effort: large
 created: 2026-03-13
-updated: 2026-03-30
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Native Containerization: macOS
 
