@@ -1,6 +1,6 @@
 ---
 title: E2E lifecycle test covers host backend
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-exec-mode/host-backend.md
   - specs/shared/host-exec-mode/container-spec-host-mode.md

@@ -213,10 +213,15 @@ test-frontend: ui-ts
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex sandboxes.
 # Requires a running wallfacer server with valid credentials.
-# Usage: make e2e-lifecycle [SANDBOX=claude|codex]
+# Usage:
+#   make e2e-lifecycle                          # container backend, both sandboxes
+#   make e2e-lifecycle SANDBOX=claude           # container backend, claude only
+#   make e2e-lifecycle BACKEND=host             # host backend (server must be running with --backend host)
+#   make e2e-lifecycle BACKEND=host SANDBOX=claude
 SANDBOX ?=
+BACKEND ?=
 e2e-lifecycle:
-	sh scripts/e2e-lifecycle.sh $(SANDBOX)
+	BACKEND=$(BACKEND) sh scripts/e2e-lifecycle.sh $(SANDBOX)
 
 # End-to-end: dependency DAG (8 tasks with fan-out/fan-in, conflict resolution, autopilot).
 # Requires a running wallfacer server. Pass WORKSPACE= pointing at a fresh git repo.
