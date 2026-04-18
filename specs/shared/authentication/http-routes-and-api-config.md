@@ -26,10 +26,14 @@ fields so the frontend can decide whether to render the sign-in badge.
 
 ## What to do
 
-1. **Handler constructor** — Extend `handler.New` (see
+1. **Handler constructor** — Extend `handler.NewHandler` (see
    `internal/handler/doc.go` and the existing constructor) to accept an
    `*auth.Client` (nullable). Store it on the `Handler` struct. Follow the
    pattern in `~/dev/latere.ai/latere-ai/internal/handler/handler.go`.
+   Before editing, grep the codebase for every call site of
+   `handler.NewHandler` (CLI server wiring, desktop entry, `*_test.go`
+   fixtures) and update them all in the same commit; pass `nil` for the
+   new parameter in every call site that is not the cloud-mode entry.
 2. **Auth handlers** — Add `internal/handler/auth.go`:
    - `Login(w, r)`, `Callback(w, r)`, `Logout(w, r)` — delegate to
      `h.auth.HandleLogin/Callback/Logout`. Return `503 Service Unavailable`
