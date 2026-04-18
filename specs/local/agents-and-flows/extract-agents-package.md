@@ -1,6 +1,6 @@
 ---
 title: Extract internal/agents package from runner
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/agents/
@@ -13,7 +13,7 @@ affects:
   - internal/runner/container.go
 effort: medium
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
