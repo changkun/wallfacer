@@ -24,9 +24,9 @@ Extend the existing `make e2e-lifecycle` harness so a developer can run the full
 
 ## What to do
 
-1. In `scripts/e2e-lifecycle.sh`, add support for a `BACKEND` env var (`local` default, `host` alternate):
+1. In `scripts/e2e-lifecycle.sh`, add support for a `BACKEND` env var (`container` default, `host` alternate):
    - Before the preflight checks, if `BACKEND=host`, verify `command -v claude && command -v codex` are both available; exit with a helpful message if not.
-   - Pass `WALLFACER_SANDBOX_BACKEND=host` through to the server the harness connects to (the harness assumes a running server — document that the server must have been started with `WALLFACER_SANDBOX_BACKEND=host` for this to be meaningful). If the harness starts its own server anywhere in the script, set the env there.
+   - The harness does not start its own server — it connects to one already running. When `BACKEND=host`, the script's preflight banner must remind the operator that the server must have been started with `wallfacer run --backend host` for the checks to be meaningful. A machine-readable check: hit `GET /api/config`, assert the response's `host_mode` field is `true` (this relies on the flag introduced by `ui-host-banner.md`).
    - Swap container-cleanup assertions: the existing `podman ps` check for "wallfacer-*" containers becomes a skip when `BACKEND=host`; add an equivalent assertion that no child processes of wallfacer named `claude` or `codex` remain after archive (use `pgrep -P <wallfacer-pid> -a` with a ~5 s grace).
 
 2. In `Makefile`, extend the `e2e-lifecycle` target to accept `BACKEND=host`:
@@ -52,7 +52,7 @@ Extend the existing `make e2e-lifecycle` harness so a developer can run the full
 
 This is itself a test script — no nested tests. Verification steps:
 
-- Run `make build-binary`, start `wallfacer run` with `WALLFACER_SANDBOX_BACKEND=host WALLFACER_HOST_CLAUDE_BINARY=$(which claude) WALLFACER_HOST_CODEX_BINARY=$(which codex)`.
+- Run `make build-host`, start `wallfacer run --backend host` (optionally set `WALLFACER_HOST_CLAUDE_BINARY=$(which claude)` / `WALLFACER_HOST_CODEX_BINARY=$(which codex)` if they are not on `$PATH`).
 - In another shell: `make e2e-lifecycle BACKEND=host SANDBOX=claude` — assert all checks pass.
 - Repeat with `SANDBOX=codex`.
 - Run the matrix: `make e2e-lifecycle` (local, default), `make e2e-lifecycle BACKEND=host` — assert both succeed.
