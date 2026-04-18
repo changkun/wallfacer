@@ -374,37 +374,15 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 	return r.buildIdeationPrompt(existingTasks, "", r.collectIdeationContext(r.shutdownCtx))
 }
 
-// buildIdeationContainerSpec builds a ContainerSpec for the ideation agent.
-// Workspaces are mounted read-only; no task label, no worktrees, and no
-// board context are used.
+// buildIdeationContainerSpec builds a ContainerSpec for the ideation
+// agent. After the agent-abstraction migration this is a thin shim
+// around buildInspectorSpec + buildAgentCmd, preserved so the
+// container-builder table-driven tests in container_builder_test.go
+// keep their fixture surface intact.
 func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb sandbox.Type) sandbox.ContainerSpec {
 	model := r.modelFromEnvForSandbox(sb)
-	spec := r.buildBaseContainerSpec(containerName, model, sb)
-
-	workspaces := r.currentWorkspaces()
-	var basenames []string
-	if len(workspaces) > 0 {
-		for _, ws := range workspaces {
-			ws = strings.TrimSpace(ws)
-			if ws == "" {
-				continue
-			}
-			basename := sanitizeBasename(ws)
-			basenames = append(basenames, basename)
-			// Read-only mount: ideation should only read, not modify.
-			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
-				Host:      ws,
-				Container: "/workspace/" + basename,
-				Options:   mountOpts("z", "ro"),
-			})
-		}
-	}
-
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
-
-	spec.WorkDir = workdirForBasenames(basenames)
+	spec := r.buildInspectorSpec(containerName, model, sb, MountReadOnly)
 	spec.Cmd = buildAgentCmd(prompt, model)
-
 	return spec
 }
 
