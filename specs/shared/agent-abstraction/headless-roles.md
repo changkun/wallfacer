@@ -1,6 +1,6 @@
 ---
 title: Migrate headless roles (title, oversight, commit message) to runAgent
-status: validated
+status: complete
 depends_on:
   - specs/shared/agent-abstraction/descriptor-and-runagent.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - internal/runner/agent.go
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---

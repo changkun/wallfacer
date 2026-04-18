@@ -1,11 +1,11 @@
 ---
 title: Agent Role Abstraction & Multi-Agent Communication
-status: drafted
+status: complete
 depends_on: []
 affects: [internal/runner/, internal/store/, internal/prompts/]
 effort: xlarge
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
@@ -419,6 +419,95 @@ These have the most accretion (session recovery, auto-continue, verdict inferenc
 1. Remove dead code: orphaned spec builders, duplicated fallback helpers.
 2. Consolidate container naming to `wallfacer-{role}-{uuid8}` pattern.
 3. Centralize remaining hard-coded timeouts into `internal/constants/`.
+
+## Outcome
+
+Shipped the Option A descriptor registry across five incremental
+migration phases. All seven sub-agent roles (title, oversight, commit
+message, refinement, ephemeral ideation, implementation, testing) now
+launch through a single `runAgent` primitive; per-role knowledge lives
+in an `AgentRole` descriptor value plus a thin wrapper that adapts the
+role's output to its caller's type. The runner's implicit stage
+sequence (refine → implement → test → commit → oversight/title) is
+untouched — session recovery, auto-continue, and verdict inference all
+stay in `execute.go`. Net the package is smaller: the migration added
+~540 lines of shared primitive and removed ~520 lines of per-role
+duplication.
+
+### What shipped
+
+- **`internal/runner/agent.go`** (new, ~570 lines): `AgentRole`,
+  `MountMode` (None / ReadOnly / ReadWrite), `runAgentOpts`,
+  `agentResult`, `runAgent`, `launchOne`, `buildInspectorSpec`,
+  `accumulateAgentUsage`, `recordFallbackEvent`, and the
+  `runAgentCircuitBreaker` interface.
+- **Descriptors** (one per role, co-located with the role's logic):
+  `roleTitle` (`title.go`), `roleOversight` (`oversight.go`),
+  `roleCommitMessage` (`commit.go`), `roleRefinement` (`refine.go`),
+  `roleIdeaAgentEphemeral` (`ideate.go`), `roleImplementation` +
+  `roleTesting` (`container.go`).
+- **Centralised timeouts** in `internal/constants/`:
+  `TitleAgentTimeout` (60 s), `OversightAgentTimeout` (3 m),
+  `CommitMessageAgentTimeout` (90 s). Existing `RefinementTimeout`
+  and per-task `DefaultTaskTimeout` are reused.
+- **Container naming** normalised to `wallfacer-<role>-<uuid8>`
+  everywhere, replacing the timestamp-based ideation name and the
+  slugged-from-prompt legacy variants (still available via
+  `runAgentOpts.ContainerName` where tests rely on the legacy form).
+- **Regression coverage**: new `agent_test.go` (8 tests covering the
+  descriptor contract, mount dispatch, token-limit fallback, and
+  OnLaunch wiring) plus updated tests in `title_test.go`,
+  `oversight_test.go`, `commit_test.go`, `refine_test.go`, and
+  `ideate_test.go`. The full 867-test runner suite stays green.
+
+### Design evolution
+
+1. **Option A only, no Options C/D.** The original spec left the door
+   open for agent graphs and message buses; in the end neither layer
+   was added. The Decision section already pre-committed to A; phases
+   0–4 stuck to that scope. A future multi-agent workflow can add the
+   graph layer on top without retrofitting the descriptor.
+
+2. **`launchOne` absorbed the heavyweight-specific concerns inline**
+   instead of being a pure mount-agnostic primitive. The parent spec
+   sketched four levels (headless / inspector / heavyweight / cleanup);
+   the actual code paths were unified enough that runAgent hosts the
+   optional heavyweight knobs (`LiveLogWriter`, `CircuitBreaker`,
+   `SessionID`, `ModelOverride`, `WorktreeOverrides`, `BoardDir`,
+   `SiblingMounts`) directly on `runAgentOpts`. Keeping them on opts
+   instead of splitting into a second function made it easier to
+   share the Claude→Codex fallback and ensured zero behaviour drift.
+
+3. **`ActivityOverride` emerged during the oversight migration** to
+   let one descriptor back two activity tags (`oversight` vs
+   `oversight_test`). The pre-migration `runOversightAgent` took the
+   activity as an argument; encoding that choice as an opts override
+   kept the descriptor pure data without adding a near-duplicate
+   `roleOversightTest` variable.
+
+4. **Parse-result ordering matters.** The spec didn't call it out, but
+   several tests (notably `TestRunCostResumedFromWaiting`) rely on
+   usage being accumulated *before* `ParseResult` runs — a parse
+   failure on the role-specific structured output still charges the
+   invocation. The final `runAgent` accumulates first, parses after,
+   and returns the parse error unchanged.
+
+5. **Error wording is part of the contract.** `classifyFailure` buckets
+   container crashes by scanning for `"exit status"` / `"empty
+   output"` substrings. The migrated `launchOne` preserves these
+   phrases verbatim in the two distinct failure paths (wait error with
+   captured exit status vs clean exit with non-zero code), which was
+   the reason `TestRunContainerErrorTransitionsToFailed` and
+   `TestMockFailureCategoryContainerCrash` both kept passing after the
+   refactor despite the message restructuring.
+
+### Commit trail
+
+- `c99bdc61` — phase 0, descriptor + runAgent core
+- `4d00df4f` — phase 1, headless migration
+- `c8be7ecd` — phase 2, inspector migration
+- `03f49aec` — phase 3, heavyweight migration
+- `948dcd06` — phase 4, collapse `buildIdeationContainerSpec`
 
 ## Deferred Work
 

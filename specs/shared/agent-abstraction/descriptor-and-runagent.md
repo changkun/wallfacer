@@ -1,6 +1,6 @@
 ---
 title: AgentRole descriptor and runAgent core
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/runner/agent.go
@@ -8,7 +8,7 @@ affects:
   - internal/constants/
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
