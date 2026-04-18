@@ -830,8 +830,9 @@ describe("buildCostChart (timestamp-based)", () => {
       `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
       ctx,
     );
-    // The polyline points should include "50.000%"
-    expect(result).toContain("50.000%");
+    // The polyline now uses numeric points inside a 100-unit viewBox, and the
+    // dot/label overlays carry "50.000%" as CSS left positions.
+    expect(result).toMatch(/(?:points="[^"]*\b50\.000\b|left:50\.000%)/);
   });
 
   it("renders colored dot markers for each activity", () => {
@@ -843,8 +844,11 @@ describe("buildCostChart (timestamp-based)", () => {
       `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
       ctx,
     );
-    // Should contain SVG circle elements for each data point
-    expect(result).toContain("<circle");
+    // Dots are rendered as absolutely-positioned <span> overlays (HTML, not
+    // SVG) so they stay round regardless of viewBox stretch. One span per
+    // timestamped usage row.
+    const dotMatches = result.match(/border-radius:50%/g) || [];
+    expect(dotMatches.length).toBeGreaterThanOrEqual(2);
   });
 });
 
