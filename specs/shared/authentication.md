@@ -171,6 +171,26 @@ same spec):
 - Login redirect for unauthenticated browser requests (Phase 1 just shows
   a sign-in link; it never forces a redirect)
 
+### Task Breakdown (Phase 1)
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [WALLFACER_CLOUD + internal/auth re-export](authentication/envconfig-and-auth-package.md) | — | small | validated |
+| [Cloud-gated routes + /api/auth/me + /api/config](authentication/http-routes-and-api-config.md) | envconfig-and-auth-package | medium | validated |
+| [Status-bar sign-in badge](authentication/status-bar-sign-in-badge.md) | http-routes-and-api-config | medium | validated |
+| [Cloud mode documentation](authentication/docs-cloud-mode.md) | status-bar-sign-in-badge | small | validated |
+
+```mermaid
+graph LR
+  A[envconfig + auth pkg] --> B[HTTP routes + /api/config]
+  B --> C[Status-bar badge]
+  C --> D[Docs]
+```
+
+Later phases (JWT middleware, data-model migration, agent token exchange,
+remote control, etc.) remain design-level and are not part of this
+breakdown.
+
 ---
 
 ## Design
