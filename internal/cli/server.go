@@ -33,6 +33,37 @@ import (
 	"github.com/google/uuid"
 )
 
+// prefixFS wraps an inner fs.FS so its contents appear under a single
+// directory prefix. Used in dev mode to expose os.DirFS("…/ui") as if it
+// were the embedded uiFiles filesystem (which has "ui" at its root), so
+// that fs.Sub(uiFS, "ui") and subsequent template/static lookups work
+// identically against either source.
+type prefixFS struct {
+	inner  fs.FS
+	prefix string
+}
+
+// noCacheMiddleware sets response headers that disable browser caching,
+// used in UI dev mode so edits are visible on reload.
+func noCacheMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (p prefixFS) Open(name string) (fs.File, error) {
+	if name == p.prefix {
+		return p.inner.Open(".")
+	}
+	if rest, ok := strings.CutPrefix(name, p.prefix+"/"); ok {
+		return p.inner.Open(rest)
+	}
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+}
+
 // IndexViewData holds the data passed to the index.html template.
 type IndexViewData struct {
 	ServerAPIKey string
@@ -48,6 +79,10 @@ type ServerConfig struct {
 	SandboxImage string
 	EnvFile      string
 	SkipCSRF     bool // Desktop mode: requests come from the local WebView, not a browser.
+	// UIDir, when non-empty, serves UI assets from this on-disk directory
+	// instead of the embedded filesystem. Used during frontend development
+	// so edits under ui/ take effect on reload without rebuilding the binary.
+	UIDir string
 }
 
 // ServerComponents holds the initialized server components returned by initServer.
@@ -341,6 +376,19 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
+	if cfg.UIDir != "" {
+		absUI, err := filepath.Abs(cfg.UIDir)
+		if err != nil {
+			logger.Fatal("resolve ui-dir", "error", err)
+		}
+		info, err := os.Stat(absUI)
+		if err != nil || !info.IsDir() {
+			logger.Fatal("ui-dir is not a directory", "path", absUI, "error", err)
+		}
+		logger.Main.Info("serving UI from disk (dev mode)", "path", absUI)
+		uiFS = prefixFS{inner: os.DirFS(absUI), prefix: "ui"}
+	}
+
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
 
 	if cfg.SkipCSRF {
@@ -393,6 +441,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
+	uiDir := fs.String("ui-dir", envOrDefault("UI_DIR", ""), "serve UI from this on-disk directory (dev mode; disables caching and reloads templates on every request)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
@@ -409,6 +458,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		ContainerCmd: *containerCmd,
 		SandboxImage: *sandboxImage,
 		EnvFile:      *envFile,
+		UIDir:        *uiDir,
 	}, uiFS, docsFS)
 	defer sc.Stop()
 
@@ -456,7 +506,13 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	if err != nil {
 		logger.Fatal("sub ui fs", "error", err)
 	}
-	indexTemplates, err := template.New("index.html").ParseFS(uiSub, "index.html", "partials/*.html")
+	// In dev mode (ui served from disk), re-parse templates on every
+	// request so edits to index.html and partials are picked up live.
+	_, devMode := uiFS.(prefixFS)
+	parseIndexTemplates := func() (*template.Template, error) {
+		return template.New("index.html").ParseFS(uiSub, "index.html", "partials/*.html")
+	}
+	indexTemplates, err := parseIndexTemplates()
 	if err != nil {
 		logger.Fatal("parse ui templates", "error", err)
 	}
@@ -465,18 +521,33 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			http.NotFound(w, r)
 			return
 		}
+		tpl := indexTemplates
+		if devMode {
+			t, err := parseIndexTemplates()
+			if err != nil {
+				logger.Main.Error("reparse ui templates", "error", err)
+				http.Error(w, "failed to parse templates", http.StatusInternalServerError)
+				return
+			}
+			tpl = t
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := indexTemplates.ExecuteTemplate(w, "index.html", indexData); err != nil {
+		if err := tpl.ExecuteTemplate(w, "index.html", indexData); err != nil {
 			logger.Main.Error("render index", "error", err)
 			http.Error(w, "failed to render index", http.StatusInternalServerError)
 		}
 	}
 	mux.HandleFunc("GET /", serveIndex)
 
-	// Static asset directories served from the embedded filesystem.
-	mux.Handle("GET /css/", http.FileServer(http.FS(uiSub)))
-	mux.Handle("GET /js/", http.FileServer(http.FS(uiSub)))
-	mux.Handle("GET /assets/", http.FileServer(http.FS(uiSub)))
+	// Static asset directories served from the embedded (or on-disk) filesystem.
+	staticFS := http.FileServer(http.FS(uiSub))
+	if devMode {
+		// Prevent browsers from caching stale assets during frontend edits.
+		staticFS = noCacheMiddleware(staticFS)
+	}
+	mux.Handle("GET /css/", staticFS)
+	mux.Handle("GET /js/", staticFS)
+	mux.Handle("GET /assets/", staticFS)
 
 	// Docs API — list and serve embedded documentation.
 	//
@@ -1015,14 +1086,21 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 	})
 }
 
-// ensureImage checks whether the sandbox image is present locally and pulls it
-// from the registry if it is not.  When the pull fails and a local fallback
-// image (sandbox-agents:latest) is available, that image is used instead.
+// ensureImage checks whether the sandbox image is present locally and pulls
+// it from the registry if it is not. For sandbox-agents images, a locally-
+// built sandbox-agents:latest (e.g. from a sibling latere-ai/images checkout)
+// is preferred over a network pull — mirroring the Makefile's pull-images
+// behavior so `wallfacer run` and `make build` stay in sync. If the pull
+// fails, the same local fallback is used as a last resort.
 // Returns the image reference that should actually be used.
 func ensureImage(containerCmd, image string) string {
 	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()
 	if err == nil && out != "" {
 		return image // already present
+	}
+	if fb, ok := localSandboxFallback(containerCmd, image); ok {
+		logger.Main.Info("using local fallback sandbox image instead of pulling", "image", fb)
+		return fb
 	}
 	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
 	cmd := exec.Command(containerCmd, "pull", image)
@@ -1030,17 +1108,42 @@ func ensureImage(containerCmd, image string) string {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		logger.Main.Warn("failed to pull sandbox image", "image", image, "error", err)
-		// Try the local fallback image if it differs from the requested one.
-		if image != fallbackSandboxImage {
-			fallbackOut, fallbackErr := cmdexec.New(containerCmd, "images", "-q", fallbackSandboxImage).Output()
-			if fallbackErr == nil && fallbackOut != "" {
-				logger.Main.Info("using local fallback sandbox image", "image", fallbackSandboxImage)
-				return fallbackSandboxImage
-			}
+		if fb, ok := localSandboxFallback(containerCmd, image); ok {
+			logger.Main.Info("using local fallback sandbox image after pull failure", "image", fb)
+			return fb
 		}
 		logger.Main.Warn("no sandbox image available; tasks may fail")
 	}
 	return image
+}
+
+// localSandboxFallback returns sandbox-agents:latest if the requested image
+// belongs to the sandbox-agents family and a local copy of the fallback is
+// available. The scoping check prevents unrelated custom images from being
+// silently substituted with the sandbox-agents fallback.
+func localSandboxFallback(containerCmd, image string) (string, bool) {
+	if image == fallbackSandboxImage || !isSandboxAgentsImage(image) {
+		return "", false
+	}
+	out, err := cmdexec.New(containerCmd, "images", "-q", fallbackSandboxImage).Output()
+	if err != nil || out == "" {
+		return "", false
+	}
+	return fallbackSandboxImage, true
+}
+
+// isSandboxAgentsImage reports whether image refers to the sandbox-agents
+// repository, regardless of registry prefix (e.g. matches both
+// "ghcr.io/latere-ai/sandbox-agents:v0.0.6" and "sandbox-agents:latest").
+func isSandboxAgentsImage(image string) bool {
+	name := image
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	if i := strings.Index(name, ":"); i >= 0 {
+		name = name[:i]
+	}
+	return name == "sandbox-agents"
 }
 
 // requiresStore returns true for route names that need an active workspace
