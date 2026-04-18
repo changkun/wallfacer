@@ -105,6 +105,49 @@ func TestPlannerExecNoBackend(t *testing.T) {
 	}
 }
 
+// TestBuildContainerSpec_HostBackend verifies that when the planner is
+// configured with the sandbox HostBackend, its WorkDir is a real host
+// path rather than the container-only /workspace/<basename>. Without
+// this, planner execs fail with "host backend: WorkDir is a container
+// path; runner must translate to a host path" as the HostBackend
+// actively rejects container paths to prevent silent CWD drift.
+func TestBuildContainerSpec_HostBackend(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(tmpDir, "specs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Create a stub claude binary so NewHostBackend succeeds.
+	bin := filepath.Join(t.TempDir(), "claude")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hb, err := sandbox.NewHostBackend(sandbox.HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	if err != nil {
+		t.Fatalf("NewHostBackend: %v", err)
+	}
+
+	p := New(Config{
+		Backend:    hb,
+		Command:    "/usr/bin/podman",
+		Image:      "sandbox-agents:latest",
+		Workspaces: []string{tmpDir},
+	})
+	spec := p.buildContainerSpec("wallfacer-plan-test", sandbox.Claude)
+
+	if spec.WorkDir != tmpDir {
+		t.Errorf("host mode WorkDir = %q, want host path %q", spec.WorkDir, tmpDir)
+	}
+	if strings.HasPrefix(spec.WorkDir, "/workspace") {
+		t.Errorf("host mode WorkDir must not be a container path, got %q", spec.WorkDir)
+	}
+	if spec.Entrypoint != "" {
+		t.Errorf("host mode spec must not carry a container entrypoint, got %q", spec.Entrypoint)
+	}
+	if len(spec.Volumes) != 0 {
+		t.Errorf("host mode spec must not carry volumes, got %d", len(spec.Volumes))
+	}
+}
+
 func TestBuildContainerSpec(t *testing.T) {
 	// Create a temp workspace with a specs/ subdirectory.
 	tmpDir := t.TempDir()

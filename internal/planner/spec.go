@@ -72,15 +72,27 @@ func (p *Planner) buildContainerSpec(containerName string, sb sandbox.Type) sand
 	// Instructions file (CLAUDE.md / AGENTS.md) mounted read-only.
 	spec.Volumes = p.appendInstructionsMount(spec.Volumes, sb, basenames)
 
-	// Working directory.
-	if len(basenames) == 1 {
+	// Working directory. Container backends resolve /workspace/<basename>
+	// through the volume mounts above; the host backend has no mounts, so
+	// the WorkDir must already be a real host path. When the backend is a
+	// HostBackend we also drop the mounts and entrypoint — they are
+	// container-only concerns that HostBackend.Launch ignores anyway, but
+	// clearing them here keeps diagnostics clean.
+	hostMode := p.isHostBackend()
+	switch {
+	case hostMode:
+		spec.Volumes = nil
+		spec.Entrypoint = ""
+		spec.WorkDir = p.hostWorkDir()
+	case len(basenames) == 1:
 		spec.WorkDir = "/workspace/" + basenames[0]
-	} else if len(basenames) > 0 {
+		spec.Entrypoint = "/usr/local/bin/entrypoint.sh"
+	case len(basenames) > 0:
 		spec.WorkDir = "/workspace"
+		spec.Entrypoint = "/usr/local/bin/entrypoint.sh"
+	default:
+		spec.Entrypoint = "/usr/local/bin/entrypoint.sh"
 	}
-
-	// Entrypoint for exec calls.
-	spec.Entrypoint = "/usr/local/bin/entrypoint.sh"
 
 	// Resource limits and network from config.
 	spec.Network = p.network
@@ -88,6 +100,28 @@ func (p *Planner) buildContainerSpec(containerName string, sb sandbox.Type) sand
 	spec.Memory = p.memory
 
 	return spec
+}
+
+// isHostBackend reports whether the configured sandbox backend runs the
+// agent CLI as a host process (no container mounts). Checked via a
+// type-assertion against *sandbox.HostBackend to avoid leaking backend
+// knowledge into the rest of the planner.
+func (p *Planner) isHostBackend() bool {
+	_, ok := p.backend.(*sandbox.HostBackend)
+	return ok
+}
+
+// hostWorkDir returns the first configured workspace as an absolute
+// host path, to be used as the planner process's CWD in host mode. When
+// no workspace is configured we fall back to an empty string and let
+// the host backend inherit its own CWD.
+func (p *Planner) hostWorkDir() string {
+	for _, ws := range p.workspaces {
+		if ws = strings.TrimSpace(ws); ws != "" {
+			return ws
+		}
+	}
+	return ""
 }
 
 // appendInstructionsMount adds the workspace AGENTS.md / CLAUDE.md file
