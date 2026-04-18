@@ -997,14 +997,9 @@ var PlanningChat = (function () {
       _onUndo(bubble, planRound, btn);
     });
     actions.appendChild(btn);
-    // Insert actions before the time stamp so the icon sits at the top
-    // of the bubble on hover, matching the CSS layout.
-    var timeEl = bubble.querySelector(".planning-chat-bubble__time");
-    if (timeEl) {
-      bubble.insertBefore(actions, timeEl);
-    } else {
-      bubble.appendChild(actions);
-    }
+    // Actions are absolutely positioned; appending to the bubble keeps them
+    // anchored at the top-right corner regardless of inner DOM layout.
+    bubble.appendChild(actions);
   }
 
   // _updateUndoButtonStates enables the undo button on the latest-round
@@ -1125,13 +1120,25 @@ var PlanningChat = (function () {
   function _createBubble(role) {
     var bubble = document.createElement("div");
     bubble.className = "planning-chat-bubble planning-chat-bubble--" + role;
+    var avLabel = role === "user" ? "me" : "wf";
+    var nameLabel = role === "user" ? "you" : "plan-agent";
     var contentClass = "planning-chat-bubble__content";
     if (role === "assistant") contentClass += " prose-content";
     bubble.innerHTML =
+      '<span class="planning-chat-bubble__av">' +
+      escapeHtml(avLabel) +
+      "</span>" +
+      '<div class="planning-chat-bubble__body">' +
+      '<div class="planning-chat-bubble__meta">' +
+      '<span class="planning-chat-bubble__name">' +
+      escapeHtml(nameLabel) +
+      "</span>" +
+      '<span class="planning-chat-bubble__time"></span>' +
+      "</div>" +
       '<div class="' +
       contentClass +
       '"></div>' +
-      '<div class="planning-chat-bubble__time"></div>';
+      "</div>";
     return bubble;
   }
 
