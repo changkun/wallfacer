@@ -70,6 +70,11 @@ type AgentRole struct {
 	// decode its own schema without leaking a shared type. The concrete
 	// type is documented in the role's descriptor comment.
 	ParseResult func(output *agentOutput) (any, error)
+	// Model, when non-nil, overrides the default per-sandbox model
+	// lookup for this role. Title uses CLAUDE_TITLE_MODEL; other
+	// roles inherit CLAUDE_DEFAULT_MODEL via r.modelFromEnvForSandbox.
+	// Nil means "use the runner's default model resolver".
+	Model func(sb sandbox.Type) string
 }
 
 // runAgentOpts carries per-invocation parameters that don't belong on
@@ -93,6 +98,11 @@ type runAgentOpts struct {
 	// Turn, when non-zero, is recorded as the TurnUsageRecord's turn
 	// index. Defaults to 1 for single-turn roles.
 	Turn int
+	// ActivityOverride lets a caller attribute usage under a different
+	// activity tag than the role's default. Oversight uses this to
+	// split regular-run oversight and test-run oversight accounting
+	// while sharing a single descriptor.
+	ActivityOverride store.SandboxActivity
 }
 
 // agentResult is runAgent's return envelope. It bundles the parsed
@@ -100,10 +110,10 @@ type runAgentOpts struct {
 // callers that need to persist turn output (heavyweight roles) can
 // reach them without re-parsing.
 type agentResult struct {
-	Output     *agentOutput
-	Parsed     any
-	RawStdout  []byte
-	RawStderr  []byte
+	Output      *agentOutput
+	Parsed      any
+	RawStdout   []byte
+	RawStderr   []byte
 	SandboxUsed sandbox.Type
 }
 
@@ -159,9 +169,17 @@ func (r *Runner) runAgent(
 	// containers.
 	containerName := "wallfacer-" + role.Name + "-" + uuid.NewString()[:8]
 
+	// Activity used for sandbox resolution, label, span events, and
+	// usage attribution. Callers may override via opts to split
+	// sub-variants of the same role (oversight vs oversight-test).
+	activity := role.Activity
+	if opts.ActivityOverride != "" {
+		activity = opts.ActivityOverride
+	}
+
 	// Build labels. The activity label feeds the monitor UI.
 	labels := map[string]string{
-		"wallfacer.task.activity": string(role.Activity),
+		"wallfacer.task.activity": string(activity),
 	}
 	if task != nil {
 		labels["wallfacer.task.id"] = task.ID.String()
@@ -170,15 +188,31 @@ func (r *Runner) runAgent(
 		labels[k] = v
 	}
 
-	result, err := r.launchHeadless(runCtx, role, containerName, prompt, primary, labels)
+	// span_start / span_end bracket each launch attempt so the event
+	// timeline shows a clean bar per container run — including retries.
+	// Callers can suppress this via opts when they own their own
+	// span accounting (the heavyweight turn loop will).
+	launchOnce := func(sb sandbox.Type) (*agentResult, error) {
+		if opts.EmitSpanEvents && task != nil {
+			_ = r.taskStore(task.ID).InsertEvent(r.shutdownCtx, task.ID, store.EventTypeSpanStart,
+				store.SpanData{Phase: "container_run", Label: string(activity)})
+			defer func() {
+				_ = r.taskStore(task.ID).InsertEvent(r.shutdownCtx, task.ID, store.EventTypeSpanEnd,
+					store.SpanData{Phase: "container_run", Label: string(activity)})
+			}()
+		}
+		return r.launchHeadless(runCtx, role, containerName, prompt, sb, labels)
+	}
+
+	result, err := launchOnce(primary)
 	// Retry on token-limit-at-launch for Claude→Codex.
 	if err != nil && primary == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
 		logger.Runner.Warn("runAgent: claude token limit on launch; retrying with codex",
 			"role", role.Name, "container", containerName)
 		if task != nil {
-			r.recordFallbackEvent(task.ID, role.Activity)
+			r.recordFallbackEvent(task.ID, activity)
 		}
-		result, err = r.launchHeadless(runCtx, role, containerName, prompt, sandbox.Codex, labels)
+		result, err = launchOnce(sandbox.Codex)
 	}
 	if err != nil {
 		return nil, err
@@ -192,12 +226,22 @@ func (r *Runner) runAgent(
 		logger.Runner.Warn("runAgent: claude reported token limit in output; retrying with codex",
 			"role", role.Name, "container", containerName)
 		if task != nil {
-			r.recordFallbackEvent(task.ID, role.Activity)
+			r.recordFallbackEvent(task.ID, activity)
 		}
-		result, err = r.launchHeadless(runCtx, role, containerName, prompt, sandbox.Codex, labels)
+		result, err = launchOnce(sandbox.Codex)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Accumulate usage first so a downstream ParseResult failure still
+	// counts the tokens/cost the agent consumed. The legacy per-role
+	// call sites all billed before parsing and some tests depend on
+	// that ordering (e.g. TestRunCostResumedFromWaiting exercises an
+	// oversight failure path where the agent returned non-JSON output
+	// but we still charge the invocation).
+	if opts.TrackUsage && task != nil && result.Output != nil {
+		r.accumulateAgentUsage(task.ID, activity, opts.Turn, result.Output)
 	}
 
 	// Parse the role-specific structured output.
@@ -207,11 +251,6 @@ func (r *Runner) runAgent(
 			return nil, fmt.Errorf("%s: %w", role.Name, parseErr)
 		}
 		result.Parsed = parsed
-	}
-
-	// Accumulate usage and append a turn record for task-bound calls.
-	if opts.TrackUsage && task != nil && result.Output != nil {
-		r.accumulateAgentUsage(task.ID, role.Activity, opts.Turn, result.Output)
 	}
 
 	return result, nil
@@ -228,8 +267,19 @@ func (r *Runner) launchHeadless(
 	labels map[string]string,
 ) (*agentResult, error) {
 	model := r.modelFromEnvForSandbox(sb)
+	if role.Model != nil {
+		if m := role.Model(sb); m != "" {
+			model = m
+		}
+	}
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
-	spec.Labels = labels
+	// Clone the labels map so a caller that hands us a shared map (the
+	// migrated title/oversight/commit call sites do) cannot be mutated
+	// by the backend or by a later retry.
+	spec.Labels = make(map[string]string, len(labels))
+	for k, v := range labels {
+		spec.Labels[k] = v
+	}
 	spec.Cmd = buildAgentCmd(prompt, model)
 
 	handle, launchErr := r.backend.Launch(ctx, spec)
@@ -240,19 +290,37 @@ func (r *Runner) launchHeadless(
 	rawStderr, _ := io.ReadAll(handle.Stderr())
 	exitCode, _ := handle.Wait()
 
-	if exitCode != 0 && ctx.Err() == nil {
-		return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
-			role.Name, exitCode, truncate(string(rawStderr), 200))
+	// Context cancellation → report as terminated (matches the legacy
+	// title/oversight/commit behaviour).
+	if ctx.Err() != nil {
+		_ = handle.Kill()
+		return nil, fmt.Errorf("%s container terminated: %w", role.Name, ctx.Err())
 	}
 
 	raw := strings.TrimSpace(string(rawStdout))
 	if raw == "" {
+		if exitCode != 0 {
+			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
+				role.Name, exitCode, truncate(string(rawStderr), 200))
+		}
 		return nil, fmt.Errorf("%s: empty output", role.Name)
 	}
 
+	// Parse first so a non-zero exit with a valid final NDJSON payload
+	// still counts as success — several existing tests cover this
+	// tolerant behaviour for title + oversight, and the legacy code
+	// paths all implemented it.
 	output, err := parseOutput(raw)
 	if err != nil {
+		if exitCode != 0 {
+			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s stdout=%s",
+				role.Name, exitCode, truncate(string(rawStderr), 200), truncate(raw, 200))
+		}
 		return nil, fmt.Errorf("%s parse failure: raw=%s", role.Name, truncate(raw, 200))
+	}
+	if exitCode != 0 {
+		logger.Runner.Warn(role.Name+": container exited non-zero but produced valid output",
+			"code", exitCode, "sandbox", sb, "model", model)
 	}
 	output.ActualSandbox = sb
 	return &agentResult{

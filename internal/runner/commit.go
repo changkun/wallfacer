@@ -511,6 +511,40 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 	return msg, nil
 }
 
+// roleCommitMessage is the headless-tier descriptor for the commit-
+// message generation sub-agent. Returns the agent's message string,
+// already trimmed of surrounding whitespace and backticks (the two
+// quoting patterns Claude consistently emits). Exported through a
+// wrapper so the commit pipeline's error-type mapping stays intact.
+var roleCommitMessage = AgentRole{
+	Activity:    store.SandboxActivityCommitMessage,
+	Name:        "commit-msg",
+	Timeout:     func(*store.Task) time.Duration { return constants.CommitMessageAgentTimeout },
+	MountMode:   MountNone,
+	SingleTurn:  true,
+	ParseResult: parseCommitMessageResult,
+}
+
+// parseCommitMessageResult trims the commit-message agent output and
+// surfaces a typed error when the agent returned an error result or
+// an empty string. Callers unwrap the string via type assertion.
+func parseCommitMessageResult(o *agentOutput) (any, error) {
+	if o.IsError {
+		msg := strings.TrimSpace(o.Result)
+		if msg == "" {
+			msg = "agent returned an error result"
+		}
+		return "", fmt.Errorf("%s", msg)
+	}
+	msg := strings.TrimSpace(o.Result)
+	msg = strings.Trim(msg, "`")
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return "", fmt.Errorf("blank result")
+	}
+	return msg, nil
+}
+
 // generateCommitMessage runs a lightweight container to produce a descriptive
 // git commit message from the task prompt, staged diff stats, and recent git
 // log history (used to match the project's commit style).
@@ -522,100 +556,25 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
 	}
 
-	sb := sandbox.Claude
-	if task != nil {
-		sb = r.sandboxForTaskActivity(task, activityCommitMessage)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
-
-	containerName := "wallfacer-commit-" + taskID.String()[:8]
-	// Note: commit intentionally does NOT register in r.taskContainers.
-	// That registry is used by StreamLogs to locate the main execution
-	// container; writing here would replace the implementation logs.
 	commitPrompt := r.promptsMgr.CommitMessage(prompts.CommitData{
 		Prompt:    prompt,
 		DiffStat:  diffStat,
 		RecentLog: recentLog,
 	})
-	labels := map[string]string{"wallfacer.task.id": taskID.String(), "wallfacer.task.activity": "commit_message"}
 
-	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
-		output, err := r.runCommitContainer(ctx, containerName, commitPrompt, selectedSandbox, labels)
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
-		return output, err
-	}
-
-	initialSandbox := sb
-	output, err := runWithSandbox(initialSandbox)
+	res, err := r.runAgent(ctx, roleCommitMessage, task, commitPrompt, runAgentOpts{
+		EmitSpanEvents: true,
+		TrackUsage:     true,
+		Turn:           1,
+	})
 	if err != nil {
-		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
-			logger.Runner.Warn("commit message generation: claude token limit hit; retrying with codex", "task", taskID)
-			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-				"result": "Sandbox fallback: claude → codex (token/rate limit hit during commit message generation)",
-			})
-			output, err = runWithSandbox(sandbox.Codex)
-		}
-		if err != nil {
-			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
-			return "", newCommitMessageGenerationError("%v", err)
-		}
+		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
+		return "", newCommitMessageGenerationError("%v", err)
 	}
-	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
-		isLikelyTokenLimitError(output.Result, output.Subtype) {
-		logger.Runner.Warn("commit message generation: claude output reported token limit; retrying with codex", "task", taskID)
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"result": "Sandbox fallback: claude → codex (token/rate limit in commit message output)",
-		})
-		output, err = runWithSandbox(sandbox.Codex)
-		if err != nil {
-			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
-			return "", newCommitMessageGenerationError("%v", err)
-		}
-	}
-	if output != nil && output.IsError {
-		logger.Runner.Warn("commit message generation: agent error", "task", taskID, "subtype", output.Subtype)
-		message := strings.TrimSpace(output.Result)
-		if message == "" {
-			message = "agent returned an error result"
-		}
-		return "", newCommitMessageGenerationError("%s", message)
-	}
-
-	msg := strings.TrimSpace(output.Result)
-	msg = strings.Trim(msg, "`")
-	msg = strings.TrimSpace(msg)
+	msg, _ := res.Parsed.(string)
 	if msg == "" {
 		logger.Runner.Warn("commit message generation: blank result", "task", taskID)
 		return "", newCommitMessageGenerationError("blank result")
-	}
-
-	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		_ = r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
-
-			InputTokens:          output.Usage.InputTokens,
-			OutputTokens:         output.Usage.OutputTokens,
-			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
-			CostUSD:              output.TotalCostUSD,
-		})
-		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
-			Turn:                 1,
-			Timestamp:            time.Now().UTC(),
-			InputTokens:          output.Usage.InputTokens,
-			OutputTokens:         output.Usage.OutputTokens,
-			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
-			CostUSD:              output.TotalCostUSD,
-			Sandbox:              output.ActualSandbox,
-			SubAgent:             store.SandboxActivityCommitMessage,
-		}); appErr != nil {
-			logger.Runner.Warn("commit message: append turn usage failed", "task", taskID, "error", appErr)
-		}
 	}
 
 	return msg, nil
