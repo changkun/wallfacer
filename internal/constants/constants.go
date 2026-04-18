@@ -18,6 +18,18 @@ const RefinementTimeout = 30 * time.Minute
 // IdeaAgentDefaultTimeout is the default timeout (minutes) for idea-agent task cards.
 const IdeaAgentDefaultTimeout = 60
 
+// TitleAgentTimeout bounds the background title-generation agent. Short
+// because the agent is headless and only needs to emit a 2–5 word summary.
+const TitleAgentTimeout = 60 * time.Second
+
+// OversightAgentTimeout bounds the oversight-summary agent. Generous
+// because oversight reads the full task event timeline before summarizing.
+const OversightAgentTimeout = 3 * time.Minute
+
+// CommitMessageAgentTimeout bounds the commit-message agent. Shorter than
+// oversight because the input (diff stat + recent log) is small.
+const CommitMessageAgentTimeout = 90 * time.Second
+
 // ---------------------------------------------------------------------------
 // Polling / watcher intervals
 // ---------------------------------------------------------------------------
