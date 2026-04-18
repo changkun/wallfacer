@@ -106,28 +106,26 @@ function _updateWorkspace() {
   el.style.display = label ? "" : "none";
 }
 
-// Cycle: nothing → terminal → dep graph → office → close
+// Cycle: nothing → terminal → office → close.
+// Dep Graph left the bottom-panel cycle when it graduated to a full Workspace
+// tab (see sidebar-nav-depgraph and switchMode('depgraph')).
 function _cycleBottomPanel() {
   var termPanel = document.getElementById("status-bar-panel");
   var termOpen = termPanel && !termPanel.classList.contains("hidden");
-  var depOpen = !!window.depGraphEnabled;
   var officePanel = document.getElementById("office-container");
   var officeOpen = officePanel && !officePanel.classList.contains("hidden");
   var termAvailable = typeof terminalEnabled !== "undefined" && terminalEnabled;
   var officeAvailable =
     typeof _officeAssetAvailable === "function" && _officeAssetAvailable();
 
-  if (!termOpen && !depOpen && !officeOpen) {
+  if (!termOpen && !officeOpen) {
     if (termAvailable) {
       _showTerminalPanel();
-    } else {
-      _showDepGraphPanel();
+    } else if (officeAvailable) {
+      _showOfficePanel();
     }
   } else if (termOpen) {
     _hideTerminalPanel();
-    _showDepGraphPanel();
-  } else if (depOpen) {
-    _hideDepGraphPanel();
     if (officeAvailable) {
       _showOfficePanel();
     }
@@ -157,7 +155,6 @@ function toggleOfficePanel() {
   if (!panel) return;
   if (panel.classList.contains("hidden")) {
     _hideTerminalPanel();
-    _hideDepGraphPanel();
     _showOfficePanel();
   } else {
     _hideOfficePanel();
@@ -187,22 +184,6 @@ function _hideTerminalPanel() {
   if (tabBar) tabBar.hidden = true;
 }
 
-function _showDepGraphPanel() {
-  window.depGraphEnabled = true;
-  var btn = document.getElementById("status-bar-depgraph-btn");
-  if (btn) btn.setAttribute("aria-expanded", "true");
-  if (typeof scheduleRender === "function") scheduleRender();
-  else if (typeof render === "function") render();
-}
-
-function _hideDepGraphPanel() {
-  window.depGraphEnabled = false;
-  var btn = document.getElementById("status-bar-depgraph-btn");
-  if (btn) btn.setAttribute("aria-expanded", "false");
-  if (typeof scheduleRender === "function") scheduleRender();
-  else if (typeof render === "function") render();
-}
-
 function toggleTerminalPanel() {
   var panel = document.getElementById("status-bar-panel");
   if (!panel) return;
@@ -215,7 +196,6 @@ function toggleTerminalPanel() {
   }
   var isHidden = panel.classList.contains("hidden");
   if (isHidden) {
-    _hideDepGraphPanel();
     _hideOfficePanel();
     _showTerminalPanel();
   } else {

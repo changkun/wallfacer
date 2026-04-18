@@ -28,6 +28,169 @@
   // Module-level fingerprint cache — avoids re-rendering unchanged graphs.
   var _lastFingerprint = null;
 
+  // Collapsed spec paths (persisted in localStorage). By default every
+  // non-leaf spec is collapsed so the initial view is a high-level
+  // overview; users drill in by clicking +/- handles. Expanded paths are
+  // stored explicitly so the on-disk set is small and a new spec added
+  // later stays collapsed until the user expands it.
+  var _expandedSpecs = _loadExpandedSpecs();
+
+  function _loadExpandedSpecs() {
+    try {
+      var raw = localStorage.getItem("depgraph-expanded-specs");
+      if (!raw) return new Set();
+      var arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (_e) {
+      return new Set();
+    }
+  }
+
+  function _saveExpandedSpecs() {
+    try {
+      localStorage.setItem(
+        "depgraph-expanded-specs",
+        JSON.stringify(Array.from(_expandedSpecs)),
+      );
+    } catch (_e) {
+      // localStorage full or disabled — graceful degradation.
+    }
+  }
+
+  // _collapsedSetFor returns the set of spec paths that are currently
+  // *collapsed* (every non-leaf path except those the user explicitly
+  // expanded). Passed to buildUnifiedGraph.
+  function _collapsedSetFor(specNodes) {
+    var collapsed = new Set();
+    for (var i = 0; i < specNodes.length; i++) {
+      var n = specNodes[i];
+      if (!n || !n.spec) continue;
+      if (n.is_leaf) continue;
+      if (_expandedSpecs.has(n.path)) continue;
+      collapsed.add(n.path);
+    }
+    return collapsed;
+  }
+
+  function _toggleSpecExpanded(path) {
+    if (!path) return;
+    if (_expandedSpecs.has(path)) _expandedSpecs.delete(path);
+    else _expandedSpecs.add(path);
+    _saveExpandedSpecs();
+    // Invalidate fingerprint so the re-render isn't short-circuited.
+    _lastFingerprint = null;
+    if (typeof scheduleRender === "function") scheduleRender();
+    else if (typeof render === "function") render();
+  }
+
+  // --- Canvas pan (hold Space + drag) --------------------------------------
+  //
+  // The Dep Graph canvas is an overflow:auto container with a potentially
+  // wide SVG inside. By default the user can only scroll. Holding Space
+  // turns the cursor into a grab handle; pressing the mouse button then
+  // drives the container's scrollLeft/scrollTop directly so the user can
+  // drag the canvas the way they would in Figma or Miro.
+  //
+  // Listeners are installed once (lazy, via _installPan) and gated on the
+  // Dep Graph mode being active — outside Dep Graph mode every handler is
+  // a cheap no-op.
+  var _panInstalled = false;
+  var _panKeyDown = false;
+  var _panDragging = false;
+  var _panStartMouseX = 0;
+  var _panStartMouseY = 0;
+  var _panStartScrollX = 0;
+  var _panStartScrollY = 0;
+
+  function _panActive() {
+    return (
+      typeof window !== "undefined" &&
+      !!window.depGraphEnabled &&
+      !!document.getElementById("depgraph-mount")
+    );
+  }
+
+  function _panMount() {
+    return document.getElementById("depgraph-mount");
+  }
+
+  function _installPan() {
+    if (_panInstalled) return;
+    if (typeof document === "undefined" || !document.addEventListener) return;
+    _panInstalled = true;
+
+    document.addEventListener("keydown", function (e) {
+      if (!_panActive()) return;
+      if (e.key !== " " && e.code !== "Space") return;
+      // Don't hijack Space while typing in an input/textarea.
+      var active = document.activeElement;
+      if (
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable)
+      ) {
+        return;
+      }
+      if (_panKeyDown) {
+        // Suppress the browser's page-scroll default while held.
+        e.preventDefault();
+        return;
+      }
+      _panKeyDown = true;
+      var mount = _panMount();
+      if (mount) mount.style.cursor = "grab";
+      e.preventDefault();
+    });
+
+    document.addEventListener("keyup", function (e) {
+      if (e.key !== " " && e.code !== "Space") return;
+      _panKeyDown = false;
+      _panDragging = false;
+      var mount = _panMount();
+      if (mount) mount.style.cursor = "";
+    });
+
+    // Blur/visibility changes can leave the "Space held" flag stuck if the
+    // keyup never fires (e.g. tab switch). Reset defensively.
+    window.addEventListener("blur", function () {
+      _panKeyDown = false;
+      _panDragging = false;
+      var mount = _panMount();
+      if (mount) mount.style.cursor = "";
+    });
+
+    document.addEventListener("mousedown", function (e) {
+      if (!_panActive() || !_panKeyDown) return;
+      var mount = _panMount();
+      if (!mount || !mount.contains(e.target)) return;
+      _panDragging = true;
+      _panStartMouseX = e.clientX;
+      _panStartMouseY = e.clientY;
+      _panStartScrollX = mount.scrollLeft;
+      _panStartScrollY = mount.scrollTop;
+      mount.style.cursor = "grabbing";
+      e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", function (e) {
+      if (!_panDragging) return;
+      var mount = _panMount();
+      if (!mount) return;
+      var dx = e.clientX - _panStartMouseX;
+      var dy = e.clientY - _panStartMouseY;
+      mount.scrollLeft = _panStartScrollX - dx;
+      mount.scrollTop = _panStartScrollY - dy;
+    });
+
+    document.addEventListener("mouseup", function () {
+      if (!_panDragging) return;
+      _panDragging = false;
+      var mount = _panMount();
+      if (mount) mount.style.cursor = _panKeyDown ? "grab" : "";
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -321,6 +484,30 @@
     var panel = document.getElementById("depgraph-panel");
     if (panel) return panel;
 
+    // Preferred mount: the full-pane Dep Graph mode container. It contains
+    // a pre-rendered shell with header + empty-state message, plus a
+    // #depgraph-mount slot for the SVG canvas. When that shell exists, we
+    // only add the SVG (the header comes from HTML).
+    var fullPaneMount = document.getElementById("depgraph-mount");
+    if (fullPaneMount) {
+      panel = document.createElement("div");
+      panel.id = "depgraph-panel";
+      panel.style.cssText = "display:block;width:100%;";
+
+      var svgInPane = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg",
+      );
+      svgInPane.id = "depgraph-svg";
+      svgInPane.style.display = "block";
+      panel.appendChild(svgInPane);
+
+      fullPaneMount.appendChild(panel);
+      return panel;
+    }
+
+    // Legacy overlay layout (below the board) — retained so any caller
+    // that still reaches for the old insertion point keeps working.
     panel = document.createElement("div");
     panel.id = "depgraph-panel";
     panel.style.cssText = [
@@ -332,7 +519,6 @@
       "background:var(--bg-raised)",
     ].join(";");
 
-    // Header row
     var header = document.createElement("div");
     header.style.cssText = [
       "display:flex",
@@ -344,7 +530,7 @@
 
     var titleEl = document.createElement("span");
     titleEl.style.cssText = "font-size:13px;font-weight:600;color:var(--text);";
-    titleEl.textContent = "Dependency Graph";
+    titleEl.textContent = "Map";
 
     var collapsed = localStorage.getItem("depgraph-collapsed") === "true";
     var collapseBtn = document.createElement("button");
@@ -366,13 +552,11 @@
     header.appendChild(collapseBtn);
     panel.appendChild(header);
 
-    // SVG canvas
     var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.id = "depgraph-svg";
     svg.style.display = collapsed ? "none" : "block";
     panel.appendChild(svg);
 
-    // Insert after the board-with-explorer wrapper (or #board if no wrapper).
     var wrapper =
       document.querySelector(".board-with-explorer") ||
       document.getElementById("board");
@@ -404,7 +588,50 @@
    * changed since the last call (fingerprint comparison).
    */
   function renderDependencyGraph(tasks) {
-    // Build the fingerprint over dependency-relevant tasks only.
+    // When spec-mode state is populated and unified-graph is loaded, prefer
+    // the unified spec+task renderer so the Dep Graph tab shows the full
+    // coordination picture. Fall back to task-only when no specs exist.
+    var specNodes =
+      typeof specModeState !== "undefined" && specModeState
+        ? specModeState.tree || []
+        : [];
+    var useUnified =
+      typeof buildUnifiedGraph === "function" &&
+      typeof renderUnifiedGraph === "function" &&
+      Array.isArray(specNodes) &&
+      specNodes.length > 0;
+
+    if (useUnified) {
+      var graph = buildUnifiedGraph(tasks, specNodes, {
+        collapsedSpecs: _collapsedSetFor(specNodes),
+      });
+      // Always make the panel visible — returning early without doing so
+      // leaves it hidden after Dep Graph → Board → Dep Graph round-trips.
+      var panel = getOrCreatePanel();
+      panel.style.display = "block";
+
+      var unifiedFp = _graphFingerprint(graph);
+      if (unifiedFp === _lastFingerprint) return;
+      _lastFingerprint = unifiedFp;
+
+      var svg = document.getElementById("depgraph-svg");
+      if (!svg) return;
+      var paneEmpty = _paneEmpty();
+      if (graph.nodes.length === 0) {
+        svg.style.display = "none";
+        if (paneEmpty) paneEmpty.style.display = "";
+        return;
+      }
+      if (paneEmpty) paneEmpty.style.display = "none";
+      svg.style.display = "block";
+      renderUnifiedGraph(graph, svg, {
+        onToggleSpec: _toggleSpecExpanded,
+      });
+      _installPan();
+      return;
+    }
+
+    // --- Legacy task-only path (no specs in the workspace) ---
     var targetIds = new Set();
     tasks.forEach(function (t) {
       if (t.depends_on)
@@ -431,43 +658,68 @@
     _lastFingerprint = fingerprint;
 
     var subgraph = getSubgraph(tasks);
-    var panel = getOrCreatePanel();
-    panel.style.display = "block";
+    var legacyPanel = getOrCreatePanel();
+    legacyPanel.style.display = "block";
 
-    var svg = document.getElementById("depgraph-svg");
-    if (!svg) return;
+    var legacySvg = document.getElementById("depgraph-svg");
+    if (!legacySvg) return;
 
-    // Show empty-state message when no dependency edges exist.
-    var emptyMsg = panel.querySelector(".depgraph-empty");
+    var paneEmptyLegacy = _paneEmpty();
+    var inlineEmpty = legacyPanel.querySelector(".depgraph-empty");
+
     if (subgraph.length === 0) {
-      svg.style.display = "none";
-      if (!emptyMsg) {
-        emptyMsg = document.createElement("div");
-        emptyMsg.className = "depgraph-empty";
-        emptyMsg.style.cssText =
-          "padding:24px;text-align:center;color:var(--text-muted);font-size:12px;";
-        emptyMsg.textContent =
-          "No dependency edges. Add depends-on links between tasks to see the graph.";
-        panel.appendChild(emptyMsg);
+      legacySvg.style.display = "none";
+      if (paneEmptyLegacy) {
+        paneEmptyLegacy.style.display = "";
+      } else {
+        if (!inlineEmpty) {
+          inlineEmpty = document.createElement("div");
+          inlineEmpty.className = "depgraph-empty";
+          inlineEmpty.style.cssText =
+            "padding:24px;text-align:center;color:var(--text-muted);font-size:12px;";
+          inlineEmpty.textContent =
+            "No dependency edges. Add depends-on links between tasks to see the graph.";
+          legacyPanel.appendChild(inlineEmpty);
+        }
+        inlineEmpty.style.display = "";
       }
-      emptyMsg.style.display = "";
       return;
     }
 
-    if (emptyMsg) emptyMsg.style.display = "none";
+    if (paneEmptyLegacy) paneEmptyLegacy.style.display = "none";
+    if (inlineEmpty) inlineEmpty.style.display = "none";
 
-    var result = kahnLevels(subgraph);
-    var layout = computeLayout(result.levels, result.cycleNodes);
+    var kr = kahnLevels(subgraph);
+    var kl = computeLayout(kr.levels, kr.cycleNodes);
 
     var isCollapsed = localStorage.getItem("depgraph-collapsed") === "true";
     if (!isCollapsed) {
-      svg.setAttribute("viewBox", "0 0 " + layout.svgW + " " + layout.svgH);
-      svg.setAttribute("width", layout.svgW);
-      svg.setAttribute("height", layout.svgH);
-      svg.style.display = "block";
+      legacySvg.setAttribute("viewBox", "0 0 " + kl.svgW + " " + kl.svgH);
+      legacySvg.setAttribute("width", kl.svgW);
+      legacySvg.setAttribute("height", kl.svgH);
+      legacySvg.style.display = "block";
     }
 
-    renderSvg(svg, subgraph, layout.positions, layout.hasCycles);
+    renderSvg(legacySvg, subgraph, kl.positions, kl.hasCycles);
+  }
+
+  function _paneEmpty() {
+    return document.getElementById("depgraph-mount")
+      ? document.querySelector("#depgraph-mount .depgraph-mode__empty")
+      : null;
+  }
+
+  // Fingerprint of the unified graph covers both tasks and specs so the
+  // graph re-renders when either side changes.
+  function _graphFingerprint(graph) {
+    return JSON.stringify({
+      n: graph.nodes.map(function (n) {
+        return [n.id, n.status, n.label, n.extra && n.extra.dispatched];
+      }),
+      e: graph.edges.map(function (e) {
+        return [e.from, e.to, e.kind];
+      }),
+    });
   }
 
   /**

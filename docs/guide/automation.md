@@ -34,7 +34,6 @@ header bar. The menu contains a horizontal strip of toggle switches:
 | Auto-test | **Test** | Automatic test verification of waiting tasks |
 | Auto-submit | **Submit** | Automatic completion of verified waiting tasks |
 | Auto-push | **Push** | Automatic git push after task completion |
-| Dep graph | **Dep graph** | Show/hide the dependency graph overlay |
 
 A badge on the lightning bolt icon shows how many toggles are currently
 active. All toggles default to off and reset to off on server restart,
@@ -286,9 +285,23 @@ respects:
   without blocking other watchers.
 - Cycle detection prevents creating circular dependencies.
 
-**Dependency graph overlay.** Toggle "Dep graph" in the Automation menu
-to display a visual overlay on the board showing dependency relationships
-as bezier curves between task cards.
+**Map view.** Click **Map** in the sidebar (Workspace section, next to
+Plan) to open a full-pane visualization of the workspace's coordination
+graph. When the workspace has specs under
+`specs/`, the view shows a unified graph of both specs and tasks:
+
+- **Specs** (rounded nodes) form a containment tree via the file layout
+  and may depend on other specs (`depends_on` in frontmatter).
+- **Tasks** (card nodes) hang off leaf specs via `dispatched_task_id`, or
+  appear as standalone nodes when no spec dispatched them.
+- Nodes are laid out by topological level so prerequisites sit to the
+  left of their dependents. Edge styles distinguish containment,
+  dispatch, spec-level deps, and task-level deps (see the legend).
+
+Clicking a task node opens its modal; clicking a spec node switches to
+Plan mode and focuses that spec. Archived specs are filtered out by
+default. When the workspace has no specs, the view falls back to the
+task-only DAG.
 
 **Batch creation with dependencies.** Use `POST /api/tasks/batch` to
 create multiple tasks atomically with symbolic dependency wiring. Tasks
