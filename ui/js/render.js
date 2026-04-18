@@ -577,6 +577,14 @@ function render() {
     cancelled: [],
   };
   for (const t of tasks) {
+    // System-managed routine agents (e.g. the ideation routine) live
+    // behind the Automation settings surface, not on the board. Their
+    // routine card is still persisted and driven by the scheduler
+    // engine; we just keep it out of the visual task list so it does
+    // not clutter backlog.
+    if (Array.isArray(t.tags) && t.tags.some((tag) => tag.startsWith("system:"))) {
+      continue;
+    }
     const col = columns[t.status];
     if (col) col.push(t);
   }
@@ -796,6 +804,10 @@ function createCard(t, rank) {
 
 function buildCardActions(t) {
   if (t.archived) return "";
+  // Routine cards have their own footer with the Run-now button; the
+  // generic Start/Refine/Retry actions don't apply to a schedule
+  // template and only create visual clutter, so we skip them.
+  if (t.kind === "routine") return "";
   const parts = [];
   if (t.status === "backlog") {
     const refineStatus = t.current_refinement && t.current_refinement.status;
