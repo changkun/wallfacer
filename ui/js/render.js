@@ -577,12 +577,18 @@ function render() {
     cancelled: [],
   };
   for (const t of tasks) {
-    // System-managed routine agents (e.g. the ideation routine) live
+    // System-managed routine *cards* (e.g. the ideation routine) live
     // behind the Automation settings surface, not on the board. Their
-    // routine card is still persisted and driven by the scheduler
-    // engine; we just keep it out of the visual task list so it does
-    // not clutter backlog.
-    if (Array.isArray(t.tags) && t.tags.some((tag) => tag.startsWith("system:"))) {
+    // card is still persisted and driven by the scheduler engine; we
+    // just keep it out of the visual task list. The instance tasks a
+    // system routine spawns inherit the system:* tag but must remain
+    // visible — they are the actual work, not the schedule template —
+    // so the filter is scoped to Kind=routine.
+    if (
+      t.kind === "routine" &&
+      Array.isArray(t.tags) &&
+      t.tags.some((tag) => tag.startsWith("system:"))
+    ) {
       continue;
     }
     const col = columns[t.status];
