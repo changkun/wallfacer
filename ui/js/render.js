@@ -906,6 +906,7 @@ function updateCard(card, t, rank) {
   card.dataset.fp = fp;
 
   const isIdeaAgent = t.kind === "idea-agent";
+  const isRoutine = t.kind === "routine";
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === "in_progress";
   const isPendingCancel =
@@ -934,6 +935,23 @@ function updateCard(card, t, rank) {
   } else {
     card.classList.remove("card-idea-agent");
   }
+  if (isRoutine) {
+    card.classList.add("card-routine");
+  } else {
+    card.classList.remove("card-routine");
+  }
+  // Status accent classes drive the left-border colour on the card itself.
+  const statusAccents = [
+    "card-backlog",
+    "card-in_progress",
+    "card-committing",
+    "card-waiting",
+    "card-done",
+    "card-failed",
+    "card-cancelled",
+  ];
+  for (const cls of statusAccents) card.classList.remove(cls);
+  if (t.status) card.classList.add("card-" + t.status);
   const showSpinner = t.status === "in_progress" || t.status === "committing";
   const showDiff = !!(
     t.worktree_paths && Object.keys(t.worktree_paths).length > 0
@@ -1107,6 +1125,7 @@ function updateCard(card, t, rank) {
           })()
         : ""
     }
+    ${isRoutine && typeof renderRoutineFooter === "function" ? renderRoutineFooter(t) : ""}
     ${buildCardActions(t)}
   `;
 
