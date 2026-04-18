@@ -303,8 +303,7 @@ function _applyMode(mode) {
   // #depgraph-mode-container while this mode is active. The panel is mounted
   // on first render (see depgraph.js getOrCreatePanel).
   if (typeof window !== "undefined") {
-    var leavingDepgraph =
-      window.depGraphEnabled && mode !== "depgraph";
+    var leavingDepgraph = window.depGraphEnabled && mode !== "depgraph";
     window.depGraphEnabled = mode === "depgraph";
     if (leavingDepgraph && typeof window._resetMapCentering === "function") {
       // Re-anchor the content on the next Map open — user was working in
@@ -323,6 +322,14 @@ function _applyMode(mode) {
       } catch (_e) {
         // Best-effort; dep graph falls back to task-only when tree is empty.
       }
+    }
+    // Seed the map search with whatever is already in the global
+    // task-search input — users who searched on the board and then flipped
+    // to Map expect the filter to carry over.
+    if (typeof setMapSearch === "function") {
+      var seedInput = document.getElementById("task-search");
+      var seed = seedInput && seedInput.value ? seedInput.value : "";
+      if (seed && seed.charAt(0) !== "@") setMapSearch(seed);
     }
     if (typeof scheduleRender === "function") scheduleRender();
     else if (typeof render === "function") render();
@@ -371,15 +378,22 @@ function _applyMode(mode) {
   // Update search placeholder based on mode.
   var searchInput = document.getElementById("task-search");
   if (searchInput) {
-    searchInput.placeholder =
-      mode === "spec"
-        ? "Filter plans\u2026"
-        : "Filter tasks\u2026 or @search server";
+    if (mode === "spec") {
+      searchInput.placeholder = "Filter plans\u2026";
+    } else if (mode === "depgraph") {
+      searchInput.placeholder = "Filter map nodes\u2026";
+    } else {
+      searchInput.placeholder = "Filter tasks\u2026 or @search server";
+    }
   }
 
   // Clear spec text filter when leaving spec mode.
   if (mode !== "spec" && typeof setSpecTextFilter === "function") {
     setSpecTextFilter("");
+  }
+  // Clear map search when leaving Map mode.
+  if (mode !== "depgraph" && typeof setMapSearch === "function") {
+    setMapSearch("");
   }
 }
 

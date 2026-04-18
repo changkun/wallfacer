@@ -135,17 +135,22 @@ function hideSearchPanel() {
         triggerServerSearch(filterQuery);
       } else {
         hideSearchPanel();
-        // In spec mode, filter the spec explorer tree; otherwise filter tasks.
-        if (
-          typeof getCurrentMode === "function" &&
-          getCurrentMode() === "spec" &&
-          typeof setSpecTextFilter === "function"
-        ) {
+        // Route the query to the active mode's filter:
+        //   spec     → spec explorer tree filter
+        //   depgraph → Map node/edge dim filter
+        //   board    → task list filter (default render path)
+        var mode =
+          typeof getCurrentMode === "function" ? getCurrentMode() : "board";
+        if (mode === "spec" && typeof setSpecTextFilter === "function") {
           setSpecTextFilter(filterQuery);
+        } else if (mode === "depgraph" && typeof setMapSearch === "function") {
+          setMapSearch(filterQuery);
         } else {
-          // Clear spec filter when switching back to board.
           if (typeof setSpecTextFilter === "function") {
             setSpecTextFilter("");
+          }
+          if (typeof setMapSearch === "function") {
+            setMapSearch("");
           }
           render();
         }
@@ -172,6 +177,9 @@ function hideSearchPanel() {
         hideSearchPanel();
         if (typeof setSpecTextFilter === "function") {
           setSpecTextFilter("");
+        }
+        if (typeof setMapSearch === "function") {
+          setMapSearch("");
         }
         render();
         input.focus();
