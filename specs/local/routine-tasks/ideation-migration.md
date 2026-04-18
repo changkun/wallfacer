@@ -1,6 +1,6 @@
 ---
 title: Migrate ideation to a system routine
-status: validated
+status: complete
 depends_on:
   - specs/local/routine-tasks/engine-integration.md
   - specs/local/routine-tasks/routine-card-ui.md
@@ -15,7 +15,7 @@ affects:
   - AGENTS.md
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---

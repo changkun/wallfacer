@@ -1,12 +1,12 @@
 ---
 title: Routine scheduler engine package
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/routine/
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---

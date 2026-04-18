@@ -1,6 +1,6 @@
 ---
 title: Routine card UI variant
-status: validated
+status: complete
 depends_on:
   - specs/local/routine-tasks/routines-api.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - ui/partials/sidebar.html
 effort: medium
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
