@@ -668,24 +668,117 @@ html.wails-desktop .app-sidebar {
   text-overflow: ellipsis;
 }
 
-.column {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  contain: layout paint style;
-}
-.col-bg {
-  background: var(--bg-raised);
-  border-radius: 12px;
-  padding: 12px;
-}
-
 /* Board grid: 4 equal columns on desktop */
 .board-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  padding: 24px;
+  gap: var(--sp-5);
+  padding: var(--sp-5);
+  overflow: auto;
+  min-height: 0;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.col-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px var(--sp-3);
+}
+.col-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.col-backlog .col-dot {
+  background: var(--col-backlog);
+}
+.col-progress .col-dot {
+  background: var(--col-progress);
+}
+.col-waiting .col-dot {
+  background: var(--col-waiting);
+}
+.col-done .col-dot {
+  background: var(--col-done);
+}
+.col-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+.col-count {
+  font-size: 10px;
+  color: var(--ink-4);
+  padding: 0 5px;
+  border-radius: var(--r-sm);
+  background: var(--bg-sunk);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+.col-stats {
+  font-size: 10px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.col-btn {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  line-height: 16px;
+}
+.col-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+.col-icon-btn {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.col-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+.col-btn.hidden,
+.col-stats.hidden {
+  display: none;
+}
+
+.column {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  contain: layout paint style;
+}
+/* Each column body reads as a soft tray — subtle enough to not compete
+   with cards, distinct enough that an empty column still reads as a
+   column rather than empty canvas. */
+.col-bg {
+  background: var(--bg-sunk);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  gap: var(--sp-2);
 }
 /* --- Settings button --- */
 .settings-btn {
