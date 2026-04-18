@@ -491,36 +491,34 @@ func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 // Resolution priority: per-task per-activity override → per-task sandbox → env-file
 // per-activity setting → env-file default sandbox → Claude (hardcoded fallback).
 //
-// Host mode coerces the result to Claude regardless of configuration, because
-// the host backend does not yet support codex (see HostBackend.Launch). Doing
-// the coercion here — at the resolution boundary — means sub-agent activities
-// (title, oversight, commit-message, etc.) that would normally route to codex
-// via env vars silently fall through to claude in host mode instead of
-// failing at launch.
+// Host mode coerces codex → claude ONLY when the codex choice came from an
+// env-file default (a passive configuration, not user intent). Explicit
+// per-task choices — `task.Sandbox` or `task.SandboxByActivity` — are passed
+// through unchanged; if the user explicitly chose codex, the host backend's
+// Launch rejects it with an actionable error rather than silently running
+// claude and producing misleading output.
 func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
-	resolved := r.resolveSandboxForActivity(task, activity)
-	if r.HostMode() && resolved == sandbox.Codex {
-		return sandbox.Claude
-	}
-	return resolved
-}
-
-// resolveSandboxForActivity is the raw resolution (no host-mode coercion).
-// Extracted so host-mode can apply a post-resolution override.
-func (r *Runner) resolveSandboxForActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
-	if task == nil {
-		return sandbox.Claude
-	}
 	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
-	if task.SandboxByActivity != nil {
-		if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
-			return sb
+
+	// Explicit per-task choices win, including in host mode — the backend
+	// reports an honest error if the choice is not supported.
+	if task != nil {
+		if task.SandboxByActivity != nil {
+			if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
+				return sb
+			}
+		}
+		if task.Sandbox.IsValid() {
+			return task.Sandbox
 		}
 	}
-	if task.Sandbox.IsValid() {
-		return task.Sandbox
-	}
+
+	// Env-file-derived default: in host mode, swap codex for claude so
+	// sub-agent activities don't fail on a default the user never asked for.
 	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
+		if r.HostMode() && sb == sandbox.Codex {
+			return sandbox.Claude
+		}
 		return sb
 	}
 	return sandbox.Claude

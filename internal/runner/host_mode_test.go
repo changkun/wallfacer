@@ -110,32 +110,52 @@ func TestRunner_HostMode_LocalIsExplicit(t *testing.T) {
 	_ = strings.ToLower("local")
 }
 
-// TestSandboxForTaskActivity_HostMode_CoercesCodexToClaude verifies the
-// routing-level override: when host mode is active, any activity that would
-// have gone to codex is silently redirected to claude. This keeps sub-agents
-// (title, oversight, etc.) working in host mode instead of failing at launch
-// when the user has codex configured for those activities.
-func TestSandboxForTaskActivity_HostMode_CoercesCodexToClaude(t *testing.T) {
+// TestSandboxForTaskActivity_HostMode_RespectsExplicitCodex verifies that an
+// explicit per-task codex choice survives host mode. The user chose codex on
+// purpose; the backend is the right place to report "codex not supported in
+// host mode" rather than silently running claude and producing misleading
+// output (e.g. "who are you" returning Claude when the task was set to
+// codex).
+func TestSandboxForTaskActivity_HostMode_RespectsExplicitCodex(t *testing.T) {
 	s := newStoreForTest(t)
-	r := NewRunner(s, RunnerConfig{
-		Command: "echo",
-	})
+	r := NewRunner(s, RunnerConfig{Command: "echo"})
 	t.Cleanup(func() { r.Shutdown() })
-
-	// Force host mode without constructing a real HostBackend (which would
-	// require a real claude binary on PATH for this test).
 	r.hostMode = true
 
 	task := &store.Task{Sandbox: "codex"}
-	got := r.sandboxForTaskActivity(task, activityTitle)
-	if string(got) != "claude" {
-		t.Errorf("host mode should coerce codex → claude; got %q", got)
+	got := r.sandboxForTaskActivity(task, activityImplementation)
+	if string(got) != "codex" {
+		t.Errorf("explicit per-task codex must survive host mode; got %q", got)
+	}
+}
+
+// TestSandboxForTaskActivity_HostMode_CoercesEnvDefault verifies that env-file
+// routing defaults that would send an activity to codex get coerced to claude
+// in host mode. This keeps sub-agents (title, oversight, etc.) working when
+// the user configured codex in WALLFACER_SANDBOX_* env vars but didn't set it
+// on the task itself — a passive default, not explicit intent.
+func TestSandboxForTaskActivity_HostMode_CoercesEnvDefault(t *testing.T) {
+	// Write an env file routing the title activity to codex as a passive default.
+	envFile := t.TempDir() + "/.env"
+	if err := os.WriteFile(envFile, []byte("WALLFACER_SANDBOX_TITLE=codex\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 
-	// Non-host mode: the same resolution should pass codex through unchanged.
+	s := newStoreForTest(t)
+	r := NewRunner(s, RunnerConfig{Command: "echo", EnvFile: envFile})
+	t.Cleanup(func() { r.Shutdown() })
+	r.hostMode = true
+
+	task := &store.Task{}
+	got := r.sandboxForTaskActivity(task, activityTitle)
+	if string(got) != "claude" {
+		t.Errorf("host mode should coerce env-routed codex → claude; got %q", got)
+	}
+
+	// Non-host mode: env default passes through unchanged.
 	r.hostMode = false
 	got = r.sandboxForTaskActivity(task, activityTitle)
 	if string(got) != "codex" {
-		t.Errorf("non-host mode should preserve codex routing; got %q", got)
+		t.Errorf("non-host mode should preserve env codex routing; got %q", got)
 	}
 }
