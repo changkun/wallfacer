@@ -67,6 +67,10 @@ func (h *Handler) reconcileRoutines(ctx context.Context) {
 		return
 	}
 
+	// Seed the system:ideation routine on first reconcile in this store
+	// so legacy callers keep seeing an ideation schedule. Idempotent.
+	h.ensureSystemIdeationRoutine(ctx, s)
+
 	tasks, err := s.ListTasks(ctx, false)
 	if err != nil {
 		logger.Handler.Warn("routine: reconcile list tasks", "error", err)

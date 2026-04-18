@@ -257,7 +257,8 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
-	h.StartIdeationWatcher(ctx)
+	// Ideation is now one instance of the routine primitive — its timer
+	// lives inside the scheduler engine via a system:ideation routine.
 	h.StartRoutineEngine(ctx)
 	h.StartWaitingSyncWatcher(ctx)
 	h.StartAutoTester(ctx)
