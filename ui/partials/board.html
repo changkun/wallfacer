@@ -144,6 +144,40 @@
               title="Leave empty to run immediately"
             />
           </div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 3px;
+              margin-top: 8px;
+            "
+          >
+            <label class="text-xs text-v-muted" style="display: flex; align-items: center; gap: 4px;">
+              <input
+                type="checkbox"
+                id="new-repeat-toggle"
+                style="width: 11px; height: 11px; accent-color: var(--accent); cursor: pointer;"
+              />
+              <span>Repeat on a schedule (create a routine instead)</span>
+            </label>
+            <label
+              for="new-repeat-minutes"
+              class="text-xs text-v-muted"
+              style="display: none"
+              id="new-repeat-minutes-row"
+              >Repeat every (minutes)</label
+            >
+            <input
+              type="number"
+              id="new-repeat-minutes"
+              class="field text-xs"
+              min="1"
+              step="1"
+              value="60"
+              style="width: 100%; display: none"
+              title="Interval in minutes between spawned instance tasks"
+            />
+          </div>
         </div>
         <!-- Budget Limits card (collapsible) -->
         <details class="settings-card" style="margin-top: 8px">
