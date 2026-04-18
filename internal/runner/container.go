@@ -381,7 +381,6 @@ func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []s
 	return volumes
 }
 
-
 // sandboxForTask returns the resolved sandbox type for the task's implementation activity.
 // Shorthand for sandboxForTaskActivity(task, activityImplementation).
 func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {

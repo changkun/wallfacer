@@ -59,7 +59,7 @@ type TurnCompletedEvent struct {
 // TurnFailedEvent closes a turn that hit an error. The inner error
 // structure mirrors top-level ThreadErrorEvent.
 type TurnFailedEvent struct {
-	Type  string            `json:"type"`
+	Type  string           `json:"type"`
 	Error ThreadErrorEvent `json:"error"`
 }
 
@@ -94,9 +94,9 @@ type ThreadErrorEvent struct {
 // CodexUsage is the per-turn token breakdown carried by
 // TurnCompletedEvent.
 type CodexUsage struct {
-	InputTokens        int64 `json:"input_tokens"`
-	CachedInputTokens  int64 `json:"cached_input_tokens"`
-	OutputTokens       int64 `json:"output_tokens"`
+	InputTokens       int64 `json:"input_tokens"`
+	CachedInputTokens int64 `json:"cached_input_tokens"`
+	OutputTokens      int64 `json:"output_tokens"`
 }
 
 // ThreadItem is the common wrapper for all item.* event payloads —
