@@ -149,25 +149,14 @@ func (b *HostBackend) probeAppendSystemPrompt(t Type) bool {
 }
 
 // Launch execs the selected agent binary and returns a Handle the runner
-// drains and reaps like any other backend.
+// drains and reaps like any other backend. Dispatches to launchClaude or
+// launchCodex based on spec.Env["WALLFACER_AGENT"]; each sub-launcher
+// handles CLI-specific argv + output wrangling.
 func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, error) {
 	agentStr := spec.Env["WALLFACER_AGENT"]
 	agent, ok := Parse(agentStr)
 	if !ok {
 		return nil, fmt.Errorf("host backend: spec.Env[WALLFACER_AGENT] is missing or unknown (got %q)", agentStr)
-	}
-	// Codex CLI does not accept the Claude-style `-p ... --verbose
-	// --output-format stream-json` argv that the runner generates. In
-	// container mode, the sandbox-agents image's `codex-agent.sh` script
-	// translates the argv and wraps the output; host mode has no such
-	// wrapper yet. Refuse codex launches cleanly rather than passing
-	// incompatible flags through and getting a confusing CLI error.
-	if agent == Codex {
-		return nil, fmt.Errorf("host backend: the codex CLI is not supported yet in host mode; route all activities to claude (WALLFACER_SANDBOX_*=claude) or use container mode")
-	}
-	bin, err := b.binaryFor(agent)
-	if err != nil {
-		return nil, err
 	}
 
 	// Reject container paths early: a leftover /workspace/<basename> here
@@ -176,28 +165,35 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 		return nil, fmt.Errorf("host backend: WorkDir %q is a container path; runner must translate to a host path", spec.WorkDir)
 	}
 
-	// Build the child environment: inherit, overlay env-file, overlay spec.Env.
-	env := os.Environ()
-	if spec.EnvFile != "" {
-		fromFile, err := parseEnvFile(spec.EnvFile)
-		if err != nil {
-			logger.Runner.Warn("host backend: parse env file", "path", spec.EnvFile, "error", err)
-		} else {
-			for k, v := range fromFile {
-				env = setEnv(env, k, v)
-			}
-		}
+	switch agent {
+	case Claude:
+		return b.launchClaude(ctx, spec)
+	case Codex:
+		return b.launchCodex(ctx, spec)
+	default:
+		return nil, fmt.Errorf("host backend: unsupported agent %q", agent)
 	}
-	for k, v := range spec.Env {
-		env = setEnv(env, k, v)
+}
+
+// launchClaude execs the claude CLI with the runner's argv passed through
+// almost verbatim — claude accepts the declarative `-p ... --verbose
+// --output-format stream-json` invocation the runner already builds. The
+// only transformation is instructions delivery: if the runner set
+// WALLFACER_INSTRUCTIONS_PATH, we either add --append-system-prompt (when
+// claude --help advertises it) or prepend the instructions content to the
+// -p prompt value.
+func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Handle, error) {
+	bin, err := b.binaryFor(Claude)
+	if err != nil {
+		return nil, err
 	}
 
-	// Start from the declared argv and adjust for instructions delivery.
+	env := b.buildChildEnv(spec)
+
 	argv := make([]string, len(spec.Cmd))
 	copy(argv, spec.Cmd)
-
 	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
-		if b.SupportsAppendSystemPrompt(agent) {
+		if b.SupportsAppendSystemPrompt(Claude) {
 			argv = append(argv, "--append-system-prompt", instrPath)
 		} else {
 			data, rErr := os.ReadFile(instrPath)
@@ -238,6 +234,26 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 	b.procMu.Unlock()
 
 	return h, nil
+}
+
+// buildChildEnv returns os.Environ() with spec.EnvFile values merged in
+// and spec.Env overlaid on top. spec.Env wins on collision.
+func (b *HostBackend) buildChildEnv(spec ContainerSpec) []string {
+	env := os.Environ()
+	if spec.EnvFile != "" {
+		fromFile, err := parseEnvFile(spec.EnvFile)
+		if err != nil {
+			logger.Runner.Warn("host backend: parse env file", "path", spec.EnvFile, "error", err)
+		} else {
+			for k, v := range fromFile {
+				env = setEnv(env, k, v)
+			}
+		}
+	}
+	for k, v := range spec.Env {
+		env = setEnv(env, k, v)
+	}
+	return env
 }
 
 // List returns info about the host processes currently tracked by the
