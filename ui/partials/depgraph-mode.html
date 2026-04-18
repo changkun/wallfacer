@@ -1,0 +1,53 @@
+<div
+  id="depgraph-mode-container"
+  class="depgraph-mode-container"
+  style="display: none"
+>
+  <div class="depgraph-mode__inner">
+    <header class="depgraph-mode__header">
+      <div>
+        <h2 class="depgraph-mode__title">Map</h2>
+        <p class="depgraph-mode__subtitle">
+          Specs and tasks laid out by dependency. Prerequisites appear to
+          the left of what they enable. Click the <kbd>+</kbd> on a spec to
+          unfold its children; hold <kbd>Space</kbd> and drag to pan.
+        </p>
+      </div>
+      <ul class="depgraph-mode__legend" aria-label="Legend">
+        <li>
+          <span class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--spec"></span>
+          Spec
+        </li>
+        <li>
+          <span class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--task"></span>
+          Task
+        </li>
+        <li>
+          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--containment"></span>
+          Contains
+        </li>
+        <li>
+          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--dispatch"></span>
+          Dispatch
+        </li>
+        <li>
+          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--spec-dep"></span>
+          Spec dep
+        </li>
+        <li>
+          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--task-dep"></span>
+          Task dep
+        </li>
+      </ul>
+    </header>
+    <div id="depgraph-mount" class="depgraph-mode__mount">
+      <div class="depgraph-mode__empty">
+        <p>
+          No dependency edges yet. Add depends-on links between tasks to see
+          the graph — drag a card from Backlog onto another, or set
+          dependencies via the task modal.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

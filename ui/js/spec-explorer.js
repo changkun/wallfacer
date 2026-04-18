@@ -37,6 +37,13 @@ function _syncSpecModeState(data) {
   if (typeof specModeState === "undefined" || !specModeState) return;
   specModeState.tree = (data && data.nodes) || [];
   specModeState.index = (data && data.index) || null;
+  // Nudge the dep-graph renderer so newly arrived spec nodes show up
+  // without a second click. The renderer's fingerprint guards against
+  // redundant re-renders.
+  if (typeof window !== "undefined" && window.depGraphEnabled) {
+    if (typeof scheduleRender === "function") scheduleRender();
+    else if (typeof render === "function") render();
+  }
 }
 
 // _firstLeafPath returns the path of the first leaf node in `nodes`,
@@ -76,14 +83,6 @@ function loadSpecTree() {
       _specTreeData = data;
       _syncSpecModeState(data);
       renderSpecTree();
-      // Update minimap with fresh tree data if a spec is focused.
-      if (
-        typeof renderMinimap === "function" &&
-        typeof getFocusedSpecPath === "function" &&
-        getFocusedSpecPath()
-      ) {
-        renderMinimap(getFocusedSpecPath(), _specTreeData);
-      }
       // Update pane visibility based on whether specs exist.
       var hasSpecs = data && data.nodes && data.nodes.length > 0;
       if (typeof _updateSpecPaneVisibility === "function") {
@@ -192,13 +191,6 @@ function _startSpecTreeStream() {
       _specTreeData = JSON.parse(e.data);
       _syncSpecModeState(_specTreeData);
       renderSpecTree();
-      if (
-        typeof renderMinimap === "function" &&
-        typeof getFocusedSpecPath === "function" &&
-        getFocusedSpecPath()
-      ) {
-        renderMinimap(getFocusedSpecPath(), _specTreeData);
-      }
       // Update pane visibility on live updates (specs may have been added/removed).
       var hasSpecs =
         _specTreeData && _specTreeData.nodes && _specTreeData.nodes.length > 0;

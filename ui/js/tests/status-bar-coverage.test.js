@@ -517,43 +517,9 @@ describe("_cycleBottomPanel", () => {
     expect(connectTerminal).toHaveBeenCalled();
   });
 
-  it("opens dep graph when nothing is open and terminal not available", () => {
-    const { ctx, scheduleRender } = setup({ termEnabled: false });
-    const handler = ctx._listeners["keydown"][0];
-    handler({
-      key: "`",
-      ctrlKey: true,
-      metaKey: false,
-      altKey: false,
-      shiftKey: false,
-      preventDefault: vi.fn(),
-    });
-    expect(vm.runInContext("depGraphEnabled", ctx)).toBe(true);
-    expect(scheduleRender).toHaveBeenCalled();
-  });
-
-  it("closes terminal and opens dep graph when terminal is open", () => {
-    const { ctx, termPanel, scheduleRender } = setup({
-      termEnabled: true,
-      termOpen: true,
-    });
-    const handler = ctx._listeners["keydown"][0];
-    handler({
-      key: "`",
-      ctrlKey: true,
-      metaKey: false,
-      altKey: false,
-      shiftKey: false,
-      preventDefault: vi.fn(),
-    });
-    expect(termPanel.classList.contains("hidden")).toBe(true);
-    expect(vm.runInContext("depGraphEnabled", ctx)).toBe(true);
-    expect(scheduleRender).toHaveBeenCalled();
-  });
-
-  it("closes dep graph and opens office when dep graph is open and office available", () => {
+  it("opens office when nothing is open, terminal unavailable, office available", () => {
     const { ctx, officePanel, officeShow } = setup({
-      depOpen: true,
+      termEnabled: false,
       officeAvailable: true,
     });
     const handler = ctx._listeners["keydown"][0];
@@ -565,14 +531,34 @@ describe("_cycleBottomPanel", () => {
       shiftKey: false,
       preventDefault: vi.fn(),
     });
-    expect(vm.runInContext("depGraphEnabled", ctx)).toBe(false);
     expect(officePanel.classList.contains("hidden")).toBe(false);
     expect(officeShow).toHaveBeenCalled();
   });
 
-  it("closes dep graph without opening office when not available", () => {
-    const { ctx, officePanel } = setup({
-      depOpen: true,
+  it("closes terminal and opens office when terminal is open and office available", () => {
+    const { ctx, termPanel, officePanel, officeShow } = setup({
+      termEnabled: true,
+      termOpen: true,
+      officeAvailable: true,
+    });
+    const handler = ctx._listeners["keydown"][0];
+    handler({
+      key: "`",
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      preventDefault: vi.fn(),
+    });
+    expect(termPanel.classList.contains("hidden")).toBe(true);
+    expect(officePanel.classList.contains("hidden")).toBe(false);
+    expect(officeShow).toHaveBeenCalled();
+  });
+
+  it("closes terminal without opening office when office not available", () => {
+    const { ctx, termPanel, officePanel } = setup({
+      termEnabled: true,
+      termOpen: true,
       officeAvailable: false,
     });
     const handler = ctx._listeners["keydown"][0];
@@ -584,7 +570,7 @@ describe("_cycleBottomPanel", () => {
       shiftKey: false,
       preventDefault: vi.fn(),
     });
-    expect(vm.runInContext("depGraphEnabled", ctx)).toBe(false);
+    expect(termPanel.classList.contains("hidden")).toBe(true);
     expect(officePanel.classList.contains("hidden")).toBe(true);
   });
 
@@ -1006,61 +992,6 @@ describe("updateStatusBar", () => {
     expect(label.textContent).toBe("Connected");
     expect(inProg.textContent).toBe("1");
     expect(ws.textContent).toBe("bar");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// _showDepGraphPanel / _hideDepGraphPanel
-// ---------------------------------------------------------------------------
-describe("dep graph panel", () => {
-  function setup() {
-    const btn = makeEl();
-    const scheduleRender = vi.fn();
-    const ctx = makeContext({
-      elements: [
-        ["status-bar-depgraph-btn", btn],
-        ["status-bar-conn-dot", makeEl()],
-        ["status-bar-conn-label", makeEl()],
-        ["status-bar-in-progress", makeEl()],
-        ["status-bar-waiting", makeEl()],
-        ["status-bar-panel", makeEl()],
-        ["status-bar-panel-resize", makeEl()],
-      ],
-      scheduleRender,
-    });
-    loadScript(ctx);
-    return { ctx, btn, scheduleRender };
-  }
-
-  it("uses render() fallback when scheduleRender is not available", () => {
-    const btn = makeEl();
-    const renderFn = vi.fn();
-    const ctx = makeContext({
-      elements: [
-        ["status-bar-depgraph-btn", btn],
-        ["status-bar-conn-dot", makeEl()],
-        ["status-bar-conn-label", makeEl()],
-        ["status-bar-in-progress", makeEl()],
-        ["status-bar-waiting", makeEl()],
-        ["status-bar-panel", makeEl()],
-        ["status-bar-panel-resize", makeEl()],
-      ],
-      render: renderFn,
-    });
-    loadScript(ctx);
-
-    // Trigger _showDepGraphPanel via cycle: nothing open, no terminal
-    const handler = ctx._listeners["keydown"][0];
-    handler({
-      key: "`",
-      ctrlKey: true,
-      metaKey: false,
-      altKey: false,
-      shiftKey: false,
-      preventDefault: vi.fn(),
-    });
-    expect(renderFn).toHaveBeenCalled();
-    expect(vm.runInContext("depGraphEnabled", ctx)).toBe(true);
   });
 });
 

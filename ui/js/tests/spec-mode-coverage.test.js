@@ -662,15 +662,6 @@ describe("focusSpec", () => {
     );
   });
 
-  it("calls renderMinimap when spec tree data is available", () => {
-    const renderMinimap = vi.fn();
-    const treeData = { nodes: [{ path: "local/my-spec.md", is_leaf: true }] };
-    const ctx = makeContext({ renderMinimap, _specTreeData: treeData });
-
-    ctx.focusSpec("local/my-spec.md", "/home/user/project");
-    expect(renderMinimap).toHaveBeenCalledWith("local/my-spec.md", treeData);
-  });
-
   it("starts refresh polling", () => {
     const setIntervalFn = vi.fn(() => 99);
     const ctx = makeContext({ setInterval: setIntervalFn });

@@ -125,11 +125,10 @@
       type="button"
       id="status-bar-depgraph-btn"
       class="status-bar-btn"
-      onclick="toggleDependencyGraph()"
-      title="Toggle dependency graph (Ctrl+&#96; to cycle)"
-      aria-expanded="false"
+      onclick="switchMode('depgraph', { persist: true })"
+      title="Open map"
     >
-      Dep Graph
+      Map
     </button>
     <button
       type="button"

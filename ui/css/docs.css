@@ -25,6 +25,270 @@
 .docs-mode__content {
   height: 100%;
   overflow-y: auto;
-  padding: 20px;
+  padding: var(--sp-7) var(--sp-7) 80px;
+  font-size: 15px;
+}
+
+/* Full-width reading surface. The nav on the left handles wayfinding;
+   the content fills the remaining pane so long code blocks, tables, and
+   diagrams don't get squeezed into a 720px column. */
+.docs-mode__content.prose-content {
+  max-width: none;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--ink);
+}
+
+/* Defensive: when docs mode is visible, suppress the workspace file
+   explorer next to it. Docs are standalone reading content; the
+   explorer belongs to Plan mode. Uses :has() to scope to the parent
+   that actually contains both panels. */
+.board-with-explorer:has(#docs-mode-container:not([style*="display: none"]))
+  #explorer-panel {
+  display: none !important;
+}
+
+.docs-mode__content.prose-content h1 {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+/* h2+ use sans for legibility — serif italic reserved for h1 / the
+   display title so long-form reading doesn't strain the eye. */
+.docs-mode__content.prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  margin: 34px 0 8px;
+}
+.docs-mode__content.prose-content h3 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+  color: var(--ink);
+  text-transform: none;
+  margin: 24px 0 8px;
+}
+.docs-mode__content.prose-content h4 {
+  font-family: var(--font-sans);
   font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 18px 0 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.docs-mode__content.prose-content p {
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--ink);
+  margin: 0 0 14px;
+}
+
+/* First paragraph after h1 gets a lead treatment + drop cap, mirroring
+   the spec body hero so docs and plan mode share one editorial voice. */
+.docs-mode__content.prose-content h1 + p {
+  font-size: 17px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin-bottom: 28px;
+  max-width: 620px;
+}
+.docs-mode__content.prose-content h1 + p::first-letter {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 3em;
+  line-height: 0.9;
+  float: left;
+  padding: 4px 10px 0 0;
+  color: var(--accent);
+}
+
+/* Code blocks mirror the spec body: clean paper tint with a thin rule,
+   not an inverted terminal block. Keeps the ink-on-paper feel consistent
+   with plan mode. */
+.docs-mode__content.prose-content pre {
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.docs-mode__content.prose-content pre code {
+  background: none;
+  color: inherit;
+}
+.docs-mode__content.prose-content code {
+  font-size: 0.92em;
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* Blockquote uses sans with a clay accent border — italic serif quotes
+   proved hard to read in long-form docs. */
+.docs-mode__content.prose-content blockquote {
+  border-left: 2px solid var(--accent);
+  padding: 4px 0 4px 16px;
+  margin: 0 0 16px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* --- Dep graph mode (full-pane DAG visualization) --- */
+.depgraph-mode-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.depgraph-mode__inner {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.depgraph-mode__header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.depgraph-mode__legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.depgraph-mode__legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.depgraph-mode__legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  background: #2f5a4c;
+}
+
+.depgraph-mode__legend-swatch--spec {
+  background: #2f5a4c;
+  border-radius: 4px;
+}
+
+.depgraph-mode__legend-swatch--task {
+  background: #2c5f98;
+  border-radius: 2px;
+}
+
+.depgraph-mode__legend-edge {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 1.5px solid #7a7570;
+}
+
+.depgraph-mode__legend-edge--containment {
+  border-top-color: #7a7570;
+}
+
+.depgraph-mode__legend-edge--dispatch {
+  border-top-color: #3b82c4;
+}
+
+.depgraph-mode__legend-edge--spec-dep {
+  border-top: 1.5px dashed #b07045;
+}
+
+.depgraph-mode__legend-edge--task-dep {
+  border-top: 1.5px dashed #5a9058;
+}
+
+.depgraph-mode__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text);
+}
+
+.depgraph-mode__subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 640px;
+}
+
+.depgraph-mode__mount {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px 24px;
+  position: relative;
+}
+
+/* Suppress text selection while the user is dragging the canvas so the
+   Space+drag gesture feels like a pan, not a text-selection action. */
+.depgraph-mode__mount[style*="grabbing"],
+.depgraph-mode__mount[style*="grab"] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.depgraph-mode__subtitle kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+}
+
+.depgraph-mode__empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 520px;
+  padding: 8px 0;
+}
+
+.depgraph-mode__empty p {
+  margin: 0;
+  line-height: 1.5;
 }

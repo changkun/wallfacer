@@ -1,11 +1,11 @@
 // --- Spec mode state and switching ---
 
-// Internal mode values: "board" | "spec" | "docs".
+// Internal mode values: "board" | "spec" | "depgraph" | "docs".
 // Saved localStorage values: "board" | "plan" (see _persistSavedMode).
 // "spec" and "plan" refer to the same mode — "spec" is the long-standing
 // internal identifier, "plan" is the user-facing label introduced by the
 // chat-first-mode rename.
-var _validModes = { board: true, spec: true, docs: true };
+var _validModes = { board: true, spec: true, depgraph: true, docs: true };
 
 // resolveDefaultMode chooses the initial mode at app open. Priority:
 //   1. Brand-new workspace → "plan"
@@ -177,6 +177,16 @@ function getLayoutState() {
 // left stuck at 0.
 var _focusedCrossfadeEpoch = 0;
 
+// _formatSpecPath normalises a spec path for the breadcrumb element in the
+// spec-focused-view header. The spec tree already emits paths prefixed with
+// "specs/", but legacy callers sometimes pass workspace-relative paths
+// without the prefix — prepend it so the displayed breadcrumb is always
+// anchored at the specs/ root.
+function _formatSpecPath(specPath) {
+  if (!specPath) return "";
+  return specPath.indexOf("specs/") === 0 ? specPath : "specs/" + specPath;
+}
+
 function _scheduleFocusedCrossfade(replaceFn) {
   var bodyInner = document.getElementById("spec-focused-body-inner");
   var reducedMotion = _prefersReducedMotion();
@@ -271,18 +281,44 @@ function _applyMode(mode) {
   // Update sidebar navigation active states.
   var boardNav = document.getElementById("sidebar-nav-board");
   var specNav = document.getElementById("sidebar-nav-spec");
+  var depgraphNav = document.getElementById("sidebar-nav-depgraph");
   var docsNav = document.getElementById("sidebar-nav-docs");
   if (boardNav) boardNav.classList.toggle("active", mode === "board");
   if (specNav) specNav.classList.toggle("active", mode === "spec");
+  if (depgraphNav) depgraphNav.classList.toggle("active", mode === "depgraph");
   if (docsNav) docsNav.classList.toggle("active", mode === "docs");
 
   // Toggle main content areas.
   var board = document.getElementById("board");
   var specView = document.getElementById("spec-mode-container");
+  var depgraphView = document.getElementById("depgraph-mode-container");
   var docsView = document.getElementById("docs-mode-container");
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
+  if (depgraphView)
+    depgraphView.style.display = mode === "depgraph" ? "" : "none";
   if (docsView) docsView.style.display = mode === "docs" ? "" : "none";
+
+  // Toggle the dep-graph rendering flag so the existing panel renders into
+  // #depgraph-mode-container while this mode is active. The panel is mounted
+  // on first render (see depgraph.js getOrCreatePanel).
+  if (typeof window !== "undefined") {
+    window.depGraphEnabled = mode === "depgraph";
+  }
+  if (mode === "depgraph") {
+    // Populate the spec tree so the unified renderer has both sides of the
+    // graph. loadSpecTree is idempotent and calls _syncSpecModeState which
+    // scheduleRender picks up on its next tick.
+    if (typeof loadSpecTree === "function") {
+      try {
+        loadSpecTree();
+      } catch (_e) {
+        // Best-effort; dep graph falls back to task-only when tree is empty.
+      }
+    }
+    if (typeof scheduleRender === "function") scheduleRender();
+    else if (typeof render === "function") render();
+  }
 
   // Stop spec refresh poll and clear hash when leaving spec mode.
   if (mode !== "spec") {
@@ -461,6 +497,8 @@ function focusSpec(specPath, workspace) {
   // old content dissolves rather than snapping.
   var titleEl = document.getElementById("spec-focused-title");
   if (titleEl) titleEl.textContent = specPath;
+  var pathEl = document.getElementById("spec-focused-path");
+  if (pathEl) pathEl.textContent = _formatSpecPath(specPath);
   _scheduleFocusedCrossfade(function () {
     // Guard against the fetch winning the race with the 40ms crossfade
     // delay: when _focusedSpecContent is already populated, the spec has
@@ -477,13 +515,6 @@ function focusSpec(specPath, workspace) {
   // Update hash for deep-linking. Writes always use the #plan/ prefix;
   // the reader also accepts legacy #spec/ URLs for backward compatibility.
   history.replaceState(null, "", "#plan/" + encodeURIComponent(specPath));
-  // Update dependency minimap.
-  if (
-    typeof renderMinimap === "function" &&
-    typeof _specTreeData !== "undefined"
-  ) {
-    renderMinimap(specPath, _specTreeData);
-  }
 }
 
 function getFocusedSpecPath() {
@@ -520,6 +551,8 @@ function focusRoadmapIndex(indexMeta) {
   // index we never rewrite them after the first clear.
   var titleEl = document.getElementById("spec-focused-title");
   if (titleEl) titleEl.textContent = "Roadmap";
+  var pathEl = document.getElementById("spec-focused-path");
+  if (pathEl) pathEl.textContent = "";
   var metaEl = document.getElementById("spec-focused-meta");
   if (metaEl) metaEl.textContent = "";
   var clearIds = [
@@ -653,6 +686,8 @@ function _loadAndRenderSpec() {
 
       if (titleEl)
         titleEl.textContent = parsed.frontmatter.title || _focusedSpecPath;
+      var pathEl = document.getElementById("spec-focused-path");
+      if (pathEl) pathEl.textContent = _formatSpecPath(_focusedSpecPath);
       if (statusEl) {
         var status = parsed.frontmatter.status || "";
         statusEl.textContent = status;
