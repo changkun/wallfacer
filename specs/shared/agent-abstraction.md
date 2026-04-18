@@ -428,3 +428,46 @@ The following are explicitly out of scope for this refactor but compatible with 
 - **Agent Graph (Option C):** The existing implicit pipeline (implement → commit → title/oversight) could be made explicit as a graph, but the current hard-coded sequencing works and the graph adds complexity with no immediate payoff.
 - **Inter-Agent Communication (Options D1/D2/D3):** No concrete use case demands it today. File-based messaging (D1) remains the simplest path if needed later.
 - **User-Configurable Agent Pipelines:** Requires a configuration format, validation, and UI — significant scope that should be driven by concrete user demand.
+
+## Task Breakdown
+
+The Decision section above settles Option A; the Implementation Plan's
+four phases map directly to child tasks. Tasks-mode breakdown (rather
+than design-mode) because the design problem is resolved and each
+phase is an implementable refactor step that leaves the tree green.
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Descriptor + runAgent core](agent-abstraction/descriptor-and-runagent.md) | — | medium | validated |
+| [Headless roles migration](agent-abstraction/headless-roles.md) | descriptor-and-runagent | medium | validated |
+| [Inspector roles migration](agent-abstraction/inspector-roles.md) | descriptor-and-runagent, headless-roles | medium | validated |
+| [Heavyweight roles migration](agent-abstraction/heavyweight-roles.md) | inspector-roles | large | validated |
+| [Cleanup](agent-abstraction/cleanup.md) | headless, inspector, heavyweight | small | validated |
+
+```mermaid
+graph LR
+  DR[Descriptor + runAgent] --> H[Headless roles]
+  H --> I[Inspector roles]
+  DR --> I
+  I --> HV[Heavyweight roles]
+  H --> C[Cleanup]
+  I --> C
+  HV --> C
+```
+
+**Recommended execution order:**
+
+1. **Descriptor + runAgent** — ships the primitive with headless-only
+   support. No caller migration, lowest risk.
+2. **Headless roles** — title, oversight, commit-message. Simplest
+   tier; validates the descriptor pattern end-to-end.
+3. **Inspector roles** — refinement, ideation (ephemeral path only).
+   Adds `MountReadOnly` support to runAgent.
+4. **Heavyweight roles** — implementation and testing. Most intricate
+   because the turn loop wraps the launch; we keep the outer loop and
+   swap only the inner launch.
+5. **Cleanup** — drop orphaned spec builders, normalize container
+   names and flag order, consolidate timeouts.
+
+Each step leaves all existing tests green; behavioral equivalence is
+the acceptance criterion throughout.
