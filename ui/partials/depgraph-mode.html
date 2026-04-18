@@ -8,10 +8,21 @@
       <div>
         <h2 class="depgraph-mode__title">Map</h2>
         <p class="depgraph-mode__subtitle">
-          Specs and tasks by dependency.
-          Click a node to focus it; <kbd>Shift</kbd>+click to open.
-          Drag a node to pin it; double-click to un-pin.
-          <kbd>+</kbd> unfolds a spec; hold <kbd>Space</kbd> and drag to pan.
+          Specs and tasks by dependency. Click a node to focus it;
+          <kbd>Shift</kbd>+click to open. Drag a node to pin it; double-click to
+          un-pin. <kbd>+</kbd> unfolds a spec; hold <kbd>Space</kbd> and drag to
+          pan.
+          <label
+            class="depgraph-mode__option"
+            title="Include archived specs and tasks"
+          >
+            <input
+              type="checkbox"
+              id="depgraph-show-archived"
+              onchange="setMapShowArchived(this.checked)"
+            />
+            Show archived
+          </label>
           <button
             type="button"
             id="depgraph-reset-btn"
@@ -25,27 +36,39 @@
       </div>
       <ul class="depgraph-mode__legend" aria-label="Legend">
         <li>
-          <span class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--spec"></span>
+          <span
+            class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--spec"
+          ></span>
           Spec
         </li>
         <li>
-          <span class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--task"></span>
+          <span
+            class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--task"
+          ></span>
           Task
         </li>
         <li>
-          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--containment"></span>
+          <span
+            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--containment"
+          ></span>
           Contains
         </li>
         <li>
-          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--dispatch"></span>
+          <span
+            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--dispatch"
+          ></span>
           Dispatch
         </li>
         <li>
-          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--spec-dep"></span>
+          <span
+            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--spec-dep"
+          ></span>
           Spec dep
         </li>
         <li>
-          <span class="depgraph-mode__legend-edge depgraph-mode__legend-edge--task-dep"></span>
+          <span
+            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--task-dep"
+          ></span>
           Task dep
         </li>
       </ul>
@@ -53,9 +76,9 @@
     <div id="depgraph-mount" class="depgraph-mode__mount">
       <div class="depgraph-mode__empty">
         <p>
-          No dependency edges yet. Add depends-on links between tasks to see
-          the graph — drag a card from Backlog onto another, or set
-          dependencies via the task modal.
+          No dependency edges yet. Add depends-on links between tasks to see the
+          graph — drag a card from Backlog onto another, or set dependencies via
+          the task modal.
         </p>
       </div>
     </div>

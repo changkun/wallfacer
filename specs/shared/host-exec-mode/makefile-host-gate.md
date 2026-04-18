@@ -1,6 +1,6 @@
 ---
 title: Document `make build-binary` as the host-mode build
-status: complete
+status: archived
 depends_on: []
 affects:
   - Makefile
@@ -13,6 +13,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Document `make build-binary` as the host-mode build
 

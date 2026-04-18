@@ -1,6 +1,6 @@
 ---
 title: buildContainerSpecForSandbox respects host mode
-status: complete
+status: archived
 depends_on:
   - specs/shared/host-exec-mode/runner-host-switch.md
 affects:
@@ -12,6 +12,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # buildContainerSpecForSandbox respects host mode
 

@@ -297,6 +297,22 @@
   border-color: var(--text-muted);
 }
 
+.depgraph-mode__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.depgraph-mode__option input {
+  margin: 0;
+  cursor: pointer;
+}
+
 .depgraph-mode__empty {
   color: var(--text-muted);
   font-size: 13px;

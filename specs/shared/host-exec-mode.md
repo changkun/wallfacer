@@ -1,6 +1,6 @@
 ---
 title: Host Exec Mode
-status: complete
+status: archived
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects:
@@ -25,6 +25,7 @@ updated: 2026-04-18
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Host Exec Mode
 
