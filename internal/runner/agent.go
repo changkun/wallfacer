@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -25,68 +26,22 @@ func taskIDString(task *store.Task) string {
 	return task.ID.String()
 }
 
-// MountMode enumerates the three fundamental container-mount profiles the
-// sub-agent roles in this package fall into. The parent spec's audit
-// (specs/shared/agent-abstraction.md) grouped the seven existing roles
-// into these exact tiers.
-type MountMode int
+// AgentRole aliases agents.Role so the runner stays decoupled from the
+// descriptor definitions. New roles are declared in internal/agents and
+// referenced from the runner via this alias.
+type AgentRole = agents.Role
 
+// MountMode aliases agents.MountMode. See internal/agents for the full
+// semantics of each tier (MountNone, MountReadOnly, MountReadWrite).
+type MountMode = agents.MountMode
+
+// Mount-mode aliases so existing role descriptors and runAgent dispatch
+// keep their short names; the canonical constants live in internal/agents.
 const (
-	// MountNone gives the container no workspace access. Suits headless
-	// roles — title, oversight, commit-message — whose input is the
-	// task's prompt and (for oversight/commit) a bundle of pre-rendered
-	// text. No read or write to the host filesystem beyond the image.
-	MountNone MountMode = iota
-	// MountReadOnly mounts every configured workspace read-only plus the
-	// workspace instructions file. Suits inspector roles — refinement,
-	// ephemeral ideation — that need to read the code but must not
-	// modify it.
-	MountReadOnly
-	// MountReadWrite mounts each task worktree read-write and, when
-	// AgentRole.MountBoard is true, the board manifest + sibling
-	// worktrees read-only. Suits heavyweight roles — implementation
-	// and testing — that produce commits.
-	MountReadWrite
+	MountNone      = agents.MountNone
+	MountReadOnly  = agents.MountReadOnly
+	MountReadWrite = agents.MountReadWrite
 )
-
-// AgentRole is a declarative descriptor for one kind of sub-agent. The
-// runner's runAgent function dispatches on the descriptor's fields
-// instead of calling role-specific launcher code, so adding a new role
-// reduces to defining a new AgentRole value + (when needed) a template
-// and a ParseResult.
-type AgentRole struct {
-	// Activity names the per-activity sandbox routing bucket (feeds
-	// sandboxForTaskActivity). Required.
-	Activity store.SandboxActivity
-	// Name is the kebab-case identifier used when composing container
-	// names: wallfacer-<Name>-<uuid8>. Required.
-	Name string
-	// Timeout is a function so roles whose timeout depends on the task
-	// (implementation, idea-agent) can derive it at call time. Roles
-	// with a fixed timeout return a constant.
-	Timeout func(*store.Task) time.Duration
-	// MountMode selects the workspace-mount profile. See the MountMode
-	// constants for the semantics of each tier.
-	MountMode MountMode
-	// MountBoard, when true, mounts the board manifest and sibling
-	// worktrees read-only alongside the workspace. Only meaningful for
-	// MountReadWrite roles today.
-	MountBoard bool
-	// SingleTurn, when true, skips the --resume session loop. Headless
-	// and inspector roles use SingleTurn=true; the heavyweight turn
-	// loop in execute.go drives multi-turn roles itself.
-	SingleTurn bool
-	// ParseResult extracts the role-specific structured output from the
-	// raw `agentOutput.Result` string. Returning any lets each role
-	// decode its own schema without leaking a shared type. The concrete
-	// type is documented in the role's descriptor comment.
-	ParseResult func(output *agentOutput) (any, error)
-	// Model, when non-nil, overrides the default per-sandbox model
-	// lookup for this role. Title uses CLAUDE_TITLE_MODEL; other
-	// roles inherit CLAUDE_DEFAULT_MODEL via r.modelFromEnvForSandbox.
-	// Nil means "use the runner's default model resolver".
-	Model func(sb sandbox.Type) string
-}
 
 // runAgentOpts carries per-invocation parameters that don't belong on
 // the role descriptor (they vary per call, not per role).
