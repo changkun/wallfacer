@@ -33,9 +33,28 @@ func mountOpts(opts ...string) string {
 	return strings.Join(opts, ",")
 }
 
-// agentOutput aliases agents.Output, the canonical container-result
-// type. The runner keeps the short name for historical call sites.
-type agentOutput = agents.Output
+// agentUsage mirrors the token-usage JSON object emitted by the
+// agent container.
+type agentUsage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+}
+
+// agentOutput is the top-level result object emitted by an agent
+// container. ActualSandbox is populated by the runner, not parsed.
+type agentOutput struct {
+	Result        string       `json:"result"`
+	SessionID     string       `json:"session_id"`
+	ThreadID      string       `json:"thread_id,omitempty"`
+	StopReason    string       `json:"stop_reason"`
+	Subtype        string      `json:"subtype"`
+	IsError       bool         `json:"is_error"`
+	TotalCostUSD  float64      `json:"total_cost_usd"`
+	Usage         agentUsage   `json:"usage"`
+	ActualSandbox sandbox.Type `json:"-"`
+}
 
 // Package-level aliases for SandboxActivity constants to reduce verbosity
 // in sandbox routing call sites throughout the runner package.
@@ -591,30 +610,13 @@ func (r *Runner) titleModelFromEnvForSandbox(sb sandbox.Type) string {
 // and a noop ParseResult stub so runAgent's required-field check
 // passes. Turn sequencing, session recovery, and verdict inference
 // stay in execute.go — runAgent handles only the per-turn launch.
-var roleImplementation = AgentRole{
-	Activity:    store.SandboxActivityImplementation,
-	Name:        "impl",
-	Timeout:     nil,
-	MountMode:   MountReadWrite,
-	MountBoard:  true,
-	SingleTurn:  false,
-	ParseResult: passthroughParse,
-}
-
-var roleTesting = AgentRole{
-	Activity:    store.SandboxActivityTesting,
-	Name:        "test",
-	Timeout:     nil,
-	MountMode:   MountReadWrite,
-	MountBoard:  true,
-	SingleTurn:  false,
-	ParseResult: passthroughParse,
-}
-
-// passthroughParse is a no-op ParseResult that hands the raw agent
-// output back to the heavyweight caller. The caller parses role-
-// specific fields (final result, verdict, continue signals) itself.
-func passthroughParse(o *agentOutput) (any, error) { return o, nil }
+// roleImplementation and roleTesting bind to the descriptors in the
+// internal/agents package; the runner's dispatch plumbing lives in
+// agent_bindings.go.
+var (
+	roleImplementation = agents.Implementation
+	roleTesting        = agents.Testing
+)
 
 // runContainer executes an agent container and parses its NDJSON output.
 // Returns (output, rawStdout, rawStderr, error). Wraps runAgent with the
@@ -644,7 +646,6 @@ func (r *Runner) runContainer(
 	if activity == store.SandboxActivityTesting {
 		role = roleTesting
 	}
-	role.Activity = activity
 
 	// Set up the live-log buffer that StreamLogs attaches to while the
 	// container is running. The tee is wired via LiveLogWriter so
@@ -672,6 +673,9 @@ func (r *Runner) runContainer(
 		LiveLogWriter:     ll,
 		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
+		// Heavyweight turn invocations rebind the activity bucket
+		// for each turn's usage ledger — implementation or testing.
+		ActivityOverride: activity,
 		// Usage is accounted in the outer turn-loop; runAgent does not
 		// bill heavyweight turns itself because the loop already does.
 	})

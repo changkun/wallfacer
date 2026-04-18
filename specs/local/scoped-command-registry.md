@@ -12,7 +12,7 @@ affects:
   - ui/js/mention.js
 effort: medium
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---

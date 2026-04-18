@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
@@ -298,8 +299,8 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			continue
 		}
 
-		out, _ := cmdexec.Git(worktreePath, "status", "--porcelain").WithContext(ctx).Output()
-		if len(out) == 0 {
+		hasChanges, _ := gitutil.HasChanges(ctx, worktreePath)
+		if !hasChanges {
 			logger.Runner.Info("host commit: nothing to commit", "repo", repoPath)
 			continue
 		}
@@ -351,15 +352,7 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 	// Second pass: commit each worktree with the generated message.
 	// Use global git identity (via -c overrides) to prevent sandbox-set
 	// local configs from overriding the host user's author information.
-	// The sandbox container may have set user.name/email in the worktree's
-	// .git/config; -c flags take precedence over all config levels.
-	var gitConfigOverrides []string
-	if n, err := cmdexec.New("git", "config", "--global", "user.name").WithContext(ctx).Output(); err == nil && n != "" {
-		gitConfigOverrides = append(gitConfigOverrides, "-c", "user.name="+n)
-	}
-	if e, err := cmdexec.New("git", "config", "--global", "user.email").WithContext(ctx).Output(); err == nil && e != "" {
-		gitConfigOverrides = append(gitConfigOverrides, "-c", "user.email="+e)
-	}
+	gitConfigOverrides := gitutil.GlobalIdentityOverrides(ctx)
 
 	committed := false
 	for _, p := range pending {
@@ -516,14 +509,9 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 // already trimmed of surrounding whitespace and backticks (the two
 // quoting patterns Claude consistently emits). Exported through a
 // wrapper so the commit pipeline's error-type mapping stays intact.
-var roleCommitMessage = AgentRole{
-	Activity:    store.SandboxActivityCommitMessage,
-	Name:        "commit-msg",
-	Timeout:     func(*store.Task) time.Duration { return constants.CommitMessageAgentTimeout },
-	MountMode:   MountNone,
-	SingleTurn:  true,
-	ParseResult: parseCommitMessageResult,
-}
+// roleCommitMessage binds to the agents.CommitMessage descriptor; the
+// runner's dispatch plumbing lives in agent_bindings.go.
+var roleCommitMessage = agents.CommitMessage
 
 // parseCommitMessageResult trims the commit-message agent output and
 // surfaces a typed error when the agent returned an error result or

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
@@ -291,14 +292,9 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 // the agent is the raw JSON-embedded list of ideas; the caller unpacks
 // it via extractIdeas so the rejection/recovery heuristics live close
 // to the ideation-specific parsing logic.
-var roleIdeaAgentEphemeral = AgentRole{
-	Activity:    store.SandboxActivityIdeaAgent,
-	Name:        "ideate",
-	Timeout:     nil, // driven by the caller's ctx (RunIdeation sets up its own deadline)
-	MountMode:   MountReadOnly,
-	SingleTurn:  true,
-	ParseResult: func(o *agentOutput) (any, error) { return o.Result, nil },
-}
+// roleIdeaAgentEphemeral binds to the agents.IdeaAgent descriptor;
+// the runner's dispatch plumbing lives in agent_bindings.go.
+var roleIdeaAgentEphemeral = agents.IdeaAgent
 
 // runIdeationEphemeral is the legacy path that launches an ephemeral container
 // per ideation run. Used when no planner is configured.
@@ -381,7 +377,7 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 // keep their fixture surface intact.
 func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb sandbox.Type) sandbox.ContainerSpec {
 	model := r.modelFromEnvForSandbox(sb)
-	spec := r.buildInspectorSpec(containerName, model, sb, MountReadOnly)
+	spec := r.buildInspectorSpec(containerName, model, sb, mountReadOnly)
 	spec.Cmd = buildAgentCmd(prompt, model)
 	return spec
 }
