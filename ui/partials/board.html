@@ -15,26 +15,26 @@
   -->
   <div id="board-empty-composer" class="board-empty-composer"></div>
   <div
-    class="flex flex-col min-h-0"
+    class="col col-backlog"
     id="col-wrapper-backlog"
     role="region"
     aria-label="Backlog column"
   >
-    <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="col-header col-header-backlog">Backlog</h2>
-      <span id="count-backlog" class="text-xs text-v-muted">0</span>
+    <div class="col-hd">
+      <span class="col-dot" aria-hidden="true"></span>
+      <span class="col-name">Backlog</span>
+      <span id="count-backlog" class="col-count">0</span>
       <button
         id="backlog-sort-btn"
         type="button"
-        class="btn-icon"
-        style="margin-left: auto; font-size: 11px; padding: 2px 8px"
+        class="col-btn"
         onclick="toggleBacklogSort()"
         title="Toggle backlog sorting between manual priority and idea impact score"
       >
         Sort: Manual
       </button>
     </div>
-    <div class="column col-bg flex flex-col">
+    <div class="column col-bg">
       <button
         type="button"
         id="new-task-btn"
@@ -439,14 +439,15 @@
     </div>
   </div>
   <div
-    class="flex flex-col min-h-0"
+    class="col col-progress"
     id="col-wrapper-in_progress"
     role="region"
     aria-label="In Progress column"
   >
-    <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="col-header col-header-progress">In Progress</h2>
-      <span id="count-in_progress" class="text-xs text-v-muted">0</span>
+    <div class="col-hd">
+      <span class="col-dot" aria-hidden="true"></span>
+      <span class="col-name">In Progress</span>
+      <span id="count-in_progress" class="col-count">0</span>
       <span
         id="max-parallel-tag"
         class="max-parallel-tag hidden"
@@ -454,21 +455,9 @@
       ></span>
       <button
         type="button"
+        class="col-icon-btn"
         onclick="showContainerMonitor(event)"
         title="Sandbox Monitor"
-        style="
-          margin-left: auto;
-          background: none;
-          border: none;
-          padding: 2px 4px;
-          cursor: pointer;
-          color: var(--text-muted);
-          display: inline-flex;
-          align-items: center;
-          border-radius: 4px;
-        "
-        onmouseover="this.style.color = 'var(--text-secondary)'"
-        onmouseout="this.style.color = 'var(--text-muted)'"
       >
         <svg
           width="13"
@@ -507,14 +496,15 @@
     ></div>
   </div>
   <div
-    class="flex flex-col min-h-0"
+    class="col col-waiting"
     id="col-wrapper-waiting"
     role="region"
     aria-label="Waiting column"
   >
-    <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="col-header col-header-waiting">Waiting</h2>
-      <span id="count-waiting" class="text-xs text-v-muted">0</span>
+    <div class="col-hd">
+      <span class="col-dot" aria-hidden="true"></span>
+      <span class="col-name">Waiting</span>
+      <span id="count-waiting" class="col-count">0</span>
     </div>
     <button
       type="button"
@@ -538,31 +528,21 @@
     ></div>
   </div>
   <div
-    class="flex flex-col min-h-0"
+    class="col col-done"
     id="col-wrapper-done"
     role="region"
     aria-label="Done column"
   >
-    <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="col-header col-header-done">Done</h2>
-      <span id="count-done" class="text-xs text-v-muted">0</span>
-      <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
+    <div class="col-hd">
+      <span class="col-dot" aria-hidden="true"></span>
+      <span class="col-name">Done</span>
+      <span id="count-done" class="col-count">0</span>
+      <span id="done-stats" class="col-stats hidden"></span>
       <button
         type="button"
         id="archive-all-btn"
+        class="col-btn hidden"
         onclick="archiveAllDone()"
-        class="hidden"
-        style="
-          margin-left: auto;
-          background: none;
-          border: none;
-          padding: 0;
-          cursor: pointer;
-          font-size: 11px;
-          color: var(--text-muted);
-        "
-        onmouseover="this.style.color = 'var(--text-secondary)'"
-        onmouseout="this.style.color = 'var(--text-muted)'"
         title="Archive all done tasks"
       >
         Archive all

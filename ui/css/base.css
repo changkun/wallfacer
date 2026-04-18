@@ -1,58 +1,34 @@
-/* --- Theme variables ---
-   Core surface/ink/accent tokens live in tokens.css. Only tag palette,
-   selection, scrollbars, and body defaults remain here. */
+/* --- Tag palette ---
+   All task-tag slots cycle through the design-system's 6 tint pairs
+   (blue / amber / green / plum / red / neutral) defined in tokens.css.
+   Dark-mode values come from the same token definitions automatically. */
 :root,
-[data-theme="light"] {
-  --tag-bg-0: #f0dbd7;
-  --tag-text-0: #7a3828;
-  --tag-bg-1: #f0e6d2;
-  --tag-text-1: #7a5020;
-  --tag-bg-2: #ecedc8;
-  --tag-text-2: #585810;
-  --tag-bg-3: #d4edcc;
-  --tag-text-3: #285a20;
-  --tag-bg-4: #c8ecdf;
-  --tag-text-4: #185848;
-  --tag-bg-5: #c8dfec;
-  --tag-text-5: #184858;
-  --tag-bg-6: #ced5ed;
-  --tag-text-6: #20306e;
-  --tag-bg-7: #ddd5ec;
-  --tag-text-7: #40286a;
-  --tag-bg-8: #eccced;
-  --tag-text-8: #601c60;
-  --tag-bg-9: #edd0d8;
-  --tag-text-9: #701830;
-  --tag-bg-10: #e8e4c4;
-  --tag-text-10: #484818;
-  --tag-bg-11: #c8e4e2;
-  --tag-text-11: #184840;
-}
+[data-theme="light"],
 [data-theme="dark"] {
-  --tag-bg-0: #4a1e16;
-  --tag-text-0: #d09080;
-  --tag-bg-1: #48300e;
-  --tag-text-1: #d0a870;
-  --tag-bg-2: #303010;
-  --tag-text-2: #b0b050;
-  --tag-bg-3: #142c10;
-  --tag-text-3: #80c068;
-  --tag-bg-4: #0c2c20;
-  --tag-text-4: #58a888;
-  --tag-bg-5: #0c2030;
-  --tag-text-5: #50a0c0;
-  --tag-bg-6: #0e1e3c;
-  --tag-text-6: #7090d0;
-  --tag-bg-7: #201038;
-  --tag-text-7: #9878cc;
-  --tag-bg-8: #300c30;
-  --tag-text-8: #c070b8;
-  --tag-bg-9: #3a0c1e;
-  --tag-text-9: #c87090;
-  --tag-bg-10: #282808;
-  --tag-text-10: #909048;
-  --tag-bg-11: #0c2422;
-  --tag-text-11: #489890;
+  --tag-bg-0: var(--tint-blue);
+  --tag-text-0: var(--tint-blue-ink);
+  --tag-bg-1: var(--tint-amber);
+  --tag-text-1: var(--tint-amber-ink);
+  --tag-bg-2: var(--tint-green);
+  --tag-text-2: var(--tint-green-ink);
+  --tag-bg-3: var(--tint-plum);
+  --tag-text-3: var(--tint-plum-ink);
+  --tag-bg-4: var(--tint-red);
+  --tag-text-4: var(--tint-red-ink);
+  --tag-bg-5: var(--tint-neutral);
+  --tag-text-5: var(--tint-neutral-ink);
+  --tag-bg-6: var(--tint-blue);
+  --tag-text-6: var(--tint-blue-ink);
+  --tag-bg-7: var(--tint-amber);
+  --tag-text-7: var(--tint-amber-ink);
+  --tag-bg-8: var(--tint-green);
+  --tag-text-8: var(--tint-green-ink);
+  --tag-bg-9: var(--tint-plum);
+  --tag-text-9: var(--tint-plum-ink);
+  --tag-bg-10: var(--tint-red);
+  --tag-text-10: var(--tint-red-ink);
+  --tag-bg-11: var(--tint-neutral);
+  --tag-text-11: var(--tint-neutral-ink);
 }
 
 ::selection {

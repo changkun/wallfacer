@@ -53,17 +53,18 @@ button:focus-visible {
 }
 .btn-dashed {
   width: 100%;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  color: var(--text-muted);
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  font-size: var(--fs-md);
+  color: var(--ink-3);
   background: transparent;
   cursor: pointer;
 }
 .btn-dashed:hover {
-  color: var(--text-secondary);
-  border-color: var(--text-muted);
+  color: var(--ink);
+  border-color: var(--ink-3);
+  background: var(--bg-hover);
 }
 .btn-danger {
   color: #b02828;

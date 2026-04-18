@@ -1,217 +1,121 @@
-/* --- Badges --- */
+/* --- Badges ---
+   Flat, paper-ink palette driven by the design tokens' tint variables.
+   Shared .badge rules keep the pill geometry consistent; per-status rules
+   supply the surface/ink pair. No more hard-coded hex colors. */
 .badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-9);
   font-weight: 500;
-  border-left: 3px solid currentColor;
-  padding-left: 5px;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
 }
 .badge-backlog {
-  background: #e4e0d8;
-  color: #6b6560;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
 }
 .badge-in_progress {
-  background: #dceaf7;
-  color: #2c5f98;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
 }
-.badge-waiting {
-  background: #f5e6ce;
-  color: #5c3a08;
-}
+.badge-waiting,
 .badge-committing {
-  background: #f5e6ce;
-  color: #5c3a08;
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
 }
 .badge-done {
-  background: #d0ebdc;
-  color: #1a6030;
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
 }
 .badge-failed {
-  background: #f5d5d5;
-  color: #6b1111;
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
 }
 .badge-archived {
-  background: #e4e0d8;
-  color: #6b6560;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
   font-style: italic;
 }
 .badge-cancelled {
-  background: #e8ddf5;
-  color: #5a3d8a;
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
 }
 .badge-cancelling {
-  background: #fde8d8;
-  color: #8b3a08;
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
 }
 .badge-priority {
-  background: linear-gradient(180deg, #d7e2f7 0%, #bfd0eb 100%);
-  color: #26355a;
-  border: 1px solid #a8bde8;
-  font-weight: 700;
-  font-size: 9px;
-  padding: 2px 5px;
-  min-width: 18px;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 5px;
+  min-width: 20px;
   text-align: center;
 }
 .badge-testing {
-  background: #e0e8ff;
-  color: #2040c0;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
 }
 .badge-test-pass {
-  background: #d0ebdc;
-  color: #1a6030;
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
 }
 .badge-test-fail {
-  background: #f5d5d5;
-  color: #8c2020;
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
 }
 .badge-test-none {
-  background: #eae8e4;
-  color: #888078;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
 }
 .badge-blocked,
 .badge-dep-cancelled,
-.badge-deps-met {
+.badge-deps-met,
+.badge-deps-ok {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.badge-blocked {
-  background: #fef3c7;
-  color: #92400e;
-  border-left-color: #92400e40;
-}
+.badge-blocked,
 .badge-dep-cancelled {
-  background: #fef3c7;
-  color: #92400e;
-  border-left-color: #92400e40;
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
 }
-[data-theme="dark"] .badge-blocked,
-[data-theme="dark"] .badge-dep-cancelled {
-  background: #2a1a00;
-  color: #d97316;
-  border-left-color: #d9731640;
-}
-.badge-deps-met {
-  background: #d0ebdc;
-  color: #1a6030;
-  border-left-color: #1a603040;
-}
-[data-theme="dark"] .badge-deps-met {
-  background: #0e2a1a;
-  color: #45b87a;
-  border-left-color: #45b87a40;
+.badge-deps-met,
+.badge-deps-ok {
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
 }
 .badge-scheduled {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-left-color: #1d4ed840;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
 }
-[data-theme="dark"] .badge-scheduled {
-  background: #0e1a35;
-  color: #60a5fa;
-  border-left-color: #60a5fa40;
-}
-.badge-deps-ok {
-  background: #d0ebdc;
-  color: #1a6030;
-  border-left-color: #1a603040;
-}
-[data-theme="dark"] .badge-deps-ok {
-  background: #0e2a1a;
-  color: #45b87a;
-  border-left-color: #45b87a40;
-}
-[data-theme="dark"] .badge-backlog {
-  background: #2a2820;
-  color: #7a7770;
-}
-[data-theme="dark"] .badge-in_progress {
-  background: #1a2d42;
-  color: #6da0dc;
-}
-[data-theme="dark"] .badge-waiting {
-  background: #352a10;
-  color: #d4a030;
-}
-[data-theme="dark"] .badge-committing {
-  background: #352a10;
-  color: #d4a030;
-}
-[data-theme="dark"] .badge-done {
-  background: #0e2a1a;
-  color: #45b87a;
-}
-[data-theme="dark"] .badge-failed {
-  background: #341414;
-  color: #d46868;
-}
-[data-theme="dark"] .badge-archived {
-  background: #2a2820;
-  color: #7a7770;
-  font-style: italic;
-}
-[data-theme="dark"] .badge-cancelled {
-  background: #2a1e3d;
-  color: #a07ad4;
-}
-[data-theme="dark"] .badge-cancelling {
-  background: #3d1a08;
-  color: #e0824a;
-}
-[data-theme="dark"] .badge-priority {
-  background: #1e2535;
-  color: #8095c0;
-}
-[data-theme="dark"] .badge-testing {
-  background: #1a2050;
-  color: #7090e8;
-}
-[data-theme="dark"] .badge-test-pass {
-  background: #0e2a1a;
-  color: #45b87a;
-}
-[data-theme="dark"] .badge-test-fail {
-  background: #341414;
-  color: #d46868;
-}
-[data-theme="dark"] .badge-test-none {
-  background: #252320;
-  color: #6a6560;
-}
-
 /* Brainstorm / idea-agent tag badge */
 .badge-idea-agent {
-  background: #e8f0ff;
-  color: #3050b0;
-  font-size: 9px;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
   font-style: italic;
-}
-[data-theme="dark"] .badge-idea-agent {
-  background: #1a2548;
-  color: #7090e0;
 }
 
 /* Brainstorm category badge (topic domain of a brainstorm-generated task) */
 .badge-category {
-  background: #f0eaff;
-  color: #5a30a0;
-  font-size: 9px;
-}
-[data-theme="dark"] .badge-category {
-  background: #251840;
-  color: #b090e8;
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
 }
 
 .tag-chip {
-  display: inline-block;
-  border-radius: 9999px;
-  font-size: 0.62rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-9);
   font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.7;
   padding: 1px 7px;
   margin: 1px 2px;
-  max-width: 80px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -219,13 +123,13 @@
   vertical-align: middle;
 }
 .tag-chip-overflow {
-  background: var(--bg-raised);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
   cursor: pointer;
 }
 .tag-chip-overflow:hover {
-  color: var(--text-secondary);
+  color: var(--ink);
 }
 .tag-chip-extra {
   display: none;
@@ -316,16 +220,12 @@
 /* --- Max Parallel Tag --- */
 .max-parallel-tag {
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: 10px;
   font-weight: 500;
-  background: #dceaf7;
-  color: #2c5f98;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
   white-space: nowrap;
-}
-[data-theme="dark"] .max-parallel-tag {
-  background: #1a2d42;
-  color: #6da0dc;
 }
 .badge-spec {
   background: #ede5f7;
