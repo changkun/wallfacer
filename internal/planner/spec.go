@@ -23,6 +23,12 @@ func (p *Planner) buildContainerSpec(containerName string, sb sandbox.Type) sand
 			"wallfacer.task.id":       planningTaskID,
 			"wallfacer.task.activity": "planning",
 		},
+		// The host backend (and the container-based backends' entrypoint
+		// script) dispatch to the right CLI based on WALLFACER_AGENT. The
+		// planner is Claude-only today; the parameter is still threaded
+		// through so a future Codex planner variant slots in without
+		// touching this call site.
+		Env: map[string]string{"WALLFACER_AGENT": string(sb)},
 	}
 
 	if p.envFile != "" {

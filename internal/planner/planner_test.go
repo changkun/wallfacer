@@ -137,6 +137,13 @@ func TestBuildContainerSpec(t *testing.T) {
 	if spec.Name != "wallfacer-plan-test" {
 		t.Errorf("Name = %q, want %q", spec.Name, "wallfacer-plan-test")
 	}
+	// The host backend and the container entrypoint script both branch
+	// on WALLFACER_AGENT. Without it, host-backend planner execs error
+	// out with "WALLFACER_AGENT is missing or unknown". Regression test
+	// for a bug where planner spec didn't thread the agent through.
+	if got := spec.Env["WALLFACER_AGENT"]; got != string(sandbox.Claude) {
+		t.Errorf("spec.Env[WALLFACER_AGENT] = %q, want %q", got, sandbox.Claude)
+	}
 	if spec.Image != "sandbox-agents:latest" {
 		t.Errorf("Image = %q, want %q", spec.Image, "sandbox-agents:latest")
 	}
