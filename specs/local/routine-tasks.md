@@ -368,3 +368,33 @@ Legacy aliases (unchanged contract; now thin wrappers):
 - Max-concurrent-instances cap per routine.
 - Pause-on-failure policy.
 - Per-routine usage/cost aggregation in the analytics panel.
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Engine package](routine-tasks/engine-package.md) | — | medium | validated |
+| [Task kind and fields](routine-tasks/task-kind-and-fields.md) | — | medium | validated |
+| [Routines API](routine-tasks/routines-api.md) | task-kind-and-fields | medium | validated |
+| [Engine integration](routine-tasks/engine-integration.md) | engine-package, routines-api | large | validated |
+| [Routine card UI](routine-tasks/routine-card-ui.md) | routines-api | medium | validated |
+| [Ideation migration](routine-tasks/ideation-migration.md) | engine-integration, routine-card-ui | medium | validated |
+
+```mermaid
+graph LR
+  EP[Engine package] --> EI[Engine integration]
+  TK[Task kind & fields] --> RA[Routines API]
+  RA --> EI
+  RA --> UI[Routine card UI]
+  EI --> IM[Ideation migration]
+  UI --> IM
+```
+
+**Recommended execution order:**
+
+1. **Engine package** and **Task kind & fields** in parallel — zero coupling.
+2. **Routines API** next — depends only on the new fields.
+3. **Engine integration** and **Routine card UI** in parallel — both depend
+   on the API; integration also needs the engine package.
+4. **Ideation migration** last — folds the existing singleton onto the now-
+   proven primitive.
