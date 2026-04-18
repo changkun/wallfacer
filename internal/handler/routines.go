@@ -240,11 +240,19 @@ func (h *Handler) TriggerRoutine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Placeholder: the engine-integration task replaces this with
-	// h.routineEngine.Trigger(id). Until then we just mark the intent.
 	h.insertEventOrLog(r.Context(), id, store.EventTypeSystem, map[string]any{
 		"kind": "routine:triggered",
 	})
+	h.routineMu.Lock()
+	eng := h.routineEngine
+	h.routineMu.Unlock()
+	if eng == nil {
+		// Engine not yet initialized (pre-boot, or test that opted out).
+		// Spawn inline so the caller still sees an instance task created.
+		go h.fireRoutine(r.Context(), id)
+	} else {
+		eng.Trigger(id)
+	}
 	logger.Handler.Info("routine: trigger requested", "routine", id)
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"queued": true})
 }
