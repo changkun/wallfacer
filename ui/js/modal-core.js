@@ -319,6 +319,140 @@ function renderModalDependencies(task) {
   }
 }
 
+// _renderModalAside populates the right-side summary rail (agent, budget,
+// git, links). Keeps values in sync with what the main panes already show —
+// this is a compact mirror, not an alternate data source.
+function _renderModalAside(task) {
+  const aside = document.getElementById("modal-aside");
+  if (!aside) return;
+  if (!task || task.status === "backlog") {
+    aside.classList.add("hidden");
+    return;
+  }
+  aside.classList.remove("hidden");
+
+  const env = task.environment || {};
+  const setText = function (id, text, mono) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("mono", !!mono);
+  };
+
+  // Agent
+  setText("aside-agent-sandbox", task.sandbox || env.sandbox || "default");
+  setText("aside-agent-model", env.model_name || task.model_override || "—");
+  setText(
+    "aside-agent-status",
+    task.status === "in_progress" ? "in progress" : task.status || "—",
+  );
+  let elapsedText = "—";
+  if (task.started_at) {
+    const endMs = task.completed_at
+      ? new Date(task.completed_at).getTime()
+      : Date.now();
+    const startMs = new Date(task.started_at).getTime();
+    const secs = Math.max(0, Math.round((endMs - startMs) / 1000));
+    if (secs < 60) elapsedText = secs + "s";
+    else if (secs < 3600)
+      elapsedText = Math.floor(secs / 60) + "m " + (secs % 60) + "s";
+    else
+      elapsedText =
+        Math.floor(secs / 3600) + "h " + Math.floor((secs % 3600) / 60) + "m";
+  }
+  setText("aside-agent-elapsed", elapsedText);
+
+  // Budget
+  const u = task.usage || {};
+  const inputTokens =
+    (u.input_tokens || 0) +
+    (u.cache_read_input_tokens || 0) +
+    (u.cache_creation_input_tokens || 0);
+  let tokenText = inputTokens ? inputTokens.toLocaleString() : "—";
+  if (task.max_input_tokens > 0) {
+    tokenText =
+      (inputTokens || 0).toLocaleString() +
+      " / " +
+      task.max_input_tokens.toLocaleString();
+  }
+  setText("aside-budget-tokens", tokenText);
+  let costText = u.cost_usd ? "$" + u.cost_usd.toFixed(4) : "—";
+  if (task.max_cost_usd > 0) {
+    costText = "$" + (u.cost_usd || 0).toFixed(4) + " / $" + task.max_cost_usd.toFixed(2);
+  }
+  setText("aside-budget-cost", costText);
+  setText(
+    "aside-budget-timeout",
+    task.timeout ? task.timeout + " min" : "—",
+  );
+
+  const bar = document.getElementById("aside-budget-bar");
+  const barFill = document.getElementById("aside-budget-bar-fill");
+  let pct = 0;
+  if (task.max_cost_usd > 0 && u.cost_usd) {
+    pct = Math.min(1, u.cost_usd / task.max_cost_usd);
+  } else if (task.max_input_tokens > 0 && inputTokens) {
+    pct = Math.min(1, inputTokens / task.max_input_tokens);
+  }
+  if (bar && barFill) {
+    if (pct > 0) {
+      bar.classList.remove("hidden");
+      barFill.style.width = (pct * 100).toFixed(1) + "%";
+    } else {
+      bar.classList.add("hidden");
+    }
+  }
+
+  // Git
+  const worktrees = task.worktree_paths || {};
+  const repos = Object.keys(worktrees);
+  setText(
+    "aside-git-branches",
+    repos.length ? repos.join(", ") : "—",
+    repos.length > 0,
+  );
+  setText(
+    "aside-git-worktrees",
+    repos.length ? repos.length + (repos.length === 1 ? " repo" : " repos") : "none",
+  );
+
+  // Links
+  const specEl = document.getElementById("aside-link-spec");
+  if (specEl) {
+    if (task.spec_source_path) {
+      const name = task.spec_source_path
+        .replace(/^.*\//, "")
+        .replace(/\.md$/, "");
+      specEl.innerHTML = '<a href="#" data-spec-path="' +
+        escapeHtml(task.spec_source_path) +
+        '">' + escapeHtml(name) + "</a>";
+      const link = specEl.querySelector("a");
+      if (link) {
+        link.onclick = function (e) {
+          e.preventDefault();
+          closeModal();
+          if (typeof switchMode === "function") switchMode("spec");
+          if (
+            typeof focusSpec === "function" &&
+            typeof activeWorkspaces !== "undefined" &&
+            activeWorkspaces &&
+            activeWorkspaces.length > 0
+          ) {
+            focusSpec(task.spec_source_path, activeWorkspaces[0]);
+          }
+        };
+      }
+    } else {
+      specEl.textContent = "—";
+    }
+  }
+  const deps = Array.isArray(task.depends_on) ? task.depends_on : [];
+  setText(
+    "aside-link-deps",
+    deps.length ? deps.length + (deps.length === 1 ? " task" : " tasks") : "none",
+  );
+}
+
 async function openModal(id) {
   function isTestCard(task) {
     return (
@@ -408,6 +542,7 @@ async function openModal(id) {
   }
 
   renderModalDependencies(task);
+  _renderModalAside(task);
 
   const backlogRight = document.getElementById("modal-backlog-right");
   const backlogSettings = document.getElementById("modal-backlog-settings");

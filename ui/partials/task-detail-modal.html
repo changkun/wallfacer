@@ -1277,6 +1277,73 @@
             <div id="refine-history-list" class="refine-history-list"></div>
           </div>
         </div>
+
+        <!-- Right aside: compact summary (agent / budget / git / links) -->
+        <aside id="modal-aside" class="modal-aside hidden">
+          <div class="mdl-section">
+            <div class="mdl-h">Agent</div>
+            <div class="row">
+              <span class="k">sandbox</span
+              ><span id="aside-agent-sandbox" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">model</span
+              ><span id="aside-agent-model" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">status</span
+              ><span id="aside-agent-status" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">elapsed</span
+              ><span id="aside-agent-elapsed" class="v">&mdash;</span>
+            </div>
+          </div>
+          <div class="mdl-section" id="aside-budget-section">
+            <div class="mdl-h">Budget</div>
+            <div class="row">
+              <span class="k">tokens</span
+              ><span id="aside-budget-tokens" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">cost</span
+              ><span id="aside-budget-cost" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">timeout</span
+              ><span id="aside-budget-timeout" class="v">&mdash;</span>
+            </div>
+            <div
+              id="aside-budget-bar"
+              class="bar hidden"
+              style="margin-top: 6px"
+            >
+              <i id="aside-budget-bar-fill" style="width: 0%"></i>
+            </div>
+          </div>
+          <div class="mdl-section">
+            <div class="mdl-h">Git</div>
+            <div class="row">
+              <span class="k">branches</span
+              ><span id="aside-git-branches" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">worktrees</span
+              ><span id="aside-git-worktrees" class="v">&mdash;</span>
+            </div>
+          </div>
+          <div class="mdl-section">
+            <div class="mdl-h">Links</div>
+            <div class="row">
+              <span class="k">spec</span
+              ><span id="aside-link-spec" class="v">&mdash;</span>
+            </div>
+            <div class="row">
+              <span class="k">depends on</span
+              ><span id="aside-link-deps" class="v">&mdash;</span>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   </div>

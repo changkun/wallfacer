@@ -74,3 +74,84 @@
 .modal-wide .logs-block {
   max-height: none;
 }
+
+/* --- Right-side aside (agent / budget / git / links) --- */
+.modal-wide .modal-aside {
+  flex: 0 0 260px;
+  min-width: 260px;
+  max-width: 260px;
+  margin-left: 20px;
+  padding-left: 20px;
+  padding-top: 4px;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.modal-aside .mdl-section {
+  margin-bottom: 20px;
+}
+.modal-aside .mdl-h {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.modal-aside .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.modal-aside .row .k {
+  color: var(--text-muted);
+  width: 78px;
+  flex-shrink: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.modal-aside .row .v {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.modal-aside .row .v.mono {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+}
+.modal-aside .row .v a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.modal-aside .row .v a:hover {
+  text-decoration: underline;
+}
+.modal-aside .bar {
+  height: 3px;
+  background: var(--bg-input);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.modal-aside .bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+/* Collapse aside on narrow viewports — the main split already competes for
+   space and an extra 260px rail becomes unreadable under ~1200px. */
+@media (max-width: 1200px) {
+  .modal-wide .modal-aside {
+    display: none;
+  }
+}
