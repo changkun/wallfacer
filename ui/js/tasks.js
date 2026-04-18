@@ -275,6 +275,38 @@ async function createTask() {
       scheduledAtEl && scheduledAtEl.value
         ? new Date(scheduledAtEl.value).toISOString()
         : undefined;
+    const repeatToggle = document.getElementById("new-repeat-toggle");
+    const repeatMinutesEl = document.getElementById("new-repeat-minutes");
+    const makeRoutine = !!(repeatToggle && repeatToggle.checked);
+
+    // When the user asks for a recurring schedule, create a routine
+    // card instead of a one-shot task. The routine fires on its
+    // interval and spawns a fresh instance task each time — the
+    // original prompt, sandbox, and tags are copied into each
+    // instance via the scheduler engine.
+    if (makeRoutine) {
+      const interval_minutes =
+        (repeatMinutesEl && parseInt(repeatMinutesEl.value, 10)) || 60;
+      const routine = await api(Routes.routines.create(), {
+        method: "POST",
+        body: JSON.stringify({
+          prompt,
+          timeout,
+          tags,
+          interval_minutes,
+        }),
+      });
+      localStorage.removeItem("wallfacer-new-task-draft");
+      hideNewTaskForm();
+      if (typeof clearWorkspaceIsNew === "function") clearWorkspaceIsNew();
+      if (routine && routine.id) {
+        waitForTaskDelta(routine.id);
+      } else {
+        fetchTasks();
+      }
+      return;
+    }
+
     const newTask = await api(Routes.tasks.create(), {
       method: "POST",
       body: JSON.stringify({
@@ -342,6 +374,20 @@ function showNewTaskForm() {
   var depsRow = document.getElementById("new-depends-on-row");
   populateDependsOnPicker("new-depends-on-picker", null, []);
   if (depsRow) depsRow.style.display = tasks.length > 0 ? "" : "none";
+
+  // Wire the "Repeat on a schedule" toggle once per form open so the
+  // interval input (hidden by default) follows the checkbox state.
+  var repeatToggle = document.getElementById("new-repeat-toggle");
+  var repeatMinutesEl = document.getElementById("new-repeat-minutes");
+  var repeatMinutesRow = document.getElementById("new-repeat-minutes-row");
+  if (repeatToggle && !repeatToggle._bound) {
+    repeatToggle._bound = true;
+    repeatToggle.addEventListener("change", function () {
+      var show = repeatToggle.checked ? "" : "none";
+      if (repeatMinutesEl) repeatMinutesEl.style.display = show;
+      if (repeatMinutesRow) repeatMinutesRow.style.display = show;
+    });
+  }
 }
 
 function hideNewTaskForm() {
@@ -366,6 +412,15 @@ function hideNewTaskForm() {
   if (maxTokensEl) maxTokensEl.value = "";
   const scheduledAtEl = document.getElementById("new-scheduled-at");
   if (scheduledAtEl) scheduledAtEl.value = "";
+  const repeatToggle = document.getElementById("new-repeat-toggle");
+  const repeatMinutesEl = document.getElementById("new-repeat-minutes");
+  const repeatMinutesRow = document.getElementById("new-repeat-minutes-row");
+  if (repeatToggle) repeatToggle.checked = false;
+  if (repeatMinutesEl) {
+    repeatMinutesEl.value = "60";
+    repeatMinutesEl.style.display = "none";
+  }
+  if (repeatMinutesRow) repeatMinutesRow.style.display = "none";
   initTagInput("new-task-tag-input", []);
   var depPicker = document.getElementById("new-depends-on-picker");
   if (depPicker) {
