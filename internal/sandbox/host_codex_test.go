@@ -164,10 +164,10 @@ func TestHostBackend_LaunchCodex_InstructionsPrepended(t *testing.T) {
 
 func TestExtractPromptAndModelFromClaudeArgv(t *testing.T) {
 	cases := []struct {
-		name     string
-		in       []string
-		wantP    string
-		wantM    string
+		name  string
+		in    []string
+		wantP string
+		wantM string
 	}{
 		{"simple", []string{"-p", "hi", "--verbose"}, "hi", ""},
 		{"with-model", []string{"-p", "hi", "--model", "sonnet"}, "hi", "sonnet"},
@@ -206,4 +206,3 @@ func TestSandboxFast(t *testing.T) {
 		})
 	}
 }
-
