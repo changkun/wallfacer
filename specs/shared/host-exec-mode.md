@@ -219,15 +219,21 @@ Skip for v1. Claude CLI on Windows runs fine in WSL2; users on Windows should ei
 
 ## API Surface
 
+### CLI flags
+
+Backend selection moves to a CLI flag — no env var. The previously-planned `WALLFACER_SANDBOX_BACKEND` is dropped from user-facing docs; the internal `cfg.SandboxBackend` field stays as plumbing, populated by the flag.
+
+- `wallfacer run --backend <container|host>` — default `container`. Aliases: `container` is the primary user-facing name for the current `LocalBackend` (internally `"local"`); accept `local` as a backward-compat alias at the flag boundary.
+- `wallfacer doctor --backend <container|host>` — mirrors `run` so readiness checks match the mode the user intends to run. Default `container`.
+
 ### Environment variables
 
-Add to the documented values in `docs/guide/configuration.md` and `AGENTS.md`:
+Two new optional vars (binary path overrides only — they are purely about *where* the CLIs live, not *whether* to use them):
 
-- `WALLFACER_SANDBOX_BACKEND` — now accepts `host` (in addition to `local`). Default remains `local` for backward compatibility.
-- `WALLFACER_HOST_CLAUDE_BINARY` (new, optional) — explicit path to the `claude` binary. Default: `exec.LookPath("claude")`.
-- `WALLFACER_HOST_CODEX_BINARY` (new, optional) — explicit path to the `codex` binary. Default: `exec.LookPath("codex")`.
+- `WALLFACER_HOST_CLAUDE_BINARY` — explicit path to `claude`. Default: `exec.LookPath("claude")`.
+- `WALLFACER_HOST_CODEX_BINARY` — explicit path to `codex`. Default: `exec.LookPath("codex")`.
 
-No new API routes. No new CLI subcommands. `wallfacer doctor` output text changes but not its invocation.
+No new API routes. No new CLI subcommands.
 
 ## Error Handling
 

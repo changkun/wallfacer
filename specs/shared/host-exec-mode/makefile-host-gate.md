@@ -1,10 +1,12 @@
 ---
-title: Makefile skips pull-images when host backend is selected
+title: Document `make build-binary` as the host-mode build
 status: validated
 depends_on: []
 affects:
   - Makefile
   - docs/guide/configuration.md
+  - CLAUDE.md
+  - AGENTS.md
 effort: small
 created: 2026-04-18
 updated: 2026-04-18
@@ -12,43 +14,58 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# Makefile skips pull-images when host backend is selected
+# Document `make build-binary` as the host-mode build
 
 ## Goal
 
-Let users opt out of image pulling at build time by setting `WALLFACER_SANDBOX_BACKEND=host` in their `.env`. `make build` should skip the `pull-images` dependency in that case, so host-mode users never touch GHCR.
+Since backend selection is now a runtime CLI flag (`wallfacer run --backend host`) and no longer an env var, the Makefile cannot predict whether the user will run container or host mode — so it should not branch on a phantom env var. Instead, make it discoverable that `make build-binary` is the right target for host-mode users (skips `pull-images` and all container machinery). Add a short Makefile comment and a docs pointer.
 
 ## What to do
 
-1. In `Makefile`, replace the single `build: fmt lint ui-ts build-binary pull-images` line with a conditional:
+1. In `Makefile`, update the comment block above `build` (around line 32) to explicitly name the host-mode path:
 
    ```makefile
-   ifeq ($(WALLFACER_SANDBOX_BACKEND),host)
-   build: fmt lint ui-ts build-binary
-   else
-   build: fmt lint ui-ts build-binary pull-images
-   endif
+   # Build the wallfacer binary and pull sandbox images (container mode).
+   # For host mode (wallfacer run --backend host) use `make build-binary`
+   # instead — it skips image pull and still runs fmt + lint + ts build.
    ```
 
-   The existing `-include .env` + `export` at lines 27–28 already makes `WALLFACER_SANDBOX_BACKEND` available to Make, so the `ifeq` resolves correctly when the user has set it in `~/.wallfacer/.env` or shell env.
+   Do **not** change the target body. `build` keeps `pull-images` unconditionally. The only behavioral change is that users who explicitly choose host mode run `make build-binary`.
 
-2. Leave `pull-images` and `pull-images-force` targets unchanged — users can still invoke them manually when they flip back to container mode.
+2. If `build-binary` currently skips lint / fmt / ts-build (per line 45, it does — it only compiles), introduce a new convenience target:
 
-3. Add a short note in the `pull-images` target comment block explaining that host mode bypasses this target entirely.
+   ```makefile
+   # Build for host mode: full fmt + lint + ts build + binary, no image pull.
+   .PHONY: build-host
+   build-host: fmt lint ui-ts build-binary
+   ```
 
-4. Update `docs/guide/configuration.md` in the Sandbox section: add a one-line mention under the `WALLFACER_SANDBOX_BACKEND` row that `host` causes `make build` to skip image pull.
+   and list it in `.PHONY`. This keeps parity with `build`'s validation pipeline for host-mode users without forcing them into a pull.
+
+3. Update `docs/guide/configuration.md` (Sandbox section):
+   - Remove any references to `WALLFACER_SANDBOX_BACKEND` (there should be one row in the env-var table — delete it).
+   - Add a new "Host mode" subsection noting:
+     - Activate via `wallfacer run --backend host`.
+     - Requires host-installed `claude` / `codex`.
+     - Build with `make build-host` (or `make build-binary` for a minimal build).
+     - No filesystem isolation — see *Write containment* warning.
+
+4. In `CLAUDE.md` and `AGENTS.md`:
+   - Remove the `WALLFACER_SANDBOX_BACKEND` row from the env-var table.
+   - Add `build-host` to the `make` target list.
+   - Add `--backend` flag to the `wallfacer run` usage examples.
 
 ## Tests
 
 No automated test — Makefile logic is verified manually. For the commit, verify both paths by hand:
 
-- `WALLFACER_SANDBOX_BACKEND=host make -n build` — output should **not** include `pull-images`.
-- `unset WALLFACER_SANDBOX_BACKEND; make -n build` — output should include `pull-images`.
+- `make -n build` — output includes `pull-images`.
+- `make -n build-host` — output does **not** include `pull-images` but does include `fmt`, `lint`, `ui-ts`, `build-binary`.
 
 Record the two `-n` outputs in the commit message body as evidence.
 
 ## Boundaries
 
-- Do **not** change the CI workflow files — CI continues to build with container mode.
-- Do **not** touch `pull-images` / `pull-images-force` internals; the existing retag-from-latest fallback is orthogonal.
-- Do **not** add a Makefile target that invokes wallfacer with backend=host — that remains a runtime choice.
+- Do **not** gate `pull-images` on a shell env var. Backend selection is a runtime CLI concern, not a build-time concern.
+- Do **not** remove the existing retag-from-latest fallback inside `pull-images`.
+- Do **not** add CI wiring to run `build-host` — CI continues to run `make build` with containers.
