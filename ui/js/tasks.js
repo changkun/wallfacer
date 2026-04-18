@@ -245,6 +245,21 @@ function getTagValues(containerId) {
   return container ? container._tags || [] : [];
 }
 
+// applyHostModeToComposer toggles the .composer--host marker class on
+// the new-task form. Called both from fetchConfig (when host_mode
+// changes) and from showNewTaskForm (belt-and-braces in case the form
+// mounts before config has been fetched). Kept as a standalone helper
+// so workspace.js can call it without pulling in the rest of tasks.js.
+function applyHostModeToComposer() {
+  var form = document.getElementById("new-task-form");
+  if (!form) return;
+  if (typeof hostMode !== "undefined" && hostMode) {
+    form.classList.add("composer--host");
+  } else {
+    form.classList.remove("composer--host");
+  }
+}
+
 // --- Task creation ---
 
 async function createTask() {
@@ -403,6 +418,11 @@ function showNewTaskForm() {
   var depsRow = document.getElementById("new-depends-on-row");
   populateDependsOnPicker("new-depends-on-picker", null, []);
   if (depsRow) depsRow.style.display = tasks.length > 0 ? "" : "none";
+
+  // Reflect host_mode on the composer so [data-host-hidden] nodes
+  // (currently just "Share siblings") collapse when no container
+  // sandbox is in play. Idempotent: called again on every open.
+  applyHostModeToComposer();
 
   // Wire the "Repeat on a schedule" toggle once per form open so the
   // interval input row (hidden by default) follows the checkbox state.
