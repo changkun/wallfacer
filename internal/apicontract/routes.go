@@ -179,6 +179,33 @@ var Routes = []Route{
 		Tags:        []string{"ideate"},
 	},
 
+	// --- Routines ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/routines", Name: "ListRoutines",
+		JSName:      "list",
+		Description: "List routine task cards with their schedules and next-run times.",
+		Tags:        []string{"routines"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/routines", Name: "CreateRoutine",
+		JSName:      "create",
+		Description: "Create a new routine card that spawns instance tasks on a fixed interval.",
+		Tags:        []string{"routines"},
+	},
+	{
+		Method: http.MethodPatch, Pattern: "/api/routines/{id}/schedule", Name: "UpdateRoutineSchedule",
+		JSName:      "updateSchedule",
+		Description: "Update a routine's interval or enabled flag; unset fields are left unchanged.",
+		Tags:        []string{"routines"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/routines/{id}/trigger", Name: "TriggerRoutine",
+		JSName:      "trigger",
+		Description: "Fire a routine immediately, bypassing the schedule; the scheduled cycle continues.",
+		Tags:        []string{"routines"},
+	},
+
 	// --- Spec tree ---
 
 	{

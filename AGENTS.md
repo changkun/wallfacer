@@ -220,6 +220,13 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `POST /api/ideate` — Launch brainstorm/ideation agent
 - `DELETE /api/ideate` — Cancel running ideation agent
 
+### Routines
+- `GET /api/routines` — List routine cards with schedules and next-run times
+- `POST /api/routines` — Create a routine (JSON: `{prompt, interval_minutes, spawn_kind?, enabled?, goal?, tags?, timeout?}`)
+- `PATCH /api/routines/{id}/schedule` — Update interval and/or enabled flag (JSON: `{interval_minutes?, enabled?}`); omitted fields left unchanged
+- `POST /api/routines/{id}/trigger` — Fire immediately; scheduled cycle continues unchanged
+- Deletion uses `DELETE /api/tasks/{id}` (routine cards are tasks)
+
 ### Spec Tree
 - `GET /api/specs/tree` — Full spec tree with metadata, progress, and dependency edges
 - `GET /api/specs/stream` — SSE: spec tree change notifications (sends snapshot on change)

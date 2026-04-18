@@ -107,6 +107,25 @@ var Routes = {
     },
   },
 
+  routines: {
+    // GET /api/routines
+    list: function () {
+      return "/api/routines";
+    },
+    // POST /api/routines
+    create: function () {
+      return "/api/routines";
+    },
+    // PATCH /api/routines/{id}/schedule
+    updateSchedule: function () {
+      return "/api/routines/{id}/schedule";
+    },
+    // POST /api/routines/{id}/trigger
+    trigger: function () {
+      return "/api/routines/{id}/trigger";
+    },
+  },
+
   specs: {
     // GET /api/specs/tree
     tree: function () {
