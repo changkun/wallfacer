@@ -1,6 +1,6 @@
 ---
 title: /api/agents endpoints and sidebar Agents tab (read-only)
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/extract-agents-package.md
 affects:
