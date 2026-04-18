@@ -1,19 +1,8 @@
-/* --- Theme variables --- */
+/* --- Theme variables ---
+   Core surface/ink/accent tokens live in tokens.css. Only tag palette,
+   selection, scrollbars, and body defaults remain here. */
 :root,
 [data-theme="light"] {
-  --bg: #f0ede6;
-  --bg-raised: #e8e4dc;
-  --bg-sidebar: #e2ded5;
-  --bg-card: #faf8f4;
-  --bg-input: #e8e4dc;
-  --text: #1f1d1a;
-  --text-secondary: #5c5851;
-  --text-muted: #9c9890;
-  --accent: #d97757;
-  --accent-hover: #c4623f;
-  --border: #d4cfc6;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.11);
   --tag-bg-0: #f0dbd7;
   --tag-text-0: #7a3828;
   --tag-bg-1: #f0e6d2;
@@ -40,19 +29,6 @@
   --tag-text-11: #184840;
 }
 [data-theme="dark"] {
-  --bg: #1a1917;
-  --bg-raised: #211f1c;
-  --bg-sidebar: #13120f;
-  --bg-card: #272420;
-  --bg-input: #1e1c19;
-  --text: #f0ede6;
-  --text-secondary: #a8a49c;
-  --text-muted: #908c86;
-  --accent: #d97757;
-  --accent-hover: #e08a68;
-  --border: #302e2a;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
   --tag-bg-0: #4a1e16;
   --tag-text-0: #d09080;
   --tag-bg-1: #48300e;
@@ -120,14 +96,9 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family:
-    "Inter",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
