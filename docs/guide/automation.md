@@ -303,6 +303,22 @@ Plan mode and focuses that spec. Archived specs are filtered out by
 default. When the workspace has no specs, the view falls back to the
 task-only DAG.
 
+Map navigation is tuned for exploring large graphs:
+
+- **Hover** a node to emphasise its 1-hop neighbourhood (non-neighbours dim).
+- **Click** to focus — the 1-hop lens becomes sticky and the mount scrolls
+  the node into view. Click empty canvas to clear.
+- **Shift+click** opens the node (task modal or Plan-mode focus).
+- **Drag** a node to pin it; **double-click** a pinned node to unpin.
+- **Search** via the top-bar search (press <kbd>/</kbd> to focus) filters
+  nodes by label or spec path substring; non-matching nodes dim alongside
+  their incident edges. The same input filters tasks on the board and
+  specs in Plan mode — the active mode decides what the query targets.
+- **Ctrl / ⌘ + scroll** zooms in or out around the cursor position.
+  Plain scroll still pans as usual.
+- **Hold Space + drag** pans the whole canvas like Figma / Miro.
+- **Reset layout** clears pinned positions, focus, zoom, and search.
+
 **Batch creation with dependencies.** Use `POST /api/tasks/batch` to
 create multiple tasks atomically with symbolic dependency wiring. Tasks
 in the batch can reference each other by position, and the dependency
