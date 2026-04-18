@@ -113,12 +113,12 @@
   height: 4px;
   cursor: ns-resize;
   background: transparent;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule);
   transition: background 0.15s;
 }
 .status-bar-panel-resize:hover,
 .status-bar-panel-resize--active {
-  background: var(--accent, #4e8cff);
+  background: var(--accent);
 }
 .status-bar-panel-resize.hidden {
   display: none;
@@ -126,10 +126,14 @@
 .status-bar-panel {
   flex-shrink: 0;
   height: 260px;
-  background: var(--bg);
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border-top: 1px solid var(--rule);
 }
 .status-bar-panel.hidden {
   display: none;
@@ -138,11 +142,12 @@
 .terminal-tab-bar {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  border-bottom: 1px solid color-mix(in oklab, var(--ink), var(--bg) 12%);
+  background: var(--ink);
   flex-shrink: 0;
-  min-height: 28px;
+  min-height: 26px;
   padding: 0 4px;
+  font-family: var(--font-mono);
 }
 .terminal-tab-bar[hidden] {
   display: none;
@@ -157,24 +162,28 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
-  color: var(--text-muted);
+  padding: 3px 10px;
+  font-size: 11px;
+  color: color-mix(in oklab, var(--bg), transparent 45%);
   cursor: pointer;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
   white-space: nowrap;
   user-select: none;
 }
+.terminal-tab:hover {
+  color: var(--bg);
+  background: color-mix(in oklab, var(--ink), var(--bg) 6%);
+}
 .terminal-tab[aria-selected="true"] {
-  color: var(--text);
-  background: var(--bg-card, var(--bg));
+  color: var(--bg);
+  background: color-mix(in oklab, var(--ink), var(--bg) 10%);
 }
 .terminal-tab__close {
   background: none;
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   padding: 0 2px;
   opacity: 0.5;
@@ -185,14 +194,14 @@
 .terminal-tab-add {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: color-mix(in oklab, var(--bg), transparent 55%);
   cursor: pointer;
-  font-size: 16px;
-  padding: 2px 6px;
+  font-size: 14px;
+  padding: 2px 8px;
   flex-shrink: 0;
 }
 .terminal-tab-add:hover {
-  color: var(--text);
+  color: var(--bg);
 }
 .terminal-container-picker {
   position: fixed;
@@ -231,18 +240,19 @@
 #terminal-canvas {
   flex: 1;
   overflow: hidden;
+  padding: 6px 0 0;
 }
 #status-bar-panel .xterm {
   height: 100%;
-  padding: 0 8px;
-  background: var(--bg);
+  padding: 0 10px;
+  background: var(--ink);
 }
 #status-bar-panel .xterm-viewport {
   overflow-y: auto;
-  background: var(--bg) !important;
+  background: var(--ink) !important;
 }
 #status-bar-panel .xterm-screen {
-  background: var(--bg);
+  background: var(--ink);
 }
 .terminal-reconnecting {
   position: absolute;
@@ -250,11 +260,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
-  opacity: 0.85;
-  color: var(--text-secondary);
+  background: var(--ink);
+  opacity: 0.9;
+  color: color-mix(in oklab, var(--bg), transparent 35%);
   font-size: 0.875rem;
   z-index: 10;
+  font-family: var(--font-mono);
 }
 @media (max-width: 768px) {
   #status-bar,
