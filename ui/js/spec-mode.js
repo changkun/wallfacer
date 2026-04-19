@@ -10,6 +10,7 @@ var _validModes = {
   spec: true,
   depgraph: true,
   agents: true,
+  flows: true,
   docs: true,
 };
 
@@ -289,11 +290,13 @@ function _applyMode(mode) {
   var specNav = document.getElementById("sidebar-nav-spec");
   var depgraphNav = document.getElementById("sidebar-nav-depgraph");
   var agentsNav = document.getElementById("sidebar-nav-agents");
+  var flowsNav = document.getElementById("sidebar-nav-flows");
   var docsNav = document.getElementById("sidebar-nav-docs");
   if (boardNav) boardNav.classList.toggle("active", mode === "board");
   if (specNav) specNav.classList.toggle("active", mode === "spec");
   if (depgraphNav) depgraphNav.classList.toggle("active", mode === "depgraph");
   if (agentsNav) agentsNav.classList.toggle("active", mode === "agents");
+  if (flowsNav) flowsNav.classList.toggle("active", mode === "flows");
   if (docsNav) docsNav.classList.toggle("active", mode === "docs");
 
   // Toggle main content areas.
@@ -301,17 +304,23 @@ function _applyMode(mode) {
   var specView = document.getElementById("spec-mode-container");
   var depgraphView = document.getElementById("depgraph-mode-container");
   var agentsView = document.getElementById("agents-mode-container");
+  var flowsView = document.getElementById("flows-mode-container");
   var docsView = document.getElementById("docs-mode-container");
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
   if (depgraphView)
     depgraphView.style.display = mode === "depgraph" ? "" : "none";
   if (agentsView) agentsView.style.display = mode === "agents" ? "" : "none";
+  if (flowsView) flowsView.style.display = mode === "flows" ? "" : "none";
   if (docsView) docsView.style.display = mode === "docs" ? "" : "none";
 
   // Load agents list when entering agents mode for the first time.
   if (mode === "agents" && typeof window.loadAgents === "function") {
     window.loadAgents();
+  }
+  // Load flows list when entering flows mode for the first time.
+  if (mode === "flows" && typeof window.loadFlows === "function") {
+    window.loadFlows();
   }
 
   // Toggle the dep-graph rendering flag so the existing panel renders into

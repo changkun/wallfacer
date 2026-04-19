@@ -1,0 +1,20 @@
+<div
+  id="flows-mode-container"
+  class="flows-mode-container"
+  style="display: none"
+>
+  <div class="flows-mode__inner">
+    <header class="flows-mode__header">
+      <h2 class="flows-mode__title">Flows</h2>
+      <p class="flows-mode__subtitle">
+        Built-in flows that compose sub-agents into a task pipeline. Each row
+        shows the step chain; <code>?</code> marks optional steps and
+        <code>‖</code> marks a parallel-sibling group. Editable and
+        user-authored flows ship in a follow-up.
+      </p>
+    </header>
+    <div id="flows-list" class="flows-mode__list" aria-busy="true">
+      <p class="flows-mode__empty">Loading flows…</p>
+    </div>
+  </div>
+</div>

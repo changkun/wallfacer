@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 119,
+  "route_count": 121,
   "routes": [
     {
       "method": "GET",
@@ -235,6 +235,24 @@
       "description": "Get one agent's full descriptor including its prompt template body.",
       "tags": [
         "agents"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/flows",
+      "name": "ListFlows",
+      "description": "List all registered flows (built-in catalog).",
+      "tags": [
+        "flows"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/flows/{slug}",
+      "name": "GetFlow",
+      "description": "Get one flow's full descriptor including its step chain and agent names.",
+      "tags": [
+        "flows"
       ]
     },
     {
