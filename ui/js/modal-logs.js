@@ -223,38 +223,12 @@ function onLogSearchInput(value) {
   renderLogs();
 }
 
-var _switchRightTab = createTabSwitcher({
-  tabs: ["implementation", "testing", "changes", "spans", "timeline"],
-  prefix: "right",
-  onActivate: {
-    spans: function () {
-      if (typeof loadFlamegraph !== "undefined" && getOpenModalTaskId()) {
-        loadFlamegraph(getOpenModalTaskId());
-      }
-    },
-    timeline: function () {
-      if (getOpenModalTaskId()) {
-        renderTimeline(getOpenModalTaskId());
-        _startTimelineRefresh(getOpenModalTaskId());
-      }
-    },
-  },
-  onSwitch: function (tab) {
-    if (tab !== "timeline") {
-      _stopTimelineRefresh();
-    }
-    if (getOpenModalTaskId()) {
-      history.replaceState(null, "", "#" + getOpenModalTaskId() + "/" + tab);
-    }
-  },
-});
-
+// setRightTab is a legacy name kept for command-palette entries and hash
+// deeplinks that still speak in sub-tab terms. Each sub-tab maps to exactly
+// one main tab now that modal-right was flattened into modal-main-content,
+// so this is a pure delegator. The implementation/testing sub-tabs live
+// inside Activity via setLeftTab.
 function setRightTab(tab) {
-  // Route legacy callers (command palette, hash deeplinks) to the new main-tab
-  // hierarchy. Implementation/testing both live inside Activity; changes,
-  // spans, timeline each have their own top-level tab. Existing right-tab-*/
-  // right-panel-* toggling below still runs so Impl/Testing sub-switch and the
-  // modal-logs.js test suite stay green.
   const mainTabMap = {
     implementation: "activity",
     testing: "activity",
@@ -265,7 +239,12 @@ function setRightTab(tab) {
   if (mainTabMap[tab] && typeof setMainTab === "function") {
     setMainTab(mainTabMap[tab]);
   }
-  _switchRightTab(tab);
+  if (tab === "implementation" || tab === "testing") {
+    if (typeof setLeftTab === "function") setLeftTab(tab);
+  }
+  if (getOpenModalTaskId()) {
+    history.replaceState(null, "", "#" + getOpenModalTaskId() + "/" + tab);
+  }
 }
 
 function setLogsMode(mode) {

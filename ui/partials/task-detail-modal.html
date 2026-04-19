@@ -119,39 +119,465 @@
         <div id="modal-row">
           <div id="modal-main-pane">
             <div id="modal-main-content">
-              <div id="modal-left">
-                <div data-main-tab-section="spec">
-                  <!-- Spec / Prompt section -->
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="section-title" style="margin-bottom: 0">Spec</h3>
-                    <div id="modal-spec-tabs" class="logs-tabs hidden">
-                      <button
-                        type="button"
-                        class="logs-tab"
-                        onclick="switchEditTab('spec', 'edit')"
+              <div data-main-tab-section="spec">
+                <!-- Spec / Prompt section -->
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="section-title" style="margin-bottom: 0">Spec</h3>
+                  <div id="modal-spec-tabs" class="logs-tabs hidden">
+                    <button
+                      type="button"
+                      class="logs-tab"
+                      onclick="switchEditTab('spec', 'edit')"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="logs-tab active"
+                      onclick="switchEditTab('spec', 'preview')"
+                    >
+                      Preview
+                    </button>
+                  </div>
+                  <div
+                    id="modal-prompt-actions"
+                    class="flex items-center gap-1.5 hidden"
+                  >
+                    <button
+                      type="button"
+                      id="copy-prompt-btn"
+                      onclick="copyModalText('prompt')"
+                      class="btn-icon"
+                      title="Copy to clipboard"
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
                       >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        class="logs-tab active"
-                        onclick="switchEditTab('spec', 'preview')"
-                      >
-                        Preview
-                      </button>
-                    </div>
+                        <rect
+                          x="9"
+                          y="9"
+                          width="13"
+                          height="13"
+                          rx="2"
+                          ry="2"
+                        ></rect>
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        ></path>
+                      </svg>
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      id="toggle-prompt-btn"
+                      onclick="toggleModalSection('prompt')"
+                      class="btn-icon"
+                    >
+                      Raw
+                    </button>
+                  </div>
+                </div>
+                <!-- Read-only spec (non-backlog) -->
+                <div
+                  id="modal-prompt-rendered"
+                  class="code-block mb-4 prose-content hidden"
+                ></div>
+                <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
+                <!-- Editable spec (backlog): edit + preview views -->
+                <textarea
+                  id="modal-edit-prompt"
+                  rows="10"
+                  class="field mb-4 hidden editable-field"
+                  style="font-family: monospace; font-size: 12px"
+                ></textarea>
+                <div
+                  id="modal-edit-prompt-preview"
+                  class="code-block mb-4 prose-content hidden editable-preview"
+                ></div>
+
+                <!-- Prompt history (collapsible) -->
+                <div id="modal-history-section" class="hidden mb-4">
+                  <details>
+                    <summary
+                      class="text-sm font-medium text-v-muted"
+                      style="cursor: pointer"
+                    >
+                      Prompt History
+                    </summary>
+                    <div id="modal-history-list" class="mt-2 space-y-2"></div>
+                  </details>
+                </div>
+
+                <!-- Retry history (collapsible) -->
+                <div id="modal-retry-history-section" class="hidden mb-4">
+                  <details>
+                    <summary
+                      class="text-sm font-medium text-v-muted"
+                      style="cursor: pointer"
+                    >
+                      Retry History
+                    </summary>
                     <div
-                      id="modal-prompt-actions"
-                      class="flex items-center gap-1.5 hidden"
+                      id="modal-retry-history-list"
+                      class="mt-2 space-y-2"
+                    ></div>
+                  </details>
+                </div>
+
+                <!-- Dependencies -->
+                <div id="modal-dependencies" class="hidden mb-4">
+                  <h3
+                    class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2"
+                  >
+                    Blocked by
+                  </h3>
+                  <div
+                    id="modal-dependencies-list"
+                    class="flex flex-col gap-1"
+                  ></div>
+                  <div
+                    id="modal-dependencies-summary"
+                    class="text-xs text-v-muted mt-1"
+                  ></div>
+                </div>
+
+                <!-- Settings for backlog tasks (hidden for non-backlog) -->
+                <div id="modal-backlog-settings" class="hidden mb-4">
+                  <h3 class="section-title">Settings</h3>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <label for="modal-edit-sandbox" class="text-xs text-v-muted"
+                      >Sandbox</label
+                    >
+                    <select
+                      id="modal-edit-sandbox"
+                      class="select"
+                      onchange="scheduleBacklogSave()"
+                      data-sandbox-select="true"
+                    >
+                      <option value="">Default</option>
+                    </select>
+                    <label for="modal-edit-timeout" class="text-xs text-v-muted"
+                      >Timeout</label
+                    >
+                    <select id="modal-edit-timeout" class="select">
+                      <option value="5">5 min</option>
+                      <option value="15">15 min</option>
+                      <option value="30">30 min</option>
+                      <option value="60" selected>1 hour</option>
+                      <option value="120">2 hours</option>
+                      <option value="360">6 hours</option>
+                      <option value="720">12 hours</option>
+                      <option value="1440">24 hours</option>
+                    </select>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 3px;
+                      margin-top: 8px;
+                    "
+                  >
+                    <label
+                      for="modal-edit-model-override"
+                      class="text-xs text-v-muted"
+                      >Model override (optional)</label
+                    >
+                    <input
+                      type="text"
+                      id="modal-edit-model-override"
+                      class="field text-xs"
+                      style="width: 100%"
+                      placeholder="default from global config"
+                      onchange="scheduleBacklogSave()"
+                      oninput="scheduleBacklogSave()"
+                    />
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 3px;
+                      margin-top: 8px;
+                    "
+                  >
+                    <label
+                      for="modal-edit-scheduled-at"
+                      class="text-xs text-v-muted"
+                      >Schedule start (optional)</label
+                    >
+                    <input
+                      type="datetime-local"
+                      id="modal-edit-scheduled-at"
+                      class="field text-xs"
+                      style="width: 100%"
+                      title="Leave empty to run immediately"
+                      onchange="scheduleBacklogSave()"
+                    />
+                  </div>
+                  <div
+                    id="modal-edit-resume-row"
+                    class="hidden flex items-center gap-2 mt-2"
+                  >
+                    <input
+                      type="checkbox"
+                      id="modal-edit-resume"
+                      onchange="saveResumeOption(this.checked)"
+                      style="cursor: pointer; accent-color: var(--accent)"
+                    />
+                    <label
+                      for="modal-edit-resume"
+                      class="text-xs text-v-secondary"
+                      style="cursor: pointer"
+                      >Resume previous session</label
+                    >
+                  </div>
+                  <div class="flex items-center gap-2 mt-2">
+                    <input
+                      type="checkbox"
+                      id="modal-edit-mount-worktrees"
+                      onchange="scheduleBacklogSave()"
+                      style="cursor: pointer; accent-color: var(--accent)"
+                    />
+                    <label
+                      for="modal-edit-mount-worktrees"
+                      class="text-xs text-v-secondary"
+                      style="cursor: pointer"
+                      >Share code with siblings
+                      <span
+                        class="hint-trigger"
+                        style="
+                          margin-left: 4px;
+                          cursor: help;
+                          font-size: 11px;
+                          color: var(--text-muted);
+                        "
+                        >?<span class="hint-tooltip"
+                          >Mount other in-progress worktrees into this task's
+                          container as read-only paths, so the agent can
+                          reference their code without modifying it.</span
+                        ></span
+                      ></label
+                    >
+                  </div>
+                  <details class="mt-2">
+                    <summary
+                      class="text-xs text-v-muted"
+                      style="cursor: pointer"
+                    >
+                      Budget limits (optional)
+                    </summary>
+                    <div
+                      class="mt-2"
+                      style="
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 8px;
+                      "
+                    >
+                      <div
+                        style="display: flex; flex-direction: column; gap: 3px"
+                      >
+                        <label
+                          for="modal-edit-max-cost-usd"
+                          class="text-xs text-v-muted"
+                          >Cost limit (USD)</label
+                        >
+                        <input
+                          type="number"
+                          id="modal-edit-max-cost-usd"
+                          min="0"
+                          step="0.01"
+                          placeholder="0 = unlimited"
+                          class="field text-xs"
+                          style="width: 100%"
+                          onchange="scheduleBacklogSave()"
+                        />
+                      </div>
+                      <div
+                        style="display: flex; flex-direction: column; gap: 3px"
+                      >
+                        <label
+                          for="modal-edit-max-input-tokens"
+                          class="text-xs text-v-muted"
+                          >Input token limit</label
+                        >
+                        <input
+                          type="number"
+                          id="modal-edit-max-input-tokens"
+                          min="0"
+                          step="1000"
+                          placeholder="0 = unlimited"
+                          class="field text-xs"
+                          style="width: 100%"
+                          onchange="scheduleBacklogSave()"
+                        />
+                      </div>
+                    </div>
+                  </details>
+                  <details class="mt-2">
+                    <summary
+                      class="text-xs text-v-muted"
+                      style="cursor: pointer"
+                    >
+                      Per-activity sandbox overrides (optional)
+                    </summary>
+                    <div
+                      class="mt-2"
+                      style="
+                        border: 1px solid var(--border);
+                        border-radius: 8px;
+                        padding: 8px;
+                        display: grid;
+                        gap: 6px;
+                      "
+                    >
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted">Implementation</span
+                        ><select
+                          id="modal-edit-sandbox-implementation"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted">Testing</span
+                        ><select
+                          id="modal-edit-sandbox-testing"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted">Refinement</span
+                        ><select
+                          id="modal-edit-sandbox-refinement"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted"
+                          >Title generation</span
+                        ><select
+                          id="modal-edit-sandbox-title"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted"
+                          >Oversight summary</span
+                        ><select
+                          id="modal-edit-sandbox-oversight"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted">Commit message</span
+                        ><select
+                          id="modal-edit-sandbox-commit_message"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: 140px 1fr;
+                          gap: 8px;
+                          align-items: center;
+                        "
+                      >
+                        <span class="text-xs text-v-muted">Idea agent</span
+                        ><select
+                          id="modal-edit-sandbox-idea_agent"
+                          class="select text-xs"
+                          onchange="scheduleBacklogSave()"
+                          data-sandbox-select="true"
+                        ></select>
+                      </div>
+                    </div>
+                  </details>
+                  <div class="mt-2" id="modal-edit-depends-on-row">
+                    <label
+                      class="text-xs text-v-muted"
+                      style="display: block; margin-bottom: 4px"
+                      >Depends on</label
+                    >
+                    <div
+                      id="modal-edit-depends-on-picker"
+                      class="dep-picker"
+                      data-onchange="scheduleBacklogSave"
                     >
                       <button
                         type="button"
-                        id="copy-prompt-btn"
-                        onclick="copyModalText('prompt')"
-                        class="btn-icon"
-                        title="Copy to clipboard"
+                        class="dep-picker-trigger"
+                        onclick="
+                          toggleDepPicker('modal-edit-depends-on-picker')
+                        "
                       >
+                        <div class="dep-picker-chips">
+                          <span class="dep-picker-placeholder">None</span>
+                        </div>
                         <svg
+                          class="dep-picker-chevron"
                           width="12"
                           height="12"
                           viewBox="0 0 24 24"
@@ -161,1112 +587,528 @@
                           stroke-linecap="round"
                           stroke-linejoin="round"
                         >
-                          <rect
-                            x="9"
-                            y="9"
-                            width="13"
-                            height="13"
-                            rx="2"
-                            ry="2"
-                          ></rect>
-                          <path
-                            d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-                          ></path>
+                          <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
-                        Copy
                       </button>
-                      <button
-                        type="button"
-                        id="toggle-prompt-btn"
-                        onclick="toggleModalSection('prompt')"
-                        class="btn-icon"
-                      >
-                        Raw
-                      </button>
+                      <div class="dep-picker-dropdown" style="display: none">
+                        <input
+                          class="dep-picker-search"
+                          type="text"
+                          placeholder="Filter tasks…"
+                          oninput="filterDepPicker(this)"
+                        />
+                        <div class="dep-picker-list"></div>
+                      </div>
                     </div>
                   </div>
-                  <!-- Read-only spec (non-backlog) -->
+                  <span
+                    id="modal-edit-status"
+                    class="text-xs text-v-muted"
+                  ></span>
+                </div>
+
+                <!-- Tags (backlog only, inside settings) -->
+                <div id="modal-backlog-tags" class="hidden mb-4">
+                  <label
+                    class="text-xs text-v-muted"
+                    style="display: block; margin-bottom: 4px"
+                    >Tags</label
+                  >
                   <div
-                    id="modal-prompt-rendered"
-                    class="code-block mb-4 prose-content hidden"
+                    id="modal-edit-tag-input"
+                    data-onchange="scheduleBacklogSave"
                   ></div>
-                  <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
-                  <!-- Editable spec (backlog): edit + preview views -->
-                  <textarea
-                    id="modal-edit-prompt"
-                    rows="10"
-                    class="field mb-4 hidden editable-field"
-                    style="font-family: monospace; font-size: 12px"
-                  ></textarea>
-                  <div
-                    id="modal-edit-prompt-preview"
-                    class="code-block mb-4 prose-content hidden editable-preview"
-                  ></div>
+                </div>
 
-                  <!-- Prompt history (collapsible) -->
-                  <div id="modal-history-section" class="hidden mb-4">
-                    <details>
-                      <summary
-                        class="text-sm font-medium text-v-muted"
-                        style="cursor: pointer"
-                      >
-                        Prompt History
-                      </summary>
-                      <div id="modal-history-list" class="mt-2 space-y-2"></div>
-                    </details>
-                  </div>
+                <!-- Start section (backlog only) -->
+                <div id="modal-start-section" class="hidden mb-4">
+                  <button
+                    type="button"
+                    onclick="startTask()"
+                    class="btn btn-accent"
+                    style="width: 100%"
+                  >
+                    &#9654; Start task
+                  </button>
+                </div>
 
-                  <!-- Retry history (collapsible) -->
-                  <div id="modal-retry-history-section" class="hidden mb-4">
-                    <details>
-                      <summary
-                        class="text-sm font-medium text-v-muted"
-                        style="cursor: pointer"
-                      >
-                        Retry History
-                      </summary>
-                      <div
-                        id="modal-retry-history-list"
-                        class="mt-2 space-y-2"
-                      ></div>
-                    </details>
-                  </div>
-
-                  <!-- Dependencies -->
-                  <div id="modal-dependencies" class="hidden mb-4">
-                    <h3
-                      class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2"
-                    >
-                      Blocked by
-                    </h3>
-                    <div
-                      id="modal-dependencies-list"
-                      class="flex flex-col gap-1"
-                    ></div>
-                    <div
-                      id="modal-dependencies-summary"
-                      class="text-xs text-v-muted mt-1"
-                    ></div>
-                  </div>
-
-                  <!-- Settings for backlog tasks (hidden for non-backlog) -->
-                  <div id="modal-backlog-settings" class="hidden mb-4">
-                    <h3 class="section-title">Settings</h3>
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <label
-                        for="modal-edit-sandbox"
-                        class="text-xs text-v-muted"
-                        >Sandbox</label
-                      >
-                      <select
-                        id="modal-edit-sandbox"
-                        class="select"
-                        onchange="scheduleBacklogSave()"
-                        data-sandbox-select="true"
-                      >
-                        <option value="">Default</option>
-                      </select>
-                      <label
-                        for="modal-edit-timeout"
-                        class="text-xs text-v-muted"
-                        >Timeout</label
-                      >
-                      <select id="modal-edit-timeout" class="select">
-                        <option value="5">5 min</option>
-                        <option value="15">15 min</option>
-                        <option value="30">30 min</option>
-                        <option value="60" selected>1 hour</option>
-                        <option value="120">2 hours</option>
-                        <option value="360">6 hours</option>
-                        <option value="720">12 hours</option>
-                        <option value="1440">24 hours</option>
-                      </select>
-                    </div>
-                    <div
-                      style="
-                        display: flex;
-                        flex-direction: column;
-                        gap: 3px;
-                        margin-top: 8px;
-                      "
-                    >
-                      <label
-                        for="modal-edit-model-override"
-                        class="text-xs text-v-muted"
-                        >Model override (optional)</label
-                      >
-                      <input
-                        type="text"
-                        id="modal-edit-model-override"
-                        class="field text-xs"
-                        style="width: 100%"
-                        placeholder="default from global config"
-                        onchange="scheduleBacklogSave()"
-                        oninput="scheduleBacklogSave()"
-                      />
-                    </div>
-                    <div
-                      style="
-                        display: flex;
-                        flex-direction: column;
-                        gap: 3px;
-                        margin-top: 8px;
-                      "
-                    >
-                      <label
-                        for="modal-edit-scheduled-at"
-                        class="text-xs text-v-muted"
-                        >Schedule start (optional)</label
-                      >
-                      <input
-                        type="datetime-local"
-                        id="modal-edit-scheduled-at"
-                        class="field text-xs"
-                        style="width: 100%"
-                        title="Leave empty to run immediately"
-                        onchange="scheduleBacklogSave()"
-                      />
-                    </div>
-                    <div
-                      id="modal-edit-resume-row"
-                      class="hidden flex items-center gap-2 mt-2"
-                    >
-                      <input
-                        type="checkbox"
-                        id="modal-edit-resume"
-                        onchange="saveResumeOption(this.checked)"
-                        style="cursor: pointer; accent-color: var(--accent)"
-                      />
-                      <label
-                        for="modal-edit-resume"
-                        class="text-xs text-v-secondary"
-                        style="cursor: pointer"
-                        >Resume previous session</label
-                      >
-                    </div>
-                    <div class="flex items-center gap-2 mt-2">
-                      <input
-                        type="checkbox"
-                        id="modal-edit-mount-worktrees"
-                        onchange="scheduleBacklogSave()"
-                        style="cursor: pointer; accent-color: var(--accent)"
-                      />
-                      <label
-                        for="modal-edit-mount-worktrees"
-                        class="text-xs text-v-secondary"
-                        style="cursor: pointer"
-                        >Share code with siblings
-                        <span
-                          class="hint-trigger"
-                          style="
-                            margin-left: 4px;
-                            cursor: help;
-                            font-size: 11px;
-                            color: var(--text-muted);
-                          "
-                          >?<span class="hint-tooltip"
-                            >Mount other in-progress worktrees into this task's
-                            container as read-only paths, so the agent can
-                            reference their code without modifying it.</span
-                          ></span
-                        ></label
-                      >
-                    </div>
-                    <details class="mt-2">
-                      <summary
-                        class="text-xs text-v-muted"
-                        style="cursor: pointer"
-                      >
-                        Budget limits (optional)
-                      </summary>
-                      <div
-                        class="mt-2"
-                        style="
-                          display: grid;
-                          grid-template-columns: 1fr 1fr;
-                          gap: 8px;
-                        "
-                      >
-                        <div
-                          style="
-                            display: flex;
-                            flex-direction: column;
-                            gap: 3px;
-                          "
-                        >
-                          <label
-                            for="modal-edit-max-cost-usd"
-                            class="text-xs text-v-muted"
-                            >Cost limit (USD)</label
-                          >
-                          <input
-                            type="number"
-                            id="modal-edit-max-cost-usd"
-                            min="0"
-                            step="0.01"
-                            placeholder="0 = unlimited"
-                            class="field text-xs"
-                            style="width: 100%"
-                            onchange="scheduleBacklogSave()"
-                          />
-                        </div>
-                        <div
-                          style="
-                            display: flex;
-                            flex-direction: column;
-                            gap: 3px;
-                          "
-                        >
-                          <label
-                            for="modal-edit-max-input-tokens"
-                            class="text-xs text-v-muted"
-                            >Input token limit</label
-                          >
-                          <input
-                            type="number"
-                            id="modal-edit-max-input-tokens"
-                            min="0"
-                            step="1000"
-                            placeholder="0 = unlimited"
-                            class="field text-xs"
-                            style="width: 100%"
-                            onchange="scheduleBacklogSave()"
-                          />
-                        </div>
-                      </div>
-                    </details>
-                    <details class="mt-2">
-                      <summary
-                        class="text-xs text-v-muted"
-                        style="cursor: pointer"
-                      >
-                        Per-activity sandbox overrides (optional)
-                      </summary>
-                      <div
-                        class="mt-2"
-                        style="
-                          border: 1px solid var(--border);
-                          border-radius: 8px;
-                          padding: 8px;
-                          display: grid;
-                          gap: 6px;
-                        "
-                      >
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted"
-                            >Implementation</span
-                          ><select
-                            id="modal-edit-sandbox-implementation"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted">Testing</span
-                          ><select
-                            id="modal-edit-sandbox-testing"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted">Refinement</span
-                          ><select
-                            id="modal-edit-sandbox-refinement"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted"
-                            >Title generation</span
-                          ><select
-                            id="modal-edit-sandbox-title"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted"
-                            >Oversight summary</span
-                          ><select
-                            id="modal-edit-sandbox-oversight"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted"
-                            >Commit message</span
-                          ><select
-                            id="modal-edit-sandbox-commit_message"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                        <div
-                          style="
-                            display: grid;
-                            grid-template-columns: 140px 1fr;
-                            gap: 8px;
-                            align-items: center;
-                          "
-                        >
-                          <span class="text-xs text-v-muted">Idea agent</span
-                          ><select
-                            id="modal-edit-sandbox-idea_agent"
-                            class="select text-xs"
-                            onchange="scheduleBacklogSave()"
-                            data-sandbox-select="true"
-                          ></select>
-                        </div>
-                      </div>
-                    </details>
-                    <div class="mt-2" id="modal-edit-depends-on-row">
-                      <label
-                        class="text-xs text-v-muted"
-                        style="display: block; margin-bottom: 4px"
-                        >Depends on</label
-                      >
-                      <div
-                        id="modal-edit-depends-on-picker"
-                        class="dep-picker"
-                        data-onchange="scheduleBacklogSave"
-                      >
-                        <button
-                          type="button"
-                          class="dep-picker-trigger"
-                          onclick="
-                            toggleDepPicker('modal-edit-depends-on-picker')
-                          "
-                        >
-                          <div class="dep-picker-chips">
-                            <span class="dep-picker-placeholder">None</span>
-                          </div>
-                          <svg
-                            class="dep-picker-chevron"
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          >
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                          </svg>
-                        </button>
-                        <div class="dep-picker-dropdown" style="display: none">
-                          <input
-                            class="dep-picker-search"
-                            type="text"
-                            placeholder="Filter tasks…"
-                            oninput="filterDepPicker(this)"
-                          />
-                          <div class="dep-picker-list"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <span
-                      id="modal-edit-status"
-                      class="text-xs text-v-muted"
-                    ></span>
-                  </div>
-
-                  <!-- Tags (backlog only, inside settings) -->
-                  <div id="modal-backlog-tags" class="hidden mb-4">
-                    <label
-                      class="text-xs text-v-muted"
-                      style="display: block; margin-bottom: 4px"
-                      >Tags</label
-                    >
-                    <div
-                      id="modal-edit-tag-input"
-                      data-onchange="scheduleBacklogSave"
-                    ></div>
-                  </div>
-
-                  <!-- Start section (backlog only) -->
-                  <div id="modal-start-section" class="hidden mb-4">
+                <!-- Resume section for failed tasks with session_id -->
+                <div id="modal-resume-section" class="hidden mb-4">
+                  <h3 class="section-title">Resume Session</h3>
+                  <p class="text-sm text-v-secondary mb-2">
+                    This task has an active session. Resume to continue from
+                    where it left off with an extended timeout.
+                  </p>
+                  <div class="flex items-center gap-2">
                     <button
                       type="button"
-                      onclick="startTask()"
-                      class="btn btn-accent"
-                      style="width: 100%"
+                      onclick="resumeTask()"
+                      class="btn btn-green"
                     >
-                      &#9654; Start task
+                      Resume
+                    </button>
+                    <label
+                      for="modal-resume-timeout"
+                      class="text-xs text-v-muted"
+                      >Timeout</label
+                    >
+                    <select id="modal-resume-timeout" class="select">
+                      <option value="5">5 min</option>
+                      <option value="15">15 min</option>
+                      <option value="30">30 min</option>
+                      <option value="60" selected>1 hour</option>
+                      <option value="120">2 hours</option>
+                      <option value="360">6 hours</option>
+                      <option value="720">12 hours</option>
+                      <option value="1440">24 hours</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <!-- end spec section A -->
+
+              <div data-main-tab-section="activity">
+                <div id="modal-summary-section" class="hidden mb-4">
+                  <!-- Implementation / Testing sub-tabs. Testing button
+                         stays hidden until openModal detects test data. -->
+                  <div class="left-panel-tabs activity-sub-tabs">
+                    <button
+                      type="button"
+                      id="left-tab-implementation"
+                      onclick="setLeftTab('implementation')"
+                      class="left-tab active"
+                    >
+                      Implementation
+                    </button>
+                    <button
+                      type="button"
+                      id="left-tab-testing"
+                      onclick="setLeftTab('testing')"
+                      class="left-tab hidden"
+                    >
+                      Testing
                     </button>
                   </div>
 
-                  <!-- Resume section for failed tasks with session_id -->
-                  <div id="modal-resume-section" class="hidden mb-4">
-                    <h3 class="section-title">Resume Session</h3>
-                    <p class="text-sm text-v-secondary mb-2">
-                      This task has an active session. Resume to continue from
-                      where it left off with an extended timeout.
-                    </p>
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onclick="resumeTask()"
-                        class="btn btn-green"
-                      >
-                        Resume
-                      </button>
-                      <label
-                        for="modal-resume-timeout"
-                        class="text-xs text-v-muted"
-                        >Timeout</label
-                      >
-                      <select id="modal-resume-timeout" class="select">
-                        <option value="5">5 min</option>
-                        <option value="15">15 min</option>
-                        <option value="30">30 min</option>
-                        <option value="60" selected>1 hour</option>
-                        <option value="120">2 hours</option>
-                        <option value="360">6 hours</option>
-                        <option value="720">12 hours</option>
-                        <option value="1440">24 hours</option>
-                      </select>
+                  <!-- Implementation agent: turns, then oversight below. -->
+                  <section
+                    id="left-panel-implementation"
+                    class="activity-agent"
+                  >
+                    <div class="activity-block">
+                      <div class="activity-block__label">Turns</div>
+                      <div id="modal-results-list"></div>
                     </div>
-                  </div>
-                </div>
-                <!-- end spec section A -->
-
-                <div data-main-tab-section="activity">
-                  <div id="modal-summary-section" class="hidden mb-4">
-                    <!-- Implementation / Testing sub-tabs. Testing button
-                         stays hidden until openModal detects test data. -->
-                    <div class="left-panel-tabs activity-sub-tabs">
-                      <button
-                        type="button"
-                        id="left-tab-implementation"
-                        onclick="setLeftTab('implementation')"
-                        class="left-tab active"
-                      >
-                        Implementation
-                      </button>
-                      <button
-                        type="button"
-                        id="left-tab-testing"
-                        onclick="setLeftTab('testing')"
-                        class="left-tab hidden"
-                      >
-                        Testing
-                      </button>
-                    </div>
-
-                    <!-- Implementation agent: turns, then oversight below. -->
-                    <section
-                      id="left-panel-implementation"
-                      class="activity-agent"
-                    >
-                      <div class="activity-block">
-                        <div class="activity-block__label">Turns</div>
-                        <div id="modal-results-list"></div>
-                      </div>
-                      <div class="activity-block activity-block--oversight">
-                        <div class="activity-block__label-row">
-                          <span class="activity-block__label">Oversight</span>
-                          <div class="logs-tabs">
-                            <button
-                              type="button"
-                              id="logs-tab-oversight"
-                              onclick="setLogsMode('oversight')"
-                              class="logs-tab"
-                            >
-                              Oversight
-                            </button>
-                            <button
-                              type="button"
-                              id="logs-tab-pretty"
-                              onclick="setLogsMode('pretty')"
-                              class="logs-tab active"
-                            >
-                              Pretty
-                            </button>
-                            <button
-                              type="button"
-                              id="logs-tab-raw"
-                              onclick="setLogsMode('raw')"
-                              class="logs-tab"
-                            >
-                              Raw
-                            </button>
-                          </div>
-                        </div>
-                        <div
-                          id="modal-logs-section"
-                          class="activity-oversight-box"
-                        >
-                          <div
-                            id="log-search-bar"
-                            style="
-                              display: flex;
-                              align-items: center;
-                              gap: 6px;
-                              padding: 4px 8px;
-                              background: #1a1917;
-                              border-radius: 8px 8px 0 0;
-                            "
+                    <div class="activity-block activity-block--oversight">
+                      <div class="activity-block__label-row">
+                        <span class="activity-block__label">Oversight</span>
+                        <div class="logs-tabs">
+                          <button
+                            type="button"
+                            id="logs-tab-oversight"
+                            onclick="setLogsMode('oversight')"
+                            class="logs-tab"
                           >
-                            <input
-                              id="log-search-input"
-                              type="search"
-                              placeholder="Filter logs…"
-                              style="
-                                flex: 1;
-                                background: transparent;
-                                border: 1px solid #444;
-                                border-radius: 4px;
-                                padding: 2px 6px;
-                                font-size: 12px;
-                                color: #cdd1d6;
-                                outline: none;
-                              "
-                              oninput="onLogSearchInput(this.value)"
-                            />
-                            <span
-                              id="log-search-count"
-                              style="
-                                font-size: 11px;
-                                color: #888;
-                                white-space: nowrap;
-                              "
-                            ></span>
-                          </div>
-                          <pre id="modal-logs" class="logs-block"></pre>
+                            Oversight
+                          </button>
+                          <button
+                            type="button"
+                            id="logs-tab-pretty"
+                            onclick="setLogsMode('pretty')"
+                            class="logs-tab active"
+                          >
+                            Pretty
+                          </button>
+                          <button
+                            type="button"
+                            id="logs-tab-raw"
+                            onclick="setLogsMode('raw')"
+                            class="logs-tab"
+                          >
+                            Raw
+                          </button>
                         </div>
-                      </div>
-                    </section>
-
-                    <!-- Testing agent: same shape; mutually exclusive with
-                         Implementation via the sub-tab switcher. -->
-                    <section
-                      id="left-panel-testing"
-                      class="activity-agent hidden"
-                    >
-                      <div class="activity-block">
-                        <div class="activity-block__label">Turns</div>
-                        <div id="modal-test-results-list"></div>
-                      </div>
-                      <div class="activity-block activity-block--oversight">
-                        <div class="activity-block__label-row">
-                          <span class="activity-block__label">Oversight</span>
-                          <div class="logs-tabs">
-                            <button
-                              type="button"
-                              id="test-logs-tab-oversight"
-                              onclick="setTestLogsMode('oversight')"
-                              class="logs-tab"
-                            >
-                              Oversight
-                            </button>
-                            <button
-                              type="button"
-                              id="test-logs-tab-pretty"
-                              onclick="setTestLogsMode('pretty')"
-                              class="logs-tab active"
-                            >
-                              Pretty
-                            </button>
-                            <button
-                              type="button"
-                              id="test-logs-tab-raw"
-                              onclick="setTestLogsMode('raw')"
-                              class="logs-tab"
-                            >
-                              Raw
-                            </button>
-                          </div>
-                        </div>
-                        <div
-                          id="modal-test-logs-section"
-                          class="activity-oversight-box"
-                        >
-                          <pre id="modal-test-logs" class="logs-block"></pre>
-                        </div>
-                      </div>
-                    </section>
-                  </div>
-                </div>
-                <!-- end activity section (left) -->
-
-                <div data-main-tab-section="events">
-                  <!-- Usage stats -->
-                  <div id="modal-usage-section" class="hidden mb-4">
-                    <h3 class="section-title">Usage</h3>
-                    <div class="usage-grid">
-                      <div class="flex justify-between">
-                        <span class="usage-label">Input tokens</span
-                        ><span
-                          id="modal-usage-input"
-                          class="usage-value"
-                        ></span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="usage-label">Output tokens</span
-                        ><span
-                          id="modal-usage-output"
-                          class="usage-value"
-                        ></span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="usage-label">Cache read</span
-                        ><span
-                          id="modal-usage-cache-read"
-                          class="usage-value"
-                        ></span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="usage-label">Cache creation</span
-                        ><span
-                          id="modal-usage-cache-creation"
-                          class="usage-value"
-                        ></span>
                       </div>
                       <div
-                        class="flex justify-between"
-                        style="
-                          grid-column: span 2;
-                          padding-top: 4px;
-                          border-top: 1px solid var(--border);
-                          margin-top: 4px;
-                        "
+                        id="modal-logs-section"
+                        class="activity-oversight-box"
                       >
-                        <span class="usage-label">Total cost</span
-                        ><span id="modal-usage-cost" class="usage-value"></span>
+                        <div
+                          id="log-search-bar"
+                          style="
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 4px 8px;
+                            background: #1a1917;
+                            border-radius: 8px 8px 0 0;
+                          "
+                        >
+                          <input
+                            id="log-search-input"
+                            type="search"
+                            placeholder="Filter logs…"
+                            style="
+                              flex: 1;
+                              background: transparent;
+                              border: 1px solid #444;
+                              border-radius: 4px;
+                              padding: 2px 6px;
+                              font-size: 12px;
+                              color: #cdd1d6;
+                              outline: none;
+                            "
+                            oninput="onLogSearchInput(this.value)"
+                          />
+                          <span
+                            id="log-search-count"
+                            style="
+                              font-size: 11px;
+                              color: #888;
+                              white-space: nowrap;
+                            "
+                          ></span>
+                        </div>
+                        <pre id="modal-logs" class="logs-block"></pre>
                       </div>
                     </div>
-                    <!-- Budget row: shown when a budget is configured -->
+                  </section>
+
+                  <!-- Testing agent: same shape; mutually exclusive with
+                         Implementation via the sub-tab switcher. -->
+                  <section
+                    id="left-panel-testing"
+                    class="activity-agent hidden"
+                  >
+                    <div class="activity-block">
+                      <div class="activity-block__label">Turns</div>
+                      <div id="modal-test-results-list"></div>
+                    </div>
+                    <div class="activity-block activity-block--oversight">
+                      <div class="activity-block__label-row">
+                        <span class="activity-block__label">Oversight</span>
+                        <div class="logs-tabs">
+                          <button
+                            type="button"
+                            id="test-logs-tab-oversight"
+                            onclick="setTestLogsMode('oversight')"
+                            class="logs-tab"
+                          >
+                            Oversight
+                          </button>
+                          <button
+                            type="button"
+                            id="test-logs-tab-pretty"
+                            onclick="setTestLogsMode('pretty')"
+                            class="logs-tab active"
+                          >
+                            Pretty
+                          </button>
+                          <button
+                            type="button"
+                            id="test-logs-tab-raw"
+                            onclick="setTestLogsMode('raw')"
+                            class="logs-tab"
+                          >
+                            Raw
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        id="modal-test-logs-section"
+                        class="activity-oversight-box"
+                      >
+                        <pre id="modal-test-logs" class="logs-block"></pre>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+              <!-- end activity section (left) -->
+
+              <div data-main-tab-section="events">
+                <!-- Usage stats -->
+                <div id="modal-usage-section" class="hidden mb-4">
+                  <h3 class="section-title">Usage</h3>
+                  <div class="usage-grid">
+                    <div class="flex justify-between">
+                      <span class="usage-label">Input tokens</span
+                      ><span id="modal-usage-input" class="usage-value"></span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Output tokens</span
+                      ><span id="modal-usage-output" class="usage-value"></span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Cache read</span
+                      ><span
+                        id="modal-usage-cache-read"
+                        class="usage-value"
+                      ></span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Cache creation</span
+                      ><span
+                        id="modal-usage-cache-creation"
+                        class="usage-value"
+                      ></span>
+                    </div>
                     <div
-                      id="modal-usage-budget-wrap"
-                      class="hidden"
+                      class="flex justify-between"
                       style="
-                        margin-top: 8px;
-                        padding: 6px 8px;
-                        border-radius: 6px;
-                        background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
-                        font-size: 12px;
+                        grid-column: span 2;
+                        padding-top: 4px;
+                        border-top: 1px solid var(--border);
+                        margin-top: 4px;
                       "
                     >
-                      <span class="usage-label" style="margin-right: 8px"
-                        >Budget</span
-                      ><span id="modal-usage-budget" class="usage-value"></span>
-                    </div>
-                    <!-- Per-sub-agent breakdown (shown when breakdown data is available) -->
-                    <div
-                      id="modal-usage-breakdown"
-                      class="hidden"
-                      style="margin-top: 8px"
-                    >
-                      <div
-                        style="
-                          font-size: 11px;
-                          color: var(--text-muted);
-                          text-transform: uppercase;
-                          letter-spacing: 0.05em;
-                          margin-bottom: 4px;
-                        "
-                      >
-                        Breakdown
-                      </div>
-                      <div id="modal-usage-breakdown-rows"></div>
+                      <span class="usage-label">Total cost</span
+                      ><span id="modal-usage-cost" class="usage-value"></span>
                     </div>
                   </div>
-                </div>
-                <!-- end events section A (usage) -->
-
-                <div data-main-tab-section="spec">
-                  <!-- Budget-exceeded banner (shown when task is waiting due to budget limit) -->
+                  <!-- Budget row: shown when a budget is configured -->
                   <div
-                    id="modal-budget-exceeded-banner"
-                    class="hidden mb-4"
+                    id="modal-usage-budget-wrap"
+                    class="hidden"
                     style="
-                      padding: 10px 14px;
-                      border-radius: 8px;
-                      background: #fef3c7;
-                      border: 1px solid #f59e0b;
+                      margin-top: 8px;
+                      padding: 6px 8px;
+                      border-radius: 6px;
+                      background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+                      font-size: 12px;
                     "
+                  >
+                    <span class="usage-label" style="margin-right: 8px"
+                      >Budget</span
+                    ><span id="modal-usage-budget" class="usage-value"></span>
+                  </div>
+                  <!-- Per-sub-agent breakdown (shown when breakdown data is available) -->
+                  <div
+                    id="modal-usage-breakdown"
+                    class="hidden"
+                    style="margin-top: 8px"
                   >
                     <div
                       style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 8px;
-                        flex-wrap: wrap;
+                        font-size: 11px;
+                        color: var(--text-muted);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        margin-bottom: 4px;
                       "
                     >
-                      <div>
-                        <span
-                          style="
-                            font-size: 13px;
-                            font-weight: 600;
-                            color: #92400e;
-                          "
-                          >&#9888; Budget limit reached</span
-                        >
-                        <div
-                          id="modal-budget-exceeded-msg"
-                          style="
-                            font-size: 12px;
-                            color: #78350f;
-                            margin-top: 2px;
-                          "
-                        ></div>
-                      </div>
-                      <button
-                        type="button"
-                        onclick="openRaiseLimitInline()"
-                        class="btn"
-                        style="
-                          font-size: 12px;
-                          padding: 4px 10px;
-                          background: #f59e0b;
-                          color: #fff;
-                          border: none;
-                        "
-                      >
-                        Raise limit
-                      </button>
+                      Breakdown
                     </div>
+                    <div id="modal-usage-breakdown-rows"></div>
                   </div>
-                  <!-- Feedback form for waiting tasks -->
-                  <div id="modal-feedback-section" class="hidden mb-4">
-                    <h3 class="section-title">Provide Feedback</h3>
+                </div>
+              </div>
+              <!-- end events section A (usage) -->
+
+              <div data-main-tab-section="spec">
+                <!-- Budget-exceeded banner (shown when task is waiting due to budget limit) -->
+                <div
+                  id="modal-budget-exceeded-banner"
+                  class="hidden mb-4"
+                  style="
+                    padding: 10px 14px;
+                    border-radius: 8px;
+                    background: #fef3c7;
+                    border: 1px solid #f59e0b;
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      gap: 8px;
+                      flex-wrap: wrap;
+                    "
+                  >
+                    <div>
+                      <span
+                        style="
+                          font-size: 13px;
+                          font-weight: 600;
+                          color: #92400e;
+                        "
+                        >&#9888; Budget limit reached</span
+                      >
+                      <div
+                        id="modal-budget-exceeded-msg"
+                        style="font-size: 12px; color: #78350f; margin-top: 2px"
+                      ></div>
+                    </div>
+                    <button
+                      type="button"
+                      onclick="openRaiseLimitInline()"
+                      class="btn"
+                      style="
+                        font-size: 12px;
+                        padding: 4px 10px;
+                        background: #f59e0b;
+                        color: #fff;
+                        border: none;
+                      "
+                    >
+                      Raise limit
+                    </button>
+                  </div>
+                </div>
+                <!-- Feedback form for waiting tasks -->
+                <div id="modal-feedback-section" class="hidden mb-4">
+                  <h3 class="section-title">Provide Feedback</h3>
+                  <textarea
+                    id="modal-feedback"
+                    rows="3"
+                    placeholder="Type your response..."
+                    class="field"
+                  ></textarea>
+                  <div class="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onclick="submitFeedback()"
+                      class="btn btn-yellow"
+                    >
+                      Submit Feedback
+                    </button>
+                    <button
+                      type="button"
+                      onclick="completeTask()"
+                      class="btn btn-green"
+                    >
+                      Mark as Done
+                    </button>
+                    <button
+                      type="button"
+                      id="modal-test-btn"
+                      onclick="toggleTestSection()"
+                      class="btn btn-accent"
+                    >
+                      Test
+                    </button>
+                  </div>
+                  <!-- Test agent sub-section (hidden until Test is clicked) -->
+                  <div
+                    id="modal-test-section"
+                    class="hidden mt-3"
+                    style="
+                      border-top: 1px solid var(--border);
+                      padding-top: 10px;
+                    "
+                  >
+                    <p class="text-xs text-v-secondary mb-2">
+                      Launch a fresh test agent to verify the implementation. It
+                      will inspect the code changes and run any available tests.
+                    </p>
                     <textarea
-                      id="modal-feedback"
+                      id="modal-test-criteria"
                       rows="3"
-                      placeholder="Type your response..."
+                      placeholder="Acceptance criteria (optional) — leave empty to use the original task requirements..."
                       class="field"
                     ></textarea>
                     <div class="flex items-center gap-2 mt-2">
                       <button
                         type="button"
-                        onclick="submitFeedback()"
-                        class="btn btn-yellow"
-                      >
-                        Submit Feedback
-                      </button>
-                      <button
-                        type="button"
-                        onclick="completeTask()"
-                        class="btn btn-green"
-                      >
-                        Mark as Done
-                      </button>
-                      <button
-                        type="button"
-                        id="modal-test-btn"
-                        onclick="toggleTestSection()"
+                        onclick="runTestTask()"
                         class="btn btn-accent"
                       >
-                        Test
+                        Run Test Agent
+                      </button>
+                      <button
+                        type="button"
+                        onclick="toggleTestSection()"
+                        class="btn btn-ghost"
+                      >
+                        Cancel
                       </button>
                     </div>
-                    <!-- Test agent sub-section (hidden until Test is clicked) -->
-                    <div
-                      id="modal-test-section"
-                      class="hidden mt-3"
-                      style="
-                        border-top: 1px solid var(--border);
-                        padding-top: 10px;
-                      "
-                    >
-                      <p class="text-xs text-v-secondary mb-2">
-                        Launch a fresh test agent to verify the implementation.
-                        It will inspect the code changes and run any available
-                        tests.
-                      </p>
-                      <textarea
-                        id="modal-test-criteria"
-                        rows="3"
-                        placeholder="Acceptance criteria (optional) — leave empty to use the original task requirements..."
-                        class="field"
-                      ></textarea>
-                      <div class="flex items-center gap-2 mt-2">
-                        <button
-                          type="button"
-                          onclick="runTestTask()"
-                          class="btn btn-accent"
-                        >
-                          Run Test Agent
-                        </button>
-                        <button
-                          type="button"
-                          onclick="toggleTestSection()"
-                          class="btn btn-ghost"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
                   </div>
+                </div>
 
-                  <!-- Retry section for done/failed/cancelled tasks -->
-                  <div id="modal-retry-section" class="hidden mb-4">
-                    <div class="flex items-center justify-between mb-1">
-                      <h3 class="section-title" style="margin-bottom: 0">
-                        Retry
-                      </h3>
-                      <div id="modal-retry-tabs" class="logs-tabs">
-                        <button
-                          type="button"
-                          class="logs-tab"
-                          onclick="switchEditTab('retry', 'edit')"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          class="logs-tab active"
-                          onclick="switchEditTab('retry', 'preview')"
-                        >
-                          Preview
-                        </button>
-                      </div>
-                    </div>
-                    <textarea
-                      id="modal-retry-prompt"
-                      rows="4"
-                      class="field editable-field spec-field hidden"
-                    ></textarea>
-                    <div
-                      id="modal-retry-prompt-preview"
-                      class="code-block prose-content editable-preview"
-                    ></div>
-                    <div
-                      id="modal-retry-resume-row"
-                      class="hidden flex items-center gap-2 mt-2"
-                    >
-                      <input
-                        type="checkbox"
-                        id="modal-retry-resume"
-                        style="cursor: pointer; accent-color: var(--accent)"
-                      />
-                      <label
-                        for="modal-retry-resume"
-                        class="text-xs text-v-secondary"
-                        style="cursor: pointer"
-                        >Resume previous session</label
+                <!-- Retry section for done/failed/cancelled tasks -->
+                <div id="modal-retry-section" class="hidden mb-4">
+                  <div class="flex items-center justify-between mb-1">
+                    <h3 class="section-title" style="margin-bottom: 0">
+                      Retry
+                    </h3>
+                    <div id="modal-retry-tabs" class="logs-tabs">
+                      <button
+                        type="button"
+                        class="logs-tab"
+                        onclick="switchEditTab('retry', 'edit')"
                       >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        class="logs-tab active"
+                        onclick="switchEditTab('retry', 'preview')"
+                      >
+                        Preview
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onclick="retryTask()"
-                      class="btn btn-accent mt-2"
-                    >
-                      Move to Backlog
-                    </button>
                   </div>
-                </div>
-                <!-- end spec section B (banner/feedback/retry) -->
-
-                <div data-main-tab-section="events">
-                  <!-- Events timeline -->
-                  <h3 class="section-title">Events</h3>
-                  <div id="modal-events" class="space-y-2"></div>
-                </div>
-                <!-- end events section B (timeline) -->
-
-                <div data-main-tab-section="spec">
-                  <!-- Archive section (done tasks only, not yet archived) -->
-                  <div id="modal-archive-section" class="hidden mb-4">
-                    <h3 class="section-title">Archive</h3>
-                    <p class="text-sm text-v-secondary mb-2">
-                      Hide this task from the Done column. It can be restored
-                      from Settings &rarr; Show archived tasks.
-                    </p>
-                    <button
-                      type="button"
-                      onclick="archiveTask()"
-                      class="btn btn-ghost"
-                      style="border: 1px solid var(--border)"
-                    >
-                      Archive task
-                    </button>
-                  </div>
-
-                  <!-- Unarchive section (archived done tasks) -->
-                  <div id="modal-unarchive-section" class="hidden mb-4">
-                    <h3 class="section-title">Archived</h3>
-                    <p class="text-sm text-v-secondary mb-2">
-                      This task is archived and hidden from the Done column by
-                      default.
-                    </p>
-                    <button
-                      type="button"
-                      onclick="unarchiveTask()"
-                      class="btn btn-ghost"
-                      style="border: 1px solid var(--border)"
-                    >
-                      Unarchive task
-                    </button>
-                  </div>
-
-                  <!-- Cancel section (backlog / in_progress / waiting / failed) -->
-                  <div id="modal-cancel-section" class="hidden mb-4">
-                    <h3 class="section-title">Cancel Task</h3>
-                    <p class="text-sm text-v-secondary mb-2">
-                      Discard all prepared changes and move this task to
-                      Cancelled. History and logs are preserved so the task can
-                      be retried later.
-                    </p>
-                    <button
-                      type="button"
-                      id="modal-cancel-btn"
-                      onclick="cancelTask()"
-                      class="btn btn-ghost"
-                      style="border: 1px solid var(--border); color: #a02828"
-                    >
-                      Cancel task
-                    </button>
-                  </div>
-
-                  <!-- Delete button -->
+                  <textarea
+                    id="modal-retry-prompt"
+                    rows="4"
+                    class="field editable-field spec-field hidden"
+                  ></textarea>
                   <div
-                    class="mt-6 pt-4"
-                    style="border-top: 1px solid var(--border)"
-                  >
-                    <button
-                      type="button"
-                      onclick="deleteCurrentTask()"
-                      class="btn-danger"
-                    >
-                      Delete task
-                    </button>
-                  </div>
-                </div>
-                <!-- end spec section C (archive/cancel/delete) -->
-              </div>
-
-              <!-- Right panel: tabbed view for non-backlog tasks -->
-              <div id="modal-right" class="hidden">
-                <div class="right-panel-tabs" data-main-tab-section="activity">
-                  <button
-                    type="button"
-                    id="right-tab-implementation"
-                    onclick="setRightTab('implementation')"
-                    class="right-tab active"
-                  >
-                    Implementation
-                  </button>
-                  <button
-                    type="button"
-                    id="right-tab-testing"
-                    onclick="setRightTab('testing')"
-                    class="right-tab hidden"
-                  >
-                    Testing
-                  </button>
-                  <button
-                    type="button"
-                    id="right-tab-changes"
-                    onclick="setRightTab('changes')"
-                    class="right-tab hidden"
-                  >
-                    Changes
-                  </button>
-                  <button
-                    type="button"
-                    id="right-tab-spans"
-                    onclick="setRightTab('spans')"
-                    class="right-tab hidden"
-                  >
-                    Flamegraph
-                  </button>
-                  <button
-                    type="button"
-                    id="right-tab-timeline"
-                    onclick="setRightTab('timeline')"
-                    class="right-tab hidden"
-                  >
-                    Timeline
-                  </button>
-                </div>
-                <!-- right-panel-implementation / right-panel-testing are now
-                   empty placeholder wrappers. The Implementation + Testing
-                   agent blocks (turns + oversight) live inside
-                   #modal-summary-section above, rendered as a single
-                   vertical flow inside the Activity main tab. -->
-                <div id="right-panel-implementation" class="hidden"></div>
-                <div id="right-panel-testing" class="hidden"></div>
-                <div
-                  id="right-panel-changes"
-                  class="hidden"
-                  data-main-tab-section="changes"
-                >
-                  <div id="modal-diff-behind" class="hidden"></div>
-                  <div id="modal-commit-message" class="hidden"></div>
-                  <div id="modal-diff-files"></div>
-                </div>
-                <div
-                  id="right-panel-spans"
-                  class="hidden"
-                  data-main-tab-section="flamegraph"
-                >
-                  <div
-                    id="modal-flamegraph-container"
-                    style="padding: 8px"
+                    id="modal-retry-prompt-preview"
+                    class="code-block prose-content editable-preview"
                   ></div>
+                  <div
+                    id="modal-retry-resume-row"
+                    class="hidden flex items-center gap-2 mt-2"
+                  >
+                    <input
+                      type="checkbox"
+                      id="modal-retry-resume"
+                      style="cursor: pointer; accent-color: var(--accent)"
+                    />
+                    <label
+                      for="modal-retry-resume"
+                      class="text-xs text-v-secondary"
+                      style="cursor: pointer"
+                      >Resume previous session</label
+                    >
+                  </div>
+                  <button
+                    type="button"
+                    onclick="retryTask()"
+                    class="btn btn-accent mt-2"
+                  >
+                    Move to Backlog
+                  </button>
                 </div>
-                <div
-                  id="right-panel-timeline"
-                  class="hidden"
-                  data-main-tab-section="timeline"
-                >
-                  <div id="modal-timeline-chart" style="padding: 8px"></div>
-                </div>
+              </div>
+              <!-- end spec section B (banner/feedback/retry) -->
+
+              <div data-main-tab-section="events">
+                <!-- Events timeline -->
+                <h3 class="section-title">Events</h3>
+                <div id="modal-events" class="space-y-2"></div>
+              </div>
+              <!-- end events section B (timeline) -->
+
+              <!-- Changes / Flamegraph / Timeline: each has its own top-level
+                   main tab. Visibility is driven by the data-main-tab-section
+                   CSS rules keyed on #modal[data-main-tab=…]; no JS toggling
+                   needed. The empty Implementation/Testing placeholders and
+                   the legacy right-panel-tabs sub-tab bar were removed — the
+                   main tabs already cover that navigation. -->
+              <div id="right-panel-changes" data-main-tab-section="changes">
+                <div id="modal-diff-behind" class="hidden"></div>
+                <div id="modal-commit-message" class="hidden"></div>
+                <div id="modal-diff-files"></div>
+              </div>
+              <div id="right-panel-spans" data-main-tab-section="flamegraph">
+                <div id="modal-flamegraph-container" style="padding: 8px"></div>
+              </div>
+              <div id="right-panel-timeline" data-main-tab-section="timeline">
+                <div id="modal-timeline-chart" style="padding: 8px"></div>
               </div>
             </div>
             <!-- end modal-main-content -->
@@ -1507,6 +1349,59 @@
             <div id="modal-environment-section" class="mdl-section hidden">
               <div class="mdl-h">Environment</div>
               <dl id="modal-environment-list" class="modal-aside__env"></dl>
+            </div>
+            <!-- Terminal actions: archive/unarchive/cancel/delete. Rendered
+                 as compact aside rows so they read like the rest of the
+                 rail instead of competing with it. Each child keeps its
+                 existing id so modal-core.js can still toggle visibility
+                 based on task status. -->
+            <div class="mdl-section modal-aside__actions">
+              <div class="mdl-h">Actions</div>
+              <div id="modal-archive-section" class="hidden">
+                <button
+                  type="button"
+                  onclick="archiveTask()"
+                  class="aside-action"
+                  title="Hide this task from the Done column"
+                >
+                  <span class="aside-action__label">Archive</span>
+                  <span class="aside-action__hint">hide from Done</span>
+                </button>
+              </div>
+              <div id="modal-unarchive-section" class="hidden">
+                <button
+                  type="button"
+                  onclick="unarchiveTask()"
+                  class="aside-action"
+                  title="Restore this task to the Done column"
+                >
+                  <span class="aside-action__label">Unarchive</span>
+                  <span class="aside-action__hint">restore to Done</span>
+                </button>
+              </div>
+              <div id="modal-cancel-section" class="hidden">
+                <button
+                  type="button"
+                  id="modal-cancel-btn"
+                  onclick="cancelTask()"
+                  class="aside-action aside-action--warn"
+                  title="Discard prepared changes and move task to Cancelled"
+                >
+                  <span class="aside-action__label">Cancel</span>
+                  <span class="aside-action__hint">discard changes</span>
+                </button>
+              </div>
+              <div id="modal-delete-section">
+                <button
+                  type="button"
+                  onclick="deleteCurrentTask()"
+                  class="aside-action aside-action--danger"
+                  title="Permanently delete this task"
+                >
+                  <span class="aside-action__label">Delete</span>
+                  <span class="aside-action__hint">remove permanently</span>
+                </button>
+              </div>
             </div>
           </aside>
         </div>
