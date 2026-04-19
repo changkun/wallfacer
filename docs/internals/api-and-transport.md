@@ -115,12 +115,6 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
-| **Refinement agent** | |
-| `POST /api/tasks/{id}/refine` | Start the refinement sandbox agent for a backlog task |
-| `DELETE /api/tasks/{id}/refine` | Cancel an in-progress refinement agent |
-| `GET /api/tasks/{id}/refine/logs` | Stream live logs from the refinement agent |
-| `POST /api/tasks/{id}/refine/apply` | Apply the refined prompt as the new task spec |
-| `POST /api/tasks/{id}/refine/dismiss` | Dismiss the refinement result without applying it |
 | **Spec tree** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |

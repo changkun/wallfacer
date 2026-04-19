@@ -1204,7 +1204,6 @@ func TestContainerCircuitBreaker(t *testing.T) {
 	}
 }
 
-
 // TestIdeateContainerName_Empty verifies that IdeateContainerName returns empty
 // when no ideation container is running.
 func TestIdeateContainerName_Empty(t *testing.T) {

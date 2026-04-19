@@ -824,5 +824,4 @@ var Routes = []Route{
 		Description: "Switch active organization; clears session and returns a redirect to /login?org_id=<target>.",
 		Tags:        []string{"login"},
 	},
-
 }

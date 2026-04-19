@@ -90,5 +90,4 @@ describe("initSortable", () => {
       body: JSON.stringify({ position: 1 }),
     });
   });
-
 });

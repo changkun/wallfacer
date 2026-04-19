@@ -50,7 +50,7 @@ Start here for the full reading order.
 
 1. Sketch the idea in the planning chat (Plan mode, press **P**).
 2. Issue `/create` (or let the agent emit `/spec-new`) to scaffold a first draft.
-3. Refine with `/refine`, `/impact`, then `/validate`.
+3. Iterate with `/impact`, then `/validate`.
 4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.
 5. When leaves are ready, `/dispatch` to push them to the board with dependency wiring.
 6. After tasks finish, `/review-impl` and `/wrapup` to close out the parent.
