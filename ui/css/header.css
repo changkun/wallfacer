@@ -883,6 +883,68 @@ html.wails-desktop .app-sidebar {
   cursor: pointer;
 }
 
+/* --- Presence (agents + self, above the bottom nav) --- */
+.sb-peers {
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+.sb-peers:empty {
+  display: none;
+}
+.sb-peer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sb-peer .pd {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sb-peer .pd.on {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 20%, transparent);
+}
+.sb-peer .pd.idle {
+  background: var(--warn);
+}
+.sb-peer .pd.off {
+  background: var(--ink-4);
+}
+.sb-peer .pn {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.sb-peer .pw {
+  color: var(--ink-4);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Collapsed sidebar: show only the dots as a compact activity strip. */
+.app-sidebar.collapsed .sb-peers {
+  padding: 6px 0;
+  align-items: center;
+}
+.app-sidebar.collapsed .sb-peer .pn,
+.app-sidebar.collapsed .sb-peer .pw {
+  display: none;
+}
+
 /* --- Latere.ai sign-in (cloud mode, bottom of sidebar) --- */
 .sb-signin {
   padding: 8px 12px;
