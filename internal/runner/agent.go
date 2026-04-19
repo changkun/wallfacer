@@ -157,11 +157,20 @@ func (r *Runner) runAgent(
 		return nil, fmt.Errorf("runAgent: binding for %s has no ParseResult", role.Slug)
 	}
 
-	// Resolve the sandbox for the task+activity using the existing 4-tier
-	// resolver (per-task activity override → per-task sandbox → env file
-	// → Claude). Task-free callers pass task=nil and get Claude.
+	// Resolve the sandbox, newest tier first:
+	//   1. role.Harness — the agent descriptor's explicit harness
+	//      pin (set by user-authored clones). Wins over every
+	//      per-task / env tier so a role marked "codex" always
+	//      reaches Codex.
+	//   2. Per-task per-activity override (SandboxByActivity).
+	//   3. Per-task sandbox.
+	//   4. Env-file per-activity setting.
+	//   5. Env-file default sandbox.
+	//   6. Claude (hardcoded fallback).
 	primary := sandbox.Claude
-	if task != nil {
+	if pin := sandbox.Type(strings.ToLower(strings.TrimSpace(role.Harness))); pin.IsValid() {
+		primary = pin
+	} else if task != nil {
 		primary = r.sandboxForTaskActivity(task, binding.Activity)
 	}
 

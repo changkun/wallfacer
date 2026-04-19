@@ -157,6 +157,56 @@ func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
 	}
 }
 
+// TestRunAgent_HarnessPinOverridesTaskSandbox verifies that an
+// agent descriptor with an explicit Harness pin reaches that
+// harness even when the task itself picks the other one. This is
+// the contract user-authored clones rely on: pinning the role to
+// "codex" should route there regardless of task / env settings.
+func TestRunAgent_HarnessPinOverridesTaskSandbox(t *testing.T) {
+	r, backend, s := newAgentTestRunner(t)
+	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
+
+	// Task pins itself to Claude; the agent role pins itself to Codex.
+	// The role pin must win.
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt: "harness pin", Timeout: 10, Sandbox: sandbox.Claude,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	role := makeTestRole(t, "t-harness-pin", mountNone)
+	role.Harness = "codex"
+
+	res, err := r.runAgent(context.Background(), role, task, "hi", runAgentOpts{})
+	if err != nil {
+		t.Fatalf("runAgent: %v", err)
+	}
+	if res.SandboxUsed != sandbox.Codex {
+		t.Errorf("SandboxUsed = %q, want codex (role.Harness pin)", res.SandboxUsed)
+	}
+}
+
+// TestRunAgent_HarnessPinEmptyInherits confirms the default path
+// is unchanged: an empty Harness pin lets the 4-tier resolver
+// pick the task's sandbox, matching pre-pin behaviour.
+func TestRunAgent_HarnessPinEmptyInherits(t *testing.T) {
+	r, backend, s := newAgentTestRunner(t)
+	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
+
+	task, _ := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt: "inherit", Timeout: 10, Sandbox: sandbox.Codex,
+	})
+	role := makeTestRole(t, "t-harness-empty", mountNone)
+	// role.Harness left empty → inherit from the task's Sandbox.
+	res, err := r.runAgent(context.Background(), role, task, "hi", runAgentOpts{})
+	if err != nil {
+		t.Fatalf("runAgent: %v", err)
+	}
+	if res.SandboxUsed != sandbox.Codex {
+		t.Errorf("SandboxUsed = %q, want codex (task sandbox)", res.SandboxUsed)
+	}
+}
+
 func TestRunAgent_TokenLimitFallback(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{
