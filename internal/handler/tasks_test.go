@@ -2839,6 +2839,8 @@ func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
+	// Drop any previously-cached limit so the handler re-reads the env file.
+	h.cachedMaxParallel.Invalidate()
 
 	// Create two distinct backlog tasks.
 	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "concurrent task one", Timeout: 30, Kind: store.TaskKindTask})
