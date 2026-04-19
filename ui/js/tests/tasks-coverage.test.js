@@ -726,14 +726,15 @@ describe("createTask", () => {
     expect(body.prompt).toBe("Test prompt");
     expect(body.timeout).toBe(30);
     expect(body.mount_worktrees).toBe(true);
-    expect(body.sandbox).toBe("claude");
     expect(body.tags).toEqual(["tag1"]);
     expect(body.max_cost_usd).toBe(5);
     expect(body.max_input_tokens).toBe(1000);
     // Flow picker replaced the old Type picker — POST now carries a
-    // flow slug, and the legacy sandbox_by_activity payload is gone.
+    // flow slug. The sandbox + sandbox_by_activity fields are gone
+    // now that harness choice lives on the agent definition.
     expect(body.flow).toBe("implement");
     expect(body.kind).toBeUndefined();
+    expect(body.sandbox).toBeUndefined();
     expect(body.sandbox_by_activity).toBeUndefined();
 
     // Draft should be cleared

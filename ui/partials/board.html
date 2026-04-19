@@ -88,22 +88,14 @@
         <!-- Tags row: inline, no dedicated label row -->
         <div class="composer__tags" id="new-task-tag-input"></div>
 
-        <!-- Primary execution row: agent, timeout, share-code, all inline.
-             "Agent" replaces the older "Sandbox" label — the user-facing
-             choice is really Claude vs Codex (vs future backends), which
-             carries across container-sandbox and host execution modes. -->
+        <!-- Primary execution row: timeout + share-code.
+             The old Agent (Claude/Codex) dropdown retired now that
+             harness choice lives on the agent definition each flow
+             step references — clone an agent and set its Harness
+             field in the Agents tab to pin Claude or Codex. The
+             workspace-wide default is still controlled by
+             WALLFACER_DEFAULT_SANDBOX. -->
         <div class="composer__row composer__row--wrap">
-          <label class="composer__field">
-            <span class="composer__field-label">Agent</span>
-            <select
-              id="new-sandbox"
-              class="composer__input"
-              title="Agent CLI used for this task (Claude, Codex, …)."
-              data-sandbox-select="true"
-            >
-              <option value="">Default</option>
-            </select>
-          </label>
           <label class="composer__field">
             <span class="composer__field-label">Timeout</span>
             <select id="new-timeout" class="composer__input" title="Timeout">

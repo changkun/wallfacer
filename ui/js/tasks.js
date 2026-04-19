@@ -380,7 +380,6 @@ async function createTask() {
     const mount_worktrees = document.getElementById(
       "new-mount-worktrees",
     ).checked;
-    const sandbox = document.getElementById("new-sandbox").value;
     const tags = getTagValues("new-task-tag-input");
     const max_cost_usd =
       parseFloat(document.getElementById("new-max-cost-usd").value) || 0;
@@ -437,7 +436,6 @@ async function createTask() {
         flow,
         timeout,
         mount_worktrees,
-        sandbox,
         tags,
         max_cost_usd,
         max_input_tokens,
@@ -496,10 +494,6 @@ function showNewTaskForm() {
       }
     });
   }
-  const sandboxSelect = document.getElementById("new-sandbox");
-  if (sandboxSelect) {
-    sandboxSelect.value = defaultSandbox || "";
-  }
   initTagInput("new-task-tag-input", []);
   var depsRow = document.getElementById("new-depends-on-row");
   populateDependsOnPicker("new-depends-on-picker", null, []);
@@ -543,10 +537,6 @@ function hideNewTaskForm() {
   textarea.value = "";
   textarea.style.height = "";
   document.getElementById("new-mount-worktrees").checked = false;
-  const sandboxSelect = document.getElementById("new-sandbox");
-  if (sandboxSelect) {
-    sandboxSelect.value = defaultSandbox || "";
-  }
   const maxCostEl = document.getElementById("new-max-cost-usd");
   if (maxCostEl) maxCostEl.value = "";
   const maxTokensEl = document.getElementById("new-max-input-tokens");
