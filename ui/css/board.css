@@ -679,6 +679,14 @@
   align-items: center;
   gap: 6px;
 }
+.composer__flow-label {
+  font-size: var(--fs-10);
+  font-weight: 600;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-right: 2px;
+}
 .composer__type {
   flex: 0 0 auto;
   font-size: var(--fs-10);

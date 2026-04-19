@@ -60,13 +60,20 @@ func (h *Handler) agentsRegistry() *agents.Registry {
 }
 
 // ListAgents returns the merged agent catalog in registration order.
-// The prompt template body is intentionally omitted; clients fetch
-// it per-agent via GetAgent to keep the list payload small.
+// User-authored agents that carry an inline PromptTmpl surface it on
+// the list so the inline editor can prefill the textarea without a
+// second round-trip. Built-in agents omit the prompt body; clients
+// fetch those per-agent via GetAgent, which renders the embedded
+// template from the prompts package.
 func (h *Handler) ListAgents(w http.ResponseWriter, _ *http.Request) {
 	roles := h.agentsRegistry().List()
 	out := make([]AgentResponse, 0, len(roles))
 	for _, role := range roles {
-		out = append(out, describeAgent(role))
+		resp := describeAgent(role)
+		if role.PromptTmpl != "" {
+			resp.PromptTmpl = role.PromptTmpl
+		}
+		out = append(out, resp)
 	}
 	httpjson.Write(w, http.StatusOK, out)
 }
@@ -82,7 +89,12 @@ func (h *Handler) GetAgent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := describeAgent(role)
-	if role.PromptTemplateName != "" {
+	// User-authored agents can ship a custom prompt body inline on
+	// the descriptor; when present it wins over the
+	// PromptTemplateName lookup into the embedded prompts catalog.
+	if role.PromptTmpl != "" {
+		resp.PromptTmpl = role.PromptTmpl
+	} else if role.PromptTemplateName != "" {
 		content, _, err := h.runner.Prompts().Content(role.PromptTemplateName)
 		if err == nil {
 			resp.PromptTmpl = content
@@ -99,6 +111,7 @@ type agentWriteRequest struct {
 	Title              string   `json:"title"`
 	Description        string   `json:"description"`
 	PromptTemplateName string   `json:"prompt_template_name"`
+	PromptTmpl         string   `json:"prompt_tmpl"`
 	Capabilities       []string `json:"capabilities"`
 	Multiturn          bool     `json:"multiturn"`
 	Harness            string   `json:"harness"`
@@ -110,6 +123,7 @@ func (req agentWriteRequest) toRole() agents.Role {
 		Title:              req.Title,
 		Description:        req.Description,
 		PromptTemplateName: req.PromptTemplateName,
+		PromptTmpl:         req.PromptTmpl,
 		Capabilities:       req.Capabilities,
 		Multiturn:          req.Multiturn,
 		Harness:            req.Harness,

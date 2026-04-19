@@ -5,13 +5,26 @@
 >
   <div class="flows-mode__inner">
     <header class="flows-mode__header">
-      <h2 class="flows-mode__title">Flows</h2>
-      <p class="flows-mode__subtitle">
-        Built-in flows that compose sub-agents into a task pipeline. Each row
-        shows the step chain; <code>?</code> marks optional steps and
-        <code>‖</code> marks a parallel-sibling group. Editable and
-        user-authored flows ship in a follow-up.
-      </p>
+      <div class="flows-mode__header-row">
+        <div>
+          <h2 class="flows-mode__title">Flows</h2>
+          <p class="flows-mode__subtitle">
+            A flow is an ordered chain of sub-agents a task runs against.
+            Built-in rows are read-only — click <strong>Clone</strong> to
+            copy one into a user-authored flow you can edit. Click
+            <strong>New Flow</strong> to start from scratch.
+            <code>?</code> marks optional steps; <code>‖</code> marks
+            steps that run in parallel.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="flows-mode__new"
+          onclick="window.__flows_test && window.__flows_test.openNewEditor && window.__flows_test.openNewEditor()"
+        >
+          + New Flow
+        </button>
+      </div>
     </header>
     <div id="flows-list" class="flows-mode__list" aria-busy="true">
       <p class="flows-mode__empty">Loading flows…</p>

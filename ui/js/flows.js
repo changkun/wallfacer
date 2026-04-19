@@ -343,10 +343,9 @@
             body: JSON.stringify(payload),
           })
         : fetch(
-            Routes.flows.update().replace(
-              "{slug}",
-              encodeURIComponent(flow.slug),
-            ),
+            Routes.flows
+              .update()
+              .replace("{slug}", encodeURIComponent(flow.slug)),
             {
               method: "PUT",
               headers: jsonHeaders(),
@@ -385,7 +384,9 @@
   function renderSteps(container, steps, agentsPromise) {
     container.innerHTML = "";
     steps.forEach(function (step, i) {
-      container.appendChild(renderStep(step, i, steps, container, agentsPromise));
+      container.appendChild(
+        renderStep(step, i, steps, container, agentsPromise),
+      );
     });
   }
 
@@ -557,6 +558,46 @@
     return h;
   }
 
+  // openNewEditor renders a blank flow editor at the top of the list
+  // so the user can author a flow from scratch. Reuses the Clone
+  // editor's mode so slug remains editable.
+  function openNewEditor() {
+    var listEl = document.getElementById("flows-list");
+    if (!listEl) return;
+    var existing = listEl.querySelector(".flows-row--draft");
+    if (existing) existing.remove();
+
+    var card = document.createElement("div");
+    card.className = "flows-row flows-row--user flows-row--draft";
+    card.setAttribute("data-slug", "(new)");
+    var header = document.createElement("div");
+    header.className = "flows-row__header";
+    var name = document.createElement("div");
+    name.className = "flows-row__name";
+    name.textContent = "New flow";
+    var badge = document.createElement("span");
+    badge.className = "flows-row__badge";
+    badge.textContent = "draft";
+    header.appendChild(name);
+    header.appendChild(badge);
+    card.appendChild(header);
+    listEl.insertBefore(card, listEl.firstChild);
+
+    openEditor(
+      card,
+      {
+        slug: "my-flow",
+        name: "",
+        description: "",
+        steps: [{ agent_slug: "", optional: false }],
+      },
+      { mode: "clone" },
+    );
+    if (typeof card.scrollIntoView === "function") {
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
   window.loadFlows = loadFlows;
   window.__flows_test = {
     renderFlow: renderFlow,
@@ -566,5 +607,6 @@
     closeEditor: closeEditor,
     readFlowPayload: readFlowPayload,
     suggestCloneSlug: suggestCloneSlug,
+    openNewEditor: openNewEditor,
   };
 })();

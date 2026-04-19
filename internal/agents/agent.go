@@ -45,6 +45,15 @@ type Role struct {
 	// of per-task or global settings. Built-in roles leave this
 	// empty; user-authored clones populate it to pin a harness.
 	Harness string
+
+	// PromptTmpl is the inline system prompt body for a user-
+	// authored agent. When non-empty, the runner uses this verbatim
+	// (after executing any template substitutions) in place of
+	// looking up PromptTemplateName from the embedded prompts
+	// catalog. Built-in roles leave this empty and rely on the
+	// prompts package; user-authored clones that want a custom
+	// system prompt populate it from the Agents-tab editor.
+	PromptTmpl string
 }
 
 // Capability values referenced from built-in descriptors. API

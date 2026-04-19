@@ -18,6 +18,33 @@
   margin-bottom: 20px;
 }
 
+.flows-mode__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.flows-mode__new {
+  font-size: 12px;
+  padding: 6px 14px;
+  background: var(--ink-accent, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.flows-mode__new:hover {
+  filter: brightness(1.1);
+}
+
+.flows-row--draft {
+  background: var(--surface-muted, #f7f7f7);
+  border-style: dashed !important;
+}
+
 .flows-mode__title {
   margin: 0 0 4px;
   font-size: 18px;
