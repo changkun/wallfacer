@@ -56,6 +56,11 @@ type TaskCreateOptions struct {
 	RoutineEnabled         bool
 	RoutineSpawnKind       TaskKind // legacy; prefer RoutineSpawnFlow
 	RoutineSpawnFlow       string   // flow slug; wins over SpawnKind
+
+	// Principal / org attribution. Empty on anonymous / local calls;
+	// populated at the handler boundary from auth.PrincipalFromContext.
+	CreatedBy string
+	OrgID     string
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
@@ -148,6 +153,11 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	if len(opts.CustomFailPatterns) > 0 {
 		task.CustomFailPatterns = append([]string(nil), opts.CustomFailPatterns...)
 	}
+
+	// Principal / org attribution. Copied as-is; zero values (empty
+	// strings) remain empty and JSON round-trips via omitempty.
+	task.CreatedBy = opts.CreatedBy
+	task.OrgID = opts.OrgID
 
 	// Routine fields: only persisted when the kind matches so a misuse of
 	// the options struct for a non-routine task doesn't accidentally set

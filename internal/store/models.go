@@ -278,6 +278,19 @@ type Task struct {
 	StartedAt   *time.Time            `json:"started_at,omitempty"`
 	UpdatedAt   time.Time             `json:"updated_at"`
 
+	// CreatedBy is the principal ID (JWT `sub`) of the user who dispatched
+	// the task. Empty for tasks created anonymously (local deployments, or
+	// requests without claims in context). Populated by handler.createTask
+	// from auth.PrincipalFromContext; the store itself never resolves
+	// claims.
+	CreatedBy string `json:"created_by,omitempty"`
+
+	// OrgID is the organization (JWT `org_id`) that owns this task in
+	// multi-tenant cloud deployments. Empty for anonymous tasks and for
+	// users with no current org context. Cloud queries filter on this
+	// field via TasksForPrincipal; local queries ignore it.
+	OrgID string `json:"org_id,omitempty"`
+
 	// Worktree isolation fields (populated when task moves to in_progress).
 	WorktreePaths    map[string]string `json:"worktree_paths,omitempty"`     // host repoPath → worktree path
 	BranchName       string            `json:"branch_name,omitempty"`        // "task/<uuid8>"
