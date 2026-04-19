@@ -415,7 +415,7 @@ func (s *Store) mutateTask(id uuid.UUID, fn func(t *Task) error) error {
 After every write, `notify()` stamps a monotonically increasing sequence number on a `SequencedDelta` and fans it out:
 
 1. Appends to a bounded replay buffer (512 entries) so reconnecting SSE clients can catch up without a full snapshot.
-2. Non-blocking send to all active subscriber channels (capacity 64). If a subscriber's buffer is full, the delta is dropped for that subscriber.
+2. Non-blocking send to all active subscriber channels (capacity 256, `pubsub.DefaultChannelSize`). If a subscriber's buffer is full, the delta is dropped for that subscriber.
 3. Wake signal to lightweight wake-only subscribers (capacity 1, coalesces bursts).
 
 ## Event Sourcing
