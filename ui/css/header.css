@@ -1072,14 +1072,15 @@ html.wails-desktop .app-sidebar {
   transform: rotate(180deg);
 }
 
-/* Popup menu: warm off-white card (bg-elevated, not bg-card pure
- * white) with a light rule and the shared --shadow-lg so it feels
- * like the rest of the app's popovers. Tight padding to match
- * sidebar density. */
+/* Popup menu: positioned `fixed` so it escapes the sidebar's
+ * overflow:hidden clipping — .app-sidebar truncates any absolutely-
+ * positioned child that extends beyond its ~208px width, and at
+ * ~48px in collapsed mode the menu would be clipped entirely.
+ * JS (_openSigninMenu in status-bar.js) sets `left` + `bottom` from
+ * the trigger's getBoundingClientRect() on open so the menu hugs
+ * the trigger in both layout modes. */
 .sb-signin__menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
+  position: fixed;
   min-width: 220px;
   background: var(--bg-elevated);
   border: 1px solid var(--rule);
@@ -1159,12 +1160,12 @@ html.wails-desktop .app-sidebar {
   margin: 4px 6px;
 }
 
-/* Collapsed sidebar: show only the avatar. Text stack, scope
- * label, chevron, menu — all hidden; we can't open a popup from a
- * 48px-wide trigger anyway. Click expands the sidebar first. */
+/* Collapsed sidebar: only the avatar is visible on the trigger;
+ * text, chevron, logout link all hide. Menu is NOT hidden —
+ * position:fixed lets it render next to the avatar at the edge
+ * of the sidebar without being clipped by overflow:hidden. */
 .app-sidebar.collapsed .sb-signin__text,
 .app-sidebar.collapsed .sb-signin__chevron,
-.app-sidebar.collapsed .sb-signin__menu,
 .app-sidebar.collapsed .sb-signin__logout,
 .app-sidebar.collapsed .sb-signin__link {
   display: none;
@@ -1175,4 +1176,5 @@ html.wails-desktop .app-sidebar {
 .app-sidebar.collapsed .sb-signin__user {
   justify-content: center;
   padding: 6px 0;
+  gap: 0;
 }
