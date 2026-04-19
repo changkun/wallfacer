@@ -5,8 +5,7 @@
 
 var _specTreeData = null;
 var _specTreeTimer = null;
-var _specStreamSource = null;
-var _specStreamRetryDelay = 1000;
+var _specStreamHandle = null;
 var _specExpandedPaths = new Set(
   JSON.parse(localStorage.getItem("wallfacer-spec-expanded") || "[]"),
 );
@@ -176,78 +175,60 @@ function _startSpecTreeStream() {
   _stopSpecTreeStream();
   if (!Routes || !Routes.specs || !Routes.specs.stream) return;
 
-  var url = withAuthToken(Routes.specs.stream());
-  _specStreamSource = new EventSource(url);
-  _specStreamRetryDelay = 1000;
+  _specStreamHandle = createSSEStream({
+    url: Routes.specs.stream(),
+    listeners: {
+      snapshot: function (e) {
+        try {
+          // Capture the pre-update state so we can detect the
+          // chat-first → three-pane transition that triggers the
+          // first-spec bootstrap choreography.
+          var prevEmpty =
+            !_specTreeData ||
+            (!(_specTreeData.nodes && _specTreeData.nodes.length > 0) &&
+              !_specTreeData.index);
 
-  _specStreamSource.addEventListener("snapshot", function (e) {
-    _specStreamRetryDelay = 1000;
-    try {
-      // Capture the pre-update state so we can detect the
-      // chat-first → three-pane transition that triggers the
-      // first-spec bootstrap choreography.
-      var prevEmpty =
-        !_specTreeData ||
-        (!(_specTreeData.nodes && _specTreeData.nodes.length > 0) &&
-          !_specTreeData.index);
+          _specTreeData = JSON.parse(e.data);
+          _syncSpecModeState(_specTreeData);
+          renderSpecTree();
+          var hasSpecs =
+            _specTreeData &&
+            _specTreeData.nodes &&
+            _specTreeData.nodes.length > 0;
+          if (typeof _updateSpecPaneVisibility === "function") {
+            _updateSpecPaneVisibility(hasSpecs);
+          }
 
-      _specTreeData = JSON.parse(e.data);
-      _syncSpecModeState(_specTreeData);
-      renderSpecTree();
-      // Update pane visibility on live updates (specs may have been added/removed).
-      var hasSpecs =
-        _specTreeData && _specTreeData.nodes && _specTreeData.nodes.length > 0;
-      if (typeof _updateSpecPaneVisibility === "function") {
-        _updateSpecPaneVisibility(hasSpecs);
-      }
-
-      // Chat-first → three-pane transition driven by a newly-created
-      // spec: kick the bootstrap choreography (auto-focus + toast).
-      // The layout transition itself is already in flight via
-      // _updateSpecPaneVisibility / _applyLayout above.
-      if (
-        prevEmpty &&
-        hasSpecs &&
-        typeof BootstrapChoreography !== "undefined" &&
-        BootstrapChoreography
-      ) {
-        var firstNode = _firstLeafPath(_specTreeData.nodes);
-        if (firstNode) {
-          var ws =
-            typeof activeWorkspaces !== "undefined" &&
-            activeWorkspaces &&
-            activeWorkspaces.length > 0
-              ? activeWorkspaces[0]
-              : "";
-          BootstrapChoreography.trigger(firstNode, ws);
+          if (
+            prevEmpty &&
+            hasSpecs &&
+            typeof BootstrapChoreography !== "undefined" &&
+            BootstrapChoreography
+          ) {
+            var firstNode = _firstLeafPath(_specTreeData.nodes);
+            if (firstNode) {
+              var ws =
+                typeof activeWorkspaces !== "undefined" &&
+                activeWorkspaces &&
+                activeWorkspaces.length > 0
+                  ? activeWorkspaces[0]
+                  : "";
+              BootstrapChoreography.trigger(firstNode, ws);
+            }
+          }
+        } catch (err) {
+          console.error("spec stream parse error:", err);
         }
-      }
-    } catch (err) {
-      console.error("spec stream parse error:", err);
-    }
+      },
+      heartbeat: function () {},
+    },
   });
-
-  _specStreamSource.addEventListener("heartbeat", function () {
-    // Connection alive — nothing to do.
-  });
-
-  _specStreamSource.onerror = function () {
-    if (
-      _specStreamSource &&
-      _specStreamSource.readyState === EventSource.CLOSED
-    ) {
-      _specStreamSource = null;
-      var jittered = _specStreamRetryDelay * (1 + Math.random());
-      _specTreeTimer = setTimeout(_startSpecTreeStream, jittered);
-      _specStreamRetryDelay = Math.min(_specStreamRetryDelay * 2, 30000);
-    }
-  };
 }
 
 function _stopSpecTreeStream() {
-  if (_specStreamSource) {
-    _specStreamSource.close();
-    _specStreamSource = null;
+  if (_specStreamHandle) {
+    _specStreamHandle.stop();
+    _specStreamHandle = null;
   }
 }
 

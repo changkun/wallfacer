@@ -5,14 +5,15 @@ function startGitStream() {
     renderWorkspaces();
     return;
   }
-  if (gitStatusSource) gitStatusSource.close();
+  if (gitStatusHandle) {
+    gitStatusHandle.stop();
+    gitStatusHandle = null;
+  }
 
   // Follower tab: receive git status via BroadcastChannel relay.
   // Seed initial state with an HTTP fetch.
   if (!_sseIsLeader()) {
-    gitStatusSource = null;
     _sseOnFollowerEvent("git-status", function (data) {
-      gitRetryDelay = 1000;
       gitStatuses = data;
       renderWorkspaces();
     });
@@ -30,26 +31,19 @@ function startGitStream() {
   }
 
   // Leader tab: open real EventSource and relay events to followers.
-  gitStatusSource = new EventSource(withAuthToken(Routes.git.stream()));
-  gitStatusSource.onmessage = function (e) {
-    gitRetryDelay = 1000;
-    try {
-      var data = JSON.parse(e.data);
-      gitStatuses = data;
-      renderWorkspaces();
-      _sseRelay("git-status", data);
-    } catch (err) {
-      console.error("git SSE parse error:", err);
-    }
-  };
-  gitStatusSource.onerror = function () {
-    if (gitStatusSource.readyState === EventSource.CLOSED) {
-      gitStatusSource = null;
-      var jittered = gitRetryDelay * (1 + Math.random()); // uniform [base, 2×base]
-      setTimeout(startGitStream, jittered);
-      gitRetryDelay = Math.min(gitRetryDelay * 2, 30000);
-    }
-  };
+  gitStatusHandle = createSSEStream({
+    url: Routes.git.stream(),
+    onMessage: function (e) {
+      try {
+        var data = JSON.parse(e.data);
+        gitStatuses = data;
+        renderWorkspaces();
+        _sseRelay("git-status", data);
+      } catch (err) {
+        console.error("git SSE parse error:", err);
+      }
+    },
+  });
 }
 
 function remoteUrlToHttps(url) {

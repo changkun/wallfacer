@@ -388,18 +388,18 @@ describe("stopTasksStream", () => {
 });
 
 describe("stopGitStream", () => {
-  it("closes the git status source", () => {
+  it("stops the git status handle", () => {
     const ctx = makeContext();
     loadApiCoreStack(ctx);
-    const mockSource = { close: vi.fn() };
+    const mockHandle = { stop: vi.fn() };
     vm.runInContext(
-      "gitStatusSource = _gs;",
-      Object.assign(ctx, { _gs: mockSource }),
+      "gitStatusHandle = _gh;",
+      Object.assign(ctx, { _gh: mockHandle }),
     );
 
     ctx.stopGitStream();
-    expect(mockSource.close).toHaveBeenCalled();
-    expect(vm.runInContext("gitStatusSource", ctx)).toBeNull();
+    expect(mockHandle.stop).toHaveBeenCalled();
+    expect(vm.runInContext("gitStatusHandle", ctx)).toBeNull();
   });
 });
 

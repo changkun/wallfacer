@@ -42,8 +42,7 @@ let lastTasksEventId = null;
 
 // Git SSE state
 let gitStatuses = [];
-let gitStatusSource = null;
-let gitRetryDelay = 1000;
+let gitStatusHandle = null;
 let activeWorkspaces = [];
 let workspaceGroups = [];
 let workspacePickerRequired = false;

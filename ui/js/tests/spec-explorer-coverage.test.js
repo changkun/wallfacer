@@ -10,6 +10,10 @@ import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
+const sseStreamCode = readFileSync(
+  join(jsDir, "build/lib/sse-stream.js"),
+  "utf8",
+);
 const code = readFileSync(join(jsDir, "spec-explorer.js"), "utf8");
 
 function makeEl(tag, registry) {
@@ -171,6 +175,7 @@ function makeContext(opts = {}) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
+  vm.runInContext(sseStreamCode, ctx);
   vm.runInContext(code, ctx);
   return ctx;
 }

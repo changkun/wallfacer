@@ -14,6 +14,10 @@ import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
+const sseStreamCode = readFileSync(
+  join(jsDir, "build/lib/sse-stream.js"),
+  "utf8",
+);
 const code = readFileSync(join(jsDir, "explorer.js"), "utf8");
 
 // ---------------------------------------------------------------------------
@@ -282,6 +286,9 @@ function makeContext(opts = {}) {
     console,
   });
 
+  vm.runInContext(sseStreamCode, ctx, {
+    filename: join(jsDir, "build/lib/sse-stream.js"),
+  });
   vm.runInContext(code, ctx, { filename: join(jsDir, "explorer.js") });
 
   return {

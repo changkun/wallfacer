@@ -442,8 +442,7 @@ function makeApiContext({ hash = "" } = {}) {
     tasksSource: null,
     tasksRetryDelay: 1000,
     gitStatuses: [],
-    gitStatusSource: null,
-    gitRetryDelay: 1000,
+    gitStatusHandle: null,
     location: { hash, pathname: "/", search: "" },
     history: { replaceState: () => {} },
     openModal: (id) => {
