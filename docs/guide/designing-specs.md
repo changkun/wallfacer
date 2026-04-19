@@ -65,12 +65,13 @@ Specs follow a structured lifecycle driven by slash commands in the planning cha
 flowchart LR
   idea["Idea"] --> create["/create"]
   create --> drafted["drafted"]
-  drafted --> validate["/validate"]
+  drafted --> refine["/refine"]
+  refine --> validate["/validate"]
   validate --> impact["/impact"]
   impact --> breakdown{"/break-down"}
   breakdown -->|design mode| sub["sub-specs<br/>(drafted)"]
   breakdown -->|tasks mode| leaves["leaf specs<br/>(validated)"]
-  sub --> validate
+  sub --> refine
   leaves --> dispatch["/dispatch"]
   dispatch --> board["Board task"]
   board --> reviewimpl["/review-impl"]
@@ -80,10 +81,10 @@ flowchart LR
 ```
 
 ```
-/create → /validate → /impact → /break-down → /review-breakdown → /dispatch → /review-impl → /diff → /wrapup
+/create → /refine → /validate → /impact → /break-down → /review-breakdown → /dispatch → /review-impl → /diff → /wrapup
 ```
 
-You don't need to follow every step linearly. Small specs can skip from `/create` to `/dispatch`. Large specs may cycle through `/validate` and `/break-down` multiple times. Use `/status` at any point to check progress across all specs.
+You don't need to follow every step linearly. Small specs can skip from `/create` to `/dispatch`. Large specs may cycle through `/refine` and `/break-down` multiple times. Use `/status` at any point to check progress across all specs.
 
 ### Breaking Down Specs
 

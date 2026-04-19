@@ -60,6 +60,7 @@ Type `/` to see an autocomplete menu of built-in commands. Commands cover the fu
 |---|---|
 | `/summarize [words]` | Summarize the focused spec, optionally limited to a word count |
 | `/create <title>` | Scaffold a new spec server-side (slug derived from the title) and hand the agent a first-draft instruction. Collisions are resolved with `-2`, `-3`, … suffixes; empty titles return a 400. |
+| `/refine [feedback]` | Update the focused spec against the current codebase state |
 | `/validate` | Check the focused spec against document model rules |
 | `/impact` | Analyze which code and specs would be affected |
 | `/status <state>` | Update the focused spec's lifecycle status |
