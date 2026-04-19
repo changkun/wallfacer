@@ -213,14 +213,7 @@ The **Catch Up** automation toggle (in the Automation menu) can automatically re
 
 ### 🚀 Auto-Push
 
-After the commit pipeline completes, Wallfacer can optionally push each workspace to its remote. Auto-push is controlled by:
-
-| Setting | Description |
-|---|---|
-| `WALLFACER_AUTO_PUSH` | Set to `true` to enable (default: disabled) |
-| `WALLFACER_AUTO_PUSH_THRESHOLD` | Minimum number of local commits ahead of upstream before a push is triggered (default: 1) |
-
-Auto-push can also be toggled from the **Automation** menu in the header.
+After the commit pipeline completes, Wallfacer can optionally push each workspace to its remote. Auto-push is controlled by the `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD` environment variables; see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference) for defaults. It can also be toggled from the **Automation** menu in the header.
 
 ### 📝 Workspace Instructions (AGENTS.md)
 
@@ -256,15 +249,7 @@ WALLFACER_WORKSPACES=/Users/you/project-a:/Users/you/project-b
 
 When you switch workspaces in the UI, this variable is updated automatically.
 
-For the full HTTP API reference (workspace, git, and instruction endpoints), see [API & Transport](../internals/api-and-transport.md).
-
-#### Configuration
-
-| Variable | Description |
-|---|---|
-| `WALLFACER_WORKSPACES` | Workspace paths (OS path-list separated) |
-| `WALLFACER_AUTO_PUSH` | Enable auto-push after task completion (`true`/`false`) |
-| `WALLFACER_AUTO_PUSH_THRESHOLD` | Minimum ahead count before auto-push triggers |
+For the full HTTP API reference (workspace, git, and instruction endpoints), see [API & Transport](../internals/api-and-transport.md). For the `WALLFACER_WORKSPACES`, `WALLFACER_AUTO_PUSH`, and `WALLFACER_AUTO_PUSH_THRESHOLD` env vars, see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
 
 ---
 

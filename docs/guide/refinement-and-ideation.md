@@ -197,10 +197,7 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 
 ### Configuration Variables
 
-| Variable | Description |
-|---|---|
-| `WALLFACER_SANDBOX_REFINEMENT` | Sandbox type for refinement agents (default: inherits from `WALLFACER_DEFAULT_SANDBOX`) |
-| `WALLFACER_SANDBOX_IDEA_AGENT` | Sandbox type for ideation agents (default: inherits from `WALLFACER_DEFAULT_SANDBOX`) |
+Sandbox routing for these agents is controlled by `WALLFACER_SANDBOX_REFINEMENT` and `WALLFACER_SANDBOX_IDEA_AGENT` (both inherit from `WALLFACER_DEFAULT_SANDBOX`). See [Configuration → Sandbox Routing](configuration.md#sandbox-routing) for the full routing table.
 
 Automation toggles (set via `PUT /api/config`):
 
