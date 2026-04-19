@@ -152,8 +152,9 @@ func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
 		t.Fatalf("expected 1 Launch call, got %d", len(calls))
 	}
 	joined := strings.Join(calls[0].Args, " ")
-	if !strings.Contains(joined, ws) {
-		t.Errorf("expected workspace path %q in launch args, got %q", ws, joined)
+	wantPath := sandbox.TranslateHostPath(ws, "")
+	if !strings.Contains(joined, wantPath) {
+		t.Errorf("expected workspace path %q in launch args, got %q", wantPath, joined)
 	}
 }
 
