@@ -46,9 +46,12 @@ func stubOrgsHTTPCapture(t *testing.T, status int, body string) {
 	t.Cleanup(func() { httpGet = original })
 }
 
-// TestAuthOrgs_SingleOrgReturns204 covers the short-circuit: a user
-// who belongs to one org sees no chooser.
-func TestAuthOrgs_SingleOrgReturns204(t *testing.T) {
+// TestAuthOrgs_SingleOrgReturns200 confirms a user with one org gets
+// a 200 with a one-entry list (not 204). The frontend renders a
+// static label in this case so the user sees which org their token
+// is scoped to — visible confirmation that /api/auth/orgs is wired
+// even for the common single-org case.
+func TestAuthOrgs_SingleOrgReturns200(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
 
@@ -58,14 +61,31 @@ func TestAuthOrgs_SingleOrgReturns204(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.AuthOrgs(w, req)
 
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
 	}
 	if lastOrgsRequest == nil {
 		t.Fatal("auth service was never called")
 	}
 	if got := lastOrgsRequest.Header.Get("Authorization"); got != "Bearer tok" {
 		t.Errorf("Authorization header = %q, want Bearer tok", got)
+	}
+}
+
+// TestAuthOrgs_NoMembershipsReturns204 covers the genuine "nothing
+// to render" case: the user has zero orgs.
+func TestAuthOrgs_NoMembershipsReturns204(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+
+	stubOrgsHTTPCapture(t, http.StatusOK, `[]`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/orgs", nil)
+	w := httptest.NewRecorder()
+	h.AuthOrgs(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", w.Code)
 	}
 }
 
