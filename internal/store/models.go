@@ -527,14 +527,14 @@ type EventType string
 
 // EventType constants.
 const (
-	EventTypeStateChange      EventType = "state_change"
-	EventTypeOutput           EventType = "output"
-	EventTypeFeedback         EventType = "feedback"
-	EventTypeError            EventType = "error"
-	EventTypeSystem           EventType = "system"
-	EventTypeSpanStart        EventType = "span_start"
-	EventTypeSpanEnd          EventType = "span_end"
-	EventTypePromptRound      EventType = "prompt_round"
+	EventTypeStateChange       EventType = "state_change"
+	EventTypeOutput            EventType = "output"
+	EventTypeFeedback          EventType = "feedback"
+	EventTypeError             EventType = "error"
+	EventTypeSystem            EventType = "system"
+	EventTypeSpanStart         EventType = "span_start"
+	EventTypeSpanEnd           EventType = "span_end"
+	EventTypePromptRound       EventType = "prompt_round"
 	EventTypePromptRoundRevert EventType = "prompt_round_revert"
 )
 
