@@ -426,6 +426,14 @@ var Routes = {
     authMe: function () {
       return "/api/auth/me";
     },
+    // GET /api/auth/orgs
+    authOrgs: function () {
+      return "/api/auth/orgs";
+    },
+    // POST /api/auth/switch-org
+    authSwitchOrg: function () {
+      return "/api/auth/switch-org";
+    },
   },
 
   "": {

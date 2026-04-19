@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 127,
+  "route_count": 129,
   "routes": [
     {
       "method": "GET",
@@ -1103,6 +1103,24 @@
       "pattern": "/api/auth/me",
       "name": "AuthMe",
       "description": "Return the current signed-in user, or 204 when unauthenticated.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/auth/orgs",
+      "name": "AuthOrgs",
+      "description": "List the signed-in user's organizations; 204 when single-org or unauthenticated.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/auth/switch-org",
+      "name": "AuthSwitchOrg",
+      "description": "Switch active organization; clears session and returns a redirect to /login?org_id=\u003ctarget\u003e.",
       "tags": [
         "login"
       ]
