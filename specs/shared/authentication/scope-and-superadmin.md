@@ -1,6 +1,6 @@
 ---
 title: Superadmin and scope gating for admin API routes
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:
@@ -69,3 +69,51 @@ when `cfg.Cloud == false`.
   belong with the teams that own each route.
 - Do not log claims on 403. 403 response is "denied"; the audit log is a
   separate spec.
+
+## Outcome
+
+Delivered. `POST /api/admin/rebuild-index` in cloud mode now requires
+a claim set whose `is_superadmin` is true, returning 403 for regular
+users and 401 for unauthenticated requests. Local mode continues to
+reach the handler without any claim, matching today's behavior.
+
+### What shipped
+
+- `internal/auth/authorize.go`: `RequireSuperadmin` and `RequireScope`
+  wrappers taking `http.Handler`. Both inspect `PrincipalFromContext`
+  and short-circuit with 401 (no claims) or 403 (wrong privilege).
+- `internal/auth/authorize_test.go`: 6 tests covering the full matrix
+  for both wrappers.
+- `internal/handler/login.go`: new `Handler.HasAuth()` predicate that
+  the cli wiring uses to detect cloud mode without reaching into
+  handler internals.
+- `internal/cli/server.go`: `adminOnly` helper wraps
+  `handlers["RebuildIndex"]` with `RequireSuperadmin` when
+  `h.HasAuth()` is true; identity wrap in local mode.
+- `internal/cli/server_superadmin_test.go`: 3 integration tests
+  against `BuildMux` covering cloud+superadmin (200), cloud+regular
+  (403), local (200 unchanged).
+- `docs/cloud/README.md`: Roadmap section notes the superadmin gate
+  as shipping and mentions `RequireScope` as scaffolded.
+
+### Implementation notes
+
+1. **Cloud-mode detection goes through `Handler.HasAuth()`, not a
+   separate flag.** The spec sketched `adminOnly` taking an explicit
+   cloud bool. Implementation uses `h.HasAuth()` instead because the
+   CLI already ran the cloud/local branching when it called
+   `h.SetAuth(...)` only in cloud mode. Reusing the single signal
+   avoids a second, parallel cloud flag in `BuildMux`. Added
+   `HasAuth()` to the handler's public surface so server wiring
+   doesn't reach into unexported fields.
+
+2. **Wrappers take/return `http.Handler`, not `http.HandlerFunc`.**
+   The spec pseudocode used `http.HandlerFunc`. Keeping the standard
+   `http.Handler` signature lets the wrappers compose like any stdlib
+   middleware (e.g. `mux.Handle(p, RequireSuperadmin(h))`). The
+   handler map in `server.go` uses `http.HandlerFunc`; the inline
+   `adminOnly` helper bridges with a trivial `wrapped.ServeHTTP`.
+
+3. **`RequireScope` is not applied to any route.** The spec said
+   scaffolded only, and that is what landed; downstream specs that
+   need scope gating will apply it at their own call sites.
