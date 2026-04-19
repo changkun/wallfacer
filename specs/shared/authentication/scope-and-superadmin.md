@@ -1,6 +1,6 @@
 ---
 title: Superadmin and scope gating for admin API routes
-status: drafted
+status: validated
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:

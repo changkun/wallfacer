@@ -1,6 +1,6 @@
 ---
 title: Principal and org fields on task + workspace records
-status: drafted
+status: validated
 depends_on: []
 affects:
   - internal/store/
@@ -97,3 +97,32 @@ but is only useful once the middleware is populating claims.
 - Do not add ACL / role checks here. That's `scope-and-superadmin.md`.
 - Do not add cross-org visibility rules beyond "strict match". Superadmin
   bypass is in `scope-and-superadmin.md`.
+
+## Coordination with `jwt-middleware.md`
+
+Structurally this spec has no dependency: fields, round-trip, and the
+`TasksForPrincipal` filter helper compile and test against a manually
+constructed `*Principal` argument. But the "Populate on create" step at
+the handler layer reads claims via `auth.PrincipalFromContext`, which is
+introduced by `jwt-middleware.md`.
+
+Two-stage delivery, both stages landable from this one spec:
+
+1. **Stage A (immediate):** add the fields, the filter helper, and all
+   tests. In `handler.createTask`, call a local nil-safe shim:
+   ```go
+   // principalOnRequest returns the authenticated principal, or nil.
+   // Replaced by auth.PrincipalFromContext once jwt-middleware lands.
+   func principalOnRequest(r *http.Request) *auth.Principal { return nil }
+   ```
+   Stage A leaves `CreatedBy` and `OrgID` empty on every task in both
+   local and Phase-1 cloud modes, which matches existing behavior
+   exactly.
+2. **Stage B (after `jwt-middleware.md`):** replace the shim's body with
+   `auth.PrincipalFromContext(r.Context())`. One-line change; no new
+   tests needed (Stage A's tests already cover the populated path by
+   injecting a `*Principal` directly into the handler constructor).
+
+Both stages ship in one commit if `jwt-middleware.md` has already landed
+when this spec is implemented; otherwise Stage A lands first and Stage B
+is a trivial follow-up.
