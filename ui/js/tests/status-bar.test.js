@@ -624,9 +624,7 @@ describe("renderSigninBadge", () => {
     // Find it by its label + role=menuitem.
     const menu = wrap.children.find((c) => c.className === "sb-signin__menu");
     expect(menu).toBeTruthy();
-    const signOutItem = menu.children.find(
-      (c) => c.textContent === "Sign out",
-    );
+    const signOutItem = menu.children.find((c) => c.textContent === "Sign out");
     expect(signOutItem).toBeTruthy();
 
     const iframe = signinEl.children.find((c) => c.tagName === "IFRAME");
@@ -916,7 +914,12 @@ describe("renderSigninBadge org switcher", () => {
       (c) => c.className && c.className.indexOf("sb-signin__menu-item") === 0,
     );
     const itemTexts = items.map((c) => c.textContent);
-    expect(itemTexts).toEqual(["Personal", "Alice Inc", "Bob Corp", "Sign out"]);
+    expect(itemTexts).toEqual([
+      "Personal",
+      "Alice Inc",
+      "Bob Corp",
+      "Sign out",
+    ]);
 
     // Only the current org is marked active.
     const active = items.filter((c) =>
