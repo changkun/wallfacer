@@ -4,7 +4,10 @@
 // treat as "auth not configured" and short-circuit accordingly.
 package auth
 
-import "latere.ai/x/pkg/oidc"
+import (
+	"latere.ai/x/pkg/jwtauth"
+	"latere.ai/x/pkg/oidc"
+)
 
 // Client is an OIDC Relying Party bound to the latere.ai auth service.
 type Client = oidc.Client
@@ -17,6 +20,15 @@ type User = oidc.User
 
 // Session holds the tokens stored in the encrypted session cookie.
 type Session = oidc.Session
+
+// Claims is a verified JWT claim set surfaced to handlers via
+// PrincipalFromContext. The full claim struct is defined by the platform
+// package; wallfacer code should read it through this alias so future
+// switches (e.g. a richer principal type) land in one place.
+type Claims = jwtauth.Claims
+
+// Validator validates RS256 JWTs issued by the auth service.
+type Validator = jwtauth.Validator
 
 // LoadConfig reads the OIDC configuration from environment variables.
 var LoadConfig = oidc.LoadConfig
