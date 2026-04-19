@@ -10,8 +10,9 @@ effort: medium
 created: 2026-04-19
 updated: 2026-04-19
 author: changkun
-dispatched_task_id: null
+dispatched_task_id: fd1181a8-a288-46ce-a233-e076ab046b23
 ---
+
 
 # Planning Message Schema and Task-Mode Threads
 
