@@ -5,12 +5,42 @@
 >
   <div class="agents-mode__inner">
     <header class="agents-mode__header">
-      <h2 class="agents-mode__title">Agents</h2>
-      <p class="agents-mode__subtitle">
-        Built-in sub-agent roles. Each row shows the activity, mount profile,
-        and turn model. Click a row to inspect its prompt template. Editing and
-        user-authored agents ship in a follow-up.
-      </p>
+      <div class="agents-mode__header-row">
+        <div>
+          <h2 class="agents-mode__title">Agents</h2>
+          <p class="agents-mode__subtitle">
+            Sub-agent roles each flow step invokes. Built-in rows are
+            read-only — click <strong>Clone</strong> to copy one into a
+            user-authored agent you can edit or pin to a specific harness.
+            Click <strong>New Agent</strong> to start from scratch.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="agents-mode__new"
+          onclick="window.__agents_test && window.__agents_test.openNewEditor && window.__agents_test.openNewEditor()"
+        >
+          + New Agent
+        </button>
+      </div>
+      <div class="agents-mode__default-row">
+        <span class="agents-mode__default-label">Workspace default harness</span>
+        <span id="agents-mode-default-harness" class="agents-mode__default-value">—</span>
+        <button
+          type="button"
+          class="agents-mode__default-edit"
+          onclick="
+            if (typeof openSettings === 'function') openSettings();
+            if (typeof setSettingsTab === 'function') setSettingsTab('sandbox');
+          "
+          title="Change the default in Settings → Sandbox"
+        >
+          Change
+        </button>
+        <span class="agents-mode__default-hint">
+          Agents with Harness = “use workspace default” fall back to this.
+        </span>
+      </div>
     </header>
     <div id="agents-list" class="agents-mode__list" aria-busy="true">
       <p class="agents-mode__empty">Loading agents…</p>

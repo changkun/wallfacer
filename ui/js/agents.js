@@ -18,6 +18,16 @@
     var listEl = document.getElementById("agents-list");
     if (!listEl) return;
 
+    // Surface the workspace-default harness in the tab header so
+    // "use workspace default" on individual agents has a concrete
+    // resolution the user can see and jump to change.
+    var defaultEl = document.getElementById("agents-mode-default-harness");
+    if (defaultEl) {
+      var sb =
+        (typeof defaultSandbox === "string" && defaultSandbox) || "claude";
+      defaultEl.textContent = sb;
+    }
+
     fetch(Routes.agents.list(), { headers: authHeaders() })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -201,11 +211,17 @@
       labeledInput("Description", "description", agent.description || ""),
     );
     editor.appendChild(
-      labeledSelect("Harness", "harness", agent.harness || "", [
-        { value: "", label: "inherit" },
-        { value: "claude", label: "claude" },
-        { value: "codex", label: "codex" },
-      ]),
+      labeledSelect(
+        "Harness",
+        "harness",
+        agent.harness || "",
+        [
+          { value: "", label: "— use workspace default —" },
+          { value: "claude", label: "Claude" },
+          { value: "codex", label: "Codex" },
+        ],
+        "Pin this agent to a specific coding harness. Empty inherits from the task-level sandbox or WALLFACER_DEFAULT_SANDBOX.",
+      ),
     );
     editor.appendChild(
       labeledCheckbox("Multi-turn", "multiturn", !!agent.multiturn),
@@ -215,6 +231,25 @@
         "Capabilities (one per line)",
         "capabilities",
         (agent.capabilities || []).join("\n"),
+      ),
+    );
+    // Inline system prompt body. Editing this writes a prompt_tmpl
+    // field to the agent's YAML. For user-authored agents it
+    // overrides any prompt_template_name lookup. Fetch the full
+    // agent on edit so the current body is prefilled.
+    editor.appendChild(
+      labeledTextarea(
+        "System prompt — optional",
+        "prompt_tmpl",
+        agent.prompt_tmpl || "",
+        {
+          rows: 8,
+          hint:
+            "Leave empty to inherit from the built-in prompt template. " +
+            "Runtime use of custom prompt bodies ships in a follow-up; " +
+            "today the field is persisted and displayed but the runner " +
+            "still loads the named template for built-in agent slots.",
+        },
       ),
     );
 
@@ -247,10 +282,9 @@
             body: JSON.stringify(payload),
           })
         : fetch(
-            Routes.agents.update().replace(
-              "{slug}",
-              encodeURIComponent(agent.slug),
-            ),
+            Routes.agents
+              .update()
+              .replace("{slug}", encodeURIComponent(agent.slug)),
             {
               method: "PUT",
               headers: jsonHeaders(),
@@ -316,9 +350,7 @@
   function readEditorPayload(editor) {
     var slug = editor.querySelector('[name="slug"]').value.trim();
     var title = editor.querySelector('[name="title"]').value.trim();
-    var description = editor
-      .querySelector('[name="description"]')
-      .value.trim();
+    var description = editor.querySelector('[name="description"]').value.trim();
     var harness = editor.querySelector('[name="harness"]').value;
     var multiturn = editor.querySelector('[name="multiturn"]').checked;
     var caps = editor
@@ -328,6 +360,8 @@
         return s.trim();
       })
       .filter(Boolean);
+    var promptTmplEl = editor.querySelector('[name="prompt_tmpl"]');
+    var promptTmpl = promptTmplEl ? promptTmplEl.value : "";
     return {
       slug: slug,
       title: title,
@@ -335,6 +369,7 @@
       harness: harness,
       multiturn: multiturn,
       capabilities: caps,
+      prompt_tmpl: promptTmpl,
     };
   }
 
@@ -374,7 +409,8 @@
     return wrap;
   }
 
-  function labeledTextarea(label, name, value) {
+  function labeledTextarea(label, name, value, opts) {
+    opts = opts || {};
     var wrap = document.createElement("label");
     wrap.className = "agents-row__field";
     var l = document.createElement("span");
@@ -382,14 +418,21 @@
     l.textContent = label;
     var t = document.createElement("textarea");
     t.name = name;
-    t.rows = 3;
+    t.rows = opts.rows || 3;
     t.value = value || "";
+    if (opts.hint) t.title = opts.hint;
     wrap.appendChild(l);
     wrap.appendChild(t);
+    if (opts.hint) {
+      var h = document.createElement("span");
+      h.className = "agents-row__field-hint";
+      h.textContent = opts.hint;
+      wrap.appendChild(h);
+    }
     return wrap;
   }
 
-  function labeledSelect(label, name, value, opts) {
+  function labeledSelect(label, name, value, opts, hint) {
     var wrap = document.createElement("label");
     wrap.className = "agents-row__field";
     var l = document.createElement("span");
@@ -397,6 +440,7 @@
     l.textContent = label;
     var s = document.createElement("select");
     s.name = name;
+    if (hint) s.title = hint;
     opts.forEach(function (opt) {
       var o = document.createElement("option");
       o.value = opt.value;
@@ -406,6 +450,12 @@
     });
     wrap.appendChild(l);
     wrap.appendChild(s);
+    if (hint) {
+      var h = document.createElement("span");
+      h.className = "agents-row__field-hint";
+      h.textContent = hint;
+      wrap.appendChild(h);
+    }
     return wrap;
   }
 
@@ -461,6 +511,53 @@
       .replace(/>/g, "&gt;");
   }
 
+  // openNewEditor inserts a standalone editor card at the top of
+  // the list so the user can author an agent from scratch. Submit
+  // reuses the same POST path Clone uses; Cancel removes the card.
+  function openNewEditor() {
+    var listEl = document.getElementById("agents-list");
+    if (!listEl) return;
+    // Collapse any existing draft so there's only one open at a time.
+    var existing = listEl.querySelector(".agents-row--draft");
+    if (existing) existing.remove();
+
+    var card = document.createElement("div");
+    card.className = "agents-row agents-row--user agents-row--draft";
+    card.setAttribute("data-slug", "(new)");
+    var header = document.createElement("div");
+    header.className = "agents-row__header";
+    var name = document.createElement("div");
+    name.className = "agents-row__name";
+    name.textContent = "New agent";
+    var meta = document.createElement("div");
+    meta.className = "agents-row__meta";
+    meta.textContent = "draft";
+    header.appendChild(name);
+    header.appendChild(meta);
+    card.appendChild(header);
+    listEl.insertBefore(card, listEl.firstChild);
+
+    // Reuse the Clone editor with a blank role so the user fills in
+    // every field. Mode "clone" keeps the slug input enabled.
+    openEditor(
+      card,
+      {
+        slug: "my-agent",
+        title: "",
+        description: "",
+        harness: "",
+        multiturn: false,
+        capabilities: [],
+      },
+      { mode: "clone" },
+    );
+    // Scroll the draft into view so the user doesn't have to hunt
+    // for the form when the list is long.
+    if (typeof card.scrollIntoView === "function") {
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
   window.loadAgents = loadAgents;
   window.__agents_test = {
     renderRow: renderRow,
@@ -469,5 +566,6 @@
     closeEditor: closeEditor,
     readEditorPayload: readEditorPayload,
     suggestCloneSlug: suggestCloneSlug,
+    openNewEditor: openNewEditor,
   };
 })();

@@ -53,10 +53,11 @@
              Type picker; per-agent sandbox choice now lives on the flow
              definition itself (Flows tab) rather than in the composer. -->
         <div class="composer__head">
+          <label class="composer__flow-label" for="new-task-flow">Flow</label>
           <select
             id="new-task-flow"
             class="composer__type"
-            title="Flow determines which sub-agents run for this task. Built-ins: Implement (refine → implement → test → commit), Brainstorm (workspace scan → up to three new task ideas)."
+            title="Flow determines which sub-agents run for this task. Built-ins: Implement (refine → implement → test → commit), Brainstorm (workspace scan → up to three new task ideas). Edit or add flows in the Flows sidebar tab."
           >
             <option value="implement">Implement</option>
           </select>

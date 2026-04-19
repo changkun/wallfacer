@@ -17,6 +17,7 @@ type diskAgent struct {
 	Title              string   `yaml:"title"`
 	Description        string   `yaml:"description,omitempty"`
 	PromptTemplateName string   `yaml:"prompt_template_name,omitempty"`
+	PromptTmpl         string   `yaml:"prompt_tmpl,omitempty"`
 	Capabilities       []string `yaml:"capabilities,omitempty"`
 	Multiturn          bool     `yaml:"multiturn,omitempty"`
 	Harness            string   `yaml:"harness,omitempty"`
@@ -72,6 +73,7 @@ func LoadUserAgents(dir string) ([]Role, error) {
 			Title:              a.Title,
 			Description:        a.Description,
 			PromptTemplateName: a.PromptTemplateName,
+			PromptTmpl:         a.PromptTmpl,
 			Capabilities:       a.Capabilities,
 			Multiturn:          a.Multiturn,
 			Harness:            a.Harness,
@@ -97,6 +99,7 @@ func WriteUserAgent(dir string, role Role) error {
 		Title:              role.Title,
 		Description:        role.Description,
 		PromptTemplateName: role.PromptTemplateName,
+		PromptTmpl:         role.PromptTmpl,
 		Capabilities:       role.Capabilities,
 		Multiturn:          role.Multiturn,
 		Harness:            role.Harness,
