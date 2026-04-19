@@ -37,11 +37,11 @@ func (h *Handler) StartRoutineEngine(ctx context.Context) {
 }
 
 // scheduleForTask turns a routine card's persisted schedule fields into
-// a concrete routine.Schedule. Disabled or non-positive intervals become
-// routine.Disabled() so the engine still tracks the entry (its next-run
-// is reported as zero in the UI) but never fires it.
+// a concrete routine.Schedule. Disabled, cancelled, or non-positive
+// intervals become routine.Disabled() so the engine still tracks the
+// entry (its next-run is reported as zero in the UI) but never fires it.
 func scheduleForTask(t store.Task) routine.Schedule {
-	if !t.RoutineEnabled || t.RoutineIntervalSeconds <= 0 {
+	if t.Status == store.TaskStatusCancelled || !t.RoutineEnabled || t.RoutineIntervalSeconds <= 0 {
 		return routine.Disabled()
 	}
 	return routine.FixedInterval{D: time.Duration(t.RoutineIntervalSeconds) * time.Second}
@@ -84,6 +84,13 @@ func (h *Handler) reconcileRoutines(ctx context.Context) {
 	seen := make(map[uuid.UUID]struct{})
 	for _, t := range tasks {
 		if !t.IsRoutine() {
+			continue
+		}
+		// Cancelled routine cards stop firing entirely. Skip them so the
+		// unregister pass below drops the engine entry — otherwise the
+		// previously-armed timer would keep spawning instance tasks even
+		// though the user cancelled the schedule.
+		if t.Status == store.TaskStatusCancelled {
 			continue
 		}
 		seen[t.ID] = struct{}{}
@@ -153,6 +160,12 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 		return
 	}
 	if !routineTask.IsRoutine() {
+		return
+	}
+	// A cancelled routine card must not spawn instance tasks. A fire can
+	// still land here if the user cancels after the engine's timer has
+	// already dispatched onto its own goroutine.
+	if routineTask.Status == store.TaskStatusCancelled {
 		return
 	}
 

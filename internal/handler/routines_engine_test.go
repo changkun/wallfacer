@@ -211,6 +211,64 @@ func TestFireRoutine_UnknownRoutineIsNoop(t *testing.T) {
 	}
 }
 
+// TestReconcileRoutines_UnregistersCancelledRoutines guards the bug where
+// a user cancels a routine card but the engine keeps firing it because the
+// reconcile loop only checked Kind, not Status.
+func TestReconcileRoutines_UnregistersCancelledRoutines(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "r", Timeout: 10, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	h.reconcileRoutines(ctx)
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; !ok {
+		t.Fatalf("pre-condition: routine should be registered")
+	}
+
+	if err := s.CancelTask(ctx, routineTask.ID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	h.reconcileRoutines(ctx)
+
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; ok {
+		t.Fatalf("expected cancelled routine unregistered from engine")
+	}
+}
+
+// TestFireRoutine_CancelledRoutineDoesNotSpawn guards against a race where
+// an engine timer dispatches fireRoutine onto a goroutine while the user
+// concurrently cancels the routine card. The fire must bail out without
+// creating an instance task.
+func TestFireRoutine_CancelledRoutineDoesNotSpawn(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "r", Timeout: 10, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	if err := s.CancelTask(ctx, routineTask.ID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+
+	before, _ := s.ListTasks(ctx, false)
+	h.fireRoutine(ctx, routineTask.ID)
+	after, _ := s.ListTasks(ctx, false)
+
+	if len(after) != len(before) {
+		t.Fatalf("cancelled routine spawned instance task: before=%d after=%d", len(before), len(after))
+	}
+	if calls := mock.RunCalls(); len(calls) != 0 {
+		t.Fatalf("expected no RunBackground calls for cancelled routine, got %d", len(calls))
+	}
+}
+
 func TestTriggerRoutine_WithEngine_SpawnsInstance(t *testing.T) {
 	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)
