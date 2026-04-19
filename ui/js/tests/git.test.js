@@ -85,8 +85,7 @@ function makeContext(overrides = {}) {
     },
     activeWorkspaces: overrides.activeWorkspaces || [],
     gitStatuses: overrides.gitStatuses || null,
-    gitStatusSource: overrides.gitStatusSource || null,
-    gitRetryDelay: overrides.gitRetryDelay || 1000,
+    gitStatusHandle: overrides.gitStatusHandle || null,
     _sseIsLeader: overrides._sseIsLeader || (() => true),
     _sseOnFollowerEvent: overrides._sseOnFollowerEvent || vi.fn(),
     _sseRelay: overrides._sseRelay || vi.fn(),
@@ -99,6 +98,10 @@ function makeContext(overrides = {}) {
 }
 
 function loadScript(ctx) {
+  const libCode = readFileSync(join(jsDir, "build/lib/sse-stream.js"), "utf8");
+  vm.runInContext(libCode, ctx, {
+    filename: join(jsDir, "build/lib/sse-stream.js"),
+  });
   const code = readFileSync(join(jsDir, "git.js"), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, "git.js") });
   return ctx;
@@ -1088,12 +1091,12 @@ describe("startGitStream", () => {
     loadScript(ctx);
 
     ctx.startGitStream();
-    // gitStatusSource should remain null (no EventSource created)
-    expect(ctx.gitStatusSource).toBe(null);
+    // No SSE handle should be created when there are no active workspaces.
+    expect(ctx.gitStatusHandle).toBe(null);
   });
 
-  it("closes existing source before creating new one", () => {
-    const closeFn = vi.fn();
+  it("closes existing handle before creating new one", () => {
+    const stopFn = vi.fn();
     const mockES = function (_url) {
       this.onmessage = null;
       this.onerror = null;
@@ -1102,13 +1105,13 @@ describe("startGitStream", () => {
     };
     const ctx = makeContext({
       activeWorkspaces: ["/repo"],
-      gitStatusSource: { close: closeFn },
+      gitStatusHandle: { stop: stopFn },
       EventSource: mockES,
     });
     loadScript(ctx);
 
     ctx.startGitStream();
-    expect(closeFn).toHaveBeenCalled();
+    expect(stopFn).toHaveBeenCalled();
   });
 
   it("fetches initial git status as follower tab", () => {
@@ -1123,7 +1126,7 @@ describe("startGitStream", () => {
 
     ctx.startGitStream();
     expect(mockApi).toHaveBeenCalledWith("/api/git/status");
-    expect(ctx.gitStatusSource).toBe(null);
+    expect(ctx.gitStatusHandle).toBe(null);
   });
 
   it("creates EventSource as leader tab", () => {
@@ -1145,7 +1148,7 @@ describe("startGitStream", () => {
 
     ctx.startGitStream();
     expect(createdUrl).toBe("/api/git/stream");
-    expect(ctx.gitStatusSource).not.toBe(null);
+    expect(ctx.gitStatusHandle).not.toBe(null);
   });
 });
 

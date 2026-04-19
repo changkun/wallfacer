@@ -431,8 +431,10 @@ function stopTasksStream() {
 }
 
 function stopGitStream() {
-  if (gitStatusSource) gitStatusSource.close();
-  gitStatusSource = null;
+  if (gitStatusHandle) {
+    gitStatusHandle.stop();
+    gitStatusHandle = null;
+  }
 }
 
 function resetBoardState() {

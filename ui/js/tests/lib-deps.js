@@ -41,6 +41,9 @@ const LIB_DEPS = {
     "lib/floating-toc.js",
   ],
   "api.js": ["lib/config-toggle.js"],
+  "git.js": ["build/lib/sse-stream.js"],
+  "explorer.js": ["build/lib/sse-stream.js"],
+  "spec-explorer.js": ["build/lib/sse-stream.js"],
 };
 
 /**
