@@ -1,8 +1,4 @@
-<div
-  id="flows-mode-container"
-  class="flows-mode-container"
-  style="display: none"
->
+<div id="flows-mode-container" class="flows-mode-container" style="display: none">
   <div class="flows-mode__inner">
     <header class="flows-mode__header">
       <div class="flows-mode__header-row">
@@ -10,24 +6,40 @@
           <h2 class="flows-mode__title">Flows</h2>
           <p class="flows-mode__subtitle">
             A flow is an ordered chain of sub-agents a task runs against.
-            Built-in rows are read-only. Click <strong>Clone</strong> to
-            copy one into a user-authored flow you can edit, or
-            <strong>New Flow</strong> to start from scratch.
-            <code>?</code> marks optional steps; <code>‖</code> marks
-            steps that run in parallel.
+            Clone a built-in or start from scratch; reorder steps by drag,
+            mark any step optional, or group steps to run in parallel.
           </p>
         </div>
-        <button
-          type="button"
-          class="flows-mode__new"
-          onclick="window.__flows_test && window.__flows_test.openNewEditor && window.__flows_test.openNewEditor()"
-        >
-          + New Flow
-        </button>
+        <div class="flows-mode__header-actions">
+          <button
+            type="button"
+            class="flows-mode__new"
+            onclick="window.__flows_test && window.__flows_test.openNewEditor && window.__flows_test.openNewEditor()"
+          >
+            + New Flow
+          </button>
+        </div>
       </div>
     </header>
-    <div id="flows-list" class="flows-mode__list" aria-busy="true">
-      <p class="flows-mode__empty">Loading flows…</p>
+    <div class="flows-mode__split">
+      <aside class="flows-mode__rail">
+        <div class="flows-mode__search">
+          <input
+            type="search"
+            id="flows-rail-search"
+            placeholder="Search flows..."
+            aria-label="Search flows"
+          />
+        </div>
+        <div id="flows-rail-list" class="flows-mode__rail-list" aria-busy="true">
+          <p class="flows-mode__empty">Loading flows...</p>
+        </div>
+      </aside>
+      <section id="flows-detail" class="flows-mode__detail">
+        <div class="flows-mode__empty-detail">
+          <p>Pick a flow on the left, or click <strong>+ New Flow</strong> above.</p>
+        </div>
+      </section>
     </div>
   </div>
 </div>
