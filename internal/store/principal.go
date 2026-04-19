@@ -73,19 +73,16 @@ func principalSeesTask(p *Principal, t *Task) bool {
 		// Local mode / anonymous call: no filtering.
 		return true
 	}
-	switch {
-	case t.OrgID == "" && t.CreatedBy == "":
-		// Legacy / pre-cloud task with no recorded owner. Shared
-		// within the deployment so single-user upgrades don't orphan
-		// history.
-		return true
-	case t.OrgID == "" && t.CreatedBy == p.Sub:
-		// Personal space: caller's own un-org-scoped task.
-		return true
-	case t.OrgID != "" && t.OrgID == p.OrgID:
-		// Org-scoped task matching the caller's current org claim.
-		return true
-	default:
+	if p.OrgID != "" {
+		// Org view: strictly the active org. Personal tasks and
+		// legacy (no-owner) tasks stay hidden so the org workspace
+		// doesn't leak in a user's private items from elsewhere.
+		return t.OrgID == p.OrgID
+	}
+	// Personal view (p.OrgID == ""): caller's own personal + legacy
+	// records. Other users' personal and any org-scoped task hidden.
+	if t.OrgID != "" {
 		return false
 	}
+	return t.CreatedBy == "" || t.CreatedBy == p.Sub
 }

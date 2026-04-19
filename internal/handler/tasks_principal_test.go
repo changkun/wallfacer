@@ -100,20 +100,14 @@ func TestListTasks_OrgScopedFiltering(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&tasks); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	// Alice@orgA sees: legacy + 2 org-a tasks = 3.
-	// bob-personal and bob-orgB stay hidden.
-	if len(tasks) != 3 {
-		t.Fatalf("orgA view returned %d tasks, want 3 (legacy + 2 org-a)", len(tasks))
+	// Alice@orgA sees only org-a tasks (strict). Legacy, bob's
+	// personal, and bob-orgB all hidden.
+	if len(tasks) != 2 {
+		t.Fatalf("orgA view returned %d tasks, want 2 (strict org-a)", len(tasks))
 	}
 	for _, task := range tasks {
-		if task.OrgID == "org-b" {
-			t.Errorf("leaked org-b task into alice's view: %+v", task)
-		}
-		if task.OrgID == "" && task.CreatedBy == "bob" {
-			t.Errorf("leaked bob's personal task into alice's view: %+v", task)
-		}
-		if task.OrgID != "org-a" && task.OrgID != "" {
-			t.Errorf("leaked task OrgID=%q into org-a view", task.OrgID)
+		if task.OrgID != "org-a" {
+			t.Errorf("leaked non-org-a task into alice's view: OrgID=%q CreatedBy=%q", task.OrgID, task.CreatedBy)
 		}
 	}
 }
