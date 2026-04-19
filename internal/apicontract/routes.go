@@ -371,6 +371,12 @@ var Routes = []Route{
 		Description: "List available slash commands.",
 		Tags:        []string{"planning"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning/tool/update_task_prompt", Name: "UpdateTaskPromptTool",
+		JSName:      "updateTaskPromptTool",
+		Description: "Tool endpoint: update a task's prompt from a task-mode planning thread.",
+		Tags:        []string{"planning"},
+	},
 
 	// --- Planning chat threads ---
 

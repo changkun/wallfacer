@@ -51,8 +51,8 @@ func TestListSystemPrompts_ReturnsAll(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(result) != 11 {
-		t.Errorf("len(result) = %d, want 11", len(result))
+	if len(result) != 12 {
+		t.Errorf("len(result) = %d, want 12", len(result))
 	}
 	for _, item := range result {
 		if item["name"] == "" {

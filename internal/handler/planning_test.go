@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/planner"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -741,5 +742,209 @@ func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
 	}
 	if errMsg, _ := resp["error"].(string); !strings.Contains(errMsg, "task-mode") {
 		t.Errorf("error = %q, want mention of task-mode", errMsg)
+	}
+}
+
+// --- UpdateTaskPromptTool ---
+
+func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
+	ctx := context.Background()
+	h := newPlannerHandlerWithThreads(t)
+	created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "original prompt",
+		Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	threadID := threads[0].ID
+	cs, _ := tm.Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: created.ID.String()})
+
+	h2 := h
+
+	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"updated prompt","thread_id":"` + threadID + `"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	h2.UpdateTaskPromptTool(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["prev_prompt"] != "original prompt" {
+		t.Errorf("prev_prompt = %v, want 'original prompt'", resp["prev_prompt"])
+	}
+	if resp["round"].(float64) != 1 {
+		t.Errorf("round = %v, want 1", resp["round"])
+	}
+
+	updated, err := h2.store.GetTask(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if updated.Prompt != "updated prompt" {
+		t.Errorf("task.Prompt = %q, want 'updated prompt'", updated.Prompt)
+	}
+
+	events, err := h2.store.GetEvents(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	var found bool
+	for _, ev := range events {
+		if ev.EventType == store.EventTypePromptRound {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected prompt_round event to be appended")
+	}
+}
+
+func TestUpdateTaskPromptTool_WrongThreadMode(t *testing.T) {
+	ctx := context.Background()
+	h := newPlannerHandlerWithThreads(t)
+	created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "original",
+		Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	// Use the default thread, which is NOT pinned to any task (spec/file-mode).
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	threadID := threads[0].ID
+
+	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"new","thread_id":"` + threadID + `"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	h.UpdateTaskPromptTool(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d (wrong mode)", rec.Code, http.StatusUnprocessableEntity)
+	}
+}
+
+func TestUpdateTaskPromptTool_MismatchedTaskID(t *testing.T) {
+	ctx := context.Background()
+
+	// Create task A (pinned in thread) and task B (sent in request).
+	h := newPlannerHandlerWithThreads(t)
+	taskA, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "A", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask A: %v", err)
+	}
+	taskB, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "B", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask B: %v", err)
+	}
+
+	// Pin thread to task A.
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	threadID := threads[0].ID
+	cs, err := tm.Store(threadID)
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskA.ID.String()}); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	// Send request with task B's ID — should be rejected.
+	body := strings.NewReader(`{"task_id":"` + taskB.ID.String() + `","prompt":"new","thread_id":"` + threadID + `"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	h.UpdateTaskPromptTool(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d (mismatched task)", rec.Code, http.StatusUnprocessableEntity)
+	}
+}
+
+func TestUpdateTaskPromptTool_ResumeHintOnWaiting(t *testing.T) {
+	ctx := context.Background()
+	h := newPlannerHandlerWithThreads(t)
+	created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "original",
+		Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, created.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	// Pin thread to task.
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	threadID := threads[0].ID
+	cs, err := tm.Store(threadID)
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: created.ID.String()}); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"updated","thread_id":"` + threadID + `"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	h.UpdateTaskPromptTool(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	events, err := h.store.GetEvents(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	var payload store.PromptRoundData
+	var found bool
+	for _, ev := range events {
+		if ev.EventType == store.EventTypePromptRound {
+			if err := json.Unmarshal(ev.Data, &payload); err != nil {
+				t.Fatalf("unmarshal PromptRoundData: %v", err)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected prompt_round event")
+	}
+	if !payload.ResumeHint {
+		t.Error("expected ResumeHint=true for waiting task")
+	}
+}
+
+func TestTaskPromptRefine_TemplateFieldsPopulated(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	d := prompts.RefinementData{
+		CreatedAt: "2026-01-01 00:00:00",
+		Today:     "2026-04-19",
+		AgeDays:   108,
+		Status:    "backlog",
+		Prompt:    "implement feature X",
+	}
+	out := mgr.TaskPromptRefine(d)
+	if out == "" {
+		t.Fatal("TaskPromptRefine returned empty string")
+	}
+	for _, want := range []string{"implement feature X", "backlog", "2026-01-01"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("template output missing %q\nfull output:\n%s", want, out)
+		}
 	}
 }

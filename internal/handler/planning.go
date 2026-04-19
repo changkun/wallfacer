@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -102,6 +103,34 @@ func archivedSpecGuard(workspaces []string, focusedSpec string) string {
 	return "\u26A0 This spec is archived (read-only). Do NOT write to or modify " +
 		"this spec. If the user requests changes, tell them to unarchive " +
 		"the spec first using the Unarchive button in the focused view.\n\n"
+}
+
+// buildTaskModeSystemPrompt renders the task-prompt refinement system prompt
+// for the pinned task UUID. Returns empty when the task cannot be resolved
+// (non-fatal: the turn still runs with the user message as context).
+func (h *Handler) buildTaskModeSystemPrompt(ctx context.Context, taskID string) string {
+	s, ok := h.currentStore()
+	if !ok {
+		return ""
+	}
+	taskUUID, err := uuid.Parse(taskID)
+	if err != nil {
+		return ""
+	}
+	task, err := s.GetTask(ctx, taskUUID)
+	if err != nil {
+		return ""
+	}
+	now := time.Now().UTC()
+	ageDays := int(math.Round(now.Sub(task.CreatedAt).Hours() / 24))
+	d := prompts.RefinementData{
+		CreatedAt: task.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
+		Today:     now.Format("2006-01-02"),
+		AgeDays:   ageDays,
+		Status:    string(task.Status),
+		Prompt:    task.Prompt,
+	}
+	return prompts.TaskPromptRefine(d)
 }
 
 // GetPlanningStatus reports whether the planning sandbox is running.
@@ -328,8 +357,29 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	if req.FocusedSpec != "" && !strings.HasPrefix(req.Message, "/") {
 		prompt = "[Focused spec: " + req.FocusedSpec + "]\n\n" + prompt
 	}
-	prompt = assemblePlanningPrompt(h.currentWorkspaces(), req.FocusedSpec, prompt)
+
+	// Determine the effective pinned task for this turn.
+	pinnedTaskID := existingSess.FocusedTask
+	if pinnedTaskID == "" {
+		pinnedTaskID = focusedTaskID
+	}
+
+	if pinnedTaskID != "" {
+		// Task-mode: inject the task-prompt refinement system prompt instead of
+		// the spec-planning system prompt.
+		if prefix := h.buildTaskModeSystemPrompt(r.Context(), pinnedTaskID); prefix != "" {
+			prompt = prefix + "\n\n" + prompt
+		}
+	} else {
+		prompt = assemblePlanningPrompt(h.currentWorkspaces(), req.FocusedSpec, prompt)
+	}
+
 	cmd := []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
+
+	// Task-mode: strip file-edit tools so the agent cannot modify workspace files.
+	if pinnedTaskID != "" {
+		cmd = append(cmd, "--disallowedTools", "Write,Edit,MultiEdit,NotebookEdit")
+	}
 
 	// Resume existing session if available.
 	sess, _ := cs.LoadSession()
