@@ -26,7 +26,7 @@ missing token an authenticated route returns 401. Unauthenticated routes
 (`/login`, `/callback`, `/logout`, `/logout/notify`, `/api/config`,
 `/api/auth/me`) pass through without requiring a token.
 
-Local mode is untouched — `WALLFACER_SERVER_API_KEY` remains the only gate.
+Local mode is untouched, `WALLFACER_SERVER_API_KEY` remains the only gate.
 
 ## What to do
 
@@ -56,7 +56,7 @@ Local mode is untouched — `WALLFACER_SERVER_API_KEY` remains the only gate.
    ```
 4. In the CLI server wiring, when `cfg.Cloud == true`, construct the validator
    once and wrap every existing `/api/*` route (except the whitelist above)
-   with `OptionalAuth` — *not* `Auth` in this task. Handlers remain open; the
+   with `OptionalAuth`, *not* `Auth` in this task. Handlers remain open; the
    goal of this spec is only to surface claims when present. The forced-401
    decision for protected routes happens in `cloud-forced-login.md` and in
    whichever handler needs strict enforcement.
@@ -73,10 +73,10 @@ Local mode is untouched — `WALLFACER_SERVER_API_KEY` remains the only gate.
   - malformed `Authorization` header → 401 on `Auth`.
   - no `Authorization` header → `OptionalAuth` passes through with no claims.
 - Integration-lite in `internal/cli/`:
-  - `TestAPIRoutes_ClaimsContext_InCloudMode` — server started with
+  - `TestAPIRoutes_ClaimsContext_InCloudMode`, server started with
     `cfg.Cloud=true`, a fake validator, and a request carrying a signed
     token; verify `GET /api/tasks` sees the claims.
-  - `TestAPIRoutes_NoValidator_InLocalMode` — server with `cfg.Cloud=false`
+  - `TestAPIRoutes_NoValidator_InLocalMode`, server with `cfg.Cloud=false`
     and an `Authorization: Bearer junk` header gets exactly today's
     behavior (no validation attempted, handler executes as before).
 

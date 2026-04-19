@@ -24,7 +24,7 @@ understand where the line sits.
 
 ## What to do
 
-1. **`docs/guide/configuration.md`** — add a new `## Cloud mode` subsection
+1. **`docs/guide/configuration.md`**, add a new `## Cloud mode` subsection
    under the appropriate parent (likely the existing env-var reference).
    Cover:
    - What `WALLFACER_CLOUD=true` enables (sign-in badge, cloud routes).
@@ -33,10 +33,10 @@ understand where the line sits.
    - Fail-fast startup behavior when cloud mode is on but config is missing.
    - Note: OIDC is latere.ai-specific; third-party OIDC is deferred.
    - Note: `WALLFACER_SERVER_API_KEY` remains orthogonal.
-2. **`AGENTS.md` / `CLAUDE.md`** — append a short section or bullet under
+2. **`AGENTS.md` / `CLAUDE.md`**, append a short section or bullet under
    Configuration describing the cloud/local partition and pointing at the
    configuration guide.
-3. **Env var table** — if there's a central env-var table (`docs/internals/*`
+3. **Env var table**, if there's a central env-var table (`docs/internals/*`
    or the Configuration section of `CLAUDE.md`), add `WALLFACER_CLOUD` and
    the `AUTH_*` vars with one-line descriptions.
 
@@ -51,7 +51,7 @@ No automated tests. Verify:
 ## Boundaries
 
 - Do not document the later phases (JWT middleware, `org_id`, agent token
-  exchange) as shipping features — they remain "planned" in the spec.
+  exchange) as shipping features, they remain "planned" in the spec.
 - Do not add a CHANGELOG entry unless the project keeps one (it doesn't,
   as of this spec).
 - Do not touch marketing / external docs.
@@ -62,12 +62,12 @@ Delivered. Cloud mode has a full env-var reference, Phase 1 scope description,
 and cross-references in the agent-facing instruction files.
 
 ### What shipped
-- `docs/cloud/README.md` — dedicated cloud-mode guide (~5.6K): `WALLFACER_CLOUD`
+- `docs/cloud/README.md`, dedicated cloud-mode guide (~5.6K): `WALLFACER_CLOUD`
   semantics, required/optional `AUTH_*` vars, fail-fast startup behavior,
   orthogonality with `WALLFACER_SERVER_API_KEY`, third-party OIDC deferral.
-- `docs/guide/configuration.md` — "Cloud mode" subsection with pointer to the
+- `docs/guide/configuration.md`, "Cloud mode" subsection with pointer to the
   dedicated guide.
-- `AGENTS.md` and `CLAUDE.md` — short "cloud/local partition" bullet under
+- `AGENTS.md` and `CLAUDE.md`, short "cloud/local partition" bullet under
   Configuration pointing at `docs/cloud/README.md`.
 
 ### Design evolution

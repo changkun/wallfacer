@@ -27,14 +27,14 @@ filtered by the new `org_id`. Users with a single org see no chooser.
 
 ## What to do
 
-1. **Org list endpoint** — `GET /api/auth/orgs`:
+1. **Org list endpoint**, `GET /api/auth/orgs`:
    - Calls `auth.latere.ai/userinfo` (or the dedicated org-list endpoint
-     if the platform exposes one — check `~/dev/latere.ai/pkg/oidc/`
+     if the platform exposes one, check `~/dev/latere.ai/pkg/oidc/`
      before adding a new HTTP call).
    - Returns JSON `{orgs: [{id, name, current}], current_id}`.
    - 204 when the user has only one org.
    - 401 when unauthenticated.
-2. **Switch endpoint** — `POST /api/auth/switch-org` with body `{org_id}`:
+2. **Switch endpoint**, `POST /api/auth/switch-org` with body `{org_id}`:
    - Uses the session's refresh token to call
      `auth.latere.ai/token` with `grant_type=refresh_token&org_id=<target>`.
      The auth service mints a new access token scoped to the requested org;
@@ -44,14 +44,14 @@ filtered by the new `org_id`. Users with a single org see no chooser.
      rejection rather than propagating the raw OAuth error).
    - Returns 200 with the updated `{org_id, org_name}`; the frontend
      reloads to pick up org-scoped data.
-3. **Frontend** — extend the status-bar badge (from Phase 1):
+3. **Frontend**, extend the status-bar badge (from Phase 1):
    - When `/api/auth/orgs` returns 200 with multiple orgs, the signed-in
      dropdown grows an "Organizations" submenu listing each org with a
      check mark next to the current one.
    - Selecting an org POSTs `/api/auth/switch-org`; on success, reload
      the page.
    - When 204, render the dropdown as today (Sign out only).
-4. **Cookie refresh** — `pkg/oidc` exposes a session-mutation helper;
+4. **Cookie refresh**, `pkg/oidc` exposes a session-mutation helper;
    reuse it rather than writing cookies directly. Preserve `HttpOnly`,
    `Secure`, `SameSite=Lax`, `__Host-` prefix.
 
@@ -78,6 +78,6 @@ filtered by the new `org_id`. Users with a single org see no chooser.
 - Do not migrate existing tasks on org switch. Switching changes the
   *lens*; data written under org A stays under org A.
 - Do not cache the org list beyond the request. The platform's session TTL
-  is the right boundary — if the membership list changes, the user sees
+  is the right boundary, if the membership list changes, the user sees
   it on next login.
 - Do not add deep-linked org switching (`/switch-org?id=...`). Only POST.

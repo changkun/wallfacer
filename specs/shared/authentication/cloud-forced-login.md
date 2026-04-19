@@ -20,7 +20,7 @@ dispatched_task_id: null
 When `WALLFACER_CLOUD=true`, a browser that hits the web UI without a valid
 session is redirected to `/login` instead of seeing an anonymous task board.
 API requests continue to receive 401 (from the JWT middleware) rather than
-a redirect — they have no browser to redirect.
+a redirect, they have no browser to redirect.
 
 Local mode is untouched: anonymous browsers still see the board.
 
@@ -67,7 +67,7 @@ Local mode is untouched: anonymous browsers still see the board.
 
 - Do not add a logout redirect. `/logout` already clears cookies and
   redirects to the auth service; the return path is out of scope here.
-- Do not add any `next`-parameter validation beyond path normalization —
+- Do not add any `next`-parameter validation beyond path normalization,
   do not allow absolute-URL redirects (open-redirect class of bug).
   Validate that `next` starts with `/` and contains no scheme.
 - Do not forbid the API key path. A cloud-mode request carrying a valid

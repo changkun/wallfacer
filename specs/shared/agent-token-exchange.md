@@ -21,7 +21,7 @@ dispatched_task_id: null
 Wallfacer launches AI agents inside sandbox containers. As latere.ai grows
 out additional services (fs.latere.ai for file storage, telemetry ingestion,
 etc.), those agents need credentials to call those services **on behalf of**
-the user who dispatched the task — not with the user's own refresh-capable
+the user who dispatched the task, not with the user's own refresh-capable
 JWT, and not as anonymous clients.
 
 RFC 8693 token exchange fits: the user's access token is the `subject_token`,
@@ -41,7 +41,7 @@ In scope:
   read-only agent work and `validation="strict"` for agents that perform
   writes against latere.ai services.
 - Inject the token into the container at launch time via an env var that the
-  sandbox images already read (or introduce one — e.g. `LATERE_AI_TOKEN`).
+  sandbox images already read (or introduce one, e.g. `LATERE_AI_TOKEN`).
 - Handle 15-minute TTL: re-mint on turn boundary if the task outlives the
   token, or surface a recoverable `token_expired` failure that auto-retry
   can replay.
@@ -56,7 +56,7 @@ Out of scope:
   `agent_token` with scope X can do, not wallfacer).
 - User-facing delegation UI (view / revoke active agent sessions).
 - Migration of `internal/oauth/` (that handles sandbox *credential* OAuth
-  like Claude/Codex API keys — entirely different system).
+  like Claude/Codex API keys, entirely different system).
 
 ## JWT Claim Reference
 
@@ -90,10 +90,10 @@ From `shared/authentication.md`'s claim table, the agent-specific fields are:
 
 Agent tokens have no refresh capability (per the auth service's design).
 Options:
-1. **Re-mint on turn boundary** — before each sandbox agent launch in a
+1. **Re-mint on turn boundary**, before each sandbox agent launch in a
    multi-turn task, re-exchange the user's (refreshed) session token.
    Simple, adds one auth call per turn (~20 ms).
-2. **Fail-fast + auto-retry** — let the token expire mid-turn; when the
+2. **Fail-fast + auto-retry**, let the token expire mid-turn; when the
    container hits a 401 from fs.latere.ai, bubble up `token_expired` as a
    recoverable failure category and let the existing retry engine re-mint
    on the next run. Cheaper, but the mid-turn failure is user-visible.
@@ -103,17 +103,17 @@ measurable in the trace spans.
 
 ## Integration Points
 
-- `internal/auth/` — add `ExchangeForAgentToken(ctx, userToken, agentID, scopes) (agentToken, delegationID, error)`.
-- `internal/runner/` — call the exchange before `ContainerSpec.Build()`;
+- `internal/auth/`, add `ExchangeForAgentToken(ctx, userToken, agentID, scopes) (agentToken, delegationID, error)`.
+- `internal/runner/`, call the exchange before `ContainerSpec.Build()`;
   inject env vars into the launch command.
-- `internal/store/` — add `AgentDelegationID string` to task execution
+- `internal/store/`, add `AgentDelegationID string` to task execution
   environment so the trace is persisted.
-- Sandbox image contract — document `LATERE_AI_TOKEN` + `LATERE_AI_DELEGATION`
+- Sandbox image contract, document `LATERE_AI_TOKEN` + `LATERE_AI_DELEGATION`
   as the env vars agents should read when calling latere.ai services.
 
 ## Dependencies
 
-- `shared/authentication.md` Phase 2 must be complete — this spec needs a
+- `shared/authentication.md` Phase 2 must be complete, this spec needs a
   real user `*jwtauth.Claims` on the task creator and a populated session
   access token on the request path.
 - The auth service must expose the `token-exchange` grant and accept an
@@ -122,11 +122,11 @@ measurable in the trace spans.
 
 ## Deferred Decisions
 
-- **Where to store the minted agent token** — in-memory on the running task
+- **Where to store the minted agent token**, in-memory on the running task
   versus persisted to `store.Task.ExecutionEnv`. In-memory keeps the secret
   out of disk; persisted helps debugging. Default: in-memory, log only
   `delegation_id`.
-- **Handling tasks dispatched by the built-in API key** — no user principal,
+- **Handling tasks dispatched by the built-in API key**, no user principal,
   no subject token. Either skip agent-token provisioning (agents can't call
   latere.ai services) or mint a service-principal token. Out of scope for
   v1; documented as a limitation.

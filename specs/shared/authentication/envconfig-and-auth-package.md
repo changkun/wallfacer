@@ -35,7 +35,7 @@ foundation all other Phase 1 tasks build on.
    as false. Match the existing boolean-parsing pattern in that file (grep for
    other bool fields in `Parse`).
 3. Plumb the new field through whatever struct the handler layer reads config
-   from on startup (check how `HostMode` flows today — `handler.GetConfig`
+   from on startup (check how `HostMode` flows today, `handler.GetConfig`
    already reads `h.runner.HostMode()`; pick the equivalent surface for a
    plain env-sourced flag).
 4. Create `internal/auth/auth.go` as a thin re-export, matching
@@ -67,18 +67,18 @@ foundation all other Phase 1 tasks build on.
 ## Tests
 
 - `internal/envconfig/envconfig_test.go`:
-  - `TestParse_CloudTrue` — `WALLFACER_CLOUD=true` → `cfg.Cloud == true`.
-  - `TestParse_CloudFalse` — `WALLFACER_CLOUD=false` → `cfg.Cloud == false`.
-  - `TestParse_CloudUnset` — missing var → `cfg.Cloud == false` (default).
-  - `TestParse_CloudTruthyVariants` — `"1"`, `"yes"`, `"TRUE"` all parse true.
+  - `TestParse_CloudTrue`, `WALLFACER_CLOUD=true` → `cfg.Cloud == true`.
+  - `TestParse_CloudFalse`, `WALLFACER_CLOUD=false` → `cfg.Cloud == false`.
+  - `TestParse_CloudUnset`, missing var → `cfg.Cloud == false` (default).
+  - `TestParse_CloudTruthyVariants`, `"1"`, `"yes"`, `"TRUE"` all parse true.
 - `internal/auth/auth_test.go`: minimal smoke test that `auth.New(auth.Config{})`
-  returns nil (matches platform's graceful-degrade contract) — keeps the
+  returns nil (matches platform's graceful-degrade contract), keeps the
   re-export honest.
 
 ## Boundaries
 
 - Do not register any HTTP routes. Do not touch `internal/handler/`.
-- Do not add `jwtauth` — Phase 1 is OIDC browser login only.
+- Do not add `jwtauth`, Phase 1 is OIDC browser login only.
 - Do not add auth config to the Settings UI / `.env` editor in this task;
   `WALLFACER_CLOUD` is set via shell env, not via the in-app `.env`.
 - Do not add `org_id` or `principal_id` anywhere.

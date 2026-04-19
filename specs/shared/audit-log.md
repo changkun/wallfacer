@@ -30,13 +30,13 @@ workspace records, which answers *who originated this record* but not:
 
 These answers matter for three audiences:
 
-1. **Cloud multi-user operators** — the `cloud/multi-user-collaboration.md`
+1. **Cloud multi-user operators**, the `cloud/multi-user-collaboration.md`
    spec already flags an audit log as an expected deliverable; teams need
    attribution for coordination and dispute resolution.
-2. **Compliance-interested single-host deployments** — regulated users
+2. **Compliance-interested single-host deployments**, regulated users
    running wallfacer on a VPS want a tamper-evident trail of mutating
    actions.
-3. **Debugging** — "the task changed hands and I don't know when" is a
+3. **Debugging**, "the task changed hands and I don't know when" is a
    recurring class of support question.
 
 This spec is flagged as **future effort**, not blocking the cloud move.
@@ -47,7 +47,7 @@ this spec sits one layer above.
 
 ### In scope
 
-- A uniform structured record — **audit event** — stamped on every
+- A uniform structured record, **audit event**, stamped on every
   mutating operation that a handler processes.
 - A write surface the store, workspace manager, and handlers can call with
   a single line: `audit.Record(ctx, op, target, delta)`.
@@ -77,11 +77,11 @@ this spec sits one layer above.
 
 ## Prerequisites
 
-- `shared/authentication.md` **Phase 2 complete** — handlers must have
+- `shared/authentication.md` **Phase 2 complete**, handlers must have
   `*jwtauth.Claims` in `ctx` to stamp actors. Before Phase 2 lands, the
   `actor_sub` field of an audit event is either empty (anonymous local)
   or populated from the API key path (`"apikey"` sentinel).
-- `local/data-boundary-enforcement.md` — if that ships first, the cloud
+- `local/data-boundary-enforcement.md`, if that ships first, the cloud
   path for audit events inherits its boundary rules. Not a hard
   dependency; this spec can ship in either order.
 
@@ -111,7 +111,7 @@ type AuditEvent struct {
 // internal/audit/audit.go
 //
 // Record stamps a mutation event. No-op when auditing is disabled.
-// Always safe to call — never panics, never fails the caller's write.
+// Always safe to call, never panics, never fails the caller's write.
 // Errors are logged, not propagated.
 func Record(ctx context.Context, op, targetKind, targetID string, delta any)
 ```
@@ -155,9 +155,9 @@ the handler.
 
 ### Read API (cloud-gated)
 
-- `GET /api/audit?target=<id>` — events for one target, newest first.
-- `GET /api/audit?actor=<sub>` — events by one principal.
-- `GET /api/audit?op=<name>` — events of a given operation type.
+- `GET /api/audit?target=<id>`, events for one target, newest first.
+- `GET /api/audit?actor=<sub>`, events by one principal.
+- `GET /api/audit?op=<name>`, events of a given operation type.
 - Pagination via `cursor` (last-seen event ID).
 - Requires claims in context; `RequireScope("audit:read")` gates it.
   `RequireSuperadmin` is sufficient for the initial cut.
@@ -168,7 +168,7 @@ Local anonymous mode doesn't mount this route.
 
 The per-task event trace in `internal/store/` (`state_change`, `feedback`,
 `error`, etc.) is a *task-scoped* log and stays where it is. The audit log
-is *cross-entity* — it covers workspaces, config, admin actions, specs,
+is *cross-entity*, it covers workspaces, config, admin actions, specs,
 and things the task trace has never tracked.
 
 Overlap on task mutations is intentional:
@@ -184,7 +184,7 @@ it.
 ## UI (deferred)
 
 The MVP is an API only. A later UI spec will build the activity panel on
-top of the read endpoints. Keeping UI out of this spec is deliberate —
+top of the read endpoints. Keeping UI out of this spec is deliberate,
 the cloud-track work that cares about audit (multi-user collaboration)
 will drive the UX from a collaborative-workflow angle, not a
 compliance-dashboard angle.
