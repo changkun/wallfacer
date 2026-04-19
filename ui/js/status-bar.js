@@ -228,11 +228,99 @@ function applyTerminalVisibility() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Latere.ai sign-in badge (cloud mode only)
+// ---------------------------------------------------------------------------
+
+// renderSigninBadge populates #status-bar-signin based on the server config
+// snapshot. Called by workspace.js after /api/config resolves. Local mode
+// (config.cloud !== true) leaves the container empty — no "Sign in" link,
+// no avatar, nothing that would suggest a cloud feature exists.
+function renderSigninBadge(config) {
+  var el = document.getElementById("status-bar-signin");
+  if (!el) return;
+  if (!config || config.cloud !== true) {
+    el.innerHTML = "";
+    return;
+  }
+  // Fire-and-forget; any fetch failure leaves the badge empty, which reads
+  // correctly as "not signed in" without surfacing a broken affordance.
+  fetch("/api/auth/me", { credentials: "same-origin" })
+    .then(function (resp) {
+      if (resp.status === 204) {
+        el.innerHTML =
+          '<a href="/login" class="status-bar-signin__link">Sign in</a>';
+        return null;
+      }
+      if (resp.status === 200) return resp.json();
+      return null;
+    })
+    .then(function (user) {
+      if (!user) return;
+      _renderSignedIn(el, user, config.auth_url);
+    })
+    .catch(function () {
+      // Network error: leave empty; status-bar connection dot already
+      // surfaces the real connectivity state.
+    });
+}
+
+function _renderSignedIn(el, user, authURL) {
+  // Prefer name; fall back to email so a user with only an email provider
+  // still sees something meaningful.
+  var display = user.name || user.email || "";
+  var picture = user.picture || "";
+
+  // Manual element construction (not innerHTML) so user-controlled strings
+  // land as text nodes / attribute values. Avatar URL is still a URL — an
+  // attacker-controlled picture field could only fetch their own image.
+  var wrap = document.createElement("span");
+  wrap.className = "status-bar-signin__user";
+
+  if (picture) {
+    var img = document.createElement("img");
+    img.className = "status-bar-signin__avatar";
+    img.src = picture;
+    img.alt = "";
+    img.setAttribute("referrerpolicy", "no-referrer");
+    wrap.appendChild(img);
+  }
+
+  var nameEl = document.createElement("span");
+  nameEl.className = "status-bar-signin__name";
+  nameEl.textContent = display;
+  wrap.appendChild(nameEl);
+
+  var out = document.createElement("a");
+  out.className = "status-bar-signin__logout";
+  out.href = "/logout";
+  out.textContent = "Sign out";
+  wrap.appendChild(out);
+
+  // Clear and attach. Also install the front-channel logout iframe so a
+  // central sign-out at auth.latere.ai clears our cookie via
+  // /logout/notify. Gate on authURL presence — if the server didn't
+  // publish auth_url the iframe would load a relative "/logout" and
+  // re-enter us in a loop.
+  el.innerHTML = "";
+  el.appendChild(wrap);
+  if (authURL) {
+    var frame = document.createElement("iframe");
+    frame.name = "latere-logout-iframe";
+    frame.src = authURL.replace(/\/$/, "") + "/logout";
+    frame.style.display = "none";
+    frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
+    frame.setAttribute("aria-hidden", "true");
+    el.appendChild(frame);
+  }
+}
+
 // Expose globally to fit the existing vanilla-JS pattern
 window.initStatusBar = initStatusBar;
 window.updateStatusBar = updateStatusBar;
 window.toggleTerminalPanel = toggleTerminalPanel;
 window.applyTerminalVisibility = applyTerminalVisibility;
+window.renderSigninBadge = renderSigninBadge;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {
