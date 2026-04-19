@@ -661,7 +661,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/tasks/{id}/resume", Name: "ResumeTask",
-		Description: "Resume a failed task using its existing session.",
+		Description: "Resume a failed or waiting task using its existing session.",
 		Tags:        []string{"tasks"},
 	},
 	{

@@ -183,19 +183,14 @@ function commandPaletteTaskActions(task) {
   const actions = [];
 
   if (task.status === "backlog") {
-    const refineStatus =
-      task.current_refinement && task.current_refinement.status;
-    const refineBlocked = refineStatus === "running" || refineStatus === "done";
-    if (!refineBlocked) {
-      actions.push({
-        id: "start-task",
-        label: "Start",
-        hint: "move to in progress",
-        execute: function () {
-          return updateTaskStatus(task.id, "in_progress");
-        },
-      });
-    }
+    actions.push({
+      id: "start-task",
+      label: "Start",
+      hint: "move to in progress",
+      execute: function () {
+        return updateTaskStatus(task.id, "in_progress");
+      },
+    });
   }
 
   if (task.status === "waiting") {
@@ -217,11 +212,14 @@ function commandPaletteTaskActions(task) {
     });
   }
 
-  if (task.status === "failed" && task.session_id) {
+  if (
+    (task.status === "failed" || task.status === "waiting") &&
+    task.session_id
+  ) {
     actions.push({
       id: "resume-task",
       label: "Resume",
-      hint: "resume failed task in same session",
+      hint: "resume task in same session",
       execute: function () {
         return quickResumeTask(task.id, task.timeout || 15);
       },
@@ -845,7 +843,6 @@ function _searchRemote(query, seq) {
           turns: local ? local.turns : 0,
           session_id: local ? local.session_id : null,
           timeout: local ? local.timeout : 15,
-          current_refinement: local ? local.current_refinement : null,
         };
         const row = _buildTaskRow(taskObj, true);
         row.snippet = result.snippet || "";

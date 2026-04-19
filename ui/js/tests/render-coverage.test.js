@@ -560,6 +560,18 @@ describe("render.js buildCardActions", () => {
     expect(html).toContain("card-action-send-to-plan");
     expect(html).toContain("Test");
     expect(html).toContain("Done");
+    expect(html).not.toContain("card-action-resume");
+  });
+
+  it("includes Resume on waiting tasks that have a session_id", () => {
+    const html = ctx.buildCardActions({
+      status: "waiting",
+      id: "t1",
+      session_id: "s1",
+      timeout: 30,
+    });
+    expect(html).toContain("card-action-resume");
+    expect(html).toContain("Resume");
   });
 
   it("includes Resume and Retry for failed with session_id", () => {

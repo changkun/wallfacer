@@ -765,18 +765,6 @@ function render() {
     archiveAllBtn.classList.toggle("hidden", !hasDone);
   }
 
-  // If the modal is open for a backlog task, refresh its refinement panel
-  // so live sandbox status updates are reflected without reopening the modal.
-  if (getOpenModalTaskId()) {
-    const openTask = getRenderableTasks().find(
-      (t) => t.id === getOpenModalTaskId(),
-    );
-    if (openTask && openTask.status === "backlog") {
-      updateRefineUI(openTask);
-      renderRefineHistory(openTask);
-    }
-  }
-
   if (window.depGraphEnabled && typeof renderDependencyGraph === "function")
     renderDependencyGraph(getRenderableTasks());
   else if (typeof hideDependencyGraph === "function") hideDependencyGraph();
@@ -824,24 +812,21 @@ function buildCardActions(t) {
   if (t.kind === "routine") return "";
   const parts = [];
   if (t.status === "backlog") {
-    const refineStatus = t.current_refinement && t.current_refinement.status;
-    const refineBlocked = refineStatus === "running" || refineStatus === "done";
-    const refineTitle =
-      refineStatus === "running"
-        ? "Refinement in progress"
-        : refineStatus === "done"
-          ? "Review the refined prompt before starting"
-          : "";
     parts.push(
       `<button class="card-action-btn card-action-send-to-plan" onclick="event.stopPropagation();openPlanForTask('${t.id}')" title="Send to Plan">&#9997; Plan</button>`,
     );
     parts.push(
-      `<button class="card-action-btn card-action-start" ${refineBlocked ? `disabled title="${refineTitle}"` : `onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress"`}>&#9654; Start</button>`,
+      `<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`,
     );
   } else if (t.status === "waiting") {
     parts.push(
       `<button class="card-action-btn card-action-send-to-plan" onclick="event.stopPropagation();openPlanForTask('${t.id}')" title="Send to Plan">&#9997; Plan</button>`,
     );
+    if (t.session_id) {
+      parts.push(
+        `<button class="card-action-btn card-action-resume" onclick="event.stopPropagation();quickResumeTask('${t.id}',${t.timeout || 15})" title="Resume in existing session">&#8635; Resume</button>`,
+      );
+    }
     parts.push(
       `<button class="card-action-btn card-action-test" onclick="event.stopPropagation();quickTestTask('${t.id}')" title="Run test agent">&#9654; Test</button>`,
     );
@@ -905,7 +890,6 @@ function _cardFingerprint(t, rank) {
     JSON.stringify(t.tags || []),
     JSON.stringify(getTaskDependencyIds(t)),
     depStatuses,
-    t.current_refinement ? t.current_refinement.status : "",
     JSON.stringify(t.worktree_paths || {}),
     displayRank,
     filterQuery,
@@ -1017,16 +1001,6 @@ function updateCard(card, t, rank) {
     new Date(t.scheduled_at) > new Date()
       ? `<span class="badge badge-scheduled" title="Scheduled: ${escapeHtml(new Date(t.scheduled_at).toLocaleString())}">\u23F0 ${escapeHtml(formatRelativeTime(new Date(t.scheduled_at)))}</span>`
       : "";
-  const refineJobStatus =
-    t.status === "backlog" &&
-    t.current_refinement &&
-    t.current_refinement.status;
-  const refinementBadge =
-    refineJobStatus === "running"
-      ? `<span class="badge badge-refining" title="Refinement in progress \u2014 start disabled">refining\u2026</span>`
-      : refineJobStatus === "done"
-        ? `<span class="badge badge-refine-review" title="Review refined prompt before starting">review prompt</span>`
-        : "";
   const testResultBadge =
     t.last_test_result === "pass"
       ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
@@ -1074,7 +1048,6 @@ function updateCard(card, t, rank) {
         ${scheduledBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ""}
-        ${refinementBadge}
         ${testResultBadge}
         ${failureCategoryBadge}
       </div>

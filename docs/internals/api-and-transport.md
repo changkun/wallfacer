@@ -90,7 +90,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
 | `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |
 | `POST /api/tasks/{id}/cancel` | Cancel a task: kill container and discard worktrees |
-| `POST /api/tasks/{id}/resume` | Resume a failed task using its existing session |
+| `POST /api/tasks/{id}/resume` | Resume a failed or waiting task using its existing session |
 | `POST /api/tasks/{id}/restore` | Restore a soft-deleted task by removing its tombstone |
 | `POST /api/tasks/{id}/archive` | Move a done/cancelled task to the archived state |
 | `POST /api/tasks/{id}/unarchive` | Restore an archived task |

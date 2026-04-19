@@ -452,14 +452,15 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != store.TaskStatusFailed {
-		http.Error(w, "only failed tasks can be resumed", http.StatusBadRequest)
+	if task.Status != store.TaskStatusFailed && task.Status != store.TaskStatusWaiting {
+		http.Error(w, "only failed or waiting tasks can be resumed", http.StatusBadRequest)
 		return
 	}
 	if task.SessionID == nil || *task.SessionID == "" {
 		http.Error(w, "task has no session to resume", http.StatusBadRequest)
 		return
 	}
+	prevStatus := task.Status
 
 	// Resuming a failed task is always allowed even when max concurrent tasks
 	// is reached. When autopilot is on, all slots are filled by auto-promotion
@@ -475,7 +476,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	promoteMu.Unlock()
 
 	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
-		store.NewStateChangeData(store.TaskStatusFailed, store.TaskStatusInProgress, store.TriggerUser, nil))
+		store.NewStateChangeData(prevStatus, store.TaskStatusInProgress, store.TriggerUser, nil))
 
 	h.runner.RunBackground(id, "continue", *task.SessionID, false)
 
