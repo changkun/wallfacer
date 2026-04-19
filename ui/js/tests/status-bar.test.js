@@ -491,7 +491,10 @@ function makeSigninContext(fetchImpl) {
   const signinEl = makeEl("div");
   signinEl.id = "sidebar-signin";
 
-  // The full stub set the main status-bar tests use, plus signinEl.
+  const peersEl = makeEl("div");
+  peersEl.id = "sidebar-peers";
+
+  // The full stub set the main status-bar tests use, plus signin + peers.
   const ids = [
     "status-bar-conn-dot",
     "status-bar-conn-label",
@@ -502,7 +505,10 @@ function makeSigninContext(fetchImpl) {
     "status-bar-panel-resize",
     "status-bar-terminal-btn",
   ];
-  const elements = { "sidebar-signin": signinEl };
+  const elements = {
+    "sidebar-signin": signinEl,
+    "sidebar-peers": peersEl,
+  };
   ids.forEach((id) => {
     elements[id] = makeEl("div");
     elements[id].id = id;
@@ -532,7 +538,7 @@ function makeSigninContext(fetchImpl) {
     setTimeout,
     clearTimeout,
   };
-  return { ctx: vm.createContext(ctx), elements, signinEl };
+  return { ctx: vm.createContext(ctx), elements, signinEl, peersEl };
 }
 
 function loadStatusBarInCtx(ctx) {
@@ -676,5 +682,80 @@ describe("renderSigninBadge", () => {
     // And there's no real <script> element in the tree.
     const scriptChild = wrap.children.find((c) => c.tagName === "SCRIPT");
     expect(scriptChild).toBeUndefined();
+  });
+});
+
+describe("renderPresence", () => {
+  it("renders nothing when local mode and no active tasks", () => {
+    const { ctx, peersEl } = makeSigninContext(() =>
+      Promise.resolve({ status: 204 }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderPresence();
+    // Local mode + idle board: :empty CSS hides it. We assert the DOM
+    // contract — no children — since ":empty" is enforced by CSS.
+    expect(peersEl.children.length).toBe(0);
+  });
+
+  it("renders one row per active task (in_progress / committing / waiting)", () => {
+    const { ctx, peersEl } = makeSigninContext(() =>
+      Promise.resolve({ status: 204 }),
+    );
+    ctx.tasks = [
+      { id: "aaaa-1111", status: "in_progress", sandbox: "claude" },
+      { id: "bbbb-2222", status: "committing", sandbox: "codex" },
+      { id: "cccc-3333", status: "waiting", sandbox: "claude" },
+      { id: "dddd-4444", status: "done", sandbox: "claude" }, // excluded
+      { id: "eeee-5555", status: "backlog", sandbox: "claude" }, // excluded
+      { id: "ffff-6666", status: "failed", sandbox: "claude" }, // excluded
+    ];
+    loadStatusBarInCtx(ctx);
+    ctx.renderPresence();
+
+    // Header row + 3 peer rows.
+    const peerRows = peersEl.children.filter((c) => c.className === "sb-peer");
+    expect(peerRows.length).toBe(3);
+
+    // Dot classes must reflect status: on/on/idle in that order.
+    const dotClasses = peerRows.map((r) => {
+      const dot = r.children.find((c) => c.className.includes("pd "));
+      return dot.className;
+    });
+    expect(dotClasses[0]).toContain("on");
+    expect(dotClasses[1]).toContain("on");
+    expect(dotClasses[2]).toContain("idle");
+  });
+
+  it("shows signed-in user as the first peer", () => {
+    const { ctx, peersEl } = makeSigninContext(() =>
+      Promise.resolve({ status: 204 }),
+    );
+    ctx.tasks = [];
+    loadStatusBarInCtx(ctx);
+    ctx._presenceSelf = { name: "Alice", email: "a@b.com" };
+    ctx.renderPresence();
+
+    const peerRows = peersEl.children.filter((c) => c.className === "sb-peer");
+    expect(peerRows.length).toBe(1);
+    const name = peerRows[0].children.find((c) => c.className === "pn");
+    expect(name.textContent).toBe("Alice");
+    // Self row is always "on".
+    const dot = peerRows[0].children.find((c) => c.className.includes("pd "));
+    expect(dot.className).toContain("on");
+  });
+
+  it("caps the rendered peer list so the sidebar doesn't grow unbounded", () => {
+    const { ctx, peersEl } = makeSigninContext(() =>
+      Promise.resolve({ status: 204 }),
+    );
+    ctx.tasks = Array.from({ length: 20 }, (_, i) => ({
+      id: `t-${i}`,
+      status: "in_progress",
+      sandbox: "claude",
+    }));
+    loadStatusBarInCtx(ctx);
+    ctx.renderPresence();
+    const peerRows = peersEl.children.filter((c) => c.className === "sb-peer");
+    expect(peerRows.length).toBeLessThanOrEqual(8);
   });
 });

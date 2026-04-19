@@ -19,6 +19,7 @@ function updateStatusBar() {
   _updateConnDot();
   _updateCounts();
   _updateWorkspace();
+  renderPresence();
 }
 
 function _updateConnDot() {
@@ -241,6 +242,8 @@ function renderSigninBadge(config) {
   if (!el) return;
   if (!config || config.cloud !== true) {
     el.innerHTML = "";
+    _presenceSelf = null;
+    renderPresence();
     return;
   }
   // Fire-and-forget; any fetch failure leaves the badge empty, which reads
@@ -248,16 +251,21 @@ function renderSigninBadge(config) {
   fetch("/api/auth/me", { credentials: "same-origin" })
     .then(function (resp) {
       if (resp.status === 204) {
-        el.innerHTML =
-          '<a href="/login" class="sb-signin__link">Sign in</a>';
+        el.innerHTML = '<a href="/login" class="sb-signin__link">Sign in</a>';
         return null;
       }
       if (resp.status === 200) return resp.json();
       return null;
     })
     .then(function (user) {
-      if (!user) return;
+      if (!user) {
+        _presenceSelf = null;
+        renderPresence();
+        return;
+      }
       _renderSignedIn(el, user, config.auth_url);
+      _presenceSelf = user;
+      renderPresence();
     })
     .catch(function () {
       // Network error: leave empty; status-bar connection dot already
@@ -315,12 +323,152 @@ function _renderSignedIn(el, user, authURL) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Presence (agents + self, bottom of left sidebar)
+// ---------------------------------------------------------------------------
+
+// _presenceSelf is set by renderSigninBadge when the user is signed in, so
+// renderPresence can surface the signed-in user as a peer without re-fetching
+// /api/auth/me on every task-stream tick.
+var _presenceSelf = null;
+
+// renderPresence rebuilds #sidebar-peers from the current `tasks` global and
+// the cached signed-in user. Called from updateStatusBar on every task
+// update. Empty in local mode with no active tasks — the `:empty` CSS rule
+// hides the container, preserving the no-cloud-affordance invariant.
+function renderPresence() {
+  var el = document.getElementById("sidebar-peers");
+  if (!el) return;
+
+  var peers = [];
+
+  // Self first (if signed in via cloud mode).
+  if (_presenceSelf) {
+    peers.push({
+      kind: "self",
+      status: "on",
+      name: _presenceSelf.name || _presenceSelf.email || "you",
+      workspace: _currentWorkspaceLabel(),
+    });
+  }
+
+  // Active agents: one row per task that is running or awaiting feedback.
+  // Done/failed/cancelled tasks are not shown — they aren't actively holding
+  // a session in the way Presence conveys.
+  var taskList =
+    typeof tasks !== "undefined" && Array.isArray(tasks) ? tasks : [];
+  for (var i = 0; i < taskList.length && peers.length < 8; i++) {
+    var t = taskList[i];
+    var s = t.status;
+    var dot =
+      s === "in_progress" || s === "committing"
+        ? "on"
+        : s === "waiting"
+          ? "idle"
+          : null;
+    if (!dot) continue;
+    peers.push({
+      kind: "agent",
+      status: dot,
+      name: _peerAgentName(t),
+      workspace: _peerWorkspaceLabel(t),
+    });
+  }
+
+  // Always replace in one pass — no orphan nodes, no inline DOM patching
+  // that could drift from the tasks list.
+  el.innerHTML = "";
+  if (peers.length === 0) return;
+
+  var header = document.createElement("div");
+  header.className = "sb-section";
+  header.style.padding = "0 0 4px";
+  header.textContent = "Presence";
+  el.appendChild(header);
+
+  for (var j = 0; j < peers.length; j++) {
+    el.appendChild(_buildPeerRow(peers[j]));
+  }
+}
+
+function _buildPeerRow(peer) {
+  var row = document.createElement("div");
+  row.className = "sb-peer";
+
+  var dot = document.createElement("span");
+  dot.className = "pd " + peer.status;
+  row.appendChild(dot);
+
+  var name = document.createElement("span");
+  name.className = "pn";
+  name.textContent = peer.name;
+  row.appendChild(name);
+
+  if (peer.workspace) {
+    var ws = document.createElement("span");
+    ws.className = "pw";
+    ws.textContent = peer.workspace;
+    row.appendChild(ws);
+  }
+  return row;
+}
+
+// _peerAgentName returns a short identifier for a task's agent. Prefer the
+// sandbox kind so the user can tell claude/codex sessions apart, then fall
+// back to a shortened task id.
+function _peerAgentName(task) {
+  var sb = task.sandbox || task.default_sandbox;
+  var prefix = sb || "agent";
+  var id = (task.id || "").split("-")[0] || "";
+  return id ? prefix + "-" + id.slice(0, 4) : prefix;
+}
+
+// _peerWorkspaceLabel picks the workspace basename for a task, or falls back
+// to a short branch hint if that's all we have. Trimmed to the CSS max-width.
+function _peerWorkspaceLabel(task) {
+  var ws = task.workspace_label || task.workspace_name || "";
+  if (!ws && Array.isArray(task.workspaces) && task.workspaces[0]) {
+    var parts = task.workspaces[0].replace(/\/$/, "").split("/");
+    ws = parts[parts.length - 1] || task.workspaces[0];
+  }
+  return ws || "";
+}
+
+// _currentWorkspaceLabel reads the active workspace label for the self row,
+// mirroring the logic _updateWorkspace uses for the bottom status bar.
+function _currentWorkspaceLabel() {
+  var list =
+    typeof activeWorkspaces !== "undefined" && Array.isArray(activeWorkspaces)
+      ? activeWorkspaces
+      : [];
+  if (list.length === 0) return "";
+  var groups =
+    typeof workspaceGroups !== "undefined" && Array.isArray(workspaceGroups)
+      ? workspaceGroups
+      : [];
+  if (groups.length > 0) {
+    var active = groups.find(function (g) {
+      return (
+        Array.isArray(g.workspaces) &&
+        g.workspaces.length === list.length &&
+        g.workspaces.every(function (w, i) {
+          return w === list[i];
+        })
+      );
+    });
+    if (active && active.name) return active.name;
+  }
+  var parts = list[0].replace(/\/$/, "").split("/");
+  return parts[parts.length - 1] || list[0];
+}
+
 // Expose globally to fit the existing vanilla-JS pattern
 window.initStatusBar = initStatusBar;
 window.updateStatusBar = updateStatusBar;
 window.toggleTerminalPanel = toggleTerminalPanel;
 window.applyTerminalVisibility = applyTerminalVisibility;
 window.renderSigninBadge = renderSigninBadge;
+window.renderPresence = renderPresence;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {

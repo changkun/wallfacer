@@ -320,6 +320,11 @@
 
   <div class="sb-spacer"></div>
 
+  <!-- Presence: signed-in user (cloud mode) + per-task agent rows.
+       Populated by renderPresence() in status-bar.js. Empty in local
+       mode with no active tasks. -->
+  <div class="sb-peers" id="sidebar-peers"></div>
+
   <div class="sb-divider"></div>
   <div class="sb-nav">
     <button
