@@ -48,18 +48,6 @@ var jsTypeRegistry = []jsTypeDef{
 		},
 	},
 	{
-		Name:    "RefinementSession",
-		Comment: "Records a single sandbox-based refinement run.",
-		Fields: []jsField{
-			{JSONName: "id", JSType: "string"},
-			{JSONName: "created_at", JSType: "string", Comment: "ISO 8601 timestamp"},
-			{JSONName: "start_prompt", JSType: "string"},
-			{JSONName: "messages", JSType: "Array.<Object>"},
-			{JSONName: "result", JSType: "string"},
-			{JSONName: "result_prompt", JSType: "string"},
-		},
-	},
-	{
 		Name:    "Task",
 		Comment: "Core domain model: a unit of work executed by an agent.",
 		Fields: []jsField{
@@ -69,8 +57,6 @@ var jsTypeRegistry = []jsTypeDef{
 			{JSONName: "prompt", JSType: "string"},
 			{JSONName: "prompt_history", JSType: "Array.<string>"},
 			{JSONName: "retry_history", JSType: "Array.<Object>"},
-			{JSONName: "refine_sessions", JSType: "Array.<RefinementSession>"},
-			{JSONName: "current_refinement", JSType: "Object", Nullable: true},
 			{JSONName: "status", JSType: "TaskStatus"},
 			{JSONName: "archived", JSType: "boolean"},
 			{JSONName: "session_id", JSType: "string", Nullable: true},
@@ -444,7 +430,7 @@ func jsTaskMethodName(r Route) string {
 }
 
 // kebabSlashToCamel converts a kebab-case or slash-separated path to camelCase.
-// "rebase-on-main" → "rebaseOnMain", "refine/logs" → "refineLogs".
+// "rebase-on-main" → "rebaseOnMain", "oversight/test" → "oversightTest".
 func kebabSlashToCamel(s string) string {
 	if s == "" {
 		return ""

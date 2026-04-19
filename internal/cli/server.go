@@ -306,7 +306,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	h.StartWaitingSyncWatcher(ctx)
 	h.StartAutoTester(ctx)
 	h.StartAutoSubmitter(ctx)
-	h.StartAutoRefiner(ctx)
 
 	reg.Gauge(
 		"wallfacer_tasks_total",
@@ -996,13 +995,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetTaskSpans":     withID(h.GetTaskSpans),
 		"GetOversight":     withID(h.GetOversight),
 		"GetTestOversight": withID(h.GetTestOversight),
-
-		// Refinement agent.
-		"StartRefinement":  withID(h.StartRefinement),
-		"CancelRefinement": withID(h.CancelRefinement),
-		"StreamRefineLogs": withID(h.StreamRefineLogs),
-		"RefineApply":      withID(h.RefineApply),
-		"RefineDismiss":    withID(h.RefineDismiss),
 
 		// OAuth authentication
 		"StartOAuth":  http.HandlerFunc(h.StartOAuth),

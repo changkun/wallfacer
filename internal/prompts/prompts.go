@@ -73,7 +73,6 @@ func templateFuncMap() template.FuncMap {
 // embeddedToAPI maps embedded template file names to user-facing API names.
 var embeddedToAPI = map[string]string{
 	"ideation.tmpl":                 "ideation",
-	"refinement.tmpl":               "refinement",
 	"oversight.tmpl":                "oversight",
 	"title.tmpl":                    "title",
 	"commit.tmpl":                   "commit_message",
@@ -89,7 +88,6 @@ var embeddedToAPI = map[string]string{
 // apiToEmbedded maps user-facing API names to embedded template file names.
 var apiToEmbedded = map[string]string{
 	"ideation":                 "ideation.tmpl",
-	"refinement":               "refinement.tmpl",
 	"oversight":                "oversight.tmpl",
 	"title":                    "title.tmpl",
 	"commit_message":           "commit.tmpl",
@@ -105,7 +103,6 @@ var apiToEmbedded = map[string]string{
 // knownNames is the ordered list of all user-facing template API names.
 var knownNames = []string{
 	"ideation",
-	"refinement",
 	"task_prompt_refine",
 	"oversight",
 	"title",
@@ -260,7 +257,7 @@ func ValidateTemplate(content string) error {
 // execution and catch field-access errors at write time.
 func mockContextFor(apiName string) (interface{}, bool) {
 	switch apiName {
-	case "refinement", "task_prompt_refine":
+	case "task_prompt_refine":
 		return RefinementData{
 			CreatedAt: "2024-01-01 00:00:00",
 			Today:     "2024-01-01",
@@ -449,11 +446,8 @@ type InstructionsData struct {
 
 // --- Manager methods ---
 
-// Refinement renders the spec-writing agent prompt.
-func (m *Manager) Refinement(d RefinementData) string { return m.render("refinement.tmpl", d) }
-
 // TaskPromptRefine renders the task-mode planning agent system prompt.
-// Uses the same RefinementData fields but from the pinned task.
+// Uses the same RefinementData fields as the task's pinned metadata.
 func (m *Manager) TaskPromptRefine(d RefinementData) string {
 	return m.render("task_prompt_refine.tmpl", d)
 }
@@ -503,9 +497,6 @@ func (m *Manager) PlanningSystemNonempty() string {
 }
 
 // --- Package-level functions (delegate to Default for backward compatibility) ---
-
-// Refinement renders the spec-writing agent prompt.
-func Refinement(d RefinementData) string { return Default.Refinement(d) }
 
 // TaskPromptRefine renders the task-mode planning agent system prompt.
 func TaskPromptRefine(d RefinementData) string { return Default.TaskPromptRefine(d) }

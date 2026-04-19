@@ -52,7 +52,6 @@ func TestSandboxByActivity(t *testing.T) {
 	cfg := Config{
 		ImplementationSandbox: "claude",
 		TestingSandbox:        "codex",
-		RefinementSandbox:     "claude",
 		TitleSandbox:          "claude",
 		OversightSandbox:      "codex",
 		CommitMessageSandbox:  "codex",
@@ -62,7 +61,6 @@ func TestSandboxByActivity(t *testing.T) {
 	want := map[store.SandboxActivity]string{
 		store.SandboxActivityImplementation: "claude",
 		store.SandboxActivityTesting:        "codex",
-		store.SandboxActivityRefinement:     "claude",
 		store.SandboxActivityTitle:          "claude",
 		store.SandboxActivityOversight:      "codex",
 		store.SandboxActivityCommitMessage:  "codex",
@@ -92,7 +90,6 @@ func TestUpdateSandboxSettings(t *testing.T) {
 		"WALLFACER_DEFAULT_SANDBOX=claude",
 		"WALLFACER_SANDBOX_IMPLEMENTATION=claude",
 		"WALLFACER_SANDBOX_TESTING=codex",
-		"WALLFACER_SANDBOX_REFINEMENT=claude",
 		"UNRELATED=keep",
 		"",
 	}, "\n")
@@ -122,9 +119,6 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	}
 	if cfg.TestingSandbox != "" {
 		t.Errorf("TestingSandbox should be cleared, got %q", cfg.TestingSandbox)
-	}
-	if cfg.RefinementSandbox != "" {
-		t.Errorf("RefinementSandbox should be cleared, got %q", cfg.RefinementSandbox)
 	}
 	if cfg.CommitMessageSandbox != "" {
 		t.Errorf("CommitMessageSandbox should be cleared, got %q", cfg.CommitMessageSandbox)

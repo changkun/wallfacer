@@ -21,7 +21,6 @@ type Interface interface {
 	RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool)
 	Commit(taskID uuid.UUID, sessionID string) error
 	SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus, onDone ...func())
-	RunRefinementBackground(taskID uuid.UUID, userInstructions string)
 
 	// Worktree management.
 	EnsureTaskWorktrees(taskID uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error)
@@ -32,9 +31,7 @@ type Interface interface {
 	ListContainers() ([]sandbox.ContainerInfo, error)
 	ContainerName(taskID uuid.UUID) string
 	TaskLogReader(taskID uuid.UUID) *LiveLogReader
-	RefineContainerName(taskID uuid.UUID) string
 	KillContainer(taskID uuid.UUID)
-	KillRefineContainer(taskID uuid.UUID)
 	StopTaskWorker(taskID uuid.UUID)
 	WorkerStats() sandbox.WorkerStatsInfo
 

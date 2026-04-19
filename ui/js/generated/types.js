@@ -22,18 +22,6 @@
  */
 
 /**
- * Records a single sandbox-based refinement run.
- *
- * @typedef {Object} RefinementSession
- * @property {string} id
- * @property {string} created_at - ISO 8601 timestamp
- * @property {string} start_prompt
- * @property {Array.<Object>} messages
- * @property {string} result
- * @property {string} result_prompt
- */
-
-/**
  * Core domain model: a unit of work executed by an agent.
  *
  * @typedef {Object} Task
@@ -43,8 +31,6 @@
  * @property {string} prompt
  * @property {Array.<string>} prompt_history
  * @property {Array.<Object>} retry_history
- * @property {Array.<RefinementSession>} refine_sessions
- * @property {Object|null} current_refinement
  * @property {TaskStatus} status
  * @property {boolean} archived
  * @property {string|null} session_id

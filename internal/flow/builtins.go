@@ -13,9 +13,8 @@ var builtins = []Flow{
 	{
 		Slug:        "implement",
 		Name:        "Implement",
-		Description: "Refine the prompt, implement, test, then commit with a generated message and oversight.",
+		Description: "Implement, test, then commit with a generated message and oversight.",
 		Steps: []Step{
-			{AgentSlug: "refine", Optional: true},
 			{AgentSlug: "impl"},
 			{AgentSlug: "test"},
 			{AgentSlug: "commit-msg", RunInParallelWith: []string{"title", "oversight"}},
@@ -29,12 +28,6 @@ var builtins = []Flow{
 		Description: "Scan the workspace and propose up to three high-impact task ideas.",
 		SpawnKind:   store.TaskKindIdeaAgent,
 		Steps:       []Step{{AgentSlug: "ideate"}},
-	},
-	{
-		Slug:        "refine-only",
-		Name:        "Refine only",
-		Description: "Expand a prompt into a detailed implementation spec without implementing it.",
-		Steps:       []Step{{AgentSlug: "refine"}},
 	},
 	{
 		Slug:        "test-only",

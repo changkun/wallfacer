@@ -381,21 +381,11 @@ func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error
 		h.closeFeedbackWaitingSpan(ctx, task.ID)
 	}
 
-	// Kill any active containers for this task before persisting the new status.
-	// KillRefineContainer is a no-op when no refinement container is registered.
-	h.runner.KillRefineContainer(task.ID)
+	// Kill any active container for this task before persisting the new status.
 	if oldStatus == store.TaskStatusInProgress {
 		h.runner.KillContainer(task.ID)
 	}
 	h.runner.StopTaskWorker(task.ID)
-
-	if task.CurrentRefinement != nil && task.CurrentRefinement.Status == store.RefinementJobStatusRunning {
-		task.CurrentRefinement.Status = store.RefinementJobStatusFailed
-		task.CurrentRefinement.Error = "task cancelled"
-		if err := h.store.UpdateRefinementJob(ctx, task.ID, task.CurrentRefinement); err != nil {
-			logger.Handler.Error("cancel task: update refinement job", "task", task.ID, "error", err)
-		}
-	}
 
 	if err := h.store.CancelTask(ctx, task.ID); err != nil {
 		return err

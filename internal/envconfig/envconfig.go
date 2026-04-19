@@ -40,7 +40,6 @@ type Config struct {
 	DefaultSandbox        sandbox.Type // WALLFACER_DEFAULT_SANDBOX
 	ImplementationSandbox sandbox.Type // WALLFACER_SANDBOX_IMPLEMENTATION
 	TestingSandbox        sandbox.Type // WALLFACER_SANDBOX_TESTING
-	RefinementSandbox     sandbox.Type // WALLFACER_SANDBOX_REFINEMENT
 	TitleSandbox          sandbox.Type // WALLFACER_SANDBOX_TITLE
 	OversightSandbox      sandbox.Type // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  sandbox.Type // WALLFACER_SANDBOX_COMMIT_MESSAGE
@@ -195,8 +194,6 @@ func Parse(path string) (Config, error) {
 			cfg.ImplementationSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_TESTING":
 			cfg.TestingSandbox = sandbox.Normalize(v)
-		case "WALLFACER_SANDBOX_REFINEMENT":
-			cfg.RefinementSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_TITLE":
 			cfg.TitleSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_OVERSIGHT":
@@ -317,9 +314,6 @@ func (c Config) SandboxByActivity() map[store.SandboxActivity]sandbox.Type {
 	}
 	if c.TestingSandbox != "" {
 		out[store.SandboxActivityTesting] = c.TestingSandbox
-	}
-	if c.RefinementSandbox != "" {
-		out[store.SandboxActivityRefinement] = c.RefinementSandbox
 	}
 	if c.TitleSandbox != "" {
 		out[store.SandboxActivityTitle] = c.TitleSandbox
@@ -476,10 +470,10 @@ func UpdateWorkspaces(path string, workspaces []string) error {
 
 // UpdateSandboxSettings merges global sandbox-routing settings into the env file.
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
-// sandboxByActivity supports keys: implementation, testing, refinement, title,
+// sandboxByActivity supports keys: implementation, testing, title,
 // oversight, commit_message, idea_agent.
 func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByActivity map[store.SandboxActivity]sandbox.Type) error {
-	var impl, test, refine, title, oversight, commit, idea *string
+	var impl, test, title, oversight, commit, idea *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
 		// Two-phase approach: start with all activity pointers set to empty strings,
@@ -487,9 +481,9 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		// activities present in the caller's map with their actual values.
 		// This ensures that omitted activities are actively removed rather than
 		// silently left stale.
-		emptyImpl, emptyTest, emptyRefine := "", "", ""
+		emptyImpl, emptyTest := "", ""
 		emptyTitle, emptyOversight, emptyCommit, emptyIdea := "", "", "", ""
-		impl, test, refine = &emptyImpl, &emptyTest, &emptyRefine
+		impl, test = &emptyImpl, &emptyTest
 		title, oversight, commit, idea = &emptyTitle, &emptyOversight, &emptyCommit, &emptyIdea
 
 		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
@@ -499,10 +493,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		if v, ok := sandboxByActivity[store.SandboxActivityTesting]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			test = &s
-		}
-		if v, ok := sandboxByActivity[store.SandboxActivityRefinement]; ok {
-			s := string(sandbox.Normalize(string(v)))
-			refine = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityTitle]; ok {
 			s := string(sandbox.Normalize(string(v)))
@@ -538,7 +528,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		"WALLFACER_DEFAULT_SANDBOX":        defaultSandboxValue,
 		"WALLFACER_SANDBOX_IMPLEMENTATION": impl,
 		"WALLFACER_SANDBOX_TESTING":        test,
-		"WALLFACER_SANDBOX_REFINEMENT":     refine,
 		"WALLFACER_SANDBOX_TITLE":          title,
 		"WALLFACER_SANDBOX_OVERSIGHT":      oversight,
 		"WALLFACER_SANDBOX_COMMIT_MESSAGE": commit,

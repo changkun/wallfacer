@@ -6,7 +6,6 @@ var BuiltinAgents = []Role{
 	Title,
 	Oversight,
 	CommitMessage,
-	Refinement,
 	IdeaAgent,
 	Implementation,
 	Testing,

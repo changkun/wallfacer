@@ -11,7 +11,6 @@ import (
 
 	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/store"
 )
 
 // oversizedBody creates a JSON reader with a single field whose value is a
@@ -205,22 +204,6 @@ func TestUpdateEnvConfig_BodyTooLarge(t *testing.T) {
 	r.Body = http.MaxBytesReader(w, r.Body, BodyLimitDefault)
 
 	h.UpdateEnvConfig(w, r)
-
-	assertBodyTooLarge(t, w)
-}
-
-func TestRefineApply_BodyTooLarge(t *testing.T) {
-	h := newTestHandler(t)
-	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	if err != nil {
-		t.Fatalf("create task: %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", oversizedBody("prompt", int(BodyLimitDefault)+100))
-	r.Body = http.MaxBytesReader(w, r.Body, BodyLimitDefault)
-
-	h.RefineApply(w, r, task.ID)
 
 	assertBodyTooLarge(t, w)
 }

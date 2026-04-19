@@ -825,33 +825,4 @@ var Routes = []Route{
 		Tags:        []string{"login"},
 	},
 
-	// --- Refinement agent ---
-
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/refine", Name: "StartRefinement",
-		JSName:      "refine",
-		Description: "Start the refinement sandbox agent for a backlog task.",
-		Tags:        []string{"tasks", "refine"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/tasks/{id}/refine", Name: "CancelRefinement",
-		JSName:      "refine",
-		Description: "Cancel an in-progress refinement agent.",
-		Tags:        []string{"tasks", "refine"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/refine/logs", Name: "StreamRefineLogs",
-		Description: "Stream live logs from the refinement agent.",
-		Tags:        []string{"tasks", "refine", "sse"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/refine/apply", Name: "RefineApply",
-		Description: "Apply the refined prompt as the new task prompt.",
-		Tags:        []string{"tasks", "refine"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/refine/dismiss", Name: "RefineDismiss",
-		Description: "Dismiss the refinement result without applying it.",
-		Tags:        []string{"tasks", "refine"},
-	},
 }

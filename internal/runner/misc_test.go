@@ -1204,23 +1204,6 @@ func TestContainerCircuitBreaker(t *testing.T) {
 	}
 }
 
-// TestRefineContainerName_Empty verifies that RefineContainerName returns empty
-// when no refinement container is registered.
-func TestRefineContainerName_Empty(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	name := r.RefineContainerName(uuid.New())
-	if name != "" {
-		t.Errorf("expected empty container name, got %q", name)
-	}
-}
-
-// TestKillRefineContainer_NoOp verifies KillRefineContainer does not panic
-// when no refinement container is running.
-func TestKillRefineContainer_NoOp(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// Should not panic.
-	r.KillRefineContainer(uuid.New())
-}
 
 // TestIdeateContainerName_Empty verifies that IdeateContainerName returns empty
 // when no ideation container is running.

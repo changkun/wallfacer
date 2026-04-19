@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 131,
+  "route_count": 126,
   "routes": [
     {
       "method": "GET",
@@ -1141,57 +1141,6 @@
       "description": "Switch active organization; clears session and returns a redirect to /login?org_id=\u003ctarget\u003e.",
       "tags": [
         "login"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/refine",
-      "name": "StartRefinement",
-      "description": "Start the refinement sandbox agent for a backlog task.",
-      "tags": [
-        "tasks",
-        "refine"
-      ]
-    },
-    {
-      "method": "DELETE",
-      "pattern": "/api/tasks/{id}/refine",
-      "name": "CancelRefinement",
-      "description": "Cancel an in-progress refinement agent.",
-      "tags": [
-        "tasks",
-        "refine"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/tasks/{id}/refine/logs",
-      "name": "StreamRefineLogs",
-      "description": "Stream live logs from the refinement agent.",
-      "tags": [
-        "tasks",
-        "refine",
-        "sse"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/refine/apply",
-      "name": "RefineApply",
-      "description": "Apply the refined prompt as the new task prompt.",
-      "tags": [
-        "tasks",
-        "refine"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/refine/dismiss",
-      "name": "RefineDismiss",
-      "description": "Dismiss the refinement result without applying it.",
-      "tags": [
-        "tasks",
-        "refine"
       ]
     }
   ]

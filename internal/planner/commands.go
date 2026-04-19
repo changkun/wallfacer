@@ -83,7 +83,6 @@ func NewCommandRegistry() *CommandRegistry {
 	}{
 		{"summarize", "Produce a structured summary of the focused spec", "/summarize [words]", "summarize.tmpl"},
 		{"create", "Create a new spec file with proper frontmatter", "/create <title>", "create.tmpl"},
-		{"refine", "Update the spec against the current codebase state", "/refine [feedback]", "refine.tmpl"},
 		{"validate", "Check the focused spec against document model rules", "/validate", "validate.tmpl"},
 		{"impact", "Analyze what code and specs would be affected", "/impact", "impact.tmpl"},
 		{"status", "Update the focused spec's status", "/status <state>", "status.tmpl"},

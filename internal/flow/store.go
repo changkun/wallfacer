@@ -156,7 +156,7 @@ func DeleteUserFlow(dir, slug string) error {
 // NewMergedRegistry combines the built-in catalog with user-authored
 // flows loaded from dir. Built-in slugs win on collision: a user
 // file shadowing a built-in is rejected with an error so the core
-// flows (implement / brainstorm / refine-only / test-only) cannot
+// flows (implement / brainstorm / test-only) cannot
 // be quietly overridden.
 func NewMergedRegistry(dir string) (*Registry, error) {
 	user, err := LoadUserFlows(dir)
