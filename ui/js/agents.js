@@ -1,26 +1,30 @@
-// Agents tab: renders the merged catalog of built-in + user-
-// authored sub-agent roles. Clicking a row toggles an inline panel
-// with the full prompt template body fetched lazily from
-// /api/agents/{slug}. Built-in rows can be cloned into a new
-// user-authored agent; user-authored rows can be edited inline or
-// deleted.
+// Agents tab: split-pane layout. Left rail lists the merged
+// built-in + user-authored catalog with search and grouping; right
+// pane renders a selected agent's detail and editor. Built-in rows
+// expose a Clone action; user-authored rows edit in place.
 
 (function () {
   "use strict";
 
-  var loaded = false;
+  // Module state. `agents` is the full catalog from /api/agents;
+  // `selectedSlug` drives detail-pane rendering; `draft` is non-null
+  // while a New Agent / Clone is being composed.
+  var agents = [];
+  var selectedSlug = null;
+  var draft = null;
+  var searchQuery = "";
 
-  // loadAgents fetches the list and renders the rows. Idempotent —
-  // a successful load is cached so repeated tab switches don't
-  // re-fetch. Pass {force: true} after a write to refresh.
   function loadAgents(opts) {
-    if (loaded && !(opts && opts.force)) return;
-    var listEl = document.getElementById("agents-list");
+    var listEl = document.getElementById("agents-rail-list");
     if (!listEl) return;
+    if (opts && opts.force) {
+      // Explicit refresh after a write. Keep selection if it still
+      // exists post-reload; otherwise clear.
+    }
 
     // Surface the workspace-default harness in the tab header so
-    // "use workspace default" on individual agents has a concrete
-    // resolution the user can see and jump to change.
+    // "(use workspace default)" on individual agents has a
+    // concrete resolution the user can see and jump to change.
     var defaultEl = document.getElementById("agents-mode-default-harness");
     if (defaultEl) {
       var sb =
@@ -34,17 +38,21 @@
         return r.json();
       })
       .then(function (rows) {
-        loaded = true;
         listEl.removeAttribute("aria-busy");
-        if (!Array.isArray(rows) || rows.length === 0) {
-          listEl.innerHTML =
-            '<p class="agents-mode__empty">No agents registered.</p>';
-          return;
+        agents = Array.isArray(rows) ? rows : [];
+        // If the previously-selected agent vanished, clear the
+        // selection so the detail pane shows the empty state.
+        if (
+          selectedSlug &&
+          !draft &&
+          !agents.find(function (a) {
+            return a.slug === selectedSlug;
+          })
+        ) {
+          selectedSlug = null;
         }
-        listEl.innerHTML = "";
-        rows.forEach(function (row) {
-          listEl.appendChild(renderRow(row));
-        });
+        renderRail();
+        renderDetail();
       })
       .catch(function (err) {
         listEl.removeAttribute("aria-busy");
@@ -55,237 +63,308 @@
       });
   }
 
-  // renderRow produces one collapsed agent card. Built-in rows get
-  // a Clone button; user-authored rows get Edit + Delete buttons.
-  function renderRow(agent) {
-    var card = document.createElement("div");
-    card.className = "agents-row";
-    card.setAttribute("data-slug", agent.slug);
-    card.setAttribute("tabindex", "0");
-    if (!agent.builtin) card.classList.add("agents-row--user");
+  function filteredAgents() {
+    if (!searchQuery) return agents.slice();
+    var q = searchQuery.toLowerCase();
+    return agents.filter(function (a) {
+      if ((a.slug || "").toLowerCase().indexOf(q) !== -1) return true;
+      if ((a.title || "").toLowerCase().indexOf(q) !== -1) return true;
+      if ((a.description || "").toLowerCase().indexOf(q) !== -1) return true;
+      return false;
+    });
+  }
 
-    var header = document.createElement("div");
-    header.className = "agents-row__header";
+  function renderRail() {
+    var listEl = document.getElementById("agents-rail-list");
+    if (!listEl) return;
+    listEl.innerHTML = "";
 
-    var name = document.createElement("div");
-    name.className = "agents-row__name";
-    name.textContent = agent.title || agent.slug;
+    var shown = filteredAgents();
+    if (shown.length === 0 && !draft) {
+      listEl.innerHTML =
+        '<p class="agents-mode__empty">' +
+        (searchQuery ? "No matches." : "No agents registered.") +
+        "</p>";
+      return;
+    }
 
-    var meta = document.createElement("div");
-    meta.className = "agents-row__meta";
-    var capLabel = capabilitiesLabel(agent.capabilities);
-    var turnLabel = agent.multiturn ? "multi-turn" : "single-turn";
-    var harness = agent.harness
-      ? "harness: " + agent.harness
-      : "harness: inherit";
-    meta.textContent =
-      (capLabel ? capLabel + " · " : "") + turnLabel + " · " + harness;
+    if (draft) {
+      listEl.appendChild(railItem(draft, { isDraft: true }));
+    }
+    var builtIns = shown.filter(function (a) {
+      return a.builtin;
+    });
+    var user = shown.filter(function (a) {
+      return !a.builtin;
+    });
+
+    if (builtIns.length) {
+      listEl.appendChild(groupHeader("Built-in"));
+      builtIns.forEach(function (a) {
+        listEl.appendChild(railItem(a));
+      });
+    }
+    if (user.length) {
+      listEl.appendChild(groupHeader("User-authored"));
+      user.forEach(function (a) {
+        listEl.appendChild(railItem(a));
+      });
+    }
+  }
+
+  function groupHeader(label) {
+    var h = document.createElement("div");
+    h.className = "agents-rail__group";
+    h.textContent = label;
+    return h;
+  }
+
+  function railItem(agent, opts) {
+    opts = opts || {};
+    var el = document.createElement("button");
+    el.type = "button";
+    el.className = "agents-rail__item";
+    el.setAttribute("data-slug", agent.slug);
+    if (opts.isDraft) el.classList.add("agents-rail__item--draft");
+    if (!agent.builtin && !opts.isDraft)
+      el.classList.add("agents-rail__item--user");
+    var isSelected =
+      (opts.isDraft && draft) ||
+      (!opts.isDraft && !draft && selectedSlug === agent.slug);
+    if (isSelected) el.classList.add("agents-rail__item--active");
+
+    var name = document.createElement("span");
+    name.className = "agents-rail__name";
+    name.textContent = agent.title || agent.slug || "(untitled)";
+    el.appendChild(name);
+
+    var meta = document.createElement("span");
+    meta.className = "agents-rail__meta";
+    if (opts.isDraft) {
+      meta.textContent = "draft";
+    } else if (agent.harness) {
+      meta.textContent = agent.harness;
+    }
+    if (meta.textContent) el.appendChild(meta);
+
+    el.addEventListener("click", function () {
+      if (opts.isDraft) {
+        // Clicking the draft entry is a no-op; the detail pane
+        // already shows the editor.
+        return;
+      }
+      // Abandon any in-flight draft when the user picks an
+      // existing agent; keep the workflow single-focus.
+      draft = null;
+      selectedSlug = agent.slug;
+      renderRail();
+      renderDetail();
+    });
+    return el;
+  }
+
+  // renderDetail paints the right pane for the current selection or
+  // for the draft if one is in flight. Empty state shows when
+  // nothing is selected.
+  function renderDetail() {
+    var detail = document.getElementById("agents-detail");
+    if (!detail) return;
+    detail.innerHTML = "";
+
+    var role = null;
+    var editing = false;
+    if (draft) {
+      role = draft;
+      editing = true;
+    } else if (selectedSlug) {
+      role = agents.find(function (a) {
+        return a.slug === selectedSlug;
+      });
+      editing = role && !role.builtin;
+    }
+
+    if (!role) {
+      var empty = document.createElement("div");
+      empty.className = "agents-mode__empty-detail";
+      empty.innerHTML =
+        "<p>Pick an agent on the left, or click <strong>+ New Agent</strong> above.</p>";
+      detail.appendChild(empty);
+      return;
+    }
+
+    detail.appendChild(renderReadOnlyHeader(role, editing));
+    if (editing || draft) {
+      detail.appendChild(renderEditor(role));
+    } else {
+      detail.appendChild(renderReadOnlyBody(role));
+    }
+  }
+
+  function renderReadOnlyHeader(role, editing) {
+    var head = document.createElement("div");
+    head.className = "agents-detail__head";
+
+    var titleWrap = document.createElement("div");
+    var title = document.createElement("h3");
+    title.className = "agents-detail__title";
+    title.textContent = role.title || role.slug || "(untitled)";
+    titleWrap.appendChild(title);
+    var subtitle = document.createElement("div");
+    subtitle.className = "agents-detail__subtitle";
+    var badge = role.builtin
+      ? '<span class="agents-detail__badge">built-in</span>'
+      : '<span class="agents-detail__badge agents-detail__badge--user">user</span>';
+    subtitle.innerHTML = badge + "<code>" + escapeHTML(role.slug) + "</code>";
+    titleWrap.appendChild(subtitle);
+    head.appendChild(titleWrap);
 
     var actions = document.createElement("div");
-    actions.className = "agents-row__actions";
-    if (agent.builtin) {
-      var clone = buttonEl("Clone", "agents-row__clone", function (e) {
-        e.stopPropagation();
-        openEditor(card, agent, { mode: "clone" });
-      });
-      clone.title = "Clone this agent into a user-authored copy you can edit.";
-      actions.appendChild(clone);
-    } else {
-      var edit = buttonEl("Edit", "agents-row__clone", function (e) {
-        e.stopPropagation();
-        openEditor(card, agent, { mode: "edit" });
-      });
-      var del = buttonEl("Delete", "agents-row__delete", function (e) {
-        e.stopPropagation();
-        deleteAgent(agent.slug);
-      });
-      actions.appendChild(edit);
-      actions.appendChild(del);
+    actions.className = "agents-detail__actions";
+    if (draft) {
+      // New Agent / Clone is in flight; actions live inside the
+      // editor so no extra buttons up here.
+    } else if (role.builtin) {
+      actions.appendChild(
+        btn("Clone", "agents-detail__btn-primary", function () {
+          startClone(role);
+        }),
+      );
+    } else if (editing) {
+      actions.appendChild(
+        btn("Delete", "agents-detail__btn-danger", function () {
+          deleteAgent(role.slug);
+        }),
+      );
     }
+    head.appendChild(actions);
+    return head;
+  }
 
-    header.appendChild(name);
-    header.appendChild(meta);
-    header.appendChild(actions);
-    card.appendChild(header);
-    if (agent.description) {
-      var desc = document.createElement("p");
-      desc.className = "agents-row__desc";
-      desc.textContent = agent.description;
-      card.appendChild(desc);
-    }
-
+  function renderReadOnlyBody(role) {
     var body = document.createElement("div");
-    body.className = "agents-row__body";
-    body.hidden = true;
-    card.appendChild(body);
+    body.className = "agents-detail__body";
 
-    var onToggle = function () {
-      if (card.classList.contains("agents-row--editing")) return;
-      expandAgent(agent.slug, card, body);
-    };
-    card.addEventListener("click", onToggle);
-    card.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onToggle();
-      }
-    });
-    return card;
+    body.appendChild(kv("Description", role.description || ""));
+    body.appendChild(kv("Harness", role.harness || "(use workspace default)"));
+    body.appendChild(
+      kv("Capabilities", (role.capabilities || []).join(", ") || "(none)"),
+    );
+    body.appendChild(
+      kv("Turn model", role.multiturn ? "multi-turn" : "single-turn"),
+    );
+
+    // Prompt template body is loaded lazily via /api/agents/{slug}
+    // for built-in rows to keep the list payload small.
+    var tmplSection = document.createElement("div");
+    tmplSection.className = "agents-detail__section";
+    var tmplLabel = document.createElement("div");
+    tmplLabel.className = "agents-detail__section-label";
+    tmplLabel.textContent = "System prompt";
+    tmplSection.appendChild(tmplLabel);
+
+    var pre = document.createElement("pre");
+    pre.className = "agents-detail__tmpl";
+    pre.textContent = "Loading...";
+    tmplSection.appendChild(pre);
+    body.appendChild(tmplSection);
+
+    var url = Routes.agents
+      .get()
+      .replace("{slug}", encodeURIComponent(role.slug));
+    fetch(url, { headers: authHeaders() })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (full) {
+        if (full && full.prompt_tmpl) {
+          pre.textContent = full.prompt_tmpl;
+        } else {
+          pre.textContent =
+            "(no system prompt; the agent consumes the task prompt directly)";
+          pre.classList.add("agents-detail__tmpl--empty");
+        }
+      })
+      .catch(function () {
+        pre.textContent = "(failed to load template)";
+      });
+
+    return body;
   }
 
-  function expandAgent(slug, card, body) {
-    if (!card.classList.contains("agents-row--open")) {
-      var url = Routes.agents.get().replace("{slug}", encodeURIComponent(slug));
-      body.innerHTML = '<p class="agents-row__loading">Loading…</p>';
-      body.hidden = false;
-      card.classList.add("agents-row--open");
-      fetch(url, { headers: authHeaders() })
-        .then(function (r) {
-          return r.ok ? r.json() : Promise.reject(r.status);
-        })
-        .then(function (full) {
-          body.innerHTML = "";
-          var tmplLabel = document.createElement("div");
-          tmplLabel.className = "agents-row__tmpl-label";
-          tmplLabel.textContent = full.prompt_tmpl
-            ? "Prompt template"
-            : "Prompt: consumed from the task prompt directly.";
-          body.appendChild(tmplLabel);
-          if (full.prompt_tmpl) {
-            var pre = document.createElement("pre");
-            pre.className = "agents-row__tmpl";
-            pre.textContent = full.prompt_tmpl;
-            body.appendChild(pre);
-          }
-          if (full.capabilities && full.capabilities.length) {
-            var foot = document.createElement("div");
-            foot.className = "agents-row__foot";
-            foot.textContent = "Capabilities: " + full.capabilities.join(", ");
-            body.appendChild(foot);
-          }
-        })
-        .catch(function (err) {
-          body.innerHTML =
-            '<p class="agents-row__loading">Failed: ' +
-            escapeHTML(String(err)) +
-            "</p>";
-        });
-    } else {
-      card.classList.remove("agents-row--open");
-      body.hidden = true;
-    }
-  }
+  function renderEditor(role) {
+    var form = document.createElement("form");
+    form.className = "agents-detail__editor";
 
-  // openEditor renders an inline form under the row so the user
-  // can fill in a new slug (clone mode) or tweak fields (edit
-  // mode) without leaving the tab. Submit posts to /api/agents;
-  // cancel restores the row to its summary state.
-  function openEditor(card, agent, opts) {
-    // Collapse the expanded panel so the editor isn't fighting it
-    // for space.
-    var body = card.querySelector(".agents-row__body");
-    if (body) body.hidden = true;
-    card.classList.remove("agents-row--open");
-    card.classList.add("agents-row--editing");
-
-    var existing = card.querySelector(".agents-row__editor");
-    if (existing) existing.remove();
-
-    var editor = document.createElement("form");
-    editor.className = "agents-row__editor";
-    editor.addEventListener("click", function (e) {
-      e.stopPropagation();
-    });
-
-    var isClone = opts.mode === "clone";
-    var slugValue = isClone ? suggestCloneSlug(agent.slug) : agent.slug;
-
-    editor.appendChild(
-      labeledInput("Slug", "slug", slugValue, {
-        disabled: !isClone,
+    var slugValue = role.slug || "my-agent";
+    form.appendChild(
+      inputRow("Slug", "slug", slugValue, {
+        disabled: !draft && !role.builtin,
         hint: "kebab-case, 2-40 chars",
       }),
     );
-    editor.appendChild(labeledInput("Title", "title", agent.title || ""));
-    editor.appendChild(
-      labeledInput("Description", "description", agent.description || ""),
+    form.appendChild(inputRow("Title", "title", role.title || ""));
+    form.appendChild(
+      inputRow("Description", "description", role.description || ""),
     );
-    editor.appendChild(
-      labeledSelect(
-        "Harness",
-        "harness",
-        agent.harness || "",
-        [
-          { value: "", label: "(use workspace default)" },
-          { value: "claude", label: "Claude" },
-          { value: "codex", label: "Codex" },
-        ],
-        "Pin this agent to a specific coding harness. Empty inherits from the task-level sandbox or WALLFACER_DEFAULT_SANDBOX.",
+
+    form.appendChild(harnessRow(role.harness || ""));
+    form.appendChild(capabilitiesRow(role.capabilities || []));
+    form.appendChild(
+      checkboxRow(
+        "Multi-turn",
+        "multiturn",
+        !!role.multiturn,
+        "Advisory only: the runner's binding table is the source of truth for dispatch.",
       ),
     );
-    editor.appendChild(
-      labeledCheckbox("Multi-turn", "multiturn", !!agent.multiturn),
-    );
-    editor.appendChild(
-      labeledTextarea(
-        "Capabilities (one per line)",
-        "capabilities",
-        (agent.capabilities || []).join("\n"),
-      ),
-    );
-    // Inline system prompt body. Editing this writes a prompt_tmpl
-    // field to the agent's YAML. For user-authored agents it
-    // overrides any prompt_template_name lookup. Fetch the full
-    // agent on edit so the current body is prefilled.
-    editor.appendChild(
-      labeledTextarea(
-        "System Prompt",
-        "prompt_tmpl",
-        agent.prompt_tmpl || "",
-        {
-          rows: 8,
-          hint:
-            "Optional. Leave empty to inherit from the built-in " +
-            "template. Runtime use of custom prompt bodies ships in " +
-            "a follow-up; today the field is persisted and displayed " +
-            "but the runner still loads the named template for " +
-            "built-in agent slots.",
-        },
-      ),
-    );
+
+    form.appendChild(promptRow(role.prompt_tmpl || ""));
 
     var err = document.createElement("p");
-    err.className = "agents-row__editor-err";
+    err.className = "agents-detail__editor-err";
     err.hidden = true;
-    editor.appendChild(err);
+    form.appendChild(err);
 
     var actions = document.createElement("div");
-    actions.className = "agents-row__editor-actions";
-    var submit = buttonEl(isClone ? "Save clone" : "Save", "agents-row__save");
-    submit.type = "submit";
-    var cancel = buttonEl("Cancel", "agents-row__cancel", function () {
-      closeEditor(card);
-    });
-    cancel.type = "button";
+    actions.className = "agents-detail__editor-actions";
+    var cancel = btn(
+      "Cancel",
+      "agents-detail__btn-ghost",
+      function () {
+        draft = null;
+        if (!role.builtin && role.slug) selectedSlug = role.slug;
+        renderRail();
+        renderDetail();
+      },
+      "button",
+    );
+    var save = btn(
+      draft ? "Create" : "Save",
+      "agents-detail__btn-primary",
+      null,
+      "submit",
+    );
     actions.appendChild(cancel);
-    actions.appendChild(submit);
-    editor.appendChild(actions);
+    actions.appendChild(save);
+    form.appendChild(actions);
 
-    editor.addEventListener("submit", function (e) {
+    form.addEventListener("submit", function (e) {
       e.preventDefault();
       err.hidden = true;
-      var payload = readEditorPayload(editor);
-      submit.disabled = true;
-      var req = isClone
+      save.disabled = true;
+      var payload = readEditorPayload(form);
+      var isCreate = !!draft;
+      var req = isCreate
         ? fetch(Routes.agents.create(), {
             method: "POST",
             headers: jsonHeaders(),
             body: JSON.stringify(payload),
           })
         : fetch(
-            Routes.agents
-              .update()
-              .replace("{slug}", encodeURIComponent(agent.slug)),
+            Routes.agents.update().replace(
+              "{slug}",
+              encodeURIComponent(role.slug),
+            ),
             {
               method: "PUT",
               headers: jsonHeaders(),
@@ -299,26 +378,90 @@
             throw new Error(text || "HTTP " + r.status);
           });
         })
-        .then(function () {
-          closeEditor(card);
+        .then(function (saved) {
+          draft = null;
+          selectedSlug = saved.slug || payload.slug;
           loadAgents({ force: true });
         })
         .catch(function (e2) {
           err.textContent = String(e2.message || e2);
           err.hidden = false;
-          submit.disabled = false;
+          save.disabled = false;
         });
     });
-
-    card.appendChild(editor);
-    var first = editor.querySelector("input, textarea, select");
-    if (first && typeof first.focus === "function") first.focus();
+    return form;
   }
 
-  function closeEditor(card) {
-    var editor = card.querySelector(".agents-row__editor");
-    if (editor) editor.remove();
-    card.classList.remove("agents-row--editing");
+  function readEditorPayload(form) {
+    var slug = form.querySelector('[name="slug"]').value.trim();
+    var title = form.querySelector('[name="title"]').value.trim();
+    var description = form.querySelector('[name="description"]').value.trim();
+    var harness = form.querySelector('[name="harness"]').value || "";
+    var multiturn = form.querySelector('[name="multiturn"]').checked;
+    var caps = Array.from(form.querySelectorAll('[name="capability"]:checked'))
+      .map(function (el) {
+        return el.value;
+      })
+      .filter(Boolean);
+    var promptTmplEl = form.querySelector('[name="prompt_tmpl"]');
+    var promptTmpl = promptTmplEl ? promptTmplEl.value : "";
+    return {
+      slug: slug,
+      title: title,
+      description: description,
+      harness: harness,
+      multiturn: multiturn,
+      capabilities: caps,
+      prompt_tmpl: promptTmpl,
+    };
+  }
+
+  function startClone(role) {
+    draft = {
+      slug: suggestCloneSlug(role.slug),
+      title: role.title || "",
+      description: role.description || "",
+      harness: role.harness || "",
+      multiturn: !!role.multiturn,
+      capabilities: (role.capabilities || []).slice(),
+      prompt_tmpl: role.prompt_tmpl || "",
+    };
+    // If prompt_tmpl wasn't in the list row, fetch the full detail
+    // so the clone starts with a populated body.
+    if (!role.prompt_tmpl && role.slug) {
+      var url = Routes.agents
+        .get()
+        .replace("{slug}", encodeURIComponent(role.slug));
+      fetch(url, { headers: authHeaders() })
+        .then(function (r) {
+          return r.ok ? r.json() : null;
+        })
+        .then(function (full) {
+          if (full && full.prompt_tmpl && draft) {
+            draft.prompt_tmpl = full.prompt_tmpl;
+            renderDetail();
+          }
+        })
+        .catch(function () {});
+    }
+    selectedSlug = null;
+    renderRail();
+    renderDetail();
+  }
+
+  function openNewEditor() {
+    draft = {
+      slug: "my-agent",
+      title: "",
+      description: "",
+      harness: "",
+      multiturn: false,
+      capabilities: [],
+      prompt_tmpl: "",
+    };
+    selectedSlug = null;
+    renderRail();
+    renderDetail();
   }
 
   function deleteAgent(slug) {
@@ -339,6 +482,7 @@
         }
       })
       .then(function () {
+        selectedSlug = null;
         loadAgents({ force: true });
       })
       .catch(function (err) {
@@ -348,148 +492,195 @@
       });
   }
 
-  function readEditorPayload(editor) {
-    var slug = editor.querySelector('[name="slug"]').value.trim();
-    var title = editor.querySelector('[name="title"]').value.trim();
-    var description = editor.querySelector('[name="description"]').value.trim();
-    var harness = editor.querySelector('[name="harness"]').value;
-    var multiturn = editor.querySelector('[name="multiturn"]').checked;
-    var caps = editor
-      .querySelector('[name="capabilities"]')
-      .value.split("\n")
-      .map(function (s) {
-        return s.trim();
-      })
-      .filter(Boolean);
-    var promptTmplEl = editor.querySelector('[name="prompt_tmpl"]');
-    var promptTmpl = promptTmplEl ? promptTmplEl.value : "";
-    return {
-      slug: slug,
-      title: title,
-      description: description,
-      harness: harness,
-      multiturn: multiturn,
-      capabilities: caps,
-      prompt_tmpl: promptTmpl,
-    };
-  }
+  // --- Editor field builders ---
 
-  function suggestCloneSlug(base) {
-    var suggestion = base + "-copy";
-    // Cap at 40 chars; "-copy" is 5, so slice base to 35 for the
-    // long-name fallback.
-    return suggestion.length <= 40 ? suggestion : base.slice(0, 35) + "-copy";
-  }
-
-  // --- DOM helpers ---
-
-  function buttonEl(label, cls, onClick) {
-    var b = document.createElement("button");
-    b.type = "button";
-    b.className = cls;
-    b.textContent = label;
-    if (onClick) b.addEventListener("click", onClick);
-    return b;
-  }
-
-  function labeledInput(label, name, value, opts) {
+  function inputRow(label, name, value, opts) {
     opts = opts || {};
     var wrap = document.createElement("label");
-    wrap.className = "agents-row__field";
+    wrap.className = "agents-detail__field";
     var l = document.createElement("span");
-    l.className = "agents-row__field-label";
+    l.className = "agents-detail__field-label";
     l.textContent = label;
-    var i = document.createElement("input");
-    i.type = "text";
-    i.name = name;
-    i.value = value || "";
-    if (opts.disabled) i.disabled = true;
-    if (opts.hint) i.title = opts.hint;
+    var input = document.createElement("input");
+    input.type = "text";
+    input.name = name;
+    input.value = value || "";
+    if (opts.disabled) input.disabled = true;
+    if (opts.hint) input.title = opts.hint;
     wrap.appendChild(l);
-    wrap.appendChild(i);
-    return wrap;
-  }
-
-  function labeledTextarea(label, name, value, opts) {
-    opts = opts || {};
-    var wrap = document.createElement("label");
-    wrap.className = "agents-row__field";
-    var l = document.createElement("span");
-    l.className = "agents-row__field-label";
-    l.textContent = label;
-    var t = document.createElement("textarea");
-    t.name = name;
-    t.rows = opts.rows || 3;
-    t.value = value || "";
-    if (opts.hint) t.title = opts.hint;
-    wrap.appendChild(l);
-    wrap.appendChild(t);
+    wrap.appendChild(input);
     if (opts.hint) {
       var h = document.createElement("span");
-      h.className = "agents-row__field-hint";
+      h.className = "agents-detail__field-hint";
       h.textContent = opts.hint;
       wrap.appendChild(h);
     }
     return wrap;
   }
 
-  function labeledSelect(label, name, value, opts, hint) {
-    var wrap = document.createElement("label");
-    wrap.className = "agents-row__field";
+  // harnessRow renders the harness pin as a three-way segmented
+  // button group so the choice reads like a toggle, not a dropdown.
+  function harnessRow(current) {
+    var wrap = document.createElement("div");
+    wrap.className = "agents-detail__field";
     var l = document.createElement("span");
-    l.className = "agents-row__field-label";
-    l.textContent = label;
-    var s = document.createElement("select");
-    s.name = name;
-    if (hint) s.title = hint;
-    opts.forEach(function (opt) {
-      var o = document.createElement("option");
-      o.value = opt.value;
-      o.textContent = opt.label;
-      if (opt.value === value) o.selected = true;
-      s.appendChild(o);
-    });
+    l.className = "agents-detail__field-label";
+    l.textContent = "Harness";
     wrap.appendChild(l);
-    wrap.appendChild(s);
+
+    var seg = document.createElement("div");
+    seg.className = "agents-detail__segment";
+    var hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "harness";
+    hidden.value = current || "";
+    wrap.appendChild(hidden);
+
+    [
+      { value: "", label: "Default" },
+      { value: "claude", label: "Claude" },
+      { value: "codex", label: "Codex" },
+    ].forEach(function (opt) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "agents-detail__segment-btn";
+      if ((current || "") === opt.value) {
+        b.classList.add("agents-detail__segment-btn--active");
+      }
+      b.textContent = opt.label;
+      b.addEventListener("click", function () {
+        hidden.value = opt.value;
+        Array.from(seg.children).forEach(function (c) {
+          c.classList.remove("agents-detail__segment-btn--active");
+        });
+        b.classList.add("agents-detail__segment-btn--active");
+      });
+      seg.appendChild(b);
+    });
+    wrap.appendChild(seg);
+
+    var h = document.createElement("span");
+    h.className = "agents-detail__field-hint";
+    h.textContent =
+      "Default inherits from the workspace setting. " +
+      "Claude and Codex pin this agent to a specific harness regardless of task or env config.";
+    wrap.appendChild(h);
+    return wrap;
+  }
+
+  function capabilitiesRow(current) {
+    var wrap = document.createElement("div");
+    wrap.className = "agents-detail__field";
+    var l = document.createElement("span");
+    l.className = "agents-detail__field-label";
+    l.textContent = "Capabilities";
+    wrap.appendChild(l);
+
+    var group = document.createElement("div");
+    group.className = "agents-detail__checks";
+    [
+      {
+        value: "workspace.read",
+        label: "workspace.read",
+        hint: "read workspace files",
+      },
+      {
+        value: "workspace.write",
+        label: "workspace.write",
+        hint: "write + commit changes",
+      },
+      {
+        value: "board.context",
+        label: "board.context",
+        hint: "see sibling tasks",
+      },
+    ].forEach(function (cap) {
+      var lab = document.createElement("label");
+      lab.className = "agents-detail__check";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.name = "capability";
+      cb.value = cap.value;
+      cb.checked = current.indexOf(cap.value) !== -1;
+      var span = document.createElement("span");
+      span.textContent = cap.label;
+      span.title = cap.hint;
+      lab.appendChild(cb);
+      lab.appendChild(span);
+      group.appendChild(lab);
+    });
+    wrap.appendChild(group);
+    return wrap;
+  }
+
+  function checkboxRow(label, name, checked, hint) {
+    var wrap = document.createElement("label");
+    wrap.className = "agents-detail__field agents-detail__field--check";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.name = name;
+    cb.checked = !!checked;
+    var span = document.createElement("span");
+    span.textContent = label;
+    wrap.appendChild(cb);
+    wrap.appendChild(span);
     if (hint) {
       var h = document.createElement("span");
-      h.className = "agents-row__field-hint";
+      h.className = "agents-detail__field-hint";
       h.textContent = hint;
       wrap.appendChild(h);
     }
     return wrap;
   }
 
-  function labeledCheckbox(label, name, checked) {
-    var wrap = document.createElement("label");
-    wrap.className = "agents-row__field agents-row__field--check";
-    var i = document.createElement("input");
-    i.type = "checkbox";
-    i.name = name;
-    i.checked = !!checked;
+  function promptRow(value) {
+    var wrap = document.createElement("div");
+    wrap.className = "agents-detail__field agents-detail__field--prompt";
     var l = document.createElement("span");
-    l.textContent = label;
-    wrap.appendChild(i);
+    l.className = "agents-detail__field-label";
+    l.textContent = "System Prompt";
     wrap.appendChild(l);
+    var ta = document.createElement("textarea");
+    ta.name = "prompt_tmpl";
+    ta.rows = 14;
+    ta.value = value || "";
+    wrap.appendChild(ta);
+    var h = document.createElement("span");
+    h.className = "agents-detail__field-hint";
+    h.textContent =
+      "Optional. Leave empty to inherit from the built-in template. " +
+      "Runtime use of custom prompt bodies ships in a follow-up; today " +
+      "the runner still loads the named template for built-in agent slots.";
+    wrap.appendChild(h);
     return wrap;
   }
 
-  function capabilitiesLabel(caps) {
-    if (!caps || caps.length === 0) return "no workspace access";
-    return caps
-      .map(function (c) {
-        switch (c) {
-          case "workspace.read":
-            return "workspace read";
-          case "workspace.write":
-            return "workspace write";
-          case "board.context":
-            return "board context";
-          default:
-            return c;
-        }
-      })
-      .join(" · ");
+  function kv(label, value) {
+    var row = document.createElement("div");
+    row.className = "agents-detail__kv";
+    var k = document.createElement("span");
+    k.className = "agents-detail__kv-key";
+    k.textContent = label;
+    var v = document.createElement("span");
+    v.className = "agents-detail__kv-value";
+    v.textContent = value;
+    row.appendChild(k);
+    row.appendChild(v);
+    return row;
+  }
+
+  function btn(text, cls, onClick, type) {
+    var b = document.createElement("button");
+    b.type = type || "button";
+    b.className = cls;
+    b.textContent = text;
+    if (onClick) b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function suggestCloneSlug(base) {
+    var suggestion = base + "-copy";
+    return suggestion.length <= 40 ? suggestion : base.slice(0, 35) + "-copy";
   }
 
   function authHeaders() {
@@ -512,61 +703,39 @@
       .replace(/>/g, "&gt;");
   }
 
-  // openNewEditor inserts a standalone editor card at the top of
-  // the list so the user can author an agent from scratch. Submit
-  // reuses the same POST path Clone uses; Cancel removes the card.
-  function openNewEditor() {
-    var listEl = document.getElementById("agents-list");
-    if (!listEl) return;
-    // Collapse any existing draft so there's only one open at a time.
-    var existing = listEl.querySelector(".agents-row--draft");
-    if (existing) existing.remove();
-
-    var card = document.createElement("div");
-    card.className = "agents-row agents-row--user agents-row--draft";
-    card.setAttribute("data-slug", "(new)");
-    var header = document.createElement("div");
-    header.className = "agents-row__header";
-    var name = document.createElement("div");
-    name.className = "agents-row__name";
-    name.textContent = "New agent";
-    var meta = document.createElement("div");
-    meta.className = "agents-row__meta";
-    meta.textContent = "draft";
-    header.appendChild(name);
-    header.appendChild(meta);
-    card.appendChild(header);
-    listEl.insertBefore(card, listEl.firstChild);
-
-    // Reuse the Clone editor with a blank role so the user fills in
-    // every field. Mode "clone" keeps the slug input enabled.
-    openEditor(
-      card,
-      {
-        slug: "my-agent",
-        title: "",
-        description: "",
-        harness: "",
-        multiturn: false,
-        capabilities: [],
-      },
-      { mode: "clone" },
-    );
-    // Scroll the draft into view so the user doesn't have to hunt
-    // for the form when the list is long.
-    if (typeof card.scrollIntoView === "function") {
-      card.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+  // Bind the search input once per tab load. The input is inside the
+  // static partial so it's safe to bind on first loadAgents() too.
+  function bindSearch() {
+    var s = document.getElementById("agents-rail-search");
+    if (!s || s.dataset.bound === "true") return;
+    s.dataset.bound = "true";
+    s.addEventListener("input", function () {
+      searchQuery = s.value || "";
+      renderRail();
+    });
   }
 
-  window.loadAgents = loadAgents;
+  // loadAgentsPublic is the window-facing entry point. It wraps
+  // loadAgents with the one-time search binding; kept as a named
+  // wrapper so biome's no-function-reassign rule stays happy.
+  function loadAgentsPublic(opts) {
+    bindSearch();
+    loadAgents(opts);
+  }
+
+  window.loadAgents = loadAgentsPublic;
   window.__agents_test = {
-    renderRow: renderRow,
-    expandAgent: expandAgent,
-    openEditor: openEditor,
-    closeEditor: closeEditor,
+    renderRail: renderRail,
+    renderDetail: renderDetail,
+    startClone: startClone,
+    openNewEditor: openNewEditor,
     readEditorPayload: readEditorPayload,
     suggestCloneSlug: suggestCloneSlug,
-    openNewEditor: openNewEditor,
+    _setState: function (state) {
+      if (state.agents) agents = state.agents;
+      if (state.selectedSlug !== undefined) selectedSlug = state.selectedSlug;
+      if (state.draft !== undefined) draft = state.draft;
+      if (state.searchQuery !== undefined) searchQuery = state.searchQuery;
+    },
   };
 })();
