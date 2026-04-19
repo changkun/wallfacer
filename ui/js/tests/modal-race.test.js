@@ -205,9 +205,6 @@ function makeRaceContext(overrides = {}) {
     oversightData: null,
     oversightFetching: false,
     timelineRefreshTimer: null,
-    refineTaskId: null,
-    refineRawLogBuffer: "",
-    refineLogsMode: "pretty",
     history: { replaceState: () => {} },
     location: { hash: "", pathname: "/", search: "" },
     document: {
@@ -236,9 +233,6 @@ function makeRaceContext(overrides = {}) {
       getEl("modal-summary-section").classList.remove("hidden");
     },
     renderTestResultsFromEvents: () => {},
-    renderRefineHistory: () => {},
-    updateRefineUI: () => {},
-    resetRefinePanel: () => {},
     applySandboxByActivity: () => {},
     populateDependsOnPicker: () => {},
     renderDiffFiles: (el, diff) => {

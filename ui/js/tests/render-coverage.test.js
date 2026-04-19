@@ -157,8 +157,6 @@ function createContext(options = {}) {
     matchesFilter: () => true,
     updateIdeationFromTasks: () => {},
     updateBacklogSortButton: () => {},
-    updateRefineUI: () => {},
-    renderRefineHistory: () => {},
     hideDependencyGraph: () => {},
     renderDependencyGraph: () => {},
     sandboxDisplayName: (s) => s || "Default",
@@ -544,15 +542,6 @@ describe("render.js buildCardActions", () => {
     const html = ctx.buildCardActions({ status: "backlog", id: "t1" });
     expect(html).toContain("card-action-send-to-plan");
     expect(html).toContain("Start");
-  });
-
-  it("disables Start when refinement is running", () => {
-    const html = ctx.buildCardActions({
-      status: "backlog",
-      id: "t1",
-      current_refinement: { status: "running" },
-    });
-    expect(html).toContain("disabled");
   });
 
   it("includes Send to Plan, Test and Done buttons for waiting", () => {

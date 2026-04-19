@@ -102,7 +102,6 @@ async function fetchConfig() {
     workspacePickerRequired = activeWorkspaces.length === 0;
     var toggleMap = {
       autopilot: "autopilot-toggle",
-      autorefine: "autorefine-toggle",
       autotest: "autotest-toggle",
       autosubmit: "autosubmit-toggle",
       autosync: "autosync-toggle",
@@ -117,7 +116,6 @@ async function fetchConfig() {
     }
     // Keep globals in sync (they are used elsewhere).
     autopilot = !!cfg.autopilot;
-    autorefine = !!cfg.autorefine;
     autotest = !!cfg.autotest;
     autosubmit = !!cfg.autosubmit;
     autosync = !!cfg.autosync;

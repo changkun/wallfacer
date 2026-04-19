@@ -4,7 +4,6 @@
 /** @typedef {import('./generated/types.js').TaskUsage} TaskUsage */
 /** @typedef {import('./generated/types.js').TaskKind} TaskKind */
 /** @typedef {import('./generated/types.js').EventType} EventType */
-/** @typedef {import('./generated/types.js').RefinementSession} RefinementSession */
 /** @typedef {import('./generated/types.js').ExecutionEnvironment} ExecutionEnvironment */
 
 // --- Deep-link hash handling ---
@@ -668,7 +667,6 @@ document.addEventListener("click", function (e) {
 function updateAutomationActiveCount() {
   var ids = [
     "ideation-header-toggle",
-    "autorefine-toggle",
     "autopilot-toggle",
     "autosync-toggle",
     "autotest-toggle",
@@ -696,7 +694,6 @@ var _watcherFriendlyNames = {
   "auto-test": "Test",
   "auto-submit": "Submit",
   "auto-sync": "Catch Up",
-  "auto-refine": "Refine",
 };
 
 function updateWatcherHealth(entries) {
@@ -791,19 +788,6 @@ var toggleAutosubmit = createConfigToggle({
     autosubmit = v;
   },
   label: "auto-submit",
-  onUpdate: updateAutomationActiveCount,
-});
-
-var toggleAutorefine = createConfigToggle({
-  elementId: "autorefine-toggle",
-  configKey: "autorefine",
-  getState: function () {
-    return autorefine;
-  },
-  setState: function (v) {
-    autorefine = v;
-  },
-  label: "auto-refine",
   onUpdate: updateAutomationActiveCount,
 });
 

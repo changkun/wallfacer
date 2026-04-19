@@ -682,22 +682,6 @@ describe("toggleAutosubmit", () => {
   });
 });
 
-describe("toggleAutorefine", () => {
-  it("reverts on failure", async () => {
-    const toggle = makeInput(true);
-    const apiFn = vi.fn().mockRejectedValue(new Error("fail"));
-    const ctx = makeContext({
-      elements: [["autorefine-toggle", toggle]],
-      api: apiFn,
-    });
-    loadApiCoreStack(ctx);
-    vm.runInContext("autorefine = false;", ctx);
-
-    await ctx.toggleAutorefine();
-    expect(toggle.checked).toBe(false);
-  });
-});
-
 describe("toggleAutosync", () => {
   it("reverts on failure", async () => {
     const toggle = makeInput(true);

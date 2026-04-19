@@ -601,7 +601,6 @@ async function openModal(id) {
   renderModalDependencies(task);
   _renderModalAside(task);
 
-  const backlogRight = document.getElementById("modal-backlog-right");
   const backlogSettings = document.getElementById("modal-backlog-settings");
   const backlogTags = document.getElementById("modal-backlog-tags");
 
@@ -624,8 +623,7 @@ async function openModal(id) {
     if (specTabs) specTabs.classList.remove("hidden");
     switchEditTab("spec", "preview");
 
-    // Show right refinement panel and left backlog-specific sections
-    backlogRight.classList.remove("hidden");
+    // Show left backlog-specific sections (refinement panel retired)
     backlogSettings.classList.remove("hidden");
     backlogTags.classList.remove("hidden");
 
@@ -685,12 +683,6 @@ async function openModal(id) {
       resumeRow.classList.add("hidden");
     }
 
-    // Reset refinement panel then restore state from task data
-    resetRefinePanel();
-    refineTaskId = task.id;
-    updateRefineUI(task);
-    renderRefineHistory(task);
-
     // Make modal wide for split layout
     const modalCard = document.querySelector("#modal .modal-card");
     modalCard.classList.add("modal-wide");
@@ -719,7 +711,6 @@ async function openModal(id) {
     var specPreviewEl = document.getElementById("modal-edit-prompt-preview");
     if (specPreviewEl) specPreviewEl.classList.add("hidden");
 
-    backlogRight.classList.add("hidden");
     backlogSettings.classList.add("hidden");
     backlogTags.classList.add("hidden");
   }
@@ -1031,27 +1022,22 @@ async function openModal(id) {
       if (changesMainTab) changesMainTab.classList.add("hidden");
     }
 
-    // Ensure main tabs suppressed for backlog are visible again, and the
-    // Refine tab (backlog-only) is hidden for executed tasks.
+    // Ensure main tabs suppressed for backlog are visible again.
     ["activity", "events"].forEach(function (t) {
       const btn = document.getElementById("main-tab-" + t);
       if (btn) btn.classList.remove("hidden");
     });
-    const refineTabBtn = document.getElementById("main-tab-refine");
-    if (refineTabBtn) refineTabBtn.classList.add("hidden");
     // Default: Activity main tab so the user lands on turn results + live
     // logs. setLeftTab("implementation") inside setMainTab resets the
     // Impl/Testing sub-tab to Implementation by default.
     setMainTab("activity");
   } else {
-    // Backlog: Spec + Refine are the only meaningful tabs. Hide the tabs
-    // that require an executed run; expose Refine next to Spec.
+    // Backlog: Spec is the primary tab. Hide tabs that require an executed
+    // run. Prompt iteration now happens via Send to Plan (task-mode planning).
     ["activity", "events"].forEach(function (t) {
       const btn = document.getElementById("main-tab-" + t);
       if (btn) btn.classList.add("hidden");
     });
-    const refineTabBtn = document.getElementById("main-tab-refine");
-    if (refineTabBtn) refineTabBtn.classList.remove("hidden");
     setMainTab("spec");
   }
 
@@ -1083,12 +1069,8 @@ async function openModal(id) {
   startSection.classList.toggle("hidden", task.status !== "backlog");
   if (task.status === "backlog") {
     const startBtn = startSection.querySelector("button");
-    const refining =
-      task.current_refinement && task.current_refinement.status === "running";
-    startBtn.disabled = refining;
-    startBtn.title = refining
-      ? "Refinement in progress — wait for it to finish"
-      : "";
+    startBtn.disabled = false;
+    startBtn.title = "";
   }
 
   // Cancel section (backlog / in_progress / waiting / failed)
@@ -1483,10 +1465,8 @@ function closeModal() {
   if (timelineMainTab) timelineMainTab.classList.add("hidden");
   const changesMainTab = document.getElementById("main-tab-changes");
   if (changesMainTab) changesMainTab.classList.add("hidden");
-  resetRefinePanel();
   const _depsSection = document.getElementById("modal-dependencies");
   if (_depsSection) _depsSection.classList.add("hidden");
-  document.getElementById("modal-backlog-right").classList.add("hidden");
   document.getElementById("modal-backlog-settings").classList.add("hidden");
   var _backlogTags = document.getElementById("modal-backlog-tags");
   if (_backlogTags) _backlogTags.classList.add("hidden");

@@ -1,7 +1,7 @@
 // --- Streaming fetch helpers ---
 //
 // Shared streaming fetch + chunk accumulation for log panels.
-// Replaces the common streaming pattern in modal-logs.js and refine.js.
+// Replaces the common streaming pattern in modal-logs.js.
 
 /**
  * Start a streaming fetch that decodes chunks and calls onChunk for each.

@@ -374,29 +374,6 @@ describe("commandPaletteTaskActions extended", () => {
     expect(ctx.commandPaletteTaskActions({ status: "backlog" })).toEqual([]);
   });
 
-  it("blocks start action when refinement is running", () => {
-    const ctx = setupCommandPaletteContext();
-    const task = {
-      id: "t1",
-      status: "backlog",
-      current_refinement: { status: "running" },
-    };
-    const actions = ctx.commandPaletteTaskActions(task).map((a) => a.id);
-    expect(actions).not.toContain("start-task");
-    expect(actions).toContain("open-task");
-  });
-
-  it("blocks start action when refinement is done", () => {
-    const ctx = setupCommandPaletteContext();
-    const task = {
-      id: "t1",
-      status: "backlog",
-      current_refinement: { status: "done" },
-    };
-    const actions = ctx.commandPaletteTaskActions(task).map((a) => a.id);
-    expect(actions).not.toContain("start-task");
-  });
-
   it("includes archive for cancelled non-archived tasks", () => {
     const ctx = setupCommandPaletteContext();
     const task = { id: "c1", status: "cancelled", archived: false };

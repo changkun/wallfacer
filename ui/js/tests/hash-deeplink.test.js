@@ -114,9 +114,6 @@ function makeModalContext() {
     oversightData: null,
     oversightFetching: false,
     timelineRefreshTimer: null,
-    refineTaskId: null,
-    refineRawLogBuffer: "",
-    refineLogsMode: "pretty",
     history: {
       replaceState(_state, _title, url) {
         replaceStateCalls.push(url);
@@ -158,9 +155,6 @@ function makeModalContext() {
     startTestLogStream: () => {},
     renderResultsFromEvents: () => {},
     renderTestResultsFromEvents: () => {},
-    renderRefineHistory: () => {},
-    updateRefineUI: () => {},
-    resetRefinePanel: () => {},
     applySandboxByActivity: () => {},
     populateDependsOnPicker: () => {},
     renderDiffFiles: () => {},

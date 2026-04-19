@@ -26,7 +26,6 @@ const LIB_DEPS = {
     "lib/markdown-render.js",
   ],
   "render.js": ["build/lib/scheduling.js"],
-  "refine.js": ["build/lib/scheduling.js"],
   "workspace.js": ["build/lib/modal.js"],
   "keyboard-shortcuts.js": [
     "build/lib/modal.js",
