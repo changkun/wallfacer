@@ -1,0 +1,48 @@
+<!-- Analytics mode: inline page replacing the floating analytics modals.
+     On entering analytics mode, analytics-tabs.js reparents the three
+     existing panel containers (usage-stats-modal, stats-modal,
+     span-stats-modal) into #analytics-panels; each panel's overlay/card
+     chrome is stripped by .analytics-mode CSS so they render as page
+     content. -->
+<div
+  id="analytics-mode-container"
+  class="analytics-mode"
+  style="display: none"
+>
+  <div class="analytics-mode__header">
+    <div class="analytics-mode__heading">
+      <span class="analytics-mode__eyebrow">Workspace</span>
+      <h1 class="analytics-mode__title">Analytics</h1>
+    </div>
+    <div class="analytics-tabs" role="tablist">
+      <button
+        type="button"
+        class="analytics-tab"
+        role="tab"
+        data-analytics-tab="usage"
+        onclick="switchAnalyticsTab('usage')"
+      >
+        Usage
+      </button>
+      <button
+        type="button"
+        class="analytics-tab"
+        role="tab"
+        data-analytics-tab="analytics"
+        onclick="switchAnalyticsTab('analytics')"
+      >
+        Tokens &amp; cost
+      </button>
+      <button
+        type="button"
+        class="analytics-tab"
+        role="tab"
+        data-analytics-tab="timing"
+        onclick="switchAnalyticsTab('timing')"
+      >
+        Execution timing
+      </button>
+    </div>
+  </div>
+  <div id="analytics-panels" class="analytics-mode__panels"></div>
+</div>

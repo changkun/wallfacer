@@ -295,8 +295,8 @@
       type="button"
       id="sidebar-nav-usage"
       class="sb-nav-item"
-      onclick="showUsageStats()"
-      title="Usage analytics"
+      onclick="switchMode('analytics', {persist:true})"
+      title="Analytics (usage, tokens &amp; cost, execution timing)"
     >
       <span class="sb-icon">
         <svg
@@ -314,7 +314,7 @@
           <rect x="2" y="13" width="4" height="8"></rect>
         </svg>
       </span>
-      <span>Usage</span>
+      <span>Analytics</span>
     </button>
   </div>
 

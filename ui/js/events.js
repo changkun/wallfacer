@@ -12,8 +12,6 @@ document.addEventListener("keydown", (e) => {
       closeFirstVisibleModal([
         { id: "explorer-preview-backdrop", close: closeExplorerPreview },
         { id: "alert-modal", close: closeAlert },
-        { id: "stats-modal", close: closeStatsModal },
-        { id: "usage-stats-modal", close: closeUsageStats },
         { id: "container-monitor-modal", close: closeContainerMonitor },
         { id: "instructions-modal", close: closeInstructionsEditor },
         { id: "settings-modal", close: closeSettings },
