@@ -21,21 +21,25 @@ type Principal struct {
 
 // TasksForPrincipal returns the tasks visible to the given principal.
 //
-// Filter rules:
+// Three task shapes exist on disk and get different visibility:
+//
+//	┌──────────────────────────────────┬────────────────────────────┐
+//	│ Task shape                       │ Who sees it                │
+//	├──────────────────────────────────┼────────────────────────────┤
+//	│ CreatedBy=""  OrgID=""  (legacy) │ Any signed-in user + local │
+//	│ CreatedBy=U   OrgID=""  (self)   │ Only user U                │
+//	│ CreatedBy=*   OrgID=X   (org)    │ Anyone with claims.OrgID=X │
+//	└──────────────────────────────────┴────────────────────────────┘
+//
+// "Legacy" = created before the cloud/org concept existed; no owner
+// was ever recorded. Treated as deployment-shared so single-user
+// upgrades to cloud mode don't lose their history. "Self" = personal
+// space for the signed-in user, explicitly scoped to them alone.
+// "Org" = the usual multi-tenant path.
+//
 //   - p == nil (local mode / anonymous call) → all tasks (today's
 //     behavior).
-//   - p.OrgID == ""  → only anonymous tasks (those with OrgID == "").
-//     A signed-in user with no org context sees their own anonymous
-//     records, not other orgs' data.
-//   - p.OrgID == "X" → tasks with OrgID == "X" PLUS legacy tasks
-//     with OrgID == "". Pre-migration records are treated as shared
-//     within the deployment rather than hidden, so users who sign in
-//     to cloud mode for the first time don't see their existing work
-//     disappear. In a genuinely multi-org deployment this is a
-//     conscious tradeoff: newly-created org-scoped tasks are isolated,
-//     legacy anonymous tasks are visible to everyone. A later cloud
-//     migration spec can tighten this once there's a UI for claiming
-//     legacy records into a specific org.
+//   - p signed in → the matrix above.
 //
 // Sort order matches ListTasks: position then creation time. The
 // includeArchived flag behaves identically to ListTasks.
@@ -62,21 +66,26 @@ func (s *Store) TasksForPrincipal(_ context.Context, p *Principal, includeArchiv
 
 // principalSeesTask encodes the filter matrix in one place so both
 // TasksForPrincipal and any future per-task visibility check (e.g.
-// GetTask in cloud mode) share the same rules.
-//
-// The org-scoped branch (p.OrgID != "") admits both the principal's
-// own org records AND legacy anonymous records (t.OrgID == ""),
-// otherwise users who sign in to cloud mode for the first time would
-// see their existing local-mode work disappear. A later migration
-// can claim legacy records into a specific org once the product has
-// a UI for it.
+// GetTask in cloud mode) share the same rules. See TasksForPrincipal
+// for the task-shape / visibility table.
 func principalSeesTask(p *Principal, t *Task) bool {
 	if p == nil {
+		// Local mode / anonymous call: no filtering.
 		return true
 	}
-	if p.OrgID != "" && t.OrgID == "" {
-		// Legacy / pre-cloud-mode task — visible to any signed-in user.
+	switch {
+	case t.OrgID == "" && t.CreatedBy == "":
+		// Legacy / pre-cloud task with no recorded owner. Shared
+		// within the deployment so single-user upgrades don't orphan
+		// history.
 		return true
+	case t.OrgID == "" && t.CreatedBy == p.Sub:
+		// Personal space: caller's own un-org-scoped task.
+		return true
+	case t.OrgID != "" && t.OrgID == p.OrgID:
+		// Org-scoped task matching the caller's current org claim.
+		return true
+	default:
+		return false
 	}
-	return p.OrgID == t.OrgID
 }
