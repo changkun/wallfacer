@@ -98,18 +98,22 @@ func TestTasksForPrincipal_NilReturnsAll(t *testing.T) {
 // records and never sees anonymous legacy records.
 func TestTasksForPrincipal_OrgIsolatesFromOtherOrgs(t *testing.T) {
 	s, insert := newFiltStore(t)
-	insert("", "")                          // legacy anonymous, now visible
-	insert("org-a", "alice")                // visible
+	insert("", "")                          // legacy — visible (shared)
+	insert("", "alice")                     // alice's personal — HIDDEN (caller is bob)
+	insert("org-a", "alice")                // visible (bob's org)
 	anotherAID := insert("org-a", "alice2") // visible
-	insert("org-b", "bob")                  // hidden
+	insert("org-b", "bob")                  // hidden (different org)
 
-	got := s.TasksForPrincipal(context.Background(), &store.Principal{OrgID: "org-a"}, false)
+	got := s.TasksForPrincipal(context.Background(), &store.Principal{Sub: "bob", OrgID: "org-a"}, false)
 	if len(got) != 3 {
-		t.Fatalf("orgA saw %d tasks, want 3 (2 org-a + 1 legacy)", len(got))
+		t.Fatalf("bob@orgA saw %d tasks, want 3 (2 org-a + 1 legacy)", len(got))
 	}
 	for _, task := range got {
-		if task.OrgID != "org-a" && task.OrgID != "" {
-			t.Errorf("leaked task OrgID=%q into org-a view", task.OrgID)
+		if task.OrgID == "org-b" {
+			t.Errorf("leaked org-b task into org-a view: %+v", task)
+		}
+		if task.OrgID == "" && task.CreatedBy == "alice" {
+			t.Errorf("leaked alice's personal task into bob's view: %+v", task)
 		}
 	}
 
@@ -143,23 +147,48 @@ func TestTasksForPrincipal_LegacyTasksVisibleAfterCloudSignIn(t *testing.T) {
 	}
 }
 
-// TestTasksForPrincipal_NoOrgSeesOnlyAnonymous covers the signed-in
-// user who has no current org context: they see their own anonymous
-// records, not other orgs' data.
-func TestTasksForPrincipal_NoOrgSeesOnlyAnonymous(t *testing.T) {
+// TestTasksForPrincipal_NoOrgSeesOwnPersonalAndLegacy covers the
+// signed-in user with no current org: sees their own personal-space
+// records (OrgID=="", CreatedBy==Sub) PLUS legacy records (no owner),
+// not other users' personal records, not other orgs.
+func TestTasksForPrincipal_NoOrgSeesOwnPersonalAndLegacy(t *testing.T) {
 	s, insert := newFiltStore(t)
-	insert("", "alice")
-	insert("", "alice") // two legacy anonymous records
-	insert("org-a", "alice")
+	insert("", "")        // legacy — visible
+	insert("", "alice")   // alice's personal — visible to alice
+	insert("", "alice")   // alice's personal — visible to alice
+	insert("", "bob")     // bob's personal — hidden from alice
+	insert("org-a", "cc") // org task — hidden (alice has no org claim)
 
 	got := s.TasksForPrincipal(context.Background(), &store.Principal{Sub: "alice"}, false)
-	if len(got) != 2 {
-		t.Fatalf("no-org principal saw %d tasks, want 2", len(got))
+	if len(got) != 3 {
+		t.Fatalf("alice saw %d tasks, want 3 (2 personal + 1 legacy)", len(got))
 	}
 	for _, task := range got {
 		if task.OrgID != "" {
-			t.Errorf("leaked orgA task into anonymous view: %+v", task)
+			t.Errorf("leaked org task into alice's view: %+v", task)
 		}
+		if task.CreatedBy == "bob" {
+			t.Errorf("leaked bob's personal task into alice's view: %+v", task)
+		}
+	}
+}
+
+// TestTasksForPrincipal_PersonalSpaceIsolationAcrossUsers is the
+// dedicated regression guard for the "personal OrgID='' is not legacy"
+// insight. Without proper owner filtering, user A's personal tasks
+// would leak to user B simply because both are signed in.
+func TestTasksForPrincipal_PersonalSpaceIsolationAcrossUsers(t *testing.T) {
+	s, insert := newFiltStore(t)
+	insert("", "alice")
+	insert("", "bob")
+
+	aliceView := s.TasksForPrincipal(context.Background(), &store.Principal{Sub: "alice"}, false)
+	if len(aliceView) != 1 || aliceView[0].CreatedBy != "alice" {
+		t.Fatalf("alice should see only her task, got %+v", aliceView)
+	}
+	bobView := s.TasksForPrincipal(context.Background(), &store.Principal{Sub: "bob"}, false)
+	if len(bobView) != 1 || bobView[0].CreatedBy != "bob" {
+		t.Fatalf("bob should see only his task, got %+v", bobView)
 	}
 }
 
