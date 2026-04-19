@@ -589,22 +589,6 @@ var Routes = {
         oversightTest: function () {
           return "/api/tasks/" + id + "/oversight/test";
         },
-        // POST /api/tasks/{id}/refine
-        refine: function () {
-          return "/api/tasks/" + id + "/refine";
-        },
-        // GET /api/tasks/{id}/refine/logs
-        refineLogs: function () {
-          return "/api/tasks/" + id + "/refine/logs";
-        },
-        // POST /api/tasks/{id}/refine/apply
-        refineApply: function () {
-          return "/api/tasks/" + id + "/refine/apply";
-        },
-        // POST /api/tasks/{id}/refine/dismiss
-        refineDismiss: function () {
-          return "/api/tasks/" + id + "/refine/dismiss";
-        },
       };
     },
   },

@@ -153,7 +153,6 @@ type Runner struct {
 	worktreeMu             sync.Mutex                       // serializes all worktree filesystem operations on worktreesDir
 	repoMu                 keyedmu.Map[string]              // per-repo mutex for serializing rebase+merge
 	taskContainers         *containerRegistry               // taskID → container name
-	refineContainers       *containerRegistry               // taskID → refinement container name
 	ideateContainer        *containerRegistry               // singleton: ideation container name
 	liveLogs               syncmap.Map[uuid.UUID, *liveLog] // live log buffers for in-progress turns
 	oversightMu            keyedmu.Map[string]              // per-task mutex for serializing oversight generation
@@ -395,14 +394,6 @@ func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, pre
 	})
 }
 
-// RunRefinementBackground launches RunRefinement in a background goroutine
-// tracked by backgroundWg so that WaitBackground can drain it before cleanup.
-func (r *Runner) RunRefinementBackground(taskID uuid.UUID, userInstructions string) {
-	r.backgroundWg.Go("refine:"+taskID.String()[:8], func() {
-		r.RunRefinement(taskID, userInstructions)
-	})
-}
-
 // GenerateOversightBackground launches GenerateOversight in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
@@ -444,7 +435,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
 		taskContainers:   &containerRegistry{},
-		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
 		shutdownCh:       make(chan struct{}),
 	}
@@ -925,15 +915,6 @@ func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
 	return r.oversightMu.Get(taskID.String())
 }
 
-// RefineContainerName returns the active refinement container name for a task.
-// Returns an empty string if no refinement container is running.
-func (r *Runner) RefineContainerName(taskID uuid.UUID) string {
-	if name, ok := r.refineContainers.Get(taskID); ok {
-		return name
-	}
-	return ""
-}
-
 // KillContainer sends a kill signal to the running container for a task.
 // Kill goes through the SandboxHandle when registered; otherwise it is a no-op
 // (container already exited or was never launched).
@@ -959,15 +940,6 @@ func (r *Runner) WorkerStats() sandbox.WorkerStatsInfo {
 func (r *Runner) StopTaskWorker(taskID uuid.UUID) {
 	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
 		wm.StopTaskWorker(taskID.String())
-	}
-}
-
-// KillRefineContainer sends a kill signal to the running refinement container.
-// Kill goes through the SandboxHandle when registered; otherwise it is a no-op.
-// Safe to call when no refinement container is running.
-func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
-	if h := r.refineContainers.GetHandle(taskID); h != nil {
-		_ = h.Kill()
 	}
 }
 

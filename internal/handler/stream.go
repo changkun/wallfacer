@@ -323,34 +323,6 @@ func (h *Handler) writeStoredTurns(w http.ResponseWriter, id uuid.UUID) {
 	}
 }
 
-// StreamRefineLogs streams live container logs for an active sandbox refinement run.
-// If no refinement container is running, returns 204 No Content so the client
-// knows the run has ended and should read the result from the task object.
-func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	containerName := h.runner.RefineContainerName(id)
-	if containerName == "" {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
-	// Do not pipe cmd.Stderr into the response: errors from the log command
-	// itself (e.g. "no such container" when the container was already removed)
-	// would be forwarded verbatim to the client. Stderr is discarded by logpipe.
-	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
-	p, err := logpipe.Start(cmd)
-	if err != nil {
-		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
-		return
-	}
-	streamLines(w, r, flusher, p)
-}
-
 // streamLines writes lines from a logpipe to the HTTP response with periodic
 // keepalive newlines. It blocks until the pipe is exhausted or the request
 // context is cancelled.

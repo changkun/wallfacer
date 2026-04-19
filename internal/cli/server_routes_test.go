@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -98,7 +99,6 @@ func TestNoRawAPILiterals_InUISourceFiles(t *testing.T) {
 		filepath.Join(root, "ui", "js", "tasks.js"),
 		filepath.Join(root, "ui", "js", "envconfig.js"),
 		filepath.Join(root, "ui", "js", "git.js"),
-		filepath.Join(root, "ui", "js", "refine.js"),
 	}
 
 	// Matches a single- or double-quoted string starting with /api/.
@@ -131,6 +131,63 @@ func TestNoRawAPILiterals_InUISourceFiles(t *testing.T) {
 			}
 			if err := scanner.Err(); err != nil {
 				t.Fatalf("scan %s: %v", src, err)
+			}
+		})
+	}
+}
+
+// TestRefineRoutesRemoved is the guard against accidental reintroduction of
+// the retired refinement subsystem's HTTP endpoints. Any of the five routes
+// returning anything other than 404 means a handler has been wired back in.
+//
+// See specs/local/refinement-into-plan/retire-refine-subsystem.md for the
+// rationale — task-mode planning (Send to Plan) replaces these routes.
+func TestRefineRoutesRemoved(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer s.Close()
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+
+	dummyID := uuid.New().String()
+	retiredRoutes := []struct {
+		method string
+		path   string
+	}{
+		{"POST", "/api/tasks/" + dummyID + "/refine"},
+		{"DELETE", "/api/tasks/" + dummyID + "/refine"},
+		{"GET", "/api/tasks/" + dummyID + "/refine/logs"},
+		{"POST", "/api/tasks/" + dummyID + "/refine/apply"},
+		{"POST", "/api/tasks/" + dummyID + "/refine/dismiss"},
+	}
+	for _, rt := range retiredRoutes {
+		rt := rt
+		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
+			req := httptest.NewRequest(rt.method, rt.path, nil)
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			// Accept 404 (no handler) or 405 (method not allowed because another
+			// method remains registered on the same path). Both prove the retired
+			// method+path has no wired handler. Only a 2xx/3xx/4xx<405 would mean
+			// a handler regressed.
+			if w.Code != http.StatusNotFound && w.Code != http.StatusMethodNotAllowed {
+				t.Errorf("%s %s returned %d, want 404 or 405 (route should be retired; Allow=%q)",
+					rt.method, rt.path, w.Code, w.Header().Get("Allow"))
 			}
 		})
 	}

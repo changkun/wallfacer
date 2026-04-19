@@ -125,7 +125,6 @@ type Handler struct {
 	autopilot  atomic.Bool
 	autotest   atomic.Bool
 	autosubmit atomic.Bool
-	autorefine atomic.Bool
 	autosync   atomic.Bool
 	autopush   atomic.Bool
 
@@ -390,14 +389,12 @@ func (h *Handler) applyGroupToggles(ws []string) {
 	}
 	if g == nil {
 		h.autopilot.Store(false)
-		h.autorefine.Store(false)
 		h.autotest.Store(false)
 		h.autosubmit.Store(false)
 		h.autosync.Store(false)
 		return
 	}
 	h.autopilot.Store(pick(g.Autopilot))
-	h.autorefine.Store(pick(g.Autorefine))
 	h.autotest.Store(pick(g.Autotest))
 	h.autosubmit.Store(pick(g.Autosubmit))
 	h.autosync.Store(pick(g.Autosync))
@@ -421,7 +418,6 @@ func (h *Handler) persistCurrentGroupToggles() {
 	key := workspace.GroupKey(ws)
 	b := func(v bool) *bool { x := v; return &x }
 	autopilot := b(h.autopilot.Load())
-	autorefine := b(h.autorefine.Load())
 	autotest := b(h.autotest.Load())
 	autosubmit := b(h.autosubmit.Load())
 	autosync := b(h.autosync.Load())
@@ -429,7 +425,6 @@ func (h *Handler) persistCurrentGroupToggles() {
 	for i := range groups {
 		if workspace.GroupKey(groups[i].Workspaces) == key {
 			groups[i].Autopilot = autopilot
-			groups[i].Autorefine = autorefine
 			groups[i].Autotest = autotest
 			groups[i].Autosubmit = autosubmit
 			groups[i].Autosync = autosync
@@ -441,7 +436,6 @@ func (h *Handler) persistCurrentGroupToggles() {
 		groups = append([]workspace.Group{{
 			Workspaces: ws,
 			Autopilot:  autopilot,
-			Autorefine: autorefine,
 			Autotest:   autotest,
 			Autosubmit: autosubmit,
 			Autosync:   autosync,
@@ -667,12 +661,6 @@ func (h *Handler) AutosubmitEnabled() bool { return h.autosubmit.Load() }
 
 // SetAutosubmit enables or disables auto-submit mode.
 func (h *Handler) SetAutosubmit(enabled bool) { h.autosubmit.Store(enabled) }
-
-// AutorefineEnabled returns whether auto-refinement mode is active.
-func (h *Handler) AutorefineEnabled() bool { return h.autorefine.Load() }
-
-// SetAutorefine enables or disables auto-refinement mode.
-func (h *Handler) SetAutorefine(enabled bool) { h.autorefine.Store(enabled) }
 
 // AutosyncEnabled returns whether auto-sync (catch up) mode is active.
 func (h *Handler) AutosyncEnabled() bool { return h.autosync.Load() }

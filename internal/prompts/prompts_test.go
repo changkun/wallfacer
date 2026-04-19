@@ -208,7 +208,7 @@ func TestPromptsDir_Empty(t *testing.T) {
 // syntactically invalid template.
 func TestValidate_ParseError(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
-	err := mgr.Validate("refinement", "{{.Unclosed")
+	err := mgr.Validate("task_prompt_refine", "{{.Unclosed")
 	if err == nil {
 		t.Fatal("expected error for unclosed template action, got nil")
 	}
@@ -223,7 +223,7 @@ func TestValidate_ParseError(t *testing.T) {
 func TestValidate_ExecutionError(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	// RefinementData has no field "FieldThatDoesNotExist".
-	err := mgr.Validate("refinement", "{{.FieldThatDoesNotExist}}")
+	err := mgr.Validate("task_prompt_refine", "{{.FieldThatDoesNotExist}}")
 	if err == nil {
 		t.Fatal("expected execution error for unknown field, got nil")
 	}
@@ -236,7 +236,7 @@ func TestValidate_ExecutionError(t *testing.T) {
 // that both parses and executes correctly against the known context.
 func TestValidate_ValidOverride(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
-	if err := mgr.Validate("refinement", "Task: {{.Prompt}}"); err != nil {
+	if err := mgr.Validate("task_prompt_refine", "Task: {{.Prompt}}"); err != nil {
 		t.Errorf("expected nil for valid override, got: %v", err)
 	}
 }
@@ -271,28 +271,6 @@ func TestValidate_AllKnownNamesWithEmbeddedDefaults(t *testing.T) {
 }
 
 // --- Tests for all six remaining template renderers ---
-
-// TestRefinement_ReturnsNonEmptyRendered verifies that the refinement template
-// renders with all fields populated and produces valid (non-empty, no raw
-// template syntax) output.
-func TestRefinement_ReturnsNonEmptyRendered(t *testing.T) {
-	mgr := prompts.NewManager(t.TempDir())
-	data := prompts.RefinementData{
-		CreatedAt:        "2024-01-01",
-		Today:            "2024-06-15",
-		AgeDays:          165,
-		Status:           "backlog",
-		Prompt:           "build a login form",
-		UserInstructions: "use TypeScript",
-	}
-	got := mgr.Refinement(data)
-	if strings.TrimSpace(got) == "" {
-		t.Error("Refinement returned empty string")
-	}
-	if strings.Contains(got, "{{") {
-		t.Errorf("Refinement returned unreplaced template syntax: %q", got)
-	}
-}
 
 // TestIdeation_ReturnsNonEmptyRendered verifies that the ideation template
 // renders with existing tasks and categories populated.
@@ -383,13 +361,6 @@ func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
 
 // Package-level delegation functions — each verifies that the package-level
 // convenience function delegates to Default and produces non-empty output.
-
-func TestPackageLevelRefinement_NonEmpty(t *testing.T) {
-	got := prompts.Refinement(prompts.RefinementData{Prompt: "do something", Status: "backlog"})
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.Refinement() returned empty string")
-	}
-}
 
 func TestPackageLevelIdeation_NonEmpty(t *testing.T) {
 	got := prompts.Ideation(prompts.IdeationData{})

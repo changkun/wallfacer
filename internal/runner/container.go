@@ -61,7 +61,6 @@ type agentOutput struct {
 const (
 	activityImplementation = store.SandboxActivityImplementation
 	activityTesting        = store.SandboxActivityTesting
-	activityRefinement     = store.SandboxActivityRefinement
 	activityTitle          = store.SandboxActivityTitle
 	activityOversight      = store.SandboxActivityOversight
 	activityCommitMessage  = store.SandboxActivityCommitMessage
@@ -524,10 +523,6 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandb
 	case activityTesting:
 		if cfg.TestingSandbox != "" {
 			return cfg.TestingSandbox
-		}
-	case activityRefinement:
-		if cfg.RefinementSandbox != "" {
-			return cfg.RefinementSandbox
 		}
 	case activityTitle:
 		if cfg.TitleSandbox != "" {

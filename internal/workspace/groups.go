@@ -32,7 +32,6 @@ type Group struct {
 	// NOT per-group: push credentials / remote setup are global, so the
 	// auto-push flag continues to live in the env file.
 	Autopilot  *bool `json:"autopilot,omitempty"`
-	Autorefine *bool `json:"autorefine,omitempty"`
 	Autotest   *bool `json:"autotest,omitempty"`
 	Autosubmit *bool `json:"autosubmit,omitempty"`
 	Autosync   *bool `json:"autosync,omitempty"`
@@ -102,7 +101,6 @@ func UpsertGroup(configDir string, workspaces []string) error {
 				MaxParallel:     group.MaxParallel,
 				MaxTestParallel: group.MaxTestParallel,
 				Autopilot:       group.Autopilot,
-				Autorefine:      group.Autorefine,
 				Autotest:        group.Autotest,
 				Autosubmit:      group.Autosubmit,
 				Autosync:        group.Autosync,
@@ -141,7 +139,6 @@ func NormalizeGroups(groups []Group) []Group {
 			MaxParallel:     sanitizeLimit(group.MaxParallel),
 			MaxTestParallel: sanitizeLimit(group.MaxTestParallel),
 			Autopilot:       group.Autopilot,
-			Autorefine:      group.Autorefine,
 			Autotest:        group.Autotest,
 			Autosubmit:      group.Autosubmit,
 			Autosync:        group.Autosync,

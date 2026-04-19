@@ -12,9 +12,6 @@ import "time"
 // DefaultTaskTimeout is the default timeout for task execution.
 const DefaultTaskTimeout = 60 * time.Minute
 
-// RefinementTimeout is the maximum time allowed for a refinement agent run.
-const RefinementTimeout = 30 * time.Minute
-
 // IdeaAgentDefaultTimeout is the default timeout (minutes) for idea-agent task cards.
 const IdeaAgentDefaultTimeout = 60
 
@@ -48,9 +45,6 @@ const AutoTestInterval = 30 * time.Second
 
 // AutoSubmitInterval is the polling interval for the auto-submit watcher.
 const AutoSubmitInterval = 30 * time.Second
-
-// AutoRefineInterval is the polling interval for the auto-refine watcher.
-const AutoRefineInterval = 30 * time.Second
 
 // FetchErrorGracePeriod is how long after a fetch error before retrying.
 const FetchErrorGracePeriod = 5 * time.Minute

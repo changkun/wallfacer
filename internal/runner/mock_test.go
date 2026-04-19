@@ -85,16 +85,12 @@ func TestMockRunner_MultipleCalls(t *testing.T) {
 	}
 }
 
-// TestMockRunner_ContainerNameFn verifies that ContainerNameFn and
-// RefineContainerNameFn overrides are respected.
+// TestMockRunner_ContainerNameFn verifies that ContainerNameFn overrides are respected.
 func TestMockRunner_ContainerNameFn(t *testing.T) {
 	id := uuid.New()
 	m := &MockRunner{
 		ContainerNameFn: func(taskID uuid.UUID) string {
 			return "mock-container-" + taskID.String()
-		},
-		RefineContainerNameFn: func(taskID uuid.UUID) string {
-			return "mock-refine-" + taskID.String()
 		},
 	}
 
@@ -102,12 +98,6 @@ func TestMockRunner_ContainerNameFn(t *testing.T) {
 	want := "mock-container-" + id.String()
 	if got != want {
 		t.Errorf("ContainerName = %q, want %q", got, want)
-	}
-
-	gotRefine := m.RefineContainerName(id)
-	wantRefine := "mock-refine-" + id.String()
-	if gotRefine != wantRefine {
-		t.Errorf("RefineContainerName = %q, want %q", gotRefine, wantRefine)
 	}
 }
 
@@ -117,9 +107,6 @@ func TestMockRunner_ContainerName_Default(t *testing.T) {
 	id := uuid.New()
 	if got := m.ContainerName(id); got != "" {
 		t.Errorf("ContainerName with nil fn = %q, want %q", got, "")
-	}
-	if got := m.RefineContainerName(id); got != "" {
-		t.Errorf("RefineContainerName with nil fn = %q, want %q", got, "")
 	}
 }
 
@@ -141,7 +128,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 	}
 
 	m.SyncWorktreesBackground(id, "sess", store.TaskStatusWaiting)
-	m.RunRefinementBackground(id, "sess")
 
 	paths, branch, err := m.EnsureTaskWorktrees(id, nil, "mybranch")
 	if err != nil {
@@ -161,8 +147,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 	if containers != nil {
 		t.Errorf("ListContainers returned non-nil: %v", containers)
 	}
-
-	m.KillRefineContainer(id)
 
 	if got := m.ContainerCircuitAllow(); !got {
 		t.Errorf("ContainerCircuitAllow = false, want true")

@@ -216,7 +216,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"sandbox_reasons":          map[string]string{},
 		"activity_sandboxes":       map[string]string{},
 		"autopilot":                h.AutopilotEnabled(),
-		"autorefine":               h.AutorefineEnabled(),
 		"autotest":                 h.AutotestEnabled(),
 		"autosubmit":               h.AutosubmitEnabled(),
 		"autosync":                 h.AutosyncEnabled(),
@@ -325,7 +324,6 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Autopilot            *bool             `json:"autopilot"`
-		Autorefine           *bool             `json:"autorefine"`
 		Autotest             *bool             `json:"autotest"`
 		Autosubmit           *bool             `json:"autosubmit"`
 		Autosync             *bool             `json:"autosync"`
@@ -355,7 +353,6 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	applyBoolToggle(req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
-	applyBoolToggle(req.Autorefine, h.SetAutorefine, h.AutorefineEnabled, h.tryAutoRefine)
 	applyBoolToggle(req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	applyBoolToggle(req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
@@ -363,7 +360,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// and back does not reset the user's automation choices, and a
 	// different group on this server stays manual unless the user turns
 	// automation on for it explicitly.
-	if req.Autopilot != nil || req.Autorefine != nil || req.Autotest != nil ||
+	if req.Autopilot != nil || req.Autotest != nil ||
 		req.Autosubmit != nil || req.Autosync != nil {
 		h.persistCurrentGroupToggles()
 	}
@@ -396,7 +393,6 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]any{
 		"autopilot":              h.AutopilotEnabled(),
-		"autorefine":             h.AutorefineEnabled(),
 		"autotest":               h.AutotestEnabled(),
 		"autosubmit":             h.AutosubmitEnabled(),
 		"autosync":               h.AutosyncEnabled(),

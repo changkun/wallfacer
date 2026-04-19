@@ -13,10 +13,9 @@ import (
 func TestBuiltinRegistry_HasExpectedFlows(t *testing.T) {
 	reg := NewBuiltinRegistry()
 	want := map[string]bool{
-		"implement":   true,
-		"brainstorm":  true,
-		"refine-only": true,
-		"test-only":   true,
+		"implement":  true,
+		"brainstorm": true,
+		"test-only":  true,
 	}
 	got := reg.List()
 	if len(got) != len(want) {
@@ -141,10 +140,10 @@ func TestResolveRoutineFlow_PrefersSpawnFlow(t *testing.T) {
 	reg := NewBuiltinRegistry()
 	got := reg.ResolveRoutineFlow(&store.Task{
 		RoutineSpawnKind: store.TaskKindIdeaAgent, // would legacy-resolve to brainstorm
-		RoutineSpawnFlow: "refine-only",
+		RoutineSpawnFlow: "test-only",
 	})
-	if got != "refine-only" {
-		t.Errorf("ResolveRoutineFlow = %q, want refine-only", got)
+	if got != "test-only" {
+		t.Errorf("ResolveRoutineFlow = %q, want test-only", got)
 	}
 }
 

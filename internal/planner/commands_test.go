@@ -9,8 +9,8 @@ func TestCommandRegistry_Commands(t *testing.T) {
 	r := NewCommandRegistry()
 	cmds := r.Commands()
 
-	if len(cmds) != 12 {
-		t.Fatalf("len(Commands) = %d, want 12", len(cmds))
+	if len(cmds) != 11 {
+		t.Fatalf("len(Commands) = %d, want 11", len(cmds))
 	}
 
 	names := make(map[string]bool)
@@ -25,7 +25,7 @@ func TestCommandRegistry_Commands(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"summarize", "create", "refine", "validate", "impact", "status",
+		"summarize", "create", "validate", "impact", "status",
 		"break-down", "review-breakdown", "dispatch", "review-impl", "diff", "wrapup",
 	} {
 		if !names[want] {

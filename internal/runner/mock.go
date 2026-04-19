@@ -37,16 +37,14 @@ type MockRunner struct {
 	// Recorded call arguments (mutex-protected for race-safety).
 	RunBackgroundCalls          []uuid.UUID
 	KillContainerCalls          []uuid.UUID
-	KillRefineContainerCalls    []uuid.UUID
 	CleanupWorktreesCalls       []uuid.UUID
 	GenerateTitleCalls          []uuid.UUID
 	MaybeAutoPushWorkspaceCalls []string
 
-	// Optional overrides for ContainerName / RefineContainerName return values.
-	// When nil the methods return "" (no container active), matching the default
+	// Optional override for ContainerName return value.
+	// When nil the method returns "" (no container active), matching the default
 	// behaviour expected by most tests.
 	ContainerNameFn       func(taskID uuid.UUID) string
-	RefineContainerNameFn func(taskID uuid.UUID) string
 
 	// GenerateCommitMessageFn lets tests stub the task-free commit-message
 	// generator. When nil the method returns an empty string and a nil
@@ -71,13 +69,6 @@ func (m *MockRunner) KillCalls() []uuid.UUID {
 	return slices.Clone(m.KillContainerCalls)
 }
 
-// KillRefineCalls returns a race-safe snapshot of the KillRefineContainer call IDs.
-func (m *MockRunner) KillRefineCalls() []uuid.UUID {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Clone(m.KillRefineContainerCalls)
-}
-
 // RunBackground records the call and returns immediately.
 func (m *MockRunner) RunBackground(taskID uuid.UUID, _, _ string, _ bool) {
 	m.mu.Lock()
@@ -91,9 +82,6 @@ func (m *MockRunner) Commit(_ uuid.UUID, _ string) error { return nil }
 // SyncWorktreesBackground is a no-op mock.
 func (m *MockRunner) SyncWorktreesBackground(_ uuid.UUID, _ string, _ store.TaskStatus, _ ...func()) {
 }
-
-// RunRefinementBackground is a no-op mock.
-func (m *MockRunner) RunRefinementBackground(_ uuid.UUID, _ string) {}
 
 // EnsureTaskWorktrees returns the provided worktrees unchanged.
 func (m *MockRunner) EnsureTaskWorktrees(_ uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {
@@ -124,14 +112,6 @@ func (m *MockRunner) ContainerName(taskID uuid.UUID) string {
 // TaskLogReader returns nil in the mock (no live logs).
 func (m *MockRunner) TaskLogReader(_ uuid.UUID) *LiveLogReader { return nil }
 
-// RefineContainerName returns the container name for a refinement run.
-func (m *MockRunner) RefineContainerName(taskID uuid.UUID) string {
-	if m.RefineContainerNameFn != nil {
-		return m.RefineContainerNameFn(taskID)
-	}
-	return ""
-}
-
 // KillContainer records a kill-container call.
 func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 	m.mu.Lock()
@@ -144,13 +124,6 @@ func (m *MockRunner) StopTaskWorker(_ uuid.UUID) {}
 
 // WorkerStats returns empty stats in the mock.
 func (m *MockRunner) WorkerStats() sandbox.WorkerStatsInfo { return sandbox.WorkerStatsInfo{} }
-
-// KillRefineContainer records a kill-refine-container call.
-func (m *MockRunner) KillRefineContainer(taskID uuid.UUID) {
-	m.mu.Lock()
-	m.KillRefineContainerCalls = append(m.KillRefineContainerCalls, taskID)
-	m.mu.Unlock()
-}
 
 // ContainerCircuitAllow always returns true in the mock.
 func (m *MockRunner) ContainerCircuitAllow() bool { return true }

@@ -51,8 +51,8 @@ func TestListSystemPrompts_ReturnsAll(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(result) != 12 {
-		t.Errorf("len(result) = %d, want 12", len(result))
+	if len(result) != 11 {
+		t.Errorf("len(result) = %d, want 11", len(result))
 	}
 	for _, item := range result {
 		if item["name"] == "" {
@@ -165,9 +165,9 @@ func TestUpdateSystemPrompt_ExecutionError(t *testing.T) {
 	// {{.FieldThatDoesNotExist}} parses fine but fails on execution against
 	// RefinementData which has no such field.
 	body, _ := json.Marshal(map[string]string{"content": "{{.FieldThatDoesNotExist}}"})
-	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/refinement", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/task_prompt_refine", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("name", "refinement")
+	req.SetPathValue("name", "task_prompt_refine")
 	w := httptest.NewRecorder()
 	h.UpdateSystemPrompt(w, req)
 

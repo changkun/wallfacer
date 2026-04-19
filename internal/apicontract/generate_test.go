@@ -145,9 +145,6 @@ func TestJSMethodName_Derivation(t *testing.T) {
 		{"archive-done", "archiveDone"},
 		{"generate-titles", "generateTitles"},
 		{"generate-oversight", "generateOversight"},
-		{"refine/logs", "refineLogs"},
-		{"refine/apply", "refineApply"},
-		{"refine/dismiss", "refineDismiss"},
 		{"oversight/test", "oversightTest"},
 		{"turn-usage", "turnUsage"},
 		{"status", "status"},
@@ -179,10 +176,6 @@ func TestBuildTaskPathExpr_Substitution(t *testing.T) {
 		{
 			"/api/tasks/{id}/outputs/{filename}",
 			`"/api/tasks/" + id + "/outputs/" + filename`,
-		},
-		{
-			"/api/tasks/{id}/refine/logs",
-			`"/api/tasks/" + id + "/refine/logs"`,
 		},
 	}
 	for _, tc := range cases {
@@ -246,10 +239,10 @@ func TestJsMethodName_NamespaceRoot(t *testing.T) {
 
 // TestJsTaskMethodName_ExplicitJSName verifies JSName takes precedence for task routes.
 func TestJsTaskMethodName_ExplicitJSName(t *testing.T) {
-	r := Route{Method: "POST", Pattern: "/api/tasks/{id}/refine", JSName: "refine"}
+	r := Route{Method: "POST", Pattern: "/api/tasks/{id}/sync", JSName: "syncMethod"}
 	got := jsTaskMethodName(r)
-	if got != "refine" {
-		t.Errorf("jsTaskMethodName() = %q, want %q", got, "refine")
+	if got != "syncMethod" {
+		t.Errorf("jsTaskMethodName() = %q, want %q", got, "syncMethod")
 	}
 }
 

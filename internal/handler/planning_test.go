@@ -401,8 +401,8 @@ func TestGetPlanningCommands(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &cmds); err != nil {
 		t.Fatalf("json decode: %v", err)
 	}
-	if len(cmds) != 12 {
-		t.Fatalf("expected 12 commands, got %d", len(cmds))
+	if len(cmds) != 11 {
+		t.Fatalf("expected 11 commands, got %d", len(cmds))
 	}
 
 	names := make(map[string]bool)
@@ -416,7 +416,7 @@ func TestGetPlanningCommands(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"summarize", "create", "refine", "validate", "impact", "status",
+		"summarize", "create", "validate", "impact", "status",
 		"break-down", "review-breakdown", "dispatch", "review-impl", "diff", "wrapup",
 	} {
 		if !names[want] {

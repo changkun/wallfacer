@@ -668,11 +668,11 @@ func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 	}
 }
 
-// --- Additional StreamLogs and StreamRefineLogs coverage tests ---
+// --- Additional StreamLogs coverage tests ---
 
 // newTestHandlerWithMockRunner creates a Handler backed by a temp-dir store and
 // a MockRunner (not a real Runner), so individual fields like ContainerNameFn
-// and RefineContainerNameFn can be configured per-test.
+// can be configured per-test.
 func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handler, *store.Store) {
 	t.Helper()
 	storeDir, err := os.MkdirTemp("", "wallfacer-mock-handler-test-*")
@@ -834,20 +834,6 @@ func TestStreamLogs_InProgressNoContainerExitsOnContextCancel(t *testing.T) {
 	}
 }
 
-// TestStreamRefineLogs_NoContainerReturns204 verifies that StreamRefineLogs
-// returns 204 No Content when the MockRunner reports no active refine container.
-func TestStreamRefineLogs_NoContainerReturns204(t *testing.T) {
-	h := newTestHandler(t)
-	// The mock runner always returns "" for RefineContainerName.
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
-	w := httptest.NewRecorder()
-	h.StreamRefineLogs(w, req, uuid.New())
-
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204 when no refine container is active, got %d", w.Code)
-	}
-}
-
 // TestStreamLogs_InProgress_NoFlusher verifies that StreamLogs returns 500 when
 // the ResponseWriter does not implement http.Flusher and the task is in-progress
 // with a live container name. Uses nonFlushingWriter which deliberately omits
@@ -872,26 +858,6 @@ func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
 	// nonFlushingWriter deliberately does not implement http.Flusher.
 	w := newNonFlushingWriter()
 	h.StreamLogs(w, req, task.ID)
-
-	if w.code != http.StatusInternalServerError {
-		t.Errorf("expected 500 (no flusher), got %d", w.code)
-	}
-}
-
-// TestStreamRefineLogs_NoFlusher verifies that StreamRefineLogs returns 500
-// when the ResponseWriter does not implement http.Flusher but a refine
-// container is active. Uses nonFlushingWriter which deliberately omits Flusher.
-func TestStreamRefineLogs_NoFlusher(t *testing.T) {
-	mock := &runner.MockRunner{
-		Cmd:                   "echo",
-		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
-	}
-	h, _ := newTestHandlerWithMockRunner(t, mock)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
-	// nonFlushingWriter deliberately does not implement http.Flusher.
-	w := newNonFlushingWriter()
-	h.StreamRefineLogs(w, req, uuid.New())
 
 	if w.code != http.StatusInternalServerError {
 		t.Errorf("expected 500 (no flusher), got %d", w.code)
@@ -1032,108 +998,6 @@ func TestStreamLogs_InProgress_ContextCancellation(t *testing.T) {
 		// Handler exited cleanly after context cancellation.
 	case <-time.After(5 * time.Second):
 		t.Error("StreamLogs did not exit after context cancellation")
-	}
-}
-
-// TestStreamRefineLogs_ContainerExitsCleanly exercises the live streaming path
-// in StreamRefineLogs. The command prints two lines and exits so the lines
-// channel closes and the handler returns naturally.
-func TestStreamRefineLogs_ContainerExitsCleanly(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	scriptPath := filepath.Join(t.TempDir(), "refine-logs.sh")
-	script := "#!/bin/sh\nprintf 'refine line 1\\nrefine line 2\\n'\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	wrapperPath := filepath.Join(t.TempDir(), "fake-podman-refine.sh")
-	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
-	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	mock := &runner.MockRunner{
-		Cmd:                   wrapperPath,
-		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
-	}
-	h, _ := newTestHandlerWithMockRunner(t, mock)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
-	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
-	h.StreamRefineLogs(w, req, uuid.New())
-
-	body := w.Body.String()
-	if !strings.Contains(body, "refine line 1") {
-		t.Errorf("expected 'refine line 1' in response, got: %s", body)
-	}
-	if !strings.Contains(body, "refine line 2") {
-		t.Errorf("expected 'refine line 2' in response, got: %s", body)
-	}
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-}
-
-// TestStreamRefineLogs_CommandStartFails exercises the cmd.Start error path in
-// StreamRefineLogs. When the binary does not exist, Start() fails and the
-// handler responds with 500.
-func TestStreamRefineLogs_CommandStartFails(t *testing.T) {
-	mock := &runner.MockRunner{
-		Cmd:                   "/nonexistent-binary-xyz",
-		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
-	}
-	h, _ := newTestHandlerWithMockRunner(t, mock)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
-	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
-	h.StreamRefineLogs(w, req, uuid.New())
-
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500 when command fails to start, got %d", w.Code)
-	}
-}
-
-// TestStreamRefineLogs_ContextCancellation verifies that StreamRefineLogs
-// exits cleanly when the request context is cancelled while streaming.
-func TestStreamRefineLogs_ContextCancellation(t *testing.T) {
-	scriptPath := filepath.Join(t.TempDir(), "blocking-refine.sh")
-	script := "#!/bin/sh\nwhile true; do sleep 1; done\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	wrapperPath := filepath.Join(t.TempDir(), "fake-podman-block-refine.sh")
-	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
-	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	mock := &runner.MockRunner{
-		Cmd:                   wrapperPath,
-		RefineContainerNameFn: func(_ uuid.UUID) string { return "blocking-refine" },
-	}
-	h, _ := newTestHandlerWithMockRunner(t, mock)
-
-	reqCtx, cancel := context.WithCancel(context.Background())
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil).WithContext(reqCtx)
-	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		h.StreamRefineLogs(w, req, uuid.New())
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-	cancel()
-
-	select {
-	case <-done:
-		// Handler exited cleanly.
-	case <-time.After(5 * time.Second):
-		t.Error("StreamRefineLogs did not exit after context cancellation")
 	}
 }
 

@@ -64,13 +64,6 @@ var agentBindings = map[string]agentBinding{
 		SingleTurn:  true,
 		ParseResult: parseCommitMessageResult,
 	},
-	agents.Refinement.Slug: {
-		Activity:    store.SandboxActivityRefinement,
-		Timeout:     func(*store.Task) time.Duration { return constants.RefinementTimeout },
-		MountMode:   mountReadOnly,
-		SingleTurn:  true,
-		ParseResult: rawResultParse,
-	},
 	agents.IdeaAgent.Slug: {
 		Activity: store.SandboxActivityIdeaAgent,
 		// Ideation caller wraps the call in its own deadline derived
@@ -117,8 +110,7 @@ func bindingFor(slug string) (agentBinding, bool) {
 }
 
 // rawResultParse hands the raw result string back unchanged. Used by
-// roles whose downstream caller does the role-specific parsing
-// (refinement, ideation).
+// roles whose downstream caller does the role-specific parsing (ideation).
 func rawResultParse(o *agentOutput) (any, error) { return o.Result, nil }
 
 // passthroughParse hands the raw *agentOutput back to the caller.
