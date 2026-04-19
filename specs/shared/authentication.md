@@ -257,6 +257,19 @@ code path or a generic OIDC client behind the existing `AuthProvider`
 interface. Self-hosted non-latere.ai deployments keep using
 `WALLFACER_SERVER_API_KEY` until this ships.
 
+### Audit Log (cross-entity mutation history)
+
+`CreatedBy` + `OrgID` on records answers *who originated this record*;
+it does not answer *who edited it, when, and to what*. Cross-entity
+mutation history — task state transitions, workspace config edits,
+admin actions — lives in its own spec: [`shared/audit-log.md`](audit-log.md).
+
+That spec depends on Phase 2 (needs `*jwtauth.Claims` on every request)
+but is scoped separately so it doesn't balloon the cloud-unblock work.
+Phase 2 only adds one hook for it: an `actor_sub` field on the existing
+per-task event trace, so task-scoped attribution arrives with Phase 2
+and the broader cross-entity log follows later.
+
 ### Remote Control
 
 When a locally-running wallfacer is signed in, the instance is **linked**
