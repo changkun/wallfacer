@@ -277,7 +277,9 @@
   border: 1px solid var(--rule);
   background: var(--bg-card);
   color: var(--ink);
-  transition: background 0.1s ease, border-color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
 }
 .flows-detail__btn-primary {
   background: var(--accent);
@@ -348,7 +350,9 @@
   border-radius: 999px;
   color: var(--ink);
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
 }
 .flows-chip:hover {
   border-color: var(--accent);
@@ -394,7 +398,9 @@
   border-radius: var(--r-sm);
   background: var(--bg-card);
   color: var(--ink);
-  transition: border-color 0.1s ease, box-shadow 0.1s ease;
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease;
 }
 .flows-detail__editor input[type="text"]:focus,
 .flows-detail__editor select:focus {
@@ -469,7 +475,9 @@
   border-radius: var(--r-sm);
   cursor: pointer;
   color: var(--ink-4);
-  transition: color 0.1s ease, border-color 0.1s ease;
+  transition:
+    color 0.1s ease,
+    border-color 0.1s ease;
 }
 .flows-detail__step-remove:hover {
   color: var(--err);
@@ -487,7 +495,10 @@
   cursor: pointer;
   color: var(--ink-3);
   margin-top: var(--sp-1);
-  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
 }
 .flows-detail__step-add:hover {
   color: var(--accent);
