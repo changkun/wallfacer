@@ -1,6 +1,6 @@
 ---
 title: User-editable agents and flows (follow-up)
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/runner-flow-integration.md
 affects:
@@ -87,9 +87,13 @@ request time so edits take effect without a restart.
      composer no longer needs a per-task override because users
      who want a different harness clone the agent (or the flow)
      and pick the harness there.
-   - Remove the `sandbox` field from the `POST /api/tasks` body.
-     Legacy clients that still send it get a 400 with a pointer
-     to the flow editor.
+   - Keep the `sandbox` field on the `POST /api/tasks` body as
+     a back-compat hint — the e2e scripts, the CLI, and older
+     UIs still pass it. The composer no longer emits it; when
+     the field IS present it applies to the task as a workspace
+     default, sitting below the agent harness pin in the
+     resolver. A later follow-up can remove it outright once
+     external consumers are migrated.
 
 6. Documentation: extend `docs/guide/board-and-tasks.md` (or the
    new Agents / Flows guide) with the clone-to-customize flow,

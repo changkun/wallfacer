@@ -66,9 +66,9 @@ Click **+ New Task** in the Backlog column header to expand the creation form. T
 
 3. **🏷️ Tags** -- type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
 
-4. **📦 Sandbox selector** -- choose which sandbox environment to use (e.g. Claude, Codex). Defaults to the global setting. Applies to any step the flow leaves at `default`.
+4. **⏱️ Timeout** -- how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
 
-5. **⏱️ Timeout** -- how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
+> **Harness (Claude vs Codex) lives on the agent now.** The composer used to have an **Agent** dropdown for picking Claude vs Codex per task; that control retired once each agent (`impl`, `test`, `refine`, …) can carry its own **Harness** pin. To run a flow's step on a specific harness, open the **Agents** sidebar tab, clone the agent (e.g. `impl` → `impl-codex`), set Harness = `codex`, then reference the clone in a flow. Workspace-wide defaults still live in `WALLFACER_DEFAULT_SANDBOX`.
 
 Click **Add** to create the task. It appears in the Backlog column with an auto-generated title.
 
