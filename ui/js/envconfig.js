@@ -438,7 +438,9 @@ async function loadEnvConfig() {
   safeSetValue("env-sandbox-fast", (el) => {
     el.checked = cfg.sandbox_fast !== false;
   });
-  applySandboxByActivity("env-sandbox-", cfg.sandbox_by_activity || {});
+  // Per-activity sandbox dropdowns retired — any legacy values on
+  // cfg.sandbox_by_activity are ignored. Workspace-wide harness
+  // routing lives on the agent definition now.
   safeSetValue("env-container-cpus", (el) => {
     el.value = cfg.container_cpus || "";
   });

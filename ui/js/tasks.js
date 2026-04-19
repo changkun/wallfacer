@@ -1,27 +1,5 @@
 const DEFAULT_TASK_TIMEOUT = 60; // minutes
 
-function setActivityOverrideDefaultSandbox(prefix, sandbox) {
-  SANDBOX_ACTIVITY_KEYS.forEach(function (key) {
-    var el = document.getElementById(prefix + key);
-    if (!el) return;
-    if (sandbox) {
-      el.dataset.defaultSandbox = sandbox;
-    } else {
-      delete el.dataset.defaultSandbox;
-    }
-  });
-  populateSandboxSelects();
-}
-
-function bindTaskSandboxInheritance(selectId, prefix) {
-  var el = document.getElementById(selectId);
-  if (!el || el.dataset.inheritanceBound === "true") return;
-  el.dataset.inheritanceBound = "true";
-  el.addEventListener("change", function () {
-    setActivityOverrideDefaultSandbox(prefix, (el.value || "").trim());
-  });
-}
-
 // --- Dependency picker helpers ---
 
 /**
