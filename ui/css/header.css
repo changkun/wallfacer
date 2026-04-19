@@ -995,20 +995,18 @@ html.wails-desktop .app-sidebar {
   color: var(--ink-1);
 }
 
-/* Signed-in button: the whole row is now a menu trigger with a
- * dropdown revealing Personal / org entries / Sign out. Bare button
- * styling — we want it to feel like part of the sidebar, not a
- * call-to-action. Uses the project's tokens.css variable names:
- * --bg-hover / --bg-active for interactive states, --ink / --ink-3
- * for foreground, --bg-card + --rule for the popup chrome. */
+/* Sign-in trigger button: part of the sidebar, not a highlighted
+ * control. No hard border or accent ring — just subtle hover/open
+ * backgrounds from the shared token set. Keeps the row aligned
+ * with the rest of the sidebar footer (Docs, Settings, etc.). */
 .sb-signin__user {
   background: transparent;
   border: none;
-  padding: 4px 6px;
+  padding: 6px 8px;
   margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
   font: inherit;
   color: var(--ink);
@@ -1016,93 +1014,154 @@ html.wails-desktop .app-sidebar {
   text-align: left;
   position: relative;
   border-radius: var(--r-sm);
+  transition: background-color 120ms ease;
 }
-.sb-signin__user:hover {
+.sb-signin__user:hover,
+.sb-signin__user[aria-expanded="true"] {
   background: var(--bg-hover);
 }
-.sb-signin__user[aria-expanded="true"] {
-  background: var(--bg-active);
+.sb-signin__user:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
-/* Initials-circle fallback when userinfo didn't include a picture. */
 .sb-signin__avatar--fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--bg-card);
+  color: #fff;
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
 }
 
-/* Current-view label (Personal / <Org Name>) sits inline with the
- * display name. Muted so it reads as context rather than headline. */
-.sb-signin__view-label {
-  color: var(--ink-3);
-  font-size: var(--fs-9);
-  padding: 0 4px;
-  max-width: 40%;
+.sb-signin__name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+
+/* Current-view chip: small, bordered rectangle to the right of the
+ * name. Reads like a pill / tag instead of loose text — makes
+ * "which scope am I in?" legible at a glance. */
+.sb-signin__view-label {
   flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 7px;
+  font-size: var(--fs-9);
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
 }
 
 .sb-signin__chevron {
   color: var(--ink-3);
-  font-size: 10px;
-  margin-left: auto;
+  font-size: 9px;
+  margin-left: 2px;
   flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+.sb-signin__user[aria-expanded="true"] .sb-signin__chevron {
+  transform: rotate(180deg);
 }
 
-/* Popup menu anchored to the trigger button. Positioned above so it
- * doesn't get cut off by the page bottom. Uses --bg-card (opaque
- * off-white) so content below doesn't bleed through. */
+/* Popup menu: warm off-white card (bg-elevated, not bg-card pure
+ * white) with a light rule and the shared --shadow-lg so it feels
+ * like the rest of the app's popovers. Tight padding to match
+ * sidebar density. */
 .sb-signin__menu {
   position: absolute;
-  bottom: calc(100% + 4px);
+  bottom: calc(100% + 6px);
   left: 0;
-  min-width: 200px;
-  background: var(--bg-card);
+  min-width: 220px;
+  background: var(--bg-elevated);
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
-  box-shadow: 0 4px 16px rgba(27, 25, 22, 0.12);
-  padding: 4px 0;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
   z-index: 100;
+  animation: sb-signin-menu-in 120ms ease-out;
+}
+@keyframes sb-signin-menu-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
 }
 .sb-signin__menu[hidden] {
   display: none;
 }
+
+/* Optional section label rendered above a group — reserved for
+ * future grouping (e.g. "Workspaces" / "Account"). Added via
+ * renderer if/when the menu grows. */
+.sb-signin__menu-label {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
 .sb-signin__menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   background: transparent;
   border: none;
-  padding: 6px 12px;
+  padding: 6px 10px;
+  margin: 0;
   font: inherit;
   font-size: var(--fs-base);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+  border-radius: var(--r-sm);
+  position: relative;
+  line-height: 1.25;
 }
-.sb-signin__menu-item:hover {
+.sb-signin__menu-item:hover,
+.sb-signin__menu-item:focus-visible {
   background: var(--bg-hover);
+  outline: none;
+}
+/* Inline check marker is a leading bullet — reserves width on every
+ * item so the label text lines up whether an item is active or not.
+ * Accent only shows on the active row. */
+.sb-signin__menu-item::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  flex-shrink: 0;
+}
+.sb-signin__menu-item--active::before {
+  background: var(--accent);
 }
 .sb-signin__menu-item--active {
   font-weight: 600;
 }
-.sb-signin__menu-item--active::before {
-  content: "✓ ";
-  color: var(--accent);
-}
+
 .sb-signin__menu-sep {
   height: 1px;
   background: var(--rule);
-  margin: 4px 0;
+  margin: 4px 6px;
 }
 
 /* Collapsed sidebar: hide name + logout text; avatar (and link) still visible. */
