@@ -299,6 +299,13 @@ function _renderSignedIn(el, user, authURL) {
   nameEl.textContent = display;
   wrap.appendChild(nameEl);
 
+  // Org switcher (multi-org users only). Mounted as a container now
+  // so the submenu has a stable slot to render into after the async
+  // /api/auth/orgs fetch resolves; the sign-out link is always last.
+  var orgSlot = document.createElement("span");
+  orgSlot.className = "sb-signin__orgs";
+  wrap.appendChild(orgSlot);
+
   var out = document.createElement("a");
   out.className = "sb-signin__logout";
   out.href = "/logout";
@@ -312,6 +319,12 @@ function _renderSignedIn(el, user, authURL) {
   // re-enter us in a loop.
   el.innerHTML = "";
   el.appendChild(wrap);
+
+  // Fire the org-list fetch after the signed-in badge is already up.
+  // 204 → single-org, nothing to render (common case, no flicker).
+  // 200 → attach a <select> to orgSlot that POSTs /api/auth/switch-org
+  // and follows the redirect_url on success.
+  _fetchAndRenderOrgSwitcher(orgSlot);
   if (authURL) {
     var frame = document.createElement("iframe");
     frame.name = "latere-logout-iframe";
@@ -321,6 +334,72 @@ function _renderSignedIn(el, user, authURL) {
     frame.setAttribute("aria-hidden", "true");
     el.appendChild(frame);
   }
+}
+
+// _fetchAndRenderOrgSwitcher queries /api/auth/orgs and, when the user
+// belongs to 2+ orgs, mounts a small <select> into `slot` that swaps
+// the active org via POST /api/auth/switch-org. 204 (single-org /
+// anonymous) is a no-op; errors are swallowed because the badge is a
+// convenience, not a critical path — any failure just means no
+// switcher appears.
+function _fetchAndRenderOrgSwitcher(slot) {
+  fetch("/api/auth/orgs", { credentials: "same-origin" })
+    .then(function (resp) {
+      if (resp.status !== 200) return null;
+      return resp.json();
+    })
+    .then(function (data) {
+      if (!data || !Array.isArray(data.orgs) || data.orgs.length < 2) {
+        return;
+      }
+      var select = document.createElement("select");
+      select.className = "sb-signin__org-select";
+      select.setAttribute("aria-label", "Switch organization");
+      for (var i = 0; i < data.orgs.length; i += 1) {
+        var o = data.orgs[i];
+        if (!o || !o.id) continue;
+        var opt = document.createElement("option");
+        opt.value = o.id;
+        opt.textContent = o.name || o.id;
+        if (o.id === data.current_id) opt.selected = true;
+        select.appendChild(opt);
+      }
+      select.addEventListener("change", function () {
+        var target = select.value;
+        if (!target || target === data.current_id) return;
+        // Lock the select so a double-click can't issue two switches
+        // racing for the same session cookie clear.
+        select.disabled = true;
+        fetch("/api/auth/switch-org", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ org_id: target }),
+        })
+          .then(function (resp) {
+            if (resp.status !== 200) {
+              select.disabled = false;
+              select.value = data.current_id;
+              return null;
+            }
+            return resp.json();
+          })
+          .then(function (body) {
+            if (body && body.redirect_url) {
+              window.location.href = body.redirect_url;
+            }
+          })
+          .catch(function () {
+            select.disabled = false;
+            select.value = data.current_id;
+          });
+      });
+      slot.appendChild(select);
+    })
+    .catch(function () {
+      // Network error: silent — user sees no switcher, same outcome
+      // as a single-org response. The next reload retries.
+    });
 }
 
 // ---------------------------------------------------------------------------

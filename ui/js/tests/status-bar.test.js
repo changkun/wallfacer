@@ -547,9 +547,12 @@ function loadStatusBarInCtx(ctx) {
 }
 
 // wait for any pending fetch().then() callbacks to flush so assertions
-// observe the post-render state.
+// observe the post-render state. 10 iterations covers the deepest
+// chain in status-bar.js: renderSigninBadge (fetch → then → then) +
+// _fetchAndRenderOrgSwitcher (fetch → then → then) runs back-to-back,
+// so later tests need extra microtask turns to settle.
 async function flushPromises() {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 10; i++) {
     await Promise.resolve();
   }
 }
@@ -757,5 +760,144 @@ describe("renderPresence", () => {
     ctx.renderPresence();
     const peerRows = peersEl.children.filter((c) => c.className === "sb-peer");
     expect(peerRows.length).toBeLessThanOrEqual(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Org switcher (cloud mode, multi-org users)
+// ---------------------------------------------------------------------------
+
+// routedFetch returns a fetch impl that dispatches by URL. Used by the
+// org-switcher tests so /api/auth/me and /api/auth/orgs can be stubbed
+// independently without ordering assumptions.
+function routedFetch(routes) {
+  return (url, opts) => {
+    const path = typeof url === "string" ? url : url.url;
+    const route = routes[path];
+    if (!route) {
+      return Promise.reject(new Error(`no stub for ${path}`));
+    }
+    return route(opts);
+  };
+}
+
+// signedInUser is the fixture the /api/auth/me stub uses across the
+// org-switcher tests — content doesn't matter beyond producing a
+// signed-in badge that renders the org slot.
+const signedInUser = {
+  sub: "u-1",
+  email: "alice@example.com",
+  name: "Alice",
+  picture: "",
+};
+
+describe("renderSigninBadge org switcher", () => {
+  it("renders no <select> when /api/auth/orgs returns 204 (single-org)", async () => {
+    const { ctx, signinEl } = makeSigninContext(
+      routedFetch({
+        "/api/auth/me": () =>
+          Promise.resolve({
+            status: 200,
+            json: () => Promise.resolve(signedInUser),
+          }),
+        "/api/auth/orgs": () => Promise.resolve({ status: 204 }),
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+
+    const wrap = signinEl.children.find(
+      (c) => c.className === "sb-signin__user",
+    );
+    const slot = wrap.children.find(
+      (c) => c.className === "sb-signin__orgs",
+    );
+    // Slot exists (mounted for layout) but has no children in the
+    // single-org case — the renderer bails on <2 orgs.
+    expect(slot).toBeTruthy();
+    expect(slot.children.length).toBe(0);
+  });
+
+  it("renders a <select> with one option per org when 2+ orgs", async () => {
+    const orgsPayload = {
+      orgs: [
+        { id: "org-a", name: "Alice Inc" },
+        { id: "org-b", name: "Bob Corp" },
+      ],
+      current_id: "org-b",
+    };
+    const { ctx, signinEl } = makeSigninContext(
+      routedFetch({
+        "/api/auth/me": () =>
+          Promise.resolve({
+            status: 200,
+            json: () => Promise.resolve(signedInUser),
+          }),
+        "/api/auth/orgs": () =>
+          Promise.resolve({
+            status: 200,
+            json: () => Promise.resolve(orgsPayload),
+          }),
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+
+    const wrap = signinEl.children.find(
+      (c) => c.className === "sb-signin__user",
+    );
+    const slot = wrap.children.find(
+      (c) => c.className === "sb-signin__orgs",
+    );
+    const select = slot.children.find((c) => c.tagName === "SELECT");
+    expect(select).toBeTruthy();
+
+    const options = select.children.filter((c) => c.tagName === "OPTION");
+    expect(options.length).toBe(2);
+    expect(options[0].textContent).toBe("Alice Inc");
+    expect(options[1].textContent).toBe("Bob Corp");
+    // Option `value` is stored on the stub element directly.
+    expect(options[0].value).toBe("org-a");
+    expect(options[1].value).toBe("org-b");
+  });
+
+  it("skips /api/auth/orgs in local mode (cloud=false)", async () => {
+    const calls = [];
+    const { ctx } = makeSigninContext((url) => {
+      calls.push(url);
+      return Promise.resolve({ status: 204 });
+    });
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: false });
+    await flushPromises();
+
+    // Cloud-off short-circuits before any fetch. Orgs endpoint in
+    // particular must never be touched (it would error because the
+    // routed stub doesn't include it anyway).
+    expect(calls).not.toContain("/api/auth/orgs");
+  });
+
+  it("does not render the switcher when /api/auth/me is 204 (signed out)", async () => {
+    const orgsCalls = [];
+    const { ctx, signinEl } = makeSigninContext(
+      routedFetch({
+        "/api/auth/me": () => Promise.resolve({ status: 204 }),
+        "/api/auth/orgs": () => {
+          orgsCalls.push("called");
+          return Promise.resolve({ status: 204 });
+        },
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+
+    // A signed-out user should see the plain Sign-in link, not any
+    // org affordance. The renderer also should not fetch /api/auth/orgs
+    // since the signed-in wrapper was never built.
+    expect(signinEl.innerHTML).toContain('href="/login"');
+    expect(orgsCalls.length).toBe(0);
   });
 });
