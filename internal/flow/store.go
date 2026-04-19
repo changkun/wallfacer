@@ -80,6 +80,7 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 			if s.AgentSlug == "" {
 				return nil, fmt.Errorf("parse %s: step %d missing agent_slug", path, i)
 			}
+			//nolint:staticcheck // S1016: diskStep is the wire format, Step is the runtime shape; keep the literal copy explicit.
 			steps = append(steps, Step{
 				AgentSlug:         s.AgentSlug,
 				Optional:          s.Optional,
@@ -109,6 +110,7 @@ func WriteUserFlow(dir string, f Flow) error {
 	}
 	steps := make([]diskStep, len(f.Steps))
 	for i, s := range f.Steps {
+		//nolint:staticcheck // S1016: see LoadUserFlows — keep diskStep distinct from Step.
 		steps[i] = diskStep{
 			AgentSlug:         s.AgentSlug,
 			Optional:          s.Optional,

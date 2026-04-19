@@ -831,13 +831,19 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TriggerIdeation":   h.TriggerIdeation,
 		"CancelIdeation":    h.CancelIdeation,
 
-		// Agents catalog (read-only for v1).
-		"ListAgents": h.ListAgents,
-		"GetAgent":   h.GetAgent,
+		// Agents catalog (read + user-authored CRUD).
+		"ListAgents":  h.ListAgents,
+		"GetAgent":    h.GetAgent,
+		"CreateAgent": h.CreateAgent,
+		"UpdateAgent": h.UpdateAgent,
+		"DeleteAgent": h.DeleteAgent,
 
-		// Flows catalog (read-only for v1).
-		"ListFlows": h.ListFlows,
-		"GetFlow":   h.GetFlow,
+		// Flows catalog (read + user-authored CRUD).
+		"ListFlows":  h.ListFlows,
+		"GetFlow":    h.GetFlow,
+		"CreateFlow": h.CreateFlow,
+		"UpdateFlow": h.UpdateFlow,
+		"DeleteFlow": h.DeleteFlow,
 
 		// Routines.
 		"ListRoutines":          h.ListRoutines,

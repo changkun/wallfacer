@@ -220,6 +220,24 @@ var Routes = []Route{
 		Description: "Get one agent's full descriptor including its prompt template body.",
 		Tags:        []string{"agents"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/agents", Name: "CreateAgent",
+		JSName:      "create",
+		Description: "Create a user-authored agent (rejects slugs that shadow a built-in).",
+		Tags:        []string{"agents"},
+	},
+	{
+		Method: http.MethodPut, Pattern: "/api/agents/{slug}", Name: "UpdateAgent",
+		JSName:      "update",
+		Description: "Update a user-authored agent; 409 for built-in slugs.",
+		Tags:        []string{"agents"},
+	},
+	{
+		Method: http.MethodDelete, Pattern: "/api/agents/{slug}", Name: "DeleteAgent",
+		JSName:      "delete",
+		Description: "Delete a user-authored agent; 409 for built-in slugs.",
+		Tags:        []string{"agents"},
+	},
 
 	// --- Flows ---
 
@@ -233,6 +251,24 @@ var Routes = []Route{
 		Method: http.MethodGet, Pattern: "/api/flows/{slug}", Name: "GetFlow",
 		JSName:      "get",
 		Description: "Get one flow's full descriptor including its step chain and agent names.",
+		Tags:        []string{"flows"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/flows", Name: "CreateFlow",
+		JSName:      "create",
+		Description: "Create a user-authored flow (rejects slugs that shadow a built-in).",
+		Tags:        []string{"flows"},
+	},
+	{
+		Method: http.MethodPut, Pattern: "/api/flows/{slug}", Name: "UpdateFlow",
+		JSName:      "update",
+		Description: "Update a user-authored flow; 409 for built-in slugs.",
+		Tags:        []string{"flows"},
+	},
+	{
+		Method: http.MethodDelete, Pattern: "/api/flows/{slug}", Name: "DeleteFlow",
+		JSName:      "delete",
+		Description: "Delete a user-authored flow; 409 for built-in slugs.",
 		Tags:        []string{"flows"},
 	},
 

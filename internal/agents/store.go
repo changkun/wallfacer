@@ -66,6 +66,7 @@ func LoadUserAgents(dir string) ([]Role, error) {
 		if a.Title == "" {
 			return nil, fmt.Errorf("parse %s: title is required", path)
 		}
+		//nolint:staticcheck // S1016: the two types share fields by design but are distinct — diskAgent is the wire format, Role is the runtime descriptor; keep them explicitly decoupled so a future field split does not silently coerce.
 		roles = append(roles, Role{
 			Slug:               a.Slug,
 			Title:              a.Title,
@@ -90,6 +91,7 @@ func WriteUserAgent(dir string, role Role) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
+	//nolint:staticcheck // S1016: see LoadUserAgents — diskAgent stays explicitly distinct from Role.
 	body, err := yaml.Marshal(diskAgent{
 		Slug:               role.Slug,
 		Title:              role.Title,
