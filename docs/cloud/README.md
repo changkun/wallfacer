@@ -85,7 +85,9 @@ The endpoint is safe to load unauthenticated: it only clears a cookie and return
 
 Later cloud phases (design-level today, no ETA):
 
-- **JWT middleware on `/api/*`** (shipped in Phase 2's first child spec). When `WALLFACER_CLOUD=true`, requests carrying `Authorization: Bearer <jwt>` have the token validated against the auth service's JWKS; valid tokens surface as `*auth.Claims` in handler context via `auth.PrincipalFromContext(r.Context())`. Today this is `OptionalAuth` only (no route requires a token; claims just surface when present); strict 401 enforcement on admin routes and forced login for unauthenticated browsers land in later Phase 2 specs.
+- **JWT middleware on `/api/*`** (shipped in Phase 2's first child spec). When `WALLFACER_CLOUD=true`, requests carrying `Authorization: Bearer <jwt>` have the token validated against the auth service's JWKS; valid tokens surface as `*auth.Claims` in handler context via `auth.PrincipalFromContext(r.Context())`. Claims also flow in from the session cookie via `CookiePrincipal`, so browser callers present the same shape as Bearer callers.
+- **Superadmin gating on `/api/admin/*`** (Phase 2). In cloud mode, `POST /api/admin/rebuild-index` requires a JWT (or cookie session) whose `is_superadmin` claim is `true`. Regular users get `403 forbidden`; anonymous requests get `401`. Local mode continues to reach the handler without any claim, unchanged.
+- `auth.RequireScope(name)` wrapper is scaffolded for other routes to opt into as scopes are assigned; no route applies it today.
 - **Authorization primitives.** `org_id` routing for multi-tenant, superadmin gating, scope-based route guards.
 - **Tenant filesystem** — fs.latere.ai integration for cloud-hosted workspace storage.
 - **K8s sandbox** — dispatch task containers as K8s Jobs instead of local podman/docker.
