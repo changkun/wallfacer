@@ -1008,7 +1008,10 @@ async function setCurrentGroupMaxParallel(value) {
   var idx = -1;
   for (var i = 0; i < workspaceGroups.length; i += 1) {
     if (
-      workspaceGroupsEqual(workspaceGroups[i].workspaces || [], activeWorkspaces)
+      workspaceGroupsEqual(
+        workspaceGroups[i].workspaces || [],
+        activeWorkspaces,
+      )
     ) {
       idx = i;
       break;
