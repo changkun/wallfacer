@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/planner"
+	"github.com/google/uuid"
 )
 
 // threadsManager returns the planner's thread manager if both are
@@ -58,9 +60,11 @@ type threadSummary struct {
 	Updated  string `json:"updated"`
 	Archived bool   `json:"archived"`
 	Active   bool   `json:"active,omitempty"`
+	Mode     string `json:"mode"`             // "spec" or "task"
+	TaskID   string `json:"task_id,omitempty"` // set when Mode == "task"
 }
 
-func toThreadSummary(m planner.ThreadMeta, activeID string) threadSummary {
+func toThreadSummary(m planner.ThreadMeta, activeID, mode, taskID string) threadSummary {
 	return threadSummary{
 		ID:       m.ID,
 		Name:     m.Name,
@@ -68,7 +72,26 @@ func toThreadSummary(m planner.ThreadMeta, activeID string) threadSummary {
 		Updated:  m.Updated.UTC().Format(time.RFC3339Nano),
 		Archived: m.Archived,
 		Active:   m.ID == activeID,
+		Mode:     mode,
+		TaskID:   taskID,
 	}
+}
+
+// threadMode derives the mode and task ID from a thread's session.
+// Returns ("spec", "") when the session is absent or task-mode is not pinned.
+func threadMode(tm *planner.ThreadManager, id string) (mode, taskID string) {
+	cs, err := tm.Store(id)
+	if err != nil {
+		return "spec", ""
+	}
+	sess, err := cs.LoadSession()
+	if err != nil {
+		return "spec", ""
+	}
+	if sess.FocusedTask != "" {
+		return "task", sess.FocusedTask
+	}
+	return "spec", ""
 }
 
 // writeThreadErr maps a ThreadManager error to an HTTP status code.
@@ -94,7 +117,8 @@ func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
 	activeID := tm.ActiveID()
 	out := make([]threadSummary, 0, len(metas))
 	for _, m := range metas {
-		out = append(out, toThreadSummary(m, activeID))
+		mode, taskID := threadMode(tm, m.ID)
+		out = append(out, toThreadSummary(m, activeID, mode, taskID))
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{
 		"threads":   out,
@@ -104,6 +128,7 @@ func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
 
 // CreatePlanningThread creates a new planning chat thread. Body is
 // optional; when `name` is empty, a default "Chat N" name is used.
+// When `focused_task` is set, the thread is pinned to task-mode immediately.
 func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
 	tm := h.threadsManager()
 	if tm == nil {
@@ -111,17 +136,47 @@ func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req, ok := httpjson.DecodeOptionalBody[struct {
-		Name string `json:"name"`
+		Name        string `json:"name"`
+		FocusedTask string `json:"focused_task"`
 	}](w, r)
 	if !ok {
 		return
 	}
+
+	// Validate focused_task UUID and existence if provided.
+	var taskIDStr string
+	if ft := strings.TrimSpace(req.FocusedTask); ft != "" {
+		taskUUID, parseErr := uuid.Parse(ft)
+		if parseErr != nil {
+			http.Error(w, "focused_task: invalid UUID", http.StatusBadRequest)
+			return
+		}
+		if h.store != nil {
+			if _, lookupErr := h.store.GetTask(context.Background(), taskUUID); lookupErr != nil {
+				http.Error(w, "focused_task: task not found", http.StatusNotFound)
+				return
+			}
+		}
+		taskIDStr = taskUUID.String()
+	}
+
 	meta, err := tm.Create(strings.TrimSpace(req.Name))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	httpjson.Write(w, http.StatusCreated, toThreadSummary(meta, tm.ActiveID()))
+
+	// Pin task-mode immediately by writing session.json before any exec.
+	mode, taskID := "spec", ""
+	if taskIDStr != "" {
+		cs, csErr := tm.Store(meta.ID)
+		if csErr == nil {
+			_ = cs.SaveSession(planner.SessionInfo{FocusedTask: taskIDStr})
+		}
+		mode, taskID = "task", taskIDStr
+	}
+
+	httpjson.Write(w, http.StatusCreated, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
 // RenamePlanningThread renames a thread. Body: {"name": "New name"}.
@@ -147,7 +202,8 @@ func (h *Handler) RenamePlanningThread(w http.ResponseWriter, r *http.Request) {
 		writeThreadErr(w, err)
 		return
 	}
-	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID()))
+	mode, taskID := threadMode(tm, id)
+	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
 // ArchivePlanningThread hides a thread from the tab bar. The thread
@@ -174,7 +230,8 @@ func (h *Handler) ArchivePlanningThread(w http.ResponseWriter, r *http.Request) 
 		writeThreadErr(w, err)
 		return
 	}
-	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID()))
+	mode, taskID := threadMode(tm, id)
+	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
 // UnarchivePlanningThread restores a thread to the visible tab set.
@@ -194,7 +251,8 @@ func (h *Handler) UnarchivePlanningThread(w http.ResponseWriter, r *http.Request
 		writeThreadErr(w, err)
 		return
 	}
-	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID()))
+	mode, taskID := threadMode(tm, id)
+	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
 // ActivatePlanningThread records a new active thread for the UI.
@@ -214,5 +272,6 @@ func (h *Handler) ActivatePlanningThread(w http.ResponseWriter, r *http.Request)
 		writeThreadErr(w, err)
 		return
 	}
-	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID()))
+	mode, taskID := threadMode(tm, id)
+	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
