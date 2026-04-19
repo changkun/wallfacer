@@ -423,7 +423,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |
 | `runtime.go` | Live server internals (goroutines, memory, task states, containers) | `GET /api/debug/runtime` |
 | `sandbox_gate.go` | Sandbox usability checks (auth validation before task launch) | — (internal helpers) |
-| `watcher.go` | Ideation watcher loop | `StartIdeationWatcher()` |
+| `watcher.go` | Shared two-phase watcher helper used by the autopilot loops in `tasks_autopilot.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |
 | `diffcache.go` | LRU diff cache for task diffs | — (internal) |
 | `file_index.go` | Background file indexing for `@` mention | — (internal) |
 | `event_helpers.go` | Shared helpers for inserting task events | — (internal) |
