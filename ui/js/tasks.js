@@ -793,6 +793,14 @@ async function startTask() {
   }
 }
 
+// --- Send to Plan ---
+
+function sendCurrentTaskToPlan() {
+  const id = getOpenModalTaskId();
+  if (!id) return;
+  openPlanForTask(id);
+}
+
 // --- Cancel ---
 
 async function cancelTask() {
