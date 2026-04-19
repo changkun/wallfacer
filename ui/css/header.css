@@ -780,7 +780,7 @@ html.wails-desktop .app-sidebar {
 .col-bg {
   background: var(--bg-sunk);
   border-radius: var(--r-md);
-  padding: var(--sp-3);
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
   gap: var(--sp-2);
 }
 /* --- Settings button --- */
