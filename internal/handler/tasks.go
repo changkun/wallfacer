@@ -780,6 +780,17 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		oldStatus := task.Status
 		newStatus := *req.Status
 
+		// Reject status changes on tasks that have an in-flight plan turn.
+		if oldStatus != newStatus {
+			if locked, threadID := h.isTaskLockedByPlanner(id.String()); locked {
+				httpjson.Write(w, http.StatusConflict, map[string]string{
+					"error":     "task is locked by an in-flight plan turn",
+					"thread_id": threadID,
+				})
+				return
+			}
+		}
+
 		// Handle retry: done/failed/waiting/cancelled → backlog
 		if newStatus == store.TaskStatusBacklog && (oldStatus == store.TaskStatusDone || oldStatus == store.TaskStatusFailed || oldStatus == store.TaskStatusCancelled || oldStatus == store.TaskStatusWaiting) {
 			newPrompt := task.Prompt
@@ -821,6 +832,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 				store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 			h.diffCache.invalidate(id)
+			h.cascadeArchiveThreadsForTask(id.String())
 			sessionID := ""
 			if !task.FreshStart && task.SessionID != nil {
 				sessionID = *task.SessionID
@@ -845,6 +857,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 				store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 			h.diffCache.invalidate(id)
+			if oldStatus == store.TaskStatusWaiting {
+				h.cascadeArchiveThreadsForTask(id.String())
+			}
 			updated, err := s.GetTask(r.Context(), id)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -865,6 +880,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 			store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 		h.diffCache.invalidate(id)
+		if oldStatus == store.TaskStatusBacklog || oldStatus == store.TaskStatusWaiting {
+			h.cascadeArchiveThreadsForTask(id.String())
+		}
 
 		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
 			sessionID := ""
@@ -924,6 +942,7 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.cascadeArchiveThreadsForTask(id.String())
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -954,6 +973,7 @@ func (h *Handler) RestoreTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.cascadeUnarchiveThreadsForTask(id.String())
 	w.WriteHeader(http.StatusNoContent)
 }
 

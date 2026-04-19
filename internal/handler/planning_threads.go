@@ -7,10 +7,49 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/planner"
 	"github.com/google/uuid"
 )
+
+// isTaskLockedByPlanner reports whether any task-mode planning thread currently
+// has an in-flight turn pinned to taskID. Returns (true, threadID) when locked.
+func (h *Handler) isTaskLockedByPlanner(taskID string) (bool, string) {
+	if h.planner == nil {
+		return false, ""
+	}
+	return h.planner.IsTaskLocked(taskID)
+}
+
+// cascadeArchiveThreadsForTask archives all non-archived task-mode threads
+// pinned to taskID and sets their AutoArchivedByTaskLifecycle flag.
+func (h *Handler) cascadeArchiveThreadsForTask(taskID string) {
+	tm := h.threadsManager()
+	if tm == nil {
+		return
+	}
+	archived, err := tm.CascadeArchiveForTask(taskID)
+	if err != nil {
+		logger.Handler.Warn("cascade archive threads failed", "task", taskID, "err", err)
+		return
+	}
+	if len(archived) > 0 {
+		logger.Handler.Debug("cascade archived task-mode threads", "task", taskID, "threads", archived)
+	}
+}
+
+// cascadeUnarchiveThreadsForTask reverses AutoArchivedByTaskLifecycle archiving
+// for threads pinned to taskID (only those still carrying the cascade flag).
+func (h *Handler) cascadeUnarchiveThreadsForTask(taskID string) {
+	tm := h.threadsManager()
+	if tm == nil {
+		return
+	}
+	if err := tm.CascadeUnarchiveForTask(taskID); err != nil {
+		logger.Handler.Warn("cascade unarchive threads failed", "task", taskID, "err", err)
+	}
+}
 
 // threadsManager returns the planner's thread manager if both are
 // configured, else nil.

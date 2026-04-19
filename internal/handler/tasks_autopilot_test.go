@@ -21,6 +21,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -1643,5 +1644,40 @@ func TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared(t *testing.T) {
 	// No session → task should go directly to done.
 	if got.Status != store.TaskStatusDone {
 		t.Errorf("expected task done after fetch error cleared, got %s", got.Status)
+	}
+}
+
+func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	h.SetAutopilot(true)
+
+	ctx := context.Background()
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "locked task"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Pin the planner thread to this task and mark it busy (in-flight turn).
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	if len(threads) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	threadID := threads[0].ID
+	cs, _ := tm.Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: task.ID.String()})
+	h.planner.SetBusy(true, threadID)
+	defer h.planner.SetBusy(false, "")
+
+	// tryAutoPromote must skip the locked task even though there is capacity.
+	h.tryAutoPromote(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("task status = %q, want backlog — locked task must not be promoted", got.Status)
 	}
 }

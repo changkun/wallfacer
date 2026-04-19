@@ -184,6 +184,30 @@ func (p *Planner) Exec(ctx context.Context, cmd []string) (sandbox.Handle, error
 	return h, nil
 }
 
+// IsTaskLocked reports whether any task-mode thread currently has an
+// in-flight turn pinned to taskID. Returns (true, threadID) when locked,
+// (false, "") otherwise.
+func (p *Planner) IsTaskLocked(taskID string) (bool, string) {
+	p.mu.Lock()
+	busy := p.busy
+	threadID := p.busyThreadID
+	threads := p.threads
+	p.mu.Unlock()
+
+	if !busy || threadID == "" || threads == nil {
+		return false, ""
+	}
+	cs, err := threads.Store(threadID)
+	if err != nil {
+		return false, ""
+	}
+	sess, err := cs.LoadSession()
+	if err != nil || sess.FocusedTask != taskID {
+		return false, ""
+	}
+	return true, threadID
+}
+
 // IsBusy reports whether a chat exec is currently in flight.
 func (p *Planner) IsBusy() bool {
 	p.mu.Lock()

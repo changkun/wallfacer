@@ -18,6 +18,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -4549,5 +4550,54 @@ func TestCreateTask_FlowFieldPersisted(t *testing.T) {
 	}
 	if task.FlowID != "refine-only" {
 		t.Errorf("FlowID = %q, want refine-only", task.FlowID)
+	}
+}
+
+func TestPatchTask_RejectedWhenLocked(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "lock test"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Pin the thread to this task and start an in-flight turn.
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	if len(threads) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	threadID := threads[0].ID
+	cs, _ := tm.Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: task.ID.String()})
+	h.planner.SetBusy(true, threadID)
+	defer h.planner.SetBusy(false, "")
+
+	// Attempt to move the task to in_progress — should be rejected with 409.
+	body := `{"status":"in_progress"}`
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("PATCH", "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	req.SetPathValue("id", task.ID.String())
+	h.UpdateTask(rec, req, task.ID)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["thread_id"] != threadID {
+		t.Errorf("thread_id = %q, want %q", resp["thread_id"], threadID)
+	}
+	if !strings.Contains(resp["error"], "in-flight") {
+		t.Errorf("error message = %q, want mention of in-flight", resp["error"])
+	}
+
+	// Task must still be in backlog.
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("task status = %q, want backlog after rejected transition", got.Status)
 	}
 }
