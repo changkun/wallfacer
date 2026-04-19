@@ -59,7 +59,6 @@ let activeGroups = [];
 
 // Automation toggle state
 let autopilot = false;
-let autorefine = false;
 let autotest = false;
 let autosubmit = false;
 let autosync = false;
@@ -76,11 +75,6 @@ let hostMode = false;
 
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
-
-// Refine logs state
-let refineRawLogBuffer = "";
-// refineLogsMode: 'pretty' | 'raw'
-let refineLogsMode = "pretty";
 
 // Debounce timer for backlog prompt auto-save
 let editDebounce = null;

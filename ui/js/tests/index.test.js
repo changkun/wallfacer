@@ -299,67 +299,6 @@ describe("backlog impact sorting helpers", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 7 – buildCardActions: Start button disabled during refinement (render.js)
-// Verifies that the Start button on backlog cards is disabled when a refinement
-// job is actively running, preventing accidental task start mid-refinement.
-// ---------------------------------------------------------------------------
-describe("buildCardActions refinement guard", () => {
-  let ctx;
-
-  beforeAll(() => {
-    ctx = makeContext({
-      escapeHtml: (s) => String(s ?? ""),
-      maxParallelTasks: 0,
-      // render.js uses these globals at various points; provide stubs
-      fetchBehindCount: () => {},
-    });
-    loadScript("state.js", ctx);
-    loadScript("render.js", ctx);
-  });
-
-  it("Start button is enabled when there is no current_refinement", () => {
-    const task = { id: "abc", status: "backlog", current_refinement: null };
-    const html = ctx.buildCardActions(task);
-    // disabled attribute must not be present
-    expect(html).not.toMatch(/disabled/);
-    expect(html).toContain("card-action-start");
-  });
-
-  it("Start button is disabled when refinement is done (requires review)", () => {
-    const task = {
-      id: "abc",
-      status: "backlog",
-      current_refinement: { status: "done" },
-    };
-    const html = ctx.buildCardActions(task);
-    expect(html).toContain("disabled");
-    expect(html).toContain("card-action-start");
-  });
-
-  it("Start button is disabled when refinement is running", () => {
-    const task = {
-      id: "abc",
-      status: "backlog",
-      current_refinement: { status: "running" },
-    };
-    const html = ctx.buildCardActions(task);
-    expect(html).toContain("disabled");
-    expect(html).toContain("card-action-start");
-  });
-
-  it("Start button is enabled when refinement has failed", () => {
-    const task = {
-      id: "abc",
-      status: "backlog",
-      current_refinement: { status: "failed" },
-    };
-    const html = ctx.buildCardActions(task);
-    expect(html).not.toMatch(/disabled/);
-    expect(html).toContain("card-action-start");
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Test 8 – populateDependsOnPicker ordering (tasks.js)
 // Verifies that tasks in the dep-picker are ordered by status priority:
 // in_progress → waiting → backlog → done.

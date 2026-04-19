@@ -112,7 +112,6 @@ function makeTask(overrides) {
       mount_worktrees: false,
       tags: [],
       depends_on: [],
-      current_refinement: null,
       worktree_paths: {},
       position: 0,
       created_at: new Date().toISOString(),

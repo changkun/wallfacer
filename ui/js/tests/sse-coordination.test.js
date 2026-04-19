@@ -157,10 +157,6 @@ function makeContext(overrides = {}) {
             sync: () => "/api/tasks/" + id + "/sync",
             test: () => "/api/tasks/" + id + "/test",
             diff: () => "/api/tasks/" + id + "/diff",
-            refine: () => "/api/tasks/" + id + "/refine",
-            refineLogs: () => "/api/tasks/" + id + "/refine/logs",
-            refineApply: () => "/api/tasks/" + id + "/refine/apply",
-            refineDismiss: () => "/api/tasks/" + id + "/refine/dismiss",
             oversight: () => "/api/tasks/" + id + "/oversight",
           };
         },
@@ -390,10 +386,6 @@ describe("openRaiseLimitInline — uses task(id).update() route helper", () => {
             sync: () => "/api/tasks/" + id + "/sync",
             test: () => "/api/tasks/" + id + "/test",
             diff: () => "/api/tasks/" + id + "/diff",
-            refine: () => "/api/tasks/" + id + "/refine",
-            refineLogs: () => "/api/tasks/" + id + "/refine/logs",
-            refineApply: () => "/api/tasks/" + id + "/refine/apply",
-            refineDismiss: () => "/api/tasks/" + id + "/refine/dismiss",
             oversight: () => "/api/tasks/" + id + "/oversight",
           };
         },

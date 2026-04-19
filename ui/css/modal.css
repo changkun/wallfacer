@@ -74,12 +74,6 @@
 .modal-wide #modal-backlog-right.hidden {
   display: none;
 }
-/* Refine main tab: backlog-right fills the whole content row; the usual
-   spec/activity main-pane collapses. */
-#modal[data-main-tab="refine"] #modal-main-pane {
-  display: none;
-}
-
 /* ---------- Activity tab: full-width vertical stack, Impl | Testing sub-tabs ----------
    Selecting a sub-tab shows one agent (turns then oversight, full width).
    Typography-driven; no rounded wrapping cards. */

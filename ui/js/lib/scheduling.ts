@@ -1,7 +1,7 @@
 // --- Render scheduling helpers ---
 //
 // Factory for requestAnimationFrame-debounced render schedulers.
-// Replaces identical patterns in modal-logs.js, refine.js, render.js.
+// Replaces identical patterns in modal-logs.js, render.js.
 
 /**
  * Create a scheduler that coalesces rapid calls into a single

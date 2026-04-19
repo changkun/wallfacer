@@ -44,23 +44,6 @@ function initSortable() {
     chosenClass: "sortable-chosen",
     onAdd: function (evt) {
       const id = evt.item.dataset.id;
-      const task = tasks.find((t) => t.id === id);
-      const refineStatus =
-        task && task.current_refinement && task.current_refinement.status;
-      if (refineStatus === "running" || refineStatus === "done") {
-        // Return card to backlog and alert user.
-        backlog.insertBefore(evt.item, backlog.children[evt.oldIndex] || null);
-        if (refineStatus === "running") {
-          showAlert(
-            "Refinement is in progress. Please wait for it to complete before starting.",
-          );
-        } else {
-          showAlert(
-            "This task has a refined prompt awaiting review. Open the task to apply or dismiss it before starting.",
-          );
-        }
-        return;
-      }
       updateTaskStatus(id, "in_progress");
     },
   });
