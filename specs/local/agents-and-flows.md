@@ -420,6 +420,7 @@ Each task preserves the green-tree acceptance criterion:
 | [Runner → flow-engine wiring](agents-and-flows/runner-flow-integration.md) | flow-engine, composer-flow-picker | large | complete |
 | [Editable agents + flows (follow-up)](agents-and-flows/editable-agents-and-flows.md) | runner-flow-integration | large | complete |
 | [Routine.SpawnFlow migration (follow-up)](agents-and-flows/routine-spawn-flow-migration.md) | runner-flow-integration | small | complete |
+| [Post-ship refinements (follow-up)](agents-and-flows/refinements.md) | editable-agents-and-flows | large | archived |
 
 ```mermaid
 graph LR
