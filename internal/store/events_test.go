@@ -824,6 +824,119 @@ func TestMaxEventSeqViaLoadEvents(t *testing.T) {
 	}
 }
 
+func TestPromptRoundEvent_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := NewFileStore(dir)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+
+	payload := NewPromptRoundEvent("thread-1", 3, "old prompt", "new prompt", false)
+	if err := s.InsertEvent(bg(), task.ID, EventTypePromptRound, payload); err != nil {
+		t.Fatalf("InsertEvent: %v", err)
+	}
+
+	// Reload from disk and verify payload survives.
+	s2, _ := NewFileStore(dir)
+	events, err := s2.GetEvents(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event after reload, got %d", len(events))
+	}
+	if events[0].EventType != EventTypePromptRound {
+		t.Errorf("EventType = %q, want %q", events[0].EventType, EventTypePromptRound)
+	}
+	var got PromptRoundData
+	if err := json.Unmarshal(events[0].Data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.ThreadID != "thread-1" {
+		t.Errorf("ThreadID = %q, want %q", got.ThreadID, "thread-1")
+	}
+	if got.Round != 3 {
+		t.Errorf("Round = %d, want 3", got.Round)
+	}
+	if got.PrevPrompt != "old prompt" {
+		t.Errorf("PrevPrompt = %q, want %q", got.PrevPrompt, "old prompt")
+	}
+	if got.NewPrompt != "new prompt" {
+		t.Errorf("NewPrompt = %q, want %q", got.NewPrompt, "new prompt")
+	}
+	if got.ResumeHint {
+		t.Error("ResumeHint should be false")
+	}
+}
+
+func TestPromptRoundRevertEvent_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := NewFileStore(dir)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+
+	payload := NewPromptRoundRevertEvent("thread-2", 5)
+	if err := s.InsertEvent(bg(), task.ID, EventTypePromptRoundRevert, payload); err != nil {
+		t.Fatalf("InsertEvent: %v", err)
+	}
+
+	s2, _ := NewFileStore(dir)
+	events, err := s2.GetEvents(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event after reload, got %d", len(events))
+	}
+	if events[0].EventType != EventTypePromptRoundRevert {
+		t.Errorf("EventType = %q, want %q", events[0].EventType, EventTypePromptRoundRevert)
+	}
+	var got PromptRoundRevertData
+	if err := json.Unmarshal(events[0].Data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.ThreadID != "thread-2" {
+		t.Errorf("ThreadID = %q, want %q", got.ThreadID, "thread-2")
+	}
+	if got.RevertedRound != 5 {
+		t.Errorf("RevertedRound = %d, want 5", got.RevertedRound)
+	}
+}
+
+func TestPromptRoundEvent_ResumeHintFlag(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := NewFileStore(dir)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+
+	// Default (false) case.
+	defaultPayload := NewPromptRoundEvent("t", 1, "a", "b", false)
+	if defaultPayload.ResumeHint {
+		t.Error("ResumeHint should default to false")
+	}
+
+	// Set case.
+	setPayload := NewPromptRoundEvent("t", 2, "a", "b", true)
+	if !setPayload.ResumeHint {
+		t.Error("ResumeHint should be true when set")
+	}
+
+	// Persist both and verify they round-trip correctly.
+	_ = s.InsertEvent(bg(), task.ID, EventTypePromptRound, defaultPayload)
+	_ = s.InsertEvent(bg(), task.ID, EventTypePromptRound, setPayload)
+
+	s2, _ := NewFileStore(dir)
+	events, _ := s2.GetEvents(bg(), task.ID)
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	var p0, p1 PromptRoundData
+	_ = json.Unmarshal(events[0].Data, &p0)
+	_ = json.Unmarshal(events[1].Data, &p1)
+	if p0.ResumeHint {
+		t.Error("first event ResumeHint should be false")
+	}
+	if !p1.ResumeHint {
+		t.Error("second event ResumeHint should be true")
+	}
+}
+
 func TestGetEventsPage_FullPaginationWalk(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
