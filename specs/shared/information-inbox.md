@@ -190,7 +190,7 @@ Shared patterns:
 
 The telemetry panel and inbox panel are siblings in the UI, not nested. A future "signals" umbrella view could unify them, but v1 keeps them separate because the data shapes and triage logic differ.
 
-The multi-agent debate spec (`specs/shared/multi-agent-debate.md`) already proposes using deliberation for telemetry signal triage. The inbox triage agent could participate in the same debate framework when multiple agents assess the relevance of an inbox item to the project.
+The multi-agent debate spec (`specs/oversight/multi-agent-debate.md`) already proposes using deliberation for telemetry signal triage. The inbox triage agent could participate in the same debate framework when multiple agents assess the relevance of an inbox item to the project.
 
 ---
 

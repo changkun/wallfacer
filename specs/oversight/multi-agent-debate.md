@@ -3,7 +3,7 @@ title: Multi-Agent Debate — Adversarial Deliberation for Ideation and Signal T
 status: drafted
 depends_on:
   - specs/shared/agent-abstraction.md
-  - specs/shared/multi-agent-consensus.md
+  - specs/oversight/multi-agent-consensus.md
 affects: [internal/runner/, internal/store/, internal/prompts/, ui/]
 effort: xlarge
 created: 2026-04-01

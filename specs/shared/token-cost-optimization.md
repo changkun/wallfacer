@@ -64,7 +64,7 @@ Additionally, `--resume` has been reported to always break cache in some version
 |-------|-------------------|---------------------|
 | Container launch flags | `--resume`, `--model`, `-p` | N/A |
 | Mounted content | AGENTS.md, board.json, worktrees | N/A |
-| Shell output volume | Can intercept via hooks/wrappers (see [sandbox-hooks](sandbox-hooks.md)) | Built-in tools bypass Bash |
+| Shell output volume | Can intercept via hooks/wrappers (see [sandbox-hooks](../oversight/sandbox-hooks.md)) | Built-in tools bypass Bash |
 | System prompt composition | N/A | Static/dynamic boundary |
 | Cache control headers | N/A | `cache_control` blocks |
 | Context compaction | N/A | Auto-compact triggers |
@@ -121,7 +121,7 @@ When a cache break is detected (cache reads drop >5% AND >2,000 tokens between c
 2. Capture what changed between turns: did AGENTS.md change? Did the model change? Was this the first turn after `--resume`? Did board.json content change?
 3. Surface in the task timeline as a diagnostic event.
 
-**Real-time signal via hooks**: If [sandbox-hooks](sandbox-hooks.md) are enabled, `PreCompact`/`PostCompact` hook events provide an immediate signal that context compaction occurred — a leading indicator of cache pressure. These events can supplement the heuristic detection above with ground-truth compaction data.
+**Real-time signal via hooks**: If [sandbox-hooks](../oversight/sandbox-hooks.md) are enabled, `PreCompact`/`PostCompact` hook events provide an immediate signal that context compaction occurred — a leading indicator of cache pressure. These events can supplement the heuristic detection above with ground-truth compaction data.
 
 This requires capturing some inputs alongside outputs. Candidate approach: hash the mounted AGENTS.md, board.json, and model string before each container invocation, store in the turn record, and diff against previous turn.
 
@@ -194,13 +194,13 @@ RTK intercepts Bash commands and returns compressed output. It claims 60-90% tok
 | C. Custom Bash wrapper | Replace `/usr/bin/bash` with a wrapper that pipes through compressor | All shell invocations | Medium |
 | D. API proxy with response rewriting | MITM proxy that compresses tool results before they reach the API | All tools | High |
 
-**Recommended**: Option B (Claude Code hooks via PreToolUse) once the [sandbox-hooks](sandbox-hooks.md) infrastructure is in place. The hooks spec's Handler 1 (Output Compression) implements exactly this — the wallfacer server rewrites Bash commands to pipe through RTK before the agent sees the output. This avoids coupling compression config to the container image and lets the server control compression policy centrally.
+**Recommended**: Option B (Claude Code hooks via PreToolUse) once the [sandbox-hooks](../oversight/sandbox-hooks.md) infrastructure is in place. The hooks spec's Handler 1 (Output Compression) implements exactly this — the wallfacer server rewrites Bash commands to pipe through RTK before the agent sees the output. This avoids coupling compression config to the container image and lets the server control compression policy centrally.
 
 **Fallback**: Option A (RTK in sandbox image) can ship independently as a low-risk interim step before sandbox hooks are available. The two approaches are compatible — image-level RTK can be replaced by hook-level rewriting without agent-visible changes.
 
 **Implementation**:
 
-1. *With sandbox hooks*: The hook HTTP server's `PreToolUse` handler rewrites Bash commands with RTK compression pipes (see [sandbox-hooks.md §Handler 1](sandbox-hooks.md)). Controlled by `WALLFACER_HOOKS_COMPRESSION` env var.
+1. *With sandbox hooks*: The hook HTTP server's `PreToolUse` handler rewrites Bash commands with RTK compression pipes (see [sandbox-hooks.md §Handler 1](../oversight/sandbox-hooks.md)). Controlled by `WALLFACER_HOOKS_COMPRESSION` env var.
 2. *Without sandbox hooks*: Add RTK binary to sandbox Dockerfiles and configure `.bashrc` interception. Controlled by `WALLFACER_TOKEN_COMPRESSION` env var.
 3. Track compressed vs uncompressed token counts to measure savings.
 
@@ -305,7 +305,7 @@ Current behavior: budget check happens after each turn, comparing accumulated co
 
 This mirrors cc-budget's `UserPromptSubmit` hook pattern but adapted for wallfacer's container execution model where wallfacer controls the prompt, not a local hook.
 
-**Alternative via sandbox hooks**: If [sandbox-hooks](sandbox-hooks.md) are enabled, budget warnings can instead be injected through the `UserPromptSubmit` hook's `additionalContext` field — exactly as cc-budget does. This is more natural (the agent sees it as part of the prompt context, not as a continuation message) but requires the hooks infrastructure. The runner-side approach above works without hooks and serves as the default.
+**Alternative via sandbox hooks**: If [sandbox-hooks](../oversight/sandbox-hooks.md) are enabled, budget warnings can instead be injected through the `UserPromptSubmit` hook's `additionalContext` field — exactly as cc-budget does. This is more natural (the agent sees it as part of the prompt context, not as a continuation message) but requires the hooks infrastructure. The runner-side approach above works without hooks and serves as the default.
 
 ### 4.3 Per-Turn Cost Deltas
 
@@ -372,7 +372,7 @@ When set, all cost displays (per-turn, per-task, daily/monthly ledger, prospecti
 
 - None required (builds on existing infrastructure).
 - Optionally benefits from [telemetry-observability.md](telemetry-observability.md) for metric storage and dashboarding, but can ship independently with in-process computation.
-- Complementary with [sandbox-hooks.md](sandbox-hooks.md): hooks provide the real-time delivery mechanism for output compression (§2.1), cache break detection (§1.2), anomaly telemetry (§3.1), and budget warning injection (§4.2). Both specs can ship independently — token cost optimization works via runner-side heuristics without hooks, and hooks can ship their infrastructure before cost analysis features exist. See the relationship table in sandbox-hooks.md for the full mapping.
+- Complementary with [sandbox-hooks.md](../oversight/sandbox-hooks.md): hooks provide the real-time delivery mechanism for output compression (§2.1), cache break detection (§1.2), anomaly telemetry (§3.1), and budget warning injection (§4.2). Both specs can ship independently — token cost optimization works via runner-side heuristics without hooks, and hooks can ship their infrastructure before cost analysis features exist. See the relationship table in sandbox-hooks.md for the full mapping.
 
 ## Acceptance Criteria
 

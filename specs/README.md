@@ -10,21 +10,19 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 7 done, 1 in progress, 20 pending
+Local Product — 7 done, 1 in progress, 17 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
   ✅ Routine Tasks                 ✅ Agents & Flows
   ○ File/Image Attachments         ○ Host Mounts
   ○ File Panel Viewer              ○ Inline Diff Feedback
-  ○ Oversight Risk Scoring         ○ Validation Barrier
-  ○ Visual Verification            ○ Live Serve
-  ○ Pull Request Creation          ○ Task Revert
-  ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
-  ○ TypeScript Migration           ○ Typed DOM Hooks
-  ○ Rebrand Module Path            ○ Spatial Canvas
-  ○ Scoped Command Registry        ○ Data Boundary Enforcement
-  ○ Refinement Into Plan
+  ○ Live Serve                     ○ Pull Request Creation
+  ○ Task Revert                    ○ Terminal UI (TUI mode)
+  ○ Excalidraw Whiteboard          ○ TypeScript Migration
+  ○ Typed DOM Hooks                ○ Rebrand Module Path
+  ○ Spatial Canvas                 ○ Scoped Command Registry
+  ○ Data Boundary Enforcement      ○ Refinement Into Plan
 
 Cloud Platform — 0/9
   ○ Tenant Filesystem              ○ K8s Sandbox Backend
@@ -33,19 +31,23 @@ Cloud Platform — 0/9
   ○ Multi-User Collaboration       ○ Billing Idempotency
   ○ Telemetry Queue Backpressure
 
-Shared Design — 3/23 complete
+Shared Design — 3/19 complete
   ✅ Authentication                ✅ Agent Abstraction
   ○ Third-Party OIDC               ○ Remote Control
   ○ Agent Token Exchange           ○ Audit Log
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
   ✅ Host Exec Mode                ○ Telemetry & Observability
-  ○ Information Inbox              ○ Multi-Agent Consensus
-  ○ Multi-Agent Debate             ○ Token & Cost Optimization
+  ○ Information Inbox              ○ Token & Cost Optimization
   ○ Extensible Prompts             ○ Intent-Driven Commits
-  ○ Sandbox Hooks                  ○ Defense in Depth
   ○ Agent Memory & Identity        ○ Intelligence System
   ○ Eval Pipeline & Benchmark
+
+Oversight — 0/7 (layered defense & multi-agent deliberation)
+  ○ Defense in Depth (umbrella)    ○ Sandbox Hooks
+  ○ Oversight Risk Scoring         ○ Validation Barrier
+  ○ Visual Verification            ○ Multi-Agent Consensus
+  ○ Multi-Agent Debate
 ```
 
 ---
@@ -67,10 +69,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
 | [inline-diff-feedback.md](local/inline-diff-feedback.md) | Not started | Code-review-style inline comments on diff lines with batch feedback submission |
-| [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
-| [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
 | [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer |
-| [validation-barrier.md](local/validation-barrier.md) | Not started | User-defined test criteria persisted on tasks for targeted verification |
 | [pull-request.md](local/pull-request.md) | Drafted | Agent-generated GitHub PR from current branch via lightweight sandbox |
 | [refinement-into-plan.md](local/refinement-into-plan.md) | Validated | Retire the bespoke refine pipeline; let Plan mode edit task prompts directly via a Task Prompts explorer section and a task-aware tool layer. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
 | [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
@@ -99,11 +98,8 @@ graph LR
 
   EW[Excalidraw Whiteboard]
   IDF[Inline Diff Feedback]
-  ORS[Oversight Risk Scoring]
   PR[Pull Request Creation]
   TR[Task Revert]
-  VB[Validation Barrier]
-  VV[Visual Verification]
   LS[Live Serve]
   OTS[OAuth Token Setup ✅]
   TUI[Terminal UI]
@@ -192,13 +188,9 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 | [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
-| [multi-agent-consensus.md](shared/multi-agent-consensus.md) | Drafted | Both | Cross-provider adversarial verification, multi-agent consensus protocol, disagreement resolution. Builds on agent abstraction. |
-| [multi-agent-debate.md](shared/multi-agent-debate.md) | Drafted | Both | Multi-round adversarial deliberation for ideation and telemetry signal triage. Agents debate, critique, and synthesize across providers. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
 | [intent-commits.md](shared/intent-commits.md) | Not started | Both | Every intent (task, planning chat, explorer edit) produces a git commit — enables fine-grained undo, attribution, and revert. |
-| [sandbox-hooks.md](shared/sandbox-hooks.md) | Not started | Both | Agent lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Mechanism layer for token cost optimization. |
-| [defense-in-depth.md](shared/defense-in-depth.md) | Drafted | Both | Layered oversight composition (Swiss cheese model), task-level permission modes, pre-dispatch validation, escalation cascade, unified decision audit. |
 | [eval-pipeline.md](shared/eval-pipeline.md) | Drafted | Both | Evaluation pipeline over captured Claude Code / Codex trajectories — vendor-format normalizer, rule-based + LLM-as-judge metrics, first-party benchmark bundles, dataset export, paired comparison reports. Keeps the door open for downstream RL/RLVR without implementing it. |
 | [agent-memory-identity.md](shared/agent-memory-identity.md) | Vague | Both | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. Foundation for intelligence system's shared world model. |
 | [intelligence-system.md](shared/intelligence-system.md) | Vague | Both | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. |
@@ -215,11 +207,45 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 ---
 
+## Oversight
+
+A layered defense stack for agent task orchestration. Defense in Depth is the umbrella composition spec; the other five are the layers it composes (hooks, risk scoring, validation gates, visual verification, multi-agent verification). Spans both local and cloud deployments — any wallfacer instance that runs agents benefits from these.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [defense-in-depth.md](oversight/defense-in-depth.md) | Drafted | Layered oversight composition (Swiss cheese model), task-level permission modes, pre-dispatch validation, escalation cascade, unified decision audit. Umbrella over the other five. |
+| [sandbox-hooks.md](oversight/sandbox-hooks.md) | Drafted | L6 mechanism layer: Claude Code / Codex lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Also the delivery path for token-cost compression. |
+| [oversight-risk-scoring.md](oversight/oversight-risk-scoring.md) | Drafted | L8 real-time agent action risk assessment — classifies tool calls, feeds the escalation cascade. |
+| [validation-barrier.md](oversight/validation-barrier.md) | Drafted | Pre-execution gate: user-defined test criteria persisted on tasks for targeted post-run verification. |
+| [visual-verification.md](oversight/visual-verification.md) | Drafted | Post-execution visual check for UI changes — Playwright-based screenshot diffs. |
+| [multi-agent-consensus.md](oversight/multi-agent-consensus.md) | Drafted | L9 cross-provider adversarial verification — voting protocol, disagreement resolution. |
+| [multi-agent-debate.md](oversight/multi-agent-debate.md) | Drafted | Multi-round adversarial deliberation — conversation protocol (vs consensus voting). Use cases: ideation synthesis, telemetry signal triage. Depends on multi-agent-consensus. |
+
+### Oversight dependencies
+
+```mermaid
+graph LR
+  AA[Agent Abstraction ✅] --> MAC[Multi-Agent Consensus]
+  AA --> SH[Sandbox Hooks]
+  MAC --> MAD[Multi-Agent Debate]
+  TO[Telemetry & Observability] --> DID[Defense in Depth]
+  SH --> DID
+  ORS[Oversight Risk Scoring] --> DID
+  MAC --> DID
+  VB[Validation Barrier]
+  VV[Visual Verification]
+
+  style AA fill:#d4edda,stroke:#28a745
+```
+
+---
+
 ## Ordering Rationale
 
 **Within local product:**
 - Spec coordination is in progress (document model, planning UX, and archival complete; drift detection remains).
-- Oversight, visual verification, live serve are independent — start anytime.
+- Live serve is independent — start anytime.
+- Oversight (risk scoring, validation barrier, visual verification, defense-in-depth, sandbox hooks, multi-agent consensus) now lives under `specs/oversight/` as a dedicated theme — see the Oversight section.
 
 **Within cloud platform:**
 - Tenant filesystem first — integrates with fs.latere.ai for config persistence and hot tier workspace allocation. Prerequisite: fs.latere.ai Phase 5 (Workspace API).
