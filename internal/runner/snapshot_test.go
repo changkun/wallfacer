@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -182,7 +183,7 @@ func TestComputeSnapshotDiff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	diff := computeSnapshotDiff(context.Background(), snapshotPath)
+	diff := gitutil.SnapshotDiff(context.Background(), snapshotPath)
 	if diff == "" {
 		t.Fatal("expected non-empty diff")
 	}
@@ -214,7 +215,7 @@ func TestComputeSnapshotDiffEmpty(t *testing.T) {
 	}
 
 	// No changes — diff should be empty.
-	diff := computeSnapshotDiff(context.Background(), snapshotPath)
+	diff := gitutil.SnapshotDiff(context.Background(), snapshotPath)
 	if diff != "" {
 		t.Fatalf("expected empty diff for unchanged snapshot, got:\n%s", diff)
 	}
