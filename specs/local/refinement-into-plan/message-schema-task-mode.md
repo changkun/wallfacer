@@ -1,6 +1,6 @@
 ---
 title: Planning Message Schema and Task-Mode Threads
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/handler/planning.go
@@ -8,7 +8,7 @@ affects:
   - internal/planner/conversation.go
 effort: medium
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-04-20
 author: changkun
 dispatched_task_id: fd1181a8-a288-46ce-a233-e076ab046b23
 ---
