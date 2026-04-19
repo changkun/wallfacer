@@ -105,11 +105,16 @@ func TestCookiePrincipal_NoSessionPassesThrough(t *testing.T) {
 	}
 }
 
-// TestCookiePrincipal_ExpiredSessionClearsCookie covers the safety
-// behavior: a session whose stored access token no longer validates
-// triggers a Set-Cookie that expires the wallfacer session cookie,
-// so the next request doesn't re-try a dead token.
-func TestCookiePrincipal_ExpiredSessionClearsCookie(t *testing.T) {
+// TestCookiePrincipal_ExpiredSessionPassesThroughAnonymous covers the
+// behavior on a stale or misvalidating session: the middleware treats
+// the caller as anonymous but does NOT clear the cookie. Clearing on
+// every failed validate produced an infinite /login ↔ /callback loop
+// in production when the validator was misconfigured (the cookie
+// would land from /callback and be nuked on the next GET /, every
+// time). Anonymous-passthrough lets ForceLogin redirect HTML users
+// to /login while the operator sees the warning log and fixes the
+// config.
+func TestCookiePrincipal_ExpiredSessionPassesThroughAnonymous(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
 	v := auth.BuildValidator(auth.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
@@ -129,17 +134,13 @@ func TestCookiePrincipal_ExpiredSessionClearsCookie(t *testing.T) {
 	if capt.ok {
 		t.Fatalf("expected no claims for expired token, got %+v", capt.seen)
 	}
-	// The session cookie must be cleared via a Set-Cookie with a past
-	// expiration / Max-Age=0; the platform's ClearSession does both.
-	foundClear := false
+	// Defensive: the middleware must NOT emit a Set-Cookie for the
+	// session cookie. A cookie-clear here is the bug that produced
+	// the redirect loop.
 	for _, c := range w.Result().Cookies() {
-		if c.MaxAge < 0 || !c.Expires.IsZero() {
-			foundClear = true
-			break
+		if c.Name == oidc.SessionCookieName && (c.MaxAge < 0 || !c.Expires.IsZero()) {
+			t.Errorf("middleware cleared the session cookie on validation failure; this causes the /login loop")
 		}
-	}
-	if !foundClear {
-		t.Error("expected a Set-Cookie clearing the session after expired token")
 	}
 }
 
