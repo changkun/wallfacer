@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -82,6 +83,11 @@ type Interface interface {
 	EnvFile() string
 	Prompts() *prompts.Manager
 	WorkspaceManager() *workspace.Manager
+
+	// Agents catalog accessors (merged built-in + user-authored).
+	AgentsRegistry() *agents.Registry
+	AgentsDir() string
+	ReloadAgents() error
 }
 
 // compile-time assertion: *Runner satisfies Interface.

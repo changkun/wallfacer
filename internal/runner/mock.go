@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -257,3 +258,14 @@ func (m *MockRunner) AutoPushWorkspaceCalls() []string {
 
 // WorkspaceManager returns nil.
 func (m *MockRunner) WorkspaceManager() *workspace.Manager { return nil }
+
+// AgentsRegistry returns the built-in catalog. Sufficient for handler
+// tests that need slug lookups without hitting the disk.
+func (m *MockRunner) AgentsRegistry() *agents.Registry { return agents.NewBuiltinRegistry() }
+
+// AgentsDir returns an empty string. Handler tests that exercise the
+// write path set this via a concrete Runner instead of the mock.
+func (m *MockRunner) AgentsDir() string { return "" }
+
+// ReloadAgents is a no-op on the mock.
+func (m *MockRunner) ReloadAgents() error { return nil }

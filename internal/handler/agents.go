@@ -26,6 +26,7 @@ type AgentResponse struct {
 	Description        string   `json:"description,omitempty"`
 	Capabilities       []string `json:"capabilities,omitempty"`
 	Multiturn          bool     `json:"multiturn"`
+	Harness            string   `json:"harness,omitempty"`
 	PromptTemplateName string   `json:"prompt_template_name,omitempty"`
 	Builtin            bool     `json:"builtin"`
 	PromptTmpl         string   `json:"prompt_tmpl,omitempty"` // only populated by GetAgent
@@ -38,16 +39,29 @@ func describeAgent(role agents.Role) AgentResponse {
 		Description:        role.Description,
 		Capabilities:       role.Capabilities,
 		Multiturn:          role.Multiturn,
+		Harness:            role.Harness,
 		PromptTemplateName: role.PromptTemplateName,
-		Builtin:            true,
+		Builtin:            agents.IsBuiltin(role.Slug),
 	}
 }
 
-// ListAgents returns the full built-in agent catalog in registration
-// order. The prompt template body is intentionally omitted; clients
-// fetch it per-agent via GetAgent to keep the list payload small.
+// agentsRegistry returns the merged built-in + user-authored
+// registry. Falls back to a built-in-only registry when the runner
+// is not wired (test harnesses).
+func (h *Handler) agentsRegistry() *agents.Registry {
+	if h.runner != nil {
+		if reg := h.runner.AgentsRegistry(); reg != nil {
+			return reg
+		}
+	}
+	return agents.NewBuiltinRegistry()
+}
+
+// ListAgents returns the merged agent catalog in registration order.
+// The prompt template body is intentionally omitted; clients fetch
+// it per-agent via GetAgent to keep the list payload small.
 func (h *Handler) ListAgents(w http.ResponseWriter, _ *http.Request) {
-	roles := agents.BuiltinAgents
+	roles := h.agentsRegistry().List()
 	out := make([]AgentResponse, 0, len(roles))
 	for _, role := range roles {
 		out = append(out, describeAgent(role))
@@ -59,21 +73,15 @@ func (h *Handler) ListAgents(w http.ResponseWriter, _ *http.Request) {
 // body for a single agent. 404 when the slug is unknown.
 func (h *Handler) GetAgent(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	var match *agents.Role
-	for i := range agents.BuiltinAgents {
-		if agents.BuiltinAgents[i].Slug == slug {
-			match = &agents.BuiltinAgents[i]
-			break
-		}
-	}
-	if match == nil {
+	role, ok := h.agentsRegistry().Get(slug)
+	if !ok {
 		http.Error(w, "unknown agent: "+slug, http.StatusNotFound)
 		return
 	}
 
-	resp := describeAgent(*match)
-	if match.PromptTemplateName != "" {
-		content, _, err := h.runner.Prompts().Content(match.PromptTemplateName)
+	resp := describeAgent(role)
+	if role.PromptTemplateName != "" {
+		content, _, err := h.runner.Prompts().Content(role.PromptTemplateName)
 		if err == nil {
 			resp.PromptTmpl = content
 		}
