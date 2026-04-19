@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 121,
+  "route_count": 127,
   "routes": [
     {
       "method": "GET",
@@ -238,6 +238,33 @@
       ]
     },
     {
+      "method": "POST",
+      "pattern": "/api/agents",
+      "name": "CreateAgent",
+      "description": "Create a user-authored agent (rejects slugs that shadow a built-in).",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/agents/{slug}",
+      "name": "UpdateAgent",
+      "description": "Update a user-authored agent; 409 for built-in slugs.",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/agents/{slug}",
+      "name": "DeleteAgent",
+      "description": "Delete a user-authored agent; 409 for built-in slugs.",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
       "method": "GET",
       "pattern": "/api/flows",
       "name": "ListFlows",
@@ -251,6 +278,33 @@
       "pattern": "/api/flows/{slug}",
       "name": "GetFlow",
       "description": "Get one flow's full descriptor including its step chain and agent names.",
+      "tags": [
+        "flows"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/flows",
+      "name": "CreateFlow",
+      "description": "Create a user-authored flow (rejects slugs that shadow a built-in).",
+      "tags": [
+        "flows"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/flows/{slug}",
+      "name": "UpdateFlow",
+      "description": "Update a user-authored flow; 409 for built-in slugs.",
+      "tags": [
+        "flows"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/flows/{slug}",
+      "name": "DeleteFlow",
+      "description": "Delete a user-authored flow; 409 for built-in slugs.",
       "tags": [
         "flows"
       ]

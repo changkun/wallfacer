@@ -135,6 +135,18 @@ var Routes = {
     get: function () {
       return "/api/agents/{slug}";
     },
+    // POST /api/agents
+    create: function () {
+      return "/api/agents";
+    },
+    // PUT /api/agents/{slug}
+    update: function () {
+      return "/api/agents/{slug}";
+    },
+    // DELETE /api/agents/{slug}
+    delete: function () {
+      return "/api/agents/{slug}";
+    },
   },
 
   flows: {
@@ -144,6 +156,18 @@ var Routes = {
     },
     // GET /api/flows/{slug}
     get: function () {
+      return "/api/flows/{slug}";
+    },
+    // POST /api/flows
+    create: function () {
+      return "/api/flows";
+    },
+    // PUT /api/flows/{slug}
+    update: function () {
+      return "/api/flows/{slug}";
+    },
+    // DELETE /api/flows/{slug}
+    delete: function () {
       return "/api/flows/{slug}";
     },
   },
