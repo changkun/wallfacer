@@ -1009,10 +1009,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Latere.ai sign-in (cloud mode). Always mounted; handlers self-gate
 		// to 503/204 when the auth provider is not configured.
-		"Login":        http.HandlerFunc(h.Login),
-		"Callback":     http.HandlerFunc(h.Callback),
-		"Logout":       http.HandlerFunc(h.Logout),
-		"LogoutNotify": http.HandlerFunc(h.LogoutNotify),
+		"Login":         http.HandlerFunc(h.Login),
+		"Callback":      http.HandlerFunc(h.Callback),
+		"Logout":        http.HandlerFunc(h.Logout),
+		"LogoutNotify":  http.HandlerFunc(h.LogoutNotify),
 		"AuthMe":        http.HandlerFunc(h.AuthMe),
 		"AuthOrgs":      http.HandlerFunc(h.AuthOrgs),
 		"AuthSwitchOrg": http.HandlerFunc(h.AuthSwitchOrg),
