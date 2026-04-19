@@ -330,20 +330,12 @@ function setMainTab(tab) {
     btn.classList.toggle("active", btn.dataset.mainTab === tab);
   });
 
-  // Reveal the corresponding legacy right-panel-* div. Without this step the
-  // panel stays `.hidden` from its initial HTML state and the tab renders as
-  // an empty column. _switchRightTab is defined in modal-logs.js and flips
-  // the .hidden class across all right-panel-* siblings.
-  const rightPanelMap = {
-    changes: "changes",
-    flamegraph: "spans",
-    timeline: "timeline",
-  };
-  if (rightPanelMap[tab] && typeof _switchRightTab === "function") {
-    _switchRightTab(rightPanelMap[tab]);
-  } else if (tab === "activity") {
-    // Activity has Impl/Testing sub-tabs; preserve the user's last choice
-    // if one is currently shown, otherwise default to Impl.
+  // Activity has Impl/Testing sub-tabs; preserve the user's last choice
+  // if one is currently shown, otherwise default to Impl. The other tabs
+  // (changes/flamegraph/timeline) hide via the data-main-tab-section CSS
+  // selector — no DOM toggling needed since modal-right was flattened
+  // into modal-main-content.
+  if (tab === "activity") {
     const impl = document.getElementById("left-panel-implementation");
     const test = document.getElementById("left-panel-testing");
     const anyVisible =
@@ -379,10 +371,13 @@ function setMainTab(tab) {
 function _renderModalAside(task) {
   const aside = document.getElementById("modal-aside");
   if (!aside) return;
-  if (!task || task.status === "backlog") {
+  if (!task) {
     aside.classList.add("hidden");
     return;
   }
+  // The aside now hosts the Actions group (archive/unarchive/cancel/delete)
+  // which must remain reachable for backlog tasks too, so we keep it visible
+  // across every status once a task is loaded.
   aside.classList.remove("hidden");
 
   const env = task.environment || {};
@@ -938,9 +933,8 @@ async function openModal(id) {
   document.getElementById("modal-test-section").classList.add("hidden");
   document.getElementById("modal-test-criteria").value = "";
 
-  // Right panel setup
+  // Modal layout setup
   const modalCard = document.querySelector("#modal .modal-card");
-  const modalRight = document.getElementById("modal-right");
   const hasWorktrees =
     task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
   // Hide test button when there are no worktrees (no changes produced); refined after diff loads.
@@ -950,7 +944,6 @@ async function openModal(id) {
 
   if (task.status !== "backlog") {
     modalCard.classList.add("modal-wide");
-    modalRight.classList.remove("hidden");
     modalBody.style.display = "flex";
     modalBody.style.gap = "0";
 
@@ -962,19 +955,9 @@ async function openModal(id) {
     if (_searchCount) _searchCount.textContent = "";
 
     // Show Flamegraph and Timeline main tabs for tasks with at least one turn.
-    // The legacy right-tab-spans/timeline buttons stay hidden (they duplicate
-    // main tabs) but we still toggle them for tests that assert on them.
-    const spansTabBtn = document.getElementById("right-tab-spans");
-    if (spansTabBtn) {
-      spansTabBtn.classList.toggle("hidden", !(task.turns > 0));
-    }
     const flamegraphMainTab = document.getElementById("main-tab-flamegraph");
     if (flamegraphMainTab) {
       flamegraphMainTab.classList.toggle("hidden", !(task.turns > 0));
-    }
-    const timelineTabBtn = document.getElementById("right-tab-timeline");
-    if (timelineTabBtn) {
-      timelineTabBtn.classList.toggle("hidden", !(task.turns > 0));
     }
     const timelineMainTab = document.getElementById("main-tab-timeline");
     if (timelineMainTab) {
@@ -985,23 +968,17 @@ async function openModal(id) {
     // exists (in-flight or completed). Impl sub-tab stays the default.
     const leftTestingBtn = document.getElementById("left-tab-testing");
     if (task.is_test_run || task.last_test_result) {
-      const testTab = document.getElementById("right-tab-testing");
-      if (testTab) testTab.classList.remove("hidden");
       if (leftTestingBtn) leftTestingBtn.classList.remove("hidden");
       startImplLogFetch(id, seq);
       startTestLogStream(id, seq);
     } else {
-      const testTab = document.getElementById("right-tab-testing");
-      if (testTab) testTab.classList.add("hidden");
       if (leftTestingBtn) leftTestingBtn.classList.add("hidden");
       startLogStream(id, seq);
     }
 
-    // Changes tab: show for any non-backlog task that has worktrees
-    const changesTab = document.getElementById("right-tab-changes");
+    // Changes main tab: show for any non-backlog task that has worktrees
     const changesMainTab = document.getElementById("main-tab-changes");
     if (hasWorktrees) {
-      if (changesTab) changesTab.classList.remove("hidden");
       if (changesMainTab) changesMainTab.classList.remove("hidden");
       const filesEl = document.getElementById("modal-diff-files");
       const behindEl = document.getElementById("modal-diff-behind");
@@ -1059,7 +1036,6 @@ async function openModal(id) {
               '<span class="text-xs ev-error">Failed to load diff</span>';
         });
     } else {
-      if (changesTab) changesTab.classList.add("hidden");
       if (changesMainTab) changesMainTab.classList.add("hidden");
     }
 
@@ -1071,14 +1047,11 @@ async function openModal(id) {
     });
     const refineTabBtn = document.getElementById("main-tab-refine");
     if (refineTabBtn) refineTabBtn.classList.add("hidden");
-    // Default: Implementation sub-tab + Activity main tab so the user lands on
-    // turn results + live logs.
-    setRightTab("implementation");
+    // Default: Activity main tab so the user lands on turn results + live
+    // logs. setLeftTab("implementation") inside setMainTab resets the
+    // Impl/Testing sub-tab to Implementation by default.
     setMainTab("activity");
   } else {
-    // Backlog tasks: modal-wide and layout already set in the backlog branch above.
-    // Just ensure the non-backlog right panel stays hidden.
-    modalRight.classList.add("hidden");
     // Backlog: Spec + Refine are the only meaningful tabs. Hide the tabs
     // that require an executed run; expose Refine next to Spec.
     ["activity", "events"].forEach(function (t) {
@@ -1501,10 +1474,6 @@ function closeModal() {
     tlChart.innerHTML = "";
     delete tlChart.dataset.loaded;
   }
-  const spansTabBtn = document.getElementById("right-tab-spans");
-  if (spansTabBtn) spansTabBtn.classList.add("hidden");
-  const timelineTabBtn = document.getElementById("right-tab-timeline");
-  if (timelineTabBtn) timelineTabBtn.classList.add("hidden");
   const flamegraphMainTab = document.getElementById("main-tab-flamegraph");
   if (flamegraphMainTab) flamegraphMainTab.classList.add("hidden");
   const timelineMainTab = document.getElementById("main-tab-timeline");

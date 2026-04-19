@@ -53,26 +53,15 @@
   flex-direction: column;
   min-height: 0;
 }
+/* Flattened layout — modal-main-content is now a single scrolling column.
+   Each data-main-tab-section child renders full-width; the attribute
+   selector below hides non-matching sections. */
 .modal-wide #modal-main-content {
   flex: 1;
-  display: flex;
   min-width: 0;
   min-height: 0;
-}
-.modal-wide #modal-left {
-  flex: 2;
-  min-width: 0;
   overflow-y: auto;
-  border-right: 1px solid var(--border);
-  padding-right: 28px;
-  margin-right: 28px;
-}
-.modal-wide #modal-right {
-  flex: 3;
-  min-width: 0;
-  overflow-y: hidden;
-  display: flex;
-  flex-direction: column;
+  padding-top: 4px;
 }
 .modal-wide #modal-backlog-right {
   flex: 1;
@@ -82,34 +71,13 @@
   flex-direction: column;
   padding-top: 12px;
 }
-.modal-wide #modal-right.hidden {
-  display: none;
-}
 .modal-wide #modal-backlog-right.hidden {
   display: none;
-}
-.modal-wide #modal-right > div:not(.right-panel-tabs):not(.hidden) {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding-top: 12px;
 }
 /* Refine main tab: backlog-right fills the whole content row; the usual
    spec/activity main-pane collapses. */
 #modal[data-main-tab="refine"] #modal-main-pane {
   display: none;
-}
-/* modal-right is empty in Activity (logs live in modal-left now). */
-#modal[data-main-tab="activity"] #modal-right {
-  display: none;
-}
-/* Right-panel sub-tab bar (legacy) stays hidden — only Impl/Testing
-   buttons inside .right-panel-tabs were needed, and they're replaced by
-   the top-level main tabs. */
-.modal-wide .right-panel-tabs {
-  display: none !important;
 }
 
 /* ---------- Activity tab: full-width vertical stack, Impl | Testing sub-tabs ----------
@@ -296,17 +264,6 @@
   display: none !important;
 }
 
-/* Hide the whole column when the active tab has no content in it. */
-#modal[data-main-tab="spec"] #modal-right,
-#modal[data-main-tab="events"] #modal-right {
-  display: none;
-}
-#modal[data-main-tab="changes"] #modal-left,
-#modal[data-main-tab="flamegraph"] #modal-left,
-#modal[data-main-tab="timeline"] #modal-left {
-  display: none;
-}
-
 /* --- Right-side aside (agent / budget / git / links) --- */
 .modal-wide .modal-aside {
   flex: 0 0 260px;
@@ -322,6 +279,61 @@
 }
 .modal-aside .mdl-section {
   margin-bottom: 20px;
+}
+/* Terminal actions rendered as quiet aside rows — no heavy borders, just
+   hover feedback, so they match the Agent/Budget/Git/Links blocks above. */
+.modal-aside__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aside-action {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.aside-action:hover,
+.aside-action:focus-visible {
+  background: var(--bg-input);
+  outline: none;
+}
+.aside-action__label {
+  font-size: 12px;
+  font-weight: 500;
+}
+.aside-action__hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.aside-action--warn {
+  color: #c27b2b;
+}
+.aside-action--warn:hover,
+.aside-action--warn:focus-visible {
+  background: rgba(194, 123, 43, 0.12);
+}
+.aside-action--danger {
+  color: #c64b4b;
+}
+.aside-action--danger:hover,
+.aside-action--danger:focus-visible {
+  background: rgba(198, 75, 75, 0.12);
 }
 .modal-aside .mdl-h {
   font-size: 10px;

@@ -220,6 +220,19 @@ function makeLogsContext() {
     loadFlamegraph: () => {},
     history: { replaceState: () => {} },
   });
+  // setRightTab now delegates to setMainTab (main tab) and setLeftTab
+  // (Impl/Testing sub-tab inside Activity). Expose spies so the setRightTab
+  // suite can assert on the delegation instead of poking the old
+  // right-tab-*/right-panel-* DOM that was removed. Arrays live on the ctx
+  // object so closures captured when the vm script runs see the same list.
+  ctx._setMainTabCalls = [];
+  ctx._setLeftTabCalls = [];
+  ctx.setMainTab = (tab) => {
+    ctx._setMainTabCalls.push(tab);
+  };
+  ctx.setLeftTab = (tab) => {
+    ctx._setLeftTabCalls.push(tab);
+  };
 
   ctx.getOpenModalTaskId = function () {
     return ctx._modalState.taskId;
@@ -232,54 +245,39 @@ function makeLogsContext() {
 // setRightTab
 // ---------------------------------------------------------------------------
 describe("setRightTab", () => {
-  let ctx, elements;
-  beforeEach(() => ({ ctx, elements } = makeLogsContext()));
+  let ctx;
+  beforeEach(() => ({ ctx } = makeLogsContext()));
 
-  it("activates the implementation tab and panel", () => {
+  it("routes implementation to activity main tab + impl sub-tab", () => {
     ctx.setRightTab("implementation");
-    const btn = elements["right-tab-implementation"];
-    const panel = elements["right-panel-implementation"];
-    expect(btn.classList.contains("active")).toBe(true);
-    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(ctx._setMainTabCalls).toEqual(["activity"]);
+    expect(ctx._setLeftTabCalls).toEqual(["implementation"]);
   });
 
-  it("hides non-active tab buttons and panels", () => {
-    ctx.setRightTab("implementation");
-    const testBtn = elements["right-tab-testing"];
-    const testPanel = elements["right-panel-testing"];
-    expect(testBtn.classList.contains("active")).toBe(false);
-    expect(testPanel.classList.contains("hidden")).toBe(true);
-  });
-
-  it("activates the testing tab", () => {
+  it("routes testing to activity main tab + testing sub-tab", () => {
     ctx.setRightTab("testing");
-    const btn = elements["right-tab-testing"];
-    const panel = elements["right-panel-testing"];
-    expect(btn.classList.contains("active")).toBe(true);
-    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(ctx._setMainTabCalls).toEqual(["activity"]);
+    expect(ctx._setLeftTabCalls).toEqual(["testing"]);
   });
 
-  it("activates the changes tab", () => {
+  it("routes changes to the changes main tab, no sub-tab change", () => {
     ctx.setRightTab("changes");
-    const btn = elements["right-tab-changes"];
-    const panel = elements["right-panel-changes"];
-    expect(btn.classList.contains("active")).toBe(true);
-    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(ctx._setMainTabCalls).toEqual(["changes"]);
+    expect(ctx._setLeftTabCalls).toEqual([]);
   });
 
-  it("deactivates a previously active tab when switching", () => {
-    ctx.setRightTab("implementation");
-    expect(
-      elements["right-tab-implementation"].classList.contains("active"),
-    ).toBe(true);
+  it("routes spans to flamegraph and timeline to timeline", () => {
+    ctx.setRightTab("spans");
+    ctx.setRightTab("timeline");
+    expect(ctx._setMainTabCalls).toEqual(["flamegraph", "timeline"]);
+  });
 
+  it("switching between Impl and Testing swaps the sub-tab", () => {
+    ctx.setRightTab("implementation");
     ctx.setRightTab("testing");
-    expect(
-      elements["right-tab-implementation"].classList.contains("active"),
-    ).toBe(false);
-    expect(elements["right-tab-testing"].classList.contains("active")).toBe(
-      true,
-    );
+    expect(ctx._setLeftTabCalls).toEqual(["implementation", "testing"]);
+    // Both calls stay on the activity main tab.
+    expect(ctx._setMainTabCalls).toEqual(["activity", "activity"]);
   });
 });
 
