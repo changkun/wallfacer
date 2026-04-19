@@ -117,7 +117,7 @@ Key server files:
 - `main.go` — Tiny entry point: embed FS declarations and subcommand dispatch
 - `internal/cli/` — CLI subcommand implementations (server, exec, status, env) and shared helpers
 - `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
-- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime, auth)
+- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, ideate, templates, stats, admin, workspace, runtime, auth)
 - `internal/oauth/` — OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex), token exchange
 - `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
 - `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index; see `docs/internals/data-and-storage.md` for full data model documentation
@@ -230,7 +230,7 @@ User agents live as YAML under `~/.wallfacer/agents/` (overridable via `WALLFACE
 
 User flows live as YAML under `~/.wallfacer/flows/` (overridable via `WALLFACER_FLOWS_DIR`). Same fsnotify watching as agents.
 
-Built-in flows: `implement` (refine? → impl → test → commit-msg ‖ title ‖ oversight), `brainstorm` (ideate), `refine-only` (refine), `test-only` (test).
+Built-in flows: `implement` (impl → test → commit-msg ‖ title ‖ oversight), `brainstorm` (ideate), `test-only` (test).
 
 ### Ideation
 - `GET /api/ideate` — Get current ideation session state (reads from the system:ideation routine card)
@@ -338,7 +338,6 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Container resource limits** configurable via `WALLFACER_CONTAINER_CPUS` and `WALLFACER_CONTAINER_MEMORY`
 - **Workspace AGENTS.md** mounted read-only at `/workspace/AGENTS.md` so Claude Code picks it up automatically
 - **Oversight summaries** generated asynchronously when tasks reach waiting/done/failed
-- **Task refinement** via sandbox agent: refines prompts before execution
 - **System prompt templates** are overridable built-in prompts (`internal/prompts/*.tmpl`); users can customize via the UI or API; includes the workspace instructions template
 - **Prompt templates** for reusable task creation patterns
 
