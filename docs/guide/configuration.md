@@ -1,22 +1,22 @@
-# ⚙️ Configuration & Customization
+# Configuration & Customization
 
 Wallfacer is configured through the Settings UI, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompts and workspace instructions. The `.env` file is auto-generated on first run with commented-out defaults; edit it directly or use the Settings UI. Most settings take effect on the next task run without restarting the server.
 
 ---
 
-## 🚀 Essentials
+## Essentials
 
 ### Opening Settings
 
 Open the Settings modal by clicking the gear icon in the top-right corner of the task board. The modal contains six tabs: Appearance, Execution, Sandbox, Workspace, Trash, and About.
 
-### 🎨 Appearance
+### Appearance
 
 **Theme** -- Choose between Light, Dark, or Auto (follows the operating system preference). The theme applies to the current browser session.
 
 **Done Column** -- Toggle "Show archived tasks" to display or hide archived completed tasks on the board.
 
-### 🔑 Setting Up Sandbox Credentials
+### Setting Up Sandbox Credentials
 
 At minimum, you need one of these credentials configured in **Settings > Sandbox**:
 
@@ -62,15 +62,15 @@ wallfacer status -watch                 # Live-updating board state
 wallfacer doctor                        # Check prerequisites and config
 ```
 
-### 📐 Plan Mode
+### Plan Mode
 
 See [Designing Specs](designing-specs.md) for the full Plan mode guide.
 
-### 💬 Planning Chat
+### Planning Chat
 
 See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
 
-### ⌨️ Keyboard Shortcuts
+### Keyboard Shortcuts
 
 This is the canonical shortcut reference. Other guides link here instead of maintaining their own tables.
 
@@ -110,9 +110,9 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 
 ---
 
-## 🔧 Advanced Topics
+## Advanced Topics
 
-### ⚡ Execution Settings
+### Execution Settings
 
 **Parallel Tasks** -- Set the maximum number of tasks that run concurrently in the In Progress column (1--20). Corresponds to `WALLFACER_MAX_PARALLEL`.
 
@@ -137,7 +137,7 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 - Title Model (`CODEX_TITLE_MODEL`) -- falls back to the Codex default model
 - **Test** button -- runs a Codex connectivity check
 
-### 📦 Sandbox Routing
+### Sandbox Routing
 
 **Global Sandbox Routing** -- Select the default sandbox type and override the sandbox for individual activities: Implementation, Testing, Refinement, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available sandbox types (claude, codex) or "default".
 
@@ -174,7 +174,7 @@ Route specific agent activities to different sandbox types (`claude` or `codex`)
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Override for commit message generation |
 | `WALLFACER_SANDBOX_IDEA_AGENT` | Override for ideation agent |
 
-### 🖥️ Container Resource Limits
+### Container Resource Limits
 
 Limit the CPU and memory available to each task container via `WALLFACER_CONTAINER_CPUS` and `WALLFACER_CONTAINER_MEMORY`. These correspond to the `--cpus` and `--memory` flags of `podman run` / `docker run`. Leave empty for no limit.
 
@@ -187,7 +187,7 @@ When `WALLFACER_SANDBOX_FAST` is `true` (the default), Wallfacer passes fast-mod
 
 **Enable /fast** -- Toggle fast-mode sandbox hints (`WALLFACER_SANDBOX_FAST`).
 
-### 📋 Full Environment Variables Reference
+### Full Environment Variables Reference
 
 All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
 
@@ -313,7 +313,7 @@ Reports the resolved binary paths and `--version` output for each CLI. Missing c
 
 Wallfacer can optionally sign the user in to [latere.ai](https://latere.ai) and display their avatar + username in the status bar. Cloud-mode documentation lives in [`docs/cloud/`](../cloud/) — start with [`docs/cloud/README.md`](../cloud/README.md) for the env-var reference, deployment constraints, and the cloud/local partition. The sign-in badge is hidden entirely when `WALLFACER_CLOUD` is unset, so local-only deployments are unchanged.
 
-### 📝 System Prompt Templates
+### System Prompt Templates
 
 Wallfacer uses eight built-in Go template files to instruct agent activities:
 
@@ -383,7 +383,7 @@ When creating a new task, select a template from the template picker to insert i
 
 From the template manager, you can view all templates sorted by creation date and delete templates you no longer need.
 
-### 🖥️ CLI Reference
+### CLI Reference
 
 #### wallfacer run
 
@@ -465,7 +465,7 @@ wallfacer exec --sandbox claude      # Open shell in a new Claude sandbox
 wallfacer exec --sandbox codex       # Open shell in a new Codex sandbox
 ```
 
-### 🛡️ Security
+### Security
 
 #### Server API Key Authentication
 
@@ -502,7 +502,7 @@ Request bodies are limited to prevent abuse:
 | Instructions (AGENTS.md) | 5 MiB |
 | Feedback | 512 KiB |
 
-### 🗑️ Trash Management
+### Trash Management
 
 View soft-deleted tasks that are within the retention window (default: 7 days, controlled by `WALLFACER_TOMBSTONE_RETENTION_DAYS`). Each entry shows the task prompt and deletion timestamp. You can:
 
@@ -517,7 +517,7 @@ Displays version information, the project link (github.com/changkun/wallfacer), 
 
 Access via **Settings > About**.
 
-### 📂 Workspace Settings
+### Workspace Settings
 
 **Active Workspaces** -- Lists the directories currently mounted into task containers. Click **Change** to open the workspace picker and select different directories.
 

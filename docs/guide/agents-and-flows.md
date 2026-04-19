@@ -1,4 +1,4 @@
-# 🤖 Agents & Flows
+# Agents & Flows
 
 Wallfacer's execution model builds on four primitives: **agents**, **flows**, **tasks**, and **routines**. Understanding how they compose is the single biggest lever for customising what Wallfacer does on your behalf, picking a different coding harness per step, tightening an agent's system prompt, adding a security-review pass to every implementation, or scheduling a nightly brainstorm.
 
@@ -206,7 +206,7 @@ steps:
 
 Each step in the parallel group lists the other members. The runner closes the group via transitive closure, so you don't need a dedicated group ID.
 
-### `input_from` for chained prompts
+### input_from` for chained prompts
 
 A step with `input_from: <earlier-slug>` receives that earlier step's parsed output as its prompt. Example: refine-only-then-impl:
 

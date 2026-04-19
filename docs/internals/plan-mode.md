@@ -292,7 +292,7 @@ After a successful round, the handler:
 
 Commits write scope-prefixed subjects `<primary-path>(plan): <imperative>` plus the `Plan-Round: N` and `Plan-Thread: <id>` trailers. `hostGitIdentityOverrides` forces the host's global `user.name`/`user.email` so a sandbox-polluted repo-local config never poisons the author.
 
-### /spec-new Directive Scanner
+### spec-new Directive Scanner
 
 `internal/handler/planning_directive.go` implements a line-oriented, fence-aware scanner. `DirectiveScanner.ScanLine(line)` tracks a `inFence` toggle on lines whose trimmed prefix is ```` ``` ````, and only fires a directive when the first non-whitespace token on a non-fenced line is `/spec-new`. This means code samples that quote the grammar never trigger spurious scaffolds.
 
