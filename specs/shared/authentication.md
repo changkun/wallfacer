@@ -1,6 +1,6 @@
 ---
 title: Authentication & Identity
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/auth/
@@ -246,6 +246,96 @@ out from those two roots.
 - Cross-org visibility (shared workspaces across orgs), belongs in
   `cloud/multi-user-collaboration.md` if needed.
 - Remote-control wire protocol, Phase 3 / separate spec.
+
+---
+
+## Outcome
+
+Phases 1 and 2 shipped together as the cloud authentication foundation.
+Cloud-mode deployments now carry a validated principal on every request,
+task and workspace records are org-scoped, unauthenticated browsers are
+pushed to `/login`, and users with multiple orgs can switch scope from the
+sign-in badge. Local-mode behavior is unchanged; the `WALLFACER_SERVER_API_KEY`
+path still works exactly as before.
+
+### What Shipped
+
+- **Backend packages**: `internal/auth/` (middleware, validator, principal,
+  authorize) re-exporting `latere.ai/x/pkg/jwtauth` and `pkg/oidc` types;
+  `internal/store/principal.go` with `TasksForPrincipal`; `internal/store/actor.go`
+  for actor attribution on events; `internal/workspace/groups.go` gains
+  `CreatedBy`/`OrgID` + `GroupsForPrincipal`.
+- **HTTP routes** (all cloud-gated): `/login`, `/callback`, `/logout`,
+  `/logout/notify`, `/api/auth/me`, `/api/auth/orgs`, `/api/auth/switch-org`.
+  Middleware chain: CookiePrincipal → OptionalAuth → BearerAuth → ForceLogin.
+- **Data model**: `CreatedBy` + `OrgID` fields on `Task` and workspace
+  `Group` (both `omitempty`, zero on-disk migration).
+  Three-shape filter matrix for the `TasksForPrincipal` / `GroupsForPrincipal`
+  queries (legacy shared / personal owner-only / strict org).
+- **Frontend**: two-line sign-in badge with avatar, display name, and scope
+  subtitle; popup menu using `position: fixed` + `getBoundingClientRect`
+  to escape the sidebar's `overflow: hidden` in both expanded and collapsed
+  layouts; Organizations submenu that reloads after `POST /api/auth/switch-org`.
+- **Cross-repo deploys**: `latere.ai/auth` `v0.5.8` (active-org column on
+  `sso_sessions`, `/authorize` accepts `org_id`, `/userinfo` returns
+  `name` + `picture`, JWT `iss` populated on access tokens);
+  `latere.ai/x/pkg/oidc` `v0.10.2` (`AuthCodeURLWithOpts` and `HandleLogin`
+  forward empty `org_id`, `UserFromRequest` fetches `/userinfo`).
+- **Configuration**: `AUTH_JWKS_URL`, `AUTH_ISSUER` (auto-derived from
+  `AUTH_URL`).
+- **Tests**: unit coverage for middleware, principal filter matrix,
+  `CookiePrincipal`, event actor stamping, org-switch handler, sign-in
+  badge rendering + menu, plus two E2E scripts under `scripts/`
+  (`e2e-auth-flow.sh` for full email-OTP sign-in and `e2e-switch-org.sh`
+  for personal ↔ org switching with workspace-group count verification).
+- **Docs**: `docs/cloud/README.md` extended with JWT, principal, forced
+  login, org switching, and scope gating sections.
+
+### Design Evolution
+
+1. **Cookie session no longer clears on JWT validation failure.** The spec
+   originally implied `CookiePrincipal` would clear a bad session. In
+   practice this caused a `/callback → / → /login → /callback` redirect
+   loop because the cookie's access token is minted by fosite and is
+   re-validated on every request. Now validation failure just attaches
+   no principal; the session survives until explicit sign-out.
+2. **JWT audience check relaxed.** `jwtauth.Validator` was originally
+   configured to require `aud == client_id`. fosite doesn't set `aud` on
+   its access tokens, so `BuildValidator` skips audience verification and
+   relies on issuer + signature instead.
+3. **Personal vs. legacy vs. org distinction** was clarified during
+   implementation. Original spec had two shapes (scoped vs. unscoped).
+   Production hit a third: records with `OrgID=""` authored by a user
+   (personal) vs. records with both empty (legacy/shared). Final matrix:
+   org view = strict (`OrgID==p.OrgID` only); personal view = owner-only
+   on `OrgID==""`; local/anonymous (`claims==nil`) = everything.
+4. **Org switching signalled via empty-value parameter.** Clearing active
+   org ("switch to personal") required forwarding `?org_id=` with an
+   empty value through `AuthCodeURLWithOpts` and `HandleLogin`. Both
+   helpers previously dropped empty params; this is the single-bit
+   "clear org" signal to the auth service.
+5. **`/userinfo` extended beyond JWT decode.** The sign-in badge needs
+   `name` and `picture`, which are not JWT claims. `UserFromRequest` in
+   `pkg/oidc` now fetches `/userinfo` after decoding the access token so
+   the badge displays `display_name` + avatar without a dedicated client
+   call per page load.
+6. **`sso_sessions.active_org_id` column added** on the auth service
+   (migration 000013) to persist the caller's selected org across refreshes.
+   NULL = personal view; a UUID = org-scoped view.
+7. **Agent-token exchange extracted** to a separate spec
+   ([`agent-token-exchange.md`](agent-token-exchange.md)) during Phase 2
+   planning. It depends on the Phase 2 principal context but does not
+   gate the cloud-track unblock.
+8. **Audit log extracted** to `shared/audit-log.md`. Phase 2 only lays
+   down one hook (`actor_sub` on the per-task event trace via
+   `task-event-actor-sub.md`); the broader cross-entity log is a
+   follow-up spec.
+9. **Sign-in badge redesigned** from an inline pill to a two-line stack
+   (name on top, scope subtitle below) after display names like
+   "Changkun Ou" were being truncated by the competing org pill. The
+   menu switched from `position: absolute` to `position: fixed` +
+   JS anchoring so it escapes the sidebar's `overflow: hidden` in the
+   collapsed layout.
 
 ---
 
