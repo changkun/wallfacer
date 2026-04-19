@@ -6,7 +6,9 @@
 package auth
 
 import (
+	"log/slog"
 	"net/http"
+	"sync/atomic"
 
 	"latere.ai/x/pkg/oidc"
 )
@@ -50,13 +52,36 @@ func CookiePrincipal(client sessionSource, v *Validator, next http.Handler) http
 		}
 		claims, err := v.Validate(sess.AccessToken)
 		if err != nil {
-			// Token in the cookie is stale or signature-invalid. Clear
-			// the cookie so the next browser navigation hits /login
-			// instead of re-trying a dead session on every request.
-			oidc.ClearSession(w)
+			// Token in the cookie is stale, signature-invalid, or the
+			// validator config is wrong. Do NOT auto-clear the cookie:
+			// a persistent validation error would produce an endless
+			// /login ↔ /callback loop once ForceLogin enters the
+			// picture, with no visible error. Pass through as
+			// anonymous — ForceLogin will redirect HTML GETs to
+			// /login, which is survivable (the user sees the login
+			// page) while the operator fixes the config.
+			logCookieValidateOnce(err)
 			next.ServeHTTP(w, r)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(WithClaims(r.Context(), claims)))
 	})
+}
+
+// cookieValidateLogged is set once to avoid flooding logs with the
+// same validation error on every request while the operator is
+// fixing config. The underlying issue is a misconfiguration, not a
+// per-request condition, so one log line is enough.
+var cookieValidateLogged atomic.Bool
+
+// logCookieValidateOnce logs the validation error at warn level the
+// first time it fires in a process. Reset on binary restart.
+func logCookieValidateOnce(err error) {
+	if cookieValidateLogged.Swap(true) {
+		return
+	}
+	slog.Warn("auth: session-cookie token validation failed; "+
+		"signed-in users will be treated as anonymous. "+
+		"Check AUTH_JWKS_URL, AUTH_ISSUER, and the auth service's token signing.",
+		"error", err)
 }

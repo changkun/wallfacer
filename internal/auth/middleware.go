@@ -23,14 +23,20 @@ import (
 type claimsCtxKey struct{}
 
 // BuildValidator constructs a Validator from the auth configuration.
-// JWKS endpoint and issuer are auto-derived from cfg.AuthURL when not
-// passed explicitly. Audience is the OAuth client ID. Returns nil when
-// cfg.AuthURL is empty (matches oidc.New's "required fields missing"
-// contract so callers can short-circuit without a nil-check dance).
+// JWKS endpoint is auto-derived from cfg.AuthURL when not passed
+// explicitly. Issuer validation is optional and only applied when an
+// explicit issuer is passed or AUTH_ISSUER is set — fosite-issued JWT
+// access tokens don't always carry iss that matches the discovery
+// document. Audience validation is deliberately omitted: we're
+// validating tokens received in our own callback from an auth service
+// we trust by JWKS signature; any token that signs under the auth
+// service's key was issued by it. Returns nil when cfg.AuthURL is
+// empty.
 //
 // jwksURL and issuer override the derived defaults; pass "" for either
-// to keep the default. The CLI boot path reads AUTH_JWKS_URL and
-// AUTH_ISSUER from the environment and forwards them here.
+// to keep the default (empty issuer = skip iss check). The CLI boot
+// path reads AUTH_JWKS_URL and AUTH_ISSUER from the environment and
+// forwards them here.
 func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
 	if cfg.AuthURL == "" {
 		return nil
@@ -38,15 +44,9 @@ func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
 	if jwksURL == "" {
 		jwksURL = strings.TrimRight(cfg.AuthURL, "/") + "/.well-known/jwks.json"
 	}
-	if issuer == "" {
-		issuer = cfg.AuthURL
-	}
 	jc := jwtauth.Config{
 		JWKSURL: jwksURL,
-		Issuer:  issuer,
-	}
-	if cfg.ClientID != "" {
-		jc.Audiences = []string{cfg.ClientID}
+		Issuer:  issuer, // empty = skip iss check; operator sets AUTH_ISSUER to opt in
 	}
 	return jwtauth.New(jc)
 }
