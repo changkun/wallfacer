@@ -19,13 +19,13 @@ dispatched_task_id: null
 
 Provide the two authorization primitives a cloud deployment needs on day one:
 
-1. **`requireSuperadmin`** — gate sensitive platform operations on the
+1. **`requireSuperadmin`**, gate sensitive platform operations on the
    `is_superadmin` claim. Applied to `/api/admin/*` routes.
-2. **`requireScope(name)`** — gate specific mutating endpoints on the `scp`
+2. **`requireScope(name)`**, gate specific mutating endpoints on the `scp`
    claim array. Scaffolded but not applied anywhere in this task; other
    handlers opt in later.
 
-In local mode both wrappers pass through unchanged — neither is installed
+In local mode both wrappers pass through unchanged, neither is installed
 when `cfg.Cloud == false`.
 
 ## What to do
@@ -56,7 +56,7 @@ when `cfg.Cloud == false`.
   - no claim in context → 401.
   - `RequireScope("admin:tasks")` with claim containing it → 200;
     without it → 403.
-- `internal/handler/admin_test.go` — integration-lite:
+- `internal/handler/admin_test.go`, integration-lite:
   - cloud + superadmin → `/api/admin/rebuild-index` 200.
   - cloud + regular user → 403.
   - local (no claims path) → 200 (unchanged from today).

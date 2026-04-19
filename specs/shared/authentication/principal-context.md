@@ -37,21 +37,21 @@ paths.
 2. Implementation path:
    - If `PrincipalFromContext` already returns claims → pass through.
    - Else load the session via `c.SessionFromRequest(r)` (add to
-     `internal/auth/` if the platform package doesn't already expose it —
+     `internal/auth/` if the platform package doesn't already expose it,
      mirror the cookie read from `client.UserFromRequest`).
    - Take the session's access token, call
-     `v.Validate(ctx, sessionAccessToken)` — this is the same JWT issued
+     `v.Validate(ctx, sessionAccessToken)`, this is the same JWT issued
      by the auth service, so validation is uniform.
    - On success, inject the resulting claims into the context.
    - On failure (token expired, signature invalid), clear the session
-     cookie and pass through as anonymous — the next interactive request
+     cookie and pass through as anonymous, the next interactive request
      hits `/login`.
 3. Wire the middleware only on HTML-rendering and API routes that benefit
-   from identity — in practice, wrap the whole mux tail after `OptionalAuth`.
+   from identity, in practice, wrap the whole mux tail after `OptionalAuth`.
 4. Document the uniform API: every handler that needs the caller uses
    `auth.PrincipalFromContext(r.Context())`; no handler ever calls
    `client.UserFromRequest` directly. Update any Phase-1 handler that
-   already reads `UserFromRequest` (only `/api/auth/me`) — that one can
+   already reads `UserFromRequest` (only `/api/auth/me`), that one can
    stay as-is since it specifically wants the OIDC userinfo shape for UI
    rendering, but add a code comment noting the distinction.
 
@@ -70,7 +70,7 @@ paths.
 
 - Do not add new cookies. The session cookie from Phase 1 is the only
   identity-carrying cookie.
-- Do not change `/api/auth/me`'s response shape — it still returns
+- Do not change `/api/auth/me`'s response shape, it still returns
   OIDC userinfo, not claims.
 - Do not introduce a third identity type. The goal is fewer shapes, not
   more.

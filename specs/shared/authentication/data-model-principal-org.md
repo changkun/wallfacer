@@ -32,7 +32,7 @@ but is only useful once the middleware is populating claims.
 
 ## What to do
 
-1. **Store model** — extend `internal/store/task.go`:
+1. **Store model**, extend `internal/store/task.go`:
    ```go
    type Task struct {
        // ... existing fields ...
@@ -42,13 +42,13 @@ but is only useful once the middleware is populating claims.
    ```
    Use empty-string + `omitempty` rather than `*string` to keep the JSON on
    disk terse for the anonymous case. Downstream consumers must not treat
-   `""` as "unknown user" — treat it as "anonymous" and handle explicitly.
-2. **Workspace model** — add the same two fields to whatever the workspace
+   `""` as "unknown user", treat it as "anonymous" and handle explicitly.
+2. **Workspace model**, add the same two fields to whatever the workspace
    manager persists today (`internal/workspace/`). If workspaces are
    currently only identified by their path list, introduce a wrapper struct
    in this task rather than punting. The cloud track needs a stable
    identifier to key per-org workspace listings on.
-3. **Populate on create** — in `handler.createTask`, if claims are in
+3. **Populate on create**, in `handler.createTask`, if claims are in
    context:
    ```go
    if c, ok := auth.PrincipalFromContext(r.Context()); ok {
@@ -59,7 +59,7 @@ but is only useful once the middleware is populating claims.
    }
    ```
    Do the same for workspace creation / group switching.
-4. **Query filter** — add a helper in `internal/store/`:
+4. **Query filter**, add a helper in `internal/store/`:
    ```go
    // TasksForPrincipal returns the slice of tasks visible to the given
    // principal. When principal is nil, returns all tasks (local mode).
@@ -90,7 +90,7 @@ but is only useful once the middleware is populating claims.
 
 ## Boundaries
 
-- Do not add an on-disk migration step. Both fields are `omitempty` — old
+- Do not add an on-disk migration step. Both fields are `omitempty`, old
   records read back with empty strings, which matches the anonymous case.
 - Do not add user profile fields (name, email, avatar) to `Task`. Display
   info is fetched from `/api/auth/me` or `/userinfo`.

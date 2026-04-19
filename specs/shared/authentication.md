@@ -46,10 +46,10 @@ Identity is delegated to the centralized **latere.ai auth service**
 - Login UI with provider buttons (served by the auth service).
 - CSRF / session-fixation handling, refresh token encryption.
 - Org, team, and RBAC definitions (the auth service owns the role matrix).
-- Sandbox-credential OAuth (`internal/oauth/` — Claude / Codex API tokens;
+- Sandbox-credential OAuth (`internal/oauth/`, Claude / Codex API tokens;
   entirely different system, unchanged by this spec).
 - **Agent token exchange** for sandbox agents calling latere.ai backends
-  (RFC 8693 delegation) — split out into
+  (RFC 8693 delegation), split out into
   [`shared/agent-token-exchange.md`](agent-token-exchange.md) because it
   doesn't block the cloud move.
 
@@ -57,10 +57,10 @@ Identity is delegated to the centralized **latere.ai auth service**
 
 Two shared Go packages carry the integration:
 
-- **`latere.ai/x/pkg/oidc`** — OAuth 2.0 Authorization Code + PKCE flow,
+- **`latere.ai/x/pkg/oidc`**, OAuth 2.0 Authorization Code + PKCE flow,
   encrypted cookie sessions, token refresh, userinfo. Used for **browser
   login**.
-- **`latere.ai/x/pkg/jwtauth`** — RS256 JWT validation via JWKS, HTTP
+- **`latere.ai/x/pkg/jwtauth`**, RS256 JWT validation via JWKS, HTTP
   middleware, claims extraction. Used for **API token validation**.
 
 `pkg/oidc` is wired in as of Phase 1. `pkg/jwtauth` lands in Phase 2.
@@ -92,12 +92,12 @@ Phase 1 (shipped) ──→ Phase 2 (drafted) ──→ Phase 3 (future)
 | 3 | Third-party OIDC, remote-control registration protocol | Future | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
 
 The agent-token-exchange spec ([link](agent-token-exchange.md)) is a
-peer, not a phase — it runs on Phase 2's principal context but doesn't
+peer, not a phase, it runs on Phase 2's principal context but doesn't
 gate the cloud move.
 
 ---
 
-## Phase 1 — Cloud-Gated Sign-In Badge (shipped)
+## Phase 1: Cloud-Gated Sign-In Badge (shipped)
 
 **Goal:** let a signed-in user see their avatar + username in the status
 bar. No routes become authenticated. No data is keyed on a principal.
@@ -110,8 +110,8 @@ local-only and cloud surfaces ahead of cloud-track work.
 
 - `WALLFACER_CLOUD` flag in `internal/envconfig/envconfig.go`.
 - `internal/auth/auth.go` re-exports `pkg/oidc` types and constructors.
-- Browser routes in `internal/handler/login.go` — `/login`, `/callback`,
-  `/logout`, `/logout/notify`, `/api/auth/me` — mounted only when
+- Browser routes in `internal/handler/login.go`, `/login`, `/callback`,
+  `/logout`, `/logout/notify`, `/api/auth/me`, mounted only when
   `cfg.Cloud == true`.
 - `GET /api/config` exposes `cloud: bool` and `auth_url: string`.
 - Status-bar badge (`ui/js/status-bar.js`) with signed-out / signed-in
@@ -124,11 +124,11 @@ Child specs (all complete):
 
 ---
 
-## Phase 2 — User login, identity, and org isolation
+## Phase 2: User login, identity, and org isolation
 
 **Goal:** in cloud mode, every request has a validated principal, data is
 scoped by `org_id`, and unauthenticated browsers are pushed to `/login`.
-Local mode is untouched — anonymous deployments and the existing
+Local mode is untouched, anonymous deployments and the existing
 `WALLFACER_SERVER_API_KEY` path work exactly as today.
 
 ### End-state request flow
@@ -155,15 +155,15 @@ Browser ─┤ session cookie       │         │ Authorization: Bearer  │
                    ┌───────────────────┼────────────────────┐
                    ▼                   ▼                    ▼
            ForceLogin           RequireSuperadmin      Task / Workspace
-           (HTML routes,        (/api/admin/*)         handlers —
+           (HTML routes,        (/api/admin/*)         handlers,
            cloud-forced-login)  (scope-and-superadmin) filter by OrgID
                                                       (data-model-
                                                        principal-org)
 ```
 
 Both identity paths (cookie, bearer) land in the same `Claims` shape in
-context. Handlers read identity via one helper — `auth.PrincipalFromContext`
-— regardless of which path authenticated the request. The session cookie's
+context. Handlers read identity via one helper, `auth.PrincipalFromContext`
+, regardless of which path authenticated the request. The session cookie's
 access token is itself a JWT issued by the auth service, so the cookie
 path validates through the same `jwtauth.Validator` as the bearer path
 rather than using a parallel code path.
@@ -215,12 +215,12 @@ Richer RBAC (role matrix, team-level ACLs) lives in
 
 | Child spec | Depends on | Effort |
 |------------|-----------|--------|
-| [jwt-middleware.md](authentication/jwt-middleware.md) — `pkg/jwtauth` on `/api/*`, `OptionalAuth`, `PrincipalFromContext` | Phase 1 | medium |
-| [principal-context.md](authentication/principal-context.md) — cookie-path principals flow into same `Claims` context | jwt-middleware | small |
-| [data-model-principal-org.md](authentication/data-model-principal-org.md) — `CreatedBy` + `OrgID` on task/workspace, org-scoped queries | — | medium |
-| [cloud-forced-login.md](authentication/cloud-forced-login.md) — anonymous HTML GET → `/login?next=`, API stays 401 | principal-context | small |
-| [scope-and-superadmin.md](authentication/scope-and-superadmin.md) — `RequireSuperadmin` + `RequireScope`; apply to `/api/admin/*` | jwt-middleware | small |
-| [org-switching.md](authentication/org-switching.md) — `/api/auth/orgs`, `/api/auth/switch-org`, badge submenu | data-model-principal-org, jwt-middleware | medium |
+| [jwt-middleware.md](authentication/jwt-middleware.md), `pkg/jwtauth` on `/api/*`, `OptionalAuth`, `PrincipalFromContext` | Phase 1 | medium |
+| [principal-context.md](authentication/principal-context.md), cookie-path principals flow into same `Claims` context | jwt-middleware | small |
+| [data-model-principal-org.md](authentication/data-model-principal-org.md), `CreatedBy` + `OrgID` on task/workspace, org-scoped queries |, | medium |
+| [cloud-forced-login.md](authentication/cloud-forced-login.md), anonymous HTML GET → `/login?next=`, API stays 401 | principal-context | small |
+| [scope-and-superadmin.md](authentication/scope-and-superadmin.md), `RequireSuperadmin` + `RequireScope`; apply to `/api/admin/*` | jwt-middleware | small |
+| [org-switching.md](authentication/org-switching.md), `/api/auth/orgs`, `/api/auth/switch-org`, badge submenu | data-model-principal-org, jwt-middleware | medium |
 
 ```mermaid
 graph LR
@@ -237,22 +237,22 @@ roots.
 
 ### Explicitly out of scope for Phase 2
 
-- Agent token exchange — see [`agent-token-exchange.md`](agent-token-exchange.md).
-- In-app user / org administration — handled by the auth service.
-- Third-party OIDC providers — Phase 3.
-- Cross-org visibility (shared workspaces across orgs) — belongs in
+- Agent token exchange, see [`agent-token-exchange.md`](agent-token-exchange.md).
+- In-app user / org administration, handled by the auth service.
+- Third-party OIDC providers, Phase 3.
+- Cross-org visibility (shared workspaces across orgs), belongs in
   `cloud/multi-user-collaboration.md` if needed.
-- Remote-control wire protocol — Phase 3 / separate spec.
+- Remote-control wire protocol, Phase 3 / separate spec.
 
 ---
 
-## Phase 3 — Future
+## Phase 3: Future
 
 ### Third-Party OIDC
 
 The `pkg/oidc` package is latere.ai-specific (cookie names, userinfo
 shape, claim layout). Generic OIDC support (Keycloak, Entra ID, etc.) for
-self-hosted deployments would need a pluggable RP — either a second
+self-hosted deployments would need a pluggable RP, either a second
 code path or a generic OIDC client behind the existing `AuthProvider`
 interface. Self-hosted non-latere.ai deployments keep using
 `WALLFACER_SERVER_API_KEY` until this ships.
@@ -261,8 +261,8 @@ interface. Self-hosted non-latere.ai deployments keep using
 
 `CreatedBy` + `OrgID` on records answers *who originated this record*;
 it does not answer *who edited it, when, and to what*. Cross-entity
-mutation history — task state transitions, workspace config edits,
-admin actions — lives in its own spec: [`shared/audit-log.md`](audit-log.md).
+mutation history, task state transitions, workspace config edits,
+admin actions, lives in its own spec: [`shared/audit-log.md`](audit-log.md).
 
 That spec depends on Phase 2 (needs `*jwtauth.Claims` on every request)
 but is scoped separately so it doesn't balloon the cloud-unblock work.
@@ -282,8 +282,8 @@ Not a paid-features gate. Not a session sync mechanism. Not a billing
 hook. Just: identity on both ends of the wire, so a latere.ai control
 plane can route a web-UI action to the right local instance.
 
-Mechanics — long-lived outbound connection vs. periodic heartbeat, the
-latere.ai-side `principal_id → [instances]` registry, the wire protocol —
+Mechanics, long-lived outbound connection vs. periodic heartbeat, the
+latere.ai-side `principal_id → [instances]` registry, the wire protocol,
 are all out of scope for this spec. The only guarantee Phase 2 has to
 make is: when sign-in happens, wallfacer records enough identity info to
 register later. Everything else is a follow-up spec.
@@ -312,7 +312,7 @@ wallfacer:
 | `iss` | string | Phase 2 | Issuer (`https://auth.latere.ai`); verified by `jwtauth.Validator`. |
 | `aud` | string | Phase 2 | Audience = wallfacer's `client_id`. |
 | `exp`, `iat`, `jti` | int64 / string | Phase 2 | Standard expiry / issuance / uniqueness. |
-| `validation` | string | Agent-token spec | `"local"` or `"strict"` — agent-token-exchange only. |
+| `validation` | string | Agent-token spec | `"local"` or `"strict"`, agent-token-exchange only. |
 | `delegation_id`, `act.sub` | string | Agent-token spec | Agent-token-exchange only. |
 
 ### Cookie security
@@ -367,7 +367,7 @@ Three combinations supported:
 
 ## Related Systems
 
-### `internal/oauth/` (sandbox credentials — unchanged)
+### `internal/oauth/` (sandbox credentials, unchanged)
 
 Wallfacer already has `internal/oauth/` for **sandbox credential** OAuth
 (Claude Code API tokens, Codex API keys). This is a completely separate
