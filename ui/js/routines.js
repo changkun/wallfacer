@@ -167,12 +167,7 @@ async function onRoutineTrigger(id) {
 // command-palette / composer integrations that ship in follow-ups.
 async function createRoutineFromPrompt(
   prompt,
-  {
-    intervalMinutes,
-    spawnKind = "",
-    enabled = true,
-    tags = [],
-  } = {},
+  { intervalMinutes, spawnKind = "", enabled = true, tags = [] } = {},
 ) {
   return api(Routes.routines.create(), {
     method: "POST",

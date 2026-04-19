@@ -37,4 +37,3 @@ func SnapshotDiff(ctx context.Context, snapshotPath string) string {
 	}
 	return out
 }
-
