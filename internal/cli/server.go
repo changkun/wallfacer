@@ -225,10 +225,16 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
 
-	// Cloud mode: wire latere.ai sign-in. oidc.New returns nil when required
-	// env vars are missing — treat that as a misconfigured cloud deployment
-	// and refuse to start rather than silently running without sign-in.
-	if envCfg.Cloud {
+	// Cloud mode: wire latere.ai sign-in. WALLFACER_CLOUD can live in the
+	// .env file (envCfg.Cloud) or in the process environment — the OIDC
+	// client config below already reads from os.Getenv, so accepting the
+	// flag from either source matches the user's expectation of
+	// `WALLFACER_CLOUD=true wallfacer run`.
+	cloudMode := envCfg.Cloud || envconfig.ParseBoolFlag(os.Getenv("WALLFACER_CLOUD"))
+	if cloudMode {
+		// oidc.New returns nil when required env vars are missing — treat
+		// that as a misconfigured cloud deployment and refuse to start
+		// rather than silently running without sign-in.
 		authClient := auth.New(auth.LoadConfig())
 		if authClient == nil {
 			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL")
