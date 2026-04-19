@@ -1,20 +1,22 @@
-// Flows tab: renders the merged catalog of built-in and user-
-// authored flows. Each flow renders as a row with a one-line chip
-// chain showing its step order, optional steps (trailing ?), and
-// parallel-sibling groups (separated from the preceding step by a
-// ‖ divider). Clicking a chip cross-navigates to the Agents tab
-// with the corresponding agent expanded. Built-in flows expose a
-// Clone action; user-authored flows expose Edit + Delete.
+// Flows tab: split-pane layout. Left rail lists built-in + user
+// flows with search; right pane renders a flow's chip-chain preview
+// (read-only for built-ins) or an editor with drag-and-drop step
+// reorder for user-authored flows.
 
 (function () {
   "use strict";
 
-  var loaded = false;
+  var flows = [];
+  var agentsCache = []; // populated from /api/agents lazily
+  var agentsPromise = null;
+  var selectedSlug = null;
+  var draft = null;
+  var searchQuery = "";
 
   function loadFlows(opts) {
-    if (loaded && !(opts && opts.force)) return;
-    var listEl = document.getElementById("flows-list");
+    var listEl = document.getElementById("flows-rail-list");
     if (!listEl) return;
+    void opts;
 
     fetch(Routes.flows.list(), { headers: authHeaders() })
       .then(function (r) {
@@ -22,17 +24,19 @@
         return r.json();
       })
       .then(function (rows) {
-        loaded = true;
         listEl.removeAttribute("aria-busy");
-        if (!Array.isArray(rows) || rows.length === 0) {
-          listEl.innerHTML =
-            '<p class="flows-mode__empty">No flows registered.</p>';
-          return;
+        flows = Array.isArray(rows) ? rows : [];
+        if (
+          selectedSlug &&
+          !draft &&
+          !flows.find(function (f) {
+            return f.slug === selectedSlug;
+          })
+        ) {
+          selectedSlug = null;
         }
-        listEl.innerHTML = "";
-        rows.forEach(function (row) {
-          listEl.appendChild(renderFlow(row));
-        });
+        renderRail();
+        renderDetail();
       })
       .catch(function (err) {
         listEl.removeAttribute("aria-busy");
@@ -43,97 +47,251 @@
       });
   }
 
-  // renderFlow produces one flow card with its chip chain plus
-  // Clone / Edit / Delete actions depending on whether the flow
-  // is built-in.
-  function renderFlow(flow) {
-    var card = document.createElement("div");
-    card.className = "flows-row";
-    card.setAttribute("data-slug", flow.slug);
-    if (!flow.builtin) card.classList.add("flows-row--user");
+  function ensureAgents() {
+    if (agentsCache.length > 0) return Promise.resolve(agentsCache);
+    if (agentsPromise) return agentsPromise;
+    agentsPromise = fetch(Routes.agents.list(), { headers: authHeaders() })
+      .then(function (r) {
+        return r.ok ? r.json() : [];
+      })
+      .then(function (rows) {
+        agentsCache = Array.isArray(rows) ? rows : [];
+        return agentsCache;
+      })
+      .catch(function () {
+        return [];
+      })
+      .finally(function () {
+        agentsPromise = null;
+      });
+    return agentsPromise;
+  }
 
-    var header = document.createElement("div");
-    header.className = "flows-row__header";
+  function filteredFlows() {
+    if (!searchQuery) return flows.slice();
+    var q = searchQuery.toLowerCase();
+    return flows.filter(function (f) {
+      if ((f.slug || "").toLowerCase().indexOf(q) !== -1) return true;
+      if ((f.name || "").toLowerCase().indexOf(q) !== -1) return true;
+      if ((f.description || "").toLowerCase().indexOf(q) !== -1) return true;
+      return false;
+    });
+  }
 
-    var name = document.createElement("div");
-    name.className = "flows-row__name";
-    name.textContent = flow.name || flow.slug;
+  function renderRail() {
+    var listEl = document.getElementById("flows-rail-list");
+    if (!listEl) return;
+    listEl.innerHTML = "";
 
-    var badge = document.createElement("span");
-    badge.className = "flows-row__badge";
-    badge.textContent = flow.builtin ? "built-in" : "custom";
+    var shown = filteredFlows();
+    if (shown.length === 0 && !draft) {
+      listEl.innerHTML =
+        '<p class="flows-mode__empty">' +
+        (searchQuery ? "No matches." : "No flows registered.") +
+        "</p>";
+      return;
+    }
+
+    if (draft) listEl.appendChild(railItem(draft, { isDraft: true }));
+    var builtIns = shown.filter(function (f) {
+      return f.builtin;
+    });
+    var user = shown.filter(function (f) {
+      return !f.builtin;
+    });
+    if (builtIns.length) {
+      listEl.appendChild(groupHeader("Built-in"));
+      builtIns.forEach(function (f) {
+        listEl.appendChild(railItem(f));
+      });
+    }
+    if (user.length) {
+      listEl.appendChild(groupHeader("User-authored"));
+      user.forEach(function (f) {
+        listEl.appendChild(railItem(f));
+      });
+    }
+  }
+
+  function groupHeader(label) {
+    var h = document.createElement("div");
+    h.className = "flows-rail__group";
+    h.textContent = label;
+    return h;
+  }
+
+  function railItem(flow, opts) {
+    opts = opts || {};
+    var el = document.createElement("button");
+    el.type = "button";
+    el.className = "flows-rail__item";
+    el.setAttribute("data-slug", flow.slug);
+    if (opts.isDraft) el.classList.add("flows-rail__item--draft");
+    if (!flow.builtin && !opts.isDraft)
+      el.classList.add("flows-rail__item--user");
+    var isSelected =
+      (opts.isDraft && draft) ||
+      (!opts.isDraft && !draft && selectedSlug === flow.slug);
+    if (isSelected) el.classList.add("flows-rail__item--active");
+
+    var name = document.createElement("span");
+    name.className = "flows-rail__name";
+    name.textContent = flow.name || flow.slug || "(untitled)";
+    el.appendChild(name);
+
+    var meta = document.createElement("span");
+    meta.className = "flows-rail__meta";
+    if (opts.isDraft) {
+      meta.textContent = "draft";
+    } else if (flow.steps) {
+      meta.textContent = flow.steps.length + " step" +
+        (flow.steps.length === 1 ? "" : "s");
+    }
+    if (meta.textContent) el.appendChild(meta);
+
+    el.addEventListener("click", function () {
+      if (opts.isDraft) return;
+      draft = null;
+      selectedSlug = flow.slug;
+      renderRail();
+      renderDetail();
+    });
+    return el;
+  }
+
+  function renderDetail() {
+    var detail = document.getElementById("flows-detail");
+    if (!detail) return;
+    detail.innerHTML = "";
+
+    var flow = null;
+    var editing = false;
+    if (draft) {
+      flow = draft;
+      editing = true;
+    } else if (selectedSlug) {
+      flow = flows.find(function (f) {
+        return f.slug === selectedSlug;
+      });
+      editing = flow && !flow.builtin;
+    }
+
+    if (!flow) {
+      var empty = document.createElement("div");
+      empty.className = "flows-mode__empty-detail";
+      empty.innerHTML =
+        "<p>Pick a flow on the left, or click <strong>+ New Flow</strong> above.</p>";
+      detail.appendChild(empty);
+      return;
+    }
+
+    detail.appendChild(renderHead(flow, editing));
+    if (editing || draft) {
+      detail.appendChild(renderEditor(flow));
+    } else {
+      detail.appendChild(renderReadOnlyBody(flow));
+    }
+  }
+
+  function renderHead(flow, editing) {
+    var head = document.createElement("div");
+    head.className = "flows-detail__head";
+    var titleWrap = document.createElement("div");
+    var title = document.createElement("h3");
+    title.className = "flows-detail__title";
+    title.textContent = flow.name || flow.slug || "(untitled)";
+    titleWrap.appendChild(title);
+    var subtitle = document.createElement("div");
+    subtitle.className = "flows-detail__subtitle";
+    var badge = flow.builtin
+      ? '<span class="flows-detail__badge">built-in</span>'
+      : '<span class="flows-detail__badge flows-detail__badge--user">user</span>';
+    subtitle.innerHTML = badge + "<code>" + escapeHTML(flow.slug) + "</code>";
+    titleWrap.appendChild(subtitle);
+    head.appendChild(titleWrap);
 
     var actions = document.createElement("div");
-    actions.className = "flows-row__actions";
-    if (flow.builtin) {
-      var clone = btn("Clone", "flows-row__clone", function (e) {
-        e.stopPropagation();
-        openEditor(card, flow, { mode: "clone" });
-      });
-      clone.title = "Clone this flow into a user-authored copy you can edit.";
-      actions.appendChild(clone);
-    } else {
+    actions.className = "flows-detail__actions";
+    if (draft) {
+      // Actions live inside the editor.
+    } else if (flow.builtin) {
       actions.appendChild(
-        btn("Edit", "flows-row__clone", function (e) {
-          e.stopPropagation();
-          openEditor(card, flow, { mode: "edit" });
+        btn("Clone", "flows-detail__btn-primary", function () {
+          startClone(flow);
         }),
       );
+    } else if (editing) {
       actions.appendChild(
-        btn("Delete", "flows-row__delete", function (e) {
-          e.stopPropagation();
+        btn("Delete", "flows-detail__btn-danger", function () {
           deleteFlow(flow.slug);
         }),
       );
     }
-
-    header.appendChild(name);
-    header.appendChild(badge);
-    header.appendChild(actions);
-    card.appendChild(header);
-
-    if (flow.description) {
-      var desc = document.createElement("p");
-      desc.className = "flows-row__desc";
-      desc.textContent = flow.description;
-      card.appendChild(desc);
-    }
-
-    var chain = buildChain(flow.steps || []);
-    card.appendChild(chain);
-
-    return card;
+    head.appendChild(actions);
+    return head;
   }
 
-  // buildChain renders the step chips left-to-right, collapsing
-  // transitively-mutual RunInParallelWith groups into a parallel
-  // cluster separated by the previous step with a ‖ divider.
+  function renderReadOnlyBody(flow) {
+    var body = document.createElement("div");
+    body.className = "flows-detail__body";
+    if (flow.description) {
+      var desc = document.createElement("p");
+      desc.className = "flows-detail__desc";
+      desc.textContent = flow.description;
+      body.appendChild(desc);
+    }
+    body.appendChild(buildChain(flow.steps || []));
+    return body;
+  }
+
+  // buildChain: one chip per step, grouped into parallel clusters
+  // via the same transitive-closure rule the engine uses.
   function buildChain(steps) {
     var container = document.createElement("div");
-    container.className = "flows-row__chain";
+    container.className = "flows-detail__chain";
     if (steps.length === 0) return container;
-
-    // Group steps using the same transitive-closure rule as the
-    // engine: any step listing another as a parallel sibling lands
-    // in the same group.
     var groups = groupParallel(steps);
-
     groups.forEach(function (group, gi) {
-      if (gi > 0) {
-        container.appendChild(arrow("→"));
-      }
+      if (gi > 0) container.appendChild(arrow("→"));
       if (group.length === 1) {
         container.appendChild(chip(group[0]));
       } else {
+        var box = document.createElement("span");
+        box.className = "flows-detail__parallel";
         for (var i = 0; i < group.length; i++) {
-          if (i > 0) {
-            container.appendChild(arrow("‖"));
-          }
-          container.appendChild(chip(group[i]));
+          if (i > 0) box.appendChild(arrow("‖"));
+          box.appendChild(chip(group[i]));
         }
+        container.appendChild(box);
       }
     });
     return container;
+  }
+
+  function chip(step) {
+    var el = document.createElement("button");
+    el.type = "button";
+    el.className = "flows-chip";
+    var label = step.agent_name || step.agent_slug;
+    if (step.optional) label += "?";
+    el.textContent = label;
+    el.title = step.input_from
+      ? 'Prompted by the output of step "' + step.input_from + '"'
+      : "Receives the task prompt";
+    el.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (typeof window.switchMode === "function") {
+        window.switchMode("agents", { persist: true });
+      }
+    });
+    return el;
+  }
+
+  function arrow(glyph) {
+    var el = document.createElement("span");
+    el.className = "flows-chain__sep";
+    el.textContent = glyph;
+    return el;
   }
 
   function groupParallel(steps) {
@@ -181,152 +339,103 @@
     return groups;
   }
 
-  function chip(step) {
-    var el = document.createElement("button");
-    el.type = "button";
-    el.className = "flows-chip";
-    el.classList.add("flows-chip");
-    var label = step.agent_name || step.agent_slug;
-    if (step.optional) label += "?";
-    el.textContent = label;
-    el.title = step.input_from
-      ? "Prompted by the output of step “" + step.input_from + "”"
-      : "Receives the task prompt";
-    el.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (typeof window.switchMode === "function") {
-        window.switchMode("agents", { persist: true });
-      }
-      // Best-effort: scroll the corresponding agent row into view.
-      window.setTimeout(function () {
-        var target = document.querySelector(
-          '.agents-row[data-slug="' + cssEscape(step.agent_slug) + '"]',
-        );
-        if (target && target.scrollIntoView) {
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 60);
-    });
-    return el;
-  }
+  // --- Editor with drag-and-drop step reorder ---
 
-  function arrow(glyph) {
-    var el = document.createElement("span");
-    el.className = "flows-chain__sep";
-    el.classList.add("flows-chain__sep");
-    el.textContent = glyph;
-    return el;
-  }
-
-  function cssEscape(s) {
-    if (window.CSS && typeof window.CSS.escape === "function") {
-      return window.CSS.escape(s);
-    }
-    return String(s).replace(/"/g, '\\"');
-  }
-
-  function authHeaders() {
-    if (typeof window.getAuthHeaders === "function") {
-      return window.getAuthHeaders();
-    }
-    return {};
-  }
-
-  function escapeHTML(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  // openEditor renders an inline editor under the flow card.
-  // Clone mode pre-fills from an existing flow with a new slug;
-  // edit mode tweaks a user-authored flow in place. The step
-  // editor is intentionally flat: a list of rows with per-step
-  // agent dropdown, optional flag, and up/down/remove buttons.
-  // The more elaborate DAG editor is future work.
-  function openEditor(card, flow, opts) {
-    var existing = card.querySelector(".flows-row__editor");
-    if (existing) existing.remove();
-    card.classList.add("flows-row--editing");
-
-    var isClone = opts.mode === "clone";
+  function renderEditor(flow) {
     var form = document.createElement("form");
-    form.className = "flows-row__editor";
-    form.addEventListener("click", function (e) {
-      e.stopPropagation();
-    });
-
-    var slugValue = isClone ? suggestCloneSlug(flow.slug) : flow.slug;
+    form.className = "flows-detail__editor";
 
     form.appendChild(
-      labeledInput("Slug", "slug", slugValue, {
-        disabled: !isClone,
+      inputRow("Slug", "slug", flow.slug || "my-flow", {
+        disabled: !draft && !flow.builtin,
         hint: "kebab-case, 2-40 chars",
       }),
     );
-    form.appendChild(labeledInput("Name", "name", flow.name || ""));
+    form.appendChild(inputRow("Name", "name", flow.name || ""));
     form.appendChild(
-      labeledInput("Description", "description", flow.description || ""),
+      inputRow("Description", "description", flow.description || ""),
     );
 
-    // Load the current agents catalog so each step's agent-slug
-    // dropdown has options. We stuff the promise on the form so the
-    // submit handler can wait on it (tests mock fetch synchronously).
-    var agentsPromise = fetch(Routes.agents.list(), { headers: authHeaders() })
-      .then(function (r) {
-        return r.ok ? r.json() : [];
-      })
-      .catch(function () {
-        return [];
-      });
-
-    var stepsContainer = document.createElement("div");
-    stepsContainer.className = "flows-row__steps";
-    var initialSteps = (flow.steps || []).map(function (s) {
+    // Clone-editable copy of the steps array. Drag-and-drop and
+    // optional/remove controls mutate this array in place so the
+    // save path serialises exactly what the user sees.
+    var steps = (flow.steps || []).map(function (s) {
       return {
-        agent_slug: s.agent_slug,
+        agent_slug: s.agent_slug || "",
         optional: !!s.optional,
         input_from: s.input_from || "",
         run_in_parallel_with: (s.run_in_parallel_with || []).slice(),
       };
     });
-    if (initialSteps.length === 0) {
-      initialSteps.push({
+    if (steps.length === 0) {
+      steps.push({
         agent_slug: "",
         optional: false,
         input_from: "",
         run_in_parallel_with: [],
       });
     }
-    renderSteps(stepsContainer, initialSteps, agentsPromise);
-    form.appendChild(label("Steps", stepsContainer));
 
-    var addBtn = btn("+ Add step", "flows-row__step-add", function () {
-      initialSteps.push({
+    var stepsWrap = document.createElement("div");
+    stepsWrap.className = "flows-detail__field";
+    var stepsLabel = document.createElement("span");
+    stepsLabel.className = "flows-detail__field-label";
+    stepsLabel.textContent = "Steps";
+    stepsWrap.appendChild(stepsLabel);
+    var stepsList = document.createElement("div");
+    stepsList.className = "flows-detail__steps";
+    stepsWrap.appendChild(stepsList);
+
+    var stepsHint = document.createElement("span");
+    stepsHint.className = "flows-detail__field-hint";
+    stepsHint.textContent =
+      "Drag the handle to reorder. Tick optional for steps the flow can skip.";
+    stepsWrap.appendChild(stepsHint);
+
+    var addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "flows-detail__step-add";
+    addBtn.textContent = "+ Add step";
+    addBtn.addEventListener("click", function () {
+      steps.push({
         agent_slug: "",
         optional: false,
         input_from: "",
         run_in_parallel_with: [],
       });
-      renderSteps(stepsContainer, initialSteps, agentsPromise);
+      renderSteps(stepsList, steps, addBtn);
     });
-    addBtn.type = "button";
-    form.appendChild(addBtn);
+    stepsWrap.appendChild(addBtn);
+    form.appendChild(stepsWrap);
+
+    ensureAgents().then(function () {
+      renderSteps(stepsList, steps, addBtn);
+    });
 
     var err = document.createElement("p");
-    err.className = "flows-row__editor-err";
+    err.className = "flows-detail__editor-err";
     err.hidden = true;
     form.appendChild(err);
 
     var actions = document.createElement("div");
-    actions.className = "flows-row__editor-actions";
-    var save = btn(isClone ? "Save clone" : "Save", "flows-row__save");
-    save.type = "submit";
-    var cancel = btn("Cancel", "flows-row__cancel", function () {
-      closeEditor(card);
-    });
-    cancel.type = "button";
+    actions.className = "flows-detail__editor-actions";
+    var cancel = btn(
+      "Cancel",
+      "flows-detail__btn-ghost",
+      function () {
+        draft = null;
+        if (!flow.builtin && flow.slug) selectedSlug = flow.slug;
+        renderRail();
+        renderDetail();
+      },
+      "button",
+    );
+    var save = btn(
+      draft ? "Create" : "Save",
+      "flows-detail__btn-primary",
+      null,
+      "submit",
+    );
     actions.appendChild(cancel);
     actions.appendChild(save);
     form.appendChild(actions);
@@ -335,17 +444,31 @@
       e.preventDefault();
       err.hidden = true;
       save.disabled = true;
-      var payload = readFlowPayload(form, initialSteps);
-      var req = isClone
+      var payload = {
+        slug: form.querySelector('[name="slug"]').value.trim(),
+        name: form.querySelector('[name="name"]').value.trim(),
+        description: form.querySelector('[name="description"]').value.trim(),
+        steps: steps.map(function (s) {
+          return {
+            agent_slug: s.agent_slug,
+            optional: s.optional,
+            input_from: s.input_from,
+            run_in_parallel_with: s.run_in_parallel_with,
+          };
+        }),
+      };
+      var isCreate = !!draft;
+      var req = isCreate
         ? fetch(Routes.flows.create(), {
             method: "POST",
             headers: jsonHeaders(),
             body: JSON.stringify(payload),
           })
         : fetch(
-            Routes.flows
-              .update()
-              .replace("{slug}", encodeURIComponent(flow.slug)),
+            Routes.flows.update().replace(
+              "{slug}",
+              encodeURIComponent(flow.slug),
+            ),
             {
               method: "PUT",
               headers: jsonHeaders(),
@@ -359,8 +482,9 @@
             throw new Error(text || "HTTP " + r.status);
           });
         })
-        .then(function () {
-          closeEditor(card);
+        .then(function (saved) {
+          draft = null;
+          selectedSlug = saved.slug || payload.slug;
           loadFlows({ force: true });
         })
         .catch(function (e2) {
@@ -369,115 +493,130 @@
           save.disabled = false;
         });
     });
-
-    card.appendChild(form);
-    var first = form.querySelector("input, select, textarea");
-    if (first && typeof first.focus === "function") first.focus();
+    return form;
   }
 
-  function closeEditor(card) {
-    var e = card.querySelector(".flows-row__editor");
-    if (e) e.remove();
-    card.classList.remove("flows-row--editing");
-  }
-
-  function renderSteps(container, steps, agentsPromise) {
+  function renderSteps(container, steps, addBtn) {
     container.innerHTML = "";
     steps.forEach(function (step, i) {
-      container.appendChild(
-        renderStep(step, i, steps, container, agentsPromise),
-      );
+      container.appendChild(renderStepRow(step, i, steps, container, addBtn));
     });
+    // Enable DnD reorder if Sortable.js is available. Runs once
+    // per list; Sortable ignores re-init safely.
+    if (
+      typeof window.Sortable === "function" &&
+      !container.dataset.sortableBound
+    ) {
+      container.dataset.sortableBound = "true";
+      window.Sortable.create(container, {
+        handle: ".flows-detail__step-drag",
+        animation: 120,
+        ghostClass: "sortable-ghost",
+        onEnd: function (evt) {
+          if (evt.oldIndex === evt.newIndex) return;
+          var item = steps.splice(evt.oldIndex, 1)[0];
+          steps.splice(evt.newIndex, 0, item);
+          // Re-render so the data-step-idx attributes stay in sync
+          // with the visual order.
+          renderSteps(container, steps, addBtn);
+        },
+      });
+    }
   }
 
-  function renderStep(step, i, all, container, agentsPromise) {
+  function renderStepRow(step, i, all, container, addBtn) {
     var row = document.createElement("div");
-    row.className = "flows-row__step";
+    row.className = "flows-detail__step";
     row.setAttribute("data-step-idx", String(i));
 
+    var drag = document.createElement("span");
+    drag.className = "flows-detail__step-drag";
+    drag.textContent = "⋮⋮";
+    drag.title = "Drag to reorder";
+    row.appendChild(drag);
+
+    var idx = document.createElement("span");
+    idx.className = "flows-detail__step-idx";
+    idx.textContent = i + 1 + ".";
+    row.appendChild(idx);
+
     var agentSelect = document.createElement("select");
-    agentSelect.className = "flows-row__step-agent";
-    // One placeholder option while the agents catalog loads.
+    agentSelect.className = "flows-detail__step-agent";
     var placeholder = document.createElement("option");
-    placeholder.value = step.agent_slug || "";
-    placeholder.textContent = step.agent_slug || "(pick an agent)";
+    placeholder.value = "";
+    placeholder.textContent = "(pick an agent)";
     agentSelect.appendChild(placeholder);
-    agentsPromise.then(function (list) {
-      agentSelect.innerHTML = "";
-      (list || []).forEach(function (a) {
-        var o = document.createElement("option");
-        o.value = a.slug;
-        o.textContent = a.title + " (" + a.slug + ")";
-        if (a.slug === step.agent_slug) o.selected = true;
-        agentSelect.appendChild(o);
-      });
+    agentsCache.forEach(function (a) {
+      var o = document.createElement("option");
+      o.value = a.slug;
+      o.textContent = a.title + " (" + a.slug + ")";
+      if (a.slug === step.agent_slug) o.selected = true;
+      agentSelect.appendChild(o);
     });
+    if (!step.agent_slug) placeholder.selected = true;
     agentSelect.addEventListener("change", function () {
       step.agent_slug = agentSelect.value;
     });
     row.appendChild(agentSelect);
 
-    var optionalWrap = document.createElement("label");
-    optionalWrap.className = "flows-row__step-check";
-    var optionalBox = document.createElement("input");
-    optionalBox.type = "checkbox";
-    optionalBox.checked = !!step.optional;
-    optionalBox.addEventListener("change", function () {
-      step.optional = optionalBox.checked;
+    var optLabel = document.createElement("label");
+    optLabel.className = "flows-detail__step-check";
+    var optCb = document.createElement("input");
+    optCb.type = "checkbox";
+    optCb.checked = !!step.optional;
+    optCb.addEventListener("change", function () {
+      step.optional = optCb.checked;
     });
-    optionalWrap.appendChild(optionalBox);
-    var optLabel = document.createElement("span");
-    optLabel.textContent = "optional";
-    optionalWrap.appendChild(optLabel);
-    row.appendChild(optionalWrap);
+    optLabel.appendChild(optCb);
+    var optSpan = document.createElement("span");
+    optSpan.textContent = "optional";
+    optLabel.appendChild(optSpan);
+    row.appendChild(optLabel);
 
-    var up = btn("↑", "flows-row__step-nav", function () {
-      if (i === 0) return;
-      var tmp = all[i - 1];
-      all[i - 1] = all[i];
-      all[i] = tmp;
-      renderSteps(container, all, agentsPromise);
-    });
-    up.type = "button";
-    up.disabled = i === 0;
-    row.appendChild(up);
-
-    var down = btn("↓", "flows-row__step-nav", function () {
-      if (i >= all.length - 1) return;
-      var tmp = all[i + 1];
-      all[i + 1] = all[i];
-      all[i] = tmp;
-      renderSteps(container, all, agentsPromise);
-    });
-    down.type = "button";
-    down.disabled = i >= all.length - 1;
-    row.appendChild(down);
-
-    var remove = btn("✕", "flows-row__step-remove", function () {
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "flows-detail__step-remove";
+    remove.textContent = "✕";
+    remove.title = "Remove step";
+    remove.addEventListener("click", function () {
       if (all.length <= 1) return;
       all.splice(i, 1);
-      renderSteps(container, all, agentsPromise);
+      renderSteps(container, all, addBtn);
     });
-    remove.type = "button";
     row.appendChild(remove);
 
     return row;
   }
 
-  function readFlowPayload(form, steps) {
-    return {
-      slug: form.querySelector('[name="slug"]').value.trim(),
-      name: form.querySelector('[name="name"]').value.trim(),
-      description: form.querySelector('[name="description"]').value.trim(),
-      steps: steps.map(function (s) {
+  function startClone(flow) {
+    draft = {
+      slug: suggestCloneSlug(flow.slug),
+      name: (flow.name || "") + " (copy)",
+      description: flow.description || "",
+      steps: (flow.steps || []).map(function (s) {
         return {
           agent_slug: s.agent_slug,
           optional: s.optional,
-          input_from: s.input_from,
-          run_in_parallel_with: s.run_in_parallel_with,
+          input_from: s.input_from || "",
+          run_in_parallel_with: (s.run_in_parallel_with || []).slice(),
         };
       }),
     };
+    selectedSlug = null;
+    renderRail();
+    renderDetail();
+  }
+
+  function openNewEditor() {
+    draft = {
+      slug: "my-flow",
+      name: "",
+      description: "",
+      steps: [{ agent_slug: "", optional: false }],
+    };
+    selectedSlug = null;
+    renderRail();
+    renderDetail();
   }
 
   function deleteFlow(slug) {
@@ -498,6 +637,7 @@
         }
       })
       .then(function () {
+        selectedSlug = null;
         loadFlows({ force: true });
       })
       .catch(function (e) {
@@ -507,49 +647,49 @@
       });
   }
 
-  function suggestCloneSlug(base) {
-    var suggestion = base + "-copy";
-    return suggestion.length <= 40 ? suggestion : base.slice(0, 35) + "-copy";
+  function inputRow(label, name, value, opts) {
+    opts = opts || {};
+    var wrap = document.createElement("label");
+    wrap.className = "flows-detail__field";
+    var l = document.createElement("span");
+    l.className = "flows-detail__field-label";
+    l.textContent = label;
+    var input = document.createElement("input");
+    input.type = "text";
+    input.name = name;
+    input.value = value || "";
+    if (opts.disabled) input.disabled = true;
+    if (opts.hint) input.title = opts.hint;
+    wrap.appendChild(l);
+    wrap.appendChild(input);
+    if (opts.hint) {
+      var h = document.createElement("span");
+      h.className = "flows-detail__field-hint";
+      h.textContent = opts.hint;
+      wrap.appendChild(h);
+    }
+    return wrap;
   }
 
-  // --- DOM helpers ---
-
-  function btn(text, cls, onClick) {
+  function btn(text, cls, onClick, type) {
     var b = document.createElement("button");
-    b.type = "button";
+    b.type = type || "button";
     b.className = cls;
     b.textContent = text;
     if (onClick) b.addEventListener("click", onClick);
     return b;
   }
 
-  function labeledInput(lbl, name, value, opts) {
-    opts = opts || {};
-    var wrap = document.createElement("label");
-    wrap.className = "flows-row__field";
-    var l = document.createElement("span");
-    l.className = "flows-row__field-label";
-    l.textContent = lbl;
-    var i = document.createElement("input");
-    i.type = "text";
-    i.name = name;
-    i.value = value || "";
-    if (opts.disabled) i.disabled = true;
-    if (opts.hint) i.title = opts.hint;
-    wrap.appendChild(l);
-    wrap.appendChild(i);
-    return wrap;
+  function suggestCloneSlug(base) {
+    var suggestion = base + "-copy";
+    return suggestion.length <= 40 ? suggestion : base.slice(0, 35) + "-copy";
   }
 
-  function label(text, child) {
-    var wrap = document.createElement("label");
-    wrap.className = "flows-row__field";
-    var l = document.createElement("span");
-    l.className = "flows-row__field-label";
-    l.textContent = text;
-    wrap.appendChild(l);
-    wrap.appendChild(child);
-    return wrap;
+  function authHeaders() {
+    if (typeof window.getAuthHeaders === "function") {
+      return window.getAuthHeaders();
+    }
+    return {};
   }
 
   function jsonHeaders() {
@@ -558,55 +698,43 @@
     return h;
   }
 
-  // openNewEditor renders a blank flow editor at the top of the list
-  // so the user can author a flow from scratch. Reuses the Clone
-  // editor's mode so slug remains editable.
-  function openNewEditor() {
-    var listEl = document.getElementById("flows-list");
-    if (!listEl) return;
-    var existing = listEl.querySelector(".flows-row--draft");
-    if (existing) existing.remove();
-
-    var card = document.createElement("div");
-    card.className = "flows-row flows-row--user flows-row--draft";
-    card.setAttribute("data-slug", "(new)");
-    var header = document.createElement("div");
-    header.className = "flows-row__header";
-    var name = document.createElement("div");
-    name.className = "flows-row__name";
-    name.textContent = "New flow";
-    var badge = document.createElement("span");
-    badge.className = "flows-row__badge";
-    badge.textContent = "draft";
-    header.appendChild(name);
-    header.appendChild(badge);
-    card.appendChild(header);
-    listEl.insertBefore(card, listEl.firstChild);
-
-    openEditor(
-      card,
-      {
-        slug: "my-flow",
-        name: "",
-        description: "",
-        steps: [{ agent_slug: "", optional: false }],
-      },
-      { mode: "clone" },
-    );
-    if (typeof card.scrollIntoView === "function") {
-      card.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+  function escapeHTML(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  window.loadFlows = loadFlows;
+  function bindSearch() {
+    var s = document.getElementById("flows-rail-search");
+    if (!s || s.dataset.bound === "true") return;
+    s.dataset.bound = "true";
+    s.addEventListener("input", function () {
+      searchQuery = s.value || "";
+      renderRail();
+    });
+  }
+
+  function loadFlowsPublic(opts) {
+    bindSearch();
+    loadFlows(opts);
+  }
+
+  window.loadFlows = loadFlowsPublic;
   window.__flows_test = {
-    renderFlow: renderFlow,
+    renderRail: renderRail,
+    renderDetail: renderDetail,
+    startClone: startClone,
+    openNewEditor: openNewEditor,
     buildChain: buildChain,
     groupParallel: groupParallel,
-    openEditor: openEditor,
-    closeEditor: closeEditor,
-    readFlowPayload: readFlowPayload,
     suggestCloneSlug: suggestCloneSlug,
-    openNewEditor: openNewEditor,
+    _setState: function (state) {
+      if (state.flows) flows = state.flows;
+      if (state.agentsCache) agentsCache = state.agentsCache;
+      if (state.selectedSlug !== undefined) selectedSlug = state.selectedSlug;
+      if (state.draft !== undefined) draft = state.draft;
+      if (state.searchQuery !== undefined) searchQuery = state.searchQuery;
+    },
   };
 })();

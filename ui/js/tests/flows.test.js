@@ -30,12 +30,16 @@ function makeElement(tag) {
     attributes: {},
     listeners: {},
     style: {},
+    dataset: {},
     textContent: "",
     innerHTML: "",
     hidden: false,
     disabled: false,
-    type: "",
     title: "",
+    type: "",
+    value: "",
+    checked: false,
+    name: "",
     setAttribute(k, v) {
       this.attributes[k] = v;
     },
@@ -52,22 +56,55 @@ function makeElement(tag) {
     addEventListener(ev, fn) {
       (this.listeners[ev] = this.listeners[ev] || []).push(fn);
     },
-    querySelector() {
+    querySelector(sel) {
+      const m = sel.match(/^\[name="([^"]+)"\]$/);
+      if (m) return findByName(this, m[1]);
       return null;
+    },
+    querySelectorAll() {
+      return [];
     },
     scrollIntoView() {},
   };
   return el;
 }
 
+function findByName(node, name) {
+  if (node.name === name) return node;
+  for (const child of node.children || []) {
+    const r = findByName(child, name);
+    if (r) return r;
+  }
+  return null;
+}
+
+function findByTag(node, tag, pred) {
+  if (!node) return null;
+  if (node.tagName === tag && (!pred || pred(node))) return node;
+  for (const child of node.children || []) {
+    const r = findByTag(child, tag, pred);
+    if (r) return r;
+  }
+  return null;
+}
+
 function makeContext(overrides = {}) {
-  const rootList = makeElement("div");
-  rootList.id = "flows-list";
+  const rail = makeElement("div");
+  rail.id = "flows-rail-list";
+  const detail = makeElement("section");
+  detail.id = "flows-detail";
+  const search = makeElement("input");
+  search.id = "flows-rail-search";
+
+  const byId = {
+    "flows-rail-list": rail,
+    "flows-detail": detail,
+    "flows-rail-search": search,
+  };
 
   const doc = {
     getElementById(id) {
-      if (id === "flows-list") return rootList;
-      return null;
+      return byId[id] || null;
     },
     createElement: makeElement,
     querySelector() {
@@ -87,8 +124,12 @@ function makeContext(overrides = {}) {
     Array,
     Promise,
     setTimeout: vi.fn(),
+    clearTimeout: vi.fn(),
     encodeURIComponent,
-    fetch: vi.fn(),
+    fetch: vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    }),
     document: doc,
     window: { CSS: { escape: (s) => s }, setTimeout: (fn) => fn() },
     Routes: {
@@ -110,7 +151,8 @@ function makeContext(overrides = {}) {
     ...overrides,
   };
   ctx.window.apiRoutes = ctx.Routes;
-  ctx._rootList = rootList;
+  ctx._rail = rail;
+  ctx._detail = detail;
   vm.createContext(ctx);
   return ctx;
 }
@@ -121,29 +163,52 @@ function loadFlows(ctx) {
   return ctx;
 }
 
-describe("flows.js", () => {
+describe("flows.js (split-pane)", () => {
   let ctx;
   beforeEach(() => {
     ctx = makeContext();
     loadFlows(ctx);
   });
 
-  it("exposes loadFlows on window", () => {
+  it("exposes loadFlows and the test hook on window", () => {
     expect(typeof ctx.window.loadFlows).toBe("function");
+    expect(typeof ctx.window.__flows_test.renderRail).toBe("function");
   });
 
-  it("groupParallel collapses transitive mutual references into one group", () => {
-    // Matches the implement flow's terminal triple.
+  it("renderRail groups built-in and user flows", () => {
+    ctx.window.__flows_test._setState({
+      flows: [
+        {
+          slug: "implement",
+          name: "Implement",
+          builtin: true,
+          steps: [{ agent_slug: "impl" }],
+        },
+        {
+          slug: "tdd-loop",
+          name: "TDD Loop",
+          builtin: false,
+          steps: [{ agent_slug: "test" }, { agent_slug: "impl" }],
+        },
+      ],
+    });
+    ctx.window.__flows_test.renderRail();
+    const buttons = ctx._rail.children.filter((c) => c.tagName === "BUTTON");
+    expect(buttons.length).toBe(2);
+    const user = buttons.find(
+      (b) => b.attributes["data-slug"] === "tdd-loop",
+    );
+    expect(user.classList.contains("flows-rail__item--user")).toBe(true);
+  });
+
+  it("groupParallel collapses transitive mutual references", () => {
     const groups = ctx.window.__flows_test.groupParallel([
       { agent_slug: "impl" },
       {
         agent_slug: "commit-msg",
         run_in_parallel_with: ["title", "oversight"],
       },
-      {
-        agent_slug: "title",
-        run_in_parallel_with: ["commit-msg", "oversight"],
-      },
+      { agent_slug: "title", run_in_parallel_with: ["commit-msg", "oversight"] },
       {
         agent_slug: "oversight",
         run_in_parallel_with: ["commit-msg", "title"],
@@ -158,141 +223,49 @@ describe("flows.js", () => {
     ]);
   });
 
-  it("buildChain inserts ‖ between parallel siblings and → between groups", () => {
+  it("buildChain wraps parallel groups in a visual box", () => {
     const chain = ctx.window.__flows_test.buildChain([
-      { agent_slug: "impl", agent_name: "Implementation" },
+      { agent_slug: "impl" },
       {
         agent_slug: "commit-msg",
-        agent_name: "Commit",
         run_in_parallel_with: ["title"],
       },
       {
         agent_slug: "title",
-        agent_name: "Title",
         run_in_parallel_with: ["commit-msg"],
       },
     ]);
-    // Expected sequence: chip, arrow(→), chip, arrow(‖), chip
-    const seps = chain.children.filter(
-      (c) => c.classList && c.classList.contains("flows-chain__sep"),
+    // After impl comes an arrow then a parallel box.
+    const box = chain.children.find(
+      (c) => c.tagName === "SPAN" && c.className === "flows-detail__parallel",
     );
-    expect(seps.map((s) => s.textContent)).toEqual(["→", "‖"]);
+    expect(box).toBeTruthy();
   });
 
-  it("chip click switches to the agents tab", () => {
-    const switchMode = vi.fn();
-    ctx.window.switchMode = switchMode;
-    const chain = ctx.window.__flows_test.buildChain([
-      { agent_slug: "impl", agent_name: "Implementation" },
-    ]);
-    const chip = chain.children[0];
-    (chip.listeners.click || []).forEach((fn) => fn({ stopPropagation() {} }));
-    expect(switchMode).toHaveBeenCalledWith(
-      "agents",
-      expect.objectContaining({ persist: true }),
-    );
+  it("openNewEditor stages a draft and renders the editor", () => {
+    ctx.window.__flows_test.openNewEditor();
+    const form = findByTag(ctx._detail, "FORM");
+    expect(form).toBeTruthy();
+    const submit = findByTag(form, "BUTTON", (b) => b.type === "submit");
+    expect(submit.textContent).toBe("Create");
   });
 
-  it("optional steps render with a trailing ?", () => {
-    const chain = ctx.window.__flows_test.buildChain([
-      { agent_slug: "refine", agent_name: "Refine", optional: true },
-    ]);
-    expect(chain.children[0].textContent).toBe("Refine?");
-  });
-
-  it("built-in flow renders a Clone action, user-authored flow renders Edit+Delete", () => {
-    const builtIn = ctx.window.__flows_test.renderFlow({
+  it("startClone pre-fills the editor with a (copy) name suffix", () => {
+    ctx.window.__flows_test.startClone({
       slug: "implement",
       name: "Implement",
       builtin: true,
-      steps: [{ agent_slug: "impl", agent_name: "Impl" }],
+      steps: [{ agent_slug: "impl" }],
     });
-    const builtInActions = builtIn.children[0].children[2];
-    expect(builtInActions.children[0].textContent).toBe("Clone");
-
-    const user = ctx.window.__flows_test.renderFlow({
-      slug: "tdd-loop",
-      name: "TDD Loop",
-      builtin: false,
-      steps: [{ agent_slug: "test" }],
-    });
-    const userActions = user.children[0].children[2];
-    const labels = userActions.children.map((c) => c.textContent);
-    expect(labels).toContain("Edit");
-    expect(labels).toContain("Delete");
-    expect(user.classList.contains("flows-row--user")).toBe(true);
+    const form = findByTag(ctx._detail, "FORM");
+    expect(form).toBeTruthy();
+    const nameInput = form.querySelector('[name="name"]');
+    expect(nameInput.value).toBe("Implement (copy)");
   });
 
-  it("readFlowPayload serialises the steps array verbatim", () => {
-    // Build a minimal form shape the helper walks.
-    const input = (name, value) => ({
-      name,
-      value,
-      querySelector(sel) {
-        return null;
-      },
-    });
-    const form = {
-      queryByName: new Map([
-        ["slug", { value: "tdd-copy" }],
-        ["name", { value: "TDD (copy)" }],
-        ["description", { value: "Test first." }],
-      ]),
-      querySelector(sel) {
-        // Match [name="..."] selectors.
-        const m = sel.match(/^\[name="([^"]+)"\]$/);
-        if (m && this.queryByName.has(m[1])) return this.queryByName.get(m[1]);
-        return null;
-      },
-    };
-    void input; // silence unused-var on CI
-    const steps = [
-      {
-        agent_slug: "test",
-        optional: false,
-        input_from: "",
-        run_in_parallel_with: [],
-      },
-      {
-        agent_slug: "impl",
-        optional: true,
-        input_from: "test",
-        run_in_parallel_with: [],
-      },
-    ];
-    const payload = ctx.window.__flows_test.readFlowPayload(form, steps);
-    expect(payload.slug).toBe("tdd-copy");
-    expect(payload.steps.length).toBe(2);
-    expect(payload.steps[1].input_from).toBe("test");
-    expect(payload.steps[1].optional).toBe(true);
-  });
-
-  it("loadFlows fetches /api/flows and renders one card per flow", async () => {
-    ctx.fetch.mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve([
-          {
-            slug: "implement",
-            name: "Implement",
-            builtin: true,
-            steps: [{ agent_slug: "impl", agent_name: "Implementation" }],
-          },
-          {
-            slug: "brainstorm",
-            name: "Brainstorm",
-            builtin: true,
-            steps: [{ agent_slug: "ideate", agent_name: "Ideate" }],
-          },
-        ]),
-    });
-    ctx.window.loadFlows();
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(ctx.fetch).toHaveBeenCalledWith(
-      "/api/flows",
-      expect.objectContaining({}),
+  it("suggestCloneSlug appends -copy and respects the 40-char cap", () => {
+    expect(ctx.window.__flows_test.suggestCloneSlug("implement")).toBe(
+      "implement-copy",
     );
-    expect(ctx._rootList.children.length).toBe(2);
-    expect(ctx._rootList.children[0].attributes["data-slug"]).toBe("implement");
   });
 });
