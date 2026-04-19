@@ -871,6 +871,25 @@ func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
 	}
 }
 
+// TestParseBoolFlag matches the shell-env fallback used in the server boot
+// path: the same truthy set must hold whether the flag comes from the
+// `.env` file or from `os.Getenv`, so users can flip cloud mode via
+// `WALLFACER_CLOUD=true wallfacer run` without editing `.env`.
+func TestParseBoolFlag(t *testing.T) {
+	truthy := []string{"true", "TRUE", "True", "1", "yes", "YES", " true "}
+	for _, v := range truthy {
+		if !envconfig.ParseBoolFlag(v) {
+			t.Errorf("ParseBoolFlag(%q) = false; want true", v)
+		}
+	}
+	falsy := []string{"", "false", "0", "no", "tru", "on", "NO"}
+	for _, v := range falsy {
+		if envconfig.ParseBoolFlag(v) {
+			t.Errorf("ParseBoolFlag(%q) = true; want false", v)
+		}
+	}
+}
+
 // TestParse_CloudTrue checks the canonical truthy spelling.
 func TestParse_CloudTrue(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_CLOUD=true\n")

@@ -226,18 +226,20 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		case "WALLFACER_CLOUD":
-			cfg.Cloud = parseBoolFlag(v)
+			cfg.Cloud = ParseBoolFlag(v)
 		}
 	}
 	return cfg, nil
 }
 
-// parseBoolFlag accepts the common truthy spellings used in environment
+// ParseBoolFlag accepts the common truthy spellings used in environment
 // variables: "true", "1", and "yes" (all case-insensitive). Everything
 // else — including empty, "false", "0", "no" — parses as false. Used by
 // flags that are explicitly documented as accepting "true/1/yes", not
 // the older WALLFACER_* flags that use `v == "true"` or `v != "false"`.
-func parseBoolFlag(v string) bool {
+// Exported so callers can apply the same semantics to shell-env
+// overrides (e.g. `WALLFACER_CLOUD=true wallfacer run`).
+func ParseBoolFlag(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "true", "1", "yes":
 		return true
