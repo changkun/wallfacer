@@ -1,6 +1,6 @@
 ---
 title: Flow engine — sequencer driving agents via runAgent
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/flow-data-model.md
   - specs/local/agents-and-flows/task-flow-field.md
@@ -15,6 +15,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Flow engine — sequencer driving agents via runAgent
 

@@ -1,6 +1,6 @@
 ---
 title: Runner delegates to flow engine for task execution
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/flow-engine.md
   - specs/local/agents-and-flows/composer-flow-picker.md
@@ -16,6 +16,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Runner delegates to flow engine for task execution
 

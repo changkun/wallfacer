@@ -1,6 +1,6 @@
 ---
 title: Agents & Flows
-status: complete
+status: archived
 depends_on:
   - specs/shared/agent-abstraction.md
 affects:
@@ -17,6 +17,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Agents & Flows
 

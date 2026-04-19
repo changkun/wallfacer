@@ -1,6 +1,6 @@
 ---
 title: /api/agents endpoints and sidebar Agents tab (read-only)
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/extract-agents-package.md
 affects:
@@ -18,6 +18,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # /api/agents endpoints and sidebar Agents tab (read-only)
 

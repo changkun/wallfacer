@@ -1,6 +1,6 @@
 ---
 title: /api/flows endpoints and sidebar Flows tab (read-only)
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/flow-data-model.md
   - specs/local/agents-and-flows/agents-api-and-tab.md
@@ -19,6 +19,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # /api/flows endpoints and sidebar Flows tab (read-only)
 
