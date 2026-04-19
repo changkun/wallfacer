@@ -382,21 +382,25 @@ func (h *Handler) forCurrentStore(fn func(s *store.Store, ws []string)) {
 	fn(s, ws)
 }
 
-// countGlobalInProgress returns the total number of non-test in-progress tasks
-// across ALL active workspace groups.
+// countGlobalInProgress returns the number of non-test in-progress tasks in
+// the currently viewed workspace group. Parallel limits
+// (WALLFACER_MAX_PARALLEL) are scoped per group so each group has its own
+// independent concurrency budget; tasks still running in other groups after
+// a switch do not consume this budget.
 func (h *Handler) countGlobalInProgress() int {
 	total := 0
-	h.forEachActiveStore(func(s *store.Store, _ []string) {
+	h.forCurrentStore(func(s *store.Store, _ []string) {
 		total += s.CountRegularInProgress()
 	})
 	return total
 }
 
-// countGlobalTestsInProgress returns the total number of test-run in-progress
-// tasks across ALL active workspace groups.
+// countGlobalTestsInProgress returns the number of test-run in-progress tasks
+// in the currently viewed workspace group. Scoped per-group for the same
+// reason as countGlobalInProgress.
 func (h *Handler) countGlobalTestsInProgress(ctx context.Context) int {
 	total := 0
-	h.forEachActiveStore(func(s *store.Store, _ []string) {
+	h.forCurrentStore(func(s *store.Store, _ []string) {
 		inProgress, _ := s.ListTasksByStatus(ctx, store.TaskStatusInProgress)
 		for i := range inProgress {
 			if inProgress[i].IsTestRun {
