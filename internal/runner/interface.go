@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -88,6 +89,11 @@ type Interface interface {
 	AgentsRegistry() *agents.Registry
 	AgentsDir() string
 	ReloadAgents() error
+
+	// Flows catalog accessors (merged built-in + user-authored).
+	FlowsRegistry() *flow.Registry
+	FlowsDir() string
+	ReloadFlows() error
 }
 
 // compile-time assertion: *Runner satisfies Interface.

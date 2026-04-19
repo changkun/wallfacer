@@ -96,6 +96,22 @@ type RunnerConfig struct {
 	// (~/.wallfacer/agents/). Missing dir is not an error — the
 	// runner uses the built-in catalog alone.
 	AgentsDir string
+	// FlowsDir is the filesystem directory scanned for user-authored
+	// flow descriptors (*.yaml). Defaults to ~/.wallfacer/flows/
+	// (overridable via WALLFACER_FLOWS_DIR). Same failure semantics
+	// as AgentsDir.
+	FlowsDir string
+}
+
+func defaultFlowsDir() string {
+	if v := strings.TrimSpace(os.Getenv("WALLFACER_FLOWS_DIR")); v != "" {
+		return v
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".wallfacer", "flows")
 }
 
 // defaultAgentsDir returns the default location for user-authored
@@ -180,6 +196,7 @@ type Runner struct {
 	agentsReg  *agents.Registry
 	agentsDir  string // ~/.wallfacer/agents by default; user-authored YAML lives here
 	flows      *flow.Registry
+	flowsDir   string // ~/.wallfacer/flows by default
 	flowEngine *flow.Engine
 }
 
@@ -442,7 +459,17 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		r.agentsReg = agents.NewBuiltinRegistry()
 	}
 	r.agentsDir = agentsDir
-	r.flows = flow.NewBuiltinRegistry()
+	flowsDir := cfg.FlowsDir
+	if flowsDir == "" {
+		flowsDir = defaultFlowsDir()
+	}
+	if reg, err := flow.NewMergedRegistry(flowsDir); err == nil {
+		r.flows = reg
+	} else {
+		logger.Runner.Warn("flows: user dir load failed, using built-in registry", "dir", flowsDir, "error", err)
+		r.flows = flow.NewBuiltinRegistry()
+	}
+	r.flowsDir = flowsDir
 	r.flowEngine = flow.NewEngine(r)
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
 
@@ -527,6 +554,31 @@ func (r *Runner) ReloadAgents() error {
 		return err
 	}
 	r.agentsReg = reg
+	return nil
+}
+
+// FlowsRegistry returns the merged built-in + user-authored flow
+// registry the dispatcher reads at Run time.
+func (r *Runner) FlowsRegistry() *flow.Registry {
+	return r.flows
+}
+
+// FlowsDir returns the filesystem directory where user-authored
+// flow YAML files live.
+func (r *Runner) FlowsDir() string {
+	return r.flowsDir
+}
+
+// ReloadFlows re-reads the user-authored flows directory and
+// replaces the in-memory registry. Also reinitialises the flow
+// engine so it holds no stale reference to the prior registry.
+func (r *Runner) ReloadFlows() error {
+	reg, err := flow.NewMergedRegistry(r.flowsDir)
+	if err != nil {
+		return err
+	}
+	r.flows = reg
+	r.flowEngine = flow.NewEngine(r)
 	return nil
 }
 
