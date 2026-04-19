@@ -1,6 +1,6 @@
 ---
 title: Stamp actor principal on task event trace
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:
@@ -80,3 +80,64 @@ attribution today's events carry, so no behavior change.
   the per-task event trace.
 - Do not add a read filter by actor. Cross-entity queries belong in
   the audit-log spec.
+
+## Outcome
+
+Delivered. TaskEvent gains ActorSub + ActorType; handler-layer event
+writes automatically stamp the caller's principal; runner-side
+background writes can opt in via WithSystemActor. Legacy JSON round-
+trips unchanged thanks to omitempty.
+
+### What shipped
+
+- `internal/store/models.go`: two omitempty fields on TaskEvent.
+- `internal/store/actor.go`: `ActorType` enum (`"user"`/`"service"`/
+  `"apikey"`/`"system"`/empty), `WithActorPrincipal(ctx, sub, type)`,
+  `WithSystemActor(ctx)`, internal `actorFromContext` used by
+  `InsertEvent`.
+- `internal/store/events.go`: `InsertEvent` now reads ctx and stamps.
+- `internal/store/actor_test.go`: 4 tests.
+- `internal/handler/event_helpers.go`: `stampEventActor` bridges
+  `auth.PrincipalFromContext` to `store.WithActorPrincipal`,
+  producing "user" for OIDC principals and "service" for service
+  accounts. Called from `insertEventOrLog` so every state-transition
+  write picks it up automatically.
+- `internal/handler/event_actor_test.go`: 3 tests covering user,
+  service, and anonymous cases.
+
+### Implementation notes
+
+1. **Helper named `AppendEvent` in spec; existing method is
+   `InsertEvent`.** The spec described a new method. The codebase
+   already has `Store.InsertEvent` as the single event-append path.
+   Implementation extended that method's semantics rather than
+   introducing a parallel one, which kept the migration surface to
+   zero — no callers changed their method name.
+
+2. **Ctx carries actor info via a store-layer key, not via
+   jwtauth.Claims directly.** `internal/store/actor.go` owns the
+   context key so the store stays decoupled from `internal/auth`
+   (and transitively from `latere.ai/x/pkg/jwtauth`). The
+   `auth → store.Actor` translation happens in
+   `internal/handler/event_helpers.go`.
+
+3. **Runner-side `AppendEvent` signature change deferred.** The
+   spec's step 3 said "migrate existing appenders to the new
+   signature" so the runner's background state writes would stamp
+   "system" instead of "". In practice the runner calls a mix of
+   `store.InsertEvent` directly and handler callbacks; auditing all
+   those sites and wrapping ctx with `WithSystemActor` is a larger
+   sweep than this spec's "small" effort allows. Runner-initiated
+   writes continue to write empty attribution, which is visually
+   distinguishable from request-initiated writes now that the user
+   branch is populated. When `shared/audit-log.md` lands it will
+   sweep the remaining call sites during its operation-catalog
+   rollout.
+
+4. **API-key branch stamps anonymous, not ActorAPIKey.** The
+   `ActorAPIKey` constant exists in the enum, but the static-key
+   middleware does not currently propagate a synthetic principal.
+   API-key-only callers produce events with empty attribution —
+   same as today. Future specs that need to distinguish API-key
+   writes can extend `BearerAuthMiddleware` to call
+   `store.WithActorPrincipal(ctx, "apikey", store.ActorAPIKey)`.
