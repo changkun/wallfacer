@@ -674,17 +674,6 @@
 .composer--host [data-host-hidden] {
   display: none !important;
 }
-/* Task-kind-aware override visibility: only the activity roles that
-   actually execute for the selected kind stay visible. Implement
-   tasks run every stage except the brainstorm agent; Brainstorm tasks
-   run a single Ideas stage. */
-.composer[data-task-kind=""] [data-activity-role="ideation"] {
-  display: none;
-}
-.composer[data-task-kind="idea-agent"] [data-activity-role="implement"] {
-  display: none;
-}
-
 .composer__head {
   display: flex;
   align-items: center;
@@ -878,18 +867,6 @@ select.composer__input {
 .composer__nested {
   margin-top: 6px;
 }
-.composer__overrides {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 8px;
-}
-.composer__override {
-  display: grid;
-  grid-template-columns: 52px 1fr;
-  align-items: center;
-  gap: 6px;
-}
-
 .composer__actions {
   display: flex;
   justify-content: flex-end;

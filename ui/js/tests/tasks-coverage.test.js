@@ -216,6 +216,10 @@ function makeContext(overrides = {}) {
 
     // Routes
     Routes: overrides.Routes || {
+      flows: {
+        list: () => "/api/flows",
+        get: () => "/api/flows/{slug}",
+      },
       tasks: {
         create: () => "/api/tasks",
         archiveDone: () => "/api/tasks/archive-done",
@@ -726,9 +730,56 @@ describe("createTask", () => {
     expect(body.tags).toEqual(["tag1"]);
     expect(body.max_cost_usd).toBe(5);
     expect(body.max_input_tokens).toBe(1000);
+    // Flow picker replaced the old Type picker — POST now carries a
+    // flow slug, and the legacy sandbox_by_activity payload is gone.
+    expect(body.flow).toBe("implement");
+    expect(body.kind).toBeUndefined();
+    expect(body.sandbox_by_activity).toBeUndefined();
 
     // Draft should be cleared
     expect(ctx.localStorage.getItem("wallfacer-new-task-draft")).toBeNull();
+  });
+
+  it("sends flow=implement by default when no flow element is set", async () => {
+    const ctx = makeCreateTaskContext();
+    loadTasks(ctx);
+    await vm.runInContext("createTask()", ctx);
+    const body = JSON.parse(ctx.api.mock.calls[0][1].body);
+    expect(body.flow).toBe("implement");
+  });
+
+  it("sends the selected flow slug when the composer picks brainstorm", async () => {
+    const flowEl = makeSelect("brainstorm");
+    flowEl.id = "new-task-flow";
+    const ctx = makeCreateTaskContext({
+      extraElements: [["new-task-flow", flowEl]],
+    });
+    loadTasks(ctx);
+    // Seed the _flowsCache so the empty-prompt rule and payload match
+    // the brainstorm built-in.
+    vm.runInContext(
+      '_flowsCache = [{slug:"brainstorm", name:"Brainstorm", spawn_kind:"idea-agent"}, {slug:"implement", name:"Implement"}];',
+      ctx,
+    );
+    // Brainstorm allows an empty prompt.
+    ctx.document.getElementById("new-prompt").value = "";
+    await vm.runInContext("createTask()", ctx);
+    expect(ctx.api).toHaveBeenCalled();
+    const body = JSON.parse(ctx.api.mock.calls[0][1].body);
+    expect(body.flow).toBe("brainstorm");
+    expect(body.prompt).toBe("");
+  });
+
+  it("still rejects an empty prompt for flows that require one", async () => {
+    const flowEl = makeSelect("implement");
+    flowEl.id = "new-task-flow";
+    const ctx = makeCreateTaskContext({
+      extraElements: [["new-task-flow", flowEl]],
+    });
+    loadTasks(ctx);
+    ctx.document.getElementById("new-prompt").value = "   ";
+    await vm.runInContext("createTask()", ctx);
+    expect(ctx.api).not.toHaveBeenCalled();
   });
 
   it("rejects empty prompt with visual feedback", async () => {

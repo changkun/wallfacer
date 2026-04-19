@@ -55,19 +55,26 @@ Allowed transitions:
 
 Click **+ New Task** in the Backlog column header to expand the creation form. The basic fields are:
 
-1. **Prompt textarea** -- describe what the agent should do. Markdown is supported. A draft is auto-saved to local storage so you do not lose work if you navigate away.
+1. **Flow picker** -- choose which sub-agent pipeline runs for this task. Populated from `GET /api/flows`. Built-ins:
+   - **Implement** (default) -- refine → implement → test → commit-msg ‖ title ‖ oversight. Prompt required.
+   - **Brainstorm** -- workspace scan proposes up to three new task ideas. Prompt optional.
+   - **Refine only**, **Test only** -- run a single agent. Prompt required.
 
-2. **🏷️ Tags** -- type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
+   Per-agent CLI (Claude vs Codex) used to be a per-task override in the composer; it now lives on the flow definition itself in the **Flows** sidebar tab. The composer no longer exposes an "Agent overrides" section.
 
-3. **📦 Sandbox selector** -- choose which sandbox environment to use (e.g. Claude, Codex). Defaults to the global setting.
+2. **Prompt textarea** -- describe what the agent should do. Markdown is supported. A draft is auto-saved to local storage so you do not lose work if you navigate away. Brainstorm flows accept an empty prompt; every other flow requires one.
 
-4. **⏱️ Timeout** -- how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
+3. **🏷️ Tags** -- type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
+
+4. **📦 Sandbox selector** -- choose which sandbox environment to use (e.g. Claude, Codex). Defaults to the global setting. Applies to any step the flow leaves at `default`.
+
+5. **⏱️ Timeout** -- how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
 
 Click **Add** to create the task. It appears in the Backlog column with an auto-generated title.
 
 Each task has two text fields: **Title** (2-5 word label) and **Prompt** (the full spec for the agent, shown on the card). After refinement, the prompt becomes the detailed implementation spec.
 
-For advanced creation options (templates, batch creation, dependencies, budgets, scheduling, per-activity sandbox overrides, and share-code), see the [Advanced Topics](#advanced-topics) section below.
+For advanced creation options (templates, batch creation, dependencies, budgets, scheduling, and share-code), see the [Advanced Topics](#advanced-topics) section below.
 
 ### ⚡ Running a Task
 
