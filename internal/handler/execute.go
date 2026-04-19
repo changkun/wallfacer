@@ -489,6 +489,9 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 	for _, id := range archived {
 		// Safety net: stop any leaked worker containers.
 		h.runner.StopTaskWorker(id)
+		// Stop any routine timer synchronously so archived cards cannot
+		// slip a spawn through the reconcile race.
+		h.unregisterRoutine(id)
 		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange, map[string]string{
 			"to":      "archived",
 			"trigger": string(store.TriggerUser),
@@ -514,14 +517,19 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Archiving a routine card must stop its timer synchronously. The
+	// reconcile-driven unregister would eventually fire once the watcher
+	// wakes, but that race leaves a ~250 ms window during which an
+	// already-armed timer can dispatch a fire and spawn another instance.
+	if task.IsRoutine() {
+		h.unregisterRoutine(id)
+	}
 	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"to":      "archived",
 		"trigger": string(store.TriggerUser),
 	})
 	// Archiving a routine card should also stop any still-live spawned
-	// instances. The routine engine treats archived cards as unscheduled,
-	// so firing halts — but previously-spawned children on the board keep
-	// running unless we cascade here.
+	// instances that were enqueued before the unregister.
 	if task.IsRoutine() {
 		h.cascadeCancelRoutineChildren(r.Context(), id)
 	}
