@@ -945,13 +945,19 @@ html.wails-desktop .app-sidebar {
   display: none;
 }
 
-/* --- Latere.ai sign-in (cloud mode, bottom of sidebar) --- */
+/* --- Latere.ai sign-in (cloud mode, bottom of sidebar) ---
+ * Container inherits the `.sb-divider` spacing rhythm (8px top,
+ * 1px rule, 8px bottom) so the line above the badge is visually
+ * balanced with the rest of the footer navigation. */
 .sb-signin {
-  padding: 8px 12px;
+  margin-top: var(--sp-3);
+  padding: var(--sp-3) 6px;
   border-top: 1px solid var(--rule);
 }
 .sb-signin:empty {
   display: none;
+  margin-top: 0;
+  border-top: none;
 }
 .sb-signin__link {
   display: block;
@@ -963,27 +969,12 @@ html.wails-desktop .app-sidebar {
 .sb-signin__link:hover {
   color: var(--ink-1);
 }
-.sb-signin__user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
 .sb-signin__avatar {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-}
-.sb-signin__name {
-  color: var(--ink-2);
-  font-size: var(--fs-9);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .sb-signin__logout {
   color: var(--ink-3);
@@ -995,18 +986,18 @@ html.wails-desktop .app-sidebar {
   color: var(--ink-1);
 }
 
-/* Sign-in trigger button: part of the sidebar, not a highlighted
- * control. No hard border or accent ring — just subtle hover/open
- * backgrounds from the shared token set. Keeps the row aligned
- * with the rest of the sidebar footer (Docs, Settings, etc.). */
+/* Sign-in trigger button: two-line stack (display name on top,
+ * current scope as subtitle below) so the name gets the full
+ * width and doesn't truncate against an inline pill. Bare hover
+ * states from the shared token set; no hard border or accent ring. */
 .sb-signin__user {
   background: transparent;
   border: none;
   padding: 6px 8px;
   margin: 0;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
   font: inherit;
   color: var(--ink);
@@ -1029,8 +1020,8 @@ html.wails-desktop .app-sidebar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
@@ -1039,39 +1030,41 @@ html.wails-desktop .app-sidebar {
   letter-spacing: 0.02em;
   flex-shrink: 0;
 }
-
-.sb-signin__name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-base);
-  color: var(--ink);
+/* Override the older 22px rule for fit with the new two-line stack. */
+.sb-signin__user img.sb-signin__avatar {
+  width: 26px;
+  height: 26px;
 }
 
-/* Current-view chip: small, bordered rectangle to the right of the
- * name. Reads like a pill / tag instead of loose text — makes
- * "which scope am I in?" legible at a glance. */
-.sb-signin__view-label {
-  flex-shrink: 0;
-  max-width: 50%;
+/* Text column: name on top, scope underneath. Column takes the
+ * remaining width so the name can grow freely and only truncates
+ * on genuinely long names. */
+.sb-signin__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  gap: 1px;
+}
+.sb-signin__name {
+  color: var(--ink);
+  font-size: var(--fs-base);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 1px 7px;
+}
+.sb-signin__view-label {
+  color: var(--ink-3);
   font-size: var(--fs-9);
-  font-weight: 500;
-  color: var(--ink-2);
-  background: var(--bg-sunk);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sb-signin__chevron {
   color: var(--ink-3);
   font-size: 9px;
-  margin-left: 2px;
   flex-shrink: 0;
   transition: transform 150ms ease;
 }
@@ -1093,7 +1086,9 @@ html.wails-desktop .app-sidebar {
   border-radius: var(--r-md);
   box-shadow: var(--shadow-lg);
   padding: 4px;
-  z-index: 100;
+  /* Sit above board / explorer / spec-mode layers (1000-1150) but
+   * below modal + command-palette (which should always trump). */
+  z-index: 1200;
   animation: sb-signin-menu-in 120ms ease-out;
 }
 @keyframes sb-signin-menu-in {
@@ -1164,13 +1159,20 @@ html.wails-desktop .app-sidebar {
   margin: 4px 6px;
 }
 
-/* Collapsed sidebar: hide name + logout text; avatar (and link) still visible. */
-.app-sidebar.collapsed .sb-signin__name,
+/* Collapsed sidebar: show only the avatar. Text stack, scope
+ * label, chevron, menu — all hidden; we can't open a popup from a
+ * 48px-wide trigger anyway. Click expands the sidebar first. */
+.app-sidebar.collapsed .sb-signin__text,
+.app-sidebar.collapsed .sb-signin__chevron,
+.app-sidebar.collapsed .sb-signin__menu,
 .app-sidebar.collapsed .sb-signin__logout,
-.app-sidebar.collapsed .sb-signin__link,
-.app-sidebar.collapsed .sb-signin__orgs {
+.app-sidebar.collapsed .sb-signin__link {
   display: none;
 }
 .app-sidebar.collapsed .sb-signin {
   text-align: center;
+}
+.app-sidebar.collapsed .sb-signin__user {
+  justify-content: center;
+  padding: 6px 0;
 }

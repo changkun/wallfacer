@@ -615,7 +615,8 @@ describe("renderSigninBadge", () => {
     expect(avatar.src).toBe("https://cdn/a.png");
     expect(avatar.getAttribute("referrerpolicy")).toBe("no-referrer");
 
-    const nameSpan = wrap.children.find(
+    const textCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const nameSpan = textCol.children.find(
       (c) => c.className === "sb-signin__name",
     );
     expect(nameSpan.textContent).toBe("Alice");
@@ -653,7 +654,8 @@ describe("renderSigninBadge", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const nameSpan = wrap.children.find(
+    const textCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const nameSpan = textCol.children.find(
       (c) => c.className === "sb-signin__name",
     );
     expect(nameSpan.textContent).toBe("bob@example.com");
@@ -679,7 +681,8 @@ describe("renderSigninBadge", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const nameSpan = wrap.children.find(
+    const textCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const nameSpan = textCol.children.find(
       (c) => c.className === "sb-signin__name",
     );
     // textContent receives the raw string — DOM would not interpret it.
@@ -821,7 +824,8 @@ describe("renderSigninBadge org switcher", () => {
       (c) => c.className === "sb-signin__user",
     );
     // The visible view label shows the current org name, not "Personal".
-    const viewLabel = wrap.children.find(
+    const viewCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const viewLabel = viewCol.children.find(
       (c) => c.className === "sb-signin__view-label",
     );
     expect(viewLabel.textContent).toBe("Solo Org");
@@ -862,7 +866,8 @@ describe("renderSigninBadge org switcher", () => {
       (c) => c.className === "sb-signin__user",
     );
     // The view label stays "Personal" when there's no active org.
-    const viewLabel = wrap.children.find(
+    const viewCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const viewLabel = viewCol.children.find(
       (c) => c.className === "sb-signin__view-label",
     );
     expect(viewLabel.textContent).toBe("Personal");
@@ -904,7 +909,8 @@ describe("renderSigninBadge org switcher", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const viewLabel = wrap.children.find(
+    const viewCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const viewLabel = viewCol.children.find(
       (c) => c.className === "sb-signin__view-label",
     );
     expect(viewLabel.textContent).toBe("Bob Corp");
