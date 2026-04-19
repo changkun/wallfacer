@@ -293,12 +293,13 @@ The generator reads the task's trace events, passes them to the Claude API with 
 
 ## 💡 Ideation / Brainstorm
 
-The ideation feature creates a task with `Kind = "idea-agent"`. Ideation is disabled by default and must be explicitly enabled via the Automation menu or Settings. The agent runs in a sandbox container, reads the configured workspaces, and calls the wallfacer API to create backlog tasks.
+Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. It runs via the standard task-and-flow dispatch path rather than a special case. The system-ideation routine is a routine card tagged `system:ideation` with `spawn_flow: brainstorm`; each fire spawns a fresh task whose `FlowID` is `brainstorm`. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and resolve to `brainstorm` via the legacy-kind mapper.
 
 ```mermaid
 flowchart TD
-    Trigger["POST /api/ideate"] --> Create["Create task with<br/>Kind = idea-agent"]
-    Create --> Launch["Launch sandbox container"]
+    Trigger["POST /api/ideate"] --> Fire["Fire system:ideation routine"]
+    Fire --> Create["Create task with<br/>FlowID = brainstorm"]
+    Create --> Launch["Launch ideate agent<br/>in sandbox container"]
     Launch --> Analyse["Read workspace contents<br/>analyse code structure"]
     Analyse --> Generate["Create backlog tasks<br/>via wallfacer API<br/>(each tagged)"]
     Generate --> Done["Container completes<br/>tasks appear on board"]
@@ -308,8 +309,9 @@ flowchart TD
 ```
 
 - Each created task gets relevant `Tags` and an `ExecutionPrompt` (full instructions) separate from `Prompt` (the short card label).
-- Triggered via `POST /api/ideate`; cancelled via `DELETE /api/ideate`.
+- Triggered via `POST /api/ideate` (fires the routine); cancelled via `DELETE /api/ideate`.
 - `GET /api/ideate` returns current ideation session state (task ID, status, created task count).
+- See [Agents & Flows](../guide/agents-and-flows.md) for how to clone the `ideate` agent with a different harness or a custom system prompt.
 
 ## ⚔️ Conflict Resolution
 

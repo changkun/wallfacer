@@ -143,21 +143,34 @@ The agent may also emit `/spec-new <path>` as a scaffold directive — this is n
 
 Read more: [Designing Specs](docs/guide/designing-specs.md) and [Exploring Ideas](docs/guide/exploring-ideas.md).
 
+## How execution is structured
+
+Wallfacer runs every task through a small, composable set of primitives:
+
+- **Agents** are sub-roles (impl, test, refine, commit-msg, etc.), each with a harness pin (Claude or Codex), capabilities, and an optional system prompt.
+- **Flows** compose agents into an ordered pipeline. Built-ins include `implement`, `brainstorm`, `refine-only`, and `test-only`.
+- **Tasks** pick a flow; the runner walks the flow's step chain.
+- **Routines** spawn tasks against a flow on a schedule.
+
+User-authored agents and flows live as YAML under `~/.wallfacer/{agents,flows}/` and are edited through the sidebar **Agents** and **Flows** tabs. Clone a built-in to pin it to a specific harness, override its system prompt, or insert a review step, without restarting the server.
+
+Read more: [Agents & Flows](docs/guide/agents-and-flows.md).
+
 ## Product Tour
 
-### Task Board — Managed Execution
+### Task Board, Managed Execution
 
 ![Wallfacer board overview](./assets/overview-board.png)
 
 Coordinate many agent tasks on a task board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs in an isolated container with its own git worktree.
 
-### Plan Mode — Structured Design
+### Plan Mode, Structured Design
 
 ![Wallfacer plan mode](./assets/overview-spec.png)
 
 Design before you build. The three-pane plan view gives you an explorer tree (left), focused markdown view (center), and planning chat (right). Break large ideas into structured specs, validate dependencies, and dispatch leaf specs to the task board when the design is right.
 
-### Oversight — Actionable Audit Trail
+### Oversight, Actionable Audit Trail
 
 ![Oversight view 1](./assets/oversight1.png)
 ![Oversight view 2](./assets/oversight2.png)
@@ -178,19 +191,20 @@ Track token usage and cost by task, activity, and turn so operations stay measur
 - **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search, oversight summaries
 - **Repo operations**: multi-workspace groups, branch switching, sync/rebase helpers, auto commit and push, task forking
 - **Development tools**: file explorer with editor, interactive host terminal, prompt templates, system prompt customization
-- **Flexible runtime**: Podman/Docker support, workspace-level AGENTS.md instructions, Claude + Codex backends, per-role sandbox routing
+- **Flexible runtime**: Podman/Docker support, workspace-level AGENTS.md instructions, Claude + Codex backends, harness pinning per agent
+- **Composable agents**: seven built-in sub-agent roles plus user-authored clones; flows compose them into pipelines that can be inspected, duplicated, or rewritten from the sidebar Agents and Flows tabs
 
 ## Roadmap
 
 Development is organized into three parallel tracks with shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
 
-**Foundations** (complete) — Sandbox backend interface, storage backend interface, container reuse, file explorer, host terminal, multi-workspace groups, Windows support.
+**Foundations** (complete): Sandbox backend interface, storage backend interface, container reuse, file explorer, host terminal, multi-workspace groups, Windows support.
 
-**Local Product** — Desktop experience and developer workflow: spec coordination (document model, planning UX, drift detection), desktop app, file/image attachments, host mounts, oversight risk scoring, visual verification, live serve.
+**Local Product**: Desktop experience and developer workflow. Spec coordination (document model, planning UX, drift detection), agents & flows (composable sub-agent pipelines), routine tasks (scheduled spawns), desktop app, file/image attachments, host mounts, oversight risk scoring, visual verification, live serve.
 
-**Cloud Platform** — Multi-tenant hosted service: tenant filesystem, K8s sandbox backend, cloud infrastructure, multi-tenant control plane, tenant API.
+**Cloud Platform**: Multi-tenant hosted service. Tenant filesystem, K8s sandbox backend, cloud infrastructure, multi-tenant control plane, tenant API.
 
-**Shared Design** — Cross-track specs: authentication, agent abstraction, native sandboxes (Linux/macOS/Windows), overlay snapshots.
+**Shared Design**: Cross-track specs. Authentication, agent abstraction, native sandboxes (Linux/macOS/Windows), overlay snapshots.
 
 ## Documentation
 

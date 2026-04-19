@@ -8,7 +8,9 @@ These documents are for maintainers and contributors who need to understand how 
 
 [Architecture](architecture.md)
 
-System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
+System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop, the ideation fast path, and the engine). Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
+
+For a user-facing treatment of the same primitives (how to clone an agent, what the Harness pin does, recipes), see the [Agents & Flows](../guide/agents-and-flows.md) guide.
 
 ### 2. Data & Storage
 
