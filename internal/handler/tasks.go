@@ -133,11 +133,10 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		httpjson.Write(w, http.StatusOK, resp)
 		return
 	}
-	tasks, err := s.ListTasks(r.Context(), includeArchived)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// GET /api/tasks applies org-scoped filtering in cloud mode when the
+	// request carried JWT claims; local-mode callers (principal == nil)
+	// get the unfiltered list identical to today's behavior.
+	tasks := s.TasksForPrincipal(r.Context(), principalFromRequest(r), includeArchived)
 	if tasks == nil {
 		tasks = []store.Task{}
 	}
@@ -222,7 +221,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+	opts := store.TaskCreateOptions{
 		Prompt:             req.Prompt,
 		Timeout:            req.Timeout,
 		Tags:               req.Tags,
@@ -235,7 +234,12 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		ScheduledAt:        req.ScheduledAt,
 		CustomPassPatterns: req.CustomPassPatterns,
 		CustomFailPatterns: req.CustomFailPatterns,
-	})
+	}
+	if p := principalFromRequest(r); p != nil {
+		opts.CreatedBy = p.Sub
+		opts.OrgID = p.OrgID
+	}
+	task, err := s.CreateTaskWithOptions(r.Context(), opts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -541,7 +545,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+		batchOpts := store.TaskCreateOptions{
 			ID:             preAssignedIDs[idx],
 			Prompt:         t.Prompt,
 			Timeout:        t.Timeout,
@@ -551,7 +555,12 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			FlowID:         t.Flow,
 			DependsOn:      depStrs,
 			SpecSourcePath: t.SpecSourcePath,
-		})
+		}
+		if p := principalFromRequest(r); p != nil {
+			batchOpts.CreatedBy = p.Sub
+			batchOpts.OrgID = p.OrgID
+		}
+		task, err := s.CreateTaskWithOptions(r.Context(), batchOpts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
