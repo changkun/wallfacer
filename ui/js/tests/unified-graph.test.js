@@ -866,11 +866,14 @@ describe("renderUnifiedGraph", () => {
       renderUnifiedGraph(graph, svg, { pinnedIds: new Set(["task:a"]) });
       const { body: bodyA } = pickNode(svg, "task:a");
       const { body: bodyB } = pickNode(svg, "task:b");
+      // Pin colour is the accent hue from the theme tokens. In the stub
+      // DOM used by these tests there's no getComputedStyle, so the
+      // renderer falls back to the documented default (#c45a33).
       const pinA = bodyA.children.find(
-        (c) => c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
+        (c) => c.tagName === "circle" && c.getAttribute("fill") === "#c45a33",
       );
       const pinB = bodyB.children.find(
-        (c) => c.tagName === "circle" && c.getAttribute("fill") === "#f7c466",
+        (c) => c.tagName === "circle" && c.getAttribute("fill") === "#c45a33",
       );
       expect(pinA).toBeDefined();
       expect(pinB).toBeUndefined();

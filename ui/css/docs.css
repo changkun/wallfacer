@@ -152,13 +152,85 @@
   line-height: 1.6;
 }
 
-/* --- Dep graph mode (full-pane DAG visualization) --- */
+/* --- Dep graph mode (full-pane DAG visualization) ---
+ *
+ * Palette: node fills are tinted status colours with a saturated stroke.
+ * These hues are defined once here and referenced from unified-graph.js via
+ * getComputedStyle so the node renderer stays theme-aware.
+ */
 .depgraph-mode-container {
   display: flex;
   flex: 1;
   min-height: 0;
   min-width: 0;
   background: var(--bg);
+  /* Task status palette — stroke (saturated) + fill (tinted). */
+  --dg-task-backlog: #8e8a80;
+  --dg-task-backlog-tint: rgba(142, 138, 128, 0.12);
+  --dg-task-progress: #3a6db3;
+  --dg-task-progress-tint: rgba(58, 109, 179, 0.14);
+  --dg-task-waiting: #a56a12;
+  --dg-task-waiting-tint: rgba(165, 106, 18, 0.14);
+  --dg-task-committing: #6a4aa3;
+  --dg-task-committing-tint: rgba(106, 74, 163, 0.14);
+  --dg-task-done: #3f7a4a;
+  --dg-task-done-tint: rgba(63, 122, 74, 0.14);
+  --dg-task-failed: #a32d2d;
+  --dg-task-failed-tint: rgba(163, 45, 45, 0.14);
+  --dg-task-cancelled: #7a766e;
+  --dg-task-cancelled-tint: rgba(122, 118, 110, 0.12);
+  /* Spec status palette. */
+  --dg-spec-vague: #7a5418;
+  --dg-spec-vague-tint: rgba(122, 84, 24, 0.1);
+  --dg-spec-drafted: #a56a12;
+  --dg-spec-drafted-tint: rgba(165, 106, 18, 0.12);
+  --dg-spec-validated: #2d6d5a;
+  --dg-spec-validated-tint: rgba(45, 109, 90, 0.12);
+  --dg-spec-complete: #3f7a4a;
+  --dg-spec-complete-tint: rgba(63, 122, 74, 0.12);
+  --dg-spec-stale: #a32d2d;
+  --dg-spec-stale-tint: rgba(163, 45, 45, 0.12);
+  --dg-spec-archived: #7a766e;
+  --dg-spec-archived-tint: rgba(122, 118, 110, 0.1);
+  /* Edge colours. */
+  --dg-edge-containment: #9a948a;
+  --dg-edge-dispatch: #3a6db3;
+  --dg-edge-spec-dep: #b07045;
+  --dg-edge-task-dep: #4a7a4f;
+}
+
+[data-theme="dark"] .depgraph-mode-container,
+.theme-dark .depgraph-mode-container {
+  --dg-task-backlog: #a8a399;
+  --dg-task-backlog-tint: rgba(168, 163, 153, 0.14);
+  --dg-task-progress: #7aa3d9;
+  --dg-task-progress-tint: rgba(122, 163, 217, 0.16);
+  --dg-task-waiting: #d4a050;
+  --dg-task-waiting-tint: rgba(212, 160, 80, 0.16);
+  --dg-task-committing: #b49de0;
+  --dg-task-committing-tint: rgba(180, 157, 224, 0.16);
+  --dg-task-done: #8bc78f;
+  --dg-task-done-tint: rgba(139, 199, 143, 0.14);
+  --dg-task-failed: #e09090;
+  --dg-task-failed-tint: rgba(224, 144, 144, 0.14);
+  --dg-task-cancelled: #b9b2a0;
+  --dg-task-cancelled-tint: rgba(185, 178, 160, 0.12);
+  --dg-spec-vague: #d4a050;
+  --dg-spec-vague-tint: rgba(212, 160, 80, 0.1);
+  --dg-spec-drafted: #d4a050;
+  --dg-spec-drafted-tint: rgba(212, 160, 80, 0.14);
+  --dg-spec-validated: #8ec5b3;
+  --dg-spec-validated-tint: rgba(142, 197, 179, 0.14);
+  --dg-spec-complete: #8bc78f;
+  --dg-spec-complete-tint: rgba(139, 199, 143, 0.14);
+  --dg-spec-stale: #e09090;
+  --dg-spec-stale-tint: rgba(224, 144, 144, 0.14);
+  --dg-spec-archived: #b9b2a0;
+  --dg-spec-archived-tint: rgba(185, 178, 160, 0.12);
+  --dg-edge-containment: #857f6f;
+  --dg-edge-dispatch: #7aa3d9;
+  --dg-edge-spec-dep: #d09366;
+  --dg-edge-task-dep: #8bc78f;
 }
 
 .depgraph-mode__inner {
@@ -171,86 +243,48 @@
 }
 
 .depgraph-mode__header {
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  flex-wrap: wrap;
 }
 
-.depgraph-mode__legend {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  font-size: 11px;
-  color: var(--text-muted);
+.depgraph-mode__titles {
+  min-width: 0;
 }
 
-.depgraph-mode__legend li {
+.depgraph-mode__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.depgraph-mode__legend-swatch {
-  display: inline-block;
-  width: 14px;
-  height: 10px;
-  border-radius: 3px;
-  background: #2f5a4c;
-}
-
-.depgraph-mode__legend-swatch--spec {
-  background: #2f5a4c;
-  border-radius: 4px;
-}
-
-.depgraph-mode__legend-swatch--task {
-  background: #2c5f98;
-  border-radius: 2px;
-}
-
-.depgraph-mode__legend-edge {
-  display: inline-block;
-  width: 18px;
-  height: 0;
-  border-top: 1.5px solid #7a7570;
-}
-
-.depgraph-mode__legend-edge--containment {
-  border-top-color: #7a7570;
-}
-
-.depgraph-mode__legend-edge--dispatch {
-  border-top-color: #3b82c4;
-}
-
-.depgraph-mode__legend-edge--spec-dep {
-  border-top: 1.5px dashed #b07045;
-}
-
-.depgraph-mode__legend-edge--task-dep {
-  border-top: 1.5px dashed #5a9058;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .depgraph-mode__title {
   font-size: 15px;
   font-weight: 600;
-  margin: 0 0 4px 0;
+  margin: 0 0 2px 0;
   color: var(--text);
+  letter-spacing: -0.005em;
 }
 
 .depgraph-mode__subtitle {
   font-size: 12px;
   color: var(--text-muted);
   margin: 0;
-  max-width: 640px;
+  max-width: 760px;
+  line-height: 1.55;
+}
+
+.depgraph-mode__body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
 }
 
 .depgraph-mode__mount {
@@ -260,6 +294,284 @@
   overflow: auto;
   padding: 16px 24px;
   position: relative;
+}
+
+/* --- Inspector (right side panel) --- */
+.depgraph-inspector {
+  width: 272px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-raised, var(--bg));
+  padding: 18px 18px 24px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.depgraph-inspector__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.depgraph-inspector__heading {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.depgraph-inspector__muted {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.depgraph-inspector__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.depgraph-inspector__legend-group ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.depgraph-inspector__legend-group li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.depgraph-inspector__legend-subheading {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.depgraph-inspector__swatch {
+  display: inline-block;
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--dg-task-backlog);
+  background: var(--dg-task-backlog-tint);
+  flex-shrink: 0;
+}
+
+.depgraph-inspector__swatch[data-task-status="in_progress"] {
+  background: var(--dg-task-progress-tint);
+  border-color: var(--dg-task-progress);
+}
+.depgraph-inspector__swatch[data-task-status="waiting"] {
+  background: var(--dg-task-waiting-tint);
+  border-color: var(--dg-task-waiting);
+}
+.depgraph-inspector__swatch[data-task-status="done"] {
+  background: var(--dg-task-done-tint);
+  border-color: var(--dg-task-done);
+}
+.depgraph-inspector__swatch[data-task-status="backlog"] {
+  background: var(--dg-task-backlog-tint);
+  border-color: var(--dg-task-backlog);
+}
+.depgraph-inspector__swatch[data-task-status="failed"] {
+  background: var(--dg-task-failed-tint);
+  border-color: var(--dg-task-failed);
+}
+
+.depgraph-inspector__swatch--spec {
+  border-radius: 6px;
+}
+.depgraph-inspector__swatch[data-spec-status="drafted"] {
+  background: var(--dg-spec-drafted-tint);
+  border-color: var(--dg-spec-drafted);
+}
+.depgraph-inspector__swatch[data-spec-status="validated"] {
+  background: var(--dg-spec-validated-tint);
+  border-color: var(--dg-spec-validated);
+}
+.depgraph-inspector__swatch[data-spec-status="complete"] {
+  background: var(--dg-spec-complete-tint);
+  border-color: var(--dg-spec-complete);
+}
+.depgraph-inspector__swatch[data-spec-status="stale"] {
+  background: var(--dg-spec-stale-tint);
+  border-color: var(--dg-spec-stale);
+}
+
+.depgraph-inspector__edge {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  border-top: 1.5px solid var(--dg-edge-containment);
+  flex-shrink: 0;
+}
+.depgraph-inspector__edge--containment {
+  border-top-color: var(--dg-edge-containment);
+}
+.depgraph-inspector__edge--dispatch {
+  border-top-color: var(--dg-edge-dispatch);
+}
+.depgraph-inspector__edge--spec-dep {
+  border-top: 1.5px dashed var(--dg-edge-spec-dep);
+}
+.depgraph-inspector__edge--task-dep {
+  border-top: 1.5px dashed var(--dg-edge-task-dep);
+}
+
+.depgraph-inspector__selection,
+.depgraph-inspector__critical {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.depgraph-inspector__selection-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.depgraph-inspector__selection-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.depgraph-inspector__selection-label {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.depgraph-inspector__selection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.depgraph-inspector__status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--dg-task-backlog);
+  background: var(--dg-task-backlog-tint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.depgraph-inspector__status-pill[data-task-status="in_progress"] {
+  background: var(--dg-task-progress-tint);
+  border-color: var(--dg-task-progress);
+}
+.depgraph-inspector__status-pill[data-task-status="waiting"] {
+  background: var(--dg-task-waiting-tint);
+  border-color: var(--dg-task-waiting);
+}
+.depgraph-inspector__status-pill[data-task-status="done"] {
+  background: var(--dg-task-done-tint);
+  border-color: var(--dg-task-done);
+}
+.depgraph-inspector__status-pill[data-task-status="failed"] {
+  background: var(--dg-task-failed-tint);
+  border-color: var(--dg-task-failed);
+}
+.depgraph-inspector__status-pill[data-spec-status="drafted"] {
+  background: var(--dg-spec-drafted-tint);
+  border-color: var(--dg-spec-drafted);
+}
+.depgraph-inspector__status-pill[data-spec-status="validated"] {
+  background: var(--dg-spec-validated-tint);
+  border-color: var(--dg-spec-validated);
+}
+.depgraph-inspector__status-pill[data-spec-status="complete"] {
+  background: var(--dg-spec-complete-tint);
+  border-color: var(--dg-spec-complete);
+}
+.depgraph-inspector__status-pill[data-spec-status="stale"] {
+  background: var(--dg-spec-stale-tint);
+  border-color: var(--dg-spec-stale);
+}
+
+.depgraph-inspector__critical-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  counter-reset: cp;
+}
+
+.depgraph-inspector__critical-list li {
+  counter-increment: cp;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.depgraph-inspector__critical-list li::before {
+  content: counter(cp);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 14px;
+  text-align: right;
+}
+
+.depgraph-inspector__critical-list li:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+}
+
+.depgraph-inspector__critical-list li.is-focused {
+  background: var(--bg-active, rgba(0, 0, 0, 0.08));
+}
+
+.depgraph-inspector__critical-kind {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.depgraph-inspector__critical-label {
+  font-size: 12px;
+  word-break: break-word;
+  flex: 1;
+  min-width: 0;
 }
 
 /* Suppress text selection while the user is dragging the canvas so the
@@ -282,7 +594,6 @@
 }
 
 .depgraph-mode__reset-btn {
-  margin-left: 8px;
   padding: 2px 8px;
   font-size: 11px;
   color: var(--text-muted);
@@ -301,7 +612,6 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
   font-size: 11px;
   color: var(--text-muted);
   cursor: pointer;

@@ -5,83 +5,177 @@
 >
   <div class="depgraph-mode__inner">
     <header class="depgraph-mode__header">
-      <div>
+      <div class="depgraph-mode__titles">
         <h2 class="depgraph-mode__title">Map</h2>
         <p class="depgraph-mode__subtitle">
-          Specs and tasks by dependency. Hover to emphasise neighbours; click a
-          node to focus it; <kbd>Shift</kbd>+click to open. Drag a node to pin
-          it; double-click to un-pin. <kbd>+</kbd> unfolds a spec; hold
-          <kbd>Space</kbd> and drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+scroll
-          to zoom. Use the <kbd>/</kbd> search bar above to filter nodes.
-          <label
-            class="depgraph-mode__option"
-            title="Include archived specs and tasks"
-          >
-            <input
-              type="checkbox"
-              id="depgraph-show-archived"
-              onchange="setMapShowArchived(this.checked)"
-            />
-            Show archived
-          </label>
-          <button
-            type="button"
-            id="depgraph-reset-btn"
-            class="depgraph-mode__reset-btn"
-            onclick="resetMapLayout()"
-            title="Clear pinned positions, focus, zoom and search"
-          >
-            Reset layout
-          </button>
+          Specs and tasks by dependency. Click a node to focus;
+          <kbd>Shift</kbd>+click to open. Drag to pin, double-click to un-pin.
+          Hold <kbd>Space</kbd> and drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+scroll to zoom.
         </p>
       </div>
-      <ul class="depgraph-mode__legend" aria-label="Legend">
-        <li>
-          <span
-            class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--spec"
-          ></span>
-          Spec
-        </li>
-        <li>
-          <span
-            class="depgraph-mode__legend-swatch depgraph-mode__legend-swatch--task"
-          ></span>
-          Task
-        </li>
-        <li>
-          <span
-            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--containment"
-          ></span>
-          Contains
-        </li>
-        <li>
-          <span
-            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--dispatch"
-          ></span>
-          Dispatch
-        </li>
-        <li>
-          <span
-            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--spec-dep"
-          ></span>
-          Spec dep
-        </li>
-        <li>
-          <span
-            class="depgraph-mode__legend-edge depgraph-mode__legend-edge--task-dep"
-          ></span>
-          Task dep
-        </li>
-      </ul>
+      <div class="depgraph-mode__actions">
+        <label
+          class="depgraph-mode__option"
+          title="Include archived specs and tasks"
+        >
+          <input
+            type="checkbox"
+            id="depgraph-show-archived"
+            onchange="setMapShowArchived(this.checked)"
+          />
+          Show archived
+        </label>
+        <button
+          type="button"
+          id="depgraph-reset-btn"
+          class="depgraph-mode__reset-btn"
+          onclick="resetMapLayout()"
+          title="Clear pinned positions, focus, zoom and search"
+        >
+          Reset layout
+        </button>
+      </div>
     </header>
-    <div id="depgraph-mount" class="depgraph-mode__mount">
-      <div class="depgraph-mode__empty">
-        <p>
-          No dependency edges yet. Add depends-on links between tasks to see the
-          graph — drag a card from Backlog onto another, or set dependencies via
-          the task modal.
-        </p>
+    <div class="depgraph-mode__body">
+      <div id="depgraph-mount" class="depgraph-mode__mount">
+        <div class="depgraph-mode__empty">
+          <p>
+            No dependency edges yet. Add depends-on links between tasks to see
+            the graph — drag a card from Backlog onto another, or set
+            dependencies via the task modal.
+          </p>
+        </div>
       </div>
+      <aside
+        id="depgraph-inspector"
+        class="depgraph-inspector"
+        aria-label="Graph inspector"
+      >
+        <section class="depgraph-inspector__section">
+          <h3 class="depgraph-inspector__heading">Legend</h3>
+          <div class="depgraph-inspector__legend">
+            <div class="depgraph-inspector__legend-group">
+              <div class="depgraph-inspector__legend-subheading">Task</div>
+              <ul>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch"
+                    data-task-status="in_progress"
+                  ></span>
+                  In progress
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch"
+                    data-task-status="waiting"
+                  ></span>
+                  Waiting
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch"
+                    data-task-status="done"
+                  ></span>
+                  Done
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch"
+                    data-task-status="backlog"
+                  ></span>
+                  Backlog
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch"
+                    data-task-status="failed"
+                  ></span>
+                  Failed
+                </li>
+              </ul>
+            </div>
+            <div class="depgraph-inspector__legend-group">
+              <div class="depgraph-inspector__legend-subheading">Spec</div>
+              <ul>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch depgraph-inspector__swatch--spec"
+                    data-spec-status="drafted"
+                  ></span>
+                  Drafted
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch depgraph-inspector__swatch--spec"
+                    data-spec-status="validated"
+                  ></span>
+                  Validated
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch depgraph-inspector__swatch--spec"
+                    data-spec-status="complete"
+                  ></span>
+                  Complete
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__swatch depgraph-inspector__swatch--spec"
+                    data-spec-status="stale"
+                  ></span>
+                  Stale
+                </li>
+              </ul>
+            </div>
+            <div class="depgraph-inspector__legend-group">
+              <div class="depgraph-inspector__legend-subheading">Edges</div>
+              <ul>
+                <li>
+                  <span
+                    class="depgraph-inspector__edge depgraph-inspector__edge--containment"
+                  ></span>
+                  Contains
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__edge depgraph-inspector__edge--dispatch"
+                  ></span>
+                  Dispatch
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__edge depgraph-inspector__edge--spec-dep"
+                  ></span>
+                  Spec dep
+                </li>
+                <li>
+                  <span
+                    class="depgraph-inspector__edge depgraph-inspector__edge--task-dep"
+                  ></span>
+                  Task dep
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+        <section class="depgraph-inspector__section">
+          <h3 class="depgraph-inspector__heading">Selection</h3>
+          <div id="depgraph-inspector-selection" class="depgraph-inspector__selection">
+            <p class="depgraph-inspector__muted">
+              Click a node to focus its neighbourhood. Shift+click opens the
+              task or spec.
+            </p>
+          </div>
+        </section>
+        <section class="depgraph-inspector__section">
+          <h3 class="depgraph-inspector__heading">Critical path</h3>
+          <div id="depgraph-inspector-critical" class="depgraph-inspector__critical">
+            <p class="depgraph-inspector__muted">
+              Longest dependency chain appears here once the graph has edges.
+            </p>
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </div>

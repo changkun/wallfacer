@@ -15,14 +15,26 @@
   var H_GAP = 120;
   var V_GAP = 16;
 
+  // Matches the tint+stroke palette defined on `.depgraph-mode-container`
+  // in docs.css. Legacy renderer pulls the values live so theme changes
+  // flow through without rebuilding the subgraph.
   var STATUS_COLORS = {
-    backlog: "#6b6560",
-    in_progress: "#2c5f98",
-    waiting: "#a07020",
-    committing: "#5a3d8a",
-    done: "#1a6030",
-    failed: "#8c2020",
-    cancelled: "#5a3d8a",
+    backlog: "#8e8a80",
+    in_progress: "#3a6db3",
+    waiting: "#a56a12",
+    committing: "#6a4aa3",
+    done: "#3f7a4a",
+    failed: "#a32d2d",
+    cancelled: "#7a766e",
+  };
+  var STATUS_TINTS = {
+    backlog: "rgba(142,138,128,0.12)",
+    in_progress: "rgba(58,109,179,0.14)",
+    waiting: "rgba(165,106,18,0.14)",
+    committing: "rgba(106,74,163,0.14)",
+    done: "rgba(63,122,74,0.14)",
+    failed: "rgba(163,45,45,0.14)",
+    cancelled: "rgba(122,118,110,0.12)",
   };
 
   // Module-level fingerprint cache — avoids re-rendering unchanged graphs.
@@ -902,7 +914,11 @@
       rect.setAttribute("width", NODE_W);
       rect.setAttribute("height", NODE_H);
       rect.setAttribute("rx", "6");
-      rect.setAttribute("fill", STATUS_COLORS[t.status] || "#4B5563");
+      var statusStroke = STATUS_COLORS[t.status] || "#7a766e";
+      var statusFill = STATUS_TINTS[t.status] || "rgba(0,0,0,0.05)";
+      rect.setAttribute("fill", statusFill);
+      rect.setAttribute("stroke", statusStroke);
+      rect.setAttribute("stroke-width", "1.25");
 
       var rawTitle = t.title || t.prompt || t.id || "";
       var truncated =
@@ -913,7 +929,10 @@
       text.setAttribute("y", y + NODE_H / 2);
       text.setAttribute("dominant-baseline", "middle");
       text.setAttribute("text-anchor", "middle");
-      text.setAttribute("fill", "#f0ede6");
+      var inkColor = (
+        computedStyle.getPropertyValue("--text") || "#1b1916"
+      ).trim();
+      text.setAttribute("fill", inkColor);
       text.setAttribute("font-size", "12");
       text.textContent = truncated;
 
@@ -1041,6 +1060,231 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Inspector (Legend / Selection / Critical path)
+  //
+  // The inspector lives in `ui/partials/depgraph-mode.html` as a right-hand
+  // aside. depgraph.js owns the dynamic sections — Selection reflects the
+  // currently-focused node, Critical path shows the longest dependency
+  // chain through the unified graph.
+  // ---------------------------------------------------------------------------
+
+  // _longestChain returns up to one longest path through (nodes, edges),
+  // considering only dependency edges (spec_dep, task_dep). Containment
+  // and dispatch edges are structural and would inflate the chain with
+  // non-dependency hops. Falls back to an empty array when the graph is
+  // empty, acyclic check is implicit via topo-order traversal — if the
+  // graph has a cycle the function still terminates because we iterate
+  // each edge once.
+  function _longestChain(graph) {
+    if (!graph || !graph.nodes || graph.nodes.length === 0) return [];
+    var depKinds = { spec_dep: true, task_dep: true };
+    var outs = new Map();
+    var ins = new Map();
+    graph.nodes.forEach(function (n) {
+      outs.set(n.id, []);
+      ins.set(n.id, 0);
+    });
+    graph.edges.forEach(function (e) {
+      if (!depKinds[e.kind]) return;
+      var arr = outs.get(e.from);
+      if (!arr) return;
+      arr.push(e.to);
+      ins.set(e.to, (ins.get(e.to) || 0) + 1);
+    });
+
+    // Kahn topo order over the dep subgraph.
+    var q = [];
+    ins.forEach(function (v, k) {
+      if (v === 0) q.push(k);
+    });
+    var order = [];
+    while (q.length > 0) {
+      var u = q.shift();
+      order.push(u);
+      var next = outs.get(u) || [];
+      for (var i = 0; i < next.length; i++) {
+        var v2 = next[i];
+        var nv = (ins.get(v2) || 0) - 1;
+        ins.set(v2, nv);
+        if (nv === 0) q.push(v2);
+      }
+    }
+    if (order.length < graph.nodes.length) {
+      // Cycle present; fall back to an empty path rather than a partial.
+      return [];
+    }
+
+    var dist = new Map();
+    var prev = new Map();
+    order.forEach(function (id) {
+      dist.set(id, 0);
+    });
+    for (var j = 0; j < order.length; j++) {
+      var a = order[j];
+      var outList = outs.get(a) || [];
+      for (var k2 = 0; k2 < outList.length; k2++) {
+        var b = outList[k2];
+        var cand = (dist.get(a) || 0) + 1;
+        if (cand > (dist.get(b) || 0)) {
+          dist.set(b, cand);
+          prev.set(b, a);
+        }
+      }
+    }
+
+    // Pick the node with the largest dist; walk back via prev.
+    var endId = null;
+    var endDist = -1;
+    dist.forEach(function (d, id) {
+      if (d > endDist) {
+        endDist = d;
+        endId = id;
+      }
+    });
+    if (endDist <= 0 || !endId) return [];
+    var chain = [];
+    var cur = endId;
+    while (cur) {
+      chain.unshift(cur);
+      cur = prev.get(cur);
+    }
+    return chain;
+  }
+
+  function _inspectorSlot(id) {
+    if (typeof document === "undefined") return null;
+    return document.getElementById(id);
+  }
+
+  function _clear(el) {
+    if (!el) return;
+    while (el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function _el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) {
+      for (var k in attrs) {
+        if (k === "className") e.className = attrs[k];
+        else if (k === "onclick") e.onclick = attrs[k];
+        else e.setAttribute(k, attrs[k]);
+      }
+    }
+    if (text !== undefined && text !== null) e.textContent = String(text);
+    return e;
+  }
+
+  function _renderSelection(graph, focusedId) {
+    var slot = _inspectorSlot("depgraph-inspector-selection");
+    if (!slot) return;
+    _clear(slot);
+    var node = null;
+    if (focusedId && graph && graph.nodes) {
+      for (var i = 0; i < graph.nodes.length; i++) {
+        if (graph.nodes[i].id === focusedId) {
+          node = graph.nodes[i];
+          break;
+        }
+      }
+    }
+    if (!node) {
+      slot.appendChild(
+        _el(
+          "p",
+          { className: "depgraph-inspector__muted" },
+          "Click a node to focus its neighbourhood. Shift+click opens the task or spec.",
+        ),
+      );
+      return;
+    }
+    var card = _el("div", { className: "depgraph-inspector__selection-card" });
+    card.appendChild(
+      _el(
+        "div",
+        { className: "depgraph-inspector__selection-kind" },
+        node.kind === "spec" ? "Spec" : "Task",
+      ),
+    );
+    card.appendChild(
+      _el(
+        "div",
+        { className: "depgraph-inspector__selection-label" },
+        node.label || node.id,
+      ),
+    );
+    var meta = _el("div", { className: "depgraph-inspector__selection-meta" });
+    var pill = _el(
+      "span",
+      { className: "depgraph-inspector__status-pill" },
+      node.status || "—",
+    );
+    if (node.kind === "spec") {
+      pill.setAttribute("data-spec-status", node.status || "");
+    } else {
+      pill.setAttribute("data-task-status", node.status || "");
+    }
+    meta.appendChild(pill);
+    if (node.kind === "spec" && node.extra && node.extra.path) {
+      meta.appendChild(_el("span", null, node.extra.path));
+    }
+    card.appendChild(meta);
+    slot.appendChild(card);
+  }
+
+  function _renderCriticalPath(graph, focusedId) {
+    var slot = _inspectorSlot("depgraph-inspector-critical");
+    if (!slot) return;
+    _clear(slot);
+    var chain = _longestChain(graph);
+    if (!chain.length) {
+      slot.appendChild(
+        _el(
+          "p",
+          { className: "depgraph-inspector__muted" },
+          "Longest dependency chain appears here once the graph has edges.",
+        ),
+      );
+      return;
+    }
+    var byId = new Map();
+    graph.nodes.forEach(function (n) {
+      byId.set(n.id, n);
+    });
+    var list = _el("ol", { className: "depgraph-inspector__critical-list" });
+    chain.forEach(function (id) {
+      var n = byId.get(id);
+      if (!n) return;
+      var li = _el("li", null);
+      if (focusedId === id) li.className = "is-focused";
+      li.appendChild(
+        _el(
+          "span",
+          { className: "depgraph-inspector__critical-kind" },
+          n.kind === "spec" ? "SPEC" : "TASK",
+        ),
+      );
+      li.appendChild(
+        _el(
+          "span",
+          { className: "depgraph-inspector__critical-label" },
+          n.label || n.id,
+        ),
+      );
+      li.onclick = function () {
+        _focusNode(id);
+      };
+      list.appendChild(li);
+    });
+    slot.appendChild(list);
+  }
+
+  function _renderInspector(graph, focusedId) {
+    if (typeof document === "undefined") return;
+    _renderSelection(graph, focusedId);
+    _renderCriticalPath(graph, focusedId);
+  }
+
+  // ---------------------------------------------------------------------------
   // Internal hide (does NOT reset fingerprint — for empty-subgraph path).
   // ---------------------------------------------------------------------------
   function _hidePanel() {
@@ -1084,8 +1328,14 @@
       var panel = getOrCreatePanel();
       panel.style.display = "block";
 
-      var unifiedFp = _graphFingerprint(graph);
-      if (unifiedFp === _lastFingerprint) return;
+      var unifiedFp =
+        _graphFingerprint(graph) + "|f=" + (_focusedNodeId || "");
+      if (unifiedFp === _lastFingerprint) {
+        // Fingerprint unchanged but inspector may still need to reflect
+        // the focused selection if the caller toggled focus.
+        _renderInspector(graph, _focusedNodeId);
+        return;
+      }
       _lastFingerprint = unifiedFp;
 
       var svg = document.getElementById("depgraph-svg");
@@ -1115,6 +1365,7 @@
       _installPan();
       _installZoom();
       _centerIntoViewIfUntouched();
+      _renderInspector(graph, _focusedNodeId);
       return;
     }
 
@@ -1188,6 +1439,28 @@
     }
 
     renderSvg(legacySvg, subgraph, kl.positions, kl.hasCycles);
+
+    // Feed the inspector with a minimal graph-shaped payload so the
+    // Selection and Critical path sections stay populated on the
+    // legacy (tasks-only) path.
+    var legacyGraph = {
+      nodes: subgraph.map(function (t) {
+        return {
+          id: t.id,
+          kind: "task",
+          status: t.status || "backlog",
+          label: t.title || t.prompt || t.id,
+        };
+      }),
+      edges: [],
+    };
+    subgraph.forEach(function (t) {
+      if (!t.depends_on) return;
+      t.depends_on.forEach(function (depId) {
+        legacyGraph.edges.push({ from: depId, to: t.id, kind: "task_dep" });
+      });
+    });
+    _renderInspector(legacyGraph, _focusedNodeId);
   }
 
   function _paneEmpty() {

@@ -1218,14 +1218,15 @@
 .spec-track-header {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 4px 8px;
+  margin-top: 4px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
 }
 
 .spec-track-header:hover {
@@ -1242,10 +1243,13 @@
 .spec-node {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 3px 8px;
+  border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1253,11 +1257,15 @@
 
 .spec-node:hover {
   background: var(--bg-hover);
+  color: var(--text);
 }
 
 .spec-node--focused {
-  background: var(--bg-card);
-  border-left: 2px solid var(--accent);
+  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
+  color: var(--text);
+}
+.spec-node--focused .spec-node-icon {
+  color: var(--accent);
 }
 
 .spec-node--archived {
@@ -1276,14 +1284,14 @@
 
 .spec-node-toggle {
   cursor: pointer;
-  width: 20px;
-  height: 20px;
+  width: 14px;
+  height: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 10px;
   border-radius: 3px;
 }
 
@@ -1291,9 +1299,14 @@
   background: var(--bg-hover);
   color: var(--text);
 }
+.spec-node-toggle svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
 
 .spec-node-toggle-placeholder {
-  width: 20px;
+  width: 14px;
   flex-shrink: 0;
 }
 
