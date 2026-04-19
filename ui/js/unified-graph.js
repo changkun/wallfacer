@@ -369,10 +369,7 @@
     if (!host && typeof document !== "undefined" && document.documentElement) {
       host = document.documentElement;
     }
-    if (
-      !host ||
-      typeof getComputedStyle !== "function"
-    ) {
+    if (!host || typeof getComputedStyle !== "function") {
       return function () {
         return "";
       };
@@ -400,8 +397,7 @@
   }
 
   function _nodeStyle(readVar, kind, status) {
-    var table =
-      kind === "spec" ? SPEC_STATUS_FALLBACK : TASK_STATUS_FALLBACK;
+    var table = kind === "spec" ? SPEC_STATUS_FALLBACK : TASK_STATUS_FALLBACK;
     var fb = table[status] || { stroke: "#7a766e", fill: "rgba(0,0,0,0.05)" };
     var prefix = kind === "spec" ? "--dg-spec-" : "--dg-task-";
     var key = status === "in_progress" ? "progress" : status;

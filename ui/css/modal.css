@@ -630,7 +630,16 @@
 .analytics-mode__panels .modal-overlay h3 {
   display: none;
 }
-.analytics-mode__panels .modal-overlay .p-6 > div:first-child > button:last-child,
-.analytics-mode__panels .modal-overlay .p-6 > div:first-child > div > button:last-child {
+.analytics-mode__panels
+  .modal-overlay
+  .p-6
+  > div:first-child
+  > button:last-child,
+.analytics-mode__panels
+  .modal-overlay
+  .p-6
+  > div:first-child
+  > div
+  > button:last-child {
   display: none;
 }
