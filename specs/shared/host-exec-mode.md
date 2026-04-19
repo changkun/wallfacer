@@ -35,7 +35,7 @@ Add an opt-in `wallfacer run --backend host` that runs `claude` directly on the 
 
 **v1 scope:** both Claude and Codex are supported in host mode. The Claude path passes the runner's argv through with optional `--append-system-prompt` for workspace instructions. The Codex path (in `internal/sandbox/host_codex.go`) translates the runner's Claude-style argv into `codex exec --full-auto --sandbox workspace-write --skip-git-repo-check --json --output-last-message <tmp>`, tees codex's native NDJSON event stream to the caller while tracking `session_id` / `turn.completed` usage / `stop_reason` / `total_cost_usd`, and appends a Claude-compatible final result record so the runner's existing parser picks it up unchanged. Session resume is a no-op for codex (matches the container path's `codex-agent.sh`). Workspace instructions are prepended to the prompt because `codex exec` has no `--append-system-prompt` equivalent.
 
-This spec is **not** a replacement for `specs/shared/native-sandbox-{linux,macos,windows}.md`, which describe *sandboxed* host execution via Bubblewrap / Landlock / `sandbox_init`. Those specs treat host execution as a platform for adding a new isolation layer. This spec owns the simpler "no isolation at all" case those specs mention as "Option C: Local CLI" but do not implement.
+This spec is **not** a replacement for the native sandbox backends (Bubblewrap / Landlock / `sandbox_init` / JobObjects / Hyper-V) tracked in the external [`latere.ai/sandbox`](https://github.com/latere-ai/sandbox) repo's `native/{linux,macos,windows}.md`. Those specs treat host execution as a platform for adding a new isolation layer. This spec owns the simpler "no isolation at all" case those specs mention as "Option C: Local CLI" but do not implement.
 
 ## Current State
 
@@ -225,7 +225,7 @@ Skip for v1. Claude CLI on Windows runs fine in WSL2; users on Windows should ei
 
 ### Write containment
 
-**Non-goal.** Host mode intentionally provides no write containment — an agent can `rm -rf $HOME`. This is the deliberate tradeoff. The mitigation is documentation + the Settings UI banner above. Users who need containment should use container mode, or wait for the `native-sandbox-*` specs to ship. No code-level defense in v1.
+**Non-goal.** Host mode intentionally provides no write containment — an agent can `rm -rf $HOME`. This is the deliberate tradeoff. The mitigation is documentation + the Settings UI banner above. Users who need containment should use container mode, or wait for the native-OS backends in [`latere.ai/sandbox`](https://github.com/latere-ai/sandbox) to ship. No code-level defense in v1.
 
 ## API Surface
 
@@ -361,5 +361,5 @@ Host mode shipped as an opt-in alternative to the container backend, selected vi
 
 - **Windows**: out of scope. Users on Windows should either use container mode with Docker Desktop / Podman Desktop, or run wallfacer itself inside WSL2.
 - **Codex session resume**: a no-op (codex `exec` has no stable resume flag; matches the container path).
-- **No write containment**: intentional. The Settings UI banner, doctor output, and commit messages all make this explicit. Users who need containment should use container mode or the in-progress `specs/shared/native-sandbox-*` specs.
+- **No write containment**: intentional. The Settings UI banner, doctor output, and commit messages all make this explicit. Users who need containment should use container mode or the in-progress native-OS backends in [`latere.ai/sandbox`](https://github.com/latere-ai/sandbox).
 - **Parallel tasks in host mode**: default cap of 1 to avoid `~/.claude/__store.db` races. Users who have verified their CLI tolerates parallelism can override with `WALLFACER_MAX_PARALLEL=N`.

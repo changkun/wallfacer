@@ -2,7 +2,6 @@
 title: Cloud Multi-Tenant
 status: drafted
 depends_on:
-  - specs/cloud/k8s-sandbox.md
   - specs/cloud/cloud-infrastructure.md
   - specs/shared/authentication.md
 affects: [internal/handler/, internal/runner/, internal/store/]
