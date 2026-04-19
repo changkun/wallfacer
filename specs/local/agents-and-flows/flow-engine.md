@@ -1,6 +1,6 @@
 ---
 title: Flow engine — sequencer driving agents via runAgent
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/flow-data-model.md
   - specs/local/agents-and-flows/task-flow-field.md
