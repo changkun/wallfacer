@@ -73,7 +73,7 @@ The work ships in three phases. Each phase has a concrete cloud-track
 prerequisite it clears.
 
 ```
-Phase 1 (shipped) ──→ Phase 2 (drafted) ──→ Phase 3 (future)
+Phase 1 (shipped) ──→ Phase 2 (shipped) ──→ Phase 3 (future)
      │                     │                      │
      │                     │                      └─ Third-party OIDC,
      │                     │                         remote-control wire
@@ -88,8 +88,8 @@ Phase 1 (shipped) ──→ Phase 2 (drafted) ──→ Phase 3 (future)
 | Phase | Ships | Status | Unblocks |
 |-------|-------|--------|----------|
 | 1 | `WALLFACER_CLOUD` flag, browser login routes, sign-in badge | **Shipped** | Visual cloud/local partition |
-| 2 | JWT on API, principal context, org fields, forced login, authz, org switcher | **Drafted** | Cloud multi-tenant + multi-user collab |
-| 3 | Third-party OIDC, remote-control registration protocol | Future | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
+| 2 | JWT on API, principal context, org fields, forced login, authz, org switcher | **Shipped** | Cloud multi-tenant + multi-user collab |
+| 3 | [`third-party-oidc.md`](third-party-oidc.md), [`remote-control.md`](remote-control.md) | Future (vague) | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
 
 The agent-token-exchange spec ([link](agent-token-exchange.md)) is a
 peer, not a phase, it runs on Phase 2's principal context but doesn't
@@ -341,45 +341,33 @@ path still works exactly as before.
 
 ## Phase 3: Future
 
-### Third-Party OIDC
+Phase 3 splits into two sibling specs, both currently `vague` and
+unblocked by Phase 2:
 
-The `pkg/oidc` package is latere.ai-specific (cookie names, userinfo
-shape, claim layout). Generic OIDC support (Keycloak, Entra ID, etc.) for
-self-hosted deployments would need a pluggable RP, either a second
-code path or a generic OIDC client behind the existing `AuthProvider`
-interface. Self-hosted non-latere.ai deployments keep using
-`WALLFACER_SERVER_API_KEY` until this ships.
+- [`shared/third-party-oidc.md`](third-party-oidc.md) —
+  pluggable OIDC so self-hosted non-latere.ai deployments can log in
+  against Keycloak, Entra ID, Okta, etc. Until this ships, those
+  deployments keep using `WALLFACER_SERVER_API_KEY`.
+- [`shared/remote-control.md`](remote-control.md) —
+  wire protocol + latere.ai-side registry that lets the latere.ai web
+  UI or a mobile client observe and operate a user's signed-in local
+  wallfacer instances. Phase 2 laid down the identity link; Phase 3
+  builds the transport.
 
 ### Audit Log (cross-entity mutation history)
 
-`CreatedBy` + `OrgID` on records answers *who originated this record*;
-it does not answer *who edited it, when, and to what*. Cross-entity
-mutation history, task state transitions, workspace config edits,
-admin actions, lives in its own spec: [`shared/audit-log.md`](audit-log.md).
+Not a Phase 3 item itself, but the third future spec that depends on
+Phase 2's principal context: `CreatedBy` + `OrgID` on records answers
+*who originated this record*; it does not answer *who edited it,
+when, and to what*. Cross-entity mutation history, task state
+transitions, workspace config edits, admin actions, lives in its own
+spec: [`shared/audit-log.md`](audit-log.md).
 
 That spec depends on Phase 2 (needs `*jwtauth.Claims` on every request)
 but is scoped separately so it doesn't balloon the cloud-unblock work.
 Phase 2 only adds one hook for it: an `actor_sub` field on the existing
 per-task event trace, so task-scoped attribution arrives with Phase 2
 and the broader cross-entity log follows later.
-
-### Remote Control
-
-When a locally-running wallfacer is signed in, the instance is **linked**
-to the user's latere.ai account. This is the foundation for remote control:
-the latere.ai web UI (or a mobile client) can observe and operate a user's
-local wallfacer instances without exposing the machine to the public
-internet.
-
-Not a paid-features gate. Not a session sync mechanism. Not a billing
-hook. Just: identity on both ends of the wire, so a latere.ai control
-plane can route a web-UI action to the right local instance.
-
-Mechanics, long-lived outbound connection vs. periodic heartbeat, the
-latere.ai-side `principal_id → [instances]` registry, the wire protocol,
-are all out of scope for this spec. The only guarantee Phase 2 has to
-make is: when sign-in happens, wallfacer records enough identity info to
-register later. Everything else is a follow-up spec.
 
 ---
 
