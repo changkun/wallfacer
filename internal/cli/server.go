@@ -225,19 +225,30 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
 
-	// Cloud mode: wire latere.ai sign-in. WALLFACER_CLOUD can live in the
-	// .env file (envCfg.Cloud) or in the process environment — the OIDC
-	// client config below already reads from os.Getenv, so accepting the
-	// flag from either source matches the user's expectation of
-	// `WALLFACER_CLOUD=true wallfacer run`.
-	cloudMode := envCfg.Cloud || envconfig.ParseBoolFlag(os.Getenv("WALLFACER_CLOUD"))
+	// Cloud mode: wire latere.ai sign-in. Both the WALLFACER_CLOUD flag
+	// and the AUTH_* vars resolve from shell env first, .env file
+	// second — users can drop everything in ~/.wallfacer/.env or export
+	// them on the command line. Shell wins so `AUTH_CLIENT_ID=other
+	// wallfacer run` is a clean override without editing the file.
+	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
+	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
 	if cloudMode {
-		// oidc.New returns nil when required env vars are missing — treat
+		authCfg := auth.Config{
+			AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
+			ClientID:     envconfig.Lookup(envFileKV, "AUTH_CLIENT_ID"),
+			ClientSecret: envconfig.Lookup(envFileKV, "AUTH_CLIENT_SECRET"),
+			RedirectURL:  envconfig.Lookup(envFileKV, "AUTH_REDIRECT_URL"),
+			CookieKey:    envconfig.Lookup(envFileKV, "AUTH_COOKIE_KEY"),
+		}
+		if authCfg.AuthURL == "" {
+			authCfg.AuthURL = "https://auth.latere.ai"
+		}
+		// oidc.New returns nil when required fields are missing — treat
 		// that as a misconfigured cloud deployment and refuse to start
 		// rather than silently running without sign-in.
-		authClient := auth.New(auth.LoadConfig())
+		authClient := auth.New(authCfg)
 		if authClient == nil {
-			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL")
+			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL (in shell env or ~/.wallfacer/.env)")
 		}
 		h.SetAuth(authClient)
 	}
