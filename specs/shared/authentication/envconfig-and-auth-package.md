@@ -1,6 +1,6 @@
 ---
 title: WALLFACER_CLOUD env flag and internal/auth re-export
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/envconfig/
@@ -82,3 +82,23 @@ foundation all other Phase 1 tasks build on.
 - Do not add auth config to the Settings UI / `.env` editor in this task;
   `WALLFACER_CLOUD` is set via shell env, not via the in-app `.env`.
 - Do not add `org_id` or `principal_id` anywhere.
+
+## Outcome
+
+Delivered. `latere.ai/x/pkg/oidc` wired into `go.mod`; `internal/auth/auth.go`
+re-exports `Client`, `Config`, `User`, `Session`, `LoadConfig`, `New`,
+`ClearSession` exactly as specified. `internal/envconfig/envconfig.go` parses
+`WALLFACER_CLOUD` with the project's existing truthy-variant rules
+(`true`/`1`/`yes`, case-insensitive).
+
+### What shipped
+- `internal/auth/auth.go` (~30 LOC) + smoke test `internal/auth/auth_test.go`
+  verifying `auth.New(auth.Config{})` returns nil (graceful-degrade contract).
+- `Cloud bool` field on `envconfig.Config` with four parse tests in
+  `internal/envconfig/envconfig_test.go` (true, false, unset, truthy variants).
+- `go.mod` / `go.sum` updated with `latere.ai/x/pkg/oidc`.
+
+### Design evolution
+No deviations. The re-export file matches the latere-ai reference layout
+line-for-line; envconfig plumbed `Cloud` through the existing boolean-field
+pattern, consumed by the CLI boot path in the follow-up routes task.

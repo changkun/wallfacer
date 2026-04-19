@@ -1,6 +1,6 @@
 ---
 title: Cloud mode documentation
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/status-bar-sign-in-badge.md
 affects:
@@ -55,3 +55,24 @@ No automated tests. Verify:
 - Do not add a CHANGELOG entry unless the project keeps one (it doesn't,
   as of this spec).
 - Do not touch marketing / external docs.
+
+## Outcome
+
+Delivered. Cloud mode has a full env-var reference, Phase 1 scope description,
+and cross-references in the agent-facing instruction files.
+
+### What shipped
+- `docs/cloud/README.md` — dedicated cloud-mode guide (~5.6K): `WALLFACER_CLOUD`
+  semantics, required/optional `AUTH_*` vars, fail-fast startup behavior,
+  orthogonality with `WALLFACER_SERVER_API_KEY`, third-party OIDC deferral.
+- `docs/guide/configuration.md` — "Cloud mode" subsection with pointer to the
+  dedicated guide.
+- `AGENTS.md` and `CLAUDE.md` — short "cloud/local partition" bullet under
+  Configuration pointing at `docs/cloud/README.md`.
+
+### Design evolution
+The spec proposed a single subsection in `docs/guide/configuration.md`. Final
+layout promotes the detail into a standalone `docs/cloud/README.md` so cloud
+deployers have a dedicated landing page; the guide subsection links out to
+it. Keeps the user-manual lean while giving the cloud-specific material
+room to grow when later phases land.

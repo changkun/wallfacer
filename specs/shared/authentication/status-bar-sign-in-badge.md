@@ -1,6 +1,6 @@
 ---
 title: Status-bar sign-in badge and front-channel logout iframe
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/http-routes-and-api-config.md
 affects:
@@ -79,3 +79,22 @@ stub `/api/config`, extend the stub to include `cloud` and `auth_url`.
   iframe.
 - Do not change any other status-bar content.
 - Do not touch the backend.
+
+## Outcome
+
+Delivered. The badge mounts only in cloud mode, renders Sign in / avatar +
+name / dropdown based on `/api/auth/me`, and the hidden front-channel iframe
+targets `${auth_url}/logout` when signed in.
+
+### What shipped
+- `ui/js/status-bar.js` — renderer reading `config.cloud` and `config.auth_url`;
+  escapes all user-controlled strings through the shared helper.
+- Styling reuses existing status-bar tokens; no new design tokens.
+- `ui/js/tests/status-bar.test.js` — regression tests for the five branches
+  (cloud=false, cloud+204, cloud+200, empty-name fallback, XSS escaping).
+
+### Design evolution
+No deviations from the spec. The renderer consumes the auto-generated route
+constants in `ui/js/generated/routes.js` for `/login`, `/logout`, and
+`/api/auth/me` rather than hard-coded strings, keeping paths in sync with
+the apicontract source.

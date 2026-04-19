@@ -1,6 +1,6 @@
 ---
 title: Cloud-gated auth routes, /api/auth/me, and /api/config extension
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/envconfig-and-auth-package.md
 affects:
@@ -102,3 +102,34 @@ fields so the frontend can decide whether to render the sign-in badge.
   session; `/api/auth/me` degrades to 204.
 - Do not touch the frontend (`ui/`) in this task.
 - Do not modify `WALLFACER_SERVER_API_KEY` handling — it remains orthogonal.
+
+## Outcome
+
+Delivered. All five routes mount only when `cfg.Cloud == true`; startup fails
+fast when cloud mode is on but OIDC env is missing; `/api/config` carries
+`cloud` and (when signed in) `auth_url`.
+
+### What shipped
+- `internal/handler/login.go` — `SetAuth`, `Login`, `Callback`, `Logout`,
+  `LogoutNotify`, `AuthMe` with the `AuthProvider` interface for fake
+  substitution in tests.
+- `internal/handler/config.go:223` — `"cloud": h.auth != nil` and conditional
+  `auth_url` field.
+- `internal/apicontract/routes.go` — five cloud-mode routes registered;
+  `ui/js/generated/routes.js` regenerated.
+- CLI boot path in `internal/cli/server.go` constructs `auth.New` only when
+  `cfg.Cloud`, and exits with a clear error when the client comes back nil.
+- `internal/handler/login_test.go` (4.5K) covers the nil-client 503 branch,
+  the 204/200 branches of `/api/auth/me`, and cookie-clear on `LogoutNotify`.
+
+### Design evolution
+1. **AuthProvider interface instead of passing `*auth.Client` directly.** The
+   spec suggested storing a nullable `*auth.Client` on the handler. In
+   practice a small interface (`HandleLogin`/`HandleCallback`/`HandleLogout`/
+   `UserFromRequest`/`AuthURL`) made tests cleaner — a fake provider beats
+   spinning up a real OIDC client. `SetAuth` is the single entry point; the
+   untyped-nil contract is preserved.
+2. **`LogoutNotify` is always safe, not "nil-independent by accident".** The
+   handler unconditionally calls `auth.ClearSession(w)` and returns 200 —
+   documented in the code comment as the intentional front-channel contract
+   rather than relying on implicit behavior.
