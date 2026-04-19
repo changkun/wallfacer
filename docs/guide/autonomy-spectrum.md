@@ -29,9 +29,9 @@ At this level, agents iterate on design rather than code. They break large specs
 
 ### Task (Managed Execution)
 
-Specs break into executable tasks on a task board. Each task runs an agent in an isolated sandbox container. The agent implements, tests, and commits changes on a dedicated branch. You review diffs, oversight summaries, and test verdicts before accepting the work.
+Specs break into executable tasks on a task board. Each task picks a **flow**, an ordered chain of sub-agents the runner walks through (refine, implement, test, commit, and so on). Each step in a flow is an agent that can be cloned or replaced, optionally pinned to a specific coding harness (Claude or Codex), and given a custom system prompt. You review diffs, oversight summaries, and test verdicts before accepting the work.
 
-This is where most day-to-day work happens. Tasks are concrete, trackable, and independently testable.
+This is where most day-to-day work happens. Tasks are concrete, trackable, and independently testable. For how to change what runs inside a task (the flow picker, cloning agents, building custom pipelines), see [Agents & Flows](agents-and-flows.md).
 
 ### Code (Direct Control)
 

@@ -20,6 +20,9 @@ Start here for the full reading order.
 ### Designing Specs
 [Designing Specs](designing-specs.md) — Plan mode layout, spec lifecycle (six states), dispatch workflow, archive/unarchive, dependency minimap.
 
+### Agents & Flows
+[Agents & Flows](agents-and-flows.md) — The four primitives (agent, flow, task, routine), how they compose, how to clone and customise, harness pinning, recipes for common customisations.
+
 ### Executing Tasks
 [Board & Tasks](board-and-tasks.md) — Task board, lifecycle, dependencies, batch creation, search.
 

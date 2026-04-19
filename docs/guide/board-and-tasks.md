@@ -55,20 +55,15 @@ Allowed transitions:
 
 Click **+ New Task** in the Backlog column header to expand the creation form. The basic fields are:
 
-1. **Flow picker** -- choose which sub-agent pipeline runs for this task. Populated from `GET /api/flows`. Built-ins:
-   - **Implement** (default) -- refine → implement → test → commit-msg ‖ title ‖ oversight. Prompt required.
-   - **Brainstorm** -- workspace scan proposes up to three new task ideas. Prompt optional.
-   - **Refine only**, **Test only** -- run a single agent. Prompt required.
+1. **Flow picker** lets you choose which sub-agent pipeline runs for this task. The dropdown is populated from `GET /api/flows` (built-ins plus any user-authored flows you've created). The default is **Implement**. **Brainstorm** accepts an empty prompt; the other built-ins (**Refine only**, **Test only**) each run a single agent.
 
-   Per-agent CLI (Claude vs Codex) used to be a per-task override in the composer; it now lives on the flow definition itself in the **Flows** sidebar tab. The composer no longer exposes an "Agent overrides" section.
+   See [Agents & Flows](agents-and-flows.md) for the full model: how to clone a built-in, pin a harness per agent, or compose a custom pipeline. This guide only covers the composer UI.
 
-2. **Prompt textarea** -- describe what the agent should do. Markdown is supported. A draft is auto-saved to local storage so you do not lose work if you navigate away. Brainstorm flows accept an empty prompt; every other flow requires one.
+2. **Prompt textarea** is where you describe what the agent should do. Markdown is supported. A draft is auto-saved to local storage so you do not lose work if you navigate away. Brainstorm flows accept an empty prompt; every other flow requires one.
 
-3. **🏷️ Tags** -- type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
+3. **🏷️ Tags**: type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
 
-4. **⏱️ Timeout** -- how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
-
-> **Harness (Claude vs Codex) lives on the agent now.** The composer used to have an **Agent** dropdown for picking Claude vs Codex per task; that control retired once each agent (`impl`, `test`, `refine`, …) can carry its own **Harness** pin. To run a flow's step on a specific harness, open the **Agents** sidebar tab, clone the agent (e.g. `impl` → `impl-codex`), set Harness = `codex`, then reference the clone in a flow. Workspace-wide defaults still live in `WALLFACER_DEFAULT_SANDBOX`.
+4. **⏱️ Timeout**: how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
 
 Click **Add** to create the task. It appears in the Backlog column with an auto-generated title.
 
@@ -193,17 +188,17 @@ Routine tasks are board cards that run on a schedule. The card itself never exec
 
 A routine card carries:
 
-- **Prompt** — what the spawned instance should do.
-- **Interval (minutes)** — the fixed schedule; minimum of 1 minute. Editable anytime.
-- **Enabled toggle** — pauses the schedule without losing the interval.
-- **Spawn kind** — usually blank (spawns a normal task); `idea-agent` is reserved for the system ideation routine.
+- **Prompt**, what the spawned instance should do.
+- **Interval (minutes)**, the fixed schedule; minimum of 1 minute. Editable anytime.
+- **Enabled toggle** pauses the schedule without losing the interval.
+- **Spawn flow** (slug), the flow each spawned instance runs against. Defaults to `implement`; the system ideation routine uses `brainstorm`. See [Agents & Flows](agents-and-flows.md) for how to author or pick a flow.
 
-The interactive controls live on the routine card (a dedicated UI ships alongside this feature). Programmatic access is exposed via the `/api/routines` endpoints:
+The interactive controls live on the routine card. Programmatic access is exposed via the `/api/routines` endpoints:
 
-- `GET /api/routines` — list routine cards with their schedules and next-run times.
-- `POST /api/routines` — create a routine: `{prompt, interval_minutes, spawn_kind?, enabled?, tags?, timeout?}`.
-- `PATCH /api/routines/{id}/schedule` — update interval and/or enabled flag; fields omitted from the body are left unchanged.
-- `POST /api/routines/{id}/trigger` — fire immediately; the scheduled cycle continues unchanged afterwards.
+- `GET /api/routines`, list routine cards with their schedules and next-run times.
+- `POST /api/routines`, create a routine: `{prompt, interval_minutes, spawn_flow?, spawn_kind?, enabled?, tags?, timeout?}`. `spawn_flow` wins when both are present; `spawn_kind` is the legacy field the server still accepts for back-compat.
+- `PATCH /api/routines/{id}/schedule`, update interval and/or enabled flag; fields omitted from the body are left unchanged.
+- `POST /api/routines/{id}/trigger`, fire immediately; the scheduled cycle continues unchanged afterwards.
 
 Routine cards are filtered out of auto-promote, auto-refine, and the dependency graph — they stay pinned in backlog regardless of capacity. To remove a routine, delete its card with `DELETE /api/tasks/{id}` (or the UI's delete action); its pending fires are dropped atomically.
 
@@ -400,9 +395,9 @@ For backlog tasks, the right panel shows the AI refinement interface instead:
 Each card on the board displays:
 
 - **Title** -- auto-generated from the prompt after creation, or set manually
-- **Prompt preview** -- the card body shows the task's prompt. For idea-agent tasks, the execution prompt is shown instead.
+- **Prompt preview** -- the card body shows the task's prompt. For brainstorm-flow tasks (or legacy `idea-agent` kind), the execution prompt is shown instead.
 - **Status badge** -- color-coded indicator of the current state (backlog, in progress, waiting, done, failed, cancelled)
-- **Tags** -- user-defined labels for categorization; special tag styles exist for `idea-agent`, `priority:N`, `impact:N`, and brainstorm categories
+- **Tags** -- user-defined labels for categorization; special tag styles exist for `idea-agent` (legacy), `priority:N`, `impact:N`, and brainstorm categories
 - **Dependency badge** -- for backlog tasks with dependencies: amber "blocked" badge (with unmet count) or green "ready" badge when all prerequisites are done
 - **Time** -- elapsed time since the task started or was created
 - **Cost** -- accumulated USD cost across all turns

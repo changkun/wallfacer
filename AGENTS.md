@@ -170,8 +170,8 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### Tasks
 - `GET /api/tasks` — List all tasks (optionally including archived)
-- `POST /api/tasks` — Create task (JSON: `{prompt, timeout}`)
-- `POST /api/tasks/batch` — Create multiple tasks atomically with symbolic dependency wiring
+- `POST /api/tasks` — Create task (JSON: `{prompt, flow?, timeout, tags?, ...}`). `flow` is a flow slug from `/api/flows`; defaults to `implement` when omitted. **Does not accept `sandbox` or `sandbox_by_activity`** — harness lives on the agent definition, and per-task sandbox overrides are applied via `PATCH /api/tasks/{id}` after creation.
+- `POST /api/tasks/batch` — Create multiple tasks atomically with symbolic dependency wiring; same `flow` support and same sandbox rejection rule as the singular endpoint.
 - `PATCH /api/tasks/{id}` — Update status/position/prompt/timeout/sandbox/dependencies/fresh_start
 - `DELETE /api/tasks/{id}` — Soft-delete task (tombstone); data retained within retention window
 - `POST /api/tasks/{id}/feedback` — Submit feedback for waiting tasks
@@ -219,16 +219,36 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `POST /api/tasks/{id}/refine/apply` — Apply refined prompt to task
 - `POST /api/tasks/{id}/refine/dismiss` — Dismiss refinement result without applying
 
+### Agents
+- `GET /api/agents` — List merged built-in + user-authored agent catalog
+- `GET /api/agents/{slug}` — Get one agent's full descriptor including its prompt template body
+- `POST /api/agents` — Create a user-authored agent (rejects slugs that shadow a built-in)
+- `PUT /api/agents/{slug}` — Update a user-authored agent (409 on built-in slugs)
+- `DELETE /api/agents/{slug}` — Delete a user-authored agent (409 on built-in slugs)
+
+User agents live as YAML under `~/.wallfacer/agents/` (overridable via `WALLFACER_AGENTS_DIR`). The runner watches the directory via fsnotify and reloads the merged registry within a ~150ms debounce on any change.
+
+### Flows
+- `GET /api/flows` — List merged built-in + user-authored flow catalog
+- `GET /api/flows/{slug}` — Get one flow's full descriptor including its step chain and resolved agent names
+- `POST /api/flows` — Create a user-authored flow (rejects slugs that shadow a built-in)
+- `PUT /api/flows/{slug}` — Update a user-authored flow (409 on built-in slugs)
+- `DELETE /api/flows/{slug}` — Delete a user-authored flow (409 on built-in slugs)
+
+User flows live as YAML under `~/.wallfacer/flows/` (overridable via `WALLFACER_FLOWS_DIR`). Same fsnotify watching as agents.
+
+Built-in flows: `implement` (refine? → impl → test → commit-msg ‖ title ‖ oversight), `brainstorm` (ideate), `refine-only` (refine), `test-only` (test).
+
 ### Ideation
 - `GET /api/ideate` — Get current ideation session state (reads from the system:ideation routine card)
 - `POST /api/ideate` — Fire the ideation routine immediately; auto-bootstraps the routine if missing
 - `DELETE /api/ideate` — Cancel the currently-running idea-agent instance task (routine card unaffected)
 
-Ideation is implemented as a routine task (`Kind=routine`, `Tags=["system:ideation"]`, `RoutineSpawnKind=idea-agent`) that the scheduler engine in `internal/routine/` fires on its configured cadence. See the Routines section above for the generic primitive.
+Ideation is implemented as a routine task (`Kind=routine`, `Tags=["system:ideation"]`, `RoutineSpawnFlow=brainstorm`) that the scheduler engine in `internal/routine/` fires on its configured cadence. See the Routines section below for the generic primitive.
 
 ### Routines
 - `GET /api/routines` — List routine cards with schedules and next-run times
-- `POST /api/routines` — Create a routine (JSON: `{prompt, interval_minutes, spawn_kind?, enabled?, tags?, timeout?}`)
+- `POST /api/routines` — Create a routine (JSON: `{prompt, interval_minutes, spawn_flow?, spawn_kind?, enabled?, tags?, timeout?}`). `spawn_flow` (a flow slug) wins over `spawn_kind` (legacy) when both are present.
 - `PATCH /api/routines/{id}/schedule` — Update interval and/or enabled flag (JSON: `{interval_minutes?, enabled?}`); omitted fields left unchanged
 - `POST /api/routines/{id}/trigger` — Fire immediately; scheduled cycle continues unchanged
 - Deletion uses `DELETE /api/tasks/{id}` (routine cards are tasks)

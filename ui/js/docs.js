@@ -60,7 +60,12 @@ function renderDocsNav() {
       "</div>";
     categories[cat].forEach(function (entry) {
       var active = entry.slug === _docsCurrentSlug;
-      // Show step number for ordered guide docs (skip the index page which is usage.md, order=9).
+      // Show step number for ordered guide docs. The index page (usage.md
+      // for the guide, internals.md for internals) is excluded via isIndex
+      // so it renders with a hamburger glyph instead of a step digit.
+      // Step numbers come from the Reading Order parser in cli/server.go
+      // and update automatically when the order section gains or loses
+      // entries.
       var prefix = "";
       var isIndex =
         entry.slug === "guide/usage" || entry.slug === "internals/internals";

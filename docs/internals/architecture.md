@@ -119,8 +119,25 @@ flowchart LR
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
     PubSub --> Refiner["Auto-refiner<br/>launch refinement agent<br/>on unrefined backlog tasks"]
-    PubSub --> Ideation["Ideation watcher<br/>launch idea-agent<br/>on interval"]
+    PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>spawn tasks against flow"]
 ```
+
+### Agents, flows, and the dispatch layer
+
+At task execution time the runner consults two registries before it invokes any CLI:
+
+- `internal/agents/` holds the **Role** descriptors (`impl`, `test`, `refine`, `title`, `oversight`, `commit-msg`, `ideate`) plus any user-authored clones loaded from `~/.wallfacer/agents/`. A role pins a harness (Claude or Codex), declares capabilities, and optionally carries a system-prompt preamble.
+- `internal/flow/` holds **Flow** definitions: ordered step chains that reference roles by slug. Four built-ins ship (`implement`, `brainstorm`, `refine-only`, `test-only`); user flows live under `~/.wallfacer/flows/`.
+
+Both directories are fsnotify-watched; edits reload the merged registry within ~150 ms without restarting the server.
+
+Task execution picks one of three dispatch paths:
+
+- `flow == "implement"` → the turn-loop path in `execute.go` (refine → impl → test → commit pipeline with full session-recovery semantics).
+- `flow == "brainstorm"` (or legacy `Kind = idea-agent`) → `runIdeationTask`, which parses ideate output and creates backlog tasks.
+- any other flow slug → the flow engine in `internal/flow/engine.go`. It walks steps linearly, fans parallel-sibling groups through an `errgroup`, and launches each role via `Runner.RunAgent`.
+
+See [Agents & Flows](../guide/agents-and-flows.md) for the full user-facing model.
 
 ## Component Responsibilities
 

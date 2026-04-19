@@ -45,7 +45,8 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
 | `Title` | `string` | `title` | Display title (auto-generated or user-set) |
-| `Kind` | `TaskKind` | `kind` | Execution mode: `""` (standard task) or `"idea-agent"` |
+| `Kind` | `TaskKind` | `kind` | Legacy execution mode. `""` for a standard task, `"idea-agent"` for pre-flow ideation records, `"routine"` for routine cards, `"planning"` for the planning sandbox. Resolves to a flow slug via the legacy mapper when `FlowID` is empty. |
+| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. New tasks always set this; legacy records fall through to the `Kind` mapper. Built-in slugs: `implement`, `brainstorm`, `refine-only`, `test-only`. See [Agents & Flows](../guide/agents-and-flows.md). |
 | `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"idea-agent"`) |
 
 ### State and Lifecycle
@@ -83,8 +84,8 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `StopReason` | `*string` | `stop_reason` | Why the agent stopped (`end_turn`, `max_tokens`, etc.) |
 | `Turns` | `int` | `turns` | Number of agent turns completed |
 | `Timeout` | `int` | `timeout` | Timeout in minutes (clamped to 1-1440, default 60) |
-| `Sandbox` | `sandbox.Type` | `sandbox` | Sandbox type: `"claude"`, `"codex"` |
-| `SandboxByActivity` | `map[SandboxActivity]sandbox.Type` | `sandbox_by_activity` | Per-activity sandbox overrides |
+| `Sandbox` | `sandbox.Type` | `sandbox` | Workspace-level sandbox hint (`"claude"`, `"codex"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's 4-tier resolver reads it below the agent's Harness pin. |
+| `SandboxByActivity` | `map[SandboxActivity]sandbox.Type` | `sandbox_by_activity` | **Deprecated.** Per-activity sandbox overrides. New tasks don't populate this; harness routing lives on the agent definition now. The runner still reads it if present for back-compat. |
 | `ModelOverride` | `*string` | `model_override` | Per-task model override; nil = global default |
 | `Environment` | `*ExecutionEnvironment` | `environment` | Runtime environment snapshot for reproducibility |
 
@@ -318,7 +319,7 @@ type Tombstone struct {
 
 ### SandboxActivity
 
-Identifies which phase of a task a container run belongs to. Used for per-activity sandbox routing and usage attribution:
+Identifies which phase of a task a container run belongs to. Primary use today is **usage attribution**: token and cost totals roll up per activity so the cost dashboard can break spend down by role. The legacy per-activity sandbox routing tier (env vars like `WALLFACER_SANDBOX_IMPLEMENTATION`) still keys off these values for back-compat, but new installs should pin harness on the agent definition instead. See [Agents & Flows](../guide/agents-and-flows.md).
 
 | Constant | Value | Usage |
 |---|---|---|

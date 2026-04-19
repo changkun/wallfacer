@@ -113,7 +113,7 @@ currently running, it launches the refinement agent to produce a
 detailed implementation spec. Only one refinement is triggered per poll
 cycle to avoid overwhelming the system.
 
-Tasks created by the brainstorm agent (idea-agent tasks) are skipped.
+Tasks created by the brainstorm flow (whose own sub-agent is the `ideate` role) are skipped, along with legacy records carrying `Kind = idea-agent`.
 
 **When to use:** Enable this when you want every task to be refined
 before execution, especially useful when combined with Autopilot so

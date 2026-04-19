@@ -2,6 +2,8 @@
 
 Wallfacer includes two AI-powered features that help you work with tasks before they execute: **Prompt Refinement** sharpens a task prompt into a detailed implementation spec by analyzing your codebase, and **Ideation** proposes entirely new task ideas by exploring your workspace for improvement opportunities. Both run inside read-only sandbox containers and never modify your code.
 
+> **Under the hood these are just flows.** Refinement is a dedicated `refine` agent; the **Refine** tab in the task modal dispatches it directly against the backlog task. Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. The rest of this guide focuses on the surface behaviour. If you want to clone either agent, pin a harness, or build a flow that includes refinement as one step of a larger pipeline, see [Agents & Flows](agents-and-flows.md).
+
 ---
 
 ## 📋 Essentials
@@ -62,7 +64,7 @@ The ideation agent analyzes your workspace -- reading source files, project mani
 
 #### How it works (after the routine-tasks rollout)
 
-Ideation is now one instance of the generic **routine task** primitive. The server materializes a `system:ideation`-tagged routine card on first boot; its schedule and enabled flag live on the card itself, and the scheduler engine fires it to spawn idea-agent instance tasks.
+Ideation is now one instance of the generic **routine task** primitive. The server materializes a `system:ideation`-tagged routine card on first boot; its schedule and enabled flag live on the card itself, and the scheduler engine fires it to spawn instance tasks against the built-in `brainstorm` flow. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and dispatch identically via the legacy-kind mapper.
 
 Two control surfaces exist, and both edit the same underlying routine:
 
@@ -82,7 +84,7 @@ Once enabled, you can trigger runs manually or configure an automatic interval.
 
 #### Triggering a Brainstorm
 
-Click the **Ideate** button in the header toolbar. This immediately creates an idea-agent task card and starts the brainstorm container. The card appears in the In Progress column with a title like "Brainstorm Mar 21, 2026 14:30".
+Click the **Ideate** button in the header toolbar. This immediately fires the system-ideation routine, which creates a task against the `brainstorm` flow and starts the ideate agent in a sandbox container. The card appears in the In Progress column with a title like "Brainstorm Mar 21, 2026 14:30".
 
 You can also trigger ideation via the API:
 
@@ -122,7 +124,7 @@ Cancel a brainstorm in one of two ways:
 - Click the **Ideate** button again while a brainstorm is running
 - Use the API: `DELETE /api/ideate`
 
-This kills the container and marks the idea-agent task as cancelled.
+This kills the container and marks the brainstorm instance task as cancelled. The routine card itself is unaffected and fires again on its next scheduled tick.
 
 ---
 
