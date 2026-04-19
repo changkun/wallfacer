@@ -4479,3 +4479,46 @@ func TestAutoPromote_PromotesAfterOrphanedDepCleared(t *testing.T) {
 		t.Errorf("expected C promoted after B done, still in backlog")
 	}
 }
+
+// TestCreateTask_FlowBrainstormAllowsEmptyPrompt confirms that the
+// brainstorm flow (new way) lets callers POST with an empty prompt,
+// mirroring the legacy Kind="idea-agent" allowance.
+func TestCreateTask_FlowBrainstormAllowsEmptyPrompt(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"prompt": "", "flow": "brainstorm", "timeout": 10}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var task store.Task
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if task.FlowID != "brainstorm" {
+		t.Errorf("FlowID = %q, want brainstorm", task.FlowID)
+	}
+}
+
+// TestCreateTask_FlowFieldPersisted asserts explicit flow request
+// bodies round-trip to the stored task without mutation.
+func TestCreateTask_FlowFieldPersisted(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"prompt": "refine this", "flow": "refine-only", "timeout": 5}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var task store.Task
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if task.FlowID != "refine-only" {
+		t.Errorf("FlowID = %q, want refine-only", task.FlowID)
+	}
+}

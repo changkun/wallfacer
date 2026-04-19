@@ -388,8 +388,19 @@ func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb sandbox.Ty
 	})
 }
 
-// UpdateTaskModelOverride sets or clears the per-task model override.
-// Passing a non-empty string sets the override; an empty string clears it (sets to nil).
+// UpdateTaskFlow sets the flow slug a task runs against. Empty string
+// clears the field so the runner's legacy Kind→Flow resolver picks
+// the default. Callers validate the slug against the flow registry
+// before calling.
+func (s *Store) UpdateTaskFlow(_ context.Context, id uuid.UUID, flowID string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.FlowID = flowID
+		return nil
+	})
+}
+
+// UpdateTaskModelOverride replaces the task's per-task model pin;
+// empty string clears it.
 func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model string) error {
 	model = strings.TrimSpace(model)
 	return s.mutateTask(id, func(t *Task) error {

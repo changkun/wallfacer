@@ -173,6 +173,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Sandbox            sandbox.Type                           `json:"sandbox"`
 		SandboxByActivity  map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 		Kind               store.TaskKind                         `json:"kind"`
+		Flow               string                                 `json:"flow"`
 		Tags               []string                               `json:"tags"`
 		MaxCostUSD         float64                                `json:"max_cost_usd"`
 		MaxInputTokens     int                                    `json:"max_input_tokens"`
@@ -184,7 +185,11 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if strings.TrimSpace(req.Prompt) == "" && req.Kind != store.TaskKindIdeaAgent {
+	// Brainstorm tasks (legacy Kind="idea-agent" or new Flow="brainstorm")
+	// are the one case where an empty prompt is allowed: the agent
+	// derives the topic from the workspace itself.
+	isBrainstorm := req.Flow == "brainstorm" || req.Kind == store.TaskKindIdeaAgent
+	if strings.TrimSpace(req.Prompt) == "" && !isBrainstorm {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
@@ -207,6 +212,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Tags:               req.Tags,
 		MountWorktrees:     req.MountWorktrees,
 		Kind:               req.Kind,
+		FlowID:             req.Flow,
 		Sandbox:            req.Sandbox,
 		SandboxByActivity:  req.SandboxByActivity,
 		MaxCostUSD:         req.MaxCostUSD,

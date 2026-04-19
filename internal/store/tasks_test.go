@@ -2,6 +2,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -1845,5 +1846,79 @@ func TestTaskSpecSourcePath_OmittedFromJSONWhenEmpty(t *testing.T) {
 	}
 	if strings.Contains(string(data), "spec_source_path") {
 		t.Error("spec_source_path should be omitted from JSON when empty")
+	}
+}
+
+// TestCreateTaskWithFlow_PersistsFlowID asserts FlowID round-trips
+// through CreateTaskWithOptions and the JSON persistence layer.
+func TestCreateTaskWithFlow_PersistsFlowID(t *testing.T) {
+	s, err := NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+	defer s.Close()
+
+	task, err := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{
+		Prompt: "write tests",
+		FlowID: "refine-only",
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	if task.FlowID != "refine-only" {
+		t.Errorf("task.FlowID = %q, want refine-only", task.FlowID)
+	}
+
+	// Reload from disk to confirm persistence.
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.FlowID != "refine-only" {
+		t.Errorf("reloaded FlowID = %q, want refine-only", got.FlowID)
+	}
+}
+
+// TestTaskFlowID_OmittedFromJSONWhenEmpty guards the omitempty tag so
+// pre-migration task records don't grow a spurious "flow_id":"" key.
+func TestTaskFlowID_OmittedFromJSONWhenEmpty(t *testing.T) {
+	task := Task{Prompt: "test"}
+	data, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(data), "flow_id") {
+		t.Error("flow_id should be omitted from JSON when empty")
+	}
+}
+
+// TestUpdateTaskFlow_WritesField guards the post-create writer so the
+// composer's "reflow" follow-up can swap a task's flow after creation.
+func TestUpdateTaskFlow_WritesField(t *testing.T) {
+	s, err := NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+	defer s.Close()
+
+	task, err := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p"})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	if err := s.UpdateTaskFlow(context.Background(), task.ID, "test-only"); err != nil {
+		t.Fatalf("UpdateTaskFlow: %v", err)
+	}
+	got, _ := s.GetTask(context.Background(), task.ID)
+	if got.FlowID != "test-only" {
+		t.Errorf("FlowID = %q, want test-only", got.FlowID)
+	}
+
+	// Clearing works.
+	if err := s.UpdateTaskFlow(context.Background(), task.ID, ""); err != nil {
+		t.Fatalf("UpdateTaskFlow clear: %v", err)
+	}
+	got, _ = s.GetTask(context.Background(), task.ID)
+	if got.FlowID != "" {
+		t.Errorf("cleared FlowID = %q, want empty", got.FlowID)
 	}
 }

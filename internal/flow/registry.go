@@ -69,6 +69,25 @@ func (r *Registry) ResolveLegacyKind(kind store.TaskKind) (Flow, bool) {
 	}
 }
 
+// ResolveForTask returns the slug of the flow a task should run
+// against. Precedence: the task's explicit FlowID wins; otherwise
+// fall back to ResolveLegacyKind so pre-migration records dispatch
+// correctly; otherwise "implement" as a last resort. This helper
+// lives on the flow Registry (rather than as a *Task method) because
+// the store package cannot import flow without creating a cycle.
+func (r *Registry) ResolveForTask(t *store.Task) string {
+	if t == nil {
+		return "implement"
+	}
+	if t.FlowID != "" {
+		return t.FlowID
+	}
+	if f, ok := r.ResolveLegacyKind(t.Kind); ok {
+		return f.Slug
+	}
+	return "implement"
+}
+
 // cloneFlow produces a defensive deep copy of a Flow. Used by Get and
 // List so callers can mutate the returned value without affecting the
 // registry.
