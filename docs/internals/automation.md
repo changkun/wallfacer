@@ -187,7 +187,7 @@ Tasks can have an `AutoRetryBudget map[FailureCategory]int` that specifies how m
 3. The task is automatically reset to `backlog` for a fresh run
 4. `AutoRetryCount` tracks the total number of auto-retries consumed
 
-A global cap (`maxTotalAutoRetries`) prevents infinite retry loops regardless of per-category budgets.
+A global cap (`constants.MaxAutoRetries`, currently 3) prevents infinite retry loops regardless of per-category budgets.
 
 Failure categories:
 

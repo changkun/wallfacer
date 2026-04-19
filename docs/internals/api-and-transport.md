@@ -28,6 +28,16 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
 | `PUT /api/workspaces` | Replace the active workspace set and switch the scoped task board |
+| `POST /api/workspaces/mkdir` | Create a new directory under a mounted workspace |
+| `POST /api/workspaces/rename` | Rename a file or directory inside a mounted workspace |
+| **Cloud authentication** (only active when `WALLFACER_CLOUD=true`) | |
+| `GET /login` | Begin the hosted sign-in flow |
+| `GET /callback` | OAuth callback target for the hosted sign-in flow |
+| `GET /logout` | Clear the session cookie and redirect to the sign-in page |
+| `GET /logout/notify` | Notify peers that this browser session has logged out |
+| `GET /api/auth/me` | Return the current principal (user + active org) |
+| `GET /api/auth/orgs` | List organizations the current user can switch to |
+| `POST /api/auth/switch-org` | Switch the active organization for subsequent requests |
 | **Ideation / brainstorm** | |
 | `GET /api/ideate` | Get brainstorm/ideation agent status |
 | `POST /api/ideate` | Trigger the ideation agent to generate new task ideas |
@@ -156,30 +166,38 @@ The HTTP server wraps the `ServeMux` in a layered middleware chain. Each request
 flowchart LR
     Request --> Logging["loggingMiddleware<br/>(server.go)"]
     Logging --> CSRF["CSRFMiddleware<br/>(handler/middleware.go)"]
-    CSRF --> Auth["BearerAuthMiddleware<br/>(handler/middleware.go)"]
-    Auth --> Mux["ServeMux route matching"]
+    CSRF --> Cookie["CookiePrincipal<br/>(internal/auth)"]
+    Cookie --> Optional["OptionalAuth<br/>(internal/auth)"]
+    Optional --> Bearer["BearerAuthMiddleware<br/>(handler/middleware.go)"]
+    Bearer --> Force["ForceLogin<br/>(handler/force_login.go)"]
+    Force --> Mux["ServeMux route matching"]
     Mux --> BodyLimit["MaxBytesMiddleware<br/>(per-route, handler/middleware.go)"]
     BodyLimit --> StoreGuard["RequireStoreMiddleware<br/>(per-route, handler/handler.go)"]
     StoreGuard --> Handler["Handler method"]
 ```
 
-The chain is assembled in `server.go` line 320:
+The chain is assembled in `internal/cli/server.go` (outermost first: logging → CSRF → CookiePrincipal → OptionalAuth → BearerAuth → ForceLogin → mux):
 ```go
-srv := &http.Server{
-    Handler: loggingMiddleware(
-        CSRFMiddleware(actualHostPort)(
-            BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
-        ), reg),
+srvHandler := h.ForceLogin(mux)
+srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
+srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
+srvHandler = auth.CookiePrincipal(authClient, jwtValidator, srvHandler)
+if !cfg.SkipCSRF {
+    srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 }
+srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 ```
 
 ### What each middleware does
 
 | Layer | Location | Behaviour |
 |---|---|---|
-| **Logging** | `server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels. |
+| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **Auth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead (browser WebSocket and EventSource APIs cannot set custom headers). No-op when no API key is configured. |
+| **CookiePrincipal** | `internal/auth` `CookiePrincipal()` | Cloud-mode only: resolves the session cookie into a principal (user + org claims) and injects it into the request context. No-op when the request has no cookie or cloud mode is disabled. |
+| **OptionalAuth** | `internal/auth` `OptionalAuth()` | Cloud-mode only: if a `Bearer` JWT is present, validates it against the configured JWKS and puts the resulting `*Claims` into the request context. JWT wins over the cookie when both are present; missing tokens pass through. |
+| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), OAuth routes (`/login`, `/callback`, `/logout`), and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead. Bypasses its static-key check when cloud claims are already populated so cookie-only browser requests succeed alongside script clients. No-op when no API key is configured. |
+| **ForceLogin** | `handler/force_login.go` `ForceLogin()` | Cloud-mode only: redirects unauthenticated browser requests for the app shell to `/login`. API routes return 401 instead. No-op in local mode. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Instructions: 5 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`. |
 
@@ -201,12 +219,12 @@ sequenceDiagram
     Handler->>Handler: Serialise full task list as JSON
     Handler-->>UI: SSE: data: {json}
 
-    Note over Handler: Buffered channel (size 64)
+    Note over Handler: Buffered channel (size 256)
     Note over Handler: Incremental deltas sent,
     Note over Handler: with replay buffer for reconnection
 ```
 
-`notify()` uses buffered channels of size 64. Each state change produces a `SequencedDelta` that is fanned out to all subscribers. A replay buffer (up to 512 entries) enables reconnecting clients to catch up on missed deltas.
+`notify()` uses buffered channels of size 256 (`pubsub.DefaultChannelSize`). Each state change produces a `SequencedDelta` that is fanned out to all subscribers. A replay buffer (up to 512 entries, `pubsub.DefaultReplayCapacity`) enables reconnecting clients to catch up on missed deltas.
 
 The same pattern applies to `GET /api/git/stream`, except the source is a time-based ticker (polling `git status` every few seconds) rather than a store write signal.
 
@@ -218,7 +236,7 @@ Implemented in `Handler.StreamTasks()` (`internal/handler/stream.go`).
 
 #### Subscriber Registration
 
-On each SSE connection, the handler calls `store.Subscribe()`, which allocates a buffered channel of size 64 (`make(chan SequencedDelta, 64)`) and registers it in the store's `subscribers` map under a monotonically increasing integer ID.
+On each SSE connection, the handler calls `store.Subscribe()`, which allocates a buffered channel sized at `pubsub.DefaultChannelSize` (256) and registers it in the store's `subscribers` map under a monotonically increasing integer ID.
 
 The subscription is created **before** reading any state, ensuring no events are missed between the initial snapshot and the live loop.
 
@@ -252,7 +270,7 @@ default:  // channel full — drop this delta for this subscriber
 }
 ```
 
-If a subscriber's buffer (64 slots) is full, the delta is silently dropped for that subscriber. The subscriber will eventually receive a later delta; if it reconnects, the replay buffer provides catch-up. All deltas sent to subscribers are deep clones of the task state, preventing data races.
+If a subscriber's buffer (256 slots) is full, the delta is silently dropped for that subscriber. The subscriber will eventually receive a later delta; if it reconnects, the replay buffer provides catch-up. All deltas sent to subscribers are deep clones of the task state, preventing data races.
 
 #### Connection Cleanup
 
