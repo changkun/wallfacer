@@ -216,7 +216,7 @@
         "harness",
         agent.harness || "",
         [
-          { value: "", label: "— use workspace default —" },
+          { value: "", label: "(use workspace default)" },
           { value: "claude", label: "Claude" },
           { value: "codex", label: "Codex" },
         ],
@@ -239,16 +239,17 @@
     // agent on edit so the current body is prefilled.
     editor.appendChild(
       labeledTextarea(
-        "System prompt — optional",
+        "System Prompt",
         "prompt_tmpl",
         agent.prompt_tmpl || "",
         {
           rows: 8,
           hint:
-            "Leave empty to inherit from the built-in prompt template. " +
-            "Runtime use of custom prompt bodies ships in a follow-up; " +
-            "today the field is persisted and displayed but the runner " +
-            "still loads the named template for built-in agent slots.",
+            "Optional. Leave empty to inherit from the built-in " +
+            "template. Runtime use of custom prompt bodies ships in " +
+            "a follow-up; today the field is persisted and displayed " +
+            "but the runner still loads the named template for " +
+            "built-in agent slots.",
         },
       ),
     );
