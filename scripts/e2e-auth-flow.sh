@@ -102,22 +102,23 @@ printf "\n  email: "; read -r EMAIL
 [ -n "$EMAIL" ] || { bad "email required"; exit 1; }
 
 step "4. POST /login/email — trigger OTP send"
-send_status="$(jc -X POST \
+# Single POST: send body to a temp file, status to stdout. Avoids
+# sending a second email (which would invalidate the first code).
+send_body_file="$(mktemp -t wf-e2e-body-XXXXXX)"
+send_status="$(curl -sS -b "$COOKIE_JAR" -c "$COOKIE_JAR" -X POST \
   --data-urlencode "email=$EMAIL" \
   --data-urlencode "csrf_token=$csrf_form" \
+  -o "$send_body_file" -w "%{http_code}" \
   "$AUTH_URL/login/email")"
 case "$send_status" in
   200|302) ok "send-code accepted (HTTP $send_status)";;
-  *) bad "send-code failed (HTTP $send_status)"; exit 1;;
+  *) bad "send-code failed (HTTP $send_status)"; rm -f "$send_body_file"; exit 1;;
 esac
 
 # The response HTML renders a fresh CSRF token for the verify form.
-csrf_verify="$(curl -sS -b "$COOKIE_JAR" -c "$COOKIE_JAR" -X POST \
-  --data-urlencode "email=$EMAIL" \
-  --data-urlencode "csrf_token=$csrf_form" \
-  "$AUTH_URL/login/email" |
-  awk 'match($0, /name="csrf_token"[^>]*value="[^"]*"/) { s=substr($0,RSTART,RLENGTH); sub(/.*value="/,"",s); sub(/".*/,"",s); print s; exit }')"
-[ -n "$csrf_verify" ] && ok "verify CSRF token ready" || info "no second CSRF (re-using first)"
+csrf_verify="$(awk 'match($0, /name="csrf_token"[^>]*value="[^"]*"/) { s=substr($0,RSTART,RLENGTH); sub(/.*value="/,"",s); sub(/".*/,"",s); print s; exit }' "$send_body_file")"
+rm -f "$send_body_file"
+[ -n "$csrf_verify" ] && ok "verify CSRF token ready" || info "no CSRF in verify form (re-using first)"
 
 printf "\n  6-digit code from your inbox: "; read -r CODE
 [ -n "$CODE" ] || { bad "code required"; exit 1; }
