@@ -9,14 +9,24 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
-// flowRegistry returns the process-wide flow registry. Built-in flows
-// are static so a single package-level value is safe; user-authored
-// flows arrive in a later task and will migrate this to a Handler
-// field.
+// flowRegistry returns the merged built-in + user-authored flow
+// registry. Prefers the runner's registry when a runner is wired so
+// the handler sees exactly the same catalog the dispatcher executes
+// against. Tests without a runner fall back to a built-in-only
+// singleton.
 var (
 	flowRegOnce sync.Once
 	flowReg     *flow.Registry
 )
+
+func (h *Handler) flowsRegistry() *flow.Registry {
+	if h.runner != nil {
+		if reg := h.runner.FlowsRegistry(); reg != nil {
+			return reg
+		}
+	}
+	return flowRegistry()
+}
 
 func flowRegistry() *flow.Registry {
 	flowRegOnce.Do(func() {
@@ -79,10 +89,9 @@ func describeFlow(f flow.Flow) FlowResponse {
 	}
 }
 
-// ListFlows returns the full built-in flow catalog in registration
-// order.
+// ListFlows returns the merged flow catalog in registration order.
 func (h *Handler) ListFlows(w http.ResponseWriter, _ *http.Request) {
-	flows := flowRegistry().List()
+	flows := h.flowsRegistry().List()
 	out := make([]FlowResponse, 0, len(flows))
 	for _, f := range flows {
 		out = append(out, describeFlow(f))
@@ -93,7 +102,7 @@ func (h *Handler) ListFlows(w http.ResponseWriter, _ *http.Request) {
 // GetFlow returns one flow by slug. 404 when the slug is unknown.
 func (h *Handler) GetFlow(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	f, ok := flowRegistry().Get(slug)
+	f, ok := h.flowsRegistry().Get(slug)
 	if !ok {
 		http.Error(w, "unknown flow: "+slug, http.StatusNotFound)
 		return

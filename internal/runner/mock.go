@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -269,3 +270,13 @@ func (m *MockRunner) AgentsDir() string { return "" }
 
 // ReloadAgents is a no-op on the mock.
 func (m *MockRunner) ReloadAgents() error { return nil }
+
+// FlowsRegistry returns the built-in flow catalog. Mirrors
+// AgentsRegistry for symmetry with the concrete Runner.
+func (m *MockRunner) FlowsRegistry() *flow.Registry { return flow.NewBuiltinRegistry() }
+
+// FlowsDir returns an empty string on the mock.
+func (m *MockRunner) FlowsDir() string { return "" }
+
+// ReloadFlows is a no-op on the mock.
+func (m *MockRunner) ReloadFlows() error { return nil }
