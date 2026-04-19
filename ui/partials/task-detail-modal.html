@@ -1271,6 +1271,83 @@
 
           <!-- Right aside: compact summary (agent / budget / git / links) -->
           <aside id="modal-aside" class="modal-aside hidden">
+            <!-- Actions first: task lifecycle transitions are what the user
+                 comes to this modal to do, so they lead the aside rather
+                 than hiding beneath the read-only summary rows. -->
+            <div class="mdl-section modal-aside__actions">
+              <div class="mdl-h">Actions</div>
+              <div id="modal-start-section" class="hidden">
+                <button
+                  type="button"
+                  onclick="startTask()"
+                  class="aside-action aside-action--primary"
+                  title="Promote this task from Backlog to In Progress"
+                >
+                  <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
+                  <span class="aside-action__body">
+                    <span class="aside-action__label">Start task</span>
+                    <span class="aside-action__hint">move to In Progress</span>
+                  </span>
+                </button>
+              </div>
+              <div id="modal-archive-section" class="hidden">
+                <button
+                  type="button"
+                  onclick="archiveTask()"
+                  class="aside-action"
+                  title="Hide this task from the Done column"
+                >
+                  <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
+                  <span class="aside-action__body">
+                    <span class="aside-action__label">Archive</span>
+                    <span class="aside-action__hint">hide from Done</span>
+                  </span>
+                </button>
+              </div>
+              <div id="modal-unarchive-section" class="hidden">
+                <button
+                  type="button"
+                  onclick="unarchiveTask()"
+                  class="aside-action"
+                  title="Restore this task to the Done column"
+                >
+                  <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
+                  <span class="aside-action__body">
+                    <span class="aside-action__label">Unarchive</span>
+                    <span class="aside-action__hint">restore to Done</span>
+                  </span>
+                </button>
+              </div>
+              <div id="modal-cancel-section" class="hidden">
+                <button
+                  type="button"
+                  id="modal-cancel-btn"
+                  onclick="cancelTask()"
+                  class="aside-action aside-action--warn"
+                  title="Discard prepared changes and move task to Cancelled"
+                >
+                  <span class="aside-action__icon" aria-hidden="true">&#9209;</span>
+                  <span class="aside-action__body">
+                    <span class="aside-action__label">Cancel</span>
+                    <span class="aside-action__hint">discard changes</span>
+                  </span>
+                </button>
+              </div>
+              <div id="modal-delete-section">
+                <button
+                  type="button"
+                  onclick="deleteCurrentTask()"
+                  class="aside-action aside-action--danger"
+                  title="Permanently delete this task"
+                >
+                  <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
+                  <span class="aside-action__body">
+                    <span class="aside-action__label">Delete</span>
+                    <span class="aside-action__hint">remove permanently</span>
+                  </span>
+                </button>
+              </div>
+            </div>
             <div class="mdl-section">
               <div class="mdl-h">Agent</div>
               <div class="row">
@@ -1338,70 +1415,6 @@
             <div id="modal-environment-section" class="mdl-section hidden">
               <div class="mdl-h">Environment</div>
               <dl id="modal-environment-list" class="modal-aside__env"></dl>
-            </div>
-            <!-- Terminal actions: archive/unarchive/cancel/delete. Rendered
-                 as compact aside rows so they read like the rest of the
-                 rail instead of competing with it. Each child keeps its
-                 existing id so modal-core.js can still toggle visibility
-                 based on task status. -->
-            <div class="mdl-section modal-aside__actions">
-              <div class="mdl-h">Actions</div>
-              <div id="modal-start-section" class="hidden">
-                <button
-                  type="button"
-                  onclick="startTask()"
-                  class="aside-action aside-action--primary"
-                  title="Promote this task from Backlog to In Progress"
-                >
-                  <span class="aside-action__label">&#9654; Start task</span>
-                  <span class="aside-action__hint">move to In Progress</span>
-                </button>
-              </div>
-              <div id="modal-archive-section" class="hidden">
-                <button
-                  type="button"
-                  onclick="archiveTask()"
-                  class="aside-action"
-                  title="Hide this task from the Done column"
-                >
-                  <span class="aside-action__label">Archive</span>
-                  <span class="aside-action__hint">hide from Done</span>
-                </button>
-              </div>
-              <div id="modal-unarchive-section" class="hidden">
-                <button
-                  type="button"
-                  onclick="unarchiveTask()"
-                  class="aside-action"
-                  title="Restore this task to the Done column"
-                >
-                  <span class="aside-action__label">Unarchive</span>
-                  <span class="aside-action__hint">restore to Done</span>
-                </button>
-              </div>
-              <div id="modal-cancel-section" class="hidden">
-                <button
-                  type="button"
-                  id="modal-cancel-btn"
-                  onclick="cancelTask()"
-                  class="aside-action aside-action--warn"
-                  title="Discard prepared changes and move task to Cancelled"
-                >
-                  <span class="aside-action__label">Cancel</span>
-                  <span class="aside-action__hint">discard changes</span>
-                </button>
-              </div>
-              <div id="modal-delete-section">
-                <button
-                  type="button"
-                  onclick="deleteCurrentTask()"
-                  class="aside-action aside-action--danger"
-                  title="Permanently delete this task"
-                >
-                  <span class="aside-action__label">Delete</span>
-                  <span class="aside-action__hint">remove permanently</span>
-                </button>
-              </div>
             </div>
           </aside>
         </div>
