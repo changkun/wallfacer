@@ -336,8 +336,9 @@ async function applyRefinement() {
   }
   try {
     // Save settings changes and apply refinement in parallel.
+    // Per-activity sandbox overrides retired with the agents/flows
+    // rewrite; the PATCH body carries the task-level sandbox only.
     const sandbox = document.getElementById("modal-edit-sandbox")?.value || "";
-    const sandboxByActivity = collectSandboxByActivity("modal-edit-sandbox-");
     const timeout =
       parseInt(document.getElementById("modal-edit-timeout")?.value, 10) ||
       DEFAULT_TASK_TIMEOUT;
@@ -348,7 +349,6 @@ async function applyRefinement() {
         method: "PATCH",
         body: JSON.stringify({
           sandbox,
-          sandbox_by_activity: sandboxByActivity,
           timeout,
           mount_worktrees: mountWorktrees,
         }),

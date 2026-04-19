@@ -75,7 +75,10 @@ describe("buildSaveEnvPayload", () => {
       base_url: "",
       title_model: "title",
       default_sandbox: "codex",
-      sandbox_by_activity: { implementation: "codex", testing: "claude" },
+      // Per-activity sandbox routing retired: payload always sends
+      // an empty map after the agents/flows rewrite so the server
+      // clears legacy WALLFACER_SANDBOX_* entries on save.
+      sandbox_by_activity: {},
       codex_default_model: "codex-default",
       codex_title_model: "",
       sandbox_fast: true,
@@ -111,7 +114,7 @@ describe("buildSandboxTestPayload", () => {
     expect(payload).toMatchObject({
       sandbox: "claude",
       default_sandbox: "claude",
-      sandbox_by_activity: { implementation: "claude" },
+      sandbox_by_activity: {},
       sandbox_fast: true,
       base_url: "https://claude",
       default_model: "claude-model",
@@ -145,7 +148,7 @@ describe("buildSandboxTestPayload", () => {
     expect(payload).toMatchObject({
       sandbox: "codex",
       default_sandbox: "codex",
-      sandbox_by_activity: { testing: "codex" },
+      sandbox_by_activity: {},
       sandbox_fast: false,
       openai_base_url: "https://openai",
       codex_default_model: "codex-default",

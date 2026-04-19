@@ -146,10 +146,7 @@ Toggle Auto-Refine from the **Automation** menu (lightning bolt icon) in the hea
 
 ### Refinement Sandbox Configuration
 
-By default, the refinement agent uses the Claude sandbox. You can change which sandbox runs refinement in two ways:
-
-- **Globally**: Set the `WALLFACER_SANDBOX_REFINEMENT` environment variable in Settings > API Configuration.
-- **Per task**: Override the refinement sandbox for a specific task using the per-activity sandbox selectors in the task detail modal.
+By default, the refinement agent uses the Claude sandbox. You can change which sandbox runs refinement by cloning the `refine` agent from the **Agents** sidebar tab, setting its **Harness** field to `codex` (or back to `claude`), and referencing the clone in a flow. The legacy workspace-wide `WALLFACER_SANDBOX_REFINEMENT` env var is still read by the 4-tier resolver when an agent has no explicit Harness pin, but the Agents-tab pin is the recommended path.
 
 If the Claude sandbox hits a token or rate limit during refinement, Wallfacer automatically falls back to the Codex sandbox and retries.
 

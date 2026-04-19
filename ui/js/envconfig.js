@@ -195,7 +195,11 @@ function buildSaveEnvPayload() {
   const defaultSandbox = document
     .getElementById("env-default-sandbox")
     .value.trim();
-  const sandboxByActivity = collectSandboxByActivity("env-sandbox-");
+  // Per-activity sandbox overrides (WALLFACER_SANDBOX_*) retired
+  // with the agents/flows rewrite — activity-specific routing now
+  // lives on the agent's Harness pin. Send an empty map so the
+  // server clears any legacy env entries on save.
+  const sandboxByActivity = {};
   const sandboxFastEl = document.getElementById("env-sandbox-fast");
   const containerCPUs = document.getElementById("env-container-cpus")
     ? document.getElementById("env-container-cpus").value.trim()

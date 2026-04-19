@@ -651,19 +651,11 @@ async function openModal(id) {
     if (editMaxTokensEl)
       editMaxTokensEl.value =
         task.max_input_tokens > 0 ? String(task.max_input_tokens) : "";
-    if (typeof bindTaskSandboxInheritance === "function") {
-      bindTaskSandboxInheritance("modal-edit-sandbox", "modal-edit-sandbox-");
-    }
-    applySandboxByActivity(
-      "modal-edit-sandbox-",
-      task.sandbox_by_activity || {},
-    );
-    if (typeof setActivityOverrideDefaultSandbox === "function") {
-      setActivityOverrideDefaultSandbox(
-        "modal-edit-sandbox-",
-        task.sandbox || "",
-      );
-    }
+    // Per-activity sandbox override dropdowns retired with the
+    // agents/flows rewrite — the modal's single Sandbox select is
+    // the only task-level harness control now. The old
+    // bindTaskSandboxInheritance / applySandboxByActivity /
+    // setActivityOverrideDefaultSandbox calls went with the UI.
     populateDependsOnPicker(
       "modal-edit-depends-on-picker",
       task.id,
