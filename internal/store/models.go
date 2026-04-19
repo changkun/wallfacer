@@ -582,4 +582,18 @@ type TaskEvent struct {
 	EventType EventType       `json:"event_type"`
 	Data      json.RawMessage `json:"data"`
 	CreatedAt time.Time       `json:"created_at"`
+
+	// ActorSub is the principal ID (JWT `sub`) of the caller who caused
+	// this event. Empty for events written on anonymous calls, by the
+	// runner's background goroutines (see ActorType "system"), or on
+	// pre-Phase-2 records deserialized from disk. Populated by
+	// InsertEvent when the context carries auth.Claims.
+	ActorSub string `json:"actor_sub,omitempty"`
+
+	// ActorType categorizes who caused the event. Values: "user" (a
+	// signed-in human), "service" (a service account JWT), "apikey" (a
+	// request gated only by WALLFACER_SERVER_API_KEY), "system" (the
+	// runner / a background goroutine with no request context), or
+	// empty (legacy / anonymous local deployment).
+	ActorType string `json:"actor_type,omitempty"`
 }
