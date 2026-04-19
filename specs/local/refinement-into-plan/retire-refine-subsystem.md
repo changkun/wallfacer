@@ -2,9 +2,7 @@
 title: Retire the Refine Subsystem
 status: validated
 depends_on:
-  - specs/local/refinement-into-plan/update-task-prompt-tool.md
   - specs/local/refinement-into-plan/task-mode-undo.md
-  - specs/local/refinement-into-plan/explorer-task-prompts-section.md
   - specs/local/refinement-into-plan/send-to-plan-card-action.md
   - specs/local/refinement-into-plan/task-lock-and-cascade.md
 affects:

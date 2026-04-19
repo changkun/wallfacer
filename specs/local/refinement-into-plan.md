@@ -202,21 +202,20 @@ Spec-mode flow is unchanged.
 | [update_task_prompt tool and system prompt](refinement-into-plan/update-task-prompt-tool.md) | message-schema, prompt-round-events | medium | validated |
 | [Task-mode undo via event rewind](refinement-into-plan/task-mode-undo.md) | update_task_prompt tool, prompt-round-events | medium | validated |
 | [Explorer task prompts section](refinement-into-plan/explorer-task-prompts-section.md) | message-schema | medium | validated |
-| [Send to Plan card action](refinement-into-plan/send-to-plan-card-action.md) | message-schema | small | validated |
+| [Send to Plan card action](refinement-into-plan/send-to-plan-card-action.md) | explorer-task-prompts-section | small | validated |
 | [Task movement lock and thread cascade](refinement-into-plan/task-lock-and-cascade.md) | update_task_prompt tool | medium | validated |
-| [Retire the refine subsystem](refinement-into-plan/retire-refine-subsystem.md) | tool, undo, explorer, card, lock | medium | validated |
+| [Retire the refine subsystem](refinement-into-plan/retire-refine-subsystem.md) | undo, card, lock | medium | validated |
 
 ```mermaid
 graph LR
   MSG[Message schema] --> TOOL[update_task_prompt tool]
   EV[Prompt round events] --> TOOL
-  MSG --> EXP[Explorer section]
-  MSG --> CARD[Send to Plan]
+  MSG --> EXP[Explorer section + openPlanForTask]
+  EXP --> CARD[Send to Plan]
   TOOL --> UNDO[Task-mode undo]
   EV --> UNDO
   TOOL --> LOCK[Lock + cascade]
-  TOOL --> RETIRE[Retire refine]
-  UNDO --> RETIRE
+  UNDO --> RETIRE[Retire refine]
   EXP --> RETIRE
   CARD --> RETIRE
   LOCK --> RETIRE
