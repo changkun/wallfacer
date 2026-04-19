@@ -1,6 +1,6 @@
 ---
 title: Task.FlowID + legacy Kind→Flow resolver
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/flow-data-model.md
 affects:
