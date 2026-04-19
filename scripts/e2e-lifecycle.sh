@@ -104,15 +104,21 @@ elif [ "$BACKEND" != "container" ] && [ "$BACKEND" != "local" ]; then
 fi
 
 # Run the lifecycle test for a given sandbox type.
+#
+# Harness (claude vs codex) is no longer settable on POST /api/tasks.
+# The new workflow creates the task, then PATCHes the per-task
+# sandbox hint before moving it to in_progress. The PATCH path still
+# honours the codex readiness gate, so unverified codex yields 400
+# the same way the old POST did.
 test_sandbox() {
     local sb="$1"
     section "lifecycle: $sb sandbox"
 
-    # 1. Create task.
-    step "creating task (sandbox=$sb)"
+    # 1. Create task (no sandbox on POST).
+    step "creating task"
     local create_resp
     create_resp=$(api POST "/api/tasks" \
-        -d "{\"prompt\":\"who are you? answer in one sentence.\",\"sandbox\":\"$sb\"}")
+        -d '{"prompt":"who are you? answer in one sentence."}')
     local task_id
     task_id=$(echo "$create_resp" | jq -r '.id')
     if [ -z "$task_id" ] || [ "$task_id" = "null" ]; then
@@ -121,13 +127,18 @@ test_sandbox() {
     fi
     pass "task created: ${task_id:0:8}"
 
-    # 2. Verify sandbox is set.
+    # 2. Apply the sandbox via PATCH (the per-task override tier in
+    #    the runner's 4-tier resolver).
+    step "pinning sandbox=$sb via PATCH"
+    local pin_resp
+    pin_resp=$(api PATCH "/api/tasks/$task_id" -d "{\"sandbox\":\"$sb\"}")
     local task_sandbox
-    task_sandbox=$(echo "$create_resp" | jq -r '.sandbox')
+    task_sandbox=$(echo "$pin_resp" | jq -r '.sandbox')
     if [ "$task_sandbox" = "$sb" ]; then
         pass "sandbox set to $sb"
     else
         fail "sandbox is $task_sandbox, expected $sb"
+        return
     fi
 
     # 3. Trigger execution (move to in_progress).
