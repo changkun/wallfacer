@@ -98,17 +98,17 @@ func TestTasksForPrincipal_NilReturnsAll(t *testing.T) {
 // records and never sees anonymous legacy records.
 func TestTasksForPrincipal_OrgIsolatesFromOtherOrgs(t *testing.T) {
 	s, insert := newFiltStore(t)
-	insert("", "")                          // legacy anonymous
+	insert("", "")                          // legacy anonymous, now visible
 	insert("org-a", "alice")                // visible
 	anotherAID := insert("org-a", "alice2") // visible
 	insert("org-b", "bob")                  // hidden
 
 	got := s.TasksForPrincipal(context.Background(), &store.Principal{OrgID: "org-a"}, false)
-	if len(got) != 2 {
-		t.Fatalf("orgA saw %d tasks, want 2", len(got))
+	if len(got) != 3 {
+		t.Fatalf("orgA saw %d tasks, want 3 (2 org-a + 1 legacy)", len(got))
 	}
 	for _, task := range got {
-		if task.OrgID != "org-a" {
+		if task.OrgID != "org-a" && task.OrgID != "" {
 			t.Errorf("leaked task OrgID=%q into org-a view", task.OrgID)
 		}
 	}
@@ -122,6 +122,24 @@ func TestTasksForPrincipal_OrgIsolatesFromOtherOrgs(t *testing.T) {
 	}
 	if !foundSecond {
 		t.Error("second orgA task missing from filtered list")
+	}
+}
+
+// TestTasksForPrincipal_LegacyTasksVisibleAfterCloudSignIn is the
+// regression guard for the "tasks disappeared" UX bug: a user who
+// turns cloud mode on and signs in with an org must still see the
+// tasks they created in local mode (OrgID=""). The strict-isolation
+// original behavior was correct per spec but shipped a broken
+// migration story; this test locks in the relaxed filter.
+func TestTasksForPrincipal_LegacyTasksVisibleAfterCloudSignIn(t *testing.T) {
+	s, insert := newFiltStore(t)
+	for i := 0; i < 3; i++ {
+		insert("", "") // three legacy local-mode tasks
+	}
+
+	got := s.TasksForPrincipal(context.Background(), &store.Principal{OrgID: "org-fresh"}, false)
+	if len(got) != 3 {
+		t.Fatalf("signed-in user sees %d legacy tasks, want 3", len(got))
 	}
 }
 
