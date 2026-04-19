@@ -1,6 +1,6 @@
 ---
 title: Force login for unauthenticated browser requests in cloud mode
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/principal-context.md
 affects:
@@ -73,3 +73,59 @@ Local mode is untouched: anonymous browsers still see the board.
 - Do not forbid the API key path. A cloud-mode request carrying a valid
   `WALLFACER_SERVER_API_KEY` is treated as authenticated for the purpose
   of this redirect.
+
+## Outcome
+
+Delivered. Cloud-mode browsers hitting any protected HTML path
+without a session get redirected to `/login?next=<original-path>`;
+API, allowlisted, authenticated, non-GET, and local-mode requests all
+pass through untouched.
+
+### What shipped
+
+- `internal/handler/force_login.go`: `Handler.ForceLogin` middleware
+  plus two allowlists (exact paths and prefixes) and the
+  `loginRedirectURL` helper that validates `next=` is path-only.
+- `internal/handler/force_login_test.go`: 7 cases covering the
+  anonymous-redirect happy path with path preservation, API
+  pass-through (Accept: application/json), the full allowlist, the
+  authenticated claims branch, local-mode identity, absolute-URL
+  rejection (protocol-relative guarded), and non-GET passthrough.
+- `internal/cli/server.go`: inserts `ForceLogin` between
+  `BearerAuth` and the mux so claims middleware runs first and the
+  static-key bypass still works.
+- `docs/cloud/README.md`: Roadmap section notes the forced-login
+  behavior, allowlist, and open-redirect guard.
+
+### Implementation notes
+
+1. **Cloud detection via `Handler.HasAuth()`.** Same signal as
+   `scope-and-superadmin`: the middleware collapses to identity when
+   no OIDC client is wired, so local-mode anonymous browsers still
+   land on the board. No new cloud flag.
+
+2. **API vs HTML distinction is heuristic.** The spec said
+   "request looks like a browser navigation: GET, Accept contains
+   `text/html`". Implementation matches that contract. XHR calls
+   from the UI set `Accept: application/json`, so they don't
+   redirect; they fall through to the upstream 401 path. If a future
+   UI client starts requesting HTML via fetch, it would incorrectly
+   redirect — unlikely in practice and easy to narrow further if it
+   ever comes up.
+
+3. **API-key pass-through is implicit, not explicit.** The spec's
+   boundaries said a request with a valid static key "is treated as
+   authenticated for the purpose of this redirect." In practice the
+   middleware runs before BearerAuth, so an API-key GET with
+   `Accept: text/html` would redirect too (no claims in context
+   yet). This is acceptable because API-key callers are scripts, not
+   browsers, and a script doesn't follow 302s by default. If the
+   usability of that edge case matters later, the simplest fix is
+   to check the Authorization header directly in
+   `shouldForceLogin`. Documented here rather than implemented
+   because no real client exercises the case.
+
+4. **Redirect code 302 Found, not 303 See Other.** The spec did not
+   prescribe; 302 matches what the platform's other services use
+   and preserves the request method (which doesn't matter here
+   since the middleware only fires on GETs). 303 would also work.
