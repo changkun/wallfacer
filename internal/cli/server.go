@@ -809,9 +809,22 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// handlers maps each Route.Name from apicontract.Routes to its handler.
 	// All per-route middleware (UUID parsing, extra path values) is applied here
 	// so the registration loop below stays trivial.
+	//
+	// adminOnly wraps a handler so cloud deployments require the superadmin
+	// claim; in local mode it is identity. Cloud mode is detected by whether
+	// the Handler has an OIDC client wired (h.HasAuth()) — the same signal
+	// used elsewhere to decide whether cloud surfaces render.
+	adminOnly := func(next http.HandlerFunc) http.HandlerFunc {
+		if !h.HasAuth() {
+			return next // local mode: no claims path exists; pass through
+		}
+		wrapped := auth.RequireSuperadmin(next)
+		return wrapped.ServeHTTP
+	}
+
 	handlers := map[string]http.HandlerFunc{
 		// Admin operations.
-		"RebuildIndex": h.RebuildIndex,
+		"RebuildIndex": adminOnly(h.RebuildIndex),
 
 		// Debug & monitoring.
 		"Health":            h.Health,

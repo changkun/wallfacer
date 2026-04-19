@@ -28,6 +28,11 @@ func (h *Handler) SetAuth(p AuthProvider) {
 	}
 }
 
+// HasAuth reports whether a cloud-mode OIDC client is wired. Used by
+// server-side wiring to decide whether to apply authorization wrappers
+// (e.g. RequireSuperadmin) to individual routes.
+func (h *Handler) HasAuth() bool { return h.auth != nil }
+
 // Login redirects the browser to the auth service's authorize endpoint.
 // Returns 503 when auth is not configured so broken deployments fail
 // loudly instead of silently 404'ing.
