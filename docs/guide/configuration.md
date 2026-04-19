@@ -284,6 +284,10 @@ Reports the resolved binary paths and `--version` output for each CLI. Missing c
 |---|---|---|
 | `WALLFACER_SERVER_API_KEY` | -- | Bearer token for server API authentication; when set, all API requests must include `Authorization: Bearer <key>` |
 
+#### Cloud mode
+
+Wallfacer can optionally sign the user in to [latere.ai](https://latere.ai) and display their avatar + username in the status bar. Cloud-mode documentation lives in [`docs/cloud/`](../cloud/) — start with [`docs/cloud/README.md`](../cloud/README.md) for the env-var reference, deployment constraints, and the cloud/local partition. The sign-in badge is hidden entirely when `WALLFACER_CLOUD` is unset, so local-only deployments are unchanged.
+
 ### 📝 System Prompt Templates
 
 Wallfacer uses eight built-in Go template files to instruct agent activities:

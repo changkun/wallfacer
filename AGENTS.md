@@ -387,8 +387,11 @@ Optional variables (also in `.env`):
 - `CODEX_DEFAULT_MODEL` — default model for Codex sandbox containers
 - `CODEX_TITLE_MODEL` — model for Codex title generation
 - Sandbox routing: `WALLFACER_DEFAULT_SANDBOX`, `WALLFACER_SANDBOX_IMPLEMENTATION`, `WALLFACER_SANDBOX_TESTING`, `WALLFACER_SANDBOX_REFINEMENT`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_OVERSIGHT`, `WALLFACER_SANDBOX_COMMIT_MESSAGE`, `WALLFACER_SANDBOX_IDEA_AGENT`
+- `WALLFACER_CLOUD` — enable cloud-gated UI surfaces (latere.ai sign-in badge, future cloud toggles); shell env only, not edited from the UI. Defaults to `false` (pure local mode). See [`docs/cloud/README.md`](docs/cloud/README.md) for the full env-var reference, deployment constraints, and Phase 1 scope; [`specs/shared/authentication.md`](specs/shared/authentication.md) covers the long-range design.
 
 All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
+
+**Cloud vs local partition.** `WALLFACER_CLOUD` is the single gate between local-only functionality and cloud surfaces. Cloud adds identity, not feature gates — task execution is identical in both modes. Full details in [`docs/cloud/README.md`](docs/cloud/README.md).
 
 ## End-to-end integration tests
 
