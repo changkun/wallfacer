@@ -10,10 +10,11 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 5 done, 1 in progress, 21 pending
+Local Product — 7 done, 1 in progress, 19 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
+  ✅ Routine Tasks                 ✅ Agents & Flows
   ○ File/Image Attachments         ○ Host Mounts
   ○ File Panel Viewer              ○ Inline Diff Feedback
   ○ Oversight Risk Scoring         ○ Validation Barrier
@@ -22,8 +23,7 @@ Local Product — 5 done, 1 in progress, 21 pending
   ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
   ○ TypeScript Migration           ○ Typed DOM Hooks
   ○ Rebrand Module Path            ○ Spatial Canvas
-  ○ Scoped Command Registry        ○ Routine Tasks
-  ○ Data Boundary Enforcement      ○ Agents & Flows
+  ○ Scoped Command Registry        ○ Data Boundary Enforcement
 
 Cloud Platform — 0/9
   ○ Tenant Filesystem              ○ K8s Sandbox Backend
@@ -32,17 +32,17 @@ Cloud Platform — 0/9
   ○ Multi-User Collaboration       ○ Billing Idempotency
   ○ Telemetry Queue Backpressure
 
-Shared Design — 2/19 complete
+Shared Design — 2/20 complete
   ◐ Authentication (Phase 1)       ✅ Agent Abstraction
-  ○ Overlay Snapshots              ○ Native Sandbox (Linux)
-  ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
-  ✅ Host Exec Mode                ○ Telemetry & Observability
-  ○ Information Inbox              ○ Multi-Agent Consensus
-  ○ Multi-Agent Debate             ○ Token & Cost Optimization
-  ○ Extensible Prompts             ○ Intent-Driven Commits
-  ○ Sandbox Hooks                  ○ Defense in Depth
-  ○ Agent Memory & Identity        ○ Intelligence System
-  ○ Eval Pipeline & Benchmark
+  ○ Agent Token Exchange           ○ Overlay Snapshots
+  ○ Native Sandbox (Linux)         ○ Native Sandbox (macOS)
+  ○ Native Sandbox (Windows)       ✅ Host Exec Mode
+  ○ Telemetry & Observability      ○ Information Inbox
+  ○ Multi-Agent Consensus          ○ Multi-Agent Debate
+  ○ Token & Cost Optimization      ○ Extensible Prompts
+  ○ Intent-Driven Commits          ○ Sandbox Hooks
+  ○ Defense in Depth               ○ Agent Memory & Identity
+  ○ Intelligence System            ○ Eval Pipeline & Benchmark
 ```
 
 ---
@@ -174,7 +174,8 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 | Spec | Status | Serves | Delivers |
 |------|--------|--------|----------|
-| [authentication.md](shared/authentication.md) | In progress (Phase 1 shipped) | Both | OAuth2/OIDC login, session management, user identity. Phase 1 landed: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2+ (JWT middleware, `org_id`/`principal_id`, agent token exchange) still to do. |
+| [authentication.md](shared/authentication.md) | In progress (Phase 1 shipped; Phase 2 drafted) | Both | OAuth2/OIDC login, session management, user identity. Phase 1 shipped: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2 (drafted): JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching — unblocks the cloud move. |
+| [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
