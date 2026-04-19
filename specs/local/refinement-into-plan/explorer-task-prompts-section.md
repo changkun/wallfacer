@@ -12,8 +12,9 @@ effort: medium
 created: 2026-04-19
 updated: 2026-04-19
 author: changkun
-dispatched_task_id: null
+dispatched_task_id: 19bcfecf-9528-4cbb-b7fd-d032f08f94e1
 ---
+
 
 # Explorer Task Prompts Virtual Section
 
