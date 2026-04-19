@@ -232,6 +232,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	// wallfacer run` is a clean override without editing the file.
 	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
 	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
+	var jwtValidator *auth.Validator
 	if cloudMode {
 		authCfg := auth.Config{
 			AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
@@ -251,6 +252,16 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL (in shell env or ~/.wallfacer/.env)")
 		}
 		h.SetAuth(authClient)
+
+		// JWT validator for API requests that carry Authorization: Bearer
+		// <jwt>. Issuer and JWKS URL fall back to AuthURL derivatives when
+		// the deployment doesn't override them; audience is the OAuth
+		// client ID so tokens minted for other services are rejected.
+		jwtValidator = auth.BuildValidator(
+			authCfg,
+			envconfig.Lookup(envFileKV, "AUTH_JWKS_URL"),
+			envconfig.Lookup(envFileKV, "AUTH_ISSUER"),
+		)
 	}
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
@@ -440,10 +451,15 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		})
 	}
 
-	// Middleware stack (outermost first): logging → CSRF → bearer auth → mux.
+	// Middleware stack (outermost first): logging → CSRF → JWT OptionalAuth
+	//   → bearer auth → mux.
 	// Desktop mode skips CSRF because requests originate from the local WebView
-	// (same-origin checks are not meaningful).
+	// (same-origin checks are not meaningful). JWT OptionalAuth runs before
+	// BearerAuth so a valid JWT lands claims in context first; BearerAuth
+	// then bypasses its static-key check for JWT-authenticated requests,
+	// keeping both identity paths workable in a cloud+API-key deployment.
 	srvHandler := handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
+	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
 	if !cfg.SkipCSRF {
 		srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	}
