@@ -1,6 +1,6 @@
 ---
 title: Unify browser session and JWT into a single principal context
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:
@@ -74,3 +74,51 @@ paths.
   OIDC userinfo, not claims.
 - Do not introduce a third identity type. The goal is fewer shapes, not
   more.
+
+## Outcome
+
+Delivered. Handlers now see `*auth.Claims` in context regardless of
+whether the caller authenticated via `Authorization: Bearer <jwt>` or a
+session cookie, accessed uniformly through `auth.PrincipalFromContext`.
+
+### What shipped
+- `internal/auth/cookie_principal.go`: `CookiePrincipal(src, v, next)`
+  middleware. Short-circuits when claims are already populated by JWT
+  OptionalAuth upstream. Otherwise loads the session via
+  `sessionSource.GetSession`, validates the stored access token through
+  the same `*jwtauth.Validator`, and injects resulting claims. Stale
+  tokens trigger `oidc.ClearSession` so the next browser nav hits
+  `/login` instead of looping.
+- `internal/auth/cookie_principal_test.go`: 5 tests covering the
+  no-op-when-JWT-present branch, the happy path with a valid session
+  token, the missing-cookie branch, the expired-token branch with the
+  cookie-clear assertion, and the nil-inputs identity collapse.
+- `internal/cli/server.go`: `authClient` promoted to the outer scope so
+  the middleware stack can wire it. `CookiePrincipal` installed ahead
+  of `OptionalAuth` (outermost of the two identity layers), so when
+  both paths would apply the JWT wins.
+
+### Implementation notes
+
+1. **`sessionSource` interface, not `*auth.Client` directly.** The spec
+   sketch used `*auth.Client` as the input type. Implementation defined
+   a tiny interface (single method `GetSession(*http.Request) (*Session, error)`)
+   so tests can substitute a fake without standing up a real encrypted
+   cookie. Production still passes `*auth.Client`, which satisfies the
+   interface via the platform's existing `GetSession` method.
+
+2. **No new `internal/auth/` helper for `SessionFromRequest`.** The spec
+   mentioned "add to `internal/auth/` if the platform package doesn't
+   already expose it." The platform package exposes
+   `Client.GetSession(r)`, so no wrapper was needed.
+
+3. **`/api/auth/me` stays unchanged.** The spec called out this handler
+   as already correct (returns OIDC userinfo, not claims). Confirmed:
+   `AuthMe` still calls `h.auth.UserFromRequest(w, r)` directly and
+   returns the `{sub, email, name, picture}` shape the status-bar
+   renderer expects.
+
+4. **No rollout to individual handlers.** The spec said to "wrap the
+   whole mux tail" after OptionalAuth. Implementation did exactly that
+   in `initServer`, so every `/api/*` and HTML route inherits the
+   bridge automatically. No per-handler rewrites.
