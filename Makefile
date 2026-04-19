@@ -104,7 +104,7 @@ server:
 # Dev mode: build once, then serve the UI from ./ui on disk so frontend
 # edits (HTML, CSS, JS) are visible on reload without rebuilding the binary.
 server-dev:
-	go build -o wallfacer . && ./wallfacer run --backend host -ui-dir ./ui
+	go build -o wallfacer . && WALLFACER_CLOUD=true ./wallfacer run --backend host -ui-dir ./ui
 
 # Space-separated list of folders to mount under /workspace/<basename>
 WORKSPACES ?= $(CURDIR)
