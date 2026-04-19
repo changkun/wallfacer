@@ -489,7 +489,7 @@ function makeSigninContext(fetchImpl) {
   }
 
   const signinEl = makeEl("div");
-  signinEl.id = "status-bar-signin";
+  signinEl.id = "sidebar-signin";
 
   // The full stub set the main status-bar tests use, plus signinEl.
   const ids = [
@@ -502,7 +502,7 @@ function makeSigninContext(fetchImpl) {
     "status-bar-panel-resize",
     "status-bar-terminal-btn",
   ];
-  const elements = { "status-bar-signin": signinEl };
+  const elements = { "sidebar-signin": signinEl };
   ids.forEach((id) => {
     elements[id] = makeEl("div");
     elements[id].id = id;
@@ -572,9 +572,7 @@ describe("renderSigninBadge", () => {
     expect(signinEl.innerHTML).toContain('href="/login"');
     expect(signinEl.innerHTML).toContain("Sign in");
     // No iframe in the signed-out branch.
-    const iframeChild = signinEl.children.find(
-      (c) => c.tagName === "IFRAME",
-    );
+    const iframeChild = signinEl.children.find((c) => c.tagName === "IFRAME");
     expect(iframeChild).toBeUndefined();
   });
 
@@ -600,7 +598,7 @@ describe("renderSigninBadge", () => {
 
     // Find the avatar img among nested children.
     const wrap = signinEl.children.find(
-      (c) => c.className === "status-bar-signin__user",
+      (c) => c.className === "sb-signin__user",
     );
     expect(wrap).toBeTruthy();
     const avatar = wrap.children.find((c) => c.tagName === "IMG");
@@ -609,12 +607,12 @@ describe("renderSigninBadge", () => {
     expect(avatar.getAttribute("referrerpolicy")).toBe("no-referrer");
 
     const nameSpan = wrap.children.find(
-      (c) => c.className === "status-bar-signin__name",
+      (c) => c.className === "sb-signin__name",
     );
     expect(nameSpan.textContent).toBe("Alice");
 
     const logout = wrap.children.find(
-      (c) => c.className === "status-bar-signin__logout",
+      (c) => c.className === "sb-signin__logout",
     );
     expect(logout.href).toBe("/logout");
 
@@ -642,10 +640,10 @@ describe("renderSigninBadge", () => {
     await flushPromises();
 
     const wrap = signinEl.children.find(
-      (c) => c.className === "status-bar-signin__user",
+      (c) => c.className === "sb-signin__user",
     );
     const nameSpan = wrap.children.find(
-      (c) => c.className === "status-bar-signin__name",
+      (c) => c.className === "sb-signin__name",
     );
     expect(nameSpan.textContent).toBe("bob@example.com");
   });
@@ -668,17 +666,15 @@ describe("renderSigninBadge", () => {
     await flushPromises();
 
     const wrap = signinEl.children.find(
-      (c) => c.className === "status-bar-signin__user",
+      (c) => c.className === "sb-signin__user",
     );
     const nameSpan = wrap.children.find(
-      (c) => c.className === "status-bar-signin__name",
+      (c) => c.className === "sb-signin__name",
     );
     // textContent receives the raw string — DOM would not interpret it.
     expect(nameSpan.textContent).toBe("<script>alert(1)</script>");
     // And there's no real <script> element in the tree.
-    const scriptChild = wrap.children.find(
-      (c) => c.tagName === "SCRIPT",
-    );
+    const scriptChild = wrap.children.find((c) => c.tagName === "SCRIPT");
     expect(scriptChild).toBeUndefined();
   });
 });
