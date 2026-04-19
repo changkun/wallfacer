@@ -306,19 +306,21 @@ function _renderSignedIn(el, user, authURL) {
     wrap.appendChild(fallback);
   }
 
+  // Two-line text stack: display name on top, current scope as a
+  // muted subtitle below. Gives the name the full available width
+  // instead of competing inline with a pill, which was truncating
+  // names as short as "Changkun Ou" in the narrow sidebar.
+  var textCol = document.createElement("span");
+  textCol.className = "sb-signin__text";
   var nameEl = document.createElement("span");
   nameEl.className = "sb-signin__name";
   nameEl.textContent = display;
-  wrap.appendChild(nameEl);
-
-  // Current-view label sits right after the name so the user can see
-  // what scope they're in at a glance. Populated by
-  // _fetchAndRenderOrgSwitcher once /api/auth/orgs resolves; shows
-  // "Personal" when no active org.
+  textCol.appendChild(nameEl);
   var viewLabel = document.createElement("span");
   viewLabel.className = "sb-signin__view-label";
   viewLabel.textContent = "Personal";
-  wrap.appendChild(viewLabel);
+  textCol.appendChild(viewLabel);
+  wrap.appendChild(textCol);
 
   var chevron = document.createElement("span");
   chevron.className = "sb-signin__chevron";
