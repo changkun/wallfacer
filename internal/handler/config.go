@@ -166,18 +166,23 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		groups = workspace.NormalizeGroups(groups)
 	}
 	// Enrich groups with their deterministic keys so the frontend can match
-	// them against activeGroupInfos entries.
+	// them against activeGroupInfos entries. Per-group concurrency overrides
+	// ride along so the In-Progress column editor can show the current value.
 	type keyedGroup struct {
-		Name       string   `json:"name,omitempty"`
-		Workspaces []string `json:"workspaces"`
-		Key        string   `json:"key"`
+		Name            string   `json:"name,omitempty"`
+		Workspaces      []string `json:"workspaces"`
+		Key             string   `json:"key"`
+		MaxParallel     *int     `json:"max_parallel,omitempty"`
+		MaxTestParallel *int     `json:"max_test_parallel,omitempty"`
 	}
 	keyedGroups := make([]keyedGroup, len(groups))
 	for i, g := range groups {
 		keyedGroups[i] = keyedGroup{
-			Name:       g.Name,
-			Workspaces: g.Workspaces,
-			Key:        prompts.InstructionsKey(g.Workspaces),
+			Name:            g.Name,
+			Workspaces:      g.Workspaces,
+			Key:             prompts.InstructionsKey(g.Workspaces),
+			MaxParallel:     g.MaxParallel,
+			MaxTestParallel: g.MaxTestParallel,
 		}
 	}
 
@@ -329,6 +334,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "save workspace groups: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		h.reloadGroupLimits()
 	}
 	applyBoolToggle := func(reqVal *bool, set func(bool), enabled func() bool, onEnable func(context.Context)) {
 		if reqVal == nil {

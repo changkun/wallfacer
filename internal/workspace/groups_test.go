@@ -307,6 +307,58 @@ func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
 	}
 }
 
+// TestSaveGroups_RoundTrip_WithLimits verifies that per-group parallel
+// limit overrides survive a save/load cycle, that negative values are
+// sanitized to nil (inherit default), and that zero is preserved as a
+// deliberate "unlimited" override.
+func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
+	configDir := t.TempDir()
+	wsA := t.TempDir()
+	wsB := t.TempDir()
+	wsC := t.TempDir()
+
+	mp, mtp := 3, 2
+	zero := 0
+	neg := -1
+	input := []Group{
+		{Name: "Limited", Workspaces: []string{wsA}, MaxParallel: &mp, MaxTestParallel: &mtp},
+		{Name: "Unlimited", Workspaces: []string{wsB}, MaxParallel: &zero},
+		{Name: "NegativeSanitized", Workspaces: []string{wsC}, MaxParallel: &neg},
+	}
+	if err := SaveGroups(configDir, input); err != nil {
+		t.Fatalf("SaveGroups: %v", err)
+	}
+	got, err := LoadGroups(configDir)
+	if err != nil {
+		t.Fatalf("LoadGroups: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("round-trip: expected 3 groups, got %d", len(got))
+	}
+
+	byName := map[string]Group{}
+	for _, g := range got {
+		byName[g.Name] = g
+	}
+	limited := byName["Limited"]
+	if limited.MaxParallel == nil || *limited.MaxParallel != 3 {
+		t.Errorf("Limited.MaxParallel: want 3, got %v", limited.MaxParallel)
+	}
+	if limited.MaxTestParallel == nil || *limited.MaxTestParallel != 2 {
+		t.Errorf("Limited.MaxTestParallel: want 2, got %v", limited.MaxTestParallel)
+	}
+
+	unlimited := byName["Unlimited"]
+	if unlimited.MaxParallel == nil || *unlimited.MaxParallel != 0 {
+		t.Errorf("Unlimited.MaxParallel: want 0, got %v", unlimited.MaxParallel)
+	}
+
+	sanitized := byName["NegativeSanitized"]
+	if sanitized.MaxParallel != nil {
+		t.Errorf("NegativeSanitized.MaxParallel: want nil after sanitize, got %v", *sanitized.MaxParallel)
+	}
+}
+
 // TestUpsertGroup_EmptyWorkspaces_NoOp verifies that upserting an empty
 // workspace list does not modify the existing groups.
 func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {

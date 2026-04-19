@@ -16,6 +16,13 @@ import (
 type Group struct {
 	Name       string   `json:"name,omitempty"`
 	Workspaces []string `json:"workspaces"`
+	// MaxParallel, when non-nil, overrides WALLFACER_MAX_PARALLEL for this
+	// group only. A value of 0 means "unlimited"; negative values are
+	// normalized to nil (inherit the env-file default). Pointer so that an
+	// absent field in on-disk JSON deserializes to nil rather than 0.
+	MaxParallel *int `json:"max_parallel,omitempty"`
+	// MaxTestParallel does the same for WALLFACER_MAX_TEST_PARALLEL.
+	MaxTestParallel *int `json:"max_test_parallel,omitempty"`
 }
 
 // groupsFilePath returns the path to the workspace-groups.json file within configDir.
@@ -67,7 +74,7 @@ func UpsertGroup(configDir string, workspaces []string) error {
 			if i == 0 {
 				return nil
 			}
-			promoted := Group{Name: group.Name, Workspaces: workspaces}
+			promoted := Group{Name: group.Name, Workspaces: workspaces, MaxParallel: group.MaxParallel, MaxTestParallel: group.MaxTestParallel}
 			reordered := append([]Group{promoted}, groups[:i]...)
 			reordered = append(reordered, groups[i+1:]...)
 			return SaveGroups(configDir, reordered)
@@ -94,9 +101,27 @@ func NormalizeGroups(groups []Group) []Group {
 			continue
 		}
 		seen.Add(key)
-		out = append(out, Group{Name: group.Name, Workspaces: ws})
+		out = append(out, Group{
+			Name:            group.Name,
+			Workspaces:      ws,
+			MaxParallel:     sanitizeLimit(group.MaxParallel),
+			MaxTestParallel: sanitizeLimit(group.MaxTestParallel),
+		})
 	}
 	return out
+}
+
+// sanitizeLimit drops negative override values so downstream callers only
+// have to distinguish "nil (inherit default)" from "non-negative override".
+func sanitizeLimit(v *int) *int {
+	if v == nil {
+		return nil
+	}
+	if *v < 0 {
+		return nil
+	}
+	n := *v
+	return &n
 }
 
 // normalizeGroupPaths deduplicates, trims whitespace, cleans, and sorts paths.

@@ -1349,6 +1349,66 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 	}
 }
 
+// TestMaxConcurrentTasks_PerGroupOverride pins that setting a per-group
+// limit via workspace_groups in PUT /api/config overrides
+// WALLFACER_MAX_PARALLEL only for the viewed group, and that a stored
+// override of 0 means "unlimited" (rendered as a large sentinel so the
+// >= limit guard never trips).
+func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+
+	// Baseline: no override -> env default applies.
+	baseline := h.maxConcurrentTasks()
+	if baseline <= 0 {
+		t.Fatalf("baseline maxConcurrentTasks should be positive, got %d", baseline)
+	}
+
+	// Save a group entry with MaxParallel=2 for the viewed workspace.
+	type reqBody struct {
+		WorkspaceGroups []workspace.Group `json:"workspace_groups"`
+	}
+	two := 2
+	body := reqBody{WorkspaceGroups: []workspace.Group{{Workspaces: []string{ws}, MaxParallel: &two}}}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
+	w := httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("UpdateConfig: %d: %s", w.Code, w.Body.String())
+	}
+
+	if got := h.maxConcurrentTasks(); got != 2 {
+		t.Errorf("per-group override: maxConcurrentTasks = %d, want 2", got)
+	}
+
+	// Stored override of 0 means unlimited (sentinel huge value).
+	zero := 0
+	body = reqBody{WorkspaceGroups: []workspace.Group{{Workspaces: []string{ws}, MaxParallel: &zero}}}
+	b, _ = json.Marshal(body)
+	req = httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
+	w = httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("UpdateConfig unlimited: %d: %s", w.Code, w.Body.String())
+	}
+	if got := h.maxConcurrentTasks(); got < 1_000_000 {
+		t.Errorf("unlimited override: expected large sentinel, got %d", got)
+	}
+
+	// Removing the override (nil pointer) falls back to the env default.
+	body = reqBody{WorkspaceGroups: []workspace.Group{{Workspaces: []string{ws}}}}
+	b, _ = json.Marshal(body)
+	req = httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
+	w = httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("UpdateConfig reset: %d: %s", w.Code, w.Body.String())
+	}
+	if got := h.maxConcurrentTasks(); got != baseline {
+		t.Errorf("after clearing override: maxConcurrentTasks = %d, want baseline %d", got, baseline)
+	}
+}
+
 // --- strict JSON decoding ---
 
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.
