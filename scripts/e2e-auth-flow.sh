@@ -41,13 +41,20 @@ step() { printf "\n\033[1m=== %s ===\033[0m\n" "$1"; }
 jc() {  # jar curl — follows no redirects, returns status only
   curl -sS -o /dev/null -w "%{http_code}" -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$@"
 }
-jcb() { # body + status; reads body into $1 (variable name), sets http_code into $2
-  local _body _status
-  _body="$(curl -sS -b "$COOKIE_JAR" -c "$COOKIE_JAR" -w $'\n%{http_code}' "$@")"
+jcb() { # jcb <body_var> <status_var> <curl_args...> — reads body + http_code.
+  # Shift the two variable names off $@ before invoking curl, otherwise
+  # they'd be passed as extra URL args and curl would try to resolve
+  # "body" and "status" as hostnames. No `local` — the script is run
+  # under /bin/sh (POSIX) which doesn't define `local`.
+  _var_body=$1
+  _var_status=$2
+  shift 2
+  _body="$(curl -sS -b "$COOKIE_JAR" -c "$COOKIE_JAR" -w '
+%{http_code}' "$@")"
   _status="${_body##*$'\n'}"
   _body="${_body%$'\n'*}"
-  eval "$1=\$_body"
-  eval "$2=\$_status"
+  eval "$_var_body=\$_body"
+  eval "$_var_status=\$_status"
 }
 jloc() { # follow location manually — returns Location header value or empty
   curl -sS -o /dev/null -D - -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$@" |
