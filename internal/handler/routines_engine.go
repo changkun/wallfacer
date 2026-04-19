@@ -42,14 +42,32 @@ func (h *Handler) StartRoutineEngine(ctx context.Context) {
 }
 
 // scheduleForTask turns a routine card's persisted schedule fields into
-// a concrete routine.Schedule. Disabled, cancelled, or non-positive
-// intervals become routine.Disabled() so the engine still tracks the
-// entry (its next-run is reported as zero in the UI) but never fires it.
+// a concrete routine.Schedule. Routines that are not in an active state
+// (cancelled, done, failed), disabled by the user, or have a non-positive
+// interval become routine.Disabled() so the engine still tracks the entry
+// (its next-run is reported as zero in the UI) but never fires it. In
+// practice the reconcile loop skips these entries entirely so the engine
+// drops them on the next pass — Disabled() is the belt to that
+// suspenders.
 func scheduleForTask(t store.Task) routine.Schedule {
-	if t.Status == store.TaskStatusCancelled || !t.RoutineEnabled || t.RoutineIntervalSeconds <= 0 {
+	if isRoutineStoppedStatus(t.Status) || !t.RoutineEnabled || t.RoutineIntervalSeconds <= 0 {
 		return routine.Disabled()
 	}
 	return routine.FixedInterval{D: time.Duration(t.RoutineIntervalSeconds) * time.Second}
+}
+
+// isRoutineStoppedStatus reports whether a routine card's status should
+// halt the engine. A routine "landing" in Done or Failed behaves like a
+// cancelled schedule: no further fires until the user moves the card
+// back to the Backlog column, at which point reconcile re-registers it.
+// Archived is handled by the ListTasks(false) filter in reconcile and by
+// the fireRoutine guard, so it is not included here.
+func isRoutineStoppedStatus(s store.TaskStatus) bool {
+	switch s {
+	case store.TaskStatusCancelled, store.TaskStatusDone, store.TaskStatusFailed:
+		return true
+	}
+	return false
 }
 
 // reconcileRoutines aligns the engine's registry with the current set of
@@ -91,11 +109,14 @@ func (h *Handler) reconcileRoutines(ctx context.Context) {
 		if !t.IsRoutine() {
 			continue
 		}
-		// Cancelled routine cards stop firing entirely. Skip them so the
-		// unregister pass below drops the engine entry — otherwise the
-		// previously-armed timer would keep spawning instance tasks even
-		// though the user cancelled the schedule.
-		if t.Status == store.TaskStatusCancelled {
+		// Stopped routine cards (cancelled, done, failed) must not fire.
+		// Skip them so the unregister pass below drops the engine entry
+		// — otherwise a previously-armed timer would keep spawning
+		// instances even though the user moved the card out of the
+		// active lanes. Moving the card back to Backlog flips the status
+		// back to backlog, which will re-enter this registration path on
+		// the next reconcile tick.
+		if isRoutineStoppedStatus(t.Status) {
 			continue
 		}
 		seen[t.ID] = struct{}{}
@@ -183,12 +204,13 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 	if !routineTask.IsRoutine() {
 		return
 	}
-	// A cancelled or archived routine card must not spawn instance tasks.
-	// A fire can still land here if the user cancels/archives after the
-	// engine's timer has already dispatched onto its own goroutine, and
-	// the reconcile-driven Unregister relies on archived rows being
-	// absent from ListTasks(false) — a timing-fragile guarantee.
-	if routineTask.Status == store.TaskStatusCancelled || routineTask.Archived {
+	// A stopped or archived routine card must not spawn instance tasks.
+	// A fire can still land here if the user moves the card out of the
+	// active lanes after the engine's timer has already dispatched onto
+	// its own goroutine, and the reconcile-driven Unregister relies on
+	// archived rows being absent from ListTasks(false) — a
+	// timing-fragile guarantee.
+	if isRoutineStoppedStatus(routineTask.Status) || routineTask.Archived {
 		return
 	}
 

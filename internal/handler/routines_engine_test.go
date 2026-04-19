@@ -378,6 +378,119 @@ func TestDeleteTask_UnregistersRoutineSynchronously(t *testing.T) {
 	}
 }
 
+// walkRoutineToDone drives a task through the state machine to reach
+// TaskStatusDone (backlog → in_progress → waiting → committing → done).
+// The task board state machine rejects direct backlog→done transitions,
+// so tests that need a Done routine must take the long path.
+func walkRoutineToDone(ctx context.Context, s *store.Store, id uuid.UUID) error {
+	for _, next := range []store.TaskStatus{
+		store.TaskStatusInProgress,
+		store.TaskStatusWaiting,
+		store.TaskStatusCommitting,
+		store.TaskStatusDone,
+	} {
+		if err := s.UpdateTaskStatus(ctx, id, next); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// TestReconcileRoutines_UnregistersDoneRoutines pins that a routine card
+// sitting in the Done column stops firing. Moving it back to Backlog is
+// the only way to resume — this test only covers the stop direction.
+func TestReconcileRoutines_UnregistersDoneRoutines(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "r", Timeout: 10, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	h.reconcileRoutines(ctx)
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; !ok {
+		t.Fatalf("pre-condition: routine should be registered")
+	}
+
+	if err := walkRoutineToDone(ctx, s, routineTask.ID); err != nil {
+		t.Fatalf("walk routine to done: %v", err)
+	}
+	h.reconcileRoutines(ctx)
+
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; ok {
+		t.Fatalf("done routine must be unregistered from engine")
+	}
+}
+
+// TestReconcileRoutines_BacklogReregistersFailedRoutine pins the reverse
+// direction: moving a stopped routine back to Backlog re-enters it into
+// the engine so it starts firing again. We use Failed → Backlog because
+// the state machine does not permit a direct Done → Backlog transition
+// (Done → Cancelled → Backlog is the closest valid sequence); Failed →
+// Backlog exercises the same scheduleForTask / reconcile branches.
+func TestReconcileRoutines_BacklogReregistersFailedRoutine(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "r", Timeout: 10, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	h.reconcileRoutines(ctx)
+	for _, next := range []store.TaskStatus{store.TaskStatusInProgress, store.TaskStatusFailed} {
+		if err := s.UpdateTaskStatus(ctx, routineTask.ID, next); err != nil {
+			t.Fatalf("transition to %s: %v", next, err)
+		}
+	}
+	h.reconcileRoutines(ctx)
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; ok {
+		t.Fatalf("pre-condition: failed routine must be unregistered")
+	}
+
+	if err := s.UpdateTaskStatus(ctx, routineTask.ID, store.TaskStatusBacklog); err != nil {
+		t.Fatalf("move back to backlog: %v", err)
+	}
+	h.reconcileRoutines(ctx)
+
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; !ok {
+		t.Fatalf("backlog routine must be re-registered in engine")
+	}
+}
+
+// TestFireRoutine_DoneRoutineDoesNotSpawn guards the in-flight race: an
+// engine timer dispatched fireRoutine onto a goroutine but the user moved
+// the card to Done before the dispatched goroutine ran. The fire must
+// bail out without spawning an instance task.
+func TestFireRoutine_DoneRoutineDoesNotSpawn(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "r", Timeout: 10, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	if err := walkRoutineToDone(ctx, s, routineTask.ID); err != nil {
+		t.Fatalf("walk routine to done: %v", err)
+	}
+
+	before, _ := s.ListTasks(ctx, false)
+	h.fireRoutine(ctx, routineTask.ID)
+	after, _ := s.ListTasks(ctx, false)
+
+	if len(after) != len(before) {
+		t.Fatalf("done routine spawned instance task: before=%d after=%d", len(before), len(after))
+	}
+	if calls := mock.RunCalls(); len(calls) != 0 {
+		t.Fatalf("expected no RunBackground calls for done routine, got %d", len(calls))
+	}
+}
+
 func TestTriggerRoutine_WithEngine_SpawnsInstance(t *testing.T) {
 	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)
