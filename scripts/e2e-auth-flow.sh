@@ -51,7 +51,7 @@ jcb() { # body + status; reads body into $1 (variable name), sets http_code into
 }
 jloc() { # follow location manually — returns Location header value or empty
   curl -sS -o /dev/null -D - -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$@" |
-    awk 'BEGIN{IGNORECASE=1} /^Location:/ { sub(/^Location:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }'
+    awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }'
 }
 
 step "0. Read wallfacer config"
@@ -75,7 +75,7 @@ step "2. /authorize (no auth session yet) → /login"
 # Capture both status and Location so we can see what auth actually said.
 authz_headers="$(curl -sS -o /dev/null -D - -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$auth_url")"
 authz_status="$(printf '%s' "$authz_headers" | awk 'NR==1{print $2; exit}')"
-login_url="$(printf '%s' "$authz_headers" | awk 'BEGIN{IGNORECASE=1} /^Location:/ { sub(/^Location:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }')"
+login_url="$(printf '%s' "$authz_headers" | awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }')"
 info "authorize status: $authz_status"
 info "authorize Location: ${login_url:-(none)}"
 case "$login_url" in
@@ -128,7 +128,7 @@ verify_url="$(curl -sS -D - -o /dev/null -b "$COOKIE_JAR" -c "$COOKIE_JAR" -X PO
   --data-urlencode "code=$CODE" \
   --data-urlencode "csrf_token=${csrf_verify:-$csrf_form}" \
   "$AUTH_URL/login/email/verify" |
-  awk 'BEGIN{IGNORECASE=1} /^Location:/ { sub(/^Location:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }')"
+  awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }')"
 case "$verify_url" in
   /authorize*|"$AUTH_URL"/authorize*) ok "code verified, SSO session established";;
   "") bad "no redirect from /login/email/verify — check the code";;
