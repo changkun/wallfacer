@@ -36,6 +36,15 @@ type Role struct {
 	// it to label the row; the runner's binding table is the
 	// source of truth for dispatch.
 	Multiturn bool
+
+	// Harness pins this agent to a specific coding harness
+	// ("claude" or "codex"). Empty means inherit from the runner's
+	// 4-tier resolver (task sandbox → activity env → default env →
+	// Claude). The pin layers above every other tier so a role
+	// that lists Harness="codex" always reaches Codex regardless
+	// of per-task or global settings. Built-in roles leave this
+	// empty; user-authored clones populate it to pin a harness.
+	Harness string
 }
 
 // Capability values referenced from built-in descriptors. API
