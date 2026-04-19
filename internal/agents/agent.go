@@ -57,8 +57,15 @@ type Registry struct {
 // NewBuiltinRegistry returns the registry populated with the seven
 // built-in agent roles in registration order.
 func NewBuiltinRegistry() *Registry {
-	reg := &Registry{byKey: make(map[string]Role, len(BuiltinAgents))}
-	for _, a := range BuiltinAgents {
+	return NewRegistry(BuiltinAgents...)
+}
+
+// NewRegistry returns a Registry populated with the given roles in
+// declaration order. Exported so tests (and future user-authored
+// loaders) can assemble registries without mutating package state.
+func NewRegistry(roles ...Role) *Registry {
+	reg := &Registry{byKey: make(map[string]Role, len(roles))}
+	for _, a := range roles {
 		reg.order = append(reg.order, a.Slug)
 		reg.byKey[a.Slug] = a
 	}

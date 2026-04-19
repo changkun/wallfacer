@@ -193,9 +193,20 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		prompt = task.ExecutionPrompt
 	}
 
-	// Idea-agent tasks use a special execution path: run the brainstorm agent,
-	// create backlog tasks from the results, then move directly to done.
-	if task.Kind == store.TaskKindIdeaAgent {
+	// Resolve the task's flow. Precedence: task.FlowID → legacy Kind
+	// mapping → "implement". The implement path stays on the turn loop
+	// below (multi-turn semantics the linear engine does not express
+	// yet); brainstorm keeps the existing ideation fast-path; any
+	// other flow runs through the flow engine.
+	flowSlug := "implement"
+	if r.flows != nil {
+		flowSlug = r.flows.ResolveForTask(task)
+	}
+
+	// Brainstorm tasks use a special execution path: run the brainstorm
+	// agent, create backlog tasks from the results, then move directly
+	// to done. Back-compat with the legacy Kind-based path.
+	if flowSlug == "brainstorm" || task.Kind == store.TaskKindIdeaAgent {
 		statusSet = true
 		ideaTimeout := time.Duration(task.Timeout) * time.Minute
 		if ideaTimeout <= 0 {
@@ -249,6 +260,62 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				"result": "Ideation complete.",
 			})
 		}
+		return
+	}
+
+	// Non-implement, non-brainstorm flows: run through the flow engine.
+	// The engine walks the flow's steps linearly (with parallel-sibling
+	// fan-out) and launches each agent via Runner.RunAgent. The
+	// implement flow stays on the turn loop below because it needs
+	// multi-turn semantics the engine does not express yet.
+	if flowSlug != "implement" && r.flowEngine != nil {
+		statusSet = true
+		f, ok := r.flows.Get(flowSlug)
+		if !ok {
+			err := fmt.Errorf("unknown flow %q", flowSlug)
+			logger.Runner.Error("flow resolve", "task", taskID, "error", err)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, classifyFailure(err, false, ""))
+			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, err.Error(), "", "", 0)
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
+			return
+		}
+		flowTimeout := time.Duration(task.Timeout) * time.Minute
+		if flowTimeout <= 0 {
+			flowTimeout = constants.DefaultTaskTimeout
+		}
+		flowCtx, flowCancel := context.WithTimeout(bgCtx, flowTimeout)
+		defer flowCancel()
+		if runErr := r.flowEngine.Execute(flowCtx, f, task); runErr != nil {
+			if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
+				return
+			}
+			category := classifyFailure(runErr, false, "")
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
+			if r.tryAutoRetry(bgCtx, taskID, category) {
+				return
+			}
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
+			return
+		}
+		// Follow the same in_progress → waiting → committing → done path
+		// the ideation branch uses (the state machine does not allow a
+		// direct in_progress → done transition).
+		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
+		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
+		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
 		return
 	}
 

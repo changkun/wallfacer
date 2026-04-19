@@ -11,8 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
@@ -147,6 +149,16 @@ type Runner struct {
 	shutdownCtx         context.Context
 	shutdownCancel      context.CancelFunc
 	reg                 *metrics.Registry // optional; nil disables metric collection
+
+	// agentsReg is the read-only catalog used by RunAgent to resolve
+	// slug → AgentRole. Built from agents.BuiltinAgents once at
+	// NewRunner. flows is the flow registry the dispatch path consults
+	// to pick the execution mode (implement/brainstorm/engine). Both
+	// are nil-safe: callers that bypass dispatch (direct runAgent,
+	// legacy ideate paths) never read them.
+	agentsReg  *agents.Registry
+	flows      *flow.Registry
+	flowEngine *flow.Engine
 }
 
 // ShutdownCtx returns the runner's shutdown context. It is cancelled when
@@ -397,6 +409,9 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		ideateContainer:  &containerRegistry{},
 		shutdownCh:       make(chan struct{}),
 	}
+	r.agentsReg = agents.NewBuiltinRegistry()
+	r.flows = flow.NewBuiltinRegistry()
+	r.flowEngine = flow.NewEngine(r)
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
 
 	// Initialise container circuit breaker.

@@ -1,6 +1,6 @@
 ---
 title: Runner delegates to flow engine for task execution
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/flow-engine.md
   - specs/local/agents-and-flows/composer-flow-picker.md
