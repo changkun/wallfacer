@@ -25,6 +25,21 @@ func NewBuiltinRegistry() *Registry {
 	return reg
 }
 
+// NewRegistry returns a Registry populated with the given flows in
+// declaration order. Exported so tests (and future user-authored
+// loaders) can assemble custom registries without mutating package
+// state. Builtin is left at each flow's supplied value — callers
+// that want to distinguish user flows from built-ins set it
+// themselves.
+func NewRegistry(flows ...Flow) *Registry {
+	reg := &Registry{byKey: make(map[string]Flow, len(flows))}
+	for _, f := range flows {
+		reg.order = append(reg.order, f.Slug)
+		reg.byKey[f.Slug] = f
+	}
+	return reg
+}
+
 // Get returns the Flow with the given slug and whether it was found.
 // The returned Flow is a deep copy so the caller cannot mutate
 // registry state by assigning to Steps or RunInParallelWith.
