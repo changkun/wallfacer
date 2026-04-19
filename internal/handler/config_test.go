@@ -1286,6 +1286,69 @@ func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
 	}
 }
 
+// TestCountInProgress_ScopedToViewedGroup pins that parallel budgets
+// (WALLFACER_MAX_PARALLEL / WALLFACER_MAX_TEST_PARALLEL) are per-group:
+// tasks in-flight in other groups do not consume the viewed group's
+// concurrency budget.
+func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+	ctx := context.Background()
+
+	sA, _ := h.currentStore()
+	// Create one regular in-progress task and one test in-progress task in A.
+	tA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular A", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask regular A: %v", err)
+	}
+	if err := sA.UpdateTaskStatus(ctx, tA.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus regular A: %v", err)
+	}
+	tAT, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test A", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask test A: %v", err)
+	}
+	if err := sA.UpdateTaskTestRun(ctx, tAT.ID, true, ""); err != nil {
+		t.Fatalf("UpdateTaskTestRun A: %v", err)
+	}
+	if err := sA.UpdateTaskStatus(ctx, tAT.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus test A: %v", err)
+	}
+
+	// Sanity: viewed group is A; counts reflect A.
+	if got := h.countGlobalInProgress(); got != 1 {
+		t.Fatalf("viewing A: countGlobalInProgress = %d, want 1", got)
+	}
+	if got := h.countGlobalTestsInProgress(ctx); got != 1 {
+		t.Fatalf("viewing A: countGlobalTestsInProgress = %d, want 1", got)
+	}
+
+	// Switch to group B (A stays active via its in-progress tasks).
+	newWS := t.TempDir()
+	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("switch group: %d: %s", w.Code, w.Body.String())
+	}
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if s, _ := h.currentStore(); s != nil && s != sA {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Group B is empty; its concurrency budget must be fresh (0), even
+	// though group A still has a regular + test task running.
+	if got := h.countGlobalInProgress(); got != 0 {
+		t.Errorf("viewing empty B: countGlobalInProgress = %d, want 0 (A's in-flight must not consume B's budget)", got)
+	}
+	if got := h.countGlobalTestsInProgress(ctx); got != 0 {
+		t.Errorf("viewing empty B: countGlobalTestsInProgress = %d, want 0", got)
+	}
+}
+
 // --- strict JSON decoding ---
 
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.

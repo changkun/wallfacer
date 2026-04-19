@@ -40,12 +40,14 @@ active. All toggles default to off and reset to off on server restart,
 except Auto-push which persists via the env file.
 
 > **Scope:** automation acts only on the **currently viewed workspace
-> group**. Tasks already running in other groups keep executing (and
-> still count against the global parallel limit), but no new
-> auto-promote / auto-test / auto-submit / auto-sync / auto-retry /
-> auto-refine actions fire against them until you switch back to that
-> group. Switch groups via the workspace selector to direct automation
-> at a different backlog.
+> group**, and parallel limits (`WALLFACER_MAX_PARALLEL` /
+> `WALLFACER_MAX_TEST_PARALLEL`) are budgeted **per group** rather than
+> globally. Tasks already running in other groups keep executing to
+> completion, but no new auto-promote / auto-test / auto-submit /
+> auto-sync / auto-retry / auto-refine actions fire against them, and
+> their in-flight count does not consume the current group's
+> concurrency budget. Switch groups via the workspace selector to
+> direct automation at a different backlog.
 
 ### Enabling Autopilot
 

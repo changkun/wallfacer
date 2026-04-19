@@ -32,8 +32,8 @@ func (h *Handler) maxTestConcurrentTasks() int {
 }
 
 // countRegularInProgress returns the number of non-test in-progress tasks
-// across ALL active workspace groups. The context parameter is unused but
-// matches the calling convention for store query methods.
+// in the currently viewed workspace group. The context parameter is unused
+// but matches the calling convention for store query methods.
 func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
 	return h.countGlobalInProgress(), nil
 }
