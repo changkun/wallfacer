@@ -1,6 +1,6 @@
 ---
 title: Retire the Refine Subsystem
-status: validated
+status: complete
 depends_on:
   - specs/local/refinement-into-plan/task-mode-undo.md
   - specs/local/refinement-into-plan/send-to-plan-card-action.md
@@ -16,7 +16,7 @@ affects:
   - CLAUDE.md
 effort: medium
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-04-20
 author: changkun
 dispatched_task_id: 1341e963-9ccf-44fa-8d18-b3bbaaae73d7
 ---
@@ -66,3 +66,12 @@ Delete the old refinement pipeline and its UI now that Plan task-mode is the onl
 - Do NOT touch the Ideation pipeline in `internal/runner/ideate.go`. Different feature.
 - Do NOT gate the deletion behind a config flag. If the prior tasks shipped correctly, users have the replacement path.
 - Do NOT push any commit to the remote as part of this task. Local commit only; user pushes explicitly.
+
+## Implementation Notes
+
+Deviations from the spec, recorded during landing:
+
+- **Store data model kept dormant.** `RefinementJob`, `RefinementSession`, `RefineSessions`/`CurrentRefinement` on `Task`, `ErrRefinementAlreadyRunning`, `Store.{UpdateRefinementJob,StartRefinementJobIfIdle,ApplyRefinement,DismissRefinement}`, `SandboxActivityRefinement`, and related constants were retained read-only. No code path writes them; removing them requires an on-disk migration for existing task records. The spec allowed either approach under point 4; retention was chosen to avoid a migration pass.
+- **Guard test location.** Spec asked for `internal/handler/routes_test.go::TestRefineRoutesRemoved`. Test lives at `internal/cli/server_routes_test.go::TestRefineRoutesRemoved` instead, where the router wiring is already exercised end-to-end.
+- **ui/js/tasks.test.js grep-assertion skipped.** The spec asked for a `noRefineReferences` snapshot test in `ui/js/tasks.test.js`. Not added. Rationale: the build graph still references the word "refine" transitively (e.g. the planner's spec-mode `/refine` slash command entry, kept per the scope clarification below), so a blanket grep would flag unrelated code. The five refine route 404 guard already prevents reintroduction of the retired HTTP surface.
+- **Planner `/refine` slash command is NOT part of retirement.** The retirement sweep initially removed `internal/planner/commands.go`'s `refine` entry, `internal/planner/commands_templates/refine.tmpl`, and doc references in `docs/guide/{designing-specs,exploring-ideas,usage}.md`. These were restored in a follow-up commit. That command operates on spec files (updates a spec against current codebase state), orthogonal to the task-prompt refinement agent that was actually retired.

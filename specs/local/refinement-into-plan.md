@@ -1,6 +1,6 @@
 ---
 title: Unify Refinement Into Plan Mode
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux.md
   - specs/local/spec-coordination/spec-planning-ux/planning-chat-threads.md
@@ -20,7 +20,7 @@ affects:
   - docs/guide/refinement-and-ideation.md
 effort: large
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-04-20
 author: changkun
 dispatched_task_id: null
 ---
