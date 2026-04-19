@@ -37,7 +37,7 @@ wallfacer run
 ```
 
 ```bash
-# ~/.wallfacer/.env — set one of:
+# wallfacer/.env — set one of:
 CLAUDE_CODE_OAUTH_TOKEN=<your-token>
 # ANTHROPIC_API_KEY=sk-ant-...
 ```

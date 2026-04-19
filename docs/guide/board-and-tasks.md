@@ -1,4 +1,4 @@
-# 📋 Board & Tasks
+# Board & Tasks
 
 Wallfacer organizes work on a four-column task board. You create tasks as cards in the Backlog, move them to In Progress to trigger agent execution inside an isolated sandbox container, review results when the agent pauses or finishes, and accept completed work into your repository. This guide covers every aspect of the task board, from creating and configuring tasks to inspecting results and managing the full task lifecycle.
 
@@ -51,7 +51,7 @@ Allowed transitions:
 | `done` | `cancelled` |
 | `cancelled` | `backlog` |
 
-### ➕ Creating a Task
+### Creating a Task
 
 Click **+ New Task** in the Backlog column header to expand the creation form. The basic fields are:
 
@@ -71,7 +71,7 @@ Each task has two text fields: **Title** (2-5 word label) and **Prompt** (the fu
 
 For advanced creation options (templates, batch creation, dependencies, budgets, scheduling, and share-code), see the [Advanced Topics](#advanced-topics) section below.
 
-### ⚡ Running a Task
+### Running a Task
 
 When a task moves from Backlog to In Progress (by dragging the card, clicking "Start task" in the detail modal, or via Autopilot), the server:
 
@@ -100,7 +100,7 @@ If the agent reaches a point where it needs user input (empty stop reason), the 
 
 A task fails when the container crashes, the timeout expires, a budget limit is exceeded, or the agent encounters an unrecoverable error. See [Task Budgets](#task-budgets) for budget-related failures.
 
-### 🔍 Reviewing Results
+### Reviewing Results
 
 Click any task card to open its detail modal. The layout adapts based on the task's state.
 
@@ -122,7 +122,7 @@ Click any task card to open its detail modal. The layout adapts based on the tas
 
 For the full reference, including the **Refine**, **Flamegraph**, **Timeline**, and **Events** main tabs and the backlog refinement interface, see [Task Detail Modal (Full Reference)](#task-detail-modal-full-reference).
 
-### 📝 Handling Waiting Tasks
+### Handling Waiting Tasks
 
 When a task is in the Waiting state, open its detail modal to see the agent's last output, then choose an action:
 
@@ -133,7 +133,7 @@ When a task is in the Waiting state, open its detail modal to see the agent's la
 | **🧪 Test** | Expand the test section, optionally enter acceptance criteria, and click "Run Test Agent" to launch a verification agent on the current code state. |
 | **❌ Cancel** | Discard all prepared changes, clean up the container and worktrees, and move the task to Cancelled. History and logs are preserved. |
 
-### 🧪 Test Verification
+### Test Verification
 
 Test verification lets you check whether a task's changes actually work before committing them. You can trigger a test from a **Waiting** task (the most common case), or from **Done** or **Failed** tasks to verify their state.
 
@@ -155,7 +155,7 @@ You can run tests multiple times; each run overwrites the previous verdict. Test
 
 For automated testing, see [Auto-Test](automation.md).
 
-### 🔍 Search
+### Search
 
 The search bar in the board header filters visible cards in real time. Type any text to filter by title, prompt content, or tags. Use `#tagname` to filter by specific tags. Press `/` to focus the search bar from anywhere on the board. Press Escape to clear and blur.
 
@@ -163,7 +163,7 @@ Press **Cmd+K** (or Ctrl+K) to open the command palette for fuzzy task search an
 
 Press **n** to open the new task form from anywhere on the board (focus lands on the prompt textarea so you can start typing immediately). Press **?** to see the full keyboard shortcuts reference. For the complete shortcut list, see [Keyboard Shortcuts](oversight-and-analytics.md#keyboard-shortcuts).
 
-### 📂 File Explorer
+### File Explorer
 
 The file explorer panel lets you browse workspace files directly in the web UI without leaving the board.
 
@@ -179,7 +179,7 @@ The file explorer panel lets you browse workspace files directly in the web UI w
 
 **Keyboard navigation:** When focused inside the tree, use arrow keys to navigate between nodes. **Right arrow** expands a collapsed directory, **Left arrow** collapses an expanded one (or moves to the parent). **Enter** toggles directories or opens file preview.
 
-### 💻 Integrated Terminal
+### Integrated Terminal
 
 Wallfacer ships with an integrated terminal panel so you can run shell commands without leaving the browser.
 
@@ -195,7 +195,7 @@ The transport is a WebSocket at `GET /api/terminal/ws` authenticated via `?token
 
 ## Advanced Topics
 
-### ⏰ Routine Tasks
+### Routine Tasks
 
 Routine tasks are board cards that run on a schedule. The card itself never executes — when its interval elapses the server spawns a fresh **instance task** with the routine's prompt, and the routine card stays on the board waiting for the next cycle.
 
@@ -217,7 +217,7 @@ Routine cards are filtered out of auto-promote, auto-refine, and the dependency 
 
 **Cascading cancel on routine cleanup.** Cancelling or archiving a routine card cascades to its spawned instance tasks: any still-live children (backlog, in_progress, waiting) are cancelled automatically so they don't linger on the board. Terminal children (done, failed, cancelled) are left alone so you can review their results and archive them yourself. Instance tasks are identified by the `spawned-by:<routine-id>` tag the runner writes on spawn.
 
-### 📝 Prompt Templates
+### Prompt Templates
 
 Save reusable prompt patterns so you do not have to retype common instructions:
 
@@ -230,7 +230,7 @@ Templates are also available via the API:
 - `POST /api/templates` -- create a new template (`{name, body}`)
 - `DELETE /api/templates/{id}` -- delete a template
 
-### 📦 Batch Task Creation
+### Batch Task Creation
 
 Use `POST /api/tasks/batch` to create multiple tasks in a single atomic operation. This endpoint supports **symbolic dependency wiring**: tasks in the batch can reference each other by their position index so that dependencies are wired up without needing to know task IDs in advance.
 
@@ -248,7 +248,7 @@ Request format:
 
 In this example, task 1 depends on task 0, and task 2 depends on both tasks 0 and 1. The server validates the dependency graph for cycles before creating any tasks. On success it returns 201 with the created tasks and a mapping from reference indices to actual task IDs.
 
-### 🔗 Task Dependencies
+### Task Dependencies
 
 #### Declaring Prerequisites
 
@@ -309,7 +309,7 @@ When retrying a task that has a previous session, the **fresh_start** flag contr
 
 Toggle this via the "Resume previous session" checkbox in the retry or backlog settings sections.
 
-### 🗑️ Soft Delete and Restore
+### Soft Delete and Restore
 
 Deleting a task creates a tombstone rather than immediately removing data. Soft-deleted tasks are recoverable for 7 days (configurable via `WALLFACER_TOMBSTONE_RETENTION_DAYS`). The confirmation dialog warns about this retention period. After the retention window, data is permanently pruned on the next server startup.
 
@@ -317,7 +317,7 @@ To restore a deleted task, use `POST /api/tasks/{id}/restore` or view deleted ta
 
 ### Task Actions Reference
 
-#### 🔄 Retry
+#### Retry
 
 Available on: `done`, `failed`, `waiting`, `cancelled`
 
@@ -341,13 +341,13 @@ Available on: `waiting`, `failed`
 
 Rebases the task's worktree branches onto the latest default branch without merging. This brings in changes that other tasks may have committed since this task started.
 
-#### 🧪 Test
+#### Test
 
 Available on: `waiting`, `done`, `failed`
 
 Launches a separate verification agent that inspects the code changes and runs tests. You can optionally provide acceptance criteria. The verdict (pass/fail) appears as a badge on the card. Run tests multiple times -- each run overwrites the previous verdict.
 
-#### ❌ Cancel
+#### Cancel
 
 Available on: `backlog`, `in_progress`, `waiting`, `failed`, `done`
 

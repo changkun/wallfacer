@@ -1,8 +1,8 @@
-# 📊 Oversight & Analytics
+# Oversight & Analytics
 
 Wallfacer provides a suite of monitoring and analytics tools that help you understand what agents are doing during task execution, how long each phase takes, and how much each task costs. This guide covers oversight summaries, live log streaming, execution timelines, usage tracking, and the stats dashboard.
 
-## 📋 Key Concepts
+## Key Concepts
 
 - **Oversight** -- An AI-generated high-level summary of an agent's activity during a task, organized into logical phases (e.g., "Reading codebase", "Implementing feature", "Running tests"). Each phase lists the tools used, commands run, and key actions taken.
 - **Spans** -- Timed intervals recorded during task execution. Each span captures a discrete phase of work such as a single agent turn, container startup, worktree setup, or commit pipeline. Spans power both the flamegraph visualization and the span statistics table.
@@ -17,9 +17,9 @@ graph LR
 
 ---
 
-## ✅ Essentials
+## Essentials
 
-### 👁️ Oversight Summaries
+### Oversight Summaries
 
 Oversight summaries are structured reports that describe what an agent did during a task in human-readable form. Rather than reading through raw logs, you can review a concise phase-by-phase breakdown of the agent's work.
 
@@ -54,7 +54,7 @@ The oversight summary has one of four statuses:
 | **ready** | Summary is available and displayed |
 | **failed** | Generation failed (hover for error details) |
 
-### 🖥️ Live Log Monitoring
+### Live Log Monitoring
 
 While a task is running, the detail modal streams live container output in real time. The log viewer connects via a streaming HTTP response and updates incrementally as new output arrives.
 
@@ -66,7 +66,7 @@ Switch between log display modes using the tabs above the log panel:
 - **Pretty** -- Parses NDJSON output and renders it with syntax highlighting, tool calls, and formatted content. This is the default for tasks without a ready oversight summary.
 - **Raw** -- Shows the raw text output with ANSI escape codes stripped.
 
-### 💰 Checking Task Costs
+### Checking Task Costs
 
 Every task tracks token consumption and cost across all its turns:
 
@@ -78,7 +78,7 @@ Every task tracks token consumption and cost across all its turns:
 
 This information is visible in the task detail modal and on task cards.
 
-### 🔍 Basic Search
+### Basic Search
 
 #### Header Search Bar
 
@@ -99,7 +99,7 @@ Press **Cmd+K** (macOS) or **Ctrl+K** (Windows/Linux) to open the command palett
 
 ---
 
-## 🔧 Advanced Topics
+## Advanced Topics
 
 ### Periodic Oversight Generation
 
@@ -129,7 +129,7 @@ The search bar is hidden in Oversight mode since the structured view is not line
 
 Large outputs are capped at 10,000 lines in the browser to prevent memory issues. When this limit is reached, a notice appears with a link to download the full log. The server also enforces an 8 MB per-turn output limit; a banner warns when server-side truncation has occurred.
 
-### 🐳 Container Monitor
+### Container Monitor
 
 Click the sandbox monitor button in the header to open the Container Monitor modal. This shows all running Wallfacer containers with:
 
@@ -142,7 +142,7 @@ Click the sandbox monitor button in the header to open the Container Monitor mod
 
 The list auto-refreshes every 5 seconds while the modal is open. Click the refresh button for an immediate update.
 
-### 🔥 Flamegraph Tab
+### Flamegraph Tab
 
 The task detail modal has two visualization main tabs: **Flamegraph** and **Timeline**.
 
@@ -156,11 +156,11 @@ The Flamegraph tab renders an interactive flamegraph-style visualization of exec
 
 Idle gaps between activity are compressed in the visualization so that long waits (e.g., for user feedback) do not distort the timeline. Compressed gaps are indicated by hatched regions with the idle duration labeled.
 
-### ⏱️ Timeline Tab
+### Timeline Tab
 
 The Timeline tab shows a chronological execution chart that updates in real time for running tasks. It provides a different perspective from the flamegraph, focusing on the sequential flow of execution phases.
 
-### 📈 Span Statistics (Global)
+### Span Statistics (Global)
 
 Click the span statistics button in the header to open the Span Stats modal. This aggregates timing data across all tasks and shows:
 
@@ -202,7 +202,7 @@ GET /api/tasks/{id}/turn-usage
 
 Each record includes the sub-agent type, timestamp, token counts, and cost for that specific turn.
 
-### 🚫 Budget Enforcement
+### Budget Enforcement
 
 Set per-task cost and token limits to prevent runaway execution:
 
@@ -222,7 +222,7 @@ Click the usage button in the header to open the Usage Statistics modal. It prov
 - **By Status table** -- Token and cost totals grouped by task status (done, failed, waiting, etc.), each with a colored status badge.
 - **By Sub-Agent table** -- Token and cost totals grouped by agent activity type.
 
-### 📊 Stats Dashboard
+### Stats Dashboard
 
 Click the stats button in the header to open the Stats modal. This provides a comprehensive analytics dashboard with:
 

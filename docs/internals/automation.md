@@ -1,8 +1,8 @@
-# 🤖 Automation
+# Automation
 
 Wallfacer runs 7 background watchers that form an autonomous pipeline: **auto-promoter**, **auto-retrier**, **auto-tester**, **auto-submitter**, **auto-refiner**, **ideation watcher**, and **waiting-sync watcher**. Together with oversight generation and circuit breakers, these watchers allow the task board to operate hands-free — promoting backlog tasks, running tests, submitting results, retrying failures, refining prompts, syncing worktrees, and generating oversight summaries without manual intervention.
 
-## 🔄 Background Goroutine Model
+## Background Goroutine Model
 
 No message queue, no worker pool. Concurrency is plain Go goroutines:
 
@@ -22,7 +22,7 @@ go func() {
 
 Tasks are long-running and IO-bound (container execution, git operations), so goroutines are appropriate — no CPU contention, and Go's scheduler handles the rest.
 
-## 🚀 Watcher Initialization & Startup
+## Watcher Initialization & Startup
 
 ### Startup Sequence in `server.go`
 
@@ -98,7 +98,7 @@ The container circuit breaker is initialized in `NewRunner()` with:
 
 After the threshold is exceeded, the circuit opens and rejects further launches. After the open duration, it enters half-open state and allows a single probe. A successful probe resets the breaker; a failed probe re-opens it.
 
-## ⚡ Autopilot (Auto-Promotion)
+## Autopilot (Auto-Promotion)
 
 When autopilot is enabled, the server automatically promotes backlog tasks to `in_progress` as capacity becomes available, without requiring the user to drag cards manually.
 
@@ -123,7 +123,7 @@ Tasks whose `DependsOn` list contains any task not yet in `done` status are skip
 
 Tasks whose `ScheduledAt` is in the future are also skipped.
 
-## 🧪 Test Verification
+## Test Verification
 
 `POST /api/tasks/{id}/test` runs a separate verification agent on a `waiting` task without committing:
 
@@ -172,13 +172,13 @@ After reviewing the verdict, the user can:
 - Provide feedback to fix issues, then re-test
 - Cancel the task
 
-## ✅ Auto-Submit
+## Auto-Submit
 
 Auto-submit is part of the autopilot pipeline. When enabled via `PUT /api/config {"autosubmit": true}`, the `StartAutoSubmitter` watcher monitors tasks that reach `waiting` state with a passing test verdict. It automatically marks them as done, triggering the commit-and-push pipeline without manual intervention.
 
 This completes the autonomous loop: autopilot promotes → agent executes → auto-tester verifies → auto-submit commits.
 
-## 🔄 Auto-Retry
+## Auto-Retry
 
 Tasks can have an `AutoRetryBudget map[FailureCategory]int` that specifies how many automatic retries are allowed for each failure category. When a task fails:
 
@@ -205,7 +205,7 @@ The `StartAutoRetrier` watcher performs a startup recovery scan for tasks that f
 
 See [Task Lifecycle](task-lifecycle.md#auto-retry) for retry history and data models.
 
-## 🔗 Tip-Sync (Auto-Sync)
+## Tip-Sync (Auto-Sync)
 
 The `StartWaitingSyncWatcher` monitors tasks in `waiting` or `failed` state and rebases their worktrees onto the latest default branch when upstream changes are detected. This keeps task branches up-to-date without merging, reducing conflict risk when the commit pipeline eventually runs.
 
@@ -217,7 +217,7 @@ Multiple workspace paths can be passed at startup or switched at runtime via `PU
 
 Non-git directories are supported as plain mount targets (no worktree, no commit pipeline for that workspace).
 
-## ✨ Auto-Refine
+## Auto-Refine
 
 The `StartAutoRefiner` watcher monitors backlog tasks and can automatically trigger prompt refinement via a sandbox agent before execution begins. When enabled, it launches the same refinement flow that users can trigger manually.
 
@@ -264,7 +264,7 @@ sequenceDiagram
 
 Both `RefineSessions []RefinementSession` (past history) and `CurrentRefinement *RefinementJob` (present job) live on the Task struct. `RefineSessions` grows over time as each refinement is applied (capped at `DefaultRefineSessionsLimit` = 5); `CurrentRefinement` is replaced on each new run and cleared on dismiss.
 
-## 👁️ Oversight Generation
+## Oversight Generation
 
 Oversight is generated asynchronously whenever a task transitions to `waiting`, `done`, or `failed`. It is also regenerated periodically during execution if `WALLFACER_OVERSIGHT_INTERVAL > 0` (minutes).
 
@@ -291,7 +291,7 @@ The generator reads the task's trace events, passes them to the Claude API with 
 
 `POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
 
-## 💡 Ideation / Brainstorm
+## Ideation / Brainstorm
 
 Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. It runs via the standard task-and-flow dispatch path rather than a special case. The system-ideation routine is a routine card tagged `system:ideation` with `spawn_flow: brainstorm`; each fire spawns a fresh task whose `FlowID` is `brainstorm`. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and resolve to `brainstorm` via the legacy-kind mapper.
 
@@ -313,7 +313,7 @@ flowchart TD
 - `GET /api/ideate` returns current ideation session state (task ID, status, created task count).
 - See [Agents & Flows](../guide/agents-and-flows.md) for how to clone the `ideate` agent with a different harness or a custom system prompt.
 
-## ⚔️ Conflict Resolution
+## Conflict Resolution
 
 When `git rebase` fails during the commit pipeline:
 
@@ -332,7 +332,7 @@ flowchart TD
 
 Using the same session ID means the agent has full context of the original task when making conflict resolution decisions.
 
-## 🛡️ Circuit Breakers
+## Circuit Breakers
 
 Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy.
 
@@ -344,7 +344,7 @@ The circuit breaker lifecycle:
 
 See [Circuit Breakers](../guide/circuit-breakers.md) for full details.
 
-## 📎 See Also
+## See Also
 
 - [Task Lifecycle](task-lifecycle.md) — State machine, turn loop, data models, auto-retry details
 - [API & Transport](api-and-transport.md) — HTTP API, SSE streams, container execution, environment configuration

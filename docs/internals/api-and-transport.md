@@ -1,8 +1,8 @@
-# 🌐 API & Transport
+# API & Transport
 
 This document covers the HTTP API surface, request processing pipeline, real-time event delivery (SSE), container runtime integration, metrics, and supporting infrastructure for the Wallfacer server.
 
-## 🛣️ HTTP API
+## HTTP API
 
 All state changes flow through `handler.go`. The handler never blocks — long-running work is always handed off to a goroutine.
 
@@ -158,7 +158,7 @@ When a `PATCH /api/tasks/{id}` request moves a task to `in_progress`, the handle
 
 The same pattern applies to feedback resumption and commit-and-push.
 
-## 🔧 Request Middleware Chain
+## Request Middleware Chain
 
 The HTTP server wraps the `ServeMux` in a layered middleware chain. Each request passes through these layers in order:
 
@@ -201,7 +201,7 @@ srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Instructions: 5 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`. |
 
-## 📡 SSE Live Updates
+## SSE Live Updates
 
 Both task state and git status use the same SSE push pattern:
 
@@ -300,7 +300,7 @@ Implemented in `Handler.SpecTreeStream()` (`internal/handler/specs.go`). Uses a 
 
 Not SSE in the strict sense — this endpoint streams raw `text/plain` output. It spawns `<runtime> logs -f --tail 100 <containerName>` as a subprocess, pipes stdout and stderr through a scanner, and writes lines to the HTTP response. A 15-second keepalive ticker sends empty newlines to keep the connection alive and detect client disconnects.
 
-## 🔌 WebSocket Terminal
+## WebSocket Terminal
 
 `GET /api/terminal/ws` is the project's only WebSocket endpoint. It provides an interactive host shell via a PTY relay. Unlike the REST routes defined in `internal/apicontract/routes.go`, this endpoint is registered directly in `BuildMux` (`internal/cli/server.go`) because WebSocket upgrades don't follow REST request/response semantics.
 
@@ -342,7 +342,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 - **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
 - **Frontend** (`ui/js/terminal.js`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
 
-## 🐳 Container Runtime
+## Container Runtime
 
 ### Auto-Detection Order
 
@@ -402,7 +402,7 @@ Container resource limits follow a three-tier resolution order (in `resolvedCont
 [--network mynet]   # from WALLFACER_CONTAINER_NETWORK, default "host"
 ```
 
-## 📊 Metrics Reference
+## Metrics Reference
 
 All metrics are served at `GET /metrics` in Prometheus text exposition format via `metrics.Registry.WritePrometheus()`.
 
@@ -432,7 +432,7 @@ These are computed on each `/metrics` scrape via registered collector functions:
 | `wallfacer_failed_tasks_by_category` | `category` | Number of currently-failed (non-archived) tasks grouped by failure category. |
 | `wallfacer_circuit_breaker_open` | — | 1 when the container launch circuit breaker is open (runtime unavailable), 0 when closed. |
 
-## 📈 Token Tracking & Cost
+## Token Tracking & Cost
 
 Per-turn usage is extracted from the agent JSON output and accumulated on the `Task`:
 
@@ -453,20 +453,20 @@ In addition to the aggregate `TaskUsage`, each task records:
 - `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `refinement`, `title`, `oversight`, `commit_message`, `idea_agent`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
 - Per-turn `TurnUsageRecord` entries accessible via `GET /api/tasks/{id}/turn-usage`, providing detailed per-turn token consumption, stop reasons, and sub-agent labels.
 
-## 🔍 Task Search
+## Task Search
 
 `GET /api/tasks/search?q=<keyword>` searches across task titles, prompts, tags, and oversight text. Results are returned as `TaskSearchResult` objects with the matched field and a context snippet.
 
 The search index is maintained in-memory and updated on task changes. Use `POST /api/admin/rebuild-index` to manually rebuild if needed.
 
-## ⏱️ Span Instrumentation
+## Span Instrumentation
 
 Key execution phases are instrumented with `span_start` / `span_end` trace events. Each span carries a `SpanData` payload with a `Phase` (e.g. `worktree_setup`, `agent_turn`, `container_run`, `commit`) and an optional `Label` to differentiate multiple spans of the same phase.
 
 - `GET /api/tasks/{id}/spans` — returns all span events for a task, useful for profiling turn latency
 - `GET /api/debug/spans` — aggregate span timing statistics across all tasks
 
-## 📄 Event Pagination
+## Event Pagination
 
 `GET /api/tasks/{id}/events` supports two modes:
 
@@ -524,7 +524,7 @@ The handler returns 400 for:
 - `limit` that is not a positive integer (including 0)
 - Any unrecognised value in `types`
 
-## 🔒 Store Concurrency
+## Store Concurrency
 
 `store.go` manages an in-memory `map[uuid.UUID]*Task` behind a `sync.RWMutex`:
 
@@ -534,7 +534,7 @@ The handler returns 400 for:
 
 Event traces are append-only. Each event is written as a separate file (`traces/NNNN.json`) using the same atomic write pattern. Files are never modified after creation.
 
-## 🛑 Graceful Shutdown
+## Graceful Shutdown
 
 The server handles `SIGTERM` and `SIGINT` via `signal.NotifyContext`, which creates a cancellable context shared by all background goroutines and the HTTP server's `BaseContext`.
 

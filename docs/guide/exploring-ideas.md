@@ -71,7 +71,7 @@ Type `/` to see an autocomplete menu of built-in commands. Commands cover the fu
 | `/diff [range]` | Compare completed implementation against spec (drift analysis) |
 | `/wrapup` | Finalize a completed spec with outcome and status updates |
 
-### @mentions
+### mentions
 
 Type `@` in the composer to trigger file path autocomplete. In Plan mode, spec files are prioritized in the suggestion list. Mentioned files are included as context for the agent.
 
