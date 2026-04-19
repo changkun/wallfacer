@@ -128,7 +128,7 @@ the missing-claims cases, and appends to the workspace group's audit log.
   trace rotation pattern).
 - Indexed lazily on read (grep-and-paginate); no secondary index in the
   MVP. Cloud deployments that need query-at-scale route audit events into
-  the telemetry pipeline in `shared/telemetry-observability.md` instead
+  the telemetry pipeline in `observability/telemetry-observability.md` instead
   of reading the local file.
 
 ### Operation catalog (initial set)

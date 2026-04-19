@@ -4,7 +4,7 @@ status: drafted
 depends_on:
   - specs/shared/agent-abstraction.md
   - specs/oversight/sandbox-hooks.md
-  - specs/shared/telemetry-observability.md
+  - specs/observability/telemetry-observability.md
 affects:
   - internal/runner/
   - internal/handler/
@@ -471,7 +471,7 @@ This spec is a **composition layer** — it does not replace existing oversight 
 | [sandbox-hooks.md](sandbox-hooks.md) | L6: Tool-call interception | Hook responses informed by permission mode constraints |
 | [oversight-risk-scoring.md](oversight-risk-scoring.md) | L8: Action risk assessment | Risk scores feed into escalation cascade |
 | [multi-agent-consensus.md](multi-agent-consensus.md) | L9: Cross-provider verification | Consensus failures trigger escalation |
-| [telemetry-observability.md](../shared/telemetry-observability.md) | Runtime anomaly detection | Auto-dispatched fix tasks enter at L1 with `restricted` mode |
+| [telemetry-observability.md](../observability/telemetry-observability.md) | Runtime anomaly detection | Auto-dispatched fix tasks enter at L1 with `restricted` mode |
 | [intelligence-system.md](../shared/intelligence-system.md) | Cross-task awareness | World model informs scope validation in L1 |
 | [information-inbox.md](../shared/information-inbox.md) | External signal ingestion | Inbox-converted tasks enter at L1 with validation |
 

@@ -3,7 +3,7 @@ title: "Information Inbox — External Signal Aggregation & Triage"
 status: drafted
 depends_on:
   - specs/shared/agent-abstraction.md
-  - specs/shared/telemetry-observability.md
+  - specs/observability/telemetry-observability.md
 affects:
   - internal/inbox/
   - internal/handler/
