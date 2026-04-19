@@ -83,6 +83,7 @@ var embeddedToAPI = map[string]string{
 	"planning.tmpl":                 "planning",
 	"planning_system_empty.tmpl":    "planning_system_empty",
 	"planning_system_nonempty.tmpl": "planning_system_nonempty",
+	"task_prompt_refine.tmpl":       "task_prompt_refine",
 }
 
 // apiToEmbedded maps user-facing API names to embedded template file names.
@@ -98,12 +99,14 @@ var apiToEmbedded = map[string]string{
 	"planning":                 "planning.tmpl",
 	"planning_system_empty":    "planning_system_empty.tmpl",
 	"planning_system_nonempty": "planning_system_nonempty.tmpl",
+	"task_prompt_refine":       "task_prompt_refine.tmpl",
 }
 
 // knownNames is the ordered list of all user-facing template API names.
 var knownNames = []string{
 	"ideation",
 	"refinement",
+	"task_prompt_refine",
 	"oversight",
 	"title",
 	"commit_message",
@@ -257,7 +260,7 @@ func ValidateTemplate(content string) error {
 // execution and catch field-access errors at write time.
 func mockContextFor(apiName string) (interface{}, bool) {
 	switch apiName {
-	case "refinement":
+	case "refinement", "task_prompt_refine":
 		return RefinementData{
 			CreatedAt: "2024-01-01 00:00:00",
 			Today:     "2024-01-01",
@@ -449,6 +452,12 @@ type InstructionsData struct {
 // Refinement renders the spec-writing agent prompt.
 func (m *Manager) Refinement(d RefinementData) string { return m.render("refinement.tmpl", d) }
 
+// TaskPromptRefine renders the task-mode planning agent system prompt.
+// Uses the same RefinementData fields but from the pinned task.
+func (m *Manager) TaskPromptRefine(d RefinementData) string {
+	return m.render("task_prompt_refine.tmpl", d)
+}
+
 // Ideation renders the brainstorm agent prompt.
 func (m *Manager) Ideation(d IdeationData) string { return m.render("ideation.tmpl", d) }
 
@@ -497,6 +506,9 @@ func (m *Manager) PlanningSystemNonempty() string {
 
 // Refinement renders the spec-writing agent prompt.
 func Refinement(d RefinementData) string { return Default.Refinement(d) }
+
+// TaskPromptRefine renders the task-mode planning agent system prompt.
+func TaskPromptRefine(d RefinementData) string { return Default.TaskPromptRefine(d) }
 
 // Ideation renders the brainstorm agent prompt.
 func Ideation(d IdeationData) string { return Default.Ideation(d) }

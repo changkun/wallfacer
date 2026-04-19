@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 129,
+  "route_count": 130,
   "routes": [
     {
       "method": "GET",
@@ -450,6 +450,15 @@
       "pattern": "/api/planning/commands",
       "name": "GetPlanningCommands",
       "description": "List available slash commands.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/planning/tool/update_task_prompt",
+      "name": "UpdateTaskPromptTool",
+      "description": "Tool endpoint: update a task's prompt from a task-mode planning thread.",
       "tags": [
         "planning"
       ]

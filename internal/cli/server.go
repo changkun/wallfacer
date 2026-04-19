@@ -898,6 +898,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"InterruptPlanningMessage": h.InterruptPlanningMessage,
 		"UndoPlanningRound":        h.UndoPlanningRound,
 		"GetPlanningCommands":      h.GetPlanningCommands,
+		"UpdateTaskPromptTool":     h.UpdateTaskPromptTool,
 
 		// Planning chat threads.
 		"ListPlanningThreads":     h.ListPlanningThreads,

@@ -240,6 +240,10 @@ var Routes = {
     commands: function () {
       return "/api/planning/commands";
     },
+    // POST /api/planning/tool/update_task_prompt
+    updateTaskPromptTool: function () {
+      return "/api/planning/tool/update_task_prompt";
+    },
     // GET /api/planning/threads
     listThreads: function () {
       return "/api/planning/threads";

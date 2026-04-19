@@ -684,3 +684,24 @@ func (s *Store) UpdateRoutineSpawnFlow(_ context.Context, id uuid.UUID, slug str
 		return nil
 	})
 }
+
+// UpdateTaskPromptDirect sets the prompt on a backlog or waiting task.
+// Returns the previous prompt and whether the task is in waiting state (resume_hint).
+// Unlike UpdateTaskBacklog it is not restricted to backlog status.
+func (s *Store) UpdateTaskPromptDirect(_ context.Context, id uuid.UUID, newPrompt string) (prevPrompt string, resumeHint bool, err error) {
+	err = s.mutateTask(id, func(t *Task) error {
+		if t.Status != TaskStatusBacklog && t.Status != TaskStatusWaiting {
+			return fmt.Errorf("task status %q does not allow prompt updates; must be backlog or waiting", t.Status)
+		}
+		prevPrompt = t.Prompt
+		resumeHint = t.Status == TaskStatusWaiting
+		t.Prompt = newPrompt
+		lowered := strings.ToLower(newPrompt)
+		if entry, ok := s.searchIndex[id]; ok {
+			entry.prompt = lowered
+			s.searchIndex[id] = entry
+		}
+		return nil
+	})
+	return
+}
