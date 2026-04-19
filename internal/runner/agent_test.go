@@ -187,6 +187,71 @@ func TestRunAgent_HarnessPinOverridesTaskSandbox(t *testing.T) {
 	}
 }
 
+// TestRunAgent_PromptTmplPrepend verifies a user-authored agent
+// with a non-empty PromptTmpl prepends that body to the caller's
+// prompt before handing it to the container CLI. Built-in roles
+// leave PromptTmpl empty, so the default path is unaffected.
+func TestRunAgent_PromptTmplPrepend(t *testing.T) {
+	r, backend, _ := newAgentTestRunner(t)
+	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
+
+	role := makeTestRole(t, "t-tmpl", mountNone)
+	role.PromptTmpl = "You are a terse reviewer.\nReply in bullet points."
+
+	_, err := r.runAgent(
+		context.Background(),
+		role,
+		nil,
+		"review this diff",
+		runAgentOpts{},
+	)
+	if err != nil {
+		t.Fatalf("runAgent: %v", err)
+	}
+	calls := backend.RunArgsCalls()
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 Launch call, got %d", len(calls))
+	}
+	joined := strings.Join(calls[0].Args, " ")
+	// The preamble must reach the container verbatim, separated
+	// from the user prompt by a blank line.
+	want := "You are a terse reviewer.\nReply in bullet points.\n\nreview this diff"
+	if !strings.Contains(joined, want) {
+		t.Errorf("expected prepended preamble + prompt in launch args;\nwant substring: %q\ngot: %q", want, joined)
+	}
+}
+
+// TestRunAgent_PromptTmplEmptyUnchanged confirms that without a
+// PromptTmpl the prompt reaches the CLI verbatim, matching
+// pre-change behaviour.
+func TestRunAgent_PromptTmplEmptyUnchanged(t *testing.T) {
+	r, backend, _ := newAgentTestRunner(t)
+	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
+
+	role := makeTestRole(t, "t-tmpl-empty", mountNone)
+	// role.PromptTmpl left empty.
+	_, err := r.runAgent(
+		context.Background(),
+		role,
+		nil,
+		"plain prompt",
+		runAgentOpts{},
+	)
+	if err != nil {
+		t.Fatalf("runAgent: %v", err)
+	}
+	calls := backend.RunArgsCalls()
+	joined := strings.Join(calls[0].Args, " ")
+	// The prompt should appear as-is with no prepended blank line
+	// or preamble marker.
+	if strings.Contains(joined, "\n\nplain prompt") {
+		t.Errorf("unexpected preamble separator in launch args: %q", joined)
+	}
+	if !strings.Contains(joined, "plain prompt") {
+		t.Errorf("prompt missing from launch args: %q", joined)
+	}
+}
+
 // TestRunAgent_HarnessPinEmptyInherits confirms the default path
 // is unchanged: an empty Harness pin lets the 4-tier resolver
 // pick the task's sandbox, matching pre-pin behaviour.
