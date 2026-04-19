@@ -70,17 +70,18 @@ func TestCreateTask_AnonymousLeavesPrincipalFieldsEmpty(t *testing.T) {
 }
 
 // TestListTasks_OrgScopedFiltering confirms that GET /api/tasks with
-// claims in context only returns tasks whose OrgID matches. A legacy
-// anonymous task and a task from a different org stay hidden.
+// claims in context shows legacy tasks + caller's org tasks, but
+// hides other orgs and other users' personal space.
 func TestListTasks_OrgScopedFiltering(t *testing.T) {
 	h := newTestHandler(t)
 
-	// Pre-populate: one anonymous, two orgA, one orgB.
+	// Pre-populate across the three shapes + cross-user personal.
 	for _, opts := range []store.TaskCreateOptions{
-		{Prompt: "anon", Timeout: 60},
+		{Prompt: "legacy", Timeout: 60},                         // legacy (shared)
+		{Prompt: "bob-personal", Timeout: 60, CreatedBy: "bob"}, // bob's personal (hidden from alice)
 		{Prompt: "alice1", Timeout: 60, OrgID: "org-a", CreatedBy: "alice"},
 		{Prompt: "alice2", Timeout: 60, OrgID: "org-a", CreatedBy: "alice"},
-		{Prompt: "bob", Timeout: 60, OrgID: "org-b", CreatedBy: "bob"},
+		{Prompt: "bob-orgB", Timeout: 60, OrgID: "org-b", CreatedBy: "bob"}, // other org (hidden)
 	} {
 		if _, err := h.store.CreateTaskWithOptions(t.Context(), opts); err != nil {
 			t.Fatalf("CreateTaskWithOptions: %v", err)
@@ -99,11 +100,19 @@ func TestListTasks_OrgScopedFiltering(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&tasks); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(tasks) != 2 {
-		t.Fatalf("orgA view returned %d tasks, want 2", len(tasks))
+	// Alice@orgA sees: legacy + 2 org-a tasks = 3.
+	// bob-personal and bob-orgB stay hidden.
+	if len(tasks) != 3 {
+		t.Fatalf("orgA view returned %d tasks, want 3 (legacy + 2 org-a)", len(tasks))
 	}
 	for _, task := range tasks {
-		if task.OrgID != "org-a" {
+		if task.OrgID == "org-b" {
+			t.Errorf("leaked org-b task into alice's view: %+v", task)
+		}
+		if task.OrgID == "" && task.CreatedBy == "bob" {
+			t.Errorf("leaked bob's personal task into alice's view: %+v", task)
+		}
+		if task.OrgID != "org-a" && task.OrgID != "" {
 			t.Errorf("leaked task OrgID=%q into org-a view", task.OrgID)
 		}
 	}

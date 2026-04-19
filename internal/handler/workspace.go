@@ -10,6 +10,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/workspace"
 )
 
 // workspaceBrowseEntry describes a single directory entry returned by
@@ -149,6 +150,13 @@ func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	// Claim the group for the current signed-in principal if it was
+	// previously unowned. Idempotent; no-op in local mode or when the
+	// group already has an owner. This is what enables the "switch to
+	// org X → see org X's workspace groups only" UX downstream.
+	if p := principalFromRequest(r); p != nil {
+		_ = workspace.ClaimGroup(h.configDir, req.Workspaces, &workspace.Principal{Sub: p.Sub, OrgID: p.OrgID})
 	}
 	// h.store and h.workspaces are updated asynchronously by the workspace
 	// subscription goroutine started in NewHandler; no direct assignment here.

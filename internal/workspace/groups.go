@@ -23,6 +23,15 @@ type Group struct {
 	MaxParallel *int `json:"max_parallel,omitempty"`
 	// MaxTestParallel does the same for WALLFACER_MAX_TEST_PARALLEL.
 	MaxTestParallel *int `json:"max_test_parallel,omitempty"`
+
+	// CreatedBy records the principal sub of the user who first owned
+	// this group in cloud mode. Empty on groups created pre-cloud or in
+	// local mode. Mirrors store.Task.CreatedBy semantics.
+	CreatedBy string `json:"created_by,omitempty"`
+	// OrgID records the org context the group is scoped to. Empty when
+	// the group is personal (CreatedBy!="") or legacy (CreatedBy==""
+	// and OrgID==""). Mirrors store.Task.OrgID semantics.
+	OrgID string `json:"org_id,omitempty"`
 }
 
 // groupsFilePath returns the path to the workspace-groups.json file within configDir.
@@ -74,7 +83,14 @@ func UpsertGroup(configDir string, workspaces []string) error {
 			if i == 0 {
 				return nil
 			}
-			promoted := Group{Name: group.Name, Workspaces: workspaces, MaxParallel: group.MaxParallel, MaxTestParallel: group.MaxTestParallel}
+			promoted := Group{
+				Name:            group.Name,
+				Workspaces:      workspaces,
+				MaxParallel:     group.MaxParallel,
+				MaxTestParallel: group.MaxTestParallel,
+				CreatedBy:       group.CreatedBy,
+				OrgID:           group.OrgID,
+			}
 			reordered := append([]Group{promoted}, groups[:i]...)
 			reordered = append(reordered, groups[i+1:]...)
 			return SaveGroups(configDir, reordered)
@@ -106,7 +122,89 @@ func NormalizeGroups(groups []Group) []Group {
 			Workspaces:      ws,
 			MaxParallel:     sanitizeLimit(group.MaxParallel),
 			MaxTestParallel: sanitizeLimit(group.MaxTestParallel),
+			CreatedBy:       group.CreatedBy,
+			OrgID:           group.OrgID,
 		})
+	}
+	return out
+}
+
+// Principal is the minimal identity surface for group visibility.
+// Matches store.Principal in shape but kept local so the workspace
+// package doesn't import the store layer.
+type Principal struct {
+	Sub   string
+	OrgID string
+}
+
+// ClaimGroup stamps the current principal onto the group matching
+// `workspaces` if the group has no owner yet (CreatedBy=="" AND
+// OrgID==""). Existing stamps are never overwritten: a group
+// originally claimed by user A stays tagged to A even if user B
+// later switches to the same workspace set. Idempotent.
+//
+// Called from the PUT /api/workspaces handler after a successful
+// Switch, so groups created in cloud mode are attributed from the
+// moment they're persisted. Groups created in local mode or by
+// startup restore remain unclaimed (legacy) until a signed-in
+// session first opens them.
+func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
+	if p == nil || (p.Sub == "" && p.OrgID == "") {
+		return nil
+	}
+	workspaces = normalizeGroupPaths(workspaces)
+	if len(workspaces) == 0 {
+		return nil
+	}
+	groups, err := LoadGroups(configDir)
+	if err != nil {
+		return err
+	}
+	key := GroupKey(workspaces)
+	changed := false
+	for i, g := range groups {
+		if GroupKey(g.Workspaces) != key {
+			continue
+		}
+		if g.CreatedBy == "" && g.OrgID == "" {
+			groups[i].CreatedBy = p.Sub
+			groups[i].OrgID = p.OrgID
+			changed = true
+		}
+		break
+	}
+	if !changed {
+		return nil
+	}
+	return SaveGroups(configDir, groups)
+}
+
+// GroupsForPrincipal returns the subset of `groups` that `p` can
+// see. Filter rules mirror store.TasksForPrincipal:
+//
+//	┌──────────────────────────────────┬────────────────────────────┐
+//	│ Group shape                      │ Who sees it                │
+//	├──────────────────────────────────┼────────────────────────────┤
+//	│ CreatedBy=""  OrgID=""  (legacy) │ Any signed-in user + local │
+//	│ CreatedBy=U   OrgID=""  (self)   │ Only user U                │
+//	│ CreatedBy=*   OrgID=X   (org)    │ Anyone with claims.OrgID=X │
+//	└──────────────────────────────────┴────────────────────────────┘
+//
+// A nil p (local mode) returns groups unchanged.
+func GroupsForPrincipal(groups []Group, p *Principal) []Group {
+	if p == nil {
+		return groups
+	}
+	out := make([]Group, 0, len(groups))
+	for _, g := range groups {
+		switch {
+		case g.OrgID == "" && g.CreatedBy == "":
+			out = append(out, g)
+		case g.OrgID == "" && g.CreatedBy == p.Sub:
+			out = append(out, g)
+		case g.OrgID != "" && g.OrgID == p.OrgID:
+			out = append(out, g)
+		}
 	}
 	return out
 }
