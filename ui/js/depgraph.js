@@ -1328,8 +1328,7 @@
       var panel = getOrCreatePanel();
       panel.style.display = "block";
 
-      var unifiedFp =
-        _graphFingerprint(graph) + "|f=" + (_focusedNodeId || "");
+      var unifiedFp = _graphFingerprint(graph) + "|f=" + (_focusedNodeId || "");
       if (unifiedFp === _lastFingerprint) {
         // Fingerprint unchanged but inspector may still need to reflect
         // the focused selection if the caller toggled focus.
