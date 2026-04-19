@@ -1,6 +1,6 @@
 ---
 title: Unify Refinement Into Plan Mode
-status: drafted
+status: validated
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux.md
   - specs/local/spec-coordination/spec-planning-ux/planning-chat-threads.md
@@ -58,7 +58,7 @@ graph LR
 
 The split is internal to Plan. The user sees one chat pane, one round model, one undo button. The header makes the current target explicit (`Spec · <path>` vs `Task Prompt · <title> (<status>)`), and the backend branches on the selection kind when committing a round and when undoing one.
 
-Refinement as a separate subsystem is removed. Task cards lose the Refine button and gain a "Send to Plan" action that opens Plan with the card selected. The `autorefine` toggle is removed with no direct replacement; users who want automatic prompt reshaping use a Flow step (out of scope for this spec, tracked separately).
+Refinement as a separate subsystem is removed. Task cards lose the Refine button and gain a "Send to Plan" action that opens Plan with the card selected. Automatic refinement is removed entirely (no `autorefine` toggle, no replacement in this spec); the user will rethink and reintroduce it in a later spec once the interactive flow has settled.
 
 ## Components
 
@@ -90,7 +90,7 @@ Undo depth is bounded by the task's event retention. Since task events today are
 
 The workspace explorer gains a top-level collapsible section labelled "Task Prompts", rendered alongside the existing workspace roots. Entries are virtual: they do not map to files on disk.
 
-Server side, a new endpoint `GET /api/explorer/task-prompts` returns a list of `{task_id, title, status, updated_at}` for tasks whose status is in the displayed set. Default set: `backlog`. A UI toggle extends the set to `waiting` and `failed` for re-refinement (see Open Questions). The endpoint reuses the task store's existing list path with a status filter.
+Server side, a new endpoint `GET /api/explorer/task-prompts` returns a list of `{task_id, title, status, updated_at}` for tasks whose status is in the displayed set. Default set: `backlog`. A UI toggle extends the set to include `waiting` (for re-refinement after a task pauses on user feedback). `failed` stays out by default; users who want to reshape a failed task's prompt cancel and recreate it. When `update_task_prompt` writes while the target task is in `waiting`, the event carries a `resume_hint` flag so the resume logic surfaces the prompt change to the user on the next action. The endpoint reuses the task store's existing list path with a status filter.
 
 Client side, `ui/js/explorer.js` renders the new section above the workspace trees. Selecting an entry sets the Plan selection to the task (not to a file path) and opens Plan mode. The existing `ExplorerStream` SSE notifier fires on task list changes as well so the section stays live.
 
@@ -110,6 +110,16 @@ After the new surfaces land and ship for one release, the following are removed:
 - The API-contract entries for `/api/tasks/{id}/refine*` in `internal/apicontract/routes.go`.
 
 `internal/prompts/refinement.tmpl` is either deleted or renamed and repurposed as the system-prompt fragment for task-mode planning threads (see "Task-aware agent tool").
+
+### Task movement lock during in-flight turns
+
+While a task-mode Plan thread has an agent turn in flight for task T, T cannot transition. The auto-promoter skips T, and manual drag returns 409 with a pointer to wait for the turn or interrupt the thread. Between turns, T moves freely. If T leaves backlog between turns, the server auto-archives any open task-mode threads for T (same cascade as archive/delete) and the next `update_task_prompt` tool call on those threads hard-fails.
+
+This mirrors the pre-spec refinement lock, which held for the duration of a refine run, without leaving tasks stranded behind idle threads.
+
+### Thread cascade on task archive or delete
+
+When a task is archived or soft-deleted, all task-mode threads pinned to it are auto-archived. The thread rows disappear from the tab bar but the `messages.jsonl` and `session.json` files are retained for the tombstone retention window so the transcript can still be inspected from the task timeline modal. Unarchiving the task unarchives its threads.
 
 ## Data Flow
 
@@ -183,9 +193,42 @@ Spec-mode flow is unchanged.
 2. Keep the deprecation for one release so external callers (CLI scripts, anyone automating against the refine endpoints) can migrate.
 3. Remove `internal/handler/refine.go`, `internal/runner/refine.go`, the modal, the autorefine toggle, and the routes. Drop the old prompt template or fold it into the planning system prompt.
 
-## Open Questions
+## Task Breakdown
 
-1. **Task states shown in the Task Prompts section.** Default is `backlog`. Should `waiting` be included for re-refinement after a task pauses on user feedback? Risk: editing `task.Prompt` while the task is waiting may confuse the resume path. Proposal: include `waiting` behind a UI toggle only, and have `update_task_prompt` annotate the next event so the resume logic can surface the change to the user.
-2. **Auto-Refine users.** Is a direct replacement required (e.g. a Flow step that calls the same planning system prompt headlessly), or is removal acceptable with a migration note? This spec assumes removal; a follow-up Flow step spec can reintroduce the automation if the usage data warrants it.
-3. **Thread retention for task mode.** Spec-mode threads are workspace-scoped. Task-mode threads follow the task's lifetime: when a task is archived or soft-deleted, its task-mode threads should likewise archive. Confirm this cascade rule before implementation.
-4. **Tool error on mid-session state change.** If a task transitions out of backlog while a user is refining, do we hard-fail the tool call (current proposal) or allow the write and surface a warning event? Hard-fail is safer; confirm.
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Message schema and task-mode threads](refinement-into-plan/message-schema-task-mode.md) | — | medium | validated |
+| [Prompt round events](refinement-into-plan/prompt-round-events.md) | — | small | validated |
+| [update_task_prompt tool and system prompt](refinement-into-plan/update-task-prompt-tool.md) | message-schema, prompt-round-events | medium | validated |
+| [Task-mode undo via event rewind](refinement-into-plan/task-mode-undo.md) | update_task_prompt tool, prompt-round-events | medium | validated |
+| [Explorer task prompts section](refinement-into-plan/explorer-task-prompts-section.md) | message-schema | medium | validated |
+| [Send to Plan card action](refinement-into-plan/send-to-plan-card-action.md) | message-schema | small | validated |
+| [Task movement lock and thread cascade](refinement-into-plan/task-lock-and-cascade.md) | update_task_prompt tool | medium | validated |
+| [Retire the refine subsystem](refinement-into-plan/retire-refine-subsystem.md) | tool, undo, explorer, card, lock | medium | validated |
+
+```mermaid
+graph LR
+  MSG[Message schema] --> TOOL[update_task_prompt tool]
+  EV[Prompt round events] --> TOOL
+  MSG --> EXP[Explorer section]
+  MSG --> CARD[Send to Plan]
+  TOOL --> UNDO[Task-mode undo]
+  EV --> UNDO
+  TOOL --> LOCK[Lock + cascade]
+  TOOL --> RETIRE[Retire refine]
+  UNDO --> RETIRE
+  EXP --> RETIRE
+  CARD --> RETIRE
+  LOCK --> RETIRE
+```
+
+Parallelism: the first wave (message schema, prompt round events) is independent. The second wave (tool, explorer, card) can run in parallel once their upstreams land. Undo and lock join on the tool. Retirement is strictly last.
+
+## Resolved Design Calls
+
+The four open questions from the drafting round have been resolved:
+
+1. **Task states shown in the Task Prompts section.** Default `backlog`. UI toggle extends to `waiting`. `failed` excluded. Writes against `waiting` tasks carry a `resume_hint` flag so the resume path surfaces the prompt change.
+2. **Auto-refinement.** Removed entirely. No `autorefine` config flag, no headless pipeline. Reintroduction is deferred to a later spec.
+3. **Thread cascade on archive or delete.** Task-mode threads auto-archive when their task is archived or soft-deleted. Files retained for the tombstone retention window. Unarchiving the task unarchives its threads.
+4. **Mid-session task state change.** Task is locked during in-flight agent turns on a task-mode thread. Between turns, the task can move; if it leaves backlog, open task-mode threads for it auto-archive and their next tool call hard-fails.

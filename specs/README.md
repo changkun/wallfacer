@@ -71,7 +71,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer |
 | [validation-barrier.md](local/validation-barrier.md) | Not started | User-defined test criteria persisted on tasks for targeted verification |
 | [pull-request.md](local/pull-request.md) | Drafted | Agent-generated GitHub PR from current branch via lightweight sandbox |
-| [refinement-into-plan.md](local/refinement-into-plan.md) | Drafted | Retire the bespoke refine pipeline; let Plan mode edit task prompts directly via a Task Prompts explorer section and a task-aware tool layer. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
+| [refinement-into-plan.md](local/refinement-into-plan.md) | Validated | Retire the bespoke refine pipeline; let Plan mode edit task prompts directly via a Task Prompts explorer section and a task-aware tool layer. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
 | [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [typescript-migration.md](local/typescript-migration.md) | Drafted | Gradual migration of the frontend from JavaScript to TypeScript — tsconfig + esbuild + tsc typecheck, `.ts` source in place, compiled `.js` as build artifact. Pilot on `ui/js/lib/clipboard.ts`. |
