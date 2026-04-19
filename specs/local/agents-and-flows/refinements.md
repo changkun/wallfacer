@@ -1,6 +1,6 @@
 ---
 title: Agents & Flows post-ship refinements
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows.md
 affects:
@@ -34,7 +34,7 @@ dispatched_task_id: null
 
 ## Overview
 
-Follow-up work to [agents-and-flows.md](agents-and-flows.md) after that
+Follow-up work to [agents-and-flows.md](../agents-and-flows.md) after that
 parent spec was marked complete and archived. Four product-level
 changes shipped against the already-live Agents + Flows surface in
 response to post-ship review, plus the dedicated user-facing guide
