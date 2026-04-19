@@ -473,6 +473,25 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	r.flowEngine = flow.NewEngine(r)
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
 
+	// Watch user-authored directories so edits made directly on
+	// disk (outside the HTTP API) take effect without a restart.
+	// Reload failures are logged but don't fault startup; the
+	// registry simply keeps its previous state.
+	if _, err := agents.Watch(r.shutdownCtx, agentsDir, func() {
+		if err := r.ReloadAgents(); err != nil {
+			logger.Runner.Warn("agents watcher: reload failed", "error", err)
+		}
+	}); err != nil {
+		logger.Runner.Warn("agents watcher: setup failed", "dir", agentsDir, "error", err)
+	}
+	if _, err := flow.Watch(r.shutdownCtx, flowsDir, func() {
+		if err := r.ReloadFlows(); err != nil {
+			logger.Runner.Warn("flows watcher: reload failed", "error", err)
+		}
+	}); err != nil {
+		logger.Runner.Warn("flows watcher: setup failed", "dir", flowsDir, "error", err)
+	}
+
 	// Initialise container circuit breaker.
 	// Defaults: 5 consecutive failures trip the breaker; it stays open for
 	// 30 s before allowing a single probe (half-open).
