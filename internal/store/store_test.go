@@ -391,7 +391,6 @@ func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
 	}
 }
 
-
 // TestMigrateTaskJSON_CanonicalizeDependsOn verifies that DependsOn entries
 // are trimmed, UUID-validated, deduplicated, and sorted.
 func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {

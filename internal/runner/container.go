@@ -49,7 +49,7 @@ type agentOutput struct {
 	SessionID     string       `json:"session_id"`
 	ThreadID      string       `json:"thread_id,omitempty"`
 	StopReason    string       `json:"stop_reason"`
-	Subtype        string      `json:"subtype"`
+	Subtype       string       `json:"subtype"`
 	IsError       bool         `json:"is_error"`
 	TotalCostUSD  float64      `json:"total_cost_usd"`
 	Usage         agentUsage   `json:"usage"`
