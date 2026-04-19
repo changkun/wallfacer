@@ -527,13 +527,15 @@ type EventType string
 
 // EventType constants.
 const (
-	EventTypeStateChange EventType = "state_change"
-	EventTypeOutput      EventType = "output"
-	EventTypeFeedback    EventType = "feedback"
-	EventTypeError       EventType = "error"
-	EventTypeSystem      EventType = "system"
-	EventTypeSpanStart   EventType = "span_start"
-	EventTypeSpanEnd     EventType = "span_end"
+	EventTypeStateChange      EventType = "state_change"
+	EventTypeOutput           EventType = "output"
+	EventTypeFeedback         EventType = "feedback"
+	EventTypeError            EventType = "error"
+	EventTypeSystem           EventType = "system"
+	EventTypeSpanStart        EventType = "span_start"
+	EventTypeSpanEnd          EventType = "span_end"
+	EventTypePromptRound      EventType = "prompt_round"
+	EventTypePromptRoundRevert EventType = "prompt_round_revert"
 )
 
 // Trigger identifies what caused a state_change event. Used in the Data payload
@@ -564,6 +566,46 @@ func NewStateChangeData(from, to TaskStatus, trigger Trigger, extra map[string]s
 		data[k] = v
 	}
 	return data
+}
+
+// PromptRoundData is the payload for EventTypePromptRound events.
+// It records one planning-thread round: the thread that drove the change,
+// the round counter, the old and new prompt text, and whether the agent
+// should be resumed immediately after the update.
+type PromptRoundData struct {
+	ThreadID   string `json:"thread_id"`
+	Round      int    `json:"round"`
+	PrevPrompt string `json:"prev_prompt"`
+	NewPrompt  string `json:"new_prompt"`
+	ResumeHint bool   `json:"resume_hint"`
+}
+
+// NewPromptRoundEvent constructs a PromptRoundData payload. ResumeHint
+// defaults to false; set it to true when the caller intends to immediately
+// resume the task after the prompt change.
+func NewPromptRoundEvent(threadID string, round int, prevPrompt, newPrompt string, resumeHint bool) PromptRoundData {
+	return PromptRoundData{
+		ThreadID:   threadID,
+		Round:      round,
+		PrevPrompt: prevPrompt,
+		NewPrompt:  newPrompt,
+		ResumeHint: resumeHint,
+	}
+}
+
+// PromptRoundRevertData is the payload for EventTypePromptRoundRevert events.
+// It records which thread issued the revert and which round was undone.
+type PromptRoundRevertData struct {
+	ThreadID      string `json:"thread_id"`
+	RevertedRound int    `json:"reverted_round"`
+}
+
+// NewPromptRoundRevertEvent constructs a PromptRoundRevertData payload.
+func NewPromptRoundRevertEvent(threadID string, revertedRound int) PromptRoundRevertData {
+	return PromptRoundRevertData{
+		ThreadID:      threadID,
+		RevertedRound: revertedRound,
+	}
 }
 
 // SpanData holds metadata for a span_start or span_end event.
