@@ -1208,6 +1208,84 @@ func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
 	}
 }
 
+// TestForCurrentStore_ScopesToViewedGroup verifies that automation actions
+// (auto-promote, auto-retry, auto-test, auto-submit, auto-sync, auto-refine)
+// see only the currently viewed workspace group's store, even when other
+// groups have active stores holding backlog tasks. Pinned against regressing
+// to the global behavior where automation fanned out across every active
+// group.
+func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
+	h, wsMgr, _ := newTestHandlerWithRealWorkspaceManager(t)
+	ctx := context.Background()
+
+	// Create a backlog task in the initial group (A).
+	sA, ok := h.currentStore()
+	if !ok || sA == nil {
+		t.Fatal("expected initial store")
+	}
+	taskA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task in group A", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask A: %v", err)
+	}
+	// Keep the store alive across the switch by pinning an in-progress task.
+	if err := sA.UpdateTaskStatus(ctx, taskA.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus A: %v", err)
+	}
+
+	// Switch to a second workspace group (B).
+	newWS := t.TempDir()
+	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("switch group: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Wait for the subscription goroutine to propagate the snapshot.
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if s, _ := h.currentStore(); s != nil && s != sA {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	sB, ok := h.currentStore()
+	if !ok || sB == nil || sB == sA {
+		t.Fatalf("expected new store for group B; got sA=%p sB=%p", sA, sB)
+	}
+	if _, err := sB.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task in group B", Timeout: 15}); err != nil {
+		t.Fatalf("CreateTask B: %v", err)
+	}
+
+	// Both stores should be visible to forEachActiveStore (used for global
+	// concurrency counts) since A still has an in-progress task pinning it.
+	var seenByEach []*store.Store
+	h.forEachActiveStore(func(s *store.Store, _ []string) {
+		seenByEach = append(seenByEach, s)
+	})
+	if len(seenByEach) < 2 {
+		snaps := wsMgr.AllActiveSnapshots()
+		t.Fatalf("forEachActiveStore should see both groups while A has in-progress work; saw %d (snapshots=%d)", len(seenByEach), len(snaps))
+	}
+
+	// forCurrentStore must visit only the viewed group (B). Group A, though
+	// still active, is out of scope for automation.
+	var seenByCurrent []*store.Store
+	h.forCurrentStore(func(s *store.Store, _ []string) {
+		seenByCurrent = append(seenByCurrent, s)
+	})
+	if len(seenByCurrent) != 1 {
+		t.Fatalf("forCurrentStore should visit exactly 1 store (the viewed group); got %d", len(seenByCurrent))
+	}
+	if seenByCurrent[0] != sB {
+		t.Errorf("forCurrentStore should visit group B's store; got a different store")
+	}
+	if seenByCurrent[0] == sA {
+		t.Error("forCurrentStore leaked group A's store into scope")
+	}
+}
+
 // --- strict JSON decoding ---
 
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.

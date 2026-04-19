@@ -146,7 +146,7 @@ var retryableCategories = map[store.FailureCategory]bool{
 // may have been missed while the server was down.
 func (h *Handler) StartAutoRetrier(ctx context.Context) {
 	retryAll := func(ctx context.Context) {
-		h.forEachActiveStore(func(s *store.Store, _ []string) {
+		h.forCurrentStore(func(s *store.Store, _ []string) {
 			failed, _ := s.ListTasksByStatus(ctx, store.TaskStatusFailed)
 			for _, t := range failed {
 				h.tryAutoRetry(ctx, s, t)
@@ -245,7 +245,8 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			// Scan ALL active stores for eligible tasks.
 
 			// Check for auto-resume candidates first (waiting tasks with failed test feedback).
-			h.forEachActiveStore(func(s *store.Store, _ []string) {
+			// Automation is scoped to the currently viewed workspace group.
+			h.forCurrentStore(func(s *store.Store, _ []string) {
 				waitingTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 				if err != nil {
 					return
@@ -288,7 +289,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				}
 				var cpCandidates []cpCandidate
 				var nextScheduled *time.Time
-				h.forEachActiveStore(func(s *store.Store, _ []string) {
+				h.forCurrentStore(func(s *store.Store, _ []string) {
 					backlogTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusBacklog)
 					if err != nil {
 						return
@@ -531,7 +532,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	}
 	var syncCandidates []syncCandidate
 
-	h.forEachActiveStore(func(s *store.Store, _ []string) {
+	h.forCurrentStore(func(s *store.Store, _ []string) {
 		tasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 		if err != nil {
 			return
@@ -691,10 +692,11 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 			h.incAutopilotPhase2Miss("auto_tester")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
-			// Phase 1 (no lock): build the list of eligible candidates.
-			// Scan ALL active stores. Git I/O (CommitsBehind) happens here so
-			// we don't hold promoteMu during potentially slow filesystem operations.
-			h.forEachActiveStore(func(s *store.Store, _ []string) {
+			// Phase 1 (no lock): build the list of eligible candidates scoped
+			// to the currently viewed workspace group. Git I/O (CommitsBehind)
+			// happens here so we don't hold promoteMu during potentially slow
+			// filesystem operations.
+			h.forCurrentStore(func(s *store.Store, _ []string) {
 				waitingTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 				if err != nil {
 					return
@@ -868,12 +870,14 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 			h.incAutopilotPhase2Miss("auto_submitter")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
-			// Scan ALL active stores for auto-submit candidates.
+			// Scan the currently viewed workspace group's store for
+			// auto-submit candidates. Other groups are left alone so their
+			// in-flight tasks finish without triggering new automation.
 			var allTasks []struct {
 				task  store.Task
 				store *store.Store
 			}
-			h.forEachActiveStore(func(s *store.Store, _ []string) {
+			h.forCurrentStore(func(s *store.Store, _ []string) {
 				tasks, err := s.ListTasks(ctx, false)
 				if err != nil {
 					return
@@ -1036,10 +1040,11 @@ func (h *Handler) tryAutoRefine(ctx context.Context) {
 		return
 	}
 
-	// Scan ALL active stores for backlog tasks needing refinement.
-	// Only trigger one per poll to avoid overwhelming the system.
+	// Scan the currently viewed workspace group's store for backlog tasks
+	// needing refinement. Only trigger one per poll to avoid overwhelming
+	// the system.
 	refined := false
-	h.forEachActiveStore(func(s *store.Store, _ []string) {
+	h.forCurrentStore(func(s *store.Store, _ []string) {
 		if refined {
 			return
 		}

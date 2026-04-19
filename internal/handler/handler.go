@@ -367,6 +367,21 @@ func (h *Handler) forEachActiveStore(fn func(s *store.Store, ws []string)) {
 	}
 }
 
+// forCurrentStore calls fn only for the currently viewed workspace group's
+// store. This scopes automation actions (auto-promote, auto-retry, auto-test,
+// auto-submit, auto-sync, auto-refine) to the viewed group: tasks already
+// running in other groups finish as normal, but no new automation fires on
+// their backlogs. It is the action-taking counterpart to forEachActiveStore,
+// which remains in use for global concurrency counting.
+func (h *Handler) forCurrentStore(fn func(s *store.Store, ws []string)) {
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		return
+	}
+	ws := h.currentWorkspaces()
+	fn(s, ws)
+}
+
 // countGlobalInProgress returns the total number of non-test in-progress tasks
 // across ALL active workspace groups.
 func (h *Handler) countGlobalInProgress() int {
