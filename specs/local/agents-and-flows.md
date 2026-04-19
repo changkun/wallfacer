@@ -551,6 +551,65 @@ flow.
    scripts/e2e-lifecycle.sh was migrated to POST without sandbox
    then PATCH to set the per-task override.
 
+## Post-completion refinements
+
+The parent spec was marked complete after the nine child specs
+landed, but substantive follow-up work continued on top of the
+initial deliverable. Recording it here so future readers don't
+mistake the spec's `complete` status for a hard scope boundary.
+
+### Post-completion commits
+
+| Topic | Commits |
+|-------|---------|
+| fsnotify hot-reload of user YAML dirs | `1e7de48b` |
+| Inline clone/edit/delete editors in both tabs | `9bda7565` |
+| Hard-reject `sandbox` on POST /api/tasks | `0df21950` |
+| Retire per-activity sandbox UI (task modal + settings) | `7a01c73b` |
+| Remove dead per-activity helpers + fix README Status Quo | `18c2f3c2` |
+| Composer Flow label, New Agent / New Flow buttons, agent system-prompt textarea, workspace-default harness surface, clearer Harness option labels | (current UX batch) |
+
+### Raised in review but still unresolved
+
+These came out of a post-ship user review of the tabs. The first
+three have been addressed by the UX batch above; the remaining
+items are the honest rough edges as of the current commit.
+
+1. **How do I create a new agent / flow?** Previously only
+   Clone was available; `+ New Agent` and `+ New Flow` buttons
+   were added, opening a dashed draft card with a blank editor.
+2. **How do I edit an existing agent's system prompt?** Added a
+   `System Prompt` textarea to the agent editor. User-authored
+   agents persist the body inline as `prompt_tmpl` in their YAML;
+   `Role.PromptTmpl` and the API / list / get responses surface
+   it. **Not yet wired at runtime:** the runner's title /
+   oversight / refinement / commit-message callers still read
+   from the named template lookup in the prompts package. Making
+   `Role.PromptTmpl` take precedence at every dispatch site is
+   a separate follow-up.
+3. **Composer flow dropdown had no label.** Added a visible
+   `Flow` label and a clearer tooltip pointing at the Flows tab.
+4. **What does "inherit" mean in the Harness dropdown?** Renamed
+   the empty option to `(use workspace default)` and added an
+   inline hint describing the resolver fallback order.
+5. **Default-sandbox setting buried in Settings.** Surfaced as a
+   read-only info row under the Agents tab header showing the
+   current default and a `Change` button that jumps to Settings.
+   Write state still lives in Settings to avoid duplication.
+6. **Visual design.** The current Agents and Flows tab layout
+   reads more like a data dump than a user surface. A dedicated
+   redesign pass is still outstanding. Candidate direction is
+   split-pane (list on the left, detail on the right) with
+   larger cards, inline prompt preview, and drag-and-drop step
+   reorder for flows. Separate spec needed.
+
+### Copy / style convention
+
+During the UX batch, the user flagged a preference against the
+em-dash character in user-facing strings. Subsequent UI copy
+uses parentheses, colons, or commas. The convention is recorded
+in the agent memory so future changes hold the line.
+
 ## Testing Strategy
 
 ### Unit tests
