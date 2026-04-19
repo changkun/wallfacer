@@ -32,17 +32,18 @@ Cloud Platform — 0/9
   ○ Multi-User Collaboration       ○ Billing Idempotency
   ○ Telemetry Queue Backpressure
 
-Shared Design — 2/20 complete
+Shared Design — 2/21 complete
   ◐ Authentication (Phase 1)       ✅ Agent Abstraction
-  ○ Agent Token Exchange           ○ Overlay Snapshots
-  ○ Native Sandbox (Linux)         ○ Native Sandbox (macOS)
-  ○ Native Sandbox (Windows)       ✅ Host Exec Mode
-  ○ Telemetry & Observability      ○ Information Inbox
-  ○ Multi-Agent Consensus          ○ Multi-Agent Debate
-  ○ Token & Cost Optimization      ○ Extensible Prompts
-  ○ Intent-Driven Commits          ○ Sandbox Hooks
-  ○ Defense in Depth               ○ Agent Memory & Identity
-  ○ Intelligence System            ○ Eval Pipeline & Benchmark
+  ○ Agent Token Exchange           ○ Audit Log
+  ○ Overlay Snapshots              ○ Native Sandbox (Linux)
+  ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
+  ✅ Host Exec Mode                ○ Telemetry & Observability
+  ○ Information Inbox              ○ Multi-Agent Consensus
+  ○ Multi-Agent Debate             ○ Token & Cost Optimization
+  ○ Extensible Prompts             ○ Intent-Driven Commits
+  ○ Sandbox Hooks                  ○ Defense in Depth
+  ○ Agent Memory & Identity        ○ Intelligence System
+  ○ Eval Pipeline & Benchmark
 ```
 
 ---
@@ -176,6 +177,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 |------|--------|--------|----------|
 | [authentication.md](shared/authentication.md) | In progress (Phase 1 shipped; Phase 2 drafted) | Both | OAuth2/OIDC login, session management, user identity. Phase 1 shipped: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2 (drafted): JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching — unblocks the cloud move. |
 | [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
+| [audit-log.md](shared/audit-log.md) | Drafted | Both | Cross-entity mutation history — uniform `audit.Record` write surface covering task transitions, workspace edits, config changes, admin actions; per-workspace JSONL storage; cloud-gated read API. Future effort; depends on auth Phase 2 for principal context. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
