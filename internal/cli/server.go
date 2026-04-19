@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/apicontract"
+	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/handler"
@@ -223,6 +224,17 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	go r.StartWorktreeHealthWatcher(ctx)
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
+
+	// Cloud mode: wire latere.ai sign-in. oidc.New returns nil when required
+	// env vars are missing — treat that as a misconfigured cloud deployment
+	// and refuse to start rather than silently running without sign-in.
+	if envCfg.Cloud {
+		authClient := auth.New(auth.LoadConfig())
+		if authClient == nil {
+			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL")
+		}
+		h.SetAuth(authClient)
+	}
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
 		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces)
@@ -931,6 +943,14 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"StartOAuth":  http.HandlerFunc(h.StartOAuth),
 		"OAuthStatus": http.HandlerFunc(h.OAuthStatus),
 		"CancelOAuth": http.HandlerFunc(h.CancelOAuth),
+
+		// Latere.ai sign-in (cloud mode). Always mounted; handlers self-gate
+		// to 503/204 when the auth provider is not configured.
+		"Login":        http.HandlerFunc(h.Login),
+		"Callback":     http.HandlerFunc(h.Callback),
+		"Logout":       http.HandlerFunc(h.Logout),
+		"LogoutNotify": http.HandlerFunc(h.LogoutNotify),
+		"AuthMe":       http.HandlerFunc(h.AuthMe),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes

@@ -220,6 +220,10 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"terminal_enabled":         true,
 		"planning_window_days":     30,
 		"host_mode":                h.runner != nil && h.runner.HostMode(),
+		"cloud":                    h.auth != nil,
+	}
+	if h.authURL != "" {
+		resp["auth_url"] = h.authURL
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
