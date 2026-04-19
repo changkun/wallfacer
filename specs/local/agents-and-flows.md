@@ -525,17 +525,26 @@ flow.
    rather than rejected with 400. The e2e scripts and CLI still
    pass it; removing it would have broken external callers. A
    future deprecation follow-up can remove it.
-6. **fsnotify hot-reload deferred**. The runner reloads the
-   registry on explicit `POST/PUT/DELETE /api/{agents,flows}`
-   via new `Runner.Reload{Agents,Flows}()` methods. Disk edits
-   require an API touch or restart today — fsnotify would add
-   a dependency without load-bearing benefit now that the write
-   path is covered.
-7. **Inline clone/edit UI not yet live**. Backend CRUD is
-   complete; the UI's "Clone" button is still a stub. Power
-   users can edit YAML directly or curl the API. A follow-up
-   spec picks up the inline editor once the YAML workflow has
-   been stress-tested.
+6. **fsnotify hot-reload initially deferred, now landed.** The
+   runner originally reloaded the registry only on explicit
+   `POST/PUT/DELETE /api/{agents,flows}`. A follow-up commit
+   added `agents.Watch` + `flow.Watch` (fsnotify with 150ms
+   debounce) and wired them in `NewRunner`, so disk edits made
+   outside the API — including dropping a YAML file straight
+   into `~/.wallfacer/{agents,flows}/` — now take effect
+   without a restart.
+7. **Inline clone/edit UI initially deferred, now landed.**
+   Backend CRUD shipped in Phase 4; the UI's Clone button was
+   a stub. A follow-up commit added inline editors in both
+   tabs: Clone on built-in rows opens a prefilled form,
+   user-authored rows get Edit + Delete, and flows get a flat
+   step editor (agent dropdown, optional toggle, reorder,
+   remove) that feeds the POST /api/flows payload.
+8. **`POST /api/tasks sandbox` retained as back-compat.** The
+   only remaining deferred item. The e2e lifecycle scripts and
+   CLI callers still pass it; rejecting with 400 would break
+   external consumers. A future deprecation follow-up can remove
+   it once those callers migrate.
 
 ## Testing Strategy
 
