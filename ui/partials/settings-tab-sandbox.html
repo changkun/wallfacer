@@ -488,147 +488,21 @@
               data-default-text="Auto (model defaults)"
             ></select>
           </div>
-          <div>
-            <label
-              style="
-                display: block;
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--text-secondary);
-                margin-bottom: 4px;
-              "
-              >Activity-specific defaults</label
-            >
-            <div
-              style="
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: 8px;
-                display: grid;
-                gap: 6px;
-              "
-            >
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Implementation</span
-                ><select
-                  id="env-sandbox-implementation"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Testing</span
-                ><select
-                  id="env-sandbox-testing"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Refinement</span
-                ><select
-                  id="env-sandbox-refinement"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Title generation</span
-                ><select
-                  id="env-sandbox-title"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Oversight summary</span
-                ><select
-                  id="env-sandbox-oversight"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Commit message</span
-                ><select
-                  id="env-sandbox-commit_message"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: 140px 1fr;
-                  gap: 8px;
-                  align-items: center;
-                "
-              >
-                <span style="font-size: 12px; color: var(--text-muted)"
-                  >Idea agent</span
-                ><select
-                  id="env-sandbox-idea_agent"
-                  class="select"
-                  style="font-size: 12px"
-                  data-sandbox-select="true"
-                ></select>
-              </div>
-            </div>
-          </div>
+          <p
+            style="
+              font-size: 11px;
+              color: var(--text-muted);
+              line-height: 1.5;
+              margin: 0 0 4px;
+            "
+          >
+            Activity-specific sandbox routing (Implementation, Testing,
+            Refinement, …) now lives on the <strong>agent</strong> definition:
+            clone a built-in from the Agents tab and set its
+            <strong>Harness</strong> field to pin that step to Claude or Codex.
+            Workspace-wide fallbacks still come from
+            <code>WALLFACER_DEFAULT_SANDBOX</code> above.
+          </p>
           <label
             style="
               display: flex;

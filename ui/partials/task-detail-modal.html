@@ -422,139 +422,6 @@
                       </div>
                     </div>
                   </details>
-                  <details class="mt-2">
-                    <summary
-                      class="text-xs text-v-muted"
-                      style="cursor: pointer"
-                    >
-                      Per-activity sandbox overrides (optional)
-                    </summary>
-                    <div
-                      class="mt-2"
-                      style="
-                        border: 1px solid var(--border);
-                        border-radius: 8px;
-                        padding: 8px;
-                        display: grid;
-                        gap: 6px;
-                      "
-                    >
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted">Implementation</span
-                        ><select
-                          id="modal-edit-sandbox-implementation"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted">Testing</span
-                        ><select
-                          id="modal-edit-sandbox-testing"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted">Refinement</span
-                        ><select
-                          id="modal-edit-sandbox-refinement"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted"
-                          >Title generation</span
-                        ><select
-                          id="modal-edit-sandbox-title"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted"
-                          >Oversight summary</span
-                        ><select
-                          id="modal-edit-sandbox-oversight"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted">Commit message</span
-                        ><select
-                          id="modal-edit-sandbox-commit_message"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                      <div
-                        style="
-                          display: grid;
-                          grid-template-columns: 140px 1fr;
-                          gap: 8px;
-                          align-items: center;
-                        "
-                      >
-                        <span class="text-xs text-v-muted">Idea agent</span
-                        ><select
-                          id="modal-edit-sandbox-idea_agent"
-                          class="select text-xs"
-                          onchange="scheduleBacklogSave()"
-                          data-sandbox-select="true"
-                        ></select>
-                      </div>
-                    </div>
-                  </details>
                   <div class="mt-2" id="modal-edit-depends-on-row">
                     <label
                       class="text-xs text-v-muted"
@@ -619,7 +486,6 @@
                     data-onchange="scheduleBacklogSave"
                   ></div>
                 </div>
-
 
                 <!-- Resume section for failed tasks with session_id -->
                 <div id="modal-resume-section" class="hidden mb-4">
@@ -1283,7 +1149,9 @@
                   class="aside-action aside-action--primary"
                   title="Promote this task from Backlog to In Progress"
                 >
-                  <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
+                  <span class="aside-action__icon" aria-hidden="true"
+                    >&#9654;</span
+                  >
                   <span class="aside-action__body">
                     <span class="aside-action__label">Start task</span>
                     <span class="aside-action__hint">move to In Progress</span>
@@ -1297,7 +1165,9 @@
                   class="aside-action"
                   title="Hide this task from the Done column"
                 >
-                  <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
+                  <span class="aside-action__icon" aria-hidden="true"
+                    >&#128229;</span
+                  >
                   <span class="aside-action__body">
                     <span class="aside-action__label">Archive</span>
                     <span class="aside-action__hint">hide from Done</span>
@@ -1311,7 +1181,9 @@
                   class="aside-action"
                   title="Restore this task to the Done column"
                 >
-                  <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
+                  <span class="aside-action__icon" aria-hidden="true"
+                    >&#128228;</span
+                  >
                   <span class="aside-action__body">
                     <span class="aside-action__label">Unarchive</span>
                     <span class="aside-action__hint">restore to Done</span>
@@ -1326,7 +1198,9 @@
                   class="aside-action aside-action--warn"
                   title="Discard prepared changes and move task to Cancelled"
                 >
-                  <span class="aside-action__icon" aria-hidden="true">&#9209;</span>
+                  <span class="aside-action__icon" aria-hidden="true"
+                    >&#9209;</span
+                  >
                   <span class="aside-action__body">
                     <span class="aside-action__label">Cancel</span>
                     <span class="aside-action__hint">discard changes</span>
@@ -1340,7 +1214,9 @@
                   class="aside-action aside-action--danger"
                   title="Permanently delete this task"
                 >
-                  <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
+                  <span class="aside-action__icon" aria-hidden="true"
+                    >&#128465;</span
+                  >
                   <span class="aside-action__body">
                     <span class="aside-action__label">Delete</span>
                     <span class="aside-action__hint">remove permanently</span>

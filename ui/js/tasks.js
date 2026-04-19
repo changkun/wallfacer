@@ -735,7 +735,9 @@ function scheduleBacklogSave() {
       "modal-edit-mount-worktrees",
     ).checked;
     const sandbox = document.getElementById("modal-edit-sandbox").value;
-    const sandbox_by_activity = collectSandboxByActivity("modal-edit-sandbox-");
+    // Per-activity sandbox overrides retired with the agents/flows
+    // rewrite — harness lives on the agent a flow step references.
+    // The backlog-save PATCH no longer collects the per-activity map.
     const depends_on = getDepPickerValues("modal-edit-depends-on-picker");
     const tags = getTagValues("modal-edit-tag-input");
     const maxCostEl = document.getElementById("modal-edit-max-cost-usd");
@@ -761,7 +763,6 @@ function scheduleBacklogSave() {
       timeout,
       mount_worktrees,
       sandbox,
-      sandbox_by_activity,
       depends_on,
       tags,
       max_cost_usd,

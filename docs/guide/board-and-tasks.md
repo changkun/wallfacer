@@ -357,7 +357,7 @@ The left panel is always visible and contains:
 - **Prompt History** -- collapsible section showing previous prompt versions (visible when the prompt has been edited)
 - **Retry History** -- collapsible section listing previous execution attempts with their status, cost, and truncated results
 - **Dependencies** -- "Blocked by" section with live status badges and links to prerequisite tasks
-- **Settings** (backlog only) -- editable sandbox, timeout, model override, scheduled start, share-code toggle, budget limits, per-activity sandbox overrides, and dependency picker. Changes auto-save with a 500ms debounce.
+- **Settings** (backlog only) -- editable sandbox, timeout, model override, scheduled start, share-code toggle, budget limits, and dependency picker. Changes auto-save with a 500ms debounce. Per-activity sandbox routing now lives on the agent definition (Agents tab → Harness); this panel exposes only the task-level default.
 - **Edit Prompt** (backlog only) -- editable textarea for the task prompt with tag input
 - **Start Task** button (backlog only)
 - **Resume Session** section (failed tasks with an existing session) -- resume button with timeout selector
