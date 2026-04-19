@@ -342,6 +342,6 @@ Specs that will want to consume this once shipped:
 - `specs/shared/agent-abstraction.md` — eval becomes the correctness bar for any new agent backend.
 - `specs/oversight/multi-agent-consensus.md` / `specs/oversight/multi-agent-debate.md` — evaluation is how we judge whether consensus/debate actually improves outcomes.
 - `specs/shared/token-cost-optimization.md` — cost-efficiency metrics here feed directly into that spec's regression model.
-- `specs/shared/intelligence-system.md` — failure pattern learning needs graded trajectories.
+- `specs/intelligence/intelligence-system.md` — failure pattern learning needs graded trajectories.
 
 These will declare `depends_on: specs/shared/eval-pipeline.md` when they reach the validation stage.

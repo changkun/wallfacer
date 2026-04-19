@@ -28,11 +28,10 @@ Cloud Platform — 0/5
   ○ Multi-Tenant (capstone)        ○ Tenant API
   ○ Billing Idempotency
 
-Shared Design — 2/9 complete
+Shared Design — 2/7 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
   ○ Overlay Snapshots              ○ Information Inbox
   ○ Token & Cost Optimization      ○ Extensible Prompts
-  ○ Agent Memory & Identity        ○ Intelligence System
   ○ Eval Pipeline & Benchmark
 
 Intent — 0/3 (every action is a commit; undo and PR build on it)
@@ -53,6 +52,9 @@ Oversight — 0/7 (layered defense & multi-agent deliberation)
 Observability — 0/3 (system telemetry & compliance)
   ○ Telemetry & Observability      ○ Audit Log
   ○ Telemetry Queue Backpressure
+
+Intelligence — 0/2 (design-space: shared world model, agent memory)
+  ○ Intelligence System            ○ Agent Memory & Identity
 ```
 
 ---
@@ -176,8 +178,6 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
 | [eval-pipeline.md](shared/eval-pipeline.md) | Drafted | Both | Evaluation pipeline over captured Claude Code / Codex trajectories — vendor-format normalizer, rule-based + LLM-as-judge metrics, first-party benchmark bundles, dataset export, paired comparison reports. Keeps the door open for downstream RL/RLVR without implementing it. |
-| [agent-memory-identity.md](shared/agent-memory-identity.md) | Vague | Both | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. Foundation for intelligence system's shared world model. |
-| [intelligence-system.md](shared/intelligence-system.md) | Vague | Both | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. |
 
 ### Why these are shared
 
@@ -295,6 +295,30 @@ graph LR
 
   style AUTH fill:#d4edda,stroke:#28a745
 ```
+
+---
+
+## Intelligence
+
+Design-space exploration: what happens when wallfacer stops being a task board and starts being an agent that composes work, remembers prior context, and shares a world model across tasks. Both specs are `vague` and speculative — held in this theme so the design space has one place, not two.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [intelligence-system.md](intelligence/intelligence-system.md) | Vague | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. The orchestration layer. |
+| [agent-memory-identity.md](intelligence/agent-memory-identity.md) | Vague | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. The substrate the intelligence system reads and writes against. |
+
+### Intelligence dependencies
+
+```mermaid
+graph LR
+  AM[Agent Memory & Identity] --> IS[Intelligence System]
+  IS -.reads.-> TO[Telemetry → Observability]
+  IS -.reads.-> MAC[Multi-Agent Consensus → Oversight]
+```
+
+Memory is the substrate; the intelligence system's shared world model reads and writes against it. Both stay vague until the primitives they sit on (telemetry signals, consensus decisions, agent abstraction) generate enough data to tell us what's actually worth orchestrating.
+
+Note: `eval-pipeline.md` remains under Shared Design — evaluation is *measurement* (post-hoc grading of trajectories), not cognition. Grouping it here would conflate two different audiences.
 
 ---
 
