@@ -65,8 +65,8 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | **Task collection (no {id})** | |
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
-| `POST /api/tasks` | Create a new task in the backlog |
-| `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring |
+| `POST /api/tasks` | Create a new task in the backlog. **Does not accept `sandbox` or `sandbox_by_activity`** — harness (Claude vs Codex) is selected by the agent a flow step references; the per-task override is applied via `PATCH /api/tasks/{id}` after creation. |
+| `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring. Same sandbox-rejection policy as the singular endpoint. |
 | `POST /api/tasks/generate-titles` | Bulk-generate titles for tasks that lack one |
 | `POST /api/tasks/generate-oversight` | Bulk-generate oversight summaries for eligible tasks |
 | `GET /api/tasks/search` | Search tasks by keyword |

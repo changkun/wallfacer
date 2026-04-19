@@ -19,7 +19,6 @@ import (
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -268,70 +267,89 @@ func TestCreateTask_Success(t *testing.T) {
 	}
 }
 
-// TestCreateTask_RespectsSandbox verifies that sandbox preference is stored at creation.
-func TestCreateTask_RespectsSandbox(t *testing.T) {
+// TestCreateTask_RejectsSandboxField covers the retirement of the
+// per-task sandbox field on POST. Harness choice now lives on the
+// agent a flow step references; per-task overrides are applied
+// via PATCH /api/tasks/{id} after creation.
+func TestCreateTask_RejectsSandboxField(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	reqEnv := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"openai_api_key":"sk-test"}`))
-	wEnv := httptest.NewRecorder()
-	h.UpdateEnvConfig(wEnv, reqEnv)
-	if wEnv.Code != http.StatusNoContent {
-		t.Fatalf("expected env update 204, got %d: %s", wEnv.Code, wEnv.Body.String())
-	}
-	h.setSandboxTestPassed(sandbox.Codex, true)
-
 	body := `{"prompt": "build a thing", "sandbox": "codex"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.CreateTask(w, req)
-
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", w.Code)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
-	var task store.Task
-	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if task.Sandbox != "codex" {
-		t.Errorf("expected sandbox 'codex', got %q", task.Sandbox)
+	if !strings.Contains(w.Body.String(), "PATCH") {
+		t.Errorf("expected error body to reference PATCH migration path; got %q", w.Body.String())
 	}
 }
 
-func TestCreateTask_RejectsCodexWhenUntested(t *testing.T) {
+// TestCreateTask_RejectsSandboxByActivity is the sibling guard
+// for the old per-activity sandbox map. Same migration guidance
+// applies: use the Harness pin on the agent definition.
+func TestCreateTask_RejectsSandboxByActivity(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	reqEnv := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"openai_api_key":"sk-test"}`))
-	wEnv := httptest.NewRecorder()
-	h.UpdateEnvConfig(wEnv, reqEnv)
-	if wEnv.Code != http.StatusNoContent {
-		t.Fatalf("expected env update 204, got %d: %s", wEnv.Code, wEnv.Body.String())
-	}
-
-	body := `{"prompt": "build a thing", "sandbox": "codex"}`
+	body := `{"prompt": "build a thing", "sandbox_by_activity": {"implementation": "codex"}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.CreateTask(w, req)
-
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
-func TestCreateTask_AllowsCodexWithHostAuthCache(t *testing.T) {
+// TestPatchTask_RejectsCodexWhenUntested preserves the coverage
+// of the sandbox-readiness gate under the new workflow: callers
+// POST without a sandbox field, then PATCH to set it.
+func TestPatchTask_RejectsCodexWhenUntested(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	reqEnv := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"openai_api_key":"sk-test"}`))
+	wEnv := httptest.NewRecorder()
+	h.UpdateEnvConfig(wEnv, reqEnv)
+	if wEnv.Code != http.StatusNoContent {
+		t.Fatalf("expected env update 204, got %d: %s", wEnv.Code, wEnv.Body.String())
+	}
+	// Create a backlog task, then try to patch sandbox=codex before
+	// codex has been validated via the test probe.
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt: "build a thing", Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	patch := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(),
+		strings.NewReader(`{"sandbox":"codex"}`))
+	rec := httptest.NewRecorder()
+	h.UpdateTask(rec, patch, task.ID)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestPatchTask_AllowsCodexWithHostAuthCache mirrors the
+// host-auth-cache readiness path on PATCH: when codex auth is
+// already cached on disk, setting sandbox=codex via PATCH goes
+// through without 400 and the store reflects the new sandbox.
+func TestPatchTask_AllowsCodexWithHostAuthCache(t *testing.T) {
 	h, _, _ := newTestHandlerWithEnvAndCodexAuth(t)
 
-	body := `{"prompt": "build a thing", "sandbox": "codex"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.CreateTask(w, req)
-
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt: "build a thing", Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
-	var task store.Task
-	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
-		t.Fatalf("decode: %v", err)
+	patch := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(),
+		strings.NewReader(`{"sandbox":"codex"}`))
+	rec := httptest.NewRecorder()
+	h.UpdateTask(rec, patch, task.ID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if task.Sandbox != "codex" {
-		t.Errorf("expected sandbox 'codex', got %q", task.Sandbox)
+	updated, _ := h.store.GetTask(context.Background(), task.ID)
+	if updated.Sandbox != "codex" {
+		t.Errorf("expected sandbox 'codex', got %q", updated.Sandbox)
 	}
 }
 
@@ -3369,15 +3387,15 @@ func storeTaskCount(t *testing.T, h *Handler) int {
 	return len(tasks)
 }
 
-// TestBatchCreateTasks_InvalidSandboxLeavesStoreEmpty verifies that an invalid
-// sandbox in any one item causes a 400 response with zero tasks persisted.
-func TestBatchCreateTasks_InvalidSandboxLeavesStoreEmpty(t *testing.T) {
-	// Use plain newTestHandler — no codex API key and no test passed, so
-	// "codex" is an invalid sandbox selection.
+// TestBatchCreateTasks_RejectsSandboxLeavesStoreEmpty confirms the
+// deprecated sandbox field bails out of the batch atomically: the
+// handler 400s on the first offending ref and nothing lands in the
+// store.
+func TestBatchCreateTasks_RejectsSandboxLeavesStoreEmpty(t *testing.T) {
 	h := newTestHandler(t)
 
 	body := `{"tasks":[
-		{"ref":"A","prompt":"do A","sandbox":"claude"},
+		{"ref":"A","prompt":"do A"},
 		{"ref":"B","prompt":"do B","sandbox":"codex"}
 	]}`
 	w := callBatchCreate(t, h, body)
@@ -3536,7 +3554,6 @@ func TestCreateTask_ReturnsSandboxBudgetAndScheduleInBody(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"prompt":           "atomic creation test",
-		"sandbox":          "claude",
 		"max_cost_usd":     5.5,
 		"max_input_tokens": 1000,
 		"scheduled_at":     futureTime,
@@ -3551,9 +3568,6 @@ func TestCreateTask_ReturnsSandboxBudgetAndScheduleInBody(t *testing.T) {
 	var task store.Task
 	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
 		t.Fatalf("decode: %v", err)
-	}
-	if task.Sandbox != "claude" {
-		t.Errorf("sandbox: want %q, got %q", "claude", task.Sandbox)
 	}
 	if task.MaxCostUSD != 5.5 {
 		t.Errorf("max_cost_usd: want 5.5, got %v", task.MaxCostUSD)
@@ -3581,7 +3595,6 @@ func TestCreateTask_EmitsOnlyOneDelta(t *testing.T) {
 	futureTime := time.Now().Add(2 * time.Hour)
 	body, _ := json.Marshal(map[string]any{
 		"prompt":           "delta count test",
-		"sandbox":          "claude",
 		"max_cost_usd":     3.0,
 		"max_input_tokens": 500,
 		"scheduled_at":     futureTime,
@@ -3612,15 +3625,17 @@ drain:
 	}
 }
 
-// TestBatchCreateTasks_ReturnsSandboxAndDeps verifies that batch-created tasks
-// already contain sandbox and dependency fields in the 201 response without
-// requiring a re-fetch.
-func TestBatchCreateTasks_ReturnsSandboxAndDeps(t *testing.T) {
+// TestBatchCreateTasks_ReturnsTasksAndDeps verifies that batch-created
+// tasks already contain their prompt and dependency fields in the 201
+// response without requiring a re-fetch. Sandbox is no longer part of
+// the batch payload — harness choice lives on the agent a flow step
+// references.
+func TestBatchCreateTasks_ReturnsTasksAndDeps(t *testing.T) {
 	h := newTestHandler(t)
 
 	body := `{"tasks":[
-		{"ref":"A","prompt":"task A","sandbox":"claude"},
-		{"ref":"B","prompt":"task B","sandbox":"claude","depends_on_refs":["A"]}
+		{"ref":"A","prompt":"task A"},
+		{"ref":"B","prompt":"task B","depends_on_refs":["A"]}
 	]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -3638,13 +3653,6 @@ func TestBatchCreateTasks_ReturnsSandboxAndDeps(t *testing.T) {
 	}
 	if len(resp.Tasks) != 2 {
 		t.Fatalf("expected 2 tasks, got %d", len(resp.Tasks))
-	}
-
-	// Both tasks must have sandbox set immediately.
-	for i, task := range resp.Tasks {
-		if task.Sandbox != "claude" {
-			t.Errorf("tasks[%d].sandbox: want %q, got %q", i, "claude", task.Sandbox)
-		}
 	}
 
 	// Task B must have A's UUID in DependsOn.
@@ -3667,6 +3675,25 @@ func TestBatchCreateTasks_ReturnsSandboxAndDeps(t *testing.T) {
 	}
 }
 
+// TestBatchCreateTasks_RejectsSandboxField guards the Phase-5
+// cleanup at the batch endpoint: per-task sandbox overrides must
+// not leak back through the batch path.
+func TestBatchCreateTasks_RejectsSandboxField(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"tasks":[{"ref":"A","prompt":"task A","sandbox":"claude"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "ref \"A\"") {
+		t.Errorf("expected error body to cite the offending ref; got %q", w.Body.String())
+	}
+}
+
 // TestBatchCreateTasks_EmitsOneDeltaPerTask verifies that each batch task
 // emits exactly one SSE delta.
 func TestBatchCreateTasks_EmitsOneDeltaPerTask(t *testing.T) {
@@ -3676,7 +3703,7 @@ func TestBatchCreateTasks_EmitsOneDeltaPerTask(t *testing.T) {
 	defer h.store.Unsubscribe(subID)
 
 	body := `{"tasks":[
-		{"ref":"X","prompt":"task X","sandbox":"claude"},
+		{"ref":"X","prompt":"task X"},
 		{"ref":"Y","prompt":"task Y","depends_on_refs":["X"]}
 	]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))

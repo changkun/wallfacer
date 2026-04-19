@@ -165,13 +165,21 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 }
 
 // CreateTask creates a new task in backlog status.
+//
+// The deprecated `sandbox` and `sandbox_by_activity` fields are no
+// longer accepted on the POST body. Harness (Claude vs Codex) is
+// now selected by pinning the agent a flow step references, and
+// the per-task workspace default can still be changed via PATCH
+// /api/tasks/{id} after creation. Requests that include either
+// deprecated field get a 400 with a pointer to the new model so
+// callers can migrate.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Prompt             string                                 `json:"prompt"`
 		Timeout            int                                    `json:"timeout"`
 		MountWorktrees     bool                                   `json:"mount_worktrees"`
-		Sandbox            sandbox.Type                           `json:"sandbox"`
-		SandboxByActivity  map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
+		Sandbox            *sandbox.Type                          `json:"sandbox,omitempty"`
+		SandboxByActivity  map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 		Kind               store.TaskKind                         `json:"kind"`
 		Flow               string                                 `json:"flow"`
 		Tags               []string                               `json:"tags"`
@@ -185,16 +193,24 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if req.Sandbox != nil {
+		http.Error(w,
+			"the \"sandbox\" field is no longer accepted on POST /api/tasks; pin the harness on the agent a flow step references (Agents tab → Clone → Harness: codex), or set the task's sandbox via PATCH /api/tasks/{id} after creation",
+			http.StatusBadRequest)
+		return
+	}
+	if len(req.SandboxByActivity) > 0 {
+		http.Error(w,
+			"the \"sandbox_by_activity\" field is no longer accepted on POST /api/tasks; per-activity routing lives on the agent definition now (Agents tab → Harness)",
+			http.StatusBadRequest)
+		return
+	}
 	// Brainstorm tasks (legacy Kind="idea-agent" or new Flow="brainstorm")
 	// are the one case where an empty prompt is allowed: the agent
 	// derives the topic from the workspace itself.
 	isBrainstorm := req.Flow == "brainstorm" || req.Kind == store.TaskKindIdeaAgent
 	if strings.TrimSpace(req.Prompt) == "" && !isBrainstorm {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
-		return
-	}
-	if err := h.validateRequestedSandboxes(req.Sandbox, req.SandboxByActivity); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
@@ -213,8 +229,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		MountWorktrees:     req.MountWorktrees,
 		Kind:               req.Kind,
 		FlowID:             req.Flow,
-		Sandbox:            req.Sandbox,
-		SandboxByActivity:  req.SandboxByActivity,
 		MaxCostUSD:         req.MaxCostUSD,
 		MaxInputTokens:     req.MaxInputTokens,
 		ModelOverride:      req.Model,
@@ -238,17 +252,23 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // batchTaskInput describes a single task in a BatchCreateTasks request.
+//
+// Sandbox + SandboxByActivity are typed as pointers so the handler
+// can distinguish "not sent" (nil) from "explicitly empty" and
+// reject callers that still pass the deprecated fields rather than
+// silently dropping them.
 type batchTaskInput struct {
-	Ref               string                                 `json:"ref"`
-	Prompt            string                                 `json:"prompt"`
-	Timeout           int                                    `json:"timeout"`
-	Tags              []string                               `json:"tags"`
-	Sandbox           sandbox.Type                           `json:"sandbox"`
-	SandboxByActivity map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
-	Kind              store.TaskKind                         `json:"kind"`
-	MountWorktrees    bool                                   `json:"mount_worktrees"`
-	DependsOnRefs     []string                               `json:"depends_on_refs"`
-	SpecSourcePath    string                                 `json:"spec_source_path"`
+	Ref               string                                  `json:"ref"`
+	Prompt            string                                  `json:"prompt"`
+	Timeout           int                                     `json:"timeout"`
+	Tags              []string                                `json:"tags"`
+	Sandbox           *sandbox.Type                           `json:"sandbox,omitempty"`
+	SandboxByActivity *map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
+	Flow              string                                  `json:"flow"`
+	Kind              store.TaskKind                          `json:"kind"`
+	MountWorktrees    bool                                    `json:"mount_worktrees"`
+	DependsOnRefs     []string                                `json:"depends_on_refs"`
+	SpecSourcePath    string                                  `json:"spec_source_path"`
 }
 
 type batchCreateRequest struct {
@@ -315,14 +335,26 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Validate sandboxes.
+	// 3. Reject the deprecated sandbox / sandbox_by_activity fields.
+	// Batch callers migrate the same way POST /api/tasks callers do:
+	// pin the harness on the agent a flow step references, or set
+	// the per-task sandbox via PATCH /api/tasks/{id} after the
+	// batch lands.
 	for i, t := range req.Tasks {
-		if err := h.validateRequestedSandboxes(t.Sandbox, t.SandboxByActivity); err != nil {
+		if t.Sandbox != nil {
 			ref := t.Ref
 			if ref == "" {
 				ref = fmt.Sprintf("<index %d>", i)
 			}
-			http.Error(w, fmt.Sprintf("ref %q: %s", ref, err.Error()), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("ref %q: \"sandbox\" is no longer accepted on POST /api/tasks/batch; pin the harness on the agent a flow step references", ref), http.StatusBadRequest)
+			return
+		}
+		if t.SandboxByActivity != nil {
+			ref := t.Ref
+			if ref == "" {
+				ref = fmt.Sprintf("<index %d>", i)
+			}
+			http.Error(w, fmt.Sprintf("ref %q: \"sandbox_by_activity\" is no longer accepted on POST /api/tasks/batch", ref), http.StatusBadRequest)
 			return
 		}
 	}
@@ -510,16 +542,15 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		}
 
 		task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
-			ID:                preAssignedIDs[idx],
-			Prompt:            t.Prompt,
-			Timeout:           t.Timeout,
-			Tags:              t.Tags,
-			MountWorktrees:    t.MountWorktrees,
-			Kind:              t.Kind,
-			Sandbox:           t.Sandbox,
-			SandboxByActivity: t.SandboxByActivity,
-			DependsOn:         depStrs,
-			SpecSourcePath:    t.SpecSourcePath,
+			ID:             preAssignedIDs[idx],
+			Prompt:         t.Prompt,
+			Timeout:        t.Timeout,
+			Tags:           t.Tags,
+			MountWorktrees: t.MountWorktrees,
+			Kind:           t.Kind,
+			FlowID:         t.Flow,
+			DependsOn:      depStrs,
+			SpecSourcePath: t.SpecSourcePath,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
