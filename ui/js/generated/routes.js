@@ -411,6 +411,10 @@ var Routes = {
     writeFile: function () {
       return "/api/explorer/file";
     },
+    // GET /api/explorer/task-prompts
+    taskPrompts: function () {
+      return "/api/explorer/task-prompts";
+    },
   },
 
   auth: {

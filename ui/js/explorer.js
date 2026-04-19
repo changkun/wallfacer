@@ -14,6 +14,12 @@ var _explorerLoaded = false;
 var _explorerRefreshTimer = null;
 var _explorerStreamHandle = null;
 
+// --- Task Prompts virtual section state ---
+var _taskPrompts = [];
+var _taskPromptsIncludeWaiting = false;
+var _taskPromptsExpanded = true;
+var _taskPromptsStreamHandle = null;
+
 // ---------------------------------------------------------------------------
 // Toggle & resize (Task 3)
 // ---------------------------------------------------------------------------
@@ -57,6 +63,7 @@ function toggleExplorer() {
 function _startExplorerRefreshPoll() {
   _stopExplorerRefreshPoll();
   _startExplorerStream();
+  _startTaskPromptsStream();
 }
 
 function _stopExplorerRefreshPoll() {
@@ -65,6 +72,7 @@ function _stopExplorerRefreshPoll() {
     _explorerRefreshTimer = null;
   }
   _stopExplorerStream();
+  _stopTaskPromptsStream();
 }
 
 function _startExplorerStream() {
@@ -87,6 +95,169 @@ function _stopExplorerStream() {
     _explorerStreamHandle.stop();
     _explorerStreamHandle = null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Task Prompts virtual section
+// ---------------------------------------------------------------------------
+
+function _startTaskPromptsStream() {
+  _stopTaskPromptsStream();
+  if (!Routes || !Routes.tasks || !Routes.tasks.stream) return;
+
+  _taskPromptsStreamHandle = createSSEStream({
+    url: Routes.tasks.stream(),
+    listeners: {
+      snapshot: function () {
+        _loadTaskPrompts();
+      },
+      "task-updated": function () {
+        _loadTaskPrompts();
+      },
+      "task-deleted": function () {
+        _loadTaskPrompts();
+      },
+      heartbeat: function () {},
+    },
+  });
+}
+
+function _stopTaskPromptsStream() {
+  if (_taskPromptsStreamHandle) {
+    _taskPromptsStreamHandle.stop();
+    _taskPromptsStreamHandle = null;
+  }
+}
+
+function _loadTaskPrompts() {
+  if (!Routes || !Routes.explorer || !Routes.explorer.taskPrompts) return;
+  var url = Routes.explorer.taskPrompts();
+  if (_taskPromptsIncludeWaiting) {
+    url += "?status=backlog,waiting";
+  }
+  api(url)
+    .then(function (data) {
+      _taskPrompts = Array.isArray(data) ? data : [];
+      _renderTree();
+    })
+    .catch(function () {});
+}
+
+function _toggleTaskPromptsWaiting() {
+  _taskPromptsIncludeWaiting = !_taskPromptsIncludeWaiting;
+  _loadTaskPrompts();
+}
+
+function _renderTaskPromptsSection(container) {
+  var section = document.createElement("div");
+  section.className = "explorer-task-prompts";
+
+  // Section header
+  var header = document.createElement("div");
+  header.className = "explorer-task-prompts__header";
+  header.setAttribute("tabindex", "0");
+  header.setAttribute("role", "button");
+  header.setAttribute("aria-expanded", String(_taskPromptsExpanded));
+
+  var chevron = document.createElement("span");
+  chevron.className = "explorer-node__toggle";
+  chevron.innerHTML = _taskPromptsExpanded ? _chevDownSvg : _chevRightSvg;
+  header.appendChild(chevron);
+
+  var label = document.createElement("span");
+  label.className = "explorer-task-prompts__label";
+  label.textContent = "Task Prompts";
+  header.appendChild(label);
+
+  var toggle = document.createElement("button");
+  toggle.className = "explorer-task-prompts__waiting-toggle";
+  toggle.title = _taskPromptsIncludeWaiting
+    ? "Hide waiting tasks"
+    : "Show waiting tasks";
+  toggle.textContent = _taskPromptsIncludeWaiting ? "W" : "w";
+  toggle.setAttribute("aria-pressed", String(_taskPromptsIncludeWaiting));
+  toggle.addEventListener("click", function (e) {
+    e.stopPropagation();
+    _toggleTaskPromptsWaiting();
+  });
+  header.appendChild(toggle);
+
+  header.addEventListener("click", function () {
+    _taskPromptsExpanded = !_taskPromptsExpanded;
+    _renderTree();
+  });
+  header.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      _taskPromptsExpanded = !_taskPromptsExpanded;
+      _renderTree();
+    }
+  });
+
+  section.appendChild(header);
+
+  if (_taskPromptsExpanded) {
+    if (_taskPrompts.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "explorer-task-prompts__empty";
+      empty.textContent = "No tasks";
+      section.appendChild(empty);
+    } else {
+      for (var i = 0; i < _taskPrompts.length; i++) {
+        section.appendChild(_renderTaskPromptEntry(_taskPrompts[i]));
+      }
+    }
+  }
+
+  container.appendChild(section);
+}
+
+function _renderTaskPromptEntry(entry) {
+  var el = document.createElement("div");
+  el.className = "explorer-task-prompts__entry";
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("data-task-id", entry.task_id);
+
+  var badge = document.createElement("span");
+  badge.className =
+    "explorer-task-prompts__badge explorer-task-prompts__badge--" +
+    entry.status;
+  badge.textContent = entry.status;
+  el.appendChild(badge);
+
+  var title = document.createElement("span");
+  title.className = "explorer-task-prompts__title";
+  title.textContent = entry.title;
+  el.appendChild(title);
+
+  var ts = document.createElement("span");
+  ts.className = "explorer-task-prompts__time";
+  try {
+    var d = new Date(entry.updated_at);
+    ts.textContent = d.toLocaleDateString();
+  } catch (_e) {}
+  el.appendChild(ts);
+
+  el.addEventListener("click", function () {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.openPlanForTask === "function"
+    ) {
+      window.openPlanForTask(entry.task_id, entry.title, entry.status);
+    }
+  });
+  el.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      if (
+        typeof window !== "undefined" &&
+        typeof window.openPlanForTask === "function"
+      ) {
+        window.openPlanForTask(entry.task_id, entry.title, entry.status);
+      }
+    }
+  });
+
+  return el;
 }
 
 function _initExplorerResize() {
@@ -197,6 +368,7 @@ function _loadExplorerRoots() {
     });
   }
   _explorerLoaded = true;
+  _loadTaskPrompts();
   _renderTree();
   // Auto-expand root workspace directories so the tree opens by default.
   for (var r = 0; r < _explorerRoots.length; r++) {
@@ -741,6 +913,13 @@ function _renderTree() {
 
   container.setAttribute("role", "tree");
 
+  // Render Task Prompts section above workspace roots in workspace mode.
+  var inSpecMode =
+    typeof getCurrentMode === "function" && getCurrentMode() === "spec";
+  if (!inSpecMode) {
+    _renderTaskPromptsSection(container);
+  }
+
   for (var i = 0; i < _explorerRoots.length; i++) {
     _renderNode(_explorerRoots[i], 0, container);
   }
@@ -1176,6 +1355,14 @@ window._getExplorerRoots = function () {
 window._setExplorerRoots = function (roots) {
   _explorerRoots = roots;
 };
+window._getTaskPrompts = function () {
+  return _taskPrompts;
+};
+window._setTaskPrompts = function (entries) {
+  _taskPrompts = entries;
+};
+window._renderTaskPromptsSection = _renderTaskPromptsSection;
+window._renderTaskPromptEntry = _renderTaskPromptEntry;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", _initExplorer);

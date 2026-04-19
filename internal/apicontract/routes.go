@@ -759,6 +759,12 @@ var Routes = []Route{
 		Description: "Write file contents to a workspace.",
 		Tags:        []string{"explorer"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/explorer/task-prompts", Name: "ExplorerTaskPrompts",
+		JSName:      "taskPrompts",
+		Description: "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
+		Tags:        []string{"explorer"},
+	},
 
 	// --- OAuth authentication ---
 

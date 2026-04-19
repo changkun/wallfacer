@@ -929,10 +929,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"DeleteTemplate": h.DeleteTemplate,
 
 		// File explorer.
-		"ExplorerTree":      h.ExplorerTree,
-		"ExplorerStream":    h.ExplorerStream,
-		"ExplorerReadFile":  h.ExplorerReadFile,
-		"ExplorerWriteFile": h.ExplorerWriteFile,
+		"ExplorerTree":        h.ExplorerTree,
+		"ExplorerStream":      h.ExplorerStream,
+		"ExplorerReadFile":    h.ExplorerReadFile,
+		"ExplorerWriteFile":   h.ExplorerWriteFile,
+		"ExplorerTaskPrompts": h.ExplorerTaskPrompts,
 
 		// Git workspace operations.
 		"GitStatus":        h.GitStatus,

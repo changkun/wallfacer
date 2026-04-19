@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func TestExplorerTree_Basic(t *testing.T) {
@@ -672,5 +673,165 @@ func TestExplorerStream_NoRefreshWhenUnchanged(t *testing.T) {
 	}
 	if !strings.Contains(body, "event: connected") {
 		t.Error("expected connected event")
+	}
+}
+
+// --- ExplorerTaskPrompts tests ---
+
+func TestTaskPromptsEndpoint_DefaultBacklog(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	ctx := t.Context()
+
+	// Create one backlog task and one waiting task.
+	backlog, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, waiting.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, waiting.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/task-prompts", nil)
+	w := httptest.NewRecorder()
+	h.ExplorerTaskPrompts(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var entries []taskPromptEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	// Default returns only backlog.
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d: %+v", len(entries), entries)
+	}
+	if entries[0].TaskID != backlog.ID.String() {
+		t.Errorf("expected backlog task %s, got %s", backlog.ID, entries[0].TaskID)
+	}
+	if entries[0].Status != "backlog" {
+		t.Errorf("expected status backlog, got %s", entries[0].Status)
+	}
+}
+
+func TestTaskPromptsEndpoint_WithWaiting(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	ctx := t.Context()
+
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, waiting.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, waiting.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/task-prompts?status=backlog,waiting", nil)
+	w := httptest.NewRecorder()
+	h.ExplorerTaskPrompts(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var entries []taskPromptEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d: %+v", len(entries), entries)
+	}
+	statuses := make(map[string]bool)
+	for _, e := range entries {
+		statuses[e.Status] = true
+	}
+	if !statuses["backlog"] || !statuses["waiting"] {
+		t.Errorf("expected both backlog and waiting, got statuses: %v", statuses)
+	}
+}
+
+func TestTaskPromptsEndpoint_RejectsFailed(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+
+	for _, badStatus := range []string{"failed", "done", "cancelled", "in_progress", "committing"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/explorer/task-prompts?status="+badStatus, nil)
+		w := httptest.NewRecorder()
+		h.ExplorerTaskPrompts(w, req)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("status=%s: expected 422, got %d: %s", badStatus, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestTaskPromptsEndpoint_ExcludesArchivedAndTombstoned(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	ctx := t.Context()
+
+	visible, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "visible backlog", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and soft-delete a task (tombstoned).
+	tombstoned, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "tombstoned task", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.DeleteTask(ctx, tombstoned.ID, "test"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Archived tasks: only done/cancelled can be archived, so create a done task and archive it.
+	// (Backlog tasks cannot be archived per the API contract, but the store allows it.)
+	archived, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "archived done", Timeout: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, archived.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, archived.ID, store.TaskStatusDone); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetTaskArchived(ctx, archived.ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/task-prompts", nil)
+	w := httptest.NewRecorder()
+	h.ExplorerTaskPrompts(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var entries []taskPromptEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry (only visible backlog), got %d: %+v", len(entries), entries)
+	}
+	if entries[0].TaskID != visible.ID.String() {
+		t.Errorf("expected visible task %s, got %s", visible.ID, entries[0].TaskID)
 	}
 }

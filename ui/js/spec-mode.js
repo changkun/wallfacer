@@ -521,6 +521,100 @@ function _highlightBoardTask(taskId) {
   );
 }
 
+// --- Task-mode Plan navigation ---
+
+// State for the currently focused task in Plan mode (set by openPlanForTask).
+var _focusedTaskId = null;
+var _focusedTaskTitle = null;
+var _focusedTaskStatus = null;
+
+// openPlanForTask opens Plan mode with the planning thread pinned to taskId.
+// It reuses an existing non-archived task-mode thread for the task if one
+// exists; otherwise it creates a new thread. Then it switches to Plan mode.
+function openPlanForTask(taskId, title, status) {
+  if (!taskId) return;
+  _focusedTaskId = taskId;
+  _focusedTaskTitle = title || "";
+  _focusedTaskStatus = status || "";
+  clearWorkspaceIsNew();
+
+  // Fetch existing threads, find a non-archived task-mode thread for this task.
+  api(Routes.planning.listThreads() + "?includeArchived=false")
+    .then(function (res) {
+      var threads = (res && res.threads) || [];
+      var match = null;
+      for (var i = 0; i < threads.length; i++) {
+        var t = threads[i];
+        if (t.mode === "task" && t.task_id === taskId && !t.archived) {
+          match = t;
+          break;
+        }
+      }
+      if (match) {
+        // Activate existing thread then reload.
+        return fetch(
+          Routes.planning.activateThread().replace("{id}", match.id),
+          {
+            method: "POST",
+            headers: withBearerHeaders({ "Content-Type": "application/json" }),
+          },
+        ).then(function () {
+          if (
+            typeof PlanningChat !== "undefined" &&
+            typeof PlanningChat.reload === "function"
+          ) {
+            PlanningChat.reload();
+          }
+        });
+      }
+      // No existing thread: create one pinned to this task.
+      var name = "Task prompt: " + (_focusedTaskTitle || taskId);
+      return api(Routes.planning.createThread(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name, focused_task: taskId }),
+      }).then(function () {
+        if (
+          typeof PlanningChat !== "undefined" &&
+          typeof PlanningChat.reload === "function"
+        ) {
+          PlanningChat.reload();
+        }
+      });
+    })
+    .catch(function (err) {
+      console.error("openPlanForTask:", err);
+    });
+
+  // Update breadcrumb and switch to Plan mode.
+  _updateTaskBreadcrumb();
+  switchMode("spec");
+}
+
+// _updateTaskBreadcrumb sets the Plan view header breadcrumb elements for the
+// currently focused task. Called by openPlanForTask after state is set.
+function _updateTaskBreadcrumb() {
+  var pathEl = document.getElementById("spec-focused-path");
+  var titleEl = document.getElementById("spec-focused-title");
+  var statusEl = document.getElementById("spec-focused-status");
+  var kindEl = document.getElementById("spec-focused-kind");
+  var effortEl = document.getElementById("spec-focused-effort");
+  var metaEl = document.getElementById("spec-focused-meta");
+  var bodyInner = document.getElementById("spec-focused-body-inner");
+
+  if (pathEl)
+    pathEl.textContent =
+      "Task Prompt" +
+      (_focusedTaskTitle ? " \u00b7 " + _focusedTaskTitle : "") +
+      (_focusedTaskStatus ? " (" + _focusedTaskStatus + ")" : "");
+  if (titleEl) titleEl.textContent = _focusedTaskTitle || "";
+  if (statusEl) statusEl.textContent = "";
+  if (kindEl) kindEl.textContent = "";
+  if (effortEl) effortEl.textContent = "";
+  if (metaEl) metaEl.innerHTML = "";
+  if (bodyInner) bodyInner.innerHTML = "";
+}
+
 // --- Focused spec view ---
 
 var _focusedSpecPath = null;
@@ -1454,3 +1548,8 @@ document.addEventListener("DOMContentLoaded", function () {
     PlanningChat.init();
   }
 });
+
+// Expose openPlanForTask globally so explorer.js can call it.
+if (typeof window !== "undefined") {
+  window.openPlanForTask = openPlanForTask;
+}

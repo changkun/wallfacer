@@ -649,3 +649,274 @@ describe("explorer init", () => {
     expect(btn).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task Prompts section tests
+// ---------------------------------------------------------------------------
+
+function makeContextWithTaskPrompts(opts = {}) {
+  const { document, registry } = makeDom();
+  const storage = {};
+  const apiCalls = [];
+  const openPlanForTaskCalls = [];
+
+  const windowObj = {
+    openPlanForTask: function (id, title, status) {
+      openPlanForTaskCalls.push({ id, title, status });
+    },
+  };
+
+  const ctx = vm.createContext({
+    document,
+    window: windowObj,
+    localStorage: {
+      getItem(k) {
+        return Object.hasOwn(storage, k) ? storage[k] : null;
+      },
+      setItem(k, v) {
+        storage[k] = String(v);
+      },
+    },
+    activeWorkspaces: opts.workspaces || [],
+    Routes: {
+      explorer: {
+        tree: () => "/api/explorer/tree",
+        readFile: () => "/api/explorer/file",
+        writeFile: () => "/api/explorer/file",
+        taskPrompts: () => "/api/explorer/task-prompts",
+      },
+      tasks: {
+        stream: () => "/api/tasks/stream",
+      },
+    },
+    createSSEStream: function () {
+      return { stop: function () {} };
+    },
+    getCurrentMode:
+      opts.getCurrentMode ||
+      function () {
+        return "board";
+      },
+    api: function (url) {
+      apiCalls.push(url);
+      if (url.indexOf("task-prompts") !== -1) {
+        return Promise.resolve(opts.taskPromptsResponse || []);
+      }
+      return Promise.resolve([]);
+    },
+    fetch: function () {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(""),
+      });
+    },
+    confirm: () => true,
+    escapeHtml: (s) => String(s),
+    extToLang: () => null,
+    splitHighlightedLines: (h) => h.split("\n"),
+    renderMarkdown: (t) => "<div>" + t + "</div>",
+    hljs: {
+      highlight: (c) => ({ value: c }),
+      highlightAuto: (c) => ({ value: c }),
+    },
+    console,
+  });
+
+  vm.runInContext(
+    join(jsDir, "explorer.js") &&
+      require("fs").readFileSync(join(jsDir, "explorer.js"), "utf8"),
+    ctx,
+    {
+      filename: join(jsDir, "explorer.js"),
+    },
+  );
+
+  return { ctx, registry, apiCalls, openPlanForTaskCalls, win: windowObj };
+}
+
+describe("taskPromptsSection_renders", () => {
+  it("renders given a mock response with status toggle", async () => {
+    const { document, registry } = makeDom();
+    const storage = {};
+    const apiCalls = [];
+    const openCalls = [];
+
+    const windowObj = {
+      openPlanForTask: (id, title, status) =>
+        openCalls.push({ id, title, status }),
+    };
+
+    const ctx = vm.createContext({
+      document,
+      window: windowObj,
+      localStorage: {
+        getItem: (k) => (Object.hasOwn(storage, k) ? storage[k] : null),
+        setItem: (k, v) => {
+          storage[k] = String(v);
+        },
+      },
+      activeWorkspaces: ["/ws"],
+      Routes: {
+        explorer: {
+          tree: () => "/api/explorer/tree",
+          readFile: () => "/api/explorer/file",
+          writeFile: () => "/api/explorer/file",
+          taskPrompts: () => "/api/explorer/task-prompts",
+        },
+        tasks: { stream: () => "/api/tasks/stream" },
+      },
+      createSSEStream: () => ({ stop: () => {} }),
+      getCurrentMode: () => "board",
+      api: (url) => {
+        apiCalls.push(url);
+        if (url.indexOf("task-prompts") !== -1) {
+          return Promise.resolve([
+            {
+              task_id: "abc",
+              title: "Fix bug",
+              status: "backlog",
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      },
+      fetch: () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(""),
+        }),
+      confirm: () => true,
+      escapeHtml: (s) => String(s),
+      extToLang: () => null,
+      splitHighlightedLines: (h) => h.split("\n"),
+      renderMarkdown: (t) => "<div>" + t + "</div>",
+      hljs: {
+        highlight: (c) => ({ value: c }),
+        highlightAuto: (c) => ({ value: c }),
+      },
+      console,
+    });
+
+    const code = require("fs").readFileSync(join(jsDir, "explorer.js"), "utf8");
+    vm.runInContext(code, ctx, { filename: join(jsDir, "explorer.js") });
+
+    // Wait for task prompts to load via _loadExplorerRoots.
+    await new Promise((r) => setTimeout(r, 20));
+
+    // _renderTree should have rendered the section; check via _setTaskPrompts + render.
+    windowObj._setTaskPrompts([
+      {
+        task_id: "abc",
+        title: "Fix bug",
+        status: "backlog",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ]);
+
+    const container = document.getElementById("explorer-tree");
+    container.innerHTML = "";
+    windowObj._renderTaskPromptsSection(container);
+
+    // Expect a section element was appended.
+    expect(container.children.length).toBe(1);
+    const section = container.children[0];
+    expect(section.className).toContain("explorer-task-prompts");
+
+    // Section has children: header + entry.
+    const headerAndEntry = section.children;
+    expect(headerAndEntry.length).toBeGreaterThanOrEqual(2);
+
+    // Toggle button exists in header.
+    const header = headerAndEntry[0];
+    const buttons = header.querySelectorAll(
+      ".explorer-task-prompts__waiting-toggle",
+    );
+    expect(buttons.length).toBe(1);
+  });
+});
+
+describe("taskPromptsSection_clickSelectsTask", () => {
+  it("clicking an entry calls openPlanForTask with the correct id", async () => {
+    const { document } = makeDom();
+    const storage = {};
+    const openCalls = [];
+    const windowObj = {
+      openPlanForTask: (id, title, status) =>
+        openCalls.push({ id, title, status }),
+    };
+
+    const ctx = vm.createContext({
+      document,
+      window: windowObj,
+      localStorage: {
+        getItem: (k) => (Object.hasOwn(storage, k) ? storage[k] : null),
+        setItem: (k, v) => {
+          storage[k] = String(v);
+        },
+      },
+      activeWorkspaces: ["/ws"],
+      Routes: {
+        explorer: {
+          tree: () => "/api/explorer/tree",
+          readFile: () => "/api/explorer/file",
+          writeFile: () => "/api/explorer/file",
+          taskPrompts: () => "/api/explorer/task-prompts",
+        },
+        tasks: { stream: () => "/api/tasks/stream" },
+      },
+      createSSEStream: () => ({ stop: () => {} }),
+      getCurrentMode: () => "board",
+      api: () => Promise.resolve([]),
+      fetch: () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(""),
+        }),
+      confirm: () => true,
+      escapeHtml: (s) => String(s),
+      extToLang: () => null,
+      splitHighlightedLines: (h) => h.split("\n"),
+      renderMarkdown: (t) => "<div>" + t + "</div>",
+      hljs: {
+        highlight: (c) => ({ value: c }),
+        highlightAuto: (c) => ({ value: c }),
+      },
+      console,
+    });
+
+    const code = require("fs").readFileSync(join(jsDir, "explorer.js"), "utf8");
+    vm.runInContext(code, ctx, { filename: join(jsDir, "explorer.js") });
+
+    // Set task prompts data and render an entry directly.
+    windowObj._setTaskPrompts([
+      {
+        task_id: "task-123",
+        title: "My task",
+        status: "backlog",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ]);
+
+    const container = document.getElementById("explorer-tree");
+    container.innerHTML = "";
+    const entry = windowObj._renderTaskPromptEntry({
+      task_id: "task-123",
+      title: "My task",
+      status: "backlog",
+      updated_at: "2026-01-01T00:00:00Z",
+    });
+    container.appendChild(entry);
+
+    // Simulate click.
+    const listeners = entry._listeners["click"] || [];
+    expect(listeners.length).toBe(1);
+    listeners[0]({});
+
+    expect(openCalls).toHaveLength(1);
+    expect(openCalls[0].id).toBe("task-123");
+  });
+});

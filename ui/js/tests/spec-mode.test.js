@@ -486,3 +486,174 @@ describe("focusRoadmapIndex", () => {
     expect(body.innerHTML).toContain("Failed to load Roadmap");
   });
 });
+
+// ---------------------------------------------------------------------------
+// openPlanForTask tests
+// ---------------------------------------------------------------------------
+
+function makeOpenPlanContext(opts = {}) {
+  const dom = makeDom();
+  // Add elements used by openPlanForTask breadcrumb.
+  for (const id of [
+    "spec-focused-path",
+    "spec-focused-title",
+    "spec-focused-status",
+    "spec-focused-kind",
+    "spec-focused-effort",
+    "spec-focused-meta",
+    "spec-focused-body-inner",
+  ]) {
+    const el = {
+      id,
+      tagName: "SPAN",
+      innerHTML: "",
+      textContent: "",
+      style: {},
+      classList: {
+        add() {},
+        remove() {},
+        toggle() {},
+        contains() {
+          return false;
+        },
+      },
+      setAttribute() {},
+      getAttribute() {
+        return null;
+      },
+    };
+    dom.registry.set(id, el);
+  }
+
+  const storage = new Map();
+  const apiCalls = [];
+  const fetchCalls = [];
+  const reloadCalls = [];
+
+  const threadsResponse =
+    opts.threadsResponse !== undefined
+      ? opts.threadsResponse
+      : { threads: [], active_id: null };
+
+  const ctx = {
+    document: dom,
+    localStorage: {
+      getItem: (k) => storage.get(k) ?? null,
+      setItem: (k, v) => storage.set(k, v),
+    },
+    api: (url, fetchOpts) => {
+      apiCalls.push({
+        url,
+        method: (fetchOpts && fetchOpts.method) || "GET",
+        body: fetchOpts && fetchOpts.body,
+      });
+      if (
+        url.indexOf("planning/threads") !== -1 &&
+        (!fetchOpts || fetchOpts.method !== "POST")
+      ) {
+        return Promise.resolve(threadsResponse);
+      }
+      return Promise.resolve({});
+    },
+    fetch: (url, fetchOpts) => {
+      fetchCalls.push({ url, method: fetchOpts && fetchOpts.method });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(""),
+      });
+    },
+    Routes: {
+      explorer: { readFile: () => "/api/explorer/file" },
+      planning: {
+        listThreads: () => "/api/planning/threads",
+        createThread: () => "/api/planning/threads",
+        activateThread: () => "/api/planning/threads/{id}/activate",
+      },
+    },
+    PlanningChat: {
+      reload: () => {
+        reloadCalls.push(true);
+        return Promise.resolve();
+      },
+    },
+    withBearerHeaders: (h) => h,
+    renderMarkdown: (t) => "<p>" + t + "</p>",
+    setInterval: () => 42,
+    clearInterval: () => {},
+    location: { hash: "", pathname: "/" },
+    history: { replaceState: () => {} },
+    console,
+    showConfirm: () => Promise.resolve(true),
+    showAlert: () => {},
+    Promise,
+    setTimeout: (fn) => fn(),
+    clearTimeout: () => {},
+    requestAnimationFrame: (fn) => fn(),
+    storage,
+    apiCalls,
+    fetchCalls,
+    reloadCalls,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(code, ctx);
+  return ctx;
+}
+
+describe("openPlanForTask", () => {
+  it("openPlanForTask_reusesExistingThread: activates rather than creates when task-mode thread exists", async () => {
+    const existingThread = {
+      id: "thread-999",
+      name: "Task prompt: my task",
+      mode: "task",
+      task_id: "task-abc",
+      archived: false,
+    };
+    const ctx = makeOpenPlanContext({
+      threadsResponse: { threads: [existingThread], active_id: "thread-999" },
+    });
+
+    ctx.openPlanForTask("task-abc", "my task", "backlog");
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Should have called activate endpoint, NOT createThread POST.
+    const activateCalls = ctx.fetchCalls.filter(
+      (c) => c.url.indexOf("activate") !== -1 && c.method === "POST",
+    );
+    expect(activateCalls.length).toBeGreaterThanOrEqual(1);
+
+    const createCalls = ctx.apiCalls.filter(
+      (c) => c.url === "/api/planning/threads" && c.method === "POST",
+    );
+    expect(createCalls.length).toBe(0);
+
+    // PlanningChat.reload should have been called.
+    expect(ctx.reloadCalls.length).toBeGreaterThanOrEqual(1);
+
+    // Should have switched to spec mode.
+    expect(ctx.getCurrentMode()).toBe("spec");
+  });
+
+  it("openPlanForTask_createsThreadWhenMissing: posts to /api/planning/threads with focused_task", async () => {
+    const ctx = makeOpenPlanContext({
+      threadsResponse: { threads: [], active_id: null },
+    });
+
+    ctx.openPlanForTask("task-xyz", "new task", "waiting");
+    await new Promise((r) => setTimeout(r, 30));
+
+    const createCalls = ctx.apiCalls.filter(
+      (c) => c.url === "/api/planning/threads" && c.method === "POST",
+    );
+    expect(createCalls.length).toBe(1);
+
+    const body = JSON.parse(createCalls[0].body);
+    expect(body.focused_task).toBe("task-xyz");
+    expect(body.name).toContain("new task");
+
+    // PlanningChat.reload should have been called.
+    expect(ctx.reloadCalls.length).toBeGreaterThanOrEqual(1);
+
+    expect(ctx.getCurrentMode()).toBe("spec");
+  });
+});
