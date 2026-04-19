@@ -232,6 +232,38 @@ func Parse(path string) (Config, error) {
 	return cfg, nil
 }
 
+// ReadRaw returns the full set of key-value pairs declared in an env file,
+// without applying the type-aware decoding that Parse does. Unknown keys
+// are preserved, so callers that need values not yet modeled in Config
+// (e.g. OIDC AUTH_* vars handled by an external package) can read them
+// without round-tripping through a separate parser. Lines that don't
+// match KEY=VALUE are skipped silently, matching Parse's semantics.
+func ReadRaw(path string) (map[string]string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string)
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		if k, v, ok := parseEnvLine(line); ok {
+			out[k] = v
+		}
+	}
+	return out, nil
+}
+
+// Lookup returns the value for key from shell env (os.Getenv) when set,
+// otherwise the value from the .env file map. Used at server boot to
+// honor a user's expectation that `WALLFACER_CLOUD=foo wallfacer run`
+// takes precedence over the same key in ~/.wallfacer/.env while also
+// letting users drop the key in the file and leave the shell clean.
+func Lookup(envFile map[string]string, key string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return envFile[key]
+}
+
 // ParseBoolFlag accepts the common truthy spellings used in environment
 // variables: "true", "1", and "yes" (all case-insensitive). Everything
 // else — including empty, "false", "0", "no" — parses as false. Used by

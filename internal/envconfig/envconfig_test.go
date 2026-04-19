@@ -871,6 +871,45 @@ func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
 	}
 }
 
+// TestReadRaw verifies that keys not modeled in Config — such as the
+// AUTH_* vars handled by the OIDC package — are still surfaced to the
+// caller so the server boot can build an auth.Config from .env.
+func TestReadRaw(t *testing.T) {
+	path := writeEnvFile(t, "AUTH_CLIENT_ID=abc\nAUTH_CLIENT_SECRET=\"sh h\"\n# comment\nCLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	raw, err := envconfig.ReadRaw(path)
+	if err != nil {
+		t.Fatalf("ReadRaw: %v", err)
+	}
+	if raw["AUTH_CLIENT_ID"] != "abc" {
+		t.Errorf("AUTH_CLIENT_ID = %q; want abc", raw["AUTH_CLIENT_ID"])
+	}
+	if raw["AUTH_CLIENT_SECRET"] != "sh h" {
+		t.Errorf("AUTH_CLIENT_SECRET = %q; want 'sh h' (quoted)", raw["AUTH_CLIENT_SECRET"])
+	}
+	if raw["CLAUDE_CODE_OAUTH_TOKEN"] != "tok" {
+		t.Errorf("CLAUDE_CODE_OAUTH_TOKEN = %q; want tok", raw["CLAUDE_CODE_OAUTH_TOKEN"])
+	}
+}
+
+// TestLookup covers the precedence rule the server boot relies on: shell
+// env wins when non-empty, .env is the fallback, "" if neither is set.
+func TestLookup(t *testing.T) {
+	file := map[string]string{"FOO": "from-file", "BAR": "only-in-file"}
+
+	t.Setenv("FOO", "from-shell")
+	if got := envconfig.Lookup(file, "FOO"); got != "from-shell" {
+		t.Errorf("Lookup(FOO) = %q; want from-shell (shell env wins)", got)
+	}
+	// BAR is not set in shell; falls back to file.
+	if got := envconfig.Lookup(file, "BAR"); got != "only-in-file" {
+		t.Errorf("Lookup(BAR) = %q; want only-in-file (.env fallback)", got)
+	}
+	// Unknown key: empty string from both sources.
+	if got := envconfig.Lookup(file, "QUX"); got != "" {
+		t.Errorf("Lookup(QUX) = %q; want empty", got)
+	}
+}
+
 // TestParseBoolFlag matches the shell-env fallback used in the server boot
 // path: the same truthy set must hold whether the flag comes from the
 // `.env` file or from `os.Getenv`, so users can flip cloud mode via
