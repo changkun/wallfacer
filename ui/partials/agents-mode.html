@@ -9,24 +9,34 @@
         <div>
           <h2 class="agents-mode__title">Agents</h2>
           <p class="agents-mode__subtitle">
-            Sub-agent roles each flow step invokes. Clone a built-in or
-            start from scratch to pin a harness, tune capabilities, or
-            override the system prompt.
+            Sub-agent roles each flow step invokes. Clone a built-in or start
+            from scratch to pin a harness, tune capabilities, or override the
+            system prompt.
           </p>
         </div>
         <div class="agents-mode__header-actions">
           <button
             type="button"
             class="agents-mode__new"
-            onclick="window.__agents_test && window.__agents_test.openNewEditor && window.__agents_test.openNewEditor()"
+            onclick="
+              window.__agents_test &&
+                window.__agents_test.openNewEditor &&
+                window.__agents_test.openNewEditor()
+            "
           >
             + New Agent
           </button>
         </div>
       </div>
       <div class="agents-mode__default-row">
-        <span class="agents-mode__default-label">Workspace default harness</span>
-        <span id="agents-mode-default-harness" class="agents-mode__default-value">...</span>
+        <span class="agents-mode__default-label"
+          >Workspace default harness</span
+        >
+        <span
+          id="agents-mode-default-harness"
+          class="agents-mode__default-value"
+          >...</span
+        >
         <button
           type="button"
           class="agents-mode__default-edit"
@@ -53,13 +63,20 @@
             aria-label="Search agents"
           />
         </div>
-        <div id="agents-rail-list" class="agents-mode__rail-list" aria-busy="true">
+        <div
+          id="agents-rail-list"
+          class="agents-mode__rail-list"
+          aria-busy="true"
+        >
           <p class="agents-mode__empty">Loading agents...</p>
         </div>
       </aside>
       <section id="agents-detail" class="agents-mode__detail">
         <div class="agents-mode__empty-detail">
-          <p>Pick an agent on the left, or click <strong>+ New Agent</strong> above.</p>
+          <p>
+            Pick an agent on the left, or click
+            <strong>+ New Agent</strong> above.
+          </p>
         </div>
       </section>
     </div>

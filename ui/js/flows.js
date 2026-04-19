@@ -144,8 +144,8 @@
     if (opts.isDraft) {
       meta.textContent = "draft";
     } else if (flow.steps) {
-      meta.textContent = flow.steps.length + " step" +
-        (flow.steps.length === 1 ? "" : "s");
+      meta.textContent =
+        flow.steps.length + " step" + (flow.steps.length === 1 ? "" : "s");
     }
     if (meta.textContent) el.appendChild(meta);
 
@@ -465,10 +465,9 @@
             body: JSON.stringify(payload),
           })
         : fetch(
-            Routes.flows.update().replace(
-              "{slug}",
-              encodeURIComponent(flow.slug),
-            ),
+            Routes.flows
+              .update()
+              .replace("{slug}", encodeURIComponent(flow.slug)),
             {
               method: "PUT",
               headers: jsonHeaders(),

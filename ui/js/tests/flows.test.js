@@ -195,9 +195,7 @@ describe("flows.js (split-pane)", () => {
     ctx.window.__flows_test.renderRail();
     const buttons = ctx._rail.children.filter((c) => c.tagName === "BUTTON");
     expect(buttons.length).toBe(2);
-    const user = buttons.find(
-      (b) => b.attributes["data-slug"] === "tdd-loop",
-    );
+    const user = buttons.find((b) => b.attributes["data-slug"] === "tdd-loop");
     expect(user.classList.contains("flows-rail__item--user")).toBe(true);
   });
 
@@ -208,7 +206,10 @@ describe("flows.js (split-pane)", () => {
         agent_slug: "commit-msg",
         run_in_parallel_with: ["title", "oversight"],
       },
-      { agent_slug: "title", run_in_parallel_with: ["commit-msg", "oversight"] },
+      {
+        agent_slug: "title",
+        run_in_parallel_with: ["commit-msg", "oversight"],
+      },
       {
         agent_slug: "oversight",
         run_in_parallel_with: ["commit-msg", "title"],

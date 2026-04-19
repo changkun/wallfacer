@@ -1,20 +1,28 @@
-<div id="flows-mode-container" class="flows-mode-container" style="display: none">
+<div
+  id="flows-mode-container"
+  class="flows-mode-container"
+  style="display: none"
+>
   <div class="flows-mode__inner">
     <header class="flows-mode__header">
       <div class="flows-mode__header-row">
         <div>
           <h2 class="flows-mode__title">Flows</h2>
           <p class="flows-mode__subtitle">
-            A flow is an ordered chain of sub-agents a task runs against.
-            Clone a built-in or start from scratch; reorder steps by drag,
-            mark any step optional, or group steps to run in parallel.
+            A flow is an ordered chain of sub-agents a task runs against. Clone
+            a built-in or start from scratch; reorder steps by drag, mark any
+            step optional, or group steps to run in parallel.
           </p>
         </div>
         <div class="flows-mode__header-actions">
           <button
             type="button"
             class="flows-mode__new"
-            onclick="window.__flows_test && window.__flows_test.openNewEditor && window.__flows_test.openNewEditor()"
+            onclick="
+              window.__flows_test &&
+                window.__flows_test.openNewEditor &&
+                window.__flows_test.openNewEditor()
+            "
           >
             + New Flow
           </button>
@@ -31,13 +39,19 @@
             aria-label="Search flows"
           />
         </div>
-        <div id="flows-rail-list" class="flows-mode__rail-list" aria-busy="true">
+        <div
+          id="flows-rail-list"
+          class="flows-mode__rail-list"
+          aria-busy="true"
+        >
           <p class="flows-mode__empty">Loading flows...</p>
         </div>
       </aside>
       <section id="flows-detail" class="flows-mode__detail">
         <div class="flows-mode__empty-detail">
-          <p>Pick a flow on the left, or click <strong>+ New Flow</strong> above.</p>
+          <p>
+            Pick a flow on the left, or click <strong>+ New Flow</strong> above.
+          </p>
         </div>
       </section>
     </div>
