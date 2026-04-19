@@ -269,6 +269,39 @@ func TestFireRoutine_CancelledRoutineDoesNotSpawn(t *testing.T) {
 	}
 }
 
+// TestFireRoutine_ArchivedRoutineDoesNotSpawn guards the race where the
+// engine timer dispatches fire on a goroutine and the user archives the
+// routine card before the dispatched goroutine runs. Archive flips the card
+// out of ListTasks(false) so reconcile eventually unregisters it, but a
+// pre-archive in-flight fire could still slip through without this guard.
+func TestFireRoutine_ArchivedRoutineDoesNotSpawn(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "r", Timeout: 10, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	// Archive directly — a routine card can be archived after being
+	// cancelled, or (in-flight) via SetTaskArchived from another code path.
+	if err := s.SetTaskArchived(ctx, routineTask.ID, true); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+
+	beforeAll, _ := s.ListTasks(ctx, true)
+	h.fireRoutine(ctx, routineTask.ID)
+	afterAll, _ := s.ListTasks(ctx, true)
+
+	if len(afterAll) != len(beforeAll) {
+		t.Fatalf("archived routine spawned instance task: before=%d after=%d", len(beforeAll), len(afterAll))
+	}
+	if calls := mock.RunCalls(); len(calls) != 0 {
+		t.Fatalf("expected no RunBackground calls for archived routine, got %d", len(calls))
+	}
+}
+
 func TestTriggerRoutine_WithEngine_SpawnsInstance(t *testing.T) {
 	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)

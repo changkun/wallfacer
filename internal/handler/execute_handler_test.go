@@ -1168,3 +1168,139 @@ func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
 		t.Errorf("expected done status, got %q", updated.Status)
 	}
 }
+
+// --- Routine cascade cancel ---
+
+// makeRoutineWithChildren creates a routine card plus three spawned-by children
+// in backlog/waiting/failed states, and one sibling task with no spawn tag.
+// Returns the routine id and the map of child ids keyed by status.
+func makeRoutineWithChildren(t *testing.T, h *Handler) (uuid.UUID, map[store.TaskStatus]uuid.UUID, uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	routineTask, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:                 "hourly scan",
+		Timeout:                30,
+		Kind:                   store.TaskKindRoutine,
+		RoutineIntervalSeconds: 3600,
+		RoutineEnabled:         true,
+	})
+	if err != nil {
+		t.Fatalf("create routine: %v", err)
+	}
+	tag := "spawned-by:" + routineTask.ID.String()
+
+	mk := func(status store.TaskStatus) uuid.UUID {
+		child, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+			Prompt:  "spawned",
+			Timeout: 30,
+			Tags:    []string{tag},
+		})
+		if err != nil {
+			t.Fatalf("create child: %v", err)
+		}
+		if err := h.store.ForceUpdateTaskStatus(ctx, child.ID, status); err != nil {
+			t.Fatalf("force status: %v", err)
+		}
+		return child.ID
+	}
+
+	children := map[store.TaskStatus]uuid.UUID{
+		store.TaskStatusBacklog: mk(store.TaskStatusBacklog),
+		store.TaskStatusWaiting: mk(store.TaskStatusWaiting),
+		store.TaskStatusFailed:  mk(store.TaskStatusFailed),
+	}
+
+	// Sibling with no spawn tag — cascade must not touch it.
+	sibling, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "unrelated", Timeout: 30})
+	if err != nil {
+		t.Fatalf("create sibling: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, sibling.ID, store.TaskStatusBacklog); err != nil {
+		t.Fatalf("force sibling status: %v", err)
+	}
+	return routineTask.ID, children, sibling.ID
+}
+
+func TestCancelTask_CascadesToLiveRoutineChildren(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	routineID, children, siblingID := makeRoutineWithChildren(t, h)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, routineID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("cancel routine: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Backlog + waiting children must be cancelled.
+	for _, status := range []store.TaskStatus{store.TaskStatusBacklog, store.TaskStatusWaiting} {
+		got, _ := h.store.GetTask(ctx, children[status])
+		if got == nil || got.Status != store.TaskStatusCancelled {
+			t.Errorf("child in %q: expected cancelled, got %q", status, got.Status)
+		}
+	}
+	// Failed child must remain failed (user's chosen policy — terminal
+	// states are left for review).
+	got, _ := h.store.GetTask(ctx, children[store.TaskStatusFailed])
+	if got == nil || got.Status != store.TaskStatusFailed {
+		t.Errorf("failed child: expected unchanged, got %q", got.Status)
+	}
+	// Untagged sibling must not be touched.
+	sib, _ := h.store.GetTask(ctx, siblingID)
+	if sib == nil || sib.Status != store.TaskStatusBacklog {
+		t.Errorf("sibling: expected untouched backlog, got %q", sib.Status)
+	}
+}
+
+func TestArchiveTask_CascadesToLiveRoutineChildren(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	routineID, children, _ := makeRoutineWithChildren(t, h)
+
+	// ArchiveTask requires the routine card to be in a terminal state.
+	if err := h.store.ForceUpdateTaskStatus(ctx, routineID, store.TaskStatusCancelled); err != nil {
+		t.Fatalf("force routine cancelled: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineID.String()+"/archive", nil)
+	w := httptest.NewRecorder()
+	h.ArchiveTask(w, req, routineID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("archive routine: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Live children (backlog, waiting) must be cancelled.
+	for _, status := range []store.TaskStatus{store.TaskStatusBacklog, store.TaskStatusWaiting} {
+		got, _ := h.store.GetTask(ctx, children[status])
+		if got == nil || got.Status != store.TaskStatusCancelled {
+			t.Errorf("child in %q after archive: expected cancelled, got %q", status, got.Status)
+		}
+	}
+}
+
+func TestCancelTask_NonRoutineDoesNotCascade(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	// A plain backlog task with a spawned-by tag pointing at some other id
+	// must not drag in siblings when cancelled — cascade is routine-only.
+	parent, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "parent", Timeout: 30})
+	child, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "tagged",
+		Timeout: 30,
+		Tags:    []string{"spawned-by:" + parent.ID.String()},
+	})
+	_ = h.store.ForceUpdateTaskStatus(ctx, child.ID, store.TaskStatusBacklog)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+parent.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, parent.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	got, _ := h.store.GetTask(ctx, child.ID)
+	if got == nil || got.Status != store.TaskStatusBacklog {
+		t.Errorf("non-routine cancel must not cascade; child status %q", got.Status)
+	}
+}
