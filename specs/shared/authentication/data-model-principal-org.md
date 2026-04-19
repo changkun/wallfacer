@@ -1,6 +1,6 @@
 ---
 title: Principal and org fields on task + workspace records
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/store/
@@ -126,3 +126,85 @@ Two-stage delivery, both stages landable from this one spec:
 Both stages ship in one commit if `jwt-middleware.md` has already landed
 when this spec is implemented; otherwise Stage A lands first and Stage B
 is a trivial follow-up.
+
+## Outcome
+
+Delivered both stages in one pass (jwt-middleware had just landed).
+`Task.CreatedBy` and `Task.OrgID` round-trip through the FileStore,
+`Store.TasksForPrincipal` implements the org-isolation matrix, and the
+`POST /api/tasks` and `GET /api/tasks` handlers thread claims through
+via a small boundary-layer translator.
+
+### What shipped
+- `internal/store/models.go`: `Task.CreatedBy` and `Task.OrgID` omitempty
+  string fields with docstring, placed next to the existing worktree /
+  attribution block.
+- `internal/store/principal.go`: `Principal` struct (`Sub`, `OrgID`) +
+  `TasksForPrincipal(ctx, *Principal, includeArchived)` with the three-way
+  filter matrix and a `principalSeesTask` visibility predicate.
+- `internal/store/principal_test.go`: 5 tests. `Task_CreatedByAndOrgID_RoundTrip`
+  covers the write-reopen cycle. Four `TasksForPrincipal_*` tests cover
+  nil, strict org match, no-org-sees-only-anonymous, and `includeArchived`.
+- `internal/store/tasks_create_delete.go`: `TaskCreateOptions` carries
+  `CreatedBy` and `OrgID` through the create path; both are copied
+  verbatim onto the new Task.
+- `internal/handler/principal.go`: `principalFromRequest(r)` translates
+  `auth.Claims` from ctx into `*store.Principal`, returning nil when no
+  claims are in context.
+- `internal/handler/tasks.go`: `CreateTask` and the batch path populate
+  `opts.CreatedBy` / `opts.OrgID` from `principalFromRequest(r)`.
+  `ListTasks` routes through `TasksForPrincipal` instead of raw
+  `ListTasks`.
+- `internal/handler/tasks_principal_test.go`: 4 handler-level tests
+  covering populate-on-create (authenticated + anonymous) and list
+  filtering (cloud + local).
+
+### Implementation notes
+
+1. **`TasksForPrincipal` takes `*store.Principal`, not `*auth.Claims`.**
+   The spec pseudocode used `*auth.Claims` directly. Passing that would
+   force `internal/store` to import `internal/auth`, which transitively
+   pulls `latere.ai/x/pkg/jwtauth` into the domain layer — a layering
+   violation the store has otherwise avoided. The handler-layer
+   `principalFromRequest` is the one-line adapter.
+
+2. **`Principal` is a 2-field struct, not a claim-subset copy.** Only
+   `Sub` and `OrgID` are needed for attribution + filtering; other JWT
+   claims (Email, Roles, Scopes, IsSuperadmin) belong to handlers that
+   consume them directly from `auth.PrincipalFromContext`. Keeping
+   `Principal` tiny means the store never grows a model of "what is a
+   principal" beyond the two values it actually uses.
+
+3. **Stage A and Stage B shipped together.** Because jwt-middleware
+   landed in the previous commit, `auth.PrincipalFromContext` was
+   already available when this spec was implemented, so there was no
+   need for the nil-safe shim described in "Coordination with
+   jwt-middleware". The Coordination section is left in the spec body
+   as a retrospective reference for future two-stage specs.
+
+4. **Scope-limited list filtering.** Only `GET /api/tasks` routes
+   through `TasksForPrincipal`. The ~20 other `ListTasks` callers
+   (autopilot scheduling, runtime metrics, oversight aggregation,
+   stats/usage rollups, ideation, planning snapshot, etc.) continue
+   to see every task regardless of org. That is intentional:
+   - Scheduling callers need fleet-wide visibility so autopilot can
+     run tasks from every org without needing per-org slots.
+   - Metrics and stats are admin surfaces; adding per-org filtering
+     there is out of scope for this spec and belongs alongside the
+     `RequireSuperadmin` work in `scope-and-superadmin.md`.
+   - Ideation/planning manipulate routine cards that are local-only
+     today; org filtering on those will come with the cloud
+     multi-tenant spec.
+
+5. **Workspace `CreatedBy` / `OrgID` not implemented.** The spec's
+   step 2 ("Workspace model — add the same two fields") was
+   deferred. The current workspace manager persists no per-group
+   metadata beyond the derived ScopedDataDir path; introducing a new
+   `workspace_meta.json` persistence layer, wiring it through
+   `Manager.Switch`, and backfilling it on first authenticated switch
+   is larger than the spec's "medium" effort allowance and has no
+   immediate consumer (no downstream spec reads workspace attribution
+   today). When `cloud/multi-tenant.md` starts listing workspaces by
+   org, that spec will introduce the persistence layer. For now this
+   spec delivers the Task side of the foundation, which is the part
+   the cloud-unblock path actually exercises.
