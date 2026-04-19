@@ -337,19 +337,34 @@ function _renderSignedIn(el, user, authURL) {
   menu.hidden = true;
   wrap.appendChild(menu);
 
-  // Click toggles the menu. Cross-handler close-on-outside-click runs
-  // once globally; add it now.
+  // Click toggles the menu. Position-on-open lets `position: fixed`
+  // escape the sidebar's overflow:hidden clip while still anchoring
+  // to the trigger button — without JS, fixed positioning defaults
+  // to (0,0) which breaks layout. Close-on-outside-click is added
+  // once globally.
+  var positionMenu = function () {
+    var rect = wrap.getBoundingClientRect();
+    // Anchor menu's bottom-left to trigger's top-left with 6px gap.
+    menu.style.left = rect.left + "px";
+    menu.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+  };
   wrap.addEventListener("click", function (e) {
     e.stopPropagation();
-    var nowOpen = menu.hidden;
-    menu.hidden = !nowOpen;
-    wrap.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+    var willOpen = menu.hidden;
+    if (willOpen) positionMenu();
+    menu.hidden = !willOpen;
+    wrap.setAttribute("aria-expanded", willOpen ? "true" : "false");
   });
   document.addEventListener("click", function () {
     if (!menu.hidden) {
       menu.hidden = true;
       wrap.setAttribute("aria-expanded", "false");
     }
+  });
+  // Reposition on window resize / sidebar width change so the menu
+  // doesn't float orphaned after the user collapses the sidebar.
+  window.addEventListener("resize", function () {
+    if (!menu.hidden) positionMenu();
   });
   menu.addEventListener("click", function (e) {
     e.stopPropagation();
