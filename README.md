@@ -129,9 +129,9 @@ Planning chat accepts these slash commands. Type `/` to autocomplete.
 | `/summarize` | Summarize the current thread or focused spec |
 | `/create` | Create a new spec from the conversation |
 | `/refine` | Tighten wording, scope, or structure of a spec |
-| `/validate` | Check spec against the document model and mark validated |
-| `/impact` | Analyze blast radius against existing specs and code |
-| `/status` | Report progress across the spec tree |
+| `/validate` | Check the focused spec against document model rules |
+| `/impact` | Analyze what code and specs would be affected |
+| `/status` | Update the focused spec's status (`/status <state>`) |
 | `/break-down` | Split a spec into child design specs or leaf tasks |
 | `/review-breakdown` | Sanity-check a proposed breakdown |
 | `/dispatch` | Dispatch validated leaf specs to the task board |
@@ -187,7 +187,7 @@ Track token usage and cost by task, activity, and turn so operations stay measur
 
 - **Execution engine**: isolated containers, per-task git worktrees, worker container reuse, safe parallel runs, circuit breaker, resource limits, dependency caching
 - **Autonomous loop**: prompt refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets, failure categorization
-- **Spec workflow**: structured design specs, five-state lifecycle, dependency DAG, recursive progress tracking, planning chat agent with slash commands
+- **Spec workflow**: structured design specs, six-state lifecycle, dependency DAG, recursive progress tracking, planning chat agent with slash commands
 - **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search, oversight summaries
 - **Repo operations**: multi-workspace groups, branch switching, sync/rebase helpers, auto commit and push, task forking
 - **Development tools**: file explorer with editor, interactive host terminal, prompt templates, system prompt customization
@@ -232,7 +232,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | 2 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, spec document model |
 | 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | 4 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
-| 5 | [API & Transport](docs/internals/api-and-transport.md) | 97 HTTP routes, SSE, WebSocket terminal, middleware |
+| 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
 | 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, ideation |
 | 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
 | 8 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |

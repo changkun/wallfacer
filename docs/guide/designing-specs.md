@@ -211,13 +211,7 @@ Use `#plan/<path>` in the URL to link directly to a spec. For example, `http://l
 
 ### Keyboard Shortcuts
 
-| Key | Action |
-|---|---|
-| **P** | Toggle between Board and Plan mode |
-| **E** | Toggle the spec explorer pane |
-| **C** | Toggle the planning chat pane |
-| **D** | Dispatch the focused spec to the task board |
-| **B** | Break down the focused spec into children |
+Plan mode uses `P`, `E`, `C`, `D`, and `B`. The full shortcut reference -- including board-only and text-input behaviour -- is in [Configuration → Keyboard Shortcuts](configuration.md#keyboard-shortcuts).
 
 ---
 

@@ -72,16 +72,41 @@ See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
 
 ### ⌨️ Keyboard Shortcuts
 
+This is the canonical shortcut reference. Other guides link here instead of maintaining their own tables.
+
+**Global** (Board and Plan mode):
+
+| Key | Action |
+|---|---|
+| `?` | Show keyboard shortcuts help |
+| `E` | Toggle file explorer |
+| `P` | Toggle Board ↔ Plan mode |
+| `` Ctrl+` `` | Toggle terminal panel |
+| `Escape` | Close topmost modal or blur search bar |
+
+**Board:**
+
 | Key | Context | Action |
 |---|---|---|
 | `N` | Board | Open new task form |
-| `?` | Global | Show keyboard shortcuts help |
-| `E` | Global | Toggle file explorer |
-| `P` | Global | Toggle board/Plan mode |
-| `C` | Plan mode | Toggle chat pane |
-| `D` | Plan mode | Dispatch focused spec as a task |
-| `B` | Plan mode | Break down focused spec into sub-specs |
-| `` ` `` | Global | Toggle terminal panel |
+| `/` | Board | Focus the search bar |
+| `Cmd+K` / `Ctrl+K` | Board | Open command palette |
+| `Ctrl+Enter` / `Cmd+Enter` | New task form | Save task |
+| `Escape` | New task form | Cancel |
+| `Enter` / `Space` | Focused card | Open task detail |
+| `Arrow keys` | Focused card | Navigate between cards |
+| `s` | Focused backlog card | Start task |
+| `d` | Focused waiting card | Mark as done |
+
+**Plan mode:**
+
+| Key | Action |
+|---|---|
+| `C` | Toggle chat pane |
+| `D` | Dispatch focused spec as a task |
+| `B` | Break down focused spec into sub-specs |
+
+Board and plan-mode shortcuts are suppressed when focus is in a text input or when a modal is open.
 
 ---
 

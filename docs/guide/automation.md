@@ -27,7 +27,7 @@ header bar. The menu contains a horizontal strip of toggle switches:
 
 | Toggle | Label in menu | What it controls |
 |--------|---------------|------------------|
-| Ideate | **Ideate** | Recurring brainstorm agent (see [Usage Guide](usage.md)) |
+| Ideate | **Ideate** | Recurring brainstorm agent (see [Refinement & Ideation](refinement-and-ideation.md#ideation--brainstorm-agent)) |
 | Auto-refine | **Refine** | Automatic prompt refinement for backlog tasks |
 | Autopilot | **Implement** | Automatic promotion of backlog tasks to In Progress |
 | Catch Up | **Catch Up** | Automatic rebase of waiting tasks onto latest branch |
@@ -402,6 +402,6 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 
 ## See Also
 
-- [Board & Tasks](usage.md) for task lifecycle and manual operations
+- [Board & Tasks](board-and-tasks.md) for task lifecycle and manual operations
 - [Circuit Breakers](circuit-breakers.md) for breaker internals
 - [Getting Started](getting-started.md) for initial setup and configuration

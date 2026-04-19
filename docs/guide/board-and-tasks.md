@@ -112,14 +112,15 @@ Click any task card to open its detail modal. The layout adapts based on the tas
 - **Usage** -- token counts (input, output, cache read, cache creation), total cost, and per-activity breakdown
 - **Events timeline** -- chronological audit trail of state changes, outputs, feedback, errors, and system events
 
-**Right panel** (appears for non-backlog tasks) key tabs:
+**Main tabs** (the horizontal bar across the top of the modal) switch what the main pane shows:
 
 | Tab | Content |
 |---|---|
-| **Implementation** | Live agent logs with three viewing modes: Oversight (high-level summary), Pretty (formatted output), and Raw (unprocessed NDJSON). Includes a log search/filter bar. |
-| **Changes** | Git diff of the task's worktree changes vs the default branch. Shows per-file diffs with syntax highlighting. Includes a commit message section and a "behind" indicator if the branch is behind the default. |
+| **Spec** | The task's prompt / spec, rendered as Markdown with an Edit/Preview toggle. |
+| **Activity** | Live agent logs (Implementation and, when present, Testing sub-tabs), each with Oversight / Pretty / Raw viewing modes. |
+| **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. |
 
-For the full detail modal reference including all left panel sections, right panel tabs (Testing, Flamegraph, Timeline), and the backlog refinement interface, see [Task Detail Modal (Full Reference)](#task-detail-modal-full-reference).
+For the full reference, including the **Refine**, **Flamegraph**, **Timeline**, and **Events** main tabs and the backlog refinement interface, see [Task Detail Modal (Full Reference)](#task-detail-modal-full-reference).
 
 ### 📝 Handling Waiting Tasks
 
@@ -177,6 +178,18 @@ The file explorer panel lets you browse workspace files directly in the web UI w
 **Editing files:** In the file preview modal, click **Edit** to switch to a plain-text editor. Make your changes, then click **Save** to write the file back to the workspace, or **Discard** to revert. If you try to close the modal or discard with unsaved changes, a confirmation prompt appears. The Tab key inserts a tab character in the editor. Saving uses an atomic write (temp file + rename) so partial writes cannot corrupt the file. Files inside `.git/` directories cannot be edited, and content exceeding 2 MB is rejected. Saves use `PUT /api/explorer/file` with a JSON body of `{path, workspace, content}`.
 
 **Keyboard navigation:** When focused inside the tree, use arrow keys to navigate between nodes. **Right arrow** expands a collapsed directory, **Left arrow** collapses an expanded one (or moves to the parent). **Enter** toggles directories or opens file preview.
+
+### 💻 Integrated Terminal
+
+Wallfacer ships with an integrated terminal panel so you can run shell commands without leaving the browser.
+
+**Opening the terminal:** Press `` Ctrl+` `` to toggle the terminal panel, or click the terminal icon in the status bar. The panel opens at the bottom of the window and supports multiple tabbed sessions.
+
+**Session types:** A new session defaults to a host shell rooted at your current workspace. From the **+** menu you can also exec into any running task container -- handy for inspecting state inside a sandbox while the task is active.
+
+**Disabling the terminal:** Set `WALLFACER_TERMINAL_ENABLED=false` in `~/.wallfacer/.env` (or via the Settings UI) to hide the terminal panel entirely. This is primarily useful for shared or kiosk deployments.
+
+The transport is a WebSocket at `GET /api/terminal/ws` authenticated via `?token=`; see [API & Transport](../internals/api-and-transport.md) for the multi-session protocol.
 
 ---
 
@@ -368,21 +381,23 @@ The left panel is always visible and contains:
 - **Cancel** -- for backlog, in progress, waiting, and failed tasks
 - **Delete** -- soft-delete with confirmation
 
-#### Right Panel
+#### Main Tabs
 
-The right panel appears for non-backlog tasks and has five tabs:
+A horizontal tab bar across the top of the modal switches what the main pane shows. Tabs appear dynamically based on task state:
 
 | Tab | Content |
 |---|---|
-| **Implementation** | Live agent logs with three viewing modes: Oversight (high-level summary), Pretty (formatted output), and Raw (unprocessed NDJSON). Includes a log search/filter bar. |
-| **Testing** | Test agent logs (same three viewing modes). Visible when test verification has been run. |
-| **Changes** | Git diff of the task's worktree changes vs the default branch. Shows per-file diffs with syntax highlighting. Includes a commit message section and a "behind" indicator if the branch is behind the default. |
-| **Flamegraph** | Visual timeline of execution spans (worktree setup, agent turns, container runs, commits) rendered as a flamegraph. Visible when the task has completed at least one turn. |
-| **Timeline** | Interactive chart of the same span data presented as a timeline view. |
+| **Spec** | The task's prompt / spec, rendered as Markdown with an Edit/Preview toggle. Always visible. |
+| **Refine** | AI refinement interface for backlog tasks (replaces Spec's edit affordance while refining). |
+| **Activity** | Live agent logs. Implementation and, when test verification has run, Testing sub-tabs, each with Oversight (high-level summary), Pretty (formatted output), and Raw (unprocessed NDJSON) viewing modes plus a log search/filter bar. |
+| **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. Visible once the task has produced changes. |
+| **Flamegraph** | Execution spans (worktree setup, agent turns, container runs, commits) rendered as a flamegraph. Visible when the task has completed at least one turn. |
+| **Timeline** | The same span data rendered as an interactive timeline chart. |
+| **Events** | Chronological audit trail of state changes, outputs, feedback, errors, and system events. Always visible. |
 
-#### Backlog Right Panel (Refinement)
+#### Backlog Refine Tab
 
-For backlog tasks, the right panel shows the AI refinement interface instead:
+For backlog tasks, the Refine tab hosts the AI refinement interface:
 
 - **Refine with AI** -- launch a sandbox agent to analyze the codebase and produce a detailed implementation spec
 - **Focus or context** -- optional textarea to guide the refinement agent

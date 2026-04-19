@@ -24,7 +24,7 @@ The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). Wh
   ```yaml
   ---
   title: Human-readable title
-  status: drafted          # vague | drafted | validated | complete | stale
+  status: drafted          # vague | drafted | validated | complete | stale | archived
   depends_on:              # list of spec paths this one requires (DAG edges)
     - specs/shared/agent-abstraction.md
   affects:                 # packages and files this spec describes

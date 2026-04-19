@@ -34,7 +34,7 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 [API & Transport](api-and-transport.md)
 
-Full HTTP route reference (97 routes), SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, planning, spec tree, explorer, image, and OAuth endpoints.
+Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, planning, spec tree, explorer, image, and OAuth endpoints.
 
 ### 6. Automation
 
