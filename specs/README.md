@@ -1,6 +1,6 @@
 # Specs
 
-Wallfacer roadmap. Three tracks run in parallel, connected by shared design foundations.
+Wallfacer roadmap. Three tracks run in parallel, connected by shared design foundations and an Oversight theme that spans both.
 Completed specs live in the [Archive](#archive) section at the bottom.
 
 ## Status Quo
@@ -33,8 +33,9 @@ Cloud Platform — 0/9
   ○ Multi-User Collaboration       ○ Billing Idempotency
   ○ Telemetry Queue Backpressure
 
-Shared Design — 3/21 complete
+Shared Design — 3/23 complete
   ✅ Authentication                ✅ Agent Abstraction
+  ○ Third-Party OIDC               ○ Remote Control
   ○ Agent Token Exchange           ○ Audit Log
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
@@ -178,7 +179,9 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 | Spec | Status | Serves | Delivers |
 |------|--------|--------|----------|
-| [authentication.md](shared/authentication.md) | **Complete** | Both | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Unblocks cloud multi-tenant and multi-user collaboration. Phase 3 (third-party OIDC, remote control) deferred. |
+| [authentication.md](shared/authentication.md) | **Complete** | Both | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Unblocks cloud multi-tenant and multi-user collaboration. Phase 3 split into sibling specs below. |
+| [third-party-oidc.md](shared/third-party-oidc.md) | Vague | Both | Pluggable OIDC so self-hosted non-latere.ai deployments can log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. Depends on authentication Phase 2. |
+| [remote-control.md](shared/remote-control.md) | Vague | Both | Wire protocol + latere.ai-side registry that lets the latere.ai web UI or a mobile client observe and operate signed-in local wallfacer instances. Depends on authentication Phase 2. |
 | [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
 | [audit-log.md](shared/audit-log.md) | Drafted | Both | Cross-entity mutation history — uniform `audit.Record` write surface covering task transitions, workspace edits, config changes, admin actions; per-workspace JSONL storage; cloud-gated read API. Future effort; depends on auth Phase 2 for principal context. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
