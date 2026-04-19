@@ -361,10 +361,9 @@
             body: JSON.stringify(payload),
           })
         : fetch(
-            Routes.agents.update().replace(
-              "{slug}",
-              encodeURIComponent(role.slug),
-            ),
+            Routes.agents
+              .update()
+              .replace("{slug}", encodeURIComponent(role.slug)),
             {
               method: "PUT",
               headers: jsonHeaders(),
