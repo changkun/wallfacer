@@ -162,53 +162,53 @@ func (h *Handler) AuthSwitchOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.OrgID = strings.TrimSpace(req.OrgID)
-	if req.OrgID == "" {
-		httpjson.Write(w, http.StatusBadRequest, map[string]string{"error": "org_id required"})
-		return
-	}
-
-	// Validate membership client-side so we give a clean 403 rather
-	// than letting the auth service silently ignore the param. The
-	// auth service will re-check; this avoids the confusing case
-	// where the browser completes the flow but lands on the old org.
+	// Empty org_id is a valid "switch to personal" request. Non-empty
+	// requires membership verification; empty skips straight to the
+	// redirect with an explicit empty org_id param that the auth
+	// service reads as "clear active_org on this SSO session."
 	client, ok := h.auth.(sessionReader)
 	if !ok {
 		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "auth not configured"})
 		return
 	}
-	// Refresh the access token if possible so /me/orgs doesn't 401
-	// on a stale session (same rationale as AuthOrgs).
 	if refresher, ok := h.auth.(tokenRefresher); ok {
 		_ = refresher.UserFromRequest(w, r)
 	}
-	sess, err := client.GetSession(r)
-	if err != nil || sess == nil || sess.AccessToken == "" {
-		httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
-		return
-	}
-	orgs, err := fetchOrgs(r.Context(), h.authURL, sess.AccessToken)
-	if err != nil {
-		httpjson.Write(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-		return
-	}
-	isMember := false
-	for _, o := range orgs {
-		if o.ID == req.OrgID {
-			isMember = true
-			break
+	if req.OrgID != "" {
+		// Membership check: give a clean 403 rather than letting the
+		// auth service silently ignore the param.
+		sess, err := client.GetSession(r)
+		if err != nil || sess == nil || sess.AccessToken == "" {
+			httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
+			return
 		}
-	}
-	if !isMember {
-		httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "not a member of target org"})
-		return
+		orgs, err := fetchOrgs(r.Context(), h.authURL, sess.AccessToken)
+		if err != nil {
+			httpjson.Write(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+			return
+		}
+		isMember := false
+		for _, o := range orgs {
+			if o.ID == req.OrgID {
+				isMember = true
+				break
+			}
+		}
+		if !isMember {
+			httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "not a member of target org"})
+			return
+		}
 	}
 
 	// Clear our local cookie so the forthcoming /login → /callback
-	// lands a clean, org-scoped session. Without this, the frontend
-	// would keep the old JWT until the /callback write, which is a
-	// small race but worth closing.
+	// lands a clean, newly-scoped session (org or personal).
 	auth.ClearSession(w)
 
+	// /login?org_id=<uuid> scopes to that org; /login?org_id=
+	// (explicit empty) resets the SSO session's active_org back to
+	// NULL so the user returns to personal view. The explicit `?`
+	// in the URL matters — absent ?org_id is a no-op on the auth
+	// side, which would preserve the user's previously-chosen org.
 	redirect := "/login?org_id=" + req.OrgID
 	httpjson.Write(w, http.StatusOK, switchOrgResponse{RedirectURL: redirect})
 }

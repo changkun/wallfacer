@@ -218,17 +218,39 @@ func TestAuthSwitchOrg_Unauthenticated401(t *testing.T) {
 	}
 }
 
-// TestAuthSwitchOrg_MissingOrgIDReturns400 covers input validation.
-func TestAuthSwitchOrg_MissingOrgIDReturns400(t *testing.T) {
+// TestAuthSwitchOrg_EmptyOrgIDSwitchesToPersonal covers the
+// switch-to-personal path: empty org_id is a valid request (not an
+// error), clears the session cookie, and returns a redirect to
+// /login?org_id= which the auth service reads as "clear
+// active_org on this SSO session".
+func TestAuthSwitchOrg_EmptyOrgIDSwitchesToPersonal(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
 
-	body := bytes.NewBufferString(`{}`)
+	body := bytes.NewBufferString(`{"org_id":""}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/switch-org", body)
 	w := httptest.NewRecorder()
 	h.AuthSwitchOrg(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var got switchOrgResponse
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.RedirectURL != "/login?org_id=" {
+		t.Errorf("redirect_url = %q, want /login?org_id=", got.RedirectURL)
+	}
+	// Session cookie must be cleared.
+	cleared := false
+	for _, c := range w.Result().Cookies() {
+		if c.MaxAge < 0 || !c.Expires.IsZero() {
+			cleared = true
+			break
+		}
+	}
+	if !cleared {
+		t.Error("session cookie not cleared on switch-to-personal")
 	}
 }
