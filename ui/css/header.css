@@ -882,3 +882,62 @@ html.wails-desktop .app-sidebar {
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* --- Latere.ai sign-in (cloud mode, bottom of sidebar) --- */
+.sb-signin {
+  padding: 8px 12px;
+  border-top: 1px solid var(--rule);
+}
+.sb-signin:empty {
+  display: none;
+}
+.sb-signin__link {
+  display: block;
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: var(--fs-9);
+  padding: 4px 0;
+}
+.sb-signin__link:hover {
+  color: var(--ink-1);
+}
+.sb-signin__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sb-signin__avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.sb-signin__name {
+  color: var(--ink-2);
+  font-size: var(--fs-9);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-signin__logout {
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: var(--fs-9);
+  flex-shrink: 0;
+}
+.sb-signin__logout:hover {
+  color: var(--ink-1);
+}
+/* Collapsed sidebar: hide name + logout text; avatar (and link) still visible. */
+.app-sidebar.collapsed .sb-signin__name,
+.app-sidebar.collapsed .sb-signin__logout,
+.app-sidebar.collapsed .sb-signin__link {
+  display: none;
+}
+.app-sidebar.collapsed .sb-signin {
+  text-align: center;
+}

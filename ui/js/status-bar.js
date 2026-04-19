@@ -232,12 +232,12 @@ function applyTerminalVisibility() {
 // Latere.ai sign-in badge (cloud mode only)
 // ---------------------------------------------------------------------------
 
-// renderSigninBadge populates #status-bar-signin based on the server config
+// renderSigninBadge populates #sidebar-signin based on the server config
 // snapshot. Called by workspace.js after /api/config resolves. Local mode
 // (config.cloud !== true) leaves the container empty — no "Sign in" link,
 // no avatar, nothing that would suggest a cloud feature exists.
 function renderSigninBadge(config) {
-  var el = document.getElementById("status-bar-signin");
+  var el = document.getElementById("sidebar-signin");
   if (!el) return;
   if (!config || config.cloud !== true) {
     el.innerHTML = "";
@@ -249,7 +249,7 @@ function renderSigninBadge(config) {
     .then(function (resp) {
       if (resp.status === 204) {
         el.innerHTML =
-          '<a href="/login" class="status-bar-signin__link">Sign in</a>';
+          '<a href="/login" class="sb-signin__link">Sign in</a>';
         return null;
       }
       if (resp.status === 200) return resp.json();
@@ -275,11 +275,11 @@ function _renderSignedIn(el, user, authURL) {
   // land as text nodes / attribute values. Avatar URL is still a URL — an
   // attacker-controlled picture field could only fetch their own image.
   var wrap = document.createElement("span");
-  wrap.className = "status-bar-signin__user";
+  wrap.className = "sb-signin__user";
 
   if (picture) {
     var img = document.createElement("img");
-    img.className = "status-bar-signin__avatar";
+    img.className = "sb-signin__avatar";
     img.src = picture;
     img.alt = "";
     img.setAttribute("referrerpolicy", "no-referrer");
@@ -287,12 +287,12 @@ function _renderSignedIn(el, user, authURL) {
   }
 
   var nameEl = document.createElement("span");
-  nameEl.className = "status-bar-signin__name";
+  nameEl.className = "sb-signin__name";
   nameEl.textContent = display;
   wrap.appendChild(nameEl);
 
   var out = document.createElement("a");
-  out.className = "status-bar-signin__logout";
+  out.className = "sb-signin__logout";
   out.href = "/logout";
   out.textContent = "Sign out";
   wrap.appendChild(out);
