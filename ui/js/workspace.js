@@ -135,6 +135,9 @@ async function fetchConfig() {
       var el = document.getElementById(toggleMap[key]);
       if (el) el.checked = !!cfg[key];
     }
+    if (typeof renderSigninBadge === "function") {
+      renderSigninBadge(cfg);
+    }
     // Keep globals in sync (they are used elsewhere).
     autopilot = !!cfg.autopilot;
     autorefine = !!cfg.autorefine;

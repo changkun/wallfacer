@@ -103,6 +103,9 @@
     </span>
   </div>
   <div class="status-bar__right">
+    <!-- Latere.ai sign-in badge — only populated when config.cloud=true
+         (see renderSigninBadge in status-bar.js). Empty in local mode. -->
+    <div id="status-bar-signin" class="status-bar-signin"></div>
     <button
       type="button"
       id="status-bar-depgraph-btn"

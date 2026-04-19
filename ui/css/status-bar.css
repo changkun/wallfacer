@@ -369,3 +369,48 @@
     display: none;
   }
 }
+
+/* --- Latere.ai sign-in badge --- */
+.status-bar-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-bar-signin:empty {
+  display: none;
+}
+.status-bar-signin__link {
+  color: var(--ink-3);
+  text-decoration: none;
+  padding: 0 6px;
+}
+.status-bar-signin__link:hover {
+  color: var(--ink-1);
+}
+.status-bar-signin__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-bar-signin__avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.status-bar-signin__name {
+  color: var(--ink-2);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-bar-signin__logout {
+  color: var(--ink-3);
+  text-decoration: none;
+  padding: 0 6px;
+}
+.status-bar-signin__logout:hover {
+  color: var(--ink-1);
+}

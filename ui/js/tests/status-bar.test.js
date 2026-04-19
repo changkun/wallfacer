@@ -401,3 +401,284 @@ describe("terminal integration", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sign-in badge (cloud mode)
+// ---------------------------------------------------------------------------
+
+function makeSigninContext(fetchImpl) {
+  // A lightweight DOM stub that supports the subset of APIs renderSigninBadge
+  // touches: createElement, appendChild, textContent, innerHTML, attributes.
+  function makeEl(tag) {
+    return {
+      tagName: String(tag || "div").toUpperCase(),
+      children: [],
+      _attrs: {},
+      style: {},
+      className: "",
+      textContent: "",
+      _innerHTML: "",
+      get innerHTML() {
+        // Reconstruct from children so tests can check either side.
+        if (this._innerHTML !== "") return this._innerHTML;
+        return this.children
+          .map((c) => {
+            if (typeof c === "string") return c;
+            if (c.tagName === "A")
+              return `<a href="${c._attrs.href || ""}">${c.textContent}</a>`;
+            return c.tagName ? `<${c.tagName.toLowerCase()}>` : "";
+          })
+          .join("");
+      },
+      set innerHTML(v) {
+        this._innerHTML = v;
+        this.children = [];
+      },
+      appendChild(c) {
+        this._innerHTML = "";
+        this.children.push(c);
+        return c;
+      },
+      setAttribute(k, v) {
+        this._attrs[k] = v;
+        if (k === "src") this.src = v;
+        if (k === "href") this.href = v;
+      },
+      getAttribute(k) {
+        return this._attrs[k] ?? null;
+      },
+      get src() {
+        return this._attrs.src || "";
+      },
+      set src(v) {
+        this._attrs.src = v;
+      },
+      get href() {
+        return this._attrs.href || "";
+      },
+      set href(v) {
+        this._attrs.href = v;
+      },
+      get alt() {
+        return this._attrs.alt || "";
+      },
+      set alt(v) {
+        this._attrs.alt = v;
+      },
+      get name() {
+        return this._attrs.name || "";
+      },
+      set name(v) {
+        this._attrs.name = v;
+      },
+      classList: {
+        _s: new Set(),
+        contains(c) {
+          return this._s.has(c);
+        },
+        add(c) {
+          this._s.add(c);
+        },
+        remove(c) {
+          this._s.delete(c);
+        },
+      },
+      addEventListener() {},
+      removeEventListener() {},
+    };
+  }
+
+  const signinEl = makeEl("div");
+  signinEl.id = "status-bar-signin";
+
+  // The full stub set the main status-bar tests use, plus signinEl.
+  const ids = [
+    "status-bar-conn-dot",
+    "status-bar-conn-label",
+    "status-bar-workspace",
+    "status-bar-in-progress",
+    "status-bar-waiting",
+    "status-bar-panel",
+    "status-bar-panel-resize",
+    "status-bar-terminal-btn",
+  ];
+  const elements = { "status-bar-signin": signinEl };
+  ids.forEach((id) => {
+    elements[id] = makeEl("div");
+    elements[id].id = id;
+  });
+
+  const ctx = {
+    document: {
+      getElementById(id) {
+        return elements[id] || null;
+      },
+      createElement: makeEl,
+      addEventListener() {},
+      removeEventListener() {},
+      activeElement: { tagName: "BODY", getAttribute: () => null },
+      readyState: "complete",
+      body: { style: {} },
+    },
+    window: {},
+    localStorage: { getItem: () => null, setItem: () => {} },
+    fetch: fetchImpl,
+    tasks: [],
+    _sseConnState: "closed",
+    activeWorkspaces: [],
+    workspaceGroups: [],
+    console,
+    Promise,
+    setTimeout,
+    clearTimeout,
+  };
+  return { ctx: vm.createContext(ctx), elements, signinEl };
+}
+
+function loadStatusBarInCtx(ctx) {
+  const code = readFileSync(join(__dirname, "..", "status-bar.js"), "utf8");
+  vm.runInContext(code, ctx);
+}
+
+// wait for any pending fetch().then() callbacks to flush so assertions
+// observe the post-render state.
+async function flushPromises() {
+  for (let i = 0; i < 5; i++) {
+    await Promise.resolve();
+  }
+}
+
+describe("renderSigninBadge", () => {
+  it("renders nothing when config.cloud is false", async () => {
+    let called = false;
+    const { ctx, signinEl } = makeSigninContext(() => {
+      called = true;
+      return Promise.resolve({ status: 204 });
+    });
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: false });
+    await flushPromises();
+    expect(signinEl.innerHTML).toBe("");
+    expect(called).toBe(false); // must NOT hit /api/auth/me in local mode
+  });
+
+  it('renders "Sign in" link when cloud && /api/auth/me → 204', async () => {
+    const { ctx, signinEl } = makeSigninContext(() =>
+      Promise.resolve({ status: 204 }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+    expect(signinEl.innerHTML).toContain('href="/login"');
+    expect(signinEl.innerHTML).toContain("Sign in");
+    // No iframe in the signed-out branch.
+    const iframeChild = signinEl.children.find(
+      (c) => c.tagName === "IFRAME",
+    );
+    expect(iframeChild).toBeUndefined();
+  });
+
+  it("renders avatar, name, and front-channel iframe when cloud && /api/auth/me → 200", async () => {
+    const user = {
+      sub: "u-123",
+      email: "alice@example.com",
+      name: "Alice",
+      picture: "https://cdn/a.png",
+    };
+    const { ctx, signinEl } = makeSigninContext(() =>
+      Promise.resolve({
+        status: 200,
+        json: () => Promise.resolve(user),
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({
+      cloud: true,
+      auth_url: "https://auth.latere.ai",
+    });
+    await flushPromises();
+
+    // Find the avatar img among nested children.
+    const wrap = signinEl.children.find(
+      (c) => c.className === "status-bar-signin__user",
+    );
+    expect(wrap).toBeTruthy();
+    const avatar = wrap.children.find((c) => c.tagName === "IMG");
+    expect(avatar).toBeTruthy();
+    expect(avatar.src).toBe("https://cdn/a.png");
+    expect(avatar.getAttribute("referrerpolicy")).toBe("no-referrer");
+
+    const nameSpan = wrap.children.find(
+      (c) => c.className === "status-bar-signin__name",
+    );
+    expect(nameSpan.textContent).toBe("Alice");
+
+    const logout = wrap.children.find(
+      (c) => c.className === "status-bar-signin__logout",
+    );
+    expect(logout.href).toBe("/logout");
+
+    const iframe = signinEl.children.find((c) => c.tagName === "IFRAME");
+    expect(iframe).toBeTruthy();
+    expect(iframe.src).toBe("https://auth.latere.ai/logout");
+    expect(iframe.name).toBe("latere-logout-iframe");
+  });
+
+  it("falls back to email when name is empty", async () => {
+    const user = {
+      sub: "u-123",
+      email: "bob@example.com",
+      name: "",
+      picture: "",
+    };
+    const { ctx, signinEl } = makeSigninContext(() =>
+      Promise.resolve({
+        status: 200,
+        json: () => Promise.resolve(user),
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+
+    const wrap = signinEl.children.find(
+      (c) => c.className === "status-bar-signin__user",
+    );
+    const nameSpan = wrap.children.find(
+      (c) => c.className === "status-bar-signin__name",
+    );
+    expect(nameSpan.textContent).toBe("bob@example.com");
+  });
+
+  it("renders user-controlled strings as text, not markup", async () => {
+    const user = {
+      sub: "u-1",
+      email: "e@e",
+      name: "<script>alert(1)</script>",
+      picture: "",
+    };
+    const { ctx, signinEl } = makeSigninContext(() =>
+      Promise.resolve({
+        status: 200,
+        json: () => Promise.resolve(user),
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+
+    const wrap = signinEl.children.find(
+      (c) => c.className === "status-bar-signin__user",
+    );
+    const nameSpan = wrap.children.find(
+      (c) => c.className === "status-bar-signin__name",
+    );
+    // textContent receives the raw string — DOM would not interpret it.
+    expect(nameSpan.textContent).toBe("<script>alert(1)</script>");
+    // And there's no real <script> element in the tree.
+    const scriptChild = wrap.children.find(
+      (c) => c.tagName === "SCRIPT",
+    );
+    expect(scriptChild).toBeUndefined();
+  });
+});
