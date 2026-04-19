@@ -1,7 +1,8 @@
 ---
 title: "Task Revert — Agent-Assisted Undo of Merged Task Changes"
 status: drafted
-depends_on: []
+depends_on:
+  - specs/intent/intent-commits.md
 affects:
   - internal/runner/revert.go
   - internal/handler/revert.go
