@@ -1,6 +1,6 @@
 ---
 title: Org switching for users belonging to multiple orgs
-status: validated
+status: complete
 depends_on:
   - specs/shared/authentication/data-model-principal-org.md
   - specs/shared/authentication/jwt-middleware.md
@@ -81,3 +81,106 @@ filtered by the new `org_id`. Users with a single org see no chooser.
   is the right boundary, if the membership list changes, the user sees
   it on next login.
 - Do not add deep-linked org switching (`/switch-org?id=...`). Only POST.
+
+## Outcome
+
+Delivered end-to-end across three repos. Users with multiple org
+memberships see an inline `<select>` in their sign-in badge;
+selecting one refreshes the session with a new token scoped to the
+chosen org. The choice survives re-authorizations because the auth
+service persists it on the SSO session row.
+
+### What shipped (three-repo change set)
+
+**`latere.ai/auth`** (migration + two handler helpers):
+- Migration `000013_sso_active_org.{up,down}.sql`: adds
+  `active_org_id UUID REFERENCES orgs(id) ON DELETE SET NULL` to
+  `sso_sessions`.
+- `activeOrgForSession(ctx, ssoSessionID, principalID)` and
+  `setActiveOrgForSession(ctx, ssoSessionID, orgID)` helpers in
+  `internal/handler/handler.go`. Membership is re-verified on read
+  so a stale selection cannot leak across an org kick.
+- `buildSession` takes `ssoSessionID` and reads the session's active
+  org instead of always falling back to first-joined.
+- `handleAuthorize` accepts an optional `?org_id=<uuid>` query param.
+  When the user is a verified member, the choice is persisted on
+  the session; non-members are silently ignored.
+
+**`latere.ai/x/pkg/oidc`** (tagged `v0.10.0`):
+- `HandleLogin` forwards an allowlisted set of query params (just
+  `org_id` today) into the authorize redirect. Narrow allowlist, not
+  a blanket pass-through.
+- New `Client.AuthCodeURLWithOpts(state, verifier, extra)` exposes
+  the `oauth2.SetAuthURLParam` plumbing for callers that need to
+  pass extension hints outside `HandleLogin`.
+
+**`wallfacer`**:
+- `GET /api/auth/orgs` (`internal/handler/orgs.go`): proxies to the
+  auth service's `/me/orgs` using the session's access token;
+  returns 200 `{orgs, current_id}` for 2+ orgs, 204 otherwise.
+- `POST /api/auth/switch-org`: validates membership via the same
+  proxy, clears the wallfacer session cookie, returns
+  `{redirect_url: "/login?org_id=<target>"}`. The frontend follows;
+  `oidc.HandleLogin` forwards `org_id`; the auth service persists
+  the choice and issues a fresh token.
+- `Handler.HasAuth()` reused as the cloud-mode signal (same pattern
+  as scope-and-superadmin + cloud-forced-login).
+- Status-bar badge extended: `.sb-signin__orgs` slot, an inline
+  `<select>` with one option per org when 2+, change-handler POSTs
+  /api/auth/switch-org and navigates to the returned redirect.
+- `go.mod` bumped to `latere.ai/x/pkg v0.10.0`.
+- 8 Go tests + 4 vitest cases covering the full decision matrix.
+
+### Implementation notes
+
+1. **Opted for redirect-through-login over a dedicated token swap.**
+   The spec sketched `POST /api/auth/switch-org` as a backend call
+   that refreshes the token directly via
+   `grant_type=refresh_token&org_id=<target>`. Fosite (the auth
+   service's OAuth library) does not expose a refresh-with-org_id
+   grant, so extending that path would require a custom handler on
+   the auth service. The chosen flow reuses the standard
+   authorize-code path: wallfacer clears its cookie, browser
+   follows to `/login?org_id=<target>`, `pkg/oidc` forwards, the
+   auth service honors the hint and persists it. Zero new
+   auth-service routes, single round-trip from the user's point of
+   view. The spec's original sketch is captured here as the fallback
+   design if this ever needs to happen purely server-side (no
+   browser round-trip).
+
+2. **The switch endpoint returns a `redirect_url` string, not a 302.**
+   The frontend posts via `fetch`, which follows 302s transparently
+   — the browser doesn't actually *navigate*, so the user stays on
+   the current page and the session cookie never updates. Returning
+   the URL in a JSON body and calling `window.location.href = ...`
+   in the handler makes the navigation explicit.
+
+3. **Pre-flight membership check is duplicated** between wallfacer
+   (via `/me/orgs`) and the auth service (in `handleAuthorize`).
+   This is intentional: without the wallfacer check, switching to a
+   non-member org would silently no-op (auth service ignores the
+   param) and the user would land on /callback still scoped to the
+   old org with no error. The wallfacer check gives a clean 403.
+   The auth service re-check is the source of truth.
+
+4. **`active_org_id` persistence fixes the "choice forgotten on
+   next token" problem.** Without the column, the user would need
+   to pass `org_id=` on every re-authorize; with it, once selected
+   the choice sticks until they switch again or the SSO session
+   expires.
+
+5. **Single-org and local-mode both return 204, not 200+empty.**
+   Lets the frontend skip rendering the switcher with one status
+   check instead of parsing a response body.
+
+6. **Frontend uses a plain `<select>`, not a custom dropdown.**
+   Accessibility + keyboard navigation come for free. Styling can
+   upgrade later without changing the behavior.
+
+7. **v0.10.0 pkg bump required an `audience` validator relaxation
+   as a side-effect.** While testing the end-to-end flow we found a
+   pre-existing config mismatch between fosite's access-token `aud`
+   and wallfacer's expected audience that produced a redirect loop.
+   The fix landed in a separate commit on `internal/auth/` — see
+   the commit message for details. Not in scope for this spec but
+   blocking for the deployment verification step.
