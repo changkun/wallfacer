@@ -897,8 +897,17 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if !ok2 {
 		return
 	}
-	if task, err := s.GetTask(r.Context(), id); err == nil && len(task.WorktreePaths) > 0 {
-		h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+	if task, err := s.GetTask(r.Context(), id); err == nil {
+		if len(task.WorktreePaths) > 0 {
+			h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+		}
+		// Soft-deleting a routine card must stop its timer synchronously.
+		// Otherwise the engine entry, still armed, can dispatch one more
+		// fire through the 250 ms reconcile settle window and spawn an
+		// instance whose parent routine no longer exists in s.tasks.
+		if task.IsRoutine() {
+			h.unregisterRoutine(id)
+		}
 	}
 	if err := s.DeleteTask(r.Context(), id, req.Reason); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
