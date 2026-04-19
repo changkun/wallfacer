@@ -166,7 +166,7 @@ Converts raw vendor streams into a stable `Trajectory` value.
 Each metric is a `func(Trajectory) (MetricResult, error)` registered under a stable name. Results are numeric (float64) plus optional structured detail.
 
 - **Process metrics (cheap):** `turns`, `tokens_input`, `tokens_output`, `cache_read_tokens`, `cost_usd`, `tool_call_count`, `tool_diversity`, `time_in_committing`, `retry_count_total`, `retry_count_by_category`.
-- **Outcome metrics (git-derived):** `reached_done`, `commit_count`, `files_changed`, `lines_added`, `lines_deleted`, `files_outside_scope` (needs a declared scope — ties to `specs/local/validation-barrier.md`).
+- **Outcome metrics (git-derived):** `reached_done`, `commit_count`, `files_changed`, `lines_added`, `lines_deleted`, `files_outside_scope` (needs a declared scope — ties to `specs/oversight/validation-barrier.md`).
 - **Test metrics:** `test_run_passed`, `test_coverage_delta` (requires prior coverage snapshot — out of scope for v1).
 - **Efficiency derived metrics:** `cost_per_success`, `turns_per_success`, `tokens_per_line_of_diff`.
 
@@ -340,7 +340,7 @@ All three modes are visible in the report rather than swallowed. Bias from drop-
 Specs that will want to consume this once shipped:
 
 - `specs/shared/agent-abstraction.md` — eval becomes the correctness bar for any new agent backend.
-- `specs/shared/multi-agent-consensus.md` / `specs/shared/multi-agent-debate.md` — evaluation is how we judge whether consensus/debate actually improves outcomes.
+- `specs/oversight/multi-agent-consensus.md` / `specs/oversight/multi-agent-debate.md` — evaluation is how we judge whether consensus/debate actually improves outcomes.
 - `specs/shared/token-cost-optimization.md` — cost-efficiency metrics here feed directly into that spec's regression model.
 - `specs/shared/intelligence-system.md` — failure pattern learning needs graded trajectories.
 

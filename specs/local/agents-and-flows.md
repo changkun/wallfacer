@@ -367,7 +367,7 @@ This is where the spec touches the most surfaces. The plan is:
 - True DAG flows with conditional edges (needed for advanced pipelines like
   "retry only if transient", "branch by test verdict")
 - Visual flow editor (drag-and-drop node graph) — v1 uses a form list
-- Multi-provider consensus flows (needs `shared/multi-agent-consensus.md`)
+- Multi-provider consensus flows (needs `oversight/multi-agent-consensus.md`)
 - Shared agent message bus (needs `shared/agent-abstraction.md` Option D)
 - Per-workspace flow overrides (files inside the repo that mask user-global)
 - Flow marketplace / import-from-URL
