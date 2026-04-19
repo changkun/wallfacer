@@ -631,7 +631,7 @@ func (r *Runner) rebaseAndMergeOne(
 
 		// Capture the diff before extraction so we can show it in the UI.
 		// The snapshot has an initial commit + agent changes committed on top.
-		if diff := computeSnapshotDiff(ctx, worktreePath); diff != "" {
+		if diff := gitutil.SnapshotDiff(ctx, worktreePath); diff != "" {
 			snapshotDiffs[repoPath] = diff
 		}
 

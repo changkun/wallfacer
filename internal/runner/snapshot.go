@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -68,10 +67,4 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 		logger.Runner.Warn("failed to remove .git from extracted snapshot", "path", targetPath, "error", err)
 	}
 	return nil
-}
-
-// computeSnapshotDiff is a thin wrapper around [gitutil.SnapshotDiff] kept for
-// call-site readability at the commit pipeline boundary.
-func computeSnapshotDiff(ctx context.Context, snapshotPath string) string {
-	return gitutil.SnapshotDiff(ctx, snapshotPath)
 }
