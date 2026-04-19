@@ -359,6 +359,14 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	applyBoolToggle(req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	applyBoolToggle(req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
+	// Persist any toggle changes to the viewed group so switching away
+	// and back does not reset the user's automation choices, and a
+	// different group on this server stays manual unless the user turns
+	// automation on for it explicitly.
+	if req.Autopilot != nil || req.Autorefine != nil || req.Autotest != nil ||
+		req.Autosubmit != nil || req.Autosync != nil {
+		h.persistCurrentGroupToggles()
+	}
 	// Auto-push: update both the in-memory toggle and the .env file so the
 	// runner (which reads .env on every commit) picks it up immediately.
 	if req.Autopush != nil {

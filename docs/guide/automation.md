@@ -36,8 +36,11 @@ header bar. The menu contains a horizontal strip of toggle switches:
 | Auto-push | **Push** | Automatic git push after task completion |
 
 A badge on the lightning bolt icon shows how many toggles are currently
-active. All toggles default to off and reset to off on server restart,
-except Auto-push which persists via the env file.
+active. Toggles (except Auto-push) are **persisted per workspace group**
+in `workspace-groups.json`: enabling Autopilot in group A does not
+follow you to group B, and switching back to A restores A's choices.
+A freshly created group starts with every toggle off. Auto-push stays
+global and continues to persist via the env file.
 
 > **Scope:** automation acts only on the **currently viewed workspace
 > group**, and parallel limits are budgeted **per group** rather than
