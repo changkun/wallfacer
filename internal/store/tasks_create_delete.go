@@ -29,11 +29,11 @@ var defaultAutoRetryBudget = map[FailureCategory]int{
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
-	ID                 uuid.UUID
-	Prompt             string
-	Timeout            int
-	MountWorktrees     bool
-	Kind               TaskKind
+	ID             uuid.UUID
+	Prompt         string
+	Timeout        int
+	MountWorktrees bool
+	Kind           TaskKind
 	// FlowID is the slug of the flow this task runs against. Empty means
 	// the runner's legacy Kind→Flow resolver picks the default
 	// ("implement" for normal tasks, "brainstorm" for idea-agent).
@@ -54,7 +54,8 @@ type TaskCreateOptions struct {
 	// for any other Kind.
 	RoutineIntervalSeconds int
 	RoutineEnabled         bool
-	RoutineSpawnKind       TaskKind
+	RoutineSpawnKind       TaskKind // legacy; prefer RoutineSpawnFlow
+	RoutineSpawnFlow       string   // flow slug; wins over SpawnKind
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
@@ -155,6 +156,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		task.RoutineIntervalSeconds = opts.RoutineIntervalSeconds
 		task.RoutineEnabled = opts.RoutineEnabled
 		task.RoutineSpawnKind = opts.RoutineSpawnKind
+		task.RoutineSpawnFlow = opts.RoutineSpawnFlow
 	}
 
 	// Build the search index entry before acquiring the lock.  Position is not

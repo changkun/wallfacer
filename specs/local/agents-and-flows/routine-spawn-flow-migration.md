@@ -1,6 +1,6 @@
 ---
 title: Routine.SpawnFlow replaces RoutineSpawnKind
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/runner-flow-integration.md
 affects:

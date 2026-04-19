@@ -94,6 +94,43 @@ func TestCreateRoutine_AcceptsIdeaAgentSpawnKind(t *testing.T) {
 	}
 }
 
+func TestCreateRoutine_AcceptsSpawnFlow(t *testing.T) {
+	h := newTestHandler(t)
+	rec := postRoutine(t, h, map[string]any{
+		"prompt":           "brainstorm routine",
+		"interval_minutes": 30,
+		"spawn_flow":       "brainstorm",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp RoutineResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.RoutineSpawnFlow != "brainstorm" {
+		t.Fatalf("spawn flow = %q, want brainstorm", resp.RoutineSpawnFlow)
+	}
+	// Persisted task carries the flow slug.
+	got, err := h.store.GetTask(context.Background(), resp.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.RoutineSpawnFlow != "brainstorm" {
+		t.Fatalf("stored RoutineSpawnFlow = %q, want brainstorm", got.RoutineSpawnFlow)
+	}
+}
+
+func TestCreateRoutine_RejectsUnknownSpawnFlow(t *testing.T) {
+	h := newTestHandler(t)
+	rec := postRoutine(t, h, map[string]any{
+		"prompt":           "bogus",
+		"interval_minutes": 5,
+		"spawn_flow":       "no-such-flow",
+	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestCreateRoutine_RejectsEmptyPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	rec := postRoutine(t, h, map[string]any{
