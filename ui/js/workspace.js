@@ -75,6 +75,24 @@ async function fetchConfig() {
     workspaceGroups = Array.isArray(cfg.workspace_groups)
       ? cfg.workspace_groups.slice()
       : [];
+    // Apply the currently viewed group's MaxParallel override (if any) so
+    // the In-Progress column "max N" badge reflects the effective limit
+    // rather than always showing the env-file default.
+    var groupOverride = null;
+    for (var gi = 0; gi < workspaceGroups.length; gi += 1) {
+      var g = workspaceGroups[gi];
+      if (
+        workspaceGroupsEqual(g.workspaces || [], activeWorkspaces) &&
+        g.max_parallel !== undefined &&
+        g.max_parallel !== null
+      ) {
+        groupOverride = g.max_parallel;
+        break;
+      }
+    }
+    if (groupOverride !== null) {
+      maxParallelTasks = groupOverride;
+    }
     activeGroups = Array.isArray(cfg.active_groups) ? cfg.active_groups : [];
     workspaceBrowserPath =
       cfg.workspace_browser_path ||
@@ -953,10 +971,96 @@ async function saveWorkspaceGroups() {
     method: "PUT",
     body: JSON.stringify({
       workspace_groups: workspaceGroups.map(function (g) {
-        return { name: g.name, workspaces: g.workspaces };
+        // Preserve per-group concurrency overrides on save. Omitting a
+        // field here would reset it on the backend because the request
+        // body replaces the entire groups list.
+        var out = { name: g.name, workspaces: g.workspaces };
+        if (g.max_parallel !== undefined && g.max_parallel !== null) {
+          out.max_parallel = g.max_parallel;
+        }
+        if (g.max_test_parallel !== undefined && g.max_test_parallel !== null) {
+          out.max_test_parallel = g.max_test_parallel;
+        }
+        return out;
       }),
     }),
   });
+}
+
+// currentGroupMaxParallel returns the per-group MaxParallel override for
+// the currently viewed workspace group, or null when no override is set.
+function currentGroupMaxParallel() {
+  for (var i = 0; i < workspaceGroups.length; i += 1) {
+    var g = workspaceGroups[i];
+    if (workspaceGroupsEqual(g.workspaces || [], activeWorkspaces)) {
+      return g.max_parallel !== undefined && g.max_parallel !== null
+        ? g.max_parallel
+        : null;
+    }
+  }
+  return null;
+}
+
+// setCurrentGroupMaxParallel persists a per-group MaxParallel override for
+// the currently viewed workspace group. Pass null to clear the override and
+// fall back to the env-file default. Refreshes the header tag on success.
+async function setCurrentGroupMaxParallel(value) {
+  var idx = -1;
+  for (var i = 0; i < workspaceGroups.length; i += 1) {
+    if (
+      workspaceGroupsEqual(workspaceGroups[i].workspaces || [], activeWorkspaces)
+    ) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx === -1) {
+    // The viewed group is not yet in the saved list; prepend it so the
+    // override has a target to attach to.
+    workspaceGroups.unshift({ workspaces: activeWorkspaces.slice() });
+    idx = 0;
+  }
+  if (value === null) {
+    delete workspaceGroups[idx].max_parallel;
+  } else {
+    workspaceGroups[idx].max_parallel = value;
+  }
+  await saveWorkspaceGroups();
+  if (typeof fetchConfig === "function") {
+    await fetchConfig();
+  }
+  if (typeof updateMaxParallelTag === "function") {
+    updateMaxParallelTag();
+  }
+}
+
+// editMaxParallelForCurrentGroup opens a prompt to edit the viewed group's
+// MaxParallel override. Accepts a positive integer (cap), 0 for "unlimited",
+// or empty input to clear the override.
+async function editMaxParallelForCurrentGroup(event) {
+  if (event && typeof event.stopPropagation === "function") {
+    event.stopPropagation();
+  }
+  var current = currentGroupMaxParallel();
+  var prefill = current === null ? "" : String(current);
+  var answer = window.prompt(
+    "Max parallel tasks for this workspace group.\n" +
+      "Leave empty to use the server default, enter 0 for unlimited, " +
+      "or a positive integer to cap this group.",
+    prefill,
+  );
+  if (answer === null) return; // cancelled
+  var trimmed = answer.trim();
+  if (trimmed === "") {
+    await setCurrentGroupMaxParallel(null);
+    return;
+  }
+  var n = parseInt(trimmed, 10);
+  if (!Number.isFinite(n) || n < 0) {
+    window.alert("Please enter 0, a positive integer, or leave empty.");
+    return;
+  }
+  await setCurrentGroupMaxParallel(n);
 }
 
 async function useWorkspaceGroup(index) {

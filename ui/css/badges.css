@@ -226,6 +226,12 @@
   background: var(--tint-blue);
   color: var(--tint-blue-ink);
   white-space: nowrap;
+  border: 0;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.max-parallel-tag:hover {
+  filter: brightness(0.95);
 }
 .badge-spec {
   background: #ede5f7;
