@@ -319,9 +319,13 @@ Every `internal/` package and its role in the system:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
+| `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload | `Registry`, `Agent`, `NewRegistry()`, `Load()` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js` | `Route`, `Routes` (slice), `Route.FullPattern()` |
-| `cli` | CLI subcommand implementations (run, exec, status, doctor) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunDoctor()`, `BuildMux()`, `ConfigDir()` |
+| `auth` | Cookie-based principal resolution and session validation for cloud mode | `CookiePrincipal`, `Middleware()` |
+| `cli` | CLI subcommand implementations (run, exec, status, doctor, spec) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
+| `eval` | Offline evaluation trajectories for planning/agent regression checks | `Trajectory`, `Run()` |
+| `flow` | Merged built-in + user-authored flow registry; composes agents into ordered step chains | `Registry`, `Flow`, `Step`, `NewRegistry()` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `handler` | HTTP API handlers organised by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
@@ -333,8 +337,8 @@ Every `internal/` package and its role in the system:
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `StartFlow()`, `Provider`, `Claude`, `Codex` |
 | `planner` | Long-lived workspace-scoped planning sandbox lifecycle; per-thread `messages.jsonl` + `session.json` persistence under `~/.wallfacer/planning/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination so only one thread runs at once | `Planner`, `ThreadManager`, `ConversationStore`, `CommandRegistry`, `ThreadMeta`, `Slugify`, `Expand` |
+| `routine` | Routine scheduler engine that fires routine-kind tasks (ideation, user-defined) on their configured cadence | `Engine`, `Start()`, `Trigger()` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; six-state lifecycle state machine; recursive tree builder with companion-directory convention; per-spec + cross-spec validation; atomic scaffold (`O_CREATE|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
-| `pty` | PTY relay for WebSocket terminal integration | `PTY`, `Start()` |
 
 Top-level packages:
 
@@ -351,24 +355,29 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/circuitbreaker` | Circuit breakers (lock-free and backoff variants) | `Breaker`, `BackoffBreaker` |
 | `pkg/cmdexec` | `os/exec` wrapper for container commands | `Runner`, `Run()` |
 | `pkg/dagscorer` | DAG-based task dependency scoring | `Score()` |
+| `pkg/dircp` | Directory tree copy with filters | `Copy()` |
+| `pkg/envutil` | Environment variable parsing with defaults and validation | `String()`, `Int()`, `Bool()`, `Duration()` |
+| `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `Decode()`, `Respond()`, `Error()` |
 | `pkg/keyedmu` | Per-key mutex map for fine-grained locking | `Map[K]` |
 | `pkg/lazyval` | Lazily-computed cached value with invalidation | `Value[T]`, `New()` |
 | `pkg/logpipe` | Streaming log pipe for container output | `Pipe` |
 | `pkg/ndjson` | Newline-delimited JSON reader | `Reader` |
 | `pkg/pagination` | Cursor-based pagination helpers | `Paginate()` |
+| `pkg/pty` | PTY relay for the WebSocket terminal integration | `PTY`, `Start()` |
 | `pkg/pubsub` | Generic fan-out notification hub with replay | `Hub[T]` |
+| `pkg/sanitize` | Input sanitization helpers | `String()` |
 | `pkg/set` | Generic set type | `Set[T]` |
 | `pkg/sortedkeys` | Sorted map key iteration | `Of()` |
 | `pkg/syncmap` | Type-safe generic wrapper around `sync.Map` | `Map[K,V]` |
+| `pkg/systray` | Optional system-tray integration for the desktop build | `Start()` |
 | `pkg/tail` | Tail-follow for log files | `Follow()` |
 | `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
+| `pkg/uuidutil` | UUID parsing/generation helpers | `New()`, `Parse()` |
 | `pkg/watcher` | Event-loop background watcher | `Start()` |
 | `pkg/dag` | Generic DAG operations (ReverseEdges, DetectCycles, Reachable) | `ReverseEdges()`, `DetectCycles()`, `Reachable()` |
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Buffer`, `NewBuffer()`, `Reader` |
 | `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Transition()` |
 | `pkg/tree` | Generic tree data structure with `iter.Seq` walk | `Node[T]`, `Walk()` |
-| `pkg/envutil` | Environment variable parsing with defaults and validation | `String()`, `Int()`, `Bool()`, `Duration()` |
-| `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `Decode()`, `Respond()`, `Error()` |
 
 ## Handler Organisation
 
@@ -378,6 +387,18 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 |---|---|---|
 | `handler.go` | Core `Handler` struct, constructor, autopilot toggle state, JSON helpers, workspace snapshot subscription | — (shared infrastructure) |
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` | — (middleware, not endpoints) |
+| `principal.go` | Request principal plumbing used by auth/cloud middleware | — (internal) |
+| `agents.go` | User-authored agent catalog CRUD backed by `~/.wallfacer/agents/` | `GET/POST /api/agents`, `PUT/DELETE /api/agents/{slug}` |
+| `flows.go` | User-authored flow catalog CRUD backed by `~/.wallfacer/flows/` | `GET/POST /api/flows`, `PUT/DELETE /api/flows/{slug}` |
+| `routines.go` | Routine card CRUD (list, create, update schedule, trigger) | `GET/POST /api/routines`, `PATCH /api/routines/{id}/schedule`, `POST /api/routines/{id}/trigger` |
+| `routines_engine.go` | Scheduler loop that fires routine tasks on their configured cadence | — (internal) |
+| `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/auth/me`, `GET /api/auth/orgs`, `POST /api/auth/switch-org` |
+| `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
+| `force_login.go` | Force-login gate used when a session must be re-authenticated | — (internal) |
+| `commitsbehind_cache.go` | LRU cache for per-workspace commits-behind-default counts | — (internal) |
+| `planning_system_prompt.go` | Per-turn selection of the planning-agent system prompt and archived-spec guard | — (internal) |
+| `watcher_wake.go` | Wake-up helpers that nudge background watchers when state changes | — (internal) |
+| `event_actor.go` | Resolves the actor identity recorded on task events | — (internal) |
 | `tasks.go` | Task CRUD, batch create, status transitions (cancel, resume, restore, archive, sync, test, done, feedback) | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/cancel`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
 | `tasks_autopilot.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-refiner, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, etc. |

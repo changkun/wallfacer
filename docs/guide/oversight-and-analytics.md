@@ -142,11 +142,11 @@ Click the sandbox monitor button in the header to open the Container Monitor mod
 
 The list auto-refreshes every 5 seconds while the modal is open. Click the refresh button for an immediate update.
 
-### 🔥 Flamegraph (Spans Tab)
+### 🔥 Flamegraph Tab
 
-The task detail modal has two visualization tabs on the right side: **Spans** (flamegraph) and **Timeline**.
+The task detail modal has two visualization main tabs: **Flamegraph** and **Timeline**.
 
-The Spans tab renders an interactive flamegraph-style visualization of execution timing. It displays:
+The Flamegraph tab renders an interactive flamegraph-style visualization of execution timing. It displays:
 
 - **Time axis** -- Horizontal axis showing elapsed time from task start, with tick marks at 0%, 25%, 50%, 75%, and 100% of the execution duration.
 - **Oversight phase band** -- When an oversight summary is available, a row of colored blocks shows the high-level phases across the timeline. Hover over a phase block to see its title and description.
@@ -264,39 +264,7 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 
 ### Keyboard Shortcuts
 
-**Global shortcuts** (work in both Board and Plan modes):
-
-| Shortcut | Action |
-|---|---|
-| `?` | Show keyboard shortcuts help |
-| `E` | Toggle file explorer |
-| `P` | Toggle board/Plan mode |
-| `` ` `` | Toggle terminal panel |
-| `Escape` | Close topmost modal or blur search bar |
-
-**Board-only shortcuts:**
-
-| Shortcut | Context | Action |
-|---|---|---|
-| `N` | Board | Open new task form |
-| `/` | Board | Focus the search bar |
-| `Cmd+K` / `Ctrl+K` | Board | Open command palette |
-| `Ctrl+Enter` / `Cmd+Enter` | New task form | Save task |
-| `Escape` | New task form | Cancel |
-| `Enter` / `Space` | Focused card | Open task detail |
-| `Arrow keys` | Focused card | Navigate between cards |
-| `s` | Focused backlog card | Start task |
-| `d` | Focused waiting card | Mark as done |
-
-**Spec-mode shortcuts:**
-
-| Shortcut | Action |
-|---|---|
-| `C` | Toggle chat pane |
-| `D` | Dispatch focused spec as a task |
-| `B` | Break down focused spec into sub-specs |
-
-Board shortcuts are suppressed when focus is in a text input or when a modal is open.
+See [Configuration → Keyboard Shortcuts](configuration.md#keyboard-shortcuts) for the canonical reference covering global, board-only, and plan-mode shortcuts. Board shortcuts are suppressed when focus is in a text input or when a modal is open.
 
 ---
 
