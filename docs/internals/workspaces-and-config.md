@@ -197,9 +197,11 @@ The `Config` struct covers all known keys. Key categories:
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
-| **Container** | `ContainerNetwork`, `ContainerCPUs`, `ContainerMemory` |
-| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold` |
+| **Sandbox backend** | `SandboxBackend` (populated by `--backend` flag; `""`/`"local"` = container, `"host"` = host exec), `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`) |
+| **Container** | `ContainerNetwork`, `ContainerCPUs`, `ContainerMemory`, `TaskWorkers` (`WALLFACER_TASK_WORKERS`, default `true`), `DependencyCaches` (`WALLFACER_DEPENDENCY_CACHES`, default `false`) |
+| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `PlanningWindowDays` (`WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
+| **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
 
 The `SandboxFast` field defaults to `true` when unset — the parser initializes it before scanning lines, and it is only set to `false` when the env file explicitly contains `WALLFACER_SANDBOX_FAST=false`.
 

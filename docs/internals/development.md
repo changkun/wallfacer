@@ -56,16 +56,27 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 
 | Target | Description |
 |---|---|
-| `make build` | Build binary + pull both sandbox images |
-| `make build-binary` | Build just the Go binary (accepts optional `VERSION=`) |
+| `make build` | Full gate: fmt + lint (Go + JS) + build binary + pull both sandbox images |
+| `make build-host` | Host-mode build: full gate, no image pull (for `wallfacer run --backend host`) |
+| `make build-binary` | Build just the Go binary, skipping fmt/lint/pull (accepts optional `VERSION=`) |
+| `make build-desktop` | Build the native desktop app for the current platform (uses `go tool wails`) |
+| `make build-desktop-darwin` / `-windows` / `-linux` | Cross-platform desktop builds |
+| `make install-wails` | Install the Wails CLI tracked as a tool in go.mod |
 | `make pull-images` | Pull Claude and Codex sandbox images |
-| `make server` | Build and run the server |
+| `make server` | Build and run the server natively |
 | `make server-dev` | Build and run the server with `-ui-dir ./ui` so UI edits reload without rebuilding |
 | `make shell` | Open a bash shell in a sandbox container |
 | `make clean` | Remove all sandbox images |
-| `make ui-css` | Regenerate Tailwind CSS |
+| `make fmt` | Format Go and JS in place |
+| `make lint` | Lint only (golangci-lint + Biome); fastest way to catch style regressions |
+| `make test` | Lint + backend tests + frontend tests |
+| `make test-backend` | Go unit tests (`go test ./...`) |
+| `make test-frontend` | Frontend Vitest runner |
+| `make ui-css` | Regenerate Tailwind CSS from UI sources |
 | `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
 | `make run PROMPT="…"` | Headless one-shot Claude execution |
+| `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`, `BACKEND=host`) |
+| `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
 | `make release-notes` | Generate an LLM prompt for release notes (requires `RELEASE_VERSION=`) |
 | `make release` | Commit release notes, tag, push, create GitHub release (requires `RELEASE_VERSION=` and `RELEASE_NOTES=`) |
 
