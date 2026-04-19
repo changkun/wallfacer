@@ -89,14 +89,18 @@ function makeContext(overrides = {}) {
     fetch: vi.fn(),
     document: doc,
     window: {},
+    Routes: {
+      agents: {
+        list: () => "/api/agents",
+        get: () => "/api/agents/{slug}",
+        create: () => "/api/agents",
+        update: () => "/api/agents/{slug}",
+        delete: () => "/api/agents/{slug}",
+      },
+    },
     ...overrides,
   };
-  ctx.window.apiRoutes = {
-    agents: {
-      list: () => "/api/agents",
-      get: () => "/api/agents/{slug}",
-    },
-  };
+  ctx.window.apiRoutes = ctx.Routes;
   ctx._rootList = rootList;
   vm.createContext(ctx);
   return ctx;
@@ -119,22 +123,49 @@ describe("agents.js", () => {
     expect(typeof ctx.window.loadAgents).toBe("function");
   });
 
-  it("renderRow builds a card with title, capabilities meta, and disabled Clone button", () => {
+  it("renderRow builds a card with title, capabilities meta, and a Clone button for built-ins", () => {
     const row = ctx.window.__agents_test.renderRow({
       slug: "impl",
       title: "Implementation",
       description: "runs implementation",
       capabilities: ["workspace.write", "board.context"],
       multiturn: true,
+      builtin: true,
     });
     expect(row.attributes["data-slug"]).toBe("impl");
     const header = row.children[0];
     expect(header.children[0].textContent).toBe("Implementation");
     expect(header.children[1].textContent).toContain("workspace write");
     expect(header.children[1].textContent).toContain("multi-turn");
-    const clone = header.children[2];
-    expect(clone.textContent).toBe("Clone");
-    expect(clone.disabled).toBe(true);
+    // The actions container holds the Clone button for built-ins.
+    const actions = header.children[2];
+    expect(actions.children[0].textContent).toBe("Clone");
+    expect(actions.children[0].disabled).toBe(false);
+  });
+
+  it("user-authored rows get Edit + Delete buttons, no Clone", () => {
+    const row = ctx.window.__agents_test.renderRow({
+      slug: "impl-codex",
+      title: "Impl Codex",
+      builtin: false,
+      harness: "codex",
+    });
+    const actions = row.children[0].children[2];
+    const labels = actions.children.map((c) => c.textContent);
+    expect(labels).toContain("Edit");
+    expect(labels).toContain("Delete");
+    expect(labels).not.toContain("Clone");
+    expect(row.classList.contains("agents-row--user")).toBe(true);
+  });
+
+  it("suggestCloneSlug appends -copy and respects the 40-char cap", () => {
+    const s = ctx.window.__agents_test.suggestCloneSlug("impl");
+    expect(s).toBe("impl-copy");
+    const long = ctx.window.__agents_test.suggestCloneSlug(
+      "a-really-long-base-slug-that-pushes-the-limit",
+    );
+    expect(long.length).toBeLessThanOrEqual(40);
+    expect(long.endsWith("-copy")).toBe(true);
   });
 
   it("loadAgents fetches /api/agents and renders rows", async () => {

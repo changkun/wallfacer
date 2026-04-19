@@ -136,3 +136,105 @@
   color: var(--ink-muted, #666);
   margin: 6px 0 0;
 }
+
+/* User-authored rows get a subtle left-border accent so users can
+ * tell their agents apart from built-ins at a glance. */
+.agents-row--user {
+  border-left: 3px solid var(--ink-accent, #2563eb);
+}
+
+.agents-row__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.agents-row__delete {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--rule, #e5e5e5);
+  background: transparent;
+  border-radius: 4px;
+  color: var(--ink-muted, #666);
+  cursor: pointer;
+}
+.agents-row__delete:hover {
+  color: var(--alert, #dc2626);
+  border-color: var(--alert, #dc2626);
+}
+
+.agents-row__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--rule, #e5e5e5);
+}
+
+.agents-row__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agents-row__field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.agents-row__field-label {
+  font-size: 11px;
+  color: var(--ink-muted, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agents-row__editor input[type="text"],
+.agents-row__editor textarea,
+.agents-row__editor select {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--rule, #e5e5e5);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  color: var(--ink-primary, #111);
+}
+.agents-row__editor input[type="text"]:disabled {
+  background: var(--surface-muted, #f7f7f7);
+  color: var(--ink-muted, #666);
+}
+
+.agents-row__editor-err {
+  font-size: 12px;
+  color: var(--alert, #dc2626);
+  margin: 0;
+}
+
+.agents-row__editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agents-row__save,
+.agents-row__cancel {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--rule, #e5e5e5);
+}
+.agents-row__save {
+  background: var(--ink-accent, #2563eb);
+  color: #fff;
+  border-color: var(--ink-accent, #2563eb);
+}
+.agents-row__save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.agents-row__cancel {
+  background: transparent;
+  color: var(--ink-primary, #111);
+}
