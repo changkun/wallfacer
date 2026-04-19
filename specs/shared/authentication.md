@@ -88,19 +88,71 @@ work is landed. They can be wrapped up via `wf-spec-wrapup`.
 
 ### Deliberately deferred past Phase 1
 
-Still out of scope; tracked by later phases in this spec:
+Still out of scope in Phase 1; see the Phase 2 breakdown below for what
+lands next:
 
 - JWT middleware on API routes (`pkg/jwtauth`)
 - `org_id` / `principal_id` columns on workspace/task records
 - Authorization checks (`IsSuperadmin`, scope gating)
-- Agent token exchange
 - Org switching
-- Login redirect for unauthenticated browser requests (Phase 1 only shows
-  a sign-in link; it never forces a redirect)
+- Login redirect for unauthenticated browser requests
+
+**Split out to its own spec:** Agent token exchange (RFC 8693 delegation
+tokens for sandbox agents calling latere.ai backend services) is orthogonal
+to user login / tenant isolation and does not unblock the cloud move. It
+lives in [`specs/shared/agent-token-exchange.md`](agent-token-exchange.md).
 
 ---
 
-## Design (long-range, not yet implemented)
+## Phase 2 — User login, identity, and org isolation
+
+Phase 2 ships the rest of "user login & auth" — enough to unblock the cloud
+move (`cloud/multi-tenant.md`, `cloud/multi-user-collaboration.md`). In
+cloud mode, every request has a validated principal; data is scoped by
+`org_id`; unauthenticated browsers are pushed to `/login`.
+
+Local mode is untouched throughout. Anonymous local deployments and the
+existing `WALLFACER_SERVER_API_KEY` path continue to work exactly as today.
+
+### Task Breakdown (Phase 2)
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [JWT validation middleware on API routes](authentication/jwt-middleware.md) | Phase 1 complete | medium | drafted |
+| [Unify browser session and JWT into a single principal context](authentication/principal-context.md) | jwt-middleware | small | drafted |
+| [Principal and org fields on task + workspace records](authentication/data-model-principal-org.md) | — | medium | drafted |
+| [Force login for unauthenticated browser requests in cloud mode](authentication/cloud-forced-login.md) | principal-context | small | drafted |
+| [Superadmin and scope gating for admin API routes](authentication/scope-and-superadmin.md) | jwt-middleware | small | drafted |
+| [Org switching for users belonging to multiple orgs](authentication/org-switching.md) | data-model-principal-org, jwt-middleware | medium | drafted |
+
+```mermaid
+graph LR
+  J[jwt-middleware] --> P[principal-context]
+  J --> SA[scope-and-superadmin]
+  P --> FL[cloud-forced-login]
+  D[data-model-principal-org] --> OS[org-switching]
+  J --> OS
+```
+
+Items marked `drafted` are ready for `/wf-spec-breakdown`-style validation
+and dispatch. `data-model-principal-org` has no `depends_on` and can start
+in parallel with `jwt-middleware`; everything else fans out from those two.
+
+### Explicitly out of scope for Phase 2
+
+- Agent token exchange — see `shared/agent-token-exchange.md`.
+- In-app user or org administration (invite, rename, delete) — handled
+  by the auth service, not wallfacer.
+- Third-party OIDC providers (Keycloak, Entra ID, etc.) for self-hosted
+  deployments. Deferred; the API-key path continues to cover non-latere.ai
+  self-hosting.
+- Cross-org visibility rules beyond strict `org_id` match (e.g. shared
+  workspaces across orgs). If needed, that belongs in
+  `cloud/multi-user-collaboration.md`.
+
+---
+
+## Design (long-range reference)
 
 ### Overview
 
@@ -298,27 +350,10 @@ The route paths do not collide. Both systems coexist.
 
 ---
 
-## Agent Token Exchange (Future)
+## Agent Token Exchange
 
-Wallfacer launches AI agents in containers. Those agents may need tokens
-to call other latere.ai services (e.g. fs for file storage). The auth
-service supports RFC 8693 token exchange:
-
-```
-POST auth.latere.ai/token
-  grant_type=urn:ietf:params:oauth:grant-type:token-exchange
-  &subject_token=<user-jwt>
-  &subject_token_type=urn:ietf:params:oauth:token-type:access_token
-  &agent_id=<agent-principal-id>
-```
-
-This produces a scoped agent token with `validation="strict"` (for
-write scopes) or `validation="local"` (read-only). Agent tokens have
-a max 15-min TTL and no refresh capability.
-
-**Out of scope for initial implementation.** Flagged here because
-wallfacer's task execution model is the primary use case for agent
-delegation. Will be addressed in a follow-up spec.
+Moved to its own spec: [`shared/agent-token-exchange.md`](agent-token-exchange.md).
+Orthogonal to user login / org isolation; does not block the cloud move.
 
 ---
 

@@ -1,0 +1,76 @@
+---
+title: Unify browser session and JWT into a single principal context
+status: drafted
+depends_on:
+  - specs/shared/authentication/jwt-middleware.md
+affects:
+  - internal/auth/
+  - internal/handler/
+effort: small
+created: 2026-04-19
+updated: 2026-04-19
+author: changkun
+dispatched_task_id: null
+---
+
+# Unify browser session and JWT into a single principal context
+
+## Goal
+
+Handlers should read identity through a single API regardless of whether the
+request carried a browser session cookie (from Phase 1) or an `Authorization:
+Bearer <jwt>` header (from `jwt-middleware.md`). Today the two paths produce
+two different shapes (`*oidc.User` vs `*jwtauth.Claims`). This task teaches
+the middleware to populate the same `*jwtauth.Claims` context value for both
+paths.
+
+## What to do
+
+1. Extend the request preamble (new middleware layer, runs after
+   `jwtauth.OptionalAuth`):
+   ```go
+   // CookiePrincipal injects claims derived from the session cookie when
+   // no Bearer token was present. No-op when claims are already populated
+   // by OptionalAuth.
+   func CookiePrincipal(c *auth.Client, v *jwtauth.Validator, next http.HandlerFunc) http.HandlerFunc
+   ```
+2. Implementation path:
+   - If `PrincipalFromContext` already returns claims → pass through.
+   - Else load the session via `c.SessionFromRequest(r)` (add to
+     `internal/auth/` if the platform package doesn't already expose it —
+     mirror the cookie read from `client.UserFromRequest`).
+   - Take the session's access token, call
+     `v.Validate(ctx, sessionAccessToken)` — this is the same JWT issued
+     by the auth service, so validation is uniform.
+   - On success, inject the resulting claims into the context.
+   - On failure (token expired, signature invalid), clear the session
+     cookie and pass through as anonymous — the next interactive request
+     hits `/login`.
+3. Wire the middleware only on HTML-rendering and API routes that benefit
+   from identity — in practice, wrap the whole mux tail after `OptionalAuth`.
+4. Document the uniform API: every handler that needs the caller uses
+   `auth.PrincipalFromContext(r.Context())`; no handler ever calls
+   `client.UserFromRequest` directly. Update any Phase-1 handler that
+   already reads `UserFromRequest` (only `/api/auth/me`) — that one can
+   stay as-is since it specifically wants the OIDC userinfo shape for UI
+   rendering, but add a code comment noting the distinction.
+
+## Tests
+
+- `internal/auth/cookie_principal_test.go`:
+  - JWT present → middleware is a no-op (claims unchanged).
+  - No JWT, valid session cookie → claims populated from session token.
+  - No JWT, expired session token → session cookie cleared, request passes
+    through as anonymous.
+  - No JWT, no session → passes through as anonymous.
+- Handler-level smoke test: `/api/tasks` called with only a session cookie
+  sees the same `Claims` it would see with a Bearer token.
+
+## Boundaries
+
+- Do not add new cookies. The session cookie from Phase 1 is the only
+  identity-carrying cookie.
+- Do not change `/api/auth/me`'s response shape — it still returns
+  OIDC userinfo, not claims.
+- Do not introduce a third identity type. The goal is fewer shapes, not
+  more.
