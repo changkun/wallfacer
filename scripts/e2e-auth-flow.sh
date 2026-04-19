@@ -72,10 +72,25 @@ case "$auth_url" in
 esac
 
 step "2. /authorize (no auth session yet) → /login"
-login_url="$(jloc "$auth_url")"
+# Capture both status and Location so we can see what auth actually said.
+authz_headers="$(curl -sS -o /dev/null -D - -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$auth_url")"
+authz_status="$(printf '%s' "$authz_headers" | awk 'NR==1{print $2; exit}')"
+login_url="$(printf '%s' "$authz_headers" | awk 'BEGIN{IGNORECASE=1} /^Location:/ { sub(/^Location:[[:space:]]*/,"",$0); sub(/\r$/,"",$0); print; exit }')"
+info "authorize status: $authz_status"
+info "authorize Location: ${login_url:-(none)}"
 case "$login_url" in
   /login|/login\?*) ok "redirected to auth /login";;
-  *) bad "unexpected: $login_url"; exit 1;;
+  "")
+    bad "no redirect from /authorize — response was $authz_status"
+    echo "  Dump of full response (first 800 chars of body):"
+    curl -sS -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$auth_url" | head -c 800
+    echo
+    echo "  Likely causes:"
+    echo "    • wallfacer's client_id/redirect_uri not registered on auth (/admin check)"
+    echo "    • fosite returned 400 with an error page instead of the usual 302 → /login"
+    echo "    • The authorize URL contains an unexpected param"
+    exit 1;;
+  *) bad "unexpected redirect: $login_url"; exit 1;;
 esac
 
 step "3. GET auth /login/email → CSRF cookie + form"
