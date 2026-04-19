@@ -162,10 +162,12 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 	if !routineTask.IsRoutine() {
 		return
 	}
-	// A cancelled routine card must not spawn instance tasks. A fire can
-	// still land here if the user cancels after the engine's timer has
-	// already dispatched onto its own goroutine.
-	if routineTask.Status == store.TaskStatusCancelled {
+	// A cancelled or archived routine card must not spawn instance tasks.
+	// A fire can still land here if the user cancels/archives after the
+	// engine's timer has already dispatched onto its own goroutine, and
+	// the reconcile-driven Unregister relies on archived rows being
+	// absent from ListTasks(false) — a timing-fragile guarantee.
+	if routineTask.Status == store.TaskStatusCancelled || routineTask.Archived {
 		return
 	}
 

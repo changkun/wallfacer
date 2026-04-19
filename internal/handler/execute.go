@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/constants"
@@ -351,48 +352,86 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	oldStatus := task.Status
-	if oldStatus == store.TaskStatusWaiting {
-		h.closeFeedbackWaitingSpan(r.Context(), id)
-	}
-
-	// Kill any active containers for this task before persisting the new status.
-	// KillRefineContainer is a no-op when no refinement container is registered.
-	h.runner.KillRefineContainer(id)
-	// For in_progress tasks: also kill the main execution container.
-	if oldStatus == store.TaskStatusInProgress {
-		h.runner.KillContainer(id)
-	}
-	// Stop the per-task worker container (no-op if workers are disabled).
-	h.runner.StopTaskWorker(id)
-
-	// If a refinement is actively running, mark it as failed so the UI
-	// reflects the correct state (same pattern as CancelRefinement).
-	if task.CurrentRefinement != nil && task.CurrentRefinement.Status == store.RefinementJobStatusRunning {
-		task.CurrentRefinement.Status = store.RefinementJobStatusFailed
-		task.CurrentRefinement.Error = "task cancelled"
-		if err := h.store.UpdateRefinementJob(r.Context(), id, task.CurrentRefinement); err != nil {
-			logger.Handler.Error("cancel task: update refinement job", "task", id, "error", err)
-		}
-	}
-
-	// Persist the cancelled status BEFORE cleaning up worktrees.
-	// CancelTask uses ForceUpdateTaskStatus internally to handle transitions not
-	// in the normal state machine (e.g. backlog → cancelled for tasks that never
-	// started), and also cleans up orphaned DependsOn entries in dependent tasks.
-	if err := h.store.CancelTask(r.Context(), id); err != nil {
+	if err := h.cancelTaskInternal(r.Context(), *task); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
-		store.NewStateChangeData(oldStatus, store.TaskStatusCancelled, store.TriggerUser, nil))
-
-	if len(task.WorktreePaths) > 0 {
-		h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+	// If this is a routine card, cascade Cancel to any still-live spawned
+	// instances so orphaned backlog/in_progress/waiting children don't
+	// keep running or clutter the board. Terminal children (done/failed/
+	// cancelled) are left alone so the user can still review results.
+	if task.IsRoutine() {
+		h.cascadeCancelRoutineChildren(r.Context(), id)
 	}
 
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+// cancelTaskInternal runs the full cancel pipeline (container kill, store
+// update, event emission, worktree cleanup) without writing an HTTP response.
+// It is shared by the CancelTask handler and the routine-cascade path.
+// The caller is responsible for validating that task.Status is cancellable.
+func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error {
+	oldStatus := task.Status
+	if oldStatus == store.TaskStatusWaiting {
+		h.closeFeedbackWaitingSpan(ctx, task.ID)
+	}
+
+	// Kill any active containers for this task before persisting the new status.
+	// KillRefineContainer is a no-op when no refinement container is registered.
+	h.runner.KillRefineContainer(task.ID)
+	if oldStatus == store.TaskStatusInProgress {
+		h.runner.KillContainer(task.ID)
+	}
+	h.runner.StopTaskWorker(task.ID)
+
+	if task.CurrentRefinement != nil && task.CurrentRefinement.Status == store.RefinementJobStatusRunning {
+		task.CurrentRefinement.Status = store.RefinementJobStatusFailed
+		task.CurrentRefinement.Error = "task cancelled"
+		if err := h.store.UpdateRefinementJob(ctx, task.ID, task.CurrentRefinement); err != nil {
+			logger.Handler.Error("cancel task: update refinement job", "task", task.ID, "error", err)
+		}
+	}
+
+	if err := h.store.CancelTask(ctx, task.ID); err != nil {
+		return err
+	}
+
+	h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData(oldStatus, store.TaskStatusCancelled, store.TriggerUser, nil))
+
+	if len(task.WorktreePaths) > 0 {
+		h.runner.CleanupWorktrees(task.ID, task.WorktreePaths, task.BranchName)
+	}
+	return nil
+}
+
+// cascadeCancelRoutineChildren cancels any non-terminal instance tasks spawned
+// by the given routine card (tagged `spawned-by:<routineID>`). Terminal
+// children — done, failed, cancelled — are left alone so their results remain
+// inspectable. Errors are logged but not returned; cascade is best-effort.
+func (h *Handler) cascadeCancelRoutineChildren(ctx context.Context, routineID uuid.UUID) {
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		logger.Handler.Warn("cascade cancel: list tasks", "routine", routineID, "error", err)
+		return
+	}
+	wantTag := "spawned-by:" + routineID.String()
+	for _, t := range tasks {
+		if t.ID == routineID {
+			continue
+		}
+		if !slices.Contains(t.Tags, wantTag) {
+			continue
+		}
+		switch t.Status {
+		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
+			if err := h.cancelTaskInternal(ctx, t); err != nil {
+				logger.Handler.Warn("cascade cancel: cancel child", "routine", routineID, "child", t.ID, "error", err)
+			}
+		}
+	}
 }
 
 // ResumeTask resumes a failed task using its existing session.
@@ -479,6 +518,13 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		"to":      "archived",
 		"trigger": string(store.TriggerUser),
 	})
+	// Archiving a routine card should also stop any still-live spawned
+	// instances. The routine engine treats archived cards as unscheduled,
+	// so firing halts — but previously-spawned children on the board keep
+	// running unless we cascade here.
+	if task.IsRoutine() {
+		h.cascadeCancelRoutineChildren(r.Context(), id)
+	}
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "archived"})
 }
 
