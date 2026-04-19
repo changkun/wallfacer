@@ -85,9 +85,9 @@ describe("routines.js", () => {
     });
 
     it("returns 'stopped (archived)' for an archived routine", () => {
-      expect(
-        ctx.formatRoutineCountdown(null, true, "cancelled", true),
-      ).toBe("stopped (archived)");
+      expect(ctx.formatRoutineCountdown(null, true, "cancelled", true)).toBe(
+        "stopped (archived)",
+      );
     });
 
     it("still fires a normal countdown for a backlog routine", () => {

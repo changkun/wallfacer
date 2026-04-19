@@ -346,7 +346,7 @@ function _renderSignedIn(el, user, authURL) {
     var rect = wrap.getBoundingClientRect();
     // Anchor menu's bottom-left to trigger's top-left with 6px gap.
     menu.style.left = rect.left + "px";
-    menu.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+    menu.style.bottom = window.innerHeight - rect.top + 6 + "px";
   };
   wrap.addEventListener("click", function (e) {
     e.stopPropagation();
