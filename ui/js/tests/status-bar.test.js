@@ -620,10 +620,14 @@ describe("renderSigninBadge", () => {
     );
     expect(nameSpan.textContent).toBe("Alice");
 
-    const logout = wrap.children.find(
-      (c) => c.className === "sb-signin__logout",
+    // Sign-out moved into the popup menu in the redesigned badge.
+    // Find it by its label + role=menuitem.
+    const menu = wrap.children.find((c) => c.className === "sb-signin__menu");
+    expect(menu).toBeTruthy();
+    const signOutItem = menu.children.find(
+      (c) => c.textContent === "Sign out",
     );
-    expect(logout.href).toBe("/logout");
+    expect(signOutItem).toBeTruthy();
 
     const iframe = signinEl.children.find((c) => c.tagName === "IFRAME");
     expect(iframe).toBeTruthy();
@@ -792,7 +796,7 @@ const signedInUser = {
 };
 
 describe("renderSigninBadge org switcher", () => {
-  it("renders a static label for single-org (200 with 1 entry)", async () => {
+  it("labels the active org + marks it active in the menu (single-org)", async () => {
     const { ctx, signinEl } = makeSigninContext(
       routedFetch({
         "/api/auth/me": () =>
@@ -818,21 +822,30 @@ describe("renderSigninBadge org switcher", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const slot = wrap.children.find(
-      (c) => c.className === "sb-signin__orgs",
+    // The visible view label shows the current org name, not "Personal".
+    const viewLabel = wrap.children.find(
+      (c) => c.className === "sb-signin__view-label",
     );
-    expect(slot).toBeTruthy();
-    const label = slot.children.find(
-      (c) => c.className === "sb-signin__org-label",
+    expect(viewLabel.textContent).toBe("Solo Org");
+
+    const menu = wrap.children.find((c) => c.className === "sb-signin__menu");
+    expect(menu).toBeTruthy();
+    // Menu contains Personal + Solo Org + Sign out with separators.
+    const items = menu.children.filter(
+      (c) => c.className && c.className.indexOf("sb-signin__menu-item") === 0,
     );
-    expect(label).toBeTruthy();
-    expect(label.textContent).toBe("Solo Org");
-    // Must NOT render a select for single-org (nothing to switch to).
-    const select = slot.children.find((c) => c.tagName === "SELECT");
-    expect(select).toBeUndefined();
+    const itemTexts = items.map((c) => c.textContent);
+    expect(itemTexts).toContain("Personal");
+    expect(itemTexts).toContain("Solo Org");
+    expect(itemTexts).toContain("Sign out");
+    // The active marker lives on the org item, not on Personal.
+    const soloItem = items.find((c) => c.textContent === "Solo Org");
+    expect(soloItem.classList.contains("sb-signin__menu-item--active")).toBe(
+      true,
+    );
   });
 
-  it("renders nothing when /api/auth/orgs returns 204 (no memberships)", async () => {
+  it("renders Personal + Sign out only when /api/auth/orgs returns 204", async () => {
     const { ctx, signinEl } = makeSigninContext(
       routedFetch({
         "/api/auth/me": () =>
@@ -850,14 +863,21 @@ describe("renderSigninBadge org switcher", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const slot = wrap.children.find(
-      (c) => c.className === "sb-signin__orgs",
+    // The view label stays "Personal" when there's no active org.
+    const viewLabel = wrap.children.find(
+      (c) => c.className === "sb-signin__view-label",
     );
-    expect(slot).toBeTruthy();
-    expect(slot.children.length).toBe(0);
+    expect(viewLabel.textContent).toBe("Personal");
+
+    const menu = wrap.children.find((c) => c.className === "sb-signin__menu");
+    const items = menu.children.filter(
+      (c) => c.className && c.className.indexOf("sb-signin__menu-item") === 0,
+    );
+    const itemTexts = items.map((c) => c.textContent);
+    expect(itemTexts).toEqual(["Personal", "Sign out"]);
   });
 
-  it("renders a <select> with one option per org when 2+ orgs", async () => {
+  it("lists Personal + every org + Sign out when 2+ orgs", async () => {
     const orgsPayload = {
       orgs: [
         { id: "org-a", name: "Alice Inc" },
@@ -886,19 +906,24 @@ describe("renderSigninBadge org switcher", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const slot = wrap.children.find(
-      (c) => c.className === "sb-signin__orgs",
+    const viewLabel = wrap.children.find(
+      (c) => c.className === "sb-signin__view-label",
     );
-    const select = slot.children.find((c) => c.tagName === "SELECT");
-    expect(select).toBeTruthy();
+    expect(viewLabel.textContent).toBe("Bob Corp");
 
-    const options = select.children.filter((c) => c.tagName === "OPTION");
-    expect(options.length).toBe(2);
-    expect(options[0].textContent).toBe("Alice Inc");
-    expect(options[1].textContent).toBe("Bob Corp");
-    // Option `value` is stored on the stub element directly.
-    expect(options[0].value).toBe("org-a");
-    expect(options[1].value).toBe("org-b");
+    const menu = wrap.children.find((c) => c.className === "sb-signin__menu");
+    const items = menu.children.filter(
+      (c) => c.className && c.className.indexOf("sb-signin__menu-item") === 0,
+    );
+    const itemTexts = items.map((c) => c.textContent);
+    expect(itemTexts).toEqual(["Personal", "Alice Inc", "Bob Corp", "Sign out"]);
+
+    // Only the current org is marked active.
+    const active = items.filter((c) =>
+      c.classList.contains("sb-signin__menu-item--active"),
+    );
+    expect(active.length).toBe(1);
+    expect(active[0].textContent).toBe("Bob Corp");
   });
 
   it("skips /api/auth/orgs in local mode (cloud=false)", async () => {

@@ -282,9 +282,15 @@ function _renderSignedIn(el, user, authURL) {
   // Manual element construction (not innerHTML) so user-controlled strings
   // land as text nodes / attribute values. Avatar URL is still a URL — an
   // attacker-controlled picture field could only fetch their own image.
-  var wrap = document.createElement("span");
+  var wrap = document.createElement("button");
   wrap.className = "sb-signin__user";
+  wrap.type = "button";
+  wrap.setAttribute("aria-haspopup", "menu");
+  wrap.setAttribute("aria-expanded", "false");
 
+  // Avatar: picture URL when provided, otherwise an initials circle so
+  // the badge always has a visual anchor. Initials from display name
+  // (first letter) uppercased.
   if (picture) {
     var img = document.createElement("img");
     img.className = "sb-signin__avatar";
@@ -292,6 +298,12 @@ function _renderSignedIn(el, user, authURL) {
     img.alt = "";
     img.setAttribute("referrerpolicy", "no-referrer");
     wrap.appendChild(img);
+  } else {
+    var fallback = document.createElement("span");
+    fallback.className = "sb-signin__avatar sb-signin__avatar--fallback";
+    fallback.textContent = (display.charAt(0) || "?").toUpperCase();
+    fallback.setAttribute("aria-hidden", "true");
+    wrap.appendChild(fallback);
   }
 
   var nameEl = document.createElement("span");
@@ -299,18 +311,47 @@ function _renderSignedIn(el, user, authURL) {
   nameEl.textContent = display;
   wrap.appendChild(nameEl);
 
-  // Org switcher (multi-org users only). Mounted as a container now
-  // so the submenu has a stable slot to render into after the async
-  // /api/auth/orgs fetch resolves; the sign-out link is always last.
-  var orgSlot = document.createElement("span");
-  orgSlot.className = "sb-signin__orgs";
-  wrap.appendChild(orgSlot);
+  // Current-view label sits right after the name so the user can see
+  // what scope they're in at a glance. Populated by
+  // _fetchAndRenderOrgSwitcher once /api/auth/orgs resolves; shows
+  // "Personal" when no active org.
+  var viewLabel = document.createElement("span");
+  viewLabel.className = "sb-signin__view-label";
+  viewLabel.textContent = "Personal";
+  wrap.appendChild(viewLabel);
 
-  var out = document.createElement("a");
-  out.className = "sb-signin__logout";
-  out.href = "/logout";
-  out.textContent = "Sign out";
-  wrap.appendChild(out);
+  var chevron = document.createElement("span");
+  chevron.className = "sb-signin__chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  chevron.textContent = "▾";
+  wrap.appendChild(chevron);
+
+  // Menu container (hidden by default). Populated with Personal +
+  // org entries + Sign out by the fetch. Menu open/close toggles on
+  // wrap click; click-outside closes it.
+  var menu = document.createElement("div");
+  menu.className = "sb-signin__menu";
+  menu.setAttribute("role", "menu");
+  menu.hidden = true;
+  wrap.appendChild(menu);
+
+  // Click toggles the menu. Cross-handler close-on-outside-click runs
+  // once globally; add it now.
+  wrap.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var nowOpen = menu.hidden;
+    menu.hidden = !nowOpen;
+    wrap.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+  });
+  document.addEventListener("click", function () {
+    if (!menu.hidden) {
+      menu.hidden = true;
+      wrap.setAttribute("aria-expanded", "false");
+    }
+  });
+  menu.addEventListener("click", function (e) {
+    e.stopPropagation();
+  });
 
   // Clear and attach. Also install the front-channel logout iframe so a
   // central sign-out at auth.latere.ai clears our cookie via
@@ -321,10 +362,9 @@ function _renderSignedIn(el, user, authURL) {
   el.appendChild(wrap);
 
   // Fire the org-list fetch after the signed-in badge is already up.
-  // 204 → single-org, nothing to render (common case, no flicker).
-  // 200 → attach a <select> to orgSlot that POSTs /api/auth/switch-org
-  // and follows the redirect_url on success.
-  _fetchAndRenderOrgSwitcher(orgSlot);
+  // The fetch populates the menu with "Personal" + org rows + Sign out.
+  // Label updates to current org name when the response includes it.
+  _fetchAndRenderOrgSwitcher(menu, viewLabel);
   if (authURL) {
     var frame = document.createElement("iframe");
     frame.name = "latere-logout-iframe";
@@ -336,85 +376,134 @@ function _renderSignedIn(el, user, authURL) {
   }
 }
 
-// _fetchAndRenderOrgSwitcher queries /api/auth/orgs and renders the
-// user's org context into `slot`. Three outcomes:
-//   - 204 (no org memberships or anonymous): bail, leave slot empty
-//   - 1 org: render a static label — serves as visible verification
-//     that the endpoint + claims are wired correctly, even when the
-//     user can't actually switch
-//   - 2+ orgs: render a <select>; change POSTs /api/auth/switch-org
-//     and navigates to the returned redirect_url
-// Errors are silent because the badge is a convenience, not a
-// critical path.
-function _fetchAndRenderOrgSwitcher(slot) {
+// _fetchAndRenderOrgSwitcher queries /api/auth/orgs and populates
+// the badge menu + current-view label. Menu is always populated with
+// at least a "Personal" entry and a "Sign out" entry so the user
+// always has something to click even with zero org memberships.
+//
+// Menu layout:
+//   ☑ Personal                 (checked when no active org)
+//   ─────
+//   ☑ Org A
+//   ☐ Org B                    (when user has ≥1 org)
+//   ─────
+//   Sign out
+function _fetchAndRenderOrgSwitcher(menu, viewLabel) {
+  var addSeparator = function () {
+    var hr = document.createElement("div");
+    hr.className = "sb-signin__menu-sep";
+    hr.setAttribute("role", "separator");
+    menu.appendChild(hr);
+  };
+  var addItem = function (text, opts) {
+    var item = document.createElement("button");
+    item.type = "button";
+    item.className = "sb-signin__menu-item";
+    if (opts && opts.active) {
+      item.classList.add("sb-signin__menu-item--active");
+      item.setAttribute("aria-current", "true");
+    }
+    item.setAttribute("role", "menuitem");
+    item.textContent = text;
+    if (opts && opts.onClick) {
+      item.addEventListener("click", opts.onClick);
+    }
+    menu.appendChild(item);
+    return item;
+  };
+
+  var renderFallback = function () {
+    // No data yet / 204 / error: show just Personal + Sign out so
+    // the menu is never empty.
+    addItem("Personal", { active: true });
+    addSeparator();
+    addItem("Sign out", {
+      onClick: function () {
+        window.location.href = "/logout";
+      },
+    });
+  };
+
   fetch("/api/auth/orgs", { credentials: "same-origin" })
     .then(function (resp) {
       if (resp.status !== 200) return null;
       return resp.json();
     })
     .then(function (data) {
+      menu.innerHTML = "";
       if (!data || !Array.isArray(data.orgs) || data.orgs.length === 0) {
+        renderFallback();
         return;
       }
-      if (data.orgs.length === 1) {
-        // Single-org: static label so the user sees which org their
-        // token is scoped to. No switch affordance — they only have
-        // one — but they know the wiring works.
-        var label = document.createElement("span");
-        label.className = "sb-signin__org-label";
-        label.textContent = data.orgs[0].name || data.orgs[0].id;
-        label.title = data.orgs[0].name || data.orgs[0].id;
-        slot.appendChild(label);
-        return;
-      }
-      // Multi-org: interactive <select> that swaps the active org.
-      var select = document.createElement("select");
-      select.className = "sb-signin__org-select";
-      select.setAttribute("aria-label", "Switch organization");
-      for (var i = 0; i < data.orgs.length; i += 1) {
-        var o = data.orgs[i];
-        if (!o || !o.id) continue;
-        var opt = document.createElement("option");
-        opt.value = o.id;
-        opt.textContent = o.name || o.id;
-        if (o.id === data.current_id) opt.selected = true;
-        select.appendChild(opt);
-      }
-      select.addEventListener("change", function () {
-        var target = select.value;
-        if (!target || target === data.current_id) return;
-        // Lock the select so a double-click can't issue two switches
-        // racing for the same session cookie clear.
-        select.disabled = true;
-        fetch("/api/auth/switch-org", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ org_id: target }),
-        })
-          .then(function (resp) {
-            if (resp.status !== 200) {
-              select.disabled = false;
-              select.value = data.current_id;
-              return null;
-            }
-            return resp.json();
-          })
-          .then(function (body) {
-            if (body && body.redirect_url) {
-              window.location.href = body.redirect_url;
-            }
-          })
-          .catch(function () {
-            select.disabled = false;
-            select.value = data.current_id;
-          });
+      var currentID = data.current_id || "";
+      // Personal is always shown so the user sees it as a peer of
+      // their orgs. Switching from an org back to personal requires
+      // an auth-service roundtrip that isn't wired yet; Personal
+      // renders as a read-only "you are here" marker for now and
+      // becomes interactive once the auth service supports
+      // clearing active_org on the authorize call. When already on
+      // personal, clicking it is a no-op.
+      addItem("Personal", {
+        active: !currentID,
       });
-      slot.appendChild(select);
+      addSeparator();
+      for (var i = 0; i < data.orgs.length; i += 1) {
+        (function (o) {
+          if (!o || !o.id) return;
+          addItem(o.name || o.id, {
+            active: o.id === currentID,
+            onClick: function () {
+              if (o.id === currentID) return;
+              _switchOrg(o.id);
+            },
+          });
+        })(data.orgs[i]);
+      }
+      addSeparator();
+      addItem("Sign out", {
+        onClick: function () {
+          window.location.href = "/logout";
+        },
+      });
+
+      // Label updates to the active org name, else "Personal".
+      if (currentID) {
+        for (var j = 0; j < data.orgs.length; j += 1) {
+          if (data.orgs[j].id === currentID) {
+            viewLabel.textContent = data.orgs[j].name || data.orgs[j].id;
+            break;
+          }
+        }
+      } else {
+        viewLabel.textContent = "Personal";
+      }
     })
     .catch(function () {
-      // Network error: silent — user sees no switcher, same outcome
-      // as a 204 response. The next reload retries.
+      menu.innerHTML = "";
+      renderFallback();
+    });
+}
+
+// _switchOrg POSTs /api/auth/switch-org and follows the redirect on
+// success. Empty target means "go to personal view" (no active org).
+function _switchOrg(target) {
+  fetch("/api/auth/switch-org", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ org_id: target }),
+  })
+    .then(function (resp) {
+      if (resp.status !== 200) return null;
+      return resp.json();
+    })
+    .then(function (body) {
+      if (body && body.redirect_url) {
+        window.location.href = body.redirect_url;
+      }
+    })
+    .catch(function () {
+      // Silent — the menu stays open for another try.
     });
 }
 
