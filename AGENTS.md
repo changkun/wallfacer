@@ -388,6 +388,8 @@ Optional variables (also in `.env`):
 - `CODEX_TITLE_MODEL` — model for Codex title generation
 - Sandbox routing: `WALLFACER_DEFAULT_SANDBOX`, `WALLFACER_SANDBOX_IMPLEMENTATION`, `WALLFACER_SANDBOX_TESTING`, `WALLFACER_SANDBOX_REFINEMENT`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_OVERSIGHT`, `WALLFACER_SANDBOX_COMMIT_MESSAGE`, `WALLFACER_SANDBOX_IDEA_AGENT`
 - `WALLFACER_CLOUD` — enable cloud-gated UI surfaces (latere.ai sign-in badge, future cloud toggles); shell env only, not edited from the UI. Defaults to `false` (pure local mode). See [`docs/cloud/README.md`](docs/cloud/README.md) for the full env-var reference, deployment constraints, and Phase 1 scope; [`specs/shared/authentication.md`](specs/shared/authentication.md) covers the long-range design.
+- `AUTH_JWKS_URL` — JWKS endpoint used to validate `Authorization: Bearer <jwt>` headers on `/api/*` in cloud mode. Auto-derived from `AUTH_URL + /.well-known/jwks.json` when unset.
+- `AUTH_ISSUER` — expected `iss` claim on incoming JWTs. Auto-derived from `AUTH_URL` when unset.
 
 All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
 
