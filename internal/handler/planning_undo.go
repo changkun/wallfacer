@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -68,6 +69,16 @@ var addedDispatchLine = regexp.MustCompile(
 func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	threadID := h.threadIDFromRequest(r)
+
+	// Task-mode threads use event rewind rather than git revert.
+	if cs := h.lookupThreadStore(threadID); cs != nil {
+		if sess, err := cs.LoadSession(); err == nil && sess.FocusedTask != "" {
+			if taskUUID, err := uuid.Parse(sess.FocusedTask); err == nil {
+				h.undoTaskModeRound(ctx, w, threadID, taskUUID)
+				return
+			}
+		}
+	}
 
 	for _, ws := range h.currentWorkspaces() {
 		hash, subject, body := findLatestThreadPlanCommit(ctx, ws, threadID)
@@ -346,6 +357,85 @@ func extractDispatchedTaskIDs(diff string) []uuid.UUID {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// undoTaskModeRound rewinds the most recent prompt_round event on taskUUID
+// that was written by threadID and has not yet been superseded by a
+// prompt_round_revert. The task's Prompt is restored to the previous value
+// atomically and a prompt_round_revert event is appended. No git operations
+// are performed. Returns 409 when no unreverted rounds exist for this thread.
+//
+// Response shape: {reverted_round, thread_id, mode: "task"}.
+// This differs from the spec-mode undoResult; the UI branches on mode.
+func (h *Handler) undoTaskModeRound(ctx context.Context, w http.ResponseWriter, threadID string, taskUUID uuid.UUID) {
+	s, ok := h.currentStore()
+	if !ok {
+		http.Error(w, "store not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	events, err := s.GetEvents(ctx, taskUUID)
+	if err != nil {
+		http.Error(w, "failed to read task events", http.StatusInternalServerError)
+		return
+	}
+
+	// Collect round numbers already reverted by this thread.
+	revertedRounds := map[int]bool{}
+	for _, ev := range events {
+		if ev.EventType != store.EventTypePromptRoundRevert {
+			continue
+		}
+		var data store.PromptRoundRevertData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data.ThreadID == threadID {
+			revertedRounds[data.RevertedRound] = true
+		}
+	}
+
+	// Walk events newest-first; pick the first prompt_round for this thread
+	// whose round is not yet reverted. Within a thread, event order equals
+	// round order, so the first match is the highest un-reverted round.
+	var target *store.PromptRoundData
+	for i := len(events) - 1; i >= 0; i-- {
+		ev := events[i]
+		if ev.EventType != store.EventTypePromptRound {
+			continue
+		}
+		var data store.PromptRoundData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data.ThreadID != threadID || revertedRounds[data.Round] {
+			continue
+		}
+		cp := data
+		target = &cp
+		break
+	}
+
+	if target == nil {
+		httpjson.Write(w, http.StatusConflict, map[string]any{
+			"error": "no planning rounds to undo for this thread",
+		})
+		return
+	}
+
+	if _, _, err := s.UpdateTaskPromptDirect(ctx, taskUUID, target.PrevPrompt); err != nil {
+		http.Error(w, "failed to restore task prompt: "+err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	_ = s.InsertEvent(ctx, taskUUID, store.EventTypePromptRoundRevert,
+		store.NewPromptRoundRevertEvent(threadID, target.Round))
+
+	httpjson.Write(w, http.StatusOK, map[string]any{
+		"reverted_round": target.Round,
+		"thread_id":      threadID,
+		"mode":           "task",
+	})
 }
 
 // cancelDispatchedTask cancels the board task linked to a dispatched spec

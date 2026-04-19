@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -205,6 +206,265 @@ func TestExtractDispatchedTaskIDs(t *testing.T) {
 	headerOnly := "+++ b/specs/foo.md\n--- a/specs/foo.md\n"
 	if len(extractDispatchedTaskIDs(headerOnly)) != 0 {
 		t.Errorf("diff-header-only should yield 0 ids")
+	}
+}
+
+// --- Task-mode undo tests ---
+
+// seedPromptRound simulates what UpdateTaskPromptTool does: updates the task
+// prompt and writes a prompt_round event. Returns the previous prompt.
+func seedPromptRound(t *testing.T, h *Handler, taskID uuid.UUID, threadID string, round int, newPrompt string) string {
+	t.Helper()
+	ctx := context.Background()
+	prev, _, err := h.store.UpdateTaskPromptDirect(ctx, taskID, newPrompt)
+	if err != nil {
+		t.Fatalf("UpdateTaskPromptDirect: %v", err)
+	}
+	payload := store.NewPromptRoundEvent(threadID, round, prev, newPrompt, false)
+	_ = h.store.InsertEvent(ctx, taskID, store.EventTypePromptRound, payload)
+	return prev
+}
+
+func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	_ = p.Start(context.Background())
+	h.planner = p
+
+	ctx := context.Background()
+	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	threadID := p.Threads().ActiveID()
+	cs, _ := p.Threads().Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+
+	// Simulate two prompt rounds.
+	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
+	seedPromptRound(t, h, tsk.ID, threadID, 2, "v2")
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	h.UndoPlanningRound(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if got := resp["reverted_round"]; got != float64(2) {
+		t.Errorf("reverted_round = %v, want 2", got)
+	}
+	if got := resp["mode"]; got != "task" {
+		t.Errorf("mode = %v, want task", got)
+	}
+	if got := resp["thread_id"]; got != threadID {
+		t.Errorf("thread_id = %v, want %q", got, threadID)
+	}
+
+	// Task prompt should be restored to round-2's prev (= "v1").
+	updated, err := h.store.GetTask(ctx, tsk.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if updated.Prompt != "v1" {
+		t.Errorf("task.Prompt = %q, want %q", updated.Prompt, "v1")
+	}
+
+	// A prompt_round_revert event for round 2 must exist.
+	events, _ := h.store.GetEvents(ctx, tsk.ID)
+	var foundRevert bool
+	for _, ev := range events {
+		if ev.EventType != store.EventTypePromptRoundRevert {
+			continue
+		}
+		var data store.PromptRoundRevertData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data.ThreadID == threadID && data.RevertedRound == 2 {
+			foundRevert = true
+		}
+	}
+	if !foundRevert {
+		t.Error("prompt_round_revert event for round 2 not found")
+	}
+}
+
+func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	_ = p.Start(context.Background())
+	h.planner = p
+
+	ctx := context.Background()
+	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	threadID := p.Threads().ActiveID()
+	cs, _ := p.Threads().Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+
+	// Two prompt rounds.
+	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
+	seedPromptRound(t, h, tsk.ID, threadID, 2, "v2")
+
+	// First undo: reverts round 2.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	h.UndoPlanningRound(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("undo1 status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Second undo: reverts round 1.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	h.UndoPlanningRound(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("undo2 status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if got := resp["reverted_round"]; got != float64(1) {
+		t.Errorf("reverted_round = %v, want 1", got)
+	}
+
+	// Prompt should be back to original.
+	updated, _ := h.store.GetTask(ctx, tsk.ID)
+	if updated.Prompt != "original" {
+		t.Errorf("task.Prompt = %q, want %q", updated.Prompt, "original")
+	}
+
+	// Two prompt_round_revert events must exist.
+	events, _ := h.store.GetEvents(ctx, tsk.ID)
+	var revertCount int
+	for _, ev := range events {
+		if ev.EventType == store.EventTypePromptRoundRevert {
+			revertCount++
+		}
+	}
+	if revertCount != 2 {
+		t.Errorf("prompt_round_revert count = %d, want 2", revertCount)
+	}
+}
+
+func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
+	h := newTestHandler(t)
+	p := newPlannerWithStore(t)
+	_ = p.Start(context.Background())
+	h.planner = p
+
+	ctx := context.Background()
+	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	threadID := p.Threads().ActiveID()
+	cs, _ := p.Threads().Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+	_ = ctx
+
+	// No prompt_round events written — undo should return 409.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	h.UndoPlanningRound(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409\nbody: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "no planning rounds to undo") {
+		t.Errorf("body = %q, want error about no planning rounds to undo", rec.Body.String())
+	}
+}
+
+func TestUndo_FileMode_Unchanged(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	writeSpec(t, ws, "foo.md", "# foo\n")
+	// Seed a planning commit with an explicit thread trailer so the lookup
+	// can match it when a thread ID is passed via ?thread=.
+	runGit(t, ws, "add", "specs/")
+	msg := "specs(plan): drafted foo\n\nPlan-Round: 1\nPlan-Thread: spec-thread-1"
+	runGit(t, ws, "commit", "-m", msg)
+
+	h := newStaticWorkspaceHandler(t, []string{ws})
+	// Attach a planner whose active thread is in spec-mode (no FocusedTask).
+	p := newPlannerWithStore(t)
+	_ = p.Start(context.Background())
+	h.planner = p
+
+	specThreadID := p.Threads().ActiveID()
+	// Do NOT set FocusedTask — this keeps the thread in spec-mode.
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+specThreadID, nil)
+	h.UndoPlanningRound(rec, req)
+
+	// Should fall through to the git-revert path. Because the planning
+	// commit was written with a different Plan-Thread, the handler won't
+	// find a matching commit and returns 409 "no planning commits to undo".
+	// The important invariant is that it did NOT call undoTaskModeRound
+	// (which would 503 on a missing store or return a task-mode payload).
+	if rec.Code == http.StatusServiceUnavailable {
+		t.Fatalf("handler entered task-mode path unexpectedly (503)")
+	}
+
+	// Verify the response is not a task-mode payload.
+	var resp map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp["mode"] == "task" {
+		t.Errorf("spec-mode thread returned mode=task; git-revert path was bypassed")
+	}
+}
+
+func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	// Seed a planning commit in the workspace so there is commit history.
+	writeSpec(t, ws, "existing.md", "# existing\n")
+	seedPlanningCommit(t, ws, 1, "existing spec")
+	commitsBefore := gitLogSubjects(t, ws)
+
+	h := newTestHandler(t)
+	h.workspaces = []string{ws}
+
+	p := newPlannerWithStore(t)
+	_ = p.Start(context.Background())
+	h.planner = p
+
+	ctx := context.Background()
+	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	threadID := p.Threads().ActiveID()
+	cs, _ := p.Threads().Store(threadID)
+	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+
+	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	h.UndoPlanningRound(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
+	}
+
+	// Git log must be unchanged — task-mode undo must not create any commits.
+	commitsAfter := gitLogSubjects(t, ws)
+	if len(commitsAfter) != len(commitsBefore) {
+		t.Errorf("git commit count changed from %d to %d; task-mode undo must not write commits",
+			len(commitsBefore), len(commitsAfter))
 	}
 }
 
