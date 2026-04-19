@@ -10,15 +10,14 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 7 done, 1 in progress, 16 pending
+Local Product — 7 done, 1 in progress, 14 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
   ✅ Routine Tasks                 ✅ Agents & Flows
   ○ File/Image Attachments         ○ Host Mounts
   ○ File Panel Viewer              ○ Inline Diff Feedback
-  ○ Live Serve                     ○ Pull Request Creation
-  ○ Task Revert                    ○ Terminal UI (TUI mode)
+  ○ Live Serve                     ○ Terminal UI (TUI mode)
   ○ Excalidraw Whiteboard          ○ TypeScript Migration
   ○ Typed DOM Hooks                ○ Rebrand Module Path
   ○ Spatial Canvas                 ○ Scoped Command Registry
@@ -29,12 +28,16 @@ Cloud Platform — 0/5
   ○ Multi-Tenant (capstone)        ○ Tenant API
   ○ Billing Idempotency
 
-Shared Design — 2/10 complete
+Shared Design — 2/9 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
   ○ Overlay Snapshots              ○ Information Inbox
   ○ Token & Cost Optimization      ○ Extensible Prompts
-  ○ Intent-Driven Commits          ○ Agent Memory & Identity
-  ○ Intelligence System            ○ Eval Pipeline & Benchmark
+  ○ Agent Memory & Identity        ○ Intelligence System
+  ○ Eval Pipeline & Benchmark
+
+Intent — 0/3 (every action is a commit; undo and PR build on it)
+  ○ Intent-Driven Commits          ○ Task Revert
+  ○ Pull Request Creation
 
 Identity — 1/6 (principals, sessions, data boundaries)
   ✅ Authentication                ○ Third-Party OIDC
@@ -72,9 +75,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
 | [inline-diff-feedback.md](local/inline-diff-feedback.md) | Not started | Code-review-style inline comments on diff lines with batch feedback submission |
 | [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer |
-| [pull-request.md](local/pull-request.md) | Drafted | Agent-generated GitHub PR from current branch via lightweight sandbox |
 | [refinement-into-plan.md](local/refinement-into-plan.md) | Validated | Retire the bespoke refine pipeline; let Plan mode edit task prompts directly via a Task Prompts explorer section and a task-aware tool layer. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
-| [task-revert.md](local/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [typescript-migration.md](local/typescript-migration.md) | Drafted | Gradual migration of the frontend from JavaScript to TypeScript — tsconfig + esbuild + tsc typecheck, `.ts` source in place, compiled `.js` as build artifact. Pilot on `ui/js/lib/clipboard.ts`. |
 | [typed-dom-hooks.md](local/typed-dom-hooks.md) | Vague | Generate typed constants from `id` / `data-js-*` attributes in `ui/partials/` so renames fail type-check instead of silently breaking selectors. Contract layer between HTML, CSS, and TS. |
@@ -174,7 +175,6 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
-| [intent-commits.md](shared/intent-commits.md) | Not started | Both | Every intent (task, planning chat, explorer edit) produces a git commit — enables fine-grained undo, attribution, and revert. |
 | [eval-pipeline.md](shared/eval-pipeline.md) | Drafted | Both | Evaluation pipeline over captured Claude Code / Codex trajectories — vendor-format normalizer, rule-based + LLM-as-judge metrics, first-party benchmark bundles, dataset export, paired comparison reports. Keeps the door open for downstream RL/RLVR without implementing it. |
 | [agent-memory-identity.md](shared/agent-memory-identity.md) | Vague | Both | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. Foundation for intelligence system's shared world model. |
 | [intelligence-system.md](shared/intelligence-system.md) | Vague | Both | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. |
@@ -216,6 +216,28 @@ graph LR
 ```
 
 Multi-user collaboration is the gate for cloud multi-tenant; data-boundary-enforcement is the gate for anything the local instance sends up to observability / cloud.
+
+---
+
+## Intent
+
+Every user or agent action becomes a git commit with metadata; revert and PR are natural consumers. Intent-commits is the primitive foundation — once every action is a commit, "undo this task" and "open a PR for this branch" are just traversals over that commit graph.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [intent-commits.md](intent/intent-commits.md) | Vague | Every intent (task run, planning chat edit, explorer file edit) produces a git commit with structured metadata. Enables fine-grained undo, attribution, and revert. Foundation for the other two specs in this theme. |
+| [task-revert.md](intent/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution. Consumes intent-commits metadata to know which commits belong to a task. |
+| [pull-request.md](intent/pull-request.md) | Drafted | Agent-generated GitHub PR from the current branch via a lightweight sandbox. Uses intent-commits metadata to pick commit messages and PR body content. |
+
+### Intent dependencies
+
+```mermaid
+graph LR
+  IC[Intent-Driven Commits] --> TR[Task Revert]
+  IC --> PR[Pull Request Creation]
+```
+
+Ship intent-commits first; revert and PR become noticeably simpler once every action is already a well-formed commit.
 
 ---
 

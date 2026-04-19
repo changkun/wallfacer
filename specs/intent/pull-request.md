@@ -1,7 +1,8 @@
 ---
 title: "Pull Request Creation — Agent-Generated PR from Current Branch"
 status: drafted
-depends_on: []
+depends_on:
+  - specs/intent/intent-commits.md
 affects:
   - internal/runner/pullrequest.go
   - internal/handler/git.go
