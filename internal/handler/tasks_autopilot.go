@@ -20,14 +20,22 @@ import (
 	"github.com/google/uuid"
 )
 
-// maxConcurrentTasks returns the configured parallel task limit. The value is
-// lazily cached and only re-parsed after UpdateEnvConfig calls Invalidate.
+// maxConcurrentTasks returns the configured parallel task limit. Per-group
+// overrides (Group.MaxParallel in workspace-groups.json) take precedence
+// over the env-file default; a 0 override means "unlimited" for that group.
 func (h *Handler) maxConcurrentTasks() int {
+	if override, ok := h.currentGroupParallelLimit(false); ok {
+		return override
+	}
 	return h.cachedMaxParallel.Get()
 }
 
 // maxTestConcurrentTasks returns the configured parallel test-run limit.
+// Same per-group override semantics as maxConcurrentTasks.
 func (h *Handler) maxTestConcurrentTasks() int {
+	if override, ok := h.currentGroupParallelLimit(true); ok {
+		return override
+	}
 	return h.cachedMaxTestParallel.Get()
 }
 

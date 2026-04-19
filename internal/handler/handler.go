@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"slices"
 	"sync"
@@ -155,6 +156,12 @@ type Handler struct {
 	cachedMaxParallel     *lazyval.Value[int]
 	cachedMaxTestParallel *lazyval.Value[int]
 
+	// groupLimitsMu guards groupLimits, the in-memory cache of per-workspace-
+	// group concurrency overrides loaded from workspace-groups.json. Refreshed
+	// by reloadGroupLimits on startup and after each group save.
+	groupLimitsMu sync.RWMutex
+	groupLimits   map[string]groupLimitEntry
+
 	// ideationExploitRatio controls the exploitation fraction for the idea-
 	// agent prompt (0.0 = fully exploratory, 1.0 = fully exploitative). It
 	// is prompt-building state used by runner.BuildIdeationPrompt, not a
@@ -254,6 +261,8 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)
 	}
+	// Populate the per-group concurrency override cache from disk.
+	h.reloadGroupLimits()
 	// Initialise handler state from the current workspace snapshot.
 	h.applySnapshot(wsMgr.Snapshot())
 	if wsMgr != nil {
@@ -346,6 +355,72 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	if h.planner != nil {
 		h.planner.UpdateWorkspaces(snap.Workspaces, snap.Key)
 	}
+}
+
+// groupLimitEntry caches the optional concurrency overrides for a single
+// workspace group. nil means "inherit the env-file default"; 0 means
+// "unlimited for this group"; positive means "hard cap".
+type groupLimitEntry struct {
+	maxParallel     *int
+	maxTestParallel *int
+}
+
+// reloadGroupLimits re-reads workspace-groups.json and rebuilds the in-memory
+// groupLimits cache. Safe to call concurrently; a read error collapses the
+// cache to empty (so callers fall back to the env-file default). Called at
+// handler construction and from UpdateConfig after each SaveGroups.
+func (h *Handler) reloadGroupLimits() {
+	groups, err := workspace.LoadGroups(h.configDir)
+	limits := make(map[string]groupLimitEntry, len(groups))
+	if err == nil {
+		for _, g := range groups {
+			if g.MaxParallel == nil && g.MaxTestParallel == nil {
+				continue
+			}
+			limits[workspace.GroupKey(g.Workspaces)] = groupLimitEntry{
+				maxParallel:     g.MaxParallel,
+				maxTestParallel: g.MaxTestParallel,
+			}
+		}
+	}
+	h.groupLimitsMu.Lock()
+	h.groupLimits = limits
+	h.groupLimitsMu.Unlock()
+}
+
+// currentGroupParallelLimit returns the per-group concurrency override for
+// the currently viewed workspace group, if one is set. The second return
+// value reports whether an override applies; when false, callers should fall
+// back to the env-file default. testRun selects between the regular
+// (MaxParallel) and test-run (MaxTestParallel) overrides.
+func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
+	ws := h.currentWorkspaces()
+	if len(ws) == 0 {
+		return 0, false
+	}
+	key := workspace.GroupKey(ws)
+	h.groupLimitsMu.RLock()
+	entry, ok := h.groupLimits[key]
+	h.groupLimitsMu.RUnlock()
+	if !ok {
+		return 0, false
+	}
+	var v *int
+	if testRun {
+		v = entry.maxTestParallel
+	} else {
+		v = entry.maxParallel
+	}
+	if v == nil {
+		return 0, false
+	}
+	// A stored value of 0 is a deliberate "unlimited" override. Return a
+	// large sentinel so the caller's "in-progress >= limit" guard never
+	// trips on this group.
+	if *v == 0 {
+		return math.MaxInt32, true
+	}
+	return *v, true
 }
 
 // forEachActiveStore calls fn for every active workspace group's store.
