@@ -463,7 +463,8 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	// was sent. BearerAuth downstream bypasses its static-key check once
 	// claims are populated so a cookie-only browser request succeeds even
 	// in a deployment that also sets WALLFACER_SERVER_API_KEY for scripts.
-	srvHandler := handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
+	srvHandler := h.ForceLogin(mux)
+	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
 	srvHandler = auth.CookiePrincipal(authClient, jwtValidator, srvHandler)
 	if !cfg.SkipCSRF {
