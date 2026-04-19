@@ -540,11 +540,16 @@ flow.
    user-authored rows get Edit + Delete, and flows get a flat
    step editor (agent dropdown, optional toggle, reorder,
    remove) that feeds the POST /api/flows payload.
-8. **`POST /api/tasks sandbox` retained as back-compat.** The
-   only remaining deferred item. The e2e lifecycle scripts and
-   CLI callers still pass it; rejecting with 400 would break
-   external consumers. A future deprecation follow-up can remove
-   it once those callers migrate.
+8. **`POST /api/tasks sandbox` initially deferred, now
+   rejected.** The original spec called for the sandbox field to
+   be 400'd on POST. A Phase-5 compromise left it as a
+   back-compat hint because the e2e scripts and CLI passed it.
+   A follow-up commit finished the cleanup: POST /api/tasks and
+   POST /api/tasks/batch now return 400 when either `sandbox` or
+   `sandbox_by_activity` is present, the error message points at
+   the harness-on-agent workflow and the PATCH escape hatch, and
+   scripts/e2e-lifecycle.sh was migrated to POST without sandbox
+   then PATCH to set the per-task override.
 
 ## Testing Strategy
 
