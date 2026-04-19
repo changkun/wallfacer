@@ -60,7 +60,7 @@ type threadSummary struct {
 	Updated  string `json:"updated"`
 	Archived bool   `json:"archived"`
 	Active   bool   `json:"active,omitempty"`
-	Mode     string `json:"mode"`             // "spec" or "task"
+	Mode     string `json:"mode"`              // "spec" or "task"
 	TaskID   string `json:"task_id,omitempty"` // set when Mode == "task"
 }
 
