@@ -1,6 +1,6 @@
 ---
 title: JWT validation middleware on API routes
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/http-routes-and-api-config.md
 affects:
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # JWT validation middleware on API routes
 

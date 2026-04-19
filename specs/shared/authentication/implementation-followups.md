@@ -1,6 +1,6 @@
 ---
 title: Phase 2 implementation follow-ups
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
   - specs/shared/authentication/principal-context.md
@@ -24,6 +24,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Phase 2 Implementation Follow-ups
 

@@ -1,6 +1,6 @@
 ---
 title: Force login for unauthenticated browser requests in cloud mode
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/principal-context.md
 affects:
@@ -12,6 +12,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Force login for unauthenticated browser requests in cloud mode
 

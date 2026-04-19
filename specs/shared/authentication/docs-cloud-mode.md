@@ -1,6 +1,6 @@
 ---
 title: Cloud mode documentation
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/status-bar-sign-in-badge.md
 affects:
@@ -13,6 +13,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Cloud mode documentation
 

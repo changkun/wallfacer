@@ -1,6 +1,6 @@
 ---
 title: Authentication & Identity
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/auth/
@@ -15,6 +15,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Authentication & Identity
 
@@ -326,7 +327,7 @@ path still works exactly as before.
    ([`agent-token-exchange.md`](agent-token-exchange.md)) during Phase 2
    planning. It depends on the Phase 2 principal context but does not
    gate the cloud-track unblock.
-8. **Audit log extracted** to `shared/audit-log.md`. Phase 2 only lays
+8. **Audit log extracted** to `observability/audit-log.md`. Phase 2 only lays
    down one hook (`actor_sub` on the per-task event trace via
    `task-event-actor-sub.md`); the broader cross-entity log is a
    follow-up spec.
@@ -361,7 +362,7 @@ Phase 2's principal context: `CreatedBy` + `OrgID` on records answers
 *who originated this record*; it does not answer *who edited it,
 when, and to what*. Cross-entity mutation history, task state
 transitions, workspace config edits, admin actions, lives in its own
-spec: [`shared/audit-log.md`](audit-log.md).
+spec: [`observability/audit-log.md`](../observability/audit-log.md).
 
 That spec depends on Phase 2 (needs `*jwtauth.Claims` on every request)
 but is scoped separately so it doesn't balloon the cloud-unblock work.

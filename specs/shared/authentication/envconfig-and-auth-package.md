@@ -1,6 +1,6 @@
 ---
 title: WALLFACER_CLOUD env flag and internal/auth re-export
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/envconfig/
@@ -13,6 +13,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # WALLFACER_CLOUD env flag and internal/auth re-export
 
