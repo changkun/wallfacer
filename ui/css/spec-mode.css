@@ -1282,6 +1282,10 @@
   margin-left: 8px;
 }
 
+.spec-show-archived.hidden {
+  display: none;
+}
+
 .spec-node-toggle {
   cursor: pointer;
   width: 14px;
