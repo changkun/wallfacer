@@ -232,7 +232,10 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	// wallfacer run` is a clean override without editing the file.
 	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
 	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
-	var jwtValidator *auth.Validator
+	var (
+		jwtValidator *auth.Validator
+		authClient   *auth.Client
+	)
 	if cloudMode {
 		authCfg := auth.Config{
 			AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
@@ -247,7 +250,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		// oidc.New returns nil when required fields are missing — treat
 		// that as a misconfigured cloud deployment and refuse to start
 		// rather than silently running without sign-in.
-		authClient := auth.New(authCfg)
+		authClient = auth.New(authCfg)
 		if authClient == nil {
 			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL (in shell env or ~/.wallfacer/.env)")
 		}
@@ -451,15 +454,18 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		})
 	}
 
-	// Middleware stack (outermost first): logging → CSRF → JWT OptionalAuth
-	//   → bearer auth → mux.
-	// Desktop mode skips CSRF because requests originate from the local WebView
-	// (same-origin checks are not meaningful). JWT OptionalAuth runs before
-	// BearerAuth so a valid JWT lands claims in context first; BearerAuth
-	// then bypasses its static-key check for JWT-authenticated requests,
-	// keeping both identity paths workable in a cloud+API-key deployment.
+	// Middleware stack (outermost first): logging → CSRF → CookiePrincipal
+	//   → JWT OptionalAuth → bearer auth → mux.
+	// Desktop mode skips CSRF because requests originate from the local WebView.
+	// Both identity paths converge on the same *Claims context key: JWT wins
+	// when a Bearer header is present (OptionalAuth runs first, downstream
+	// from the cookie bridge), the cookie bridge fills in when no Bearer
+	// was sent. BearerAuth downstream bypasses its static-key check once
+	// claims are populated so a cookie-only browser request succeeds even
+	// in a deployment that also sets WALLFACER_SERVER_API_KEY for scripts.
 	srvHandler := handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
+	srvHandler = auth.CookiePrincipal(authClient, jwtValidator, srvHandler)
 	if !cfg.SkipCSRF {
 		srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	}
