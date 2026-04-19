@@ -870,3 +870,72 @@ func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
 		})
 	}
 }
+
+// TestParse_CloudTrue checks the canonical truthy spelling.
+func TestParse_CloudTrue(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_CLOUD=true\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !cfg.Cloud {
+		t.Error("Cloud = false; want true")
+	}
+}
+
+// TestParse_CloudFalse checks an explicit false value.
+func TestParse_CloudFalse(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_CLOUD=false\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.Cloud {
+		t.Error("Cloud = true; want false")
+	}
+}
+
+// TestParse_CloudUnset checks that a missing key defaults to false — cloud
+// mode is opt-in, not opt-out.
+func TestParse_CloudUnset(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.Cloud {
+		t.Error("Cloud = true; want false when unset")
+	}
+}
+
+// TestParse_CloudTruthyVariants exercises the case-insensitive truthy set
+// ("true", "1", "yes"). Anything else must parse to false so typos like
+// "tru" fail closed rather than silently enabling cloud mode.
+func TestParse_CloudTruthyVariants(t *testing.T) {
+	truthy := []string{"true", "TRUE", "True", "1", "yes", "YES", "Yes"}
+	for _, v := range truthy {
+		t.Run("truthy/"+v, func(t *testing.T) {
+			path := writeEnvFile(t, "WALLFACER_CLOUD="+v+"\n")
+			cfg, err := envconfig.Parse(path)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if !cfg.Cloud {
+				t.Errorf("Cloud = false; want true for %q", v)
+			}
+		})
+	}
+	falsy := []string{"", "false", "0", "no", "tru", "on"}
+	for _, v := range falsy {
+		t.Run("falsy/"+v, func(t *testing.T) {
+			path := writeEnvFile(t, "WALLFACER_CLOUD="+v+"\n")
+			cfg, err := envconfig.Parse(path)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if cfg.Cloud {
+				t.Errorf("Cloud = true; want false for %q", v)
+			}
+		})
+	}
+}

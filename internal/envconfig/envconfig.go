@@ -62,6 +62,12 @@ type Config struct {
 	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
+
+	// Cloud gates every cloud-only UI surface and HTTP route (latere.ai
+	// sign-in badge today; tenant-filesystem, billing, remote-control
+	// later). Sourced from WALLFACER_CLOUD; parsed here so the CLI entry
+	// point reads a single config surface.
+	Cloud bool // WALLFACER_CLOUD ("true"/"1"/"yes", case-insensitive)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -104,6 +110,7 @@ var knownKeys = []string{
 	"WALLFACER_DEPENDENCY_CACHES",
 	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
+	"WALLFACER_CLOUD",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -218,9 +225,24 @@ func Parse(path string) (Config, error) {
 			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
+		case "WALLFACER_CLOUD":
+			cfg.Cloud = parseBoolFlag(v)
 		}
 	}
 	return cfg, nil
+}
+
+// parseBoolFlag accepts the common truthy spellings used in environment
+// variables: "true", "1", and "yes" (all case-insensitive). Everything
+// else — including empty, "false", "0", "no" — parses as false. Used by
+// flags that are explicitly documented as accepting "true/1/yes", not
+// the older WALLFACER_* flags that use `v == "true"` or `v != "false"`.
+func parseBoolFlag(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "true", "1", "yes":
+		return true
+	}
+	return false
 }
 
 // ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted
