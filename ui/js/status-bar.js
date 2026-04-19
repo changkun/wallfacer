@@ -436,15 +436,16 @@ function _fetchAndRenderOrgSwitcher(menu, viewLabel) {
         return;
       }
       var currentID = data.current_id || "";
-      // Personal is always shown so the user sees it as a peer of
-      // their orgs. Switching from an org back to personal requires
-      // an auth-service roundtrip that isn't wired yet; Personal
-      // renders as a read-only "you are here" marker for now and
-      // becomes interactive once the auth service supports
-      // clearing active_org on the authorize call. When already on
-      // personal, clicking it is a no-op.
+      // Personal is always shown as a peer of the orgs. Clicking it
+      // when already on personal is a no-op; clicking from an org
+      // posts /api/auth/switch-org with org_id="" which clears
+      // active_org on the SSO session and re-scopes the token.
       addItem("Personal", {
         active: !currentID,
+        onClick: function () {
+          if (!currentID) return;
+          _switchOrg("");
+        },
       });
       addSeparator();
       for (var i = 0; i < data.orgs.length; i += 1) {
