@@ -1409,6 +1409,86 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 	}
 }
 
+// TestAutomationToggles_ScopedPerWorkspaceGroup pins that automation
+// toggles (autopilot, autotest, etc.) are stored per workspace group:
+// toggling autopilot on in group A and switching to group B (which has
+// never been toggled) must leave autopilot off in B. Switching back to
+// A must restore it. Autopush stays global and is deliberately excluded.
+func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
+	h, wsMgr, wsA := newTestHandlerWithRealWorkspaceManager(t)
+
+	// Enable autopilot and autotest in group A via the HTTP handler so
+	// the persistence side-effect matches production.
+	pilot := true
+	tst := true
+	b, _ := json.Marshal(struct {
+		Autopilot *bool `json:"autopilot"`
+		Autotest  *bool `json:"autotest"`
+	}{&pilot, &tst})
+	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
+	w := httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("enable in A: %d: %s", w.Code, w.Body.String())
+	}
+	if !h.AutopilotEnabled() || !h.AutotestEnabled() {
+		t.Fatalf("toggles should be on in A")
+	}
+
+	// Switch to a fresh group B.
+	wsB := t.TempDir()
+	body := strings.NewReader(`{"workspaces":["` + wsB + `"]}`)
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w = httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("switch to B: %d: %s", w.Code, w.Body.String())
+	}
+	// Poll until the subscription goroutine has applied the B snapshot
+	// and cleared the toggles. The HTTP PUT completes before
+	// applySnapshot runs on the manager's subscription goroutine.
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if !h.AutopilotEnabled() && !h.AutotestEnabled() {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Group B has never seen a toggle before — every automation must be
+	// off regardless of what A had on.
+	if h.AutopilotEnabled() {
+		t.Errorf("autopilot leaked into fresh group B")
+	}
+	if h.AutotestEnabled() {
+		t.Errorf("autotest leaked into fresh group B")
+	}
+
+	// Switch back to A and the toggles must return to their saved state.
+	body = strings.NewReader(`{"workspaces":["` + wsA + `"]}`)
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w = httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("switch back to A: %d: %s", w.Code, w.Body.String())
+	}
+	// Poll until the subscription goroutine has reapplied the A snapshot
+	// and the toggles have been restored — the workspace update returns
+	// before applySnapshot runs on the subscription goroutine.
+	deadline = time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if h.AutopilotEnabled() && h.AutotestEnabled() {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !h.AutopilotEnabled() || !h.AutotestEnabled() {
+		t.Errorf("toggles should be restored in A after round-trip (autopilot=%v autotest=%v)",
+			h.AutopilotEnabled(), h.AutotestEnabled())
+	}
+	_ = wsMgr
+}
+
 // --- strict JSON decoding ---
 
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.

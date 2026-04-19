@@ -24,6 +24,19 @@ type Group struct {
 	// MaxTestParallel does the same for WALLFACER_MAX_TEST_PARALLEL.
 	MaxTestParallel *int `json:"max_test_parallel,omitempty"`
 
+	// Automation toggles are per-group so that switching workspaces does
+	// not carry an "autopilot on" state into a group the user expected to
+	// operate manually. Pointers so that absent fields in on-disk JSON
+	// deserialize to nil (meaning "unset, default off"), distinguishable
+	// from an explicit false the user saved. Autopush is intentionally
+	// NOT per-group: push credentials / remote setup are global, so the
+	// auto-push flag continues to live in the env file.
+	Autopilot  *bool `json:"autopilot,omitempty"`
+	Autorefine *bool `json:"autorefine,omitempty"`
+	Autotest   *bool `json:"autotest,omitempty"`
+	Autosubmit *bool `json:"autosubmit,omitempty"`
+	Autosync   *bool `json:"autosync,omitempty"`
+
 	// CreatedBy records the principal sub of the user who first owned
 	// this group in cloud mode. Empty on groups created pre-cloud or in
 	// local mode. Mirrors store.Task.CreatedBy semantics.
@@ -88,6 +101,11 @@ func UpsertGroup(configDir string, workspaces []string) error {
 				Workspaces:      workspaces,
 				MaxParallel:     group.MaxParallel,
 				MaxTestParallel: group.MaxTestParallel,
+				Autopilot:       group.Autopilot,
+				Autorefine:      group.Autorefine,
+				Autotest:        group.Autotest,
+				Autosubmit:      group.Autosubmit,
+				Autosync:        group.Autosync,
 				CreatedBy:       group.CreatedBy,
 				OrgID:           group.OrgID,
 			}
@@ -122,6 +140,11 @@ func NormalizeGroups(groups []Group) []Group {
 			Workspaces:      ws,
 			MaxParallel:     sanitizeLimit(group.MaxParallel),
 			MaxTestParallel: sanitizeLimit(group.MaxTestParallel),
+			Autopilot:       group.Autopilot,
+			Autorefine:      group.Autorefine,
+			Autotest:        group.Autotest,
+			Autosubmit:      group.Autosubmit,
+			Autosync:        group.Autosync,
 			CreatedBy:       group.CreatedBy,
 			OrgID:           group.OrgID,
 		})

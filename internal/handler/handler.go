@@ -355,6 +355,101 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	if h.planner != nil {
 		h.planner.UpdateWorkspaces(snap.Workspaces, snap.Key)
 	}
+
+	// Switching groups must also swap the automation toggle state so a
+	// group the user expected to operate manually does not inherit an
+	// autopilot-on flag from the previous group. Autopush is a global
+	// env-file flag and is not touched here.
+	h.applyGroupToggles(snap.Workspaces)
+}
+
+// applyGroupToggles syncs the in-memory automation toggle atomics to the
+// values persisted for the given workspace group. A group whose fields
+// are nil (never configured or saved pre-migration) resets every toggle
+// to off, which matches the user expectation that a brand-new group
+// starts fully manual.
+func (h *Handler) applyGroupToggles(ws []string) {
+	var g *workspace.Group
+	if len(ws) > 0 {
+		groups, err := workspace.LoadGroups(h.configDir)
+		if err == nil {
+			key := workspace.GroupKey(ws)
+			for i := range groups {
+				if workspace.GroupKey(groups[i].Workspaces) == key {
+					g = &groups[i]
+					break
+				}
+			}
+		}
+	}
+	pick := func(v *bool) bool {
+		if v == nil {
+			return false
+		}
+		return *v
+	}
+	if g == nil {
+		h.autopilot.Store(false)
+		h.autorefine.Store(false)
+		h.autotest.Store(false)
+		h.autosubmit.Store(false)
+		h.autosync.Store(false)
+		return
+	}
+	h.autopilot.Store(pick(g.Autopilot))
+	h.autorefine.Store(pick(g.Autorefine))
+	h.autotest.Store(pick(g.Autotest))
+	h.autosubmit.Store(pick(g.Autosubmit))
+	h.autosync.Store(pick(g.Autosync))
+}
+
+// persistCurrentGroupToggles writes the current in-memory toggle state
+// into the workspace-groups.json entry for the currently viewed group,
+// creating a new entry if the group is not yet persisted. Called from
+// UpdateConfig after the user flips any automation toggle so switching
+// to another group and back restores their choice.
+func (h *Handler) persistCurrentGroupToggles() {
+	ws := h.currentWorkspaces()
+	if len(ws) == 0 {
+		return
+	}
+	groups, err := workspace.LoadGroups(h.configDir)
+	if err != nil {
+		logger.Handler.Warn("persist group toggles: load groups", "error", err)
+		return
+	}
+	key := workspace.GroupKey(ws)
+	b := func(v bool) *bool { x := v; return &x }
+	autopilot := b(h.autopilot.Load())
+	autorefine := b(h.autorefine.Load())
+	autotest := b(h.autotest.Load())
+	autosubmit := b(h.autosubmit.Load())
+	autosync := b(h.autosync.Load())
+	found := false
+	for i := range groups {
+		if workspace.GroupKey(groups[i].Workspaces) == key {
+			groups[i].Autopilot = autopilot
+			groups[i].Autorefine = autorefine
+			groups[i].Autotest = autotest
+			groups[i].Autosubmit = autosubmit
+			groups[i].Autosync = autosync
+			found = true
+			break
+		}
+	}
+	if !found {
+		groups = append([]workspace.Group{{
+			Workspaces: ws,
+			Autopilot:  autopilot,
+			Autorefine: autorefine,
+			Autotest:   autotest,
+			Autosubmit: autosubmit,
+			Autosync:   autosync,
+		}}, groups...)
+	}
+	if err := workspace.SaveGroups(h.configDir, groups); err != nil {
+		logger.Handler.Warn("persist group toggles: save groups", "error", err)
+	}
 }
 
 // groupLimitEntry caches the optional concurrency overrides for a single
