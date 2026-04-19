@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/auth"
+	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
@@ -68,6 +69,16 @@ func (h *Handler) AuthOrgs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	// Force a refresh first when the provider supports it. Otherwise
+	// an expired access token would produce a 401 from /me/orgs,
+	// which fetchOrgs would surface as a 502 — confusing "network
+	// error" signal for what is actually "your session needs to
+	// refresh". UserFromRequest internally calls RefreshToken with
+	// the stored refresh_token and updates the session cookie. The
+	// subsequent GetSession read picks up the freshly-minted token.
+	if refresher, ok := h.auth.(tokenRefresher); ok {
+		_ = refresher.UserFromRequest(w, r)
+	}
 	sess, err := client.GetSession(r)
 	if err != nil || sess == nil || sess.AccessToken == "" {
 		w.WriteHeader(http.StatusNoContent)
@@ -76,7 +87,13 @@ func (h *Handler) AuthOrgs(w http.ResponseWriter, r *http.Request) {
 
 	orgs, err := fetchOrgs(r.Context(), h.authURL, sess.AccessToken)
 	if err != nil {
-		httpjson.Write(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		// Treat upstream auth errors as "no orgs to show" rather
+		// than surfacing a 502 to the frontend. The status-bar
+		// renderer bails cleanly on 204, matching the behavior when
+		// the user isn't in any org. The specific error lands in
+		// the server log so operators can diagnose.
+		logger.Handler.Warn("AuthOrgs: /me/orgs fetch failed", "error", err)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	// No org memberships at all → 204. This is the one case where
@@ -101,6 +118,17 @@ func (h *Handler) AuthOrgs(w http.ResponseWriter, r *http.Request) {
 // grow.
 type sessionReader interface {
 	GetSession(*http.Request) (*auth.Session, error)
+}
+
+// tokenRefresher is the optional subset of AuthProvider that can
+// auto-refresh an expired access token. *auth.Client satisfies it via
+// oidc.Client.UserFromRequest, which internally refreshes with the
+// stored refresh token and updates the session cookie. When the
+// provider doesn't implement this (test fakes, older cores), we skip
+// the refresh step and the caller falls back to the stored access
+// token as-is.
+type tokenRefresher interface {
+	UserFromRequest(http.ResponseWriter, *http.Request) *auth.User
 }
 
 // switchOrgRequest is the POST /api/auth/switch-org body. Only org_id
@@ -147,6 +175,11 @@ func (h *Handler) AuthSwitchOrg(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "auth not configured"})
 		return
+	}
+	// Refresh the access token if possible so /me/orgs doesn't 401
+	// on a stale session (same rationale as AuthOrgs).
+	if refresher, ok := h.auth.(tokenRefresher); ok {
+		_ = refresher.UserFromRequest(w, r)
 	}
 	sess, err := client.GetSession(r)
 	if err != nil || sess == nil || sess.AccessToken == "" {
