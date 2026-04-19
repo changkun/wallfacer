@@ -321,6 +321,17 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.aside-action--primary {
+  color: var(--accent);
+}
+.aside-action--primary:hover,
+.aside-action--primary:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.aside-action--primary[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .aside-action--warn {
   color: #c27b2b;
 }

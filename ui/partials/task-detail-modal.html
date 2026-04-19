@@ -620,17 +620,6 @@
                   ></div>
                 </div>
 
-                <!-- Start section (backlog only) -->
-                <div id="modal-start-section" class="hidden mb-4">
-                  <button
-                    type="button"
-                    onclick="startTask()"
-                    class="btn btn-accent"
-                    style="width: 100%"
-                  >
-                    &#9654; Start task
-                  </button>
-                </div>
 
                 <!-- Resume section for failed tasks with session_id -->
                 <div id="modal-resume-section" class="hidden mb-4">
@@ -1357,6 +1346,17 @@
                  based on task status. -->
             <div class="mdl-section modal-aside__actions">
               <div class="mdl-h">Actions</div>
+              <div id="modal-start-section" class="hidden">
+                <button
+                  type="button"
+                  onclick="startTask()"
+                  class="aside-action aside-action--primary"
+                  title="Promote this task from Backlog to In Progress"
+                >
+                  <span class="aside-action__label">&#9654; Start task</span>
+                  <span class="aside-action__hint">move to In Progress</span>
+                </button>
+              </div>
               <div id="modal-archive-section" class="hidden">
                 <button
                   type="button"
