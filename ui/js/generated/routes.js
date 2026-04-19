@@ -387,6 +387,29 @@ var Routes = {
     cancel: function () {
       return "/api/auth/{provider}/cancel";
     },
+    // GET /api/auth/me
+    authMe: function () {
+      return "/api/auth/me";
+    },
+  },
+
+  "": {
+    // GET /login
+    login: function () {
+      return "/login";
+    },
+    // GET /callback
+    callback: function () {
+      return "/callback";
+    },
+    // GET /logout
+    logout: function () {
+      return "/logout";
+    },
+    // GET /logout/notify
+    logoutNotify: function () {
+      return "/logout/notify";
+    },
   },
 
   tasks: {

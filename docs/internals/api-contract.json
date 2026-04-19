@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 114,
+  "route_count": 119,
   "routes": [
     {
       "method": "GET",
@@ -988,6 +988,51 @@
       "description": "Cancel an in-progress OAuth flow for the given provider.",
       "tags": [
         "auth"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/login",
+      "name": "Login",
+      "description": "Redirect to the latere.ai auth service to begin sign-in.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/callback",
+      "name": "Callback",
+      "description": "OAuth2 authorization-code callback; sets the session cookie.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/logout",
+      "name": "Logout",
+      "description": "Clear the local session and redirect to the auth service logout.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/logout/notify",
+      "name": "LogoutNotify",
+      "description": "Front-channel logout target: clear the local cookie when the user signs out centrally.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/auth/me",
+      "name": "AuthMe",
+      "description": "Return the current signed-in user, or 204 when unauthenticated.",
+      "tags": [
+        "login"
       ]
     },
     {

@@ -721,6 +721,35 @@ var Routes = []Route{
 		Tags:        []string{"auth"},
 	},
 
+	// --- Latere.ai sign-in (cloud mode only; mounted when WALLFACER_CLOUD=true) ---
+
+	{
+		Method: http.MethodGet, Pattern: "/login", Name: "Login",
+		Description: "Redirect to the latere.ai auth service to begin sign-in.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/callback", Name: "Callback",
+		Description: "OAuth2 authorization-code callback; sets the session cookie.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/logout", Name: "Logout",
+		Description: "Clear the local session and redirect to the auth service logout.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/logout/notify", Name: "LogoutNotify",
+		Description: "Front-channel logout target: clear the local cookie when the user signs out centrally.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/auth/me", Name: "AuthMe",
+		JSName:      "authMe",
+		Description: "Return the current signed-in user, or 204 when unauthenticated.",
+		Tags:        []string{"login"},
+	},
+
 	// --- Refinement agent ---
 
 	{

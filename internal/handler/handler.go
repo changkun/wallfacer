@@ -135,6 +135,14 @@ type Handler struct {
 
 	oauthManager *oauth.Manager
 
+	// auth provides latere.ai OIDC sign-in when cloud mode is active. Nil
+	// (untyped) means auth is not configured; handlers short-circuit to 503
+	// or 204 accordingly. Wired via SetAuth from the CLI boot path.
+	auth AuthProvider
+	// authURL caches the auth service base URL for /api/config responses so
+	// handlers don't call back into AuthProvider for every config request.
+	authURL string
+
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache
 	fileIndex          *fileIndex
