@@ -79,9 +79,9 @@ flowchart LR
     Tasks --> Commits([Commits])
 ```
 
-## Plan Mode
+## The Autonomy Spectrum
 
-Plan mode is Wallfacer's design-time surface. A three-pane layout appears whenever any spec exists: **file explorer** on the left, **focused spec view** in the center, and **planning chat** on the right. When the specs tree is empty, plan mode collapses into a chat-first experience so you can start from an idea with zero scaffolding. Press `P` to toggle between the board and plan mode; `E` toggles the explorer, `C` toggles the chat, `D` dispatches, `B` breaks down.
+Wallfacer lets you work at whichever abstraction level fits the problem, and move between them as the shape becomes clearer.
 
 ```mermaid
 graph LR
@@ -90,58 +90,9 @@ graph LR
     Task --> Code[Code<br/>surgical edits]
 ```
 
-Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one.
+Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one. Specs move through a six-state lifecycle (`vague → drafted → validated → complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
 
-### Spec Lifecycle
-
-Every spec carries one of six lifecycle states. Transitions are intentional — the planner drives them explicitly via slash commands or direct edits, and the tree UI surfaces the current state as a colored pill.
-
-```mermaid
-stateDiagram-v2
-    [*] --> vague
-    vague --> drafted
-    drafted --> validated
-    drafted --> stale
-    drafted --> archived
-    validated --> complete
-    validated --> stale
-    complete --> stale
-    complete --> archived
-    stale --> drafted
-    stale --> validated
-    stale --> archived
-    archived --> drafted
-```
-
-- **vague** — a seed idea, still being shaped in chat.
-- **drafted** — structure and frontmatter in place; ready for review.
-- **validated** — reviewed and accepted; leaf specs in this state are dispatchable.
-- **complete** — all dispatched work landed; outcomes recorded.
-- **stale** — the world moved; spec needs refresh before further work.
-- **archived** — retired but preserved; can be revived back to drafted.
-
-### Slash Commands
-
-Planning chat accepts these slash commands. Type `/` to autocomplete.
-
-| Command | Purpose |
-|---------|---------|
-| `/summarize` | Summarize the current thread or focused spec |
-| `/create` | Create a new spec from the conversation |
-| `/refine` | Tighten wording, scope, or structure of a spec |
-| `/validate` | Check the focused spec against document model rules |
-| `/impact` | Analyze what code and specs would be affected |
-| `/status` | Update the focused spec's status (`/status <state>`) |
-| `/break-down` | Split a spec into child design specs or leaf tasks |
-| `/review-breakdown` | Sanity-check a proposed breakdown |
-| `/dispatch` | Dispatch validated leaf specs to the task board |
-| `/review-impl` | Review an implementation against its spec |
-| `/diff` | Compare a completed task against its source spec |
-| `/wrapup` | Finalize a completed spec and record outcomes |
-
-The agent may also emit `/spec-new <path>` as a scaffold directive — this is not a user command; it tells the server to create a new spec file at the given path with valid frontmatter defaults.
-
-Read more: [Designing Specs](docs/guide/designing-specs.md) and [Exploring Ideas](docs/guide/exploring-ideas.md).
+Read more: [The Autonomy Spectrum](docs/guide/autonomy-spectrum.md), [Designing Specs](docs/guide/designing-specs.md), and [Exploring Ideas](docs/guide/exploring-ideas.md).
 
 ## How execution is structured
 
@@ -185,14 +136,12 @@ Track token usage and cost by task, activity, and turn so operations stay measur
 
 ## Capability Stack
 
-- **Execution engine**: isolated containers, per-task git worktrees, worker container reuse, safe parallel runs, circuit breaker, resource limits, dependency caching
-- **Autonomous loop**: prompt refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets, failure categorization
-- **Spec workflow**: structured design specs, six-state lifecycle, dependency DAG, recursive progress tracking, planning chat agent with slash commands
-- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search, oversight summaries
-- **Repo operations**: multi-workspace groups, branch switching, sync/rebase helpers, auto commit and push, task forking
-- **Development tools**: file explorer with editor, interactive host terminal, prompt templates, system prompt customization
-- **Flexible runtime**: Podman/Docker support, workspace-level AGENTS.md instructions, Claude + Codex backends, harness pinning per agent
-- **Composable agents**: seven built-in sub-agent roles plus user-authored clones; flows compose them into pipelines that can be inspected, duplicated, or rewritten from the sidebar Agents and Flows tabs
+- **Chat** — planning chat with slash commands and file-explorer context, refinement and brainstorm agents, conversational drift away from or back into specs.
+- **Spec** — six-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
+- **Task** — isolated containers or host-mode exec, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
+- **Code** — file explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, workspace-level AGENTS.md instructions.
+
+Built on seven composable sub-agent roles (Claude or Codex) arranged into flows (`implement`, `brainstorm`, `refine-only`, `test-only`, plus user-authored clones) that can be inspected or rewritten from the sidebar.
 
 ## Roadmap
 
@@ -239,17 +188,7 @@ Development is organized into three parallel tracks with shared foundations. See
 
 ## Origin
 
-Wallfacer started as a practical response to a repeated workflow: write a task prompt, run an agent, inspect output, and do it again. The bottleneck was not coding speed — it was coordination and visibility across many concurrent agent tasks. A task board became the control surface.
-
-The first version was a Go server with a minimal web UI. Tasks moved from backlog to in progress, executed in isolated containers, and landed in done when complete. Git worktrees provided branch-level isolation so many tasks could run in parallel without collisions.
-
-Then the system kept growing into its own gaps. The execution engine gained container reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handles prompt refinement, implementation, testing, auto-retry, and autopilot promotion. An oversight layer — live logs, timelines, traces, diffs, and per-turn cost breakdown — ensures every agent decision is auditable before results are accepted.
-
-As the projects grew in complexity, raw task prompts became insufficient. Design specs emerged as the thinking layer between ideas and executable tasks — structured documents with lifecycle states, dependency graphs, and recursive progress tracking. A planning chat agent made specs conversational: explore an idea in chat, iterate on the design, break it into tasks, dispatch to the board.
-
-The integrated development environment now includes a file explorer with editor, an interactive host terminal, system prompt customization, and prompt templates — all accessible from the browser.
-
-Most of Wallfacer's recent capabilities were developed by Wallfacer itself, creating a compounding loop where the system continuously improves its own engineering process.
+Wallfacer started as a task board for coordinating concurrent agent runs and grew into its own gaps from there: spec coordination, oversight, refinement, an integrated IDE. Most recent capabilities were developed by Wallfacer itself. See [docs/origin.md](docs/origin.md) for the long version.
 
 ## License
 
