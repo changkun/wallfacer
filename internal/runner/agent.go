@@ -157,6 +157,24 @@ func (r *Runner) runAgent(
 		return nil, fmt.Errorf("runAgent: binding for %s has no ParseResult", role.Slug)
 	}
 
+	// role.PromptTmpl carries a user-authored preamble that shapes
+	// the agent's behaviour. When non-empty, prepend it to the
+	// caller's prompt so the agent sees the preamble first and
+	// the runtime input second, separated by a blank line. No
+	// template substitution — the preamble is whatever the user
+	// typed into the Agents-tab editor, verbatim. Built-in roles
+	// leave PromptTmpl empty, so the default path is a no-op.
+	//
+	// Effective for agents invoked via Runner.RunAgent (the flow
+	// engine's launcher). The turn-loop callers (GenerateTitle,
+	// GenerateCommitMessage, GenerateOversight, RunRefinement,
+	// RunIdeation) construct their own rendered prompts and
+	// bypass this preamble; they're scoped to built-in roles with
+	// empty PromptTmpl, so their behaviour is unchanged.
+	if role.PromptTmpl != "" {
+		prompt = role.PromptTmpl + "\n\n" + prompt
+	}
+
 	// Resolve the sandbox, newest tier first:
 	//   1. role.Harness — the agent descriptor's explicit harness
 	//      pin (set by user-authored clones). Wins over every

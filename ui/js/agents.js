@@ -648,9 +648,13 @@
     var h = document.createElement("span");
     h.className = "agents-detail__field-hint";
     h.textContent =
-      "Optional. Leave empty to inherit from the built-in template. " +
-      "Runtime use of custom prompt bodies ships in a follow-up; today " +
-      "the runner still loads the named template for built-in agent slots.";
+      "Optional preamble prepended to every invocation of this agent " +
+      "through the flow engine. The agent sees this text first, then " +
+      "a blank line, then the caller's prompt. Leave empty to use the " +
+      "agent's default behaviour. Note: built-in sub-agents invoked by " +
+      "the implement turn loop (title, oversight, commit-msg) use " +
+      "their embedded templates regardless; put custom prompts on a " +
+      "clone referenced from a custom flow.";
     wrap.appendChild(h);
     return wrap;
   }
