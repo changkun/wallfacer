@@ -93,31 +93,29 @@ func TestTasksForPrincipal_NilReturnsAll(t *testing.T) {
 	}
 }
 
-// TestTasksForPrincipal_OrgIsolatesFromOtherOrgs covers the core
-// multi-tenant contract: a caller scoped to orgA never sees orgB's
-// records and never sees anonymous legacy records.
-func TestTasksForPrincipal_OrgIsolatesFromOtherOrgs(t *testing.T) {
+// TestTasksForPrincipal_OrgViewIsStrict: caller in org-a sees only
+// org-a records. Personal + legacy + other-org records all stay
+// hidden. This is the user-facing contract: switching into an org
+// gives you a clean workspace, not a merged view with private data.
+func TestTasksForPrincipal_OrgViewIsStrict(t *testing.T) {
 	s, insert := newFiltStore(t)
-	insert("", "")                          // legacy — visible (shared)
-	insert("", "alice")                     // alice's personal — HIDDEN (caller is bob)
-	insert("org-a", "alice")                // visible (bob's org)
+	insert("", "")                          // legacy — hidden in org view
+	insert("", "alice")                     // alice's personal — hidden
+	insert("org-a", "alice")                // visible
 	anotherAID := insert("org-a", "alice2") // visible
 	insert("org-b", "bob")                  // hidden (different org)
 
 	got := s.TasksForPrincipal(context.Background(), &store.Principal{Sub: "bob", OrgID: "org-a"}, false)
-	if len(got) != 3 {
-		t.Fatalf("bob@orgA saw %d tasks, want 3 (2 org-a + 1 legacy)", len(got))
+	if len(got) != 2 {
+		t.Fatalf("bob@orgA saw %d tasks, want 2 (strictly org-a)", len(got))
 	}
 	for _, task := range got {
-		if task.OrgID == "org-b" {
-			t.Errorf("leaked org-b task into org-a view: %+v", task)
-		}
-		if task.OrgID == "" && task.CreatedBy == "alice" {
-			t.Errorf("leaked alice's personal task into bob's view: %+v", task)
+		if task.OrgID != "org-a" {
+			t.Errorf("leaked non-org-a task into org-a view: %+v", task)
 		}
 	}
 
-	// And a sanity check that the second orgA task is in the set.
+	// Sanity: the second orgA task is in the set.
 	foundSecond := false
 	for _, task := range got {
 		if task.ID == anotherAID {
@@ -129,21 +127,26 @@ func TestTasksForPrincipal_OrgIsolatesFromOtherOrgs(t *testing.T) {
 	}
 }
 
-// TestTasksForPrincipal_LegacyTasksVisibleAfterCloudSignIn is the
-// regression guard for the "tasks disappeared" UX bug: a user who
-// turns cloud mode on and signs in with an org must still see the
-// tasks they created in local mode (OrgID=""). The strict-isolation
-// original behavior was correct per spec but shipped a broken
-// migration story; this test locks in the relaxed filter.
-func TestTasksForPrincipal_LegacyTasksVisibleAfterCloudSignIn(t *testing.T) {
+// TestTasksForPrincipal_PersonalViewSeesLegacy covers the
+// signed-in-to-personal case: legacy (no-owner) records are
+// visible there so a single-user upgrade doesn't lose history.
+// The org view no longer admits them.
+func TestTasksForPrincipal_PersonalViewSeesLegacy(t *testing.T) {
 	s, insert := newFiltStore(t)
 	for i := 0; i < 3; i++ {
 		insert("", "") // three legacy local-mode tasks
 	}
 
-	got := s.TasksForPrincipal(context.Background(), &store.Principal{OrgID: "org-fresh"}, false)
-	if len(got) != 3 {
-		t.Fatalf("signed-in user sees %d legacy tasks, want 3", len(got))
+	personal := s.TasksForPrincipal(context.Background(), &store.Principal{Sub: "alice"}, false)
+	if len(personal) != 3 {
+		t.Errorf("personal view saw %d legacy tasks, want 3", len(personal))
+	}
+
+	// Same store, now with an org-scoped caller — legacy should be
+	// hidden from the org view (strict isolation).
+	orgView := s.TasksForPrincipal(context.Background(), &store.Principal{OrgID: "org-fresh"}, false)
+	if len(orgView) != 0 {
+		t.Errorf("org view leaked %d legacy tasks", len(orgView))
 	}
 }
 
@@ -174,7 +177,7 @@ func TestTasksForPrincipal_NoOrgSeesOwnPersonalAndLegacy(t *testing.T) {
 }
 
 // TestTasksForPrincipal_PersonalSpaceIsolationAcrossUsers is the
-// dedicated regression guard for the "personal OrgID='' is not legacy"
+// dedicated regression guard for the "personal OrgID=” is not legacy"
 // insight. Without proper owner filtering, user A's personal tasks
 // would leak to user B simply because both are signed in.
 func TestTasksForPrincipal_PersonalSpaceIsolationAcrossUsers(t *testing.T) {

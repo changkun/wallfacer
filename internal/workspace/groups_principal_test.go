@@ -112,30 +112,18 @@ func TestGroupsForPrincipal_AlicePersonal(t *testing.T) {
 	}
 }
 
-// TestGroupsForPrincipal_AliceInOrgA: alice active in org-a sees
-// legacy + all org-a groups (both hers and contractor's) +
-// her own personal. Bob's personal and org-b stay hidden.
+// TestGroupsForPrincipal_AliceInOrgA: alice in org-a sees only
+// org-a groups. Her own personal, legacy, other users' personal,
+// other orgs — all hidden. Org view is strict.
 func TestGroupsForPrincipal_AliceInOrgA(t *testing.T) {
 	got := workspace.GroupsForPrincipal(fixture(), &workspace.Principal{Sub: "alice", OrgID: "org-a"})
-	wantPaths := []string{"/legacy", "/alice-personal", "/org-a-shared", "/org-a-other"}
+	wantPaths := []string{"/org-a-shared", "/org-a-other"}
 	if len(got) != len(wantPaths) {
-		t.Fatalf("alice@org-a saw %d groups, want %d: %+v", len(got), len(wantPaths), got)
-	}
-	seen := map[string]bool{}
-	for _, g := range got {
-		seen[g.Workspaces[0]] = true
-	}
-	for _, p := range wantPaths {
-		if !seen[p] {
-			t.Errorf("alice@org-a missing %s", p)
-		}
+		t.Fatalf("alice@org-a saw %d groups, want %d (strict org): %+v", len(got), len(wantPaths), got)
 	}
 	for _, g := range got {
-		if g.Workspaces[0] == "/bob-personal" {
-			t.Error("leaked bob's personal into alice's view")
-		}
-		if g.Workspaces[0] == "/org-b-shared" {
-			t.Error("leaked org-b group into org-a view")
+		if g.OrgID != "org-a" {
+			t.Errorf("leaked non-org-a group into alice's view: %+v", g)
 		}
 	}
 }

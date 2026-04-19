@@ -180,29 +180,37 @@ func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
 }
 
 // GroupsForPrincipal returns the subset of `groups` that `p` can
-// see. Filter rules mirror store.TasksForPrincipal:
+// see. Mirrors store.TasksForPrincipal's strict isolation:
 //
-//	┌──────────────────────────────────┬────────────────────────────┐
-//	│ Group shape                      │ Who sees it                │
-//	├──────────────────────────────────┼────────────────────────────┤
-//	│ CreatedBy=""  OrgID=""  (legacy) │ Any signed-in user + local │
-//	│ CreatedBy=U   OrgID=""  (self)   │ Only user U                │
-//	│ CreatedBy=*   OrgID=X   (org)    │ Anyone with claims.OrgID=X │
-//	└──────────────────────────────────┴────────────────────────────┘
+//	┌─────────────────────────────┬──────────────────────────────────┐
+//	│ Caller view                 │ Sees                             │
+//	├─────────────────────────────┼──────────────────────────────────┤
+//	│ local (nil principal)       │ every group                      │
+//	│ personal (OrgID == "")      │ own personal + legacy no-owner   │
+//	│ org X (OrgID == "X")        │ only OrgID=="X" groups (strict)  │
+//	└─────────────────────────────┴──────────────────────────────────┘
 //
-// A nil p (local mode) returns groups unchanged.
+// The org view does NOT include personal or legacy groups — those
+// belong to the user's personal workspace, not the org. Switching
+// into an org should feel like a clean workspace, not a merged
+// view of private + org data.
 func GroupsForPrincipal(groups []Group, p *Principal) []Group {
 	if p == nil {
 		return groups
 	}
 	out := make([]Group, 0, len(groups))
 	for _, g := range groups {
-		switch {
-		case g.OrgID == "" && g.CreatedBy == "":
-			out = append(out, g)
-		case g.OrgID == "" && g.CreatedBy == p.Sub:
-			out = append(out, g)
-		case g.OrgID != "" && g.OrgID == p.OrgID:
+		if p.OrgID != "" {
+			if g.OrgID == p.OrgID {
+				out = append(out, g)
+			}
+			continue
+		}
+		// Personal view.
+		if g.OrgID != "" {
+			continue
+		}
+		if g.CreatedBy == "" || g.CreatedBy == p.Sub {
 			out = append(out, g)
 		}
 	}
