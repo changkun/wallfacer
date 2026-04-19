@@ -113,43 +113,10 @@ describe("sandboxDisplayName", () => {
   });
 });
 
-describe("collectSandboxByActivity / applySandboxByActivity", () => {
-  it("collects non-empty sandbox values by activity key", () => {
-    const ctx = makeContext({
-      elements: [
-        ["env-sandbox-implementation", { value: "claude" }],
-        ["env-sandbox-testing", { value: "codex" }],
-      ],
-    });
-    loadScript(ctx, "state.js");
-    loadScript(ctx, "utils.js");
-    loadScript(ctx, "workspace.js");
-    expect(ctx.collectSandboxByActivity("env-sandbox-")).toEqual({
-      implementation: "claude",
-      testing: "codex",
-    });
-  });
-
-  it("applies sandbox values to the matching elements", () => {
-    const impl = { value: "" };
-    const testing = { value: "codex" };
-    const ctx = makeContext({
-      elements: [
-        ["env-sandbox-implementation", impl],
-        ["env-sandbox-testing", testing],
-      ],
-    });
-    loadScript(ctx, "state.js");
-    loadScript(ctx, "utils.js");
-    loadScript(ctx, "workspace.js");
-    ctx.applySandboxByActivity("env-sandbox-", {
-      implementation: "custom",
-      oversight: "codex",
-    });
-    expect(impl.value).toBe("custom");
-    expect(testing.value).toBe(""); // not in the values map → cleared
-  });
-});
+// collectSandboxByActivity / applySandboxByActivity retired with
+// the agents/flows rewrite — per-activity sandbox routing lives on
+// agent.Harness now, not on per-env dropdowns, so the helpers and
+// their tests no longer exist.
 
 // ---------------------------------------------------------------------------
 // fetchConfig

@@ -273,10 +273,10 @@ describe("loadEnvConfig", () => {
     expect(statusEl.textContent).toBe("");
     expect(claudeTestStatusEl.textContent).toBe("");
     expect(codexTestStatusEl.textContent).toBe("");
-    expect(applySandboxByActivity).toHaveBeenCalledWith("env-sandbox-", {
-      implementation: "claude",
-      testing: "codex",
-    });
+    // applySandboxByActivity retired with the agents/flows rewrite;
+    // the server may still emit sandbox_by_activity for back-compat
+    // but the UI no longer applies it to DOM.
+    expect(applySandboxByActivity).not.toHaveBeenCalled();
     expect(populateSandboxSelects).toHaveBeenCalled();
   });
 

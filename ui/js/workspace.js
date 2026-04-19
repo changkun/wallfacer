@@ -11,18 +11,8 @@
 
 let availableSandboxes = [];
 let defaultSandbox = "";
-let defaultSandboxByActivity = {};
 let sandboxUsable = {};
 let sandboxReasons = {};
-let SANDBOX_ACTIVITY_KEYS = [
-  "implementation",
-  "testing",
-  "refinement",
-  "title",
-  "oversight",
-  "commit_message",
-  "idea_agent",
-];
 
 // ---------------------------------------------------------------------------
 // Sandbox helpers
@@ -46,18 +36,7 @@ function populateSandboxSelects() {
     var includeDefault = sel.dataset.defaultOption !== "false";
     sel.innerHTML = "";
     if (includeDefault) {
-      var effectiveDefault = sel.dataset.defaultSandbox || "";
-      if (!effectiveDefault) {
-        var matched = SANDBOX_ACTIVITY_KEYS.find(function (key) {
-          return sel.id.endsWith("-" + key);
-        });
-        if (matched) {
-          effectiveDefault =
-            defaultSandboxByActivity[matched] || defaultSandbox || "";
-        } else {
-          effectiveDefault = defaultSandbox || "";
-        }
-      }
+      var effectiveDefault = sel.dataset.defaultSandbox || defaultSandbox || "";
       var suffix = effectiveDefault
         ? " (" + sandboxDisplayName(effectiveDefault) + ")"
         : "";
@@ -81,26 +60,6 @@ function populateSandboxSelects() {
       sel.value = "";
     }
   }
-}
-
-function collectSandboxByActivity(prefix) {
-  var out = {};
-  SANDBOX_ACTIVITY_KEYS.forEach(function (key) {
-    var el = document.getElementById(prefix + key);
-    if (!el) return;
-    var value = (el.value || "").trim();
-    if (value) out[key] = value;
-  });
-  return out;
-}
-
-function applySandboxByActivity(prefix, values) {
-  var data = values || {};
-  SANDBOX_ACTIVITY_KEYS.forEach(function (key) {
-    var el = document.getElementById(prefix + key);
-    if (!el) return;
-    el.value = data[key] || "";
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -147,15 +106,11 @@ async function fetchConfig() {
     autopush = !!cfg.autopush;
     availableSandboxes = Array.isArray(cfg.sandboxes) ? cfg.sandboxes : [];
     defaultSandbox = cfg.default_sandbox || "";
-    defaultSandboxByActivity = cfg.activity_sandboxes || {};
     sandboxUsable = cfg.sandbox_usable || {};
     sandboxReasons = cfg.sandbox_reasons || {};
-    if (
-      Array.isArray(cfg.sandbox_activities) &&
-      cfg.sandbox_activities.length > 0
-    ) {
-      SANDBOX_ACTIVITY_KEYS = cfg.sandbox_activities;
-    }
+    // cfg.activity_sandboxes and cfg.sandbox_activities are still
+    // emitted by the server for back-compat but no longer consumed:
+    // per-activity routing lives on the agent's Harness pin.
     if (typeof setBrainstormCategories === "function") {
       setBrainstormCategories(cfg.ideation_categories || []);
     }
