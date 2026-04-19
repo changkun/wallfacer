@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 130,
+  "route_count": 131,
   "routes": [
     {
       "method": "GET",
@@ -1040,6 +1040,15 @@
       "pattern": "/api/explorer/file",
       "name": "ExplorerWriteFile",
       "description": "Write file contents to a workspace.",
+      "tags": [
+        "explorer"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/explorer/task-prompts",
+      "name": "ExplorerTaskPrompts",
+      "description": "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
       "tags": [
         "explorer"
       ]

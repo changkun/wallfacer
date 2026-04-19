@@ -16,6 +16,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // maxFileWriteSize is the maximum content size accepted by ExplorerWriteFile.
@@ -399,4 +400,92 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 		"size":   len(data),
 	})
+}
+
+// taskPromptEntry is a single entry in the Task Prompts virtual section.
+type taskPromptEntry struct {
+	TaskID    string    `json:"task_id"`
+	Title     string    `json:"title"`
+	Status    string    `json:"status"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ExplorerTaskPrompts returns backlog (and optionally waiting) tasks as virtual
+// explorer entries for the Task Prompts section. The ?status= query param is a
+// comma-separated list; the default is "backlog". Only "backlog" and "waiting"
+// are valid; any other value returns 422. Archived and tombstoned tasks are
+// excluded. Results are sorted by UpdatedAt descending.
+func (h *Handler) ExplorerTaskPrompts(w http.ResponseWriter, r *http.Request) {
+	statusParam := r.URL.Query().Get("status")
+	if statusParam == "" {
+		statusParam = "backlog"
+	}
+
+	parts := strings.Split(statusParam, ",")
+	var statuses []store.TaskStatus
+	seenStatus := make(map[store.TaskStatus]bool)
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		s := store.TaskStatus(p)
+		switch s {
+		case store.TaskStatusBacklog, store.TaskStatusWaiting:
+			if !seenStatus[s] {
+				seenStatus[s] = true
+				statuses = append(statuses, s)
+			}
+		default:
+			http.Error(w, "invalid status: only backlog and waiting are allowed", http.StatusUnprocessableEntity)
+			return
+		}
+	}
+
+	st, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	seenID := make(map[string]bool)
+	var entries []taskPromptEntry
+
+	for _, status := range statuses {
+		tasks, err := st.ListTasksByStatus(r.Context(), status)
+		if err != nil {
+			http.Error(w, "failed to list tasks", http.StatusInternalServerError)
+			return
+		}
+		for _, t := range tasks {
+			if t.Archived {
+				continue
+			}
+			id := t.ID.String()
+			if seenID[id] {
+				continue
+			}
+			seenID[id] = true
+			title := t.Title
+			if title == "" {
+				title = t.Prompt
+				if len(title) > 80 {
+					title = title[:80] + "..."
+				}
+			}
+			entries = append(entries, taskPromptEntry{
+				TaskID:    id,
+				Title:     title,
+				Status:    string(t.Status),
+				UpdatedAt: t.UpdatedAt.UTC(),
+			})
+		}
+	}
+
+	// Sort by UpdatedAt descending (most recently updated first).
+	slices.SortFunc(entries, func(a, b taskPromptEntry) int {
+		return b.UpdatedAt.Compare(a.UpdatedAt)
+	})
+
+	if entries == nil {
+		entries = []taskPromptEntry{}
+	}
+
+	httpjson.Write(w, http.StatusOK, entries)
 }
