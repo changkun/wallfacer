@@ -3,7 +3,7 @@ title: Intelligence System
 status: vague
 depends_on:
   - specs/shared/agent-abstraction.md
-  - specs/shared/telemetry-observability.md
+  - specs/observability/telemetry-observability.md
   - specs/oversight/multi-agent-consensus.md
   - specs/shared/agent-memory-identity.md
 affects:

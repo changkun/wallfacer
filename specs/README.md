@@ -24,20 +24,18 @@ Local Product — 7 done, 1 in progress, 17 pending
   ○ Spatial Canvas                 ○ Scoped Command Registry
   ○ Data Boundary Enforcement      ○ Refinement Into Plan
 
-Cloud Platform — 0/9
+Cloud Platform — 0/8
   ○ Tenant Filesystem              ○ K8s Sandbox Backend
   ○ Sandbox Isolation              ○ Cloud Infrastructure
   ○ Multi-Tenant (capstone)        ○ Tenant API
   ○ Multi-User Collaboration       ○ Billing Idempotency
-  ○ Telemetry Queue Backpressure
 
-Shared Design — 3/19 complete
+Shared Design — 3/17 complete
   ✅ Authentication                ✅ Agent Abstraction
   ○ Third-Party OIDC               ○ Remote Control
-  ○ Agent Token Exchange           ○ Audit Log
-  ○ Overlay Snapshots              ○ Native Sandbox (Linux)
-  ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
-  ✅ Host Exec Mode                ○ Telemetry & Observability
+  ○ Agent Token Exchange           ○ Overlay Snapshots
+  ○ Native Sandbox (Linux)         ○ Native Sandbox (macOS)
+  ○ Native Sandbox (Windows)       ✅ Host Exec Mode
   ○ Information Inbox              ○ Token & Cost Optimization
   ○ Extensible Prompts             ○ Intent-Driven Commits
   ○ Agent Memory & Identity        ○ Intelligence System
@@ -48,6 +46,10 @@ Oversight — 0/7 (layered defense & multi-agent deliberation)
   ○ Oversight Risk Scoring         ○ Validation Barrier
   ○ Visual Verification            ○ Multi-Agent Consensus
   ○ Multi-Agent Debate
+
+Observability — 0/3 (system telemetry & compliance)
+  ○ Telemetry & Observability      ○ Audit Log
+  ○ Telemetry Queue Backpressure
 ```
 
 ---
@@ -131,7 +133,6 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 | [multi-user-collaboration.md](cloud/multi-user-collaboration.md) | Drafted | Blocker for cloud: reframes tenant as org (not user), adds actor fields across the store, RBAC role matrix, presence/focus, audit log, optimistic concurrency, private planning threads |
 | [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
 | [billing-idempotency.md](cloud/billing-idempotency.md) | Drafted | Stripe idempotency keys on every charge operation — prevents double-billing under retry, single-charge guarantee for cost-visibility trust story |
-| [telemetry-queue-backpressure.md](cloud/telemetry-queue-backpressure.md) | Drafted | Cap on the local telemetry queue when the cloud is unreachable — bounded disk use, defined drop policy, keeps the local UI responsive under long outages |
 
 ### Cloud platform dependencies
 
@@ -179,14 +180,12 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [third-party-oidc.md](shared/third-party-oidc.md) | Vague | Both | Pluggable OIDC so self-hosted non-latere.ai deployments can log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. Depends on authentication Phase 2. |
 | [remote-control.md](shared/remote-control.md) | Vague | Both | Wire protocol + latere.ai-side registry that lets the latere.ai web UI or a mobile client observe and operate signed-in local wallfacer instances. Depends on authentication Phase 2. |
 | [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
-| [audit-log.md](shared/audit-log.md) | Drafted | Both | Cross-entity mutation history — uniform `audit.Record` write surface covering task transitions, workspace edits, config changes, admin actions; per-workspace JSONL storage; cloud-gated read API. Future effort; depends on auth Phase 2 for principal context. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
 | [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
 | [host-exec-mode.md](shared/host-exec-mode.md) | **Complete** | Local | `HostBackend` — opt-in `wallfacer run --backend host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. Covers both agents, live NDJSON streaming, parallel-cap default, Settings UI warning, `make build-host` target, and host-mode E2E harness. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
-| [telemetry-observability.md](shared/telemetry-observability.md) | Not started | Both | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
 | [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
@@ -236,6 +235,30 @@ graph LR
   VV[Visual Verification]
 
   style AA fill:#d4edda,stroke:#28a745
+```
+
+---
+
+## Observability
+
+System-facing monitoring and compliance: what is the software (including wallfacer itself and its sandboxed agents) doing, and who changed what. Distinct from Oversight, which governs *agent behavior* at dispatch/execution time. Observability feeds Oversight (telemetry anomalies become fix tasks; audit records attribute oversight decisions) but the two themes have different readers and lifetimes.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [telemetry-observability.md](observability/telemetry-observability.md) | Drafted | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
+| [audit-log.md](observability/audit-log.md) | Drafted | Cross-entity mutation history — uniform `audit.Record` write surface covering task transitions, workspace edits, config changes, admin actions; per-workspace JSONL storage; cloud-gated read API. Depends on auth Phase 2 for principal context. |
+| [telemetry-queue-backpressure.md](observability/telemetry-queue-backpressure.md) | Drafted | Cap on the local telemetry queue when the cloud is unreachable — bounded disk use, defined drop policy, keeps the local UI responsive under long outages. Implementation detail of telemetry-observability. |
+
+### Observability dependencies
+
+```mermaid
+graph LR
+  AUTH[Authentication ✅] --> AL[Audit Log]
+  TO[Telemetry & Observability] --> TQB[Telemetry Queue Backpressure]
+  TO --> DID[Defense in Depth → Oversight]
+  AL --> DID
+
+  style AUTH fill:#d4edda,stroke:#28a745
 ```
 
 ---

@@ -80,7 +80,7 @@ Either path needs:
   through. Remote-control is not a bypass.
 - An audit record of every remote action, stamped with the calling
   principal + the source IP of the control-plane client. Hooks into
-  [`shared/audit-log.md`](../audit-log.md) when that ships.
+  [`observability/audit-log.md`](../observability/audit-log.md) when that ships.
 
 ## What Phase 2 already delivered
 
