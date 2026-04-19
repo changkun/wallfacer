@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/auth"
+
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/prompts"
@@ -147,6 +149,13 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		payloadLimits = s.GetPayloadLimits()
 	}
 	groups, _ := workspace.LoadGroups(h.configDir)
+	// Org / personal filtering: cloud-mode callers see only groups
+	// their principal is allowed to see. Local mode (principal==nil)
+	// passes through unchanged. We resolve the principal directly
+	// from ctx here since buildConfigResponse doesn't take *Request.
+	if c, ok := auth.PrincipalFromContext(ctx); ok && c != nil {
+		groups = workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+	}
 	if len(workspaces) > 0 {
 		key := workspace.GroupKey(workspaces)
 		found := false
