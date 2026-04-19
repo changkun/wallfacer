@@ -657,12 +657,30 @@ func (s *Store) UpdateRoutineLastFiredAt(_ context.Context, id uuid.UUID, fired 
 // UpdateRoutineSpawnKind changes which Kind the routine's instance tasks
 // are created with. Callers must restrict the value to the whitelist
 // enforced at the API boundary ("", TaskKindIdeaAgent for v1).
+//
+// Deprecated: new writers should call UpdateRoutineSpawnFlow. This
+// setter stays for back-compat with API clients that still populate
+// the legacy spawn_kind field.
 func (s *Store) UpdateRoutineSpawnKind(_ context.Context, id uuid.UUID, kind TaskKind) error {
 	return s.mutateTask(id, func(t *Task) error {
 		if !t.IsRoutine() {
 			return fmt.Errorf("task %s is not a routine", id)
 		}
 		t.RoutineSpawnKind = kind
+		return nil
+	})
+}
+
+// UpdateRoutineSpawnFlow sets the flow slug a routine's instance
+// tasks run against. Takes precedence over RoutineSpawnKind at
+// dispatch time. Passing an empty string clears the override and
+// falls back to the legacy-Kind mapper.
+func (s *Store) UpdateRoutineSpawnFlow(_ context.Context, id uuid.UUID, slug string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		if !t.IsRoutine() {
+			return fmt.Errorf("task %s is not a routine", id)
+		}
+		t.RoutineSpawnFlow = slug
 		return nil
 	})
 }

@@ -135,6 +135,38 @@ func TestResolveForTask_NilTaskReturnsDefault(t *testing.T) {
 	}
 }
 
+// TestResolveRoutineFlow_PrefersSpawnFlow confirms a routine with an
+// explicit RoutineSpawnFlow overrides any legacy RoutineSpawnKind.
+func TestResolveRoutineFlow_PrefersSpawnFlow(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	got := reg.ResolveRoutineFlow(&store.Task{
+		RoutineSpawnKind: store.TaskKindIdeaAgent, // would legacy-resolve to brainstorm
+		RoutineSpawnFlow: "refine-only",
+	})
+	if got != "refine-only" {
+		t.Errorf("ResolveRoutineFlow = %q, want refine-only", got)
+	}
+}
+
+// TestResolveRoutineFlow_LegacyIdeaAgentMapsToBrainstorm covers
+// pre-migration routine records whose SpawnKind was idea-agent.
+func TestResolveRoutineFlow_LegacyIdeaAgentMapsToBrainstorm(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	got := reg.ResolveRoutineFlow(&store.Task{RoutineSpawnKind: store.TaskKindIdeaAgent})
+	if got != "brainstorm" {
+		t.Errorf("ResolveRoutineFlow = %q, want brainstorm", got)
+	}
+}
+
+// TestResolveRoutineFlow_EmptyDefaultsToImplement covers routines
+// with neither field set (regular implementation spawns).
+func TestResolveRoutineFlow_EmptyDefaultsToImplement(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	if got := reg.ResolveRoutineFlow(&store.Task{}); got != "implement" {
+		t.Errorf("ResolveRoutineFlow = %q, want implement", got)
+	}
+}
+
 // TestRegistry_ListReturnsDeepCopy catches accidental sharing of the
 // Steps slice between List output and registry state — mutating a
 // returned Flow must not leak back.

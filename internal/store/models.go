@@ -384,10 +384,20 @@ type Task struct {
 	// RoutineLastFiredAt records when the routine most recently spawned an
 	// instance task (successful or not). Used by the UI to show "fired Xm ago".
 	RoutineLastFiredAt *time.Time `json:"routine_last_fired_at,omitempty"`
-	// RoutineSpawnKind is the Kind assigned to tasks spawned by this routine.
-	// Empty string spawns regular implementation tasks; "idea-agent" is used
-	// by the migrated ideation routine. Whitelisted at the API boundary.
+	// RoutineSpawnKind is the legacy Kind assigned to tasks spawned by this
+	// routine. Kept for back-compat with records written before the Flow
+	// migration; new writers populate RoutineSpawnFlow instead and the
+	// runner resolves via ResolvedRoutineFlow. Whitelisted at the API
+	// boundary. Deprecated: use RoutineSpawnFlow.
 	RoutineSpawnKind TaskKind `json:"routine_spawn_kind,omitempty"`
+
+	// RoutineSpawnFlow is the flow slug assigned to tasks spawned by this
+	// routine. When non-empty it takes precedence over RoutineSpawnKind;
+	// empty records continue to resolve via the legacy Kind mapper. The
+	// resolution helper is ResolvedRoutineFlow, which lives on
+	// *flow.Registry (the store package cannot import flow without a
+	// cycle).
+	RoutineSpawnFlow string `json:"routine_spawn_flow,omitempty"`
 }
 
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry

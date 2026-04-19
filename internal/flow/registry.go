@@ -103,6 +103,24 @@ func (r *Registry) ResolveForTask(t *store.Task) string {
 	return "implement"
 }
 
+// ResolveRoutineFlow returns the slug of the flow a routine should
+// spawn instance tasks against. Precedence: RoutineSpawnFlow wins;
+// otherwise the legacy RoutineSpawnKind is mapped via the legacy
+// resolver; otherwise "implement". Shares the same cycle-breaking
+// rationale as ResolveForTask.
+func (r *Registry) ResolveRoutineFlow(t *store.Task) string {
+	if t == nil {
+		return "implement"
+	}
+	if t.RoutineSpawnFlow != "" {
+		return t.RoutineSpawnFlow
+	}
+	if f, ok := r.ResolveLegacyKind(t.RoutineSpawnKind); ok {
+		return f.Slug
+	}
+	return "implement"
+}
+
 // cloneFlow produces a defensive deep copy of a Flow. Used by Get and
 // List so callers can mutate the returned value without affecting the
 // registry.

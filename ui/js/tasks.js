@@ -403,11 +403,10 @@ async function createTask() {
     if (makeRoutine) {
       const interval_minutes =
         (repeatMinutesEl && parseInt(repeatMinutesEl.value, 10)) || 60;
-      // Routines for brainstorm flows spawn idea-agent tasks; other
-      // flows fall back to the runner's default spawn_kind. Once the
-      // routine-spawn-flow-migration task lands, this can pass the
-      // flow slug directly instead of translating back to spawn_kind.
-      const spawn_kind = _flowAllowsEmptyPrompt(flow) ? "idea-agent" : "";
+      // Routines spawn their instance tasks against the flow slug
+      // the composer picked. The server resolves it via the flow
+      // registry at fire time; legacy spawn_kind is filled on the
+      // response for older UIs but not written from here.
       const routinePrompt =
         prompt || "Brainstorm improvement ideas for the current workspace.";
       const routine = await api(Routes.routines.create(), {
@@ -417,7 +416,7 @@ async function createTask() {
           timeout,
           tags,
           interval_minutes,
-          spawn_kind,
+          spawn_flow: flow,
         }),
       });
       localStorage.removeItem("wallfacer-new-task-draft");
