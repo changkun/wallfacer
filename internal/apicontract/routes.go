@@ -800,6 +800,18 @@ var Routes = []Route{
 		Description: "Return the current signed-in user, or 204 when unauthenticated.",
 		Tags:        []string{"login"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/auth/orgs", Name: "AuthOrgs",
+		JSName:      "authOrgs",
+		Description: "List the signed-in user's organizations; 204 when single-org or unauthenticated.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/auth/switch-org", Name: "AuthSwitchOrg",
+		JSName:      "authSwitchOrg",
+		Description: "Switch active organization; clears session and returns a redirect to /login?org_id=<target>.",
+		Tags:        []string{"login"},
+	},
 
 	// --- Refinement agent ---
 

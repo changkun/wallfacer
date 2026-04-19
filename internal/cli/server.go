@@ -1013,7 +1013,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"Callback":     http.HandlerFunc(h.Callback),
 		"Logout":       http.HandlerFunc(h.Logout),
 		"LogoutNotify": http.HandlerFunc(h.LogoutNotify),
-		"AuthMe":       http.HandlerFunc(h.AuthMe),
+		"AuthMe":        http.HandlerFunc(h.AuthMe),
+		"AuthOrgs":      http.HandlerFunc(h.AuthOrgs),
+		"AuthSwitchOrg": http.HandlerFunc(h.AuthSwitchOrg),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
