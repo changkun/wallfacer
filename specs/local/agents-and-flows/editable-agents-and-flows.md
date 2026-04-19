@@ -9,10 +9,13 @@ affects:
   - internal/apicontract/routes.go
   - internal/handler/agents.go
   - internal/handler/flows.go
+  - internal/runner/agent_bindings.go
   - ui/partials/agents-tab.html
   - ui/partials/flows-tab.html
+  - ui/partials/board.html
   - ui/js/agents.js
   - ui/js/flows.js
+  - ui/js/tasks.js
 effort: large
 created: 2026-04-19
 updated: 2026-04-19
@@ -68,10 +71,31 @@ request time so edits take effect without a restart.
    - No self-reference in `RunInParallelWith`; parallel siblings
      must all be within the same flow.
 
-5. Documentation: extend `docs/guide/board-and-tasks.md` (or the
+5. Agent CLI pin + composer retirement of the Agent selector:
+   - Add an optional `CLI string` field to the agent descriptor
+     (values: `"claude"`, `"codex"`, empty for "inherit"). The
+     runner's sandbox resolver gains a new top tier that reads
+     this pin ahead of the existing activity / task / env /
+     default tiers.
+   - The editor in the Agents tab exposes the CLI as a dropdown so
+     users can bind an agent to a specific CLI when cloning
+     (`impl-codex`, `impl-claude`, etc.).
+   - Retire the composer's "Agent" dropdown (`#new-sandbox` in
+     `ui/partials/board.html`) now that CLI choice lives on the
+     agent definition each flow step references. Preserve the
+     workspace-wide default via `WALLFACER_DEFAULT_SANDBOX` — the
+     composer no longer needs a per-task override because users
+     who want a different CLI clone the agent (or the flow) and
+     pick the CLI there.
+   - Remove the `sandbox` field from the `POST /api/tasks` body.
+     Legacy clients that still send it get a 400 with a pointer
+     to the flow editor.
+
+6. Documentation: extend `docs/guide/board-and-tasks.md` (or the
    new Agents / Flows guide) with the clone-to-customize flow,
-   the file layout under `~/.wallfacer/`, and the
-   env-var knobs.
+   the file layout under `~/.wallfacer/`, and the env-var knobs.
+   Call out the composer change explicitly so users who relied on
+   the per-task Agent override know where it went.
 
 ## Tests
 
@@ -82,6 +106,13 @@ request time so edits take effect without a restart.
 - `internal/handler/agents_test.go` + `flows_test.go`:
   - POST / PUT / DELETE round-trips for user-authored.
   - 409 on mutation of a built-in.
+  - Agent response carries the new `cli` field.
+- `internal/runner/sandbox_resolver_test.go`: the agent CLI pin
+  wins over the task's legacy `Sandbox` field (treated as
+  workspace default until retirement).
+- `ui/js/tests/tasks-coverage.test.js`:
+  - POST body no longer includes `sandbox` after the composer
+    retires the Agent selector.
 - `ui/js/tests/` updates for the clone / edit flows.
 
 ## Boundaries
@@ -95,3 +126,8 @@ request time so edits take effect without a restart.
 - Do NOT migrate existing routines' `spawn_kind` to `spawn_flow`
   in this task. That's the sibling
   `routine-spawn-flow-migration` follow-up.
+- Do NOT rewire the sandbox resolver's per-activity env-var tier
+  (`WALLFACER_SANDBOX_IMPLEMENTATION` etc.). The agent CLI pin
+  layers *above* the activity tier so activity-level env
+  overrides continue to work for user installs that rely on
+  them.
