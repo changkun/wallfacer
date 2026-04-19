@@ -107,6 +107,7 @@ function createModalContext(options = {}) {
     "modal-resume-section",
     "modal-resume-timeout",
     "modal-start-section",
+    "modal-send-to-plan-section",
     "modal-cancel-section",
     "modal-retry-section",
     "modal-retry-resume-row",

@@ -833,12 +833,15 @@ function buildCardActions(t) {
           ? "Review the refined prompt before starting"
           : "";
     parts.push(
-      `<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openModal('${t.id}').then(()=>startRefinement())" title="Refine task with AI">&#9998; Refine</button>`,
+      `<button class="card-action-btn card-action-send-to-plan" onclick="event.stopPropagation();openPlanForTask('${t.id}')" title="Send to Plan">&#9997; Plan</button>`,
     );
     parts.push(
       `<button class="card-action-btn card-action-start" ${refineBlocked ? `disabled title="${refineTitle}"` : `onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress"`}>&#9654; Start</button>`,
     );
   } else if (t.status === "waiting") {
+    parts.push(
+      `<button class="card-action-btn card-action-send-to-plan" onclick="event.stopPropagation();openPlanForTask('${t.id}')" title="Send to Plan">&#9997; Plan</button>`,
+    );
     parts.push(
       `<button class="card-action-btn card-action-test" onclick="event.stopPropagation();quickTestTask('${t.id}')" title="Run test agent">&#9654; Test</button>`,
     );

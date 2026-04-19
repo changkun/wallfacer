@@ -540,9 +540,9 @@ describe("render.js buildCardActions", () => {
     expect(ctx.buildCardActions({ archived: true, status: "done" })).toBe("");
   });
 
-  it("includes Refine and Start buttons for backlog", () => {
+  it("includes Send to Plan and Start buttons for backlog", () => {
     const html = ctx.buildCardActions({ status: "backlog", id: "t1" });
-    expect(html).toContain("Refine");
+    expect(html).toContain("card-action-send-to-plan");
     expect(html).toContain("Start");
   });
 
@@ -555,8 +555,9 @@ describe("render.js buildCardActions", () => {
     expect(html).toContain("disabled");
   });
 
-  it("includes Test and Done buttons for waiting", () => {
+  it("includes Send to Plan, Test and Done buttons for waiting", () => {
     const html = ctx.buildCardActions({ status: "waiting", id: "t1" });
+    expect(html).toContain("card-action-send-to-plan");
     expect(html).toContain("Test");
     expect(html).toContain("Done");
   });
