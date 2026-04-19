@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
@@ -92,6 +93,14 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
+			// A request already authenticated by the upstream JWT
+			// middleware (cloud mode) bypasses the static-key check.
+			// Keeps cookie-only and JWT-bearer clients working even
+			// when WALLFACER_SERVER_API_KEY is set for script access.
+			if _, ok := auth.PrincipalFromContext(r.Context()); ok {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if isSSEPath(r.URL.Path) {
 				if r.URL.Query().Get("token") != key {
 					httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -100,8 +109,8 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			auth := strings.TrimSpace(r.Header.Get("Authorization"))
-			if auth != "Bearer "+key {
+			got := strings.TrimSpace(r.Header.Get("Authorization"))
+			if got != "Bearer "+key {
 				httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}

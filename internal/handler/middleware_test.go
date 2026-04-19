@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -144,6 +145,33 @@ func TestBearerAuthMiddleware(t *testing.T) {
 				t.Fatalf("error = %q, want %q", resp["error"], tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestBearerAuthMiddleware_ClaimsBypass confirms that a request whose
+// context already carries a validated principal (populated upstream by
+// auth.OptionalAuth in cloud mode) skips the static-key check. Keeps
+// cookie-only and JWT-bearer clients working in a deployment that also
+// sets WALLFACER_SERVER_API_KEY for scripts.
+func TestBearerAuthMiddleware_ClaimsBypass(t *testing.T) {
+	var served bool
+	mw := BearerAuthMiddleware("secret")
+	next := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		served = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	// No Authorization header, but claims are already in context — should pass.
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req = req.WithContext(auth.WithClaims(req.Context(), &auth.Claims{Sub: "user-xyz"}))
+	w := httptest.NewRecorder()
+	next.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204 (claims bypass)", w.Code)
+	}
+	if !served {
+		t.Fatal("next handler not invoked")
 	}
 }
 
