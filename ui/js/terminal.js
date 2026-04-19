@@ -16,6 +16,7 @@ var _sessionBufferLimit = 100000; // ~100KB per session
 // In desktop mode (Wails), the reverse proxy can't forward WebSocket upgrades.
 // Discover the real server port via /api/desktop-port and connect directly.
 var _desktopServerHost = (function () {
+  if (!(window.wails || window.WailsInvoke)) return null;
   try {
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/api/desktop-port", false);

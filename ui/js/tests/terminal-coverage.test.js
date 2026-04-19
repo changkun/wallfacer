@@ -262,8 +262,14 @@ function loadTerminal(ctx) {
 // ---------------------------------------------------------------------------
 
 describe("_desktopServerHost IIFE", () => {
-  it("returns host:port when XHR succeeds", () => {
-    const ctx = makeContext({
+  function desktopCtx(overrides) {
+    const ctx = makeContext(overrides);
+    ctx.wails = {};
+    return ctx;
+  }
+
+  it("returns host:port when XHR succeeds (desktop mode)", () => {
+    const ctx = desktopCtx({
       XMLHttpRequest: makeMockXHR(200, "9090"),
     });
     loadTerminal(ctx);
@@ -272,7 +278,7 @@ describe("_desktopServerHost IIFE", () => {
   });
 
   it("returns null when XHR returns non-200", () => {
-    const ctx = makeContext({
+    const ctx = desktopCtx({
       XMLHttpRequest: makeMockXHR(404, ""),
     });
     loadTerminal(ctx);
@@ -281,7 +287,7 @@ describe("_desktopServerHost IIFE", () => {
   });
 
   it("returns null when XHR returns empty body", () => {
-    const ctx = makeContext({
+    const ctx = desktopCtx({
       XMLHttpRequest: makeMockXHR(200, ""),
     });
     loadTerminal(ctx);
@@ -296,9 +302,25 @@ describe("_desktopServerHost IIFE", () => {
       }
       send() {}
     }
-    const ctx = makeContext({ XMLHttpRequest: ThrowingXHR });
+    const ctx = desktopCtx({ XMLHttpRequest: ThrowingXHR });
     loadTerminal(ctx);
     const result = vm.runInContext("_desktopServerHost", ctx);
+    expect(result).toBeNull();
+  });
+
+  it("does not issue the XHR in browser (non-desktop) mode", () => {
+    let opened = false;
+    class SpyXHR {
+      open() {
+        opened = true;
+      }
+      send() {}
+    }
+    const ctx = makeContext({ XMLHttpRequest: SpyXHR });
+    // No ctx.wails / ctx.WailsInvoke — simulates normal browser.
+    loadTerminal(ctx);
+    const result = vm.runInContext("_desktopServerHost", ctx);
+    expect(opened).toBe(false);
     expect(result).toBeNull();
   });
 });
