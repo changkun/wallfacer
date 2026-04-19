@@ -68,6 +68,35 @@ describe("routines.js", () => {
       expect(ctx.formatRoutineCountdown(null, true)).toBe("re-arming\u2026");
     });
 
+    it("returns 'stopped' for a cancelled routine, even if still enabled", () => {
+      // Regression: the previous formatter said "re-arming…" for a
+      // cancelled routine that still had routine_enabled=true. The
+      // engine has unregistered it, so the misleading label confused
+      // users into thinking the card was still about to fire.
+      expect(ctx.formatRoutineCountdown(null, true, "cancelled", false)).toBe(
+        "stopped",
+      );
+      expect(ctx.formatRoutineCountdown(null, true, "done", false)).toBe(
+        "stopped",
+      );
+      expect(ctx.formatRoutineCountdown(null, true, "failed", false)).toBe(
+        "stopped",
+      );
+    });
+
+    it("returns 'stopped (archived)' for an archived routine", () => {
+      expect(
+        ctx.formatRoutineCountdown(null, true, "cancelled", true),
+      ).toBe("stopped (archived)");
+    });
+
+    it("still fires a normal countdown for a backlog routine", () => {
+      const future = new Date(Date.now() + 60 * 1000).toISOString();
+      expect(
+        ctx.formatRoutineCountdown(future, true, "backlog", false),
+      ).toMatch(/^in \d+s$|^in 1m \d+s$/);
+    });
+
     it("returns 'fired just now' for past timestamps", () => {
       const past = new Date(Date.now() - 5000).toISOString();
       expect(ctx.formatRoutineCountdown(past, true)).toBe("fired just now");

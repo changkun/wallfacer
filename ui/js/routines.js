@@ -8,10 +8,22 @@
 // directly; keeping the picker short avoids a tangled multi-step UX.
 const ROUTINE_INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
 
-// formatRoutineCountdown turns a next-run ISO timestamp into a
-// "in 3m 12s" / "fired just now" / "paused" label.
-// Exposed so ui/js/tests can exercise the formatter without DOM state.
-function formatRoutineCountdown(nextRunISO, enabled) {
+// ROUTINE_STOPPED_STATUSES mirrors the backend's isRoutineStoppedStatus
+// in internal/handler/routines_engine.go. A routine card in any of these
+// states is unregistered from the engine and will not fire again until
+// the user moves it back to Backlog. Keep the two lists in sync.
+const ROUTINE_STOPPED_STATUSES = new Set(["cancelled", "done", "failed"]);
+
+// formatRoutineCountdown turns a next-run ISO timestamp into a short
+// status label for the routine footer. The `enabled` flag alone is not
+// enough to decide: a routine in a stopped lane (cancelled, done, failed)
+// or an archived one is no longer registered in the engine even if the
+// user left the "Enabled" checkbox on, so we must branch on `status` and
+// `archived` before falling through to the timing branches. Exposed so
+// ui/js/tests can exercise the formatter without DOM state.
+function formatRoutineCountdown(nextRunISO, enabled, status, archived) {
+  if (archived) return "stopped (archived)";
+  if (status && ROUTINE_STOPPED_STATUSES.has(status)) return "stopped";
   if (!enabled) return "paused";
   if (!nextRunISO) return "re-arming\u2026";
   const next = new Date(nextRunISO);
@@ -81,7 +93,7 @@ function renderRoutineFooter(t) {
       <div class="routine-footer-row">
         <span class="badge badge-routine" title="Routine schedule">routine</span>
         ${spawnBadge}
-        <span class="routine-next-run" data-routine-id="${t.id}" data-routine-next="${escapeHtml(nextRun || "")}" data-routine-enabled="${enabled ? "1" : "0"}" title="Next scheduled fire">${escapeHtml(formatRoutineCountdown(nextRun, enabled))}</span>
+        <span class="routine-next-run" data-routine-id="${t.id}" data-routine-next="${escapeHtml(nextRun || "")}" data-routine-enabled="${enabled ? "1" : "0"}" data-routine-status="${escapeHtml(t.status || "")}" data-routine-archived="${t.archived ? "1" : "0"}" title="Next scheduled fire">${escapeHtml(formatRoutineCountdown(nextRun, enabled, t.status, !!t.archived))}</span>
       </div>
       <div class="routine-footer-row">
         <label class="routine-interval-label">
@@ -189,7 +201,9 @@ function tickRoutineCountdowns() {
   for (const el of spans) {
     const enabled = el.getAttribute("data-routine-enabled") === "1";
     const nextRun = el.getAttribute("data-routine-next") || null;
-    el.textContent = formatRoutineCountdown(nextRun, enabled);
+    const status = el.getAttribute("data-routine-status") || "";
+    const archived = el.getAttribute("data-routine-archived") === "1";
+    el.textContent = formatRoutineCountdown(nextRun, enabled, status, archived);
   }
 }
 
