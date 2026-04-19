@@ -1,6 +1,6 @@
 ---
 title: Superadmin and scope gating for admin API routes
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:
@@ -12,6 +12,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Superadmin and scope gating for admin API routes
 

@@ -1,6 +1,6 @@
 ---
 title: Stamp actor principal on task event trace
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:
@@ -13,6 +13,7 @@ author: changkun
 dispatched_task_id: null
 ---
 
+
 # Stamp actor principal on task event trace
 
 ## Goal
@@ -20,7 +21,7 @@ dispatched_task_id: null
 When a handler writes an event to a task's trace (`state_change`, `feedback`,
 `error`, `system`, etc.), record *who* caused the event. This gives Phase 2
 task-scoped attribution out of the box and provides the hook that
-`shared/audit-log.md` will later extend to cross-entity mutation history.
+`observability/audit-log.md` will later extend to cross-entity mutation history.
 
 Local anonymous mode writes an empty actor string, which is the same
 attribution today's events carry, so no behavior change.
@@ -76,7 +77,7 @@ attribution today's events carry, so no behavior change.
 - Do not persist email or display name on the event. Only the principal
   sub. Display-name resolution is a read-path concern.
 - Do not fan out to workspaces, config, or admin actions, that is
-  [`shared/audit-log.md`](../audit-log.md)'s job. This spec covers only
+  [`observability/audit-log.md`](../observability/audit-log.md)'s job. This spec covers only
   the per-task event trace.
 - Do not add a read filter by actor. Cross-entity queries belong in
   the audit-log spec.
@@ -130,7 +131,7 @@ trips unchanged thanks to omitempty.
    sweep than this spec's "small" effort allows. Runner-initiated
    writes continue to write empty attribution, which is visually
    distinguishable from request-initiated writes now that the user
-   branch is populated. When `shared/audit-log.md` lands it will
+   branch is populated. When `observability/audit-log.md` lands it will
    sweep the remaining call sites during its operation-catalog
    rollout.
 

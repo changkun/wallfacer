@@ -1,6 +1,6 @@
 ---
 title: Cloud-gated auth routes, /api/auth/me, and /api/config extension
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/envconfig-and-auth-package.md
 affects:
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Cloud-gated auth routes, /api/auth/me, and /api/config extension
 

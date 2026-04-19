@@ -1,6 +1,6 @@
 ---
 title: Principal and org fields on task + workspace records
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/store/
@@ -12,6 +12,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Principal and org fields on task + workspace records
 

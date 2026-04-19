@@ -1,6 +1,6 @@
 ---
 title: Status-bar sign-in badge and front-channel logout iframe
-status: complete
+status: archived
 depends_on:
   - specs/shared/authentication/http-routes-and-api-config.md
 affects:
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Status-bar sign-in badge and front-channel logout iframe
 
