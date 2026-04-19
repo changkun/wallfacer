@@ -336,12 +336,16 @@ function _renderSignedIn(el, user, authURL) {
   }
 }
 
-// _fetchAndRenderOrgSwitcher queries /api/auth/orgs and, when the user
-// belongs to 2+ orgs, mounts a small <select> into `slot` that swaps
-// the active org via POST /api/auth/switch-org. 204 (single-org /
-// anonymous) is a no-op; errors are swallowed because the badge is a
-// convenience, not a critical path — any failure just means no
-// switcher appears.
+// _fetchAndRenderOrgSwitcher queries /api/auth/orgs and renders the
+// user's org context into `slot`. Three outcomes:
+//   - 204 (no org memberships or anonymous): bail, leave slot empty
+//   - 1 org: render a static label — serves as visible verification
+//     that the endpoint + claims are wired correctly, even when the
+//     user can't actually switch
+//   - 2+ orgs: render a <select>; change POSTs /api/auth/switch-org
+//     and navigates to the returned redirect_url
+// Errors are silent because the badge is a convenience, not a
+// critical path.
 function _fetchAndRenderOrgSwitcher(slot) {
   fetch("/api/auth/orgs", { credentials: "same-origin" })
     .then(function (resp) {
@@ -349,9 +353,21 @@ function _fetchAndRenderOrgSwitcher(slot) {
       return resp.json();
     })
     .then(function (data) {
-      if (!data || !Array.isArray(data.orgs) || data.orgs.length < 2) {
+      if (!data || !Array.isArray(data.orgs) || data.orgs.length === 0) {
         return;
       }
+      if (data.orgs.length === 1) {
+        // Single-org: static label so the user sees which org their
+        // token is scoped to. No switch affordance — they only have
+        // one — but they know the wiring works.
+        var label = document.createElement("span");
+        label.className = "sb-signin__org-label";
+        label.textContent = data.orgs[0].name || data.orgs[0].id;
+        label.title = data.orgs[0].name || data.orgs[0].id;
+        slot.appendChild(label);
+        return;
+      }
+      // Multi-org: interactive <select> that swaps the active org.
       var select = document.createElement("select");
       select.className = "sb-signin__org-select";
       select.setAttribute("aria-label", "Switch organization");
@@ -398,7 +414,7 @@ function _fetchAndRenderOrgSwitcher(slot) {
     })
     .catch(function () {
       // Network error: silent — user sees no switcher, same outcome
-      // as a single-org response. The next reload retries.
+      // as a 204 response. The next reload retries.
     });
 }
 

@@ -79,9 +79,14 @@ func (h *Handler) AuthOrgs(w http.ResponseWriter, r *http.Request) {
 		httpjson.Write(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
 	}
-	// Single-org users see no chooser; return 204 so the frontend can
-	// skip rendering the submenu.
-	if len(orgs) <= 1 {
+	// No org memberships at all → 204. This is the one case where
+	// there is genuinely nothing to render: the user isn't in any
+	// org, the cloud tenant boundary doesn't apply to them, and the
+	// status-bar renderer should bail. For 1+ orgs we return 200 so
+	// the frontend can always surface the active org — even single-
+	// org users get a visible label, which doubles as operator-
+	// visible confirmation that /api/auth/orgs is wired correctly.
+	if len(orgs) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}

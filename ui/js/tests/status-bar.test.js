@@ -792,7 +792,47 @@ const signedInUser = {
 };
 
 describe("renderSigninBadge org switcher", () => {
-  it("renders no <select> when /api/auth/orgs returns 204 (single-org)", async () => {
+  it("renders a static label for single-org (200 with 1 entry)", async () => {
+    const { ctx, signinEl } = makeSigninContext(
+      routedFetch({
+        "/api/auth/me": () =>
+          Promise.resolve({
+            status: 200,
+            json: () => Promise.resolve(signedInUser),
+          }),
+        "/api/auth/orgs": () =>
+          Promise.resolve({
+            status: 200,
+            json: () =>
+              Promise.resolve({
+                orgs: [{ id: "org-solo", name: "Solo Org" }],
+                current_id: "org-solo",
+              }),
+          }),
+      }),
+    );
+    loadStatusBarInCtx(ctx);
+    ctx.renderSigninBadge({ cloud: true });
+    await flushPromises();
+
+    const wrap = signinEl.children.find(
+      (c) => c.className === "sb-signin__user",
+    );
+    const slot = wrap.children.find(
+      (c) => c.className === "sb-signin__orgs",
+    );
+    expect(slot).toBeTruthy();
+    const label = slot.children.find(
+      (c) => c.className === "sb-signin__org-label",
+    );
+    expect(label).toBeTruthy();
+    expect(label.textContent).toBe("Solo Org");
+    // Must NOT render a select for single-org (nothing to switch to).
+    const select = slot.children.find((c) => c.tagName === "SELECT");
+    expect(select).toBeUndefined();
+  });
+
+  it("renders nothing when /api/auth/orgs returns 204 (no memberships)", async () => {
     const { ctx, signinEl } = makeSigninContext(
       routedFetch({
         "/api/auth/me": () =>
@@ -813,8 +853,6 @@ describe("renderSigninBadge org switcher", () => {
     const slot = wrap.children.find(
       (c) => c.className === "sb-signin__orgs",
     );
-    // Slot exists (mounted for layout) but has no children in the
-    // single-org case — the renderer bails on <2 orgs.
     expect(slot).toBeTruthy();
     expect(slot.children.length).toBe(0);
   });

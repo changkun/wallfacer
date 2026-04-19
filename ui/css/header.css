@@ -994,10 +994,49 @@ html.wails-desktop .app-sidebar {
 .sb-signin__logout:hover {
   color: var(--ink-1);
 }
+
+/* Org switcher slot: contains either a static label (single-org) or a
+ * <select> (multi-org). Kept compact so it sits inline with the user
+ * name without forcing the sign-in row to wrap. */
+.sb-signin__orgs {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+}
+.sb-signin__org-label {
+  color: var(--ink-3);
+  font-size: var(--fs-9);
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-signin__org-select {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  font-size: var(--fs-9);
+  padding: 2px 4px;
+  max-width: 100%;
+  cursor: pointer;
+}
+.sb-signin__org-select:hover {
+  color: var(--ink-1);
+  border-color: var(--border-1);
+}
+.sb-signin__org-select:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* Collapsed sidebar: hide name + logout text; avatar (and link) still visible. */
 .app-sidebar.collapsed .sb-signin__name,
 .app-sidebar.collapsed .sb-signin__logout,
-.app-sidebar.collapsed .sb-signin__link {
+.app-sidebar.collapsed .sb-signin__link,
+.app-sidebar.collapsed .sb-signin__orgs {
   display: none;
 }
 .app-sidebar.collapsed .sb-signin {
