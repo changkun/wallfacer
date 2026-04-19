@@ -616,18 +616,39 @@ func TestResumeTask_NotFound(t *testing.T) {
 	}
 }
 
-func TestResumeTask_RejectsNonFailed(t *testing.T) {
+func TestResumeTask_RejectsNonResumableStatus(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	// Task is in backlog, not failed.
+	// Task is in backlog — not failed and not waiting.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/resume", nil)
 	w := httptest.NewRecorder()
 	h.ResumeTask(w, req, task.ID)
 
 	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for non-failed task, got %d", w.Code)
+		t.Errorf("expected 400 for backlog task, got %d", w.Code)
+	}
+}
+
+func TestResumeTask_AcceptsWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	setTaskSessionID(t, h, task.ID, "session-waiting")
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/resume", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.ResumeTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for waiting task, got %d: %s", w.Code, w.Body.String())
+	}
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusInProgress && updated.Status != store.TaskStatusFailed {
+		t.Errorf("expected in_progress or failed, got %s", updated.Status)
 	}
 }
 

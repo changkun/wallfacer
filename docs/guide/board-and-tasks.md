@@ -325,9 +325,9 @@ Moves the task back to Backlog with the same (or edited) prompt. The retry secti
 
 #### Resume
 
-Available on: `failed` (when a session ID exists)
+Available on: `failed`, `waiting` (when a session ID exists)
 
-Resumes the failed task in its existing session with an extended timeout. The agent picks up where it left off rather than restarting from scratch. Choose a timeout from the dropdown before clicking Resume.
+Resumes the task in its existing session with an extended timeout. The agent picks up where it left off rather than restarting from scratch. This is particularly useful for tasks that hit their timeout and landed in waiting/failed with partial progress: extend the timeout and let the same session continue. Choose a timeout from the dropdown before clicking Resume.
 
 #### Archive / Unarchive
 

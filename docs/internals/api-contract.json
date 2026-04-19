@@ -884,7 +884,7 @@
       "method": "POST",
       "pattern": "/api/tasks/{id}/resume",
       "name": "ResumeTask",
-      "description": "Resume a failed task using its existing session.",
+      "description": "Resume a failed or waiting task using its existing session.",
       "tags": [
         "tasks"
       ]
