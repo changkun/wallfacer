@@ -356,6 +356,9 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if task.Status == store.TaskStatusBacklog || task.Status == store.TaskStatusWaiting {
+		h.cascadeArchiveThreadsForTask(id.String())
+	}
 
 	// If this is a routine card, cascade Cancel to any still-live spawned
 	// instances so orphaned backlog/in_progress/waiting children don't
@@ -533,6 +536,7 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 	if task.IsRoutine() {
 		h.cascadeCancelRoutineChildren(r.Context(), id)
 	}
+	h.cascadeArchiveThreadsForTask(id.String())
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "archived"})
 }
 
@@ -550,6 +554,7 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		"to":      "unarchived",
 		"trigger": string(store.TriggerUser),
 	})
+	h.cascadeUnarchiveThreadsForTask(id.String())
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "unarchived"})
 }
 

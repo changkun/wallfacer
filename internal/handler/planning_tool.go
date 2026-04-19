@@ -37,6 +37,14 @@ func (h *Handler) UpdateTaskPromptTool(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "thread not found", http.StatusNotFound)
 		return
 	}
+	// Reject calls on threads that were auto-archived because their task moved
+	// past backlog. The agent should surface this error to the user.
+	if tm := h.threadsManager(); tm != nil {
+		if meta, err := tm.Meta(threadID); err == nil && meta.Archived && meta.AutoArchivedByTaskLifecycle {
+			http.Error(w, "task has moved past backlog; start a new task to refine a new prompt.", http.StatusUnprocessableEntity)
+			return
+		}
+	}
 	sess, _ := cs.LoadSession()
 	if sess.FocusedTask == "" {
 		http.Error(w, "thread is not in task-mode", http.StatusUnprocessableEntity)

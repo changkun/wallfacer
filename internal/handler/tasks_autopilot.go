@@ -323,6 +323,12 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 							h.incAutopilotAction("auto_promoter", "skipped_dependency")
 							continue
 						}
+						if locked, threadID := h.isTaskLockedByPlanner(t.ID.String()); locked {
+							h.incAutopilotAction("auto_promoter", "skipped_locked")
+							logger.Handler.Debug("auto-promote: skipping locked task",
+								"task", t.ID, "thread", threadID)
+							continue
+						}
 						cpCandidates = append(cpCandidates, cpCandidate{task: *t, store: s, score: s.CriticalPathScore(t.ID)})
 					}
 				})
@@ -419,6 +425,15 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					break
 				}
 
+				// Re-check under the Phase-2 lock: a plan turn may have started
+				// between Phase 1 and Phase 2 and pinned this task.
+				if locked, threadID := h.isTaskLockedByPlanner(c.task.ID.String()); locked {
+					h.incAutopilotAction("auto_promoter", "skipped_locked")
+					logger.Handler.Debug("auto-promote Phase 2: skipping locked task",
+						"task", c.task.ID, "thread", threadID)
+					continue
+				}
+
 				logger.Handler.Info("auto-promoting backlog task",
 					"task", c.task.ID, "position", c.task.Position,
 					"in_progress", freshInProgress)
@@ -431,6 +446,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				h.incAutopilotAction("auto_promoter", "promoted")
 				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
 					store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerAutoPromote, nil))
+				h.cascadeArchiveThreadsForTask(c.task.ID.String())
 
 				sessionID := ""
 				if !c.task.FreshStart && c.task.SessionID != nil {

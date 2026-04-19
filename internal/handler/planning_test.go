@@ -948,3 +948,51 @@ func TestTaskPromptRefine_TemplateFieldsPopulated(t *testing.T) {
 		}
 	}
 }
+
+func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	if len(threads) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	threadID := threads[0].ID
+
+	// Pin the thread to a synthetic task ID.
+	const taskID = "00000000-0000-0000-0000-000000000001"
+	cs, err := tm.Store(threadID)
+	if err != nil {
+		t.Fatalf("tm.Store: %v", err)
+	}
+	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskID}); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	// Not busy yet — should return false.
+	if locked, _ := h.isTaskLockedByPlanner(taskID); locked {
+		t.Error("isTaskLockedByPlanner: want false when not busy")
+	}
+
+	// Mark the planner busy on this thread.
+	h.planner.SetBusy(true, threadID)
+	defer h.planner.SetBusy(false, "")
+
+	locked, gotThreadID := h.isTaskLockedByPlanner(taskID)
+	if !locked {
+		t.Error("isTaskLockedByPlanner: want true while exec in flight")
+	}
+	if gotThreadID != threadID {
+		t.Errorf("thread_id = %q, want %q", gotThreadID, threadID)
+	}
+
+	// A different task ID should not be locked.
+	if locked2, _ := h.isTaskLockedByPlanner("other-task-id"); locked2 {
+		t.Error("isTaskLockedByPlanner: want false for unrelated task")
+	}
+
+	// Clear busy — should return false again.
+	h.planner.SetBusy(false, "")
+	if locked3, _ := h.isTaskLockedByPlanner(taskID); locked3 {
+		t.Error("isTaskLockedByPlanner: want false after exec ends")
+	}
+}

@@ -23,6 +23,10 @@ type ThreadMeta struct {
 	Created  time.Time `json:"created"`
 	Updated  time.Time `json:"updated"`
 	Archived bool      `json:"archived,omitempty"`
+	// AutoArchivedByTaskLifecycle is true when the thread was archived
+	// automatically because its pinned task left the backlog/waiting state.
+	// Cleared when the thread is manually unarchived.
+	AutoArchivedByTaskLifecycle bool `json:"auto_archived_by_task_lifecycle,omitempty"`
 }
 
 // threadManifest is the on-disk shape of threads.json.
@@ -298,7 +302,12 @@ func (m *ThreadManager) Archive(id string) error {
 	return ErrThreadNotFound
 }
 
-// Unarchive returns a thread to the visible set.
+// Unarchive returns a thread to the visible set. AutoArchivedByTaskLifecycle
+// is intentionally NOT cleared here: if the thread was cascade-archived and
+// the user manually unarchives it, we keep the flag set (Archived=false,
+// flag=true) so that a subsequent task re-archive will skip this thread and
+// respect the user's explicit intent. The flag is only cleared by
+// CascadeUnarchiveForTask (programmatic reversal of a cascade-archive).
 func (m *ThreadManager) Unarchive(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -310,6 +319,100 @@ func (m *ThreadManager) Unarchive(id string) error {
 		}
 	}
 	return ErrThreadNotFound
+}
+
+// CascadeArchiveForTask archives every non-archived task-mode thread whose
+// pinned task matches taskID, setting AutoArchivedByTaskLifecycle=true on
+// each. Returns the list of thread IDs that were archived.
+func (m *ThreadManager) CascadeArchiveForTask(taskID string) ([]string, error) {
+	// Collect candidate thread IDs outside the manifest lock so that loading
+	// session.json (disk I/O) does not hold the manifest lock for long.
+	m.mu.Lock()
+	var candidates []string
+	for _, t := range m.manifest.Threads {
+		// Skip already-archived threads and threads the user has manually
+		// unarchived (flag=true, Archived=false); that combination means the
+		// user has expressed intent to keep the thread visible.
+		if !t.Archived && !t.AutoArchivedByTaskLifecycle {
+			candidates = append(candidates, t.ID)
+		}
+	}
+	m.mu.Unlock()
+
+	var archived []string
+	for _, id := range candidates {
+		cs, err := m.Store(id)
+		if err != nil {
+			continue
+		}
+		sess, err := cs.LoadSession()
+		if err != nil || sess.FocusedTask != taskID {
+			continue
+		}
+		// Mark archived with the cascade flag.
+		m.mu.Lock()
+		for i := range m.manifest.Threads {
+			if m.manifest.Threads[i].ID == id && !m.manifest.Threads[i].Archived {
+				m.manifest.Threads[i].Archived = true
+				m.manifest.Threads[i].AutoArchivedByTaskLifecycle = true
+				m.manifest.Threads[i].Updated = time.Now().UTC()
+				if m.active == id {
+					m.active = ""
+					for _, t := range m.manifest.Threads {
+						if !t.Archived {
+							m.active = t.ID
+							break
+						}
+					}
+					_ = m.writeActive()
+				}
+				if err := m.writeManifest(); err == nil {
+					archived = append(archived, id)
+				}
+				break
+			}
+		}
+		m.mu.Unlock()
+	}
+	return archived, nil
+}
+
+// CascadeUnarchiveForTask reverses a previous CascadeArchiveForTask call:
+// it unarchives every task-mode thread pinned to taskID whose
+// AutoArchivedByTaskLifecycle flag is still true (i.e. the user has not
+// manually unarchived it since).
+func (m *ThreadManager) CascadeUnarchiveForTask(taskID string) error {
+	m.mu.Lock()
+	var candidates []string
+	for _, t := range m.manifest.Threads {
+		if t.Archived && t.AutoArchivedByTaskLifecycle {
+			candidates = append(candidates, t.ID)
+		}
+	}
+	m.mu.Unlock()
+
+	for _, id := range candidates {
+		cs, err := m.Store(id)
+		if err != nil {
+			continue
+		}
+		sess, err := cs.LoadSession()
+		if err != nil || sess.FocusedTask != taskID {
+			continue
+		}
+		m.mu.Lock()
+		for i := range m.manifest.Threads {
+			if m.manifest.Threads[i].ID == id && m.manifest.Threads[i].AutoArchivedByTaskLifecycle {
+				m.manifest.Threads[i].Archived = false
+				m.manifest.Threads[i].AutoArchivedByTaskLifecycle = false
+				m.manifest.Threads[i].Updated = time.Now().UTC()
+				_ = m.writeManifest()
+				break
+			}
+		}
+		m.mu.Unlock()
+	}
+	return nil
 }
 
 // Meta returns the metadata for a thread.

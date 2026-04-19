@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -292,6 +293,222 @@ func TestListPlanningThreads_DefaultMode(t *testing.T) {
 	}
 	if th["task_id"] != nil && th["task_id"] != "" {
 		t.Errorf("task_id = %v, want empty for spec-mode thread", th["task_id"])
+	}
+}
+
+// pinThreadToTask saves a task-mode session for a thread, making it look like
+// the thread is actively planning for the given task.
+func pinThreadToTask(t *testing.T, tm *planner.ThreadManager, threadID, taskID string) {
+	t.Helper()
+	cs, err := tm.Store(threadID)
+	if err != nil {
+		t.Fatalf("pinThreadToTask: Store(%q): %v", threadID, err)
+	}
+	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskID}); err != nil {
+		t.Fatalf("pinThreadToTask: SaveSession: %v", err)
+	}
+}
+
+func TestCascade_ArchiveOnTaskLeavesBacklog(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	ctx := context.Background()
+
+	// Create a backlog task.
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cascade test"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Pin the planner thread to this task.
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	if len(threads) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	threadID := threads[0].ID
+	pinThreadToTask(t, tm, threadID, task.ID.String())
+
+	// Transition task backlog → in_progress via the PATCH handler.
+	body := `{"status":"in_progress"}`
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("PATCH", "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	req.SetPathValue("id", task.ID.String())
+	h.UpdateTask(rec, req, task.ID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("UpdateTask status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Thread must now be archived with the cascade flag set.
+	meta, err := tm.Meta(threadID)
+	if err != nil {
+		t.Fatalf("tm.Meta: %v", err)
+	}
+	if !meta.Archived {
+		t.Error("thread should be archived after task leaves backlog")
+	}
+	if !meta.AutoArchivedByTaskLifecycle {
+		t.Error("AutoArchivedByTaskLifecycle should be true")
+	}
+}
+
+func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	ctx := context.Background()
+
+	// Create a done task so we can archive it.
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "unarchive cascade"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	// Pin the planner thread to this task.
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	if len(threads) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	threadID := threads[0].ID
+	pinThreadToTask(t, tm, threadID, task.ID.String())
+
+	// Archive the task (this should cascade-archive the thread).
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/archive", nil)
+	req.SetPathValue("id", task.ID.String())
+	h.ArchiveTask(rec, req, task.ID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ArchiveTask status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	meta, err := tm.Meta(threadID)
+	if err != nil {
+		t.Fatalf("meta after archive: %v", err)
+	}
+	if !meta.Archived || !meta.AutoArchivedByTaskLifecycle {
+		t.Fatal("thread should be cascade-archived after task archive")
+	}
+
+	// Unarchive the task — thread should be un-archived too.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/unarchive", nil)
+	req.SetPathValue("id", task.ID.String())
+	h.UnarchiveTask(rec, req, task.ID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("UnarchiveTask status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	meta, err = tm.Meta(threadID)
+	if err != nil {
+		t.Fatalf("meta after unarchive: %v", err)
+	}
+	if meta.Archived {
+		t.Error("thread should be unarchived after task unarchive")
+	}
+	if meta.AutoArchivedByTaskLifecycle {
+		t.Error("AutoArchivedByTaskLifecycle should be cleared after unarchive")
+	}
+}
+
+func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "re-archive test"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	threadID := threads[0].ID
+	pinThreadToTask(t, tm, threadID, task.ID.String())
+
+	// Archive task → cascade-archive thread.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/archive", nil)
+	req.SetPathValue("id", task.ID.String())
+	h.ArchiveTask(rec, req, task.ID)
+
+	// Manually unarchive just the thread (simulates user action).
+	// Under the new semantics, Unarchive() intentionally keeps
+	// AutoArchivedByTaskLifecycle=true so CascadeArchiveForTask knows to skip
+	// this thread in future.
+	if err := tm.Unarchive(threadID); err != nil {
+		t.Fatalf("Unarchive: %v", err)
+	}
+	meta, _ := tm.Meta(threadID)
+	if meta.Archived {
+		t.Fatal("thread should be visible after manual unarchive")
+	}
+	if !meta.AutoArchivedByTaskLifecycle {
+		t.Fatal("flag must be preserved after manual unarchive so future cascades skip this thread")
+	}
+
+	// Unarchive the task then archive it again — thread should NOT be
+	// re-cascade-archived because flag=true signals user intent to keep it
+	// visible.
+	if err := h.store.SetTaskArchived(ctx, task.ID, false); err != nil {
+		t.Fatalf("SetTaskArchived false: %v", err)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/archive", nil)
+	req.SetPathValue("id", task.ID.String())
+	h.ArchiveTask(rec, req, task.ID)
+
+	meta, _ = tm.Meta(threadID)
+	if meta.Archived {
+		t.Error("should not re-cascade after manual unarchive: user intent (flag=true, Archived=false) must be respected")
+	}
+}
+
+func TestUpdateTaskPromptTool_FailsOnCascadeArchivedThread(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	ctx := context.Background()
+
+	// Create a backlog task.
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "prompt tool test"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Pin the thread to this task.
+	tm := h.planner.Threads()
+	threads := tm.List(false)
+	threadID := threads[0].ID
+	pinThreadToTask(t, tm, threadID, task.ID.String())
+
+	// Cascade-archive the thread manually (simulates task leaving backlog).
+	if _, err := tm.CascadeArchiveForTask(task.ID.String()); err != nil {
+		t.Fatalf("CascadeArchiveForTask: %v", err)
+	}
+
+	// Now the tool should return an error.
+	body := `{"task_id":"` + task.ID.String() + `","prompt":"new prompt","thread_id":"` + threadID + `"}`
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/planning/tool/update_task_prompt", strings.NewReader(body))
+	h.UpdateTaskPromptTool(rec, req)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422; body = %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "moved past backlog") {
+		t.Errorf("unexpected error body: %s", rec.Body.String())
+	}
+
+	// On the non-cascade-archived state it should work fine (restore first).
+	if err := tm.Unarchive(threadID); err != nil {
+		t.Fatalf("Unarchive: %v", err)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("POST", "/api/planning/tool/update_task_prompt", strings.NewReader(body))
+	h.UpdateTaskPromptTool(rec, req)
+	// Should succeed (200) or fail for a different reason (not 422 cascade-archived).
+	if rec.Code == http.StatusUnprocessableEntity && strings.Contains(rec.Body.String(), "moved past backlog") {
+		t.Errorf("should not reject after manual unarchive; body = %s", rec.Body.String())
 	}
 }
 
