@@ -403,7 +403,15 @@ function formatInProgressCount(count) {
 function updateMaxParallelTag() {
   const tag = document.getElementById("max-parallel-tag");
   if (!tag) return;
-  if (maxParallelTasks > 0) {
+  const override =
+    typeof currentGroupMaxParallel === "function"
+      ? currentGroupMaxParallel()
+      : null;
+  if (override === 0) {
+    // 0 is a deliberate per-group "unlimited" override.
+    tag.textContent = "max ∞";
+    tag.classList.remove("hidden");
+  } else if (maxParallelTasks > 0) {
     tag.textContent = "max " + maxParallelTasks;
     tag.classList.remove("hidden");
   } else {

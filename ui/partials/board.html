@@ -309,11 +309,13 @@
       <span class="col-dot" aria-hidden="true"></span>
       <span class="col-name">In Progress</span>
       <span id="count-in_progress" class="col-count">0</span>
-      <span
+      <button
+        type="button"
         id="max-parallel-tag"
         class="max-parallel-tag hidden"
-        title="Max parallel tasks"
-      ></span>
+        title="Max parallel tasks for this workspace group — click to edit"
+        onclick="editMaxParallelForCurrentGroup(event)"
+      ></button>
       <button
         type="button"
         class="col-icon-btn"
