@@ -24,22 +24,19 @@ Local Product — 7 done, 1 in progress, 17 pending
   ○ Spatial Canvas                 ○ Scoped Command Registry
   ○ Data Boundary Enforcement      ○ Refinement Into Plan
 
-Cloud Platform — 0/8
-  ○ Tenant Filesystem              ○ K8s Sandbox Backend
-  ○ Sandbox Isolation              ○ Cloud Infrastructure
+Cloud Platform — 0/6
+  ○ Tenant Filesystem              ○ Cloud Infrastructure
   ○ Multi-Tenant (capstone)        ○ Tenant API
   ○ Multi-User Collaboration       ○ Billing Idempotency
 
-Shared Design — 3/17 complete
+Shared Design — 3/14 complete
   ✅ Authentication                ✅ Agent Abstraction
   ○ Third-Party OIDC               ○ Remote Control
   ○ Agent Token Exchange           ○ Overlay Snapshots
-  ○ Native Sandbox (Linux)         ○ Native Sandbox (macOS)
-  ○ Native Sandbox (Windows)       ✅ Host Exec Mode
-  ○ Information Inbox              ○ Token & Cost Optimization
-  ○ Extensible Prompts             ○ Intent-Driven Commits
-  ○ Agent Memory & Identity        ○ Intelligence System
-  ○ Eval Pipeline & Benchmark
+  ✅ Host Exec Mode                ○ Information Inbox
+  ○ Token & Cost Optimization      ○ Extensible Prompts
+  ○ Intent-Driven Commits          ○ Agent Memory & Identity
+  ○ Intelligence System            ○ Eval Pipeline & Benchmark
 
 Oversight — 0/7 (layered defense & multi-agent deliberation)
   ○ Defense in Depth (umbrella)    ○ Sandbox Hooks
@@ -121,13 +118,11 @@ graph LR
 
 ## Cloud Platform
 
-Multi-tenant hosted service. Builds on sandbox and storage interfaces.
+Multi-tenant hosted service. Builds on storage interfaces and the external sandbox runtime (`latere.ai/sandbox` repo — K8s orchestration, warm pool, egress policies, hardening, native-OS backends).
 
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | fs.latere.ai integration, repo provisioner, workspace group cloud mapping |
-| [k8s-sandbox.md](cloud/k8s-sandbox.md) | Not started | `K8sBackend` — K8s Jobs with fs.latere.ai hot tier mounts, pod log streaming, exec |
-| [sandbox-isolation.md](cloud/sandbox-isolation.md) | Not started | Policy engine — network allow/deny + observability, FS isolation, action log |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
 | [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning, policy-controlled sandbox model |
 | [multi-user-collaboration.md](cloud/multi-user-collaboration.md) | Drafted | Blocker for cloud: reframes tenant as org (not user), adds actor fields across the store, RBAC role matrix, presence/focus, audit log, optimistic concurrency, private planning threads |
@@ -139,13 +134,9 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 ```mermaid
 graph LR
   FS[fs.latere.ai ext] --> TFS[Tenant FS]
-  SBI[Sandbox Interface ✅] --> TFS
+  SBX[latere.ai/sandbox ext] --> MT[Multi-Tenant]
   STI[Storage Interface ✅] --> TFS
-  TFS --> K8S[K8s Sandbox]
   STI --> CS[Cloud Storage]
-  K8S --> ISO[Sandbox Isolation]
-  K8S --> MT[Multi-Tenant]
-  ISO --> MT
   CS --> MT
   AUTH[Authentication] --> MT
   CI[Cloud Infrastructure] --> MT
@@ -153,9 +144,9 @@ graph LR
   AUTH --> MUC[Multi-User Collaboration]
   MT --> MUC
 
-  style SBI fill:#d4edda,stroke:#28a745
   style STI fill:#d4edda,stroke:#28a745
   style FS fill:#e8daef,stroke:#8e44ad
+  style SBX fill:#e8daef,stroke:#8e44ad
 ```
 
 ### Deployment modes
@@ -181,9 +172,6 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [remote-control.md](shared/remote-control.md) | Vague | Both | Wire protocol + latere.ai-side registry that lets the latere.ai web UI or a mobile client observe and operate signed-in local wallfacer instances. Depends on authentication Phase 2. |
 | [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
-| [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
-| [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
-| [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
 | [host-exec-mode.md](shared/host-exec-mode.md) | **Complete** | Local | `HostBackend` — opt-in `wallfacer run --backend host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. Covers both agents, live NDJSON streaming, parallel-cap default, Settings UI warning, `make build-host` target, and host-mode E2E harness. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
@@ -199,8 +187,6 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 **Authentication** is the clearest cross-track spec. A single-host deployment gets real login instead of a bearer token. The cloud track needs it as a prerequisite for multi-tenant. Implementing it once serves both.
 
 **Agent abstraction** refactors `internal/runner/` — the execution engine that both tracks use. Without it, every new agent role requires touching 6+ files with duplicated launch/parse/usage logic. Both tracks add new roles (cloud adds K8s-aware agents, local product adds planning/gate agents from spec coordination).
-
-**Native sandboxes** are alternatives to the container-based `LocalBackend`. They eliminate the Docker/Podman dependency for local deployments and the desktop app.
 
 **Overlay snapshots** accelerates container startup for both local workers and cloud K8s pods.
 
@@ -280,7 +266,7 @@ graph LR
 **Cross-track:**
 - Authentication should be early — useful for both tracks and blocks multi-tenant.
 - Agent abstraction reduces duplication before either track adds new agent roles.
-- Native sandboxes are independent — start when the desktop app needs them.
+- Sandbox backends (K8s, native-OS, hardening) live in the external `latere.ai/sandbox` repo and evolve on their own timeline; wallfacer depends on the `Runtime` interface that repo exposes.
 
 **Between tracks:**
 - The two tracks are independent after shared foundations. They can run in parallel.

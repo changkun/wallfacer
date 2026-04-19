@@ -304,7 +304,7 @@ The single-node baseline ($38/mo) already exists as part of latere.ai. Adding wa
 
 - **Sandbox Backend Interface** (`specs/foundations/sandbox-backends.md`) — defines the `Backend` interface that `K8sBackend` will implement (complete)
 - **Storage Backend Interface** (`specs/foundations/storage-backends.md`) — defines `StorageBackend`; `FilesystemBackend` is implemented (complete)
-- **K8s Sandbox Backend** (`specs/cloud/k8s-sandbox.md`) — implements `K8sBackend` for dispatching Jobs; must be implemented before sandbox tasks work in-cluster
+- **External sandbox runtime** ([`latere.ai/sandbox`](https://github.com/latere-ai/sandbox)) — implements the `Runtime` interface wallfacer dispatches tasks through (K8s Jobs, egress policies, hardening); must be deployed before sandbox tasks work in-cluster
 
 ## What depends on this
 
