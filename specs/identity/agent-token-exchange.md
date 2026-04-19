@@ -2,7 +2,7 @@
 title: Agent Token Exchange
 status: drafted
 depends_on:
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
 affects:
   - internal/runner/
   - internal/auth/
@@ -28,7 +28,7 @@ RFC 8693 token exchange fits: the user's access token is the `subject_token`,
 the auth service mints a scoped `agent_token` tied to a delegation record,
 and that short-lived token travels into the container.
 
-This spec was pulled out of `shared/authentication.md` because it is
+This spec was pulled out of `identity/authentication.md` because it is
 **orthogonal** to user login / auth / tenant isolation. It unblocks nothing
 on the cloud move; it is consumed only when we start calling latere.ai
 backend services *from inside task containers*.
@@ -60,7 +60,7 @@ Out of scope:
 
 ## JWT Claim Reference
 
-From `shared/authentication.md`'s claim table, the agent-specific fields are:
+From `identity/authentication.md`'s claim table, the agent-specific fields are:
 
 | Claim | Description |
 |-------|-------------|
@@ -113,7 +113,7 @@ measurable in the trace spans.
 
 ## Dependencies
 
-- `shared/authentication.md` Phase 2 must be complete, this spec needs a
+- `identity/authentication.md` Phase 2 must be complete, this spec needs a
   real user `*jwtauth.Claims` on the task creator and a populated session
   access token on the request path.
 - The auth service must expose the `token-exchange` grant and accept an

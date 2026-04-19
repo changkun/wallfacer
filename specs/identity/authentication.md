@@ -51,7 +51,7 @@ Identity is delegated to the centralized **latere.ai auth service**
   entirely different system, unchanged by this spec).
 - **Agent token exchange** for sandbox agents calling latere.ai backends
   (RFC 8693 delegation), split out into
-  [`shared/agent-token-exchange.md`](agent-token-exchange.md) because it
+  [`identity/agent-token-exchange.md`](agent-token-exchange.md) because it
   doesn't block the cloud move.
 
 ## Platform dependencies
@@ -80,7 +80,7 @@ Phase 1 (shipped) ──→ Phase 2 (shipped) ──→ Phase 3 (future)
      │                     │                         remote-control wire
      │                     │
      │                     └─ Unblocks: cloud/multi-tenant.md,
-     │                                  cloud/multi-user-collaboration.md
+     │                                  identity/multi-user-collaboration.md
      │
      └─ Unblocks: having a visible cloud/local partition in the UI
         ahead of tenant-filesystem and k8s-sandbox work
@@ -210,7 +210,7 @@ Phase 2 installs the two primitives every cloud deployment needs:
   opt in as scopes are assigned.
 
 Richer RBAC (role matrix, team-level ACLs) lives in
-`cloud/multi-user-collaboration.md`, not here.
+`identity/multi-user-collaboration.md`, not here.
 
 ### Task Breakdown
 
@@ -245,7 +245,7 @@ out from those two roots.
 - In-app user / org administration, handled by the auth service.
 - Third-party OIDC providers, Phase 3.
 - Cross-org visibility (shared workspaces across orgs), belongs in
-  `cloud/multi-user-collaboration.md` if needed.
+  `identity/multi-user-collaboration.md` if needed.
 - Remote-control wire protocol, Phase 3 / separate spec.
 
 ---
@@ -345,11 +345,11 @@ path still works exactly as before.
 Phase 3 splits into two sibling specs, both currently `vague` and
 unblocked by Phase 2:
 
-- [`shared/third-party-oidc.md`](third-party-oidc.md) —
+- [`identity/third-party-oidc.md`](third-party-oidc.md) —
   pluggable OIDC so self-hosted non-latere.ai deployments can log in
   against Keycloak, Entra ID, Okta, etc. Until this ships, those
   deployments keep using `WALLFACER_SERVER_API_KEY`.
-- [`shared/remote-control.md`](remote-control.md) —
+- [`identity/remote-control.md`](remote-control.md) —
   wire protocol + latere.ai-side registry that lets the latere.ai web
   UI or a mobile client observe and operate a user's signed-in local
   wallfacer instances. Phase 2 laid down the identity link; Phase 3
@@ -389,7 +389,7 @@ wallfacer:
 | `email` | string | Phase 1 | Users only; used for the sign-in badge fallback. |
 | `org_id` | string? | Phase 2 | Current org context; `null` if user has no org. Populates `Task.OrgID`. |
 | `scp` | string[] | Phase 2 | Granted scopes, consumed by `RequireScope`. |
-| `roles` | string[] | Future | Reserved for `cloud/multi-user-collaboration.md`. |
+| `roles` | string[] | Future | Reserved for `identity/multi-user-collaboration.md`. |
 | `is_superadmin` | bool | Phase 2 | Consumed by `RequireSuperadmin`. |
 | `iss` | string | Phase 2 | Issuer (`https://auth.latere.ai`); verified by `jwtauth.Validator`. |
 | `aud` | string | Phase 2 | Audience = wallfacer's `client_id`. |
@@ -465,7 +465,7 @@ system from user login. The two coexist:
 The route paths do not collide (the sandbox-credential flow uses a
 `{provider}` path parameter; the user-login routes use bare `/login` etc.).
 
-### `shared/agent-token-exchange.md` (peer spec)
+### `identity/agent-token-exchange.md` (peer spec)
 
 RFC 8693 token exchange for sandbox agents that need to call latere.ai
 backend services on behalf of the dispatching user. Runs on top of the

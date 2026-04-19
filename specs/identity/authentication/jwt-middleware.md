@@ -2,7 +2,7 @@
 title: JWT validation middleware on API routes
 status: archived
 depends_on:
-  - specs/shared/authentication/http-routes-and-api-config.md
+  - specs/identity/authentication/http-routes-and-api-config.md
 affects:
   - internal/auth/
   - internal/handler/

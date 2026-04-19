@@ -1,6 +1,6 @@
 ---
 title: Explorer Task Prompts Virtual Section
-status: validated
+status: complete
 depends_on:
   - specs/local/refinement-into-plan/message-schema-task-mode.md
 affects:
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: 19bcfecf-9528-4cbb-b7fd-d032f08f94e1
 ---
+
 
 
 # Explorer Task Prompts Virtual Section

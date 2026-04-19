@@ -2,13 +2,13 @@
 title: Phase 2 implementation follow-ups
 status: archived
 depends_on:
-  - specs/shared/authentication/jwt-middleware.md
-  - specs/shared/authentication/principal-context.md
-  - specs/shared/authentication/data-model-principal-org.md
-  - specs/shared/authentication/cloud-forced-login.md
-  - specs/shared/authentication/scope-and-superadmin.md
-  - specs/shared/authentication/org-switching.md
-  - specs/shared/authentication/task-event-actor-sub.md
+  - specs/identity/authentication/jwt-middleware.md
+  - specs/identity/authentication/principal-context.md
+  - specs/identity/authentication/data-model-principal-org.md
+  - specs/identity/authentication/cloud-forced-login.md
+  - specs/identity/authentication/scope-and-superadmin.md
+  - specs/identity/authentication/org-switching.md
+  - specs/identity/authentication/task-event-actor-sub.md
 affects:
   - internal/auth/
   - internal/handler/

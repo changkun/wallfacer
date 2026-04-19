@@ -2,7 +2,7 @@
 title: Cloud mode documentation
 status: archived
 depends_on:
-  - specs/shared/authentication/status-bar-sign-in-badge.md
+  - specs/identity/authentication/status-bar-sign-in-badge.md
 affects:
   - docs/guide/configuration.md
   - AGENTS.md

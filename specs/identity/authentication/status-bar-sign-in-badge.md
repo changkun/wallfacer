@@ -2,7 +2,7 @@
 title: Status-bar sign-in badge and front-channel logout iframe
 status: archived
 depends_on:
-  - specs/shared/authentication/http-routes-and-api-config.md
+  - specs/identity/authentication/http-routes-and-api-config.md
 affects:
   - ui/partials/status-bar.html
   - ui/js/

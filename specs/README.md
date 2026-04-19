@@ -10,7 +10,7 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 7 done, 1 in progress, 17 pending
+Local Product — 7 done, 1 in progress, 16 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
@@ -22,21 +22,24 @@ Local Product — 7 done, 1 in progress, 17 pending
   ○ Excalidraw Whiteboard          ○ TypeScript Migration
   ○ Typed DOM Hooks                ○ Rebrand Module Path
   ○ Spatial Canvas                 ○ Scoped Command Registry
-  ○ Data Boundary Enforcement      ○ Refinement Into Plan
+  ○ Refinement Into Plan
 
-Cloud Platform — 0/6
+Cloud Platform — 0/5
   ○ Tenant Filesystem              ○ Cloud Infrastructure
   ○ Multi-Tenant (capstone)        ○ Tenant API
-  ○ Multi-User Collaboration       ○ Billing Idempotency
+  ○ Billing Idempotency
 
-Shared Design — 3/14 complete
-  ✅ Authentication                ✅ Agent Abstraction
-  ○ Third-Party OIDC               ○ Remote Control
-  ○ Agent Token Exchange           ○ Overlay Snapshots
-  ✅ Host Exec Mode                ○ Information Inbox
+Shared Design — 2/10 complete
+  ✅ Agent Abstraction             ✅ Host Exec Mode
+  ○ Overlay Snapshots              ○ Information Inbox
   ○ Token & Cost Optimization      ○ Extensible Prompts
   ○ Intent-Driven Commits          ○ Agent Memory & Identity
   ○ Intelligence System            ○ Eval Pipeline & Benchmark
+
+Identity — 1/6 (principals, sessions, data boundaries)
+  ✅ Authentication                ○ Third-Party OIDC
+  ○ Remote Control                 ○ Agent Token Exchange
+  ○ Multi-User Collaboration       ○ Data Boundary Enforcement
 
 Oversight — 0/7 (layered defense & multi-agent deliberation)
   ○ Defense in Depth (umbrella)    ○ Sandbox Hooks
@@ -77,7 +80,6 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [typed-dom-hooks.md](local/typed-dom-hooks.md) | Vague | Generate typed constants from `id` / `data-js-*` attributes in `ui/partials/` so renames fail type-check instead of silently breaking selectors. Contract layer between HTML, CSS, and TS. |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 | [spatial-canvas.md](local/spatial-canvas.md) | Vague | Spatial infinite-canvas view — tasks, agents, and notes as free-form nodes on a 2D plane |
-| [data-boundary-enforcement.md](local/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the planning-only slash command registry to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting). Task board and other UI surfaces can then trigger their own `/` commands via the shared autocomplete widget. |
 | [routine-tasks.md](local/routine-tasks.md) | **Complete** | Promote the ideation agent's "cronjob" scheduler into a generic primitive: routines are board cards (`Kind=routine`) with a schedule that spawn fresh instance tasks when they fire. Users create, edit, and toggle routines on the board; ideation migrates to a `system:ideation`-tagged routine. |
 | [agents-and-flows.md](local/agents-and-flows.md) | **Complete** | Promote agent role + pipeline to first-class user-facing primitives. Sidebar gains Agents and Flows tabs; the composer simplifies to "pick a Flow, write a prompt". Seeded built-in flows (`implement`, `brainstorm`, `refine-only`, `test-only`) replace the current TaskKind + Agent-overrides surface. Depends on the backend abstraction in `shared/agent-abstraction.md`. |
@@ -125,7 +127,6 @@ Multi-tenant hosted service. Builds on storage interfaces and the external sandb
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | fs.latere.ai integration, repo provisioner, workspace group cloud mapping |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
 | [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning, policy-controlled sandbox model |
-| [multi-user-collaboration.md](cloud/multi-user-collaboration.md) | Drafted | Blocker for cloud: reframes tenant as org (not user), adds actor fields across the store, RBAC role matrix, presence/focus, audit log, optimistic concurrency, private planning threads |
 | [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
 | [billing-idempotency.md](cloud/billing-idempotency.md) | Drafted | Stripe idempotency keys on every charge operation — prevents double-billing under retry, single-charge guarantee for cost-visibility trust story |
 
@@ -138,20 +139,20 @@ graph LR
   STI[Storage Interface ✅] --> TFS
   STI --> CS[Cloud Storage]
   CS --> MT
-  AUTH[Authentication] --> MT
+  AUTH[Identity → Authentication ✅] --> MT
+  MUC[Identity → Multi-User Collab] --> MT
   CI[Cloud Infrastructure] --> MT
   MT --> TA[Tenant API]
-  AUTH --> MUC[Multi-User Collaboration]
-  MT --> MUC
 
   style STI fill:#d4edda,stroke:#28a745
+  style AUTH fill:#d4edda,stroke:#28a745
   style FS fill:#e8daef,stroke:#8e44ad
   style SBX fill:#e8daef,stroke:#8e44ad
 ```
 
 ### Deployment modes
 
-Three modes, auth is opt-in at every mode (see [authentication.md](shared/authentication.md)):
+Three modes, auth is opt-in at every mode (see [authentication.md](identity/authentication.md)):
 
 1. **Local anonymous (today):** Wallfacer runs on the user's machine, no auth. Filesystem storage, local containers.
 2. **Local authenticated:** Same binary, signed in to latere.ai. Enables the remote-control placeholder (auth spec) — no other changes.
@@ -167,10 +168,6 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 | Spec | Status | Serves | Delivers |
 |------|--------|--------|----------|
-| [authentication.md](shared/authentication.md) | **Complete** | Both | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Unblocks cloud multi-tenant and multi-user collaboration. Phase 3 split into sibling specs below. |
-| [third-party-oidc.md](shared/third-party-oidc.md) | Vague | Both | Pluggable OIDC so self-hosted non-latere.ai deployments can log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. Depends on authentication Phase 2. |
-| [remote-control.md](shared/remote-control.md) | Vague | Both | Wire protocol + latere.ai-side registry that lets the latere.ai web UI or a mobile client observe and operate signed-in local wallfacer instances. Depends on authentication Phase 2. |
-| [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [host-exec-mode.md](shared/host-exec-mode.md) | **Complete** | Local | `HostBackend` — opt-in `wallfacer run --backend host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. Covers both agents, live NDJSON streaming, parallel-cap default, Settings UI warning, `make build-host` target, and host-mode E2E harness. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
@@ -184,11 +181,41 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 ### Why these are shared
 
-**Authentication** is the clearest cross-track spec. A single-host deployment gets real login instead of a bearer token. The cloud track needs it as a prerequisite for multi-tenant. Implementing it once serves both.
-
 **Agent abstraction** refactors `internal/runner/` — the execution engine that both tracks use. Without it, every new agent role requires touching 6+ files with duplicated launch/parse/usage logic. Both tracks add new roles (cloud adds K8s-aware agents, local product adds planning/gate agents from spec coordination).
 
 **Overlay snapshots** accelerates container startup for both local workers and cloud K8s pods.
+
+---
+
+## Identity
+
+Everything about principals, sessions, delegation, and what data crosses the machine boundary. Authentication is the anchor; the rest build on the principal context it establishes. Spans local, cloud, and cross-machine (remote-control) deployments — any wallfacer instance that has a user, an org, or an agent acting on behalf of either needs these.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [authentication.md](identity/authentication.md) | **Complete** | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Unblocks cloud multi-tenant and multi-user collaboration. Phase 3 split into third-party-oidc and remote-control below. |
+| [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Pluggable OIDC so self-hosted non-latere.ai deployments can log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. Depends on authentication Phase 2. |
+| [remote-control.md](identity/remote-control.md) | Vague | Wire protocol + latere.ai-side registry that lets the latere.ai web UI or a mobile client observe and operate signed-in local wallfacer instances. Depends on authentication Phase 2. |
+| [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login. |
+| [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Drafted | Reframes tenant as org (not user), adds actor fields across the store, RBAC role matrix, presence/focus, optimistic concurrency, private planning threads. Blocker for cloud hosting. |
+| [data-boundary-enforcement.md](identity/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets. |
+
+### Identity dependencies
+
+```mermaid
+graph LR
+  AUTH[Authentication ✅] --> TPO[Third-Party OIDC]
+  AUTH --> RC[Remote Control]
+  AUTH --> ATE[Agent Token Exchange]
+  AUTH --> MUC[Multi-User Collaboration]
+  AUTH --> DBE[Data Boundary Enforcement]
+  MUC --> MT[Multi-Tenant → Cloud]
+  DBE --> TO[Telemetry → Observability]
+
+  style AUTH fill:#d4edda,stroke:#28a745
+```
+
+Multi-user collaboration is the gate for cloud multi-tenant; data-boundary-enforcement is the gate for anything the local instance sends up to observability / cloud.
 
 ---
 
@@ -264,7 +291,7 @@ graph LR
 - Multi-tenant is the capstone wiring everything together. Tenant API comes after.
 
 **Cross-track:**
-- Authentication should be early — useful for both tracks and blocks multi-tenant.
+- Identity (authentication, OIDC, remote-control, agent-tokens, multi-user-collab, data-boundary) now lives in `specs/identity/` as its own theme — authentication complete; the rest unblocked by Phase 2.
 - Agent abstraction reduces duplication before either track adds new agent roles.
 - Sandbox backends (K8s, native-OS, hardening) live in the external `latere.ai/sandbox` repo and evolve on their own timeline; wallfacer depends on the `Runtime` interface that repo exposes.
 

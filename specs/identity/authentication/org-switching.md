@@ -2,8 +2,8 @@
 title: Org switching for users belonging to multiple orgs
 status: archived
 depends_on:
-  - specs/shared/authentication/data-model-principal-org.md
-  - specs/shared/authentication/jwt-middleware.md
+  - specs/identity/authentication/data-model-principal-org.md
+  - specs/identity/authentication/jwt-middleware.md
 affects:
   - internal/handler/
   - internal/auth/
