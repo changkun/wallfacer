@@ -383,18 +383,9 @@ details.
 
 ### Configuration Reference
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `WALLFACER_MAX_PARALLEL` | 5 | Maximum concurrent implementation tasks |
-| `WALLFACER_MAX_TEST_PARALLEL` | 2 | Maximum concurrent test runs |
-| `WALLFACER_AUTO_PUSH` | `false` | Enable auto-push after task completion |
-| `WALLFACER_AUTO_PUSH_THRESHOLD` | 1 | Minimum completed tasks before auto-push triggers |
-| `WALLFACER_CONTAINER_CB_THRESHOLD` | 5 | Runtime failures before container breaker opens |
-| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | 30 | Seconds the container breaker stays open |
+Automation-related environment variables (`WALLFACER_MAX_PARALLEL`, `WALLFACER_MAX_TEST_PARALLEL`, `WALLFACER_AUTO_PUSH`, `WALLFACER_AUTO_PUSH_THRESHOLD`, `WALLFACER_CONTAINER_CB_THRESHOLD`, `WALLFACER_CONTAINER_CB_OPEN_SECONDS`) are documented, with defaults, in [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
 
-All automation toggles (except Auto-push) are also available via
-`PUT /api/config` with the fields `autopilot`, `autotest`, `autosubmit`,
-`autosync`, and `autorefine`.
+All automation toggles (except Auto-push) are also available via `PUT /api/config` with the fields `autopilot`, `autotest`, `autosubmit`, `autosync`, and `autorefine`.
 
 For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 
