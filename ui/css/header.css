@@ -998,7 +998,9 @@ html.wails-desktop .app-sidebar {
 /* Signed-in button: the whole row is now a menu trigger with a
  * dropdown revealing Personal / org entries / Sign out. Bare button
  * styling — we want it to feel like part of the sidebar, not a
- * call-to-action. */
+ * call-to-action. Uses the project's tokens.css variable names:
+ * --bg-hover / --bg-active for interactive states, --ink / --ink-3
+ * for foreground, --bg-card + --rule for the popup chrome. */
 .sb-signin__user {
   background: transparent;
   border: none;
@@ -1009,18 +1011,17 @@ html.wails-desktop .app-sidebar {
   gap: 6px;
   cursor: pointer;
   font: inherit;
-  color: inherit;
+  color: var(--ink);
   width: 100%;
   text-align: left;
   position: relative;
+  border-radius: var(--r-sm);
 }
 .sb-signin__user:hover {
-  background: var(--bg-2, rgba(0, 0, 0, 0.04));
-  border-radius: 4px;
+  background: var(--bg-hover);
 }
 .sb-signin__user[aria-expanded="true"] {
-  background: var(--bg-2, rgba(0, 0, 0, 0.06));
-  border-radius: 4px;
+  background: var(--bg-active);
 }
 
 /* Initials-circle fallback when userinfo didn't include a picture. */
@@ -1031,8 +1032,8 @@ html.wails-desktop .app-sidebar {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--accent-3, #9cab8f);
-  color: var(--bg-1, #f7f4ee);
+  background: var(--accent);
+  color: var(--bg-card);
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
@@ -1059,16 +1060,17 @@ html.wails-desktop .app-sidebar {
 }
 
 /* Popup menu anchored to the trigger button. Positioned above so it
- * doesn't get cut off by the page bottom. */
+ * doesn't get cut off by the page bottom. Uses --bg-card (opaque
+ * off-white) so content below doesn't bleed through. */
 .sb-signin__menu {
   position: absolute;
   bottom: calc(100% + 4px);
   left: 0;
   min-width: 200px;
-  background: var(--bg-1);
-  border: 1px solid var(--border-2);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(27, 25, 22, 0.12);
   padding: 4px 0;
   z-index: 100;
 }
@@ -1082,25 +1084,24 @@ html.wails-desktop .app-sidebar {
   border: none;
   padding: 6px 12px;
   font: inherit;
-  font-size: var(--fs-9);
-  color: var(--ink-1);
+  font-size: var(--fs-base);
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 .sb-signin__menu-item:hover {
-  background: var(--bg-2, rgba(0, 0, 0, 0.05));
+  background: var(--bg-hover);
 }
 .sb-signin__menu-item--active {
-  color: var(--ink-1);
   font-weight: 600;
 }
 .sb-signin__menu-item--active::before {
   content: "✓ ";
-  color: var(--accent-1);
+  color: var(--accent);
 }
 .sb-signin__menu-sep {
   height: 1px;
-  background: var(--border-2);
+  background: var(--rule);
   margin: 4px 0;
 }
 
