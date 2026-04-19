@@ -51,6 +51,8 @@ When `WALLFACER_CLOUD=true` but any of `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, o
 | `AUTH_CLIENT_SECRET` | (required when cloud is on) | OAuth client secret |
 | `AUTH_REDIRECT_URL` | (required when cloud is on) | OAuth callback URL, e.g. `https://your-host/callback` |
 | `AUTH_COOKIE_KEY` | (derived from client secret) | AES-GCM key for encrypted session cookies; set an explicit value in production so session cookies survive a rotation of the client secret |
+| `AUTH_JWKS_URL` | `{AUTH_URL}/.well-known/jwks.json` | JWKS endpoint used to validate `Authorization: Bearer <jwt>` headers on API routes. Override only when the auth service publishes JWKS on a non-standard path. |
+| `AUTH_ISSUER` | `AUTH_URL` | Expected `iss` claim on incoming JWTs. Override only when the auth service issues tokens with an issuer that differs from its base URL. |
 
 Client registration with the auth service is a prerequisite. Wallfacer must be registered as a **confidential** `oauth_client` with `redirect_uris` containing `AUTH_REDIRECT_URL` and `allowed_scopes` including `openid`, `email`, `profile`.
 
@@ -83,7 +85,8 @@ The endpoint is safe to load unauthenticated: it only clears a cookie and return
 
 Later cloud phases (design-level today, no ETA):
 
-- **JWT middleware + authorization.** API routes gate on valid JWTs; `org_id` routing for multi-tenant.
+- **JWT middleware on `/api/*`** (shipped in Phase 2's first child spec). When `WALLFACER_CLOUD=true`, requests carrying `Authorization: Bearer <jwt>` have the token validated against the auth service's JWKS; valid tokens surface as `*auth.Claims` in handler context via `auth.PrincipalFromContext(r.Context())`. Today this is `OptionalAuth` only (no route requires a token; claims just surface when present); strict 401 enforcement on admin routes and forced login for unauthenticated browsers land in later Phase 2 specs.
+- **Authorization primitives.** `org_id` routing for multi-tenant, superadmin gating, scope-based route guards.
 - **Tenant filesystem** — fs.latere.ai integration for cloud-hosted workspace storage.
 - **K8s sandbox** — dispatch task containers as K8s Jobs instead of local podman/docker.
 - **Multi-user collaboration** — presence, audit log, RBAC.
