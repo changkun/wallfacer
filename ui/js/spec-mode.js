@@ -292,12 +292,14 @@ function _applyMode(mode) {
   var agentsNav = document.getElementById("sidebar-nav-agents");
   var flowsNav = document.getElementById("sidebar-nav-flows");
   var docsNav = document.getElementById("sidebar-nav-docs");
+  var usageNav = document.getElementById("sidebar-nav-usage");
   if (boardNav) boardNav.classList.toggle("active", mode === "board");
   if (specNav) specNav.classList.toggle("active", mode === "spec");
   if (depgraphNav) depgraphNav.classList.toggle("active", mode === "depgraph");
   if (agentsNav) agentsNav.classList.toggle("active", mode === "agents");
   if (flowsNav) flowsNav.classList.toggle("active", mode === "flows");
   if (docsNav) docsNav.classList.toggle("active", mode === "docs");
+  if (usageNav) usageNav.classList.toggle("active", mode === "analytics");
 
   // Toggle main content areas.
   var board = document.getElementById("board");
@@ -306,6 +308,7 @@ function _applyMode(mode) {
   var agentsView = document.getElementById("agents-mode-container");
   var flowsView = document.getElementById("flows-mode-container");
   var docsView = document.getElementById("docs-mode-container");
+  var analyticsView = document.getElementById("analytics-mode-container");
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
   if (depgraphView)
@@ -313,6 +316,14 @@ function _applyMode(mode) {
   if (agentsView) agentsView.style.display = mode === "agents" ? "" : "none";
   if (flowsView) flowsView.style.display = mode === "flows" ? "" : "none";
   if (docsView) docsView.style.display = mode === "docs" ? "" : "none";
+  if (analyticsView)
+    analyticsView.style.display = mode === "analytics" ? "" : "none";
+  if (typeof document !== "undefined" && document.body) {
+    document.body.classList.toggle("analytics-mode-on", mode === "analytics");
+  }
+  if (mode === "analytics" && typeof window.enterAnalyticsMode === "function") {
+    window.enterAnalyticsMode();
+  }
 
   // Load agents list when entering agents mode for the first time.
   if (mode === "agents" && typeof window.loadAgents === "function") {
@@ -396,8 +407,9 @@ function _applyMode(mode) {
       ? document.querySelector(".app-header")
       : null;
   var gitBar = document.getElementById("workspace-git-bar");
-  if (header) header.style.display = mode === "docs" ? "none" : "";
-  if (gitBar) gitBar.style.display = mode === "docs" ? "none" : "";
+  var fullPageMode = mode === "docs" || mode === "analytics";
+  if (header) header.style.display = fullPageMode ? "none" : "";
+  if (gitBar) gitBar.style.display = fullPageMode ? "none" : "";
 
   // Update search placeholder based on mode.
   var searchInput = document.getElementById("task-search");

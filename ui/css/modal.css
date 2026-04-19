@@ -492,3 +492,145 @@
     display: none;
   }
 }
+
+/* ===== Analytics tab pill group =====
+   Segmented control: a single rounded track that holds all tabs; the
+   active tab is a raised pill within it. Designed to sit on the right
+   side of the mode header. */
+.analytics-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--bg-sunk, var(--bg-raised));
+  border: 1px solid var(--border);
+}
+.analytics-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.analytics-tab:hover {
+  color: var(--text);
+}
+.analytics-tab.active {
+  background: var(--bg-card, var(--bg));
+  color: var(--text);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .analytics-tab.active {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.analytics-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ===== Analytics mode (inline page, not modal) =====
+   When the analytics view is active, the three legacy modal partials live
+   inside #analytics-panels and are rendered as a page. The .modal-overlay
+   chrome (fixed positioning, backdrop, centred card) is neutralised here. */
+.analytics-mode {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+.analytics-mode__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 28px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.analytics-mode__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.analytics-mode__eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.analytics-mode__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.analytics-mode__panels {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.analytics-mode__panels > .modal-overlay {
+  position: static;
+  inset: auto;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  z-index: auto;
+  align-items: stretch;
+  justify-content: stretch;
+  /* Neutralise the backdrop click-to-close: the overlay itself must not
+     receive pointer events in this inline layout, otherwise clicking
+     empty space inside the analytics page closes the panel via the
+     bindModalBackdropClose handler registered in each module's init. */
+  pointer-events: none;
+}
+.analytics-mode__panels > .modal-overlay > * {
+  pointer-events: auto;
+}
+.analytics-mode__panels > .modal-overlay.hidden {
+  display: none;
+}
+.analytics-mode__panels > .modal-overlay > .modal-card {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+/* Hide the redundant close (×) button and inner title inside each panel. */
+.analytics-mode__panels .modal-overlay h3 {
+  display: none;
+}
+.analytics-mode__panels .modal-overlay .p-6 > div:first-child > button:last-child,
+.analytics-mode__panels .modal-overlay .p-6 > div:first-child > div > button:last-child {
+  display: none;
+}
