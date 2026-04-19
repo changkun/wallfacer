@@ -34,6 +34,10 @@ type TaskCreateOptions struct {
 	Timeout            int
 	MountWorktrees     bool
 	Kind               TaskKind
+	// FlowID is the slug of the flow this task runs against. Empty means
+	// the runner's legacy Kind→Flow resolver picks the default
+	// ("implement" for normal tasks, "brainstorm" for idea-agent).
+	FlowID             string
 	Tags               []string
 	Sandbox            sandbox.Type
 	SandboxByActivity  map[SandboxActivity]sandbox.Type
@@ -78,6 +82,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		Timeout:        clampTimeout(opts.Timeout),
 		MountWorktrees: opts.MountWorktrees,
 		Kind:           opts.Kind,
+		FlowID:         opts.FlowID,
 		// Position is set under the lock after scanning existing backlog tasks.
 		CreatedAt: now,
 		UpdatedAt: now,

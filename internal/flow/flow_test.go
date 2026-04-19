@@ -93,6 +93,48 @@ func TestRegistry_ResolveLegacyKind_UnknownReturnsFalse(t *testing.T) {
 	}
 }
 
+// TestResolveForTask_ExplicitFlowIDWins confirms the task's explicit
+// FlowID takes precedence over its legacy Kind.
+func TestResolveForTask_ExplicitFlowIDWins(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	got := reg.ResolveForTask(&store.Task{
+		Kind:   store.TaskKindIdeaAgent, // would legacy-resolve to brainstorm
+		FlowID: "test-only",
+	})
+	if got != "test-only" {
+		t.Errorf("ResolveForTask = %q, want test-only", got)
+	}
+}
+
+// TestResolveForTask_EmptyFallsBackToImplement covers pre-migration
+// records with no FlowID and no special Kind.
+func TestResolveForTask_EmptyFallsBackToImplement(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	got := reg.ResolveForTask(&store.Task{})
+	if got != "implement" {
+		t.Errorf("ResolveForTask = %q, want implement", got)
+	}
+}
+
+// TestResolveForTask_IdeaAgentKindResolvesToBrainstorm covers pre-
+// migration idea-agent records.
+func TestResolveForTask_IdeaAgentKindResolvesToBrainstorm(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	got := reg.ResolveForTask(&store.Task{Kind: store.TaskKindIdeaAgent})
+	if got != "brainstorm" {
+		t.Errorf("ResolveForTask = %q, want brainstorm", got)
+	}
+}
+
+// TestResolveForTask_NilTaskReturnsDefault covers the defensive nil
+// check so callers can pass task pointers without guarding.
+func TestResolveForTask_NilTaskReturnsDefault(t *testing.T) {
+	reg := NewBuiltinRegistry()
+	if got := reg.ResolveForTask(nil); got != "implement" {
+		t.Errorf("ResolveForTask(nil) = %q, want implement", got)
+	}
+}
+
 // TestRegistry_ListReturnsDeepCopy catches accidental sharing of the
 // Steps slice between List output and registry state — mutating a
 // returned Flow must not leak back.

@@ -305,6 +305,13 @@ type Task struct {
 	// Empty string and "task" are equivalent: a standard implementation task.
 	Kind TaskKind `json:"kind,omitempty"`
 
+	// FlowID is the slug of the flow this task runs against (see
+	// internal/flow). Empty means the runner falls back to the legacy
+	// Kind→Flow resolver so pre-flow-migration task records keep
+	// working without data migration. Resolved at read-time via
+	// (*Task).ResolvedFlowID.
+	FlowID string `json:"flow_id,omitempty"`
+
 	// Tags are labels attached to a task for categorisation (e.g. "idea-agent" for
 	// tasks auto-created by the brainstorm agent).
 	Tags []string `json:"tags,omitempty"`
