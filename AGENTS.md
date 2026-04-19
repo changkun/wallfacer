@@ -266,7 +266,7 @@ Ideation is implemented as a routine task (`Kind=routine`, `Tags=["system:ideati
 - `POST /api/planning` — Start the planning sandbox container (idempotent)
 - `DELETE /api/planning` — Stop the planning sandbox container
 - `GET /api/planning/messages` — Retrieve conversation history for a thread (supports `?before=<RFC3339>` pagination and `?thread=<id>`; defaults to the active thread)
-- `POST /api/planning/messages` — Send a user message; body field `thread` (or `?thread=`) selects the thread. Returns 202; 409 if busy
+- `POST /api/planning/messages` — Send a user message; body fields: `message` (required), `focused_spec` (spec-mode), `focused_task` (task-mode UUID), `thread`. `focused_spec` and `focused_task` are mutually exclusive (422). Unknown `focused_task` → 404. Mode mismatch on an already-pinned thread → 409. Returns 202; 409 if busy.
 - `DELETE /api/planning/messages` — Clear a thread's conversation history and session (`?thread=<id>`; defaults to active)
 - `GET /api/planning/messages/stream` — SSE: stream agent response tokens. Returns 204 if no exec in flight or `?thread=<id>` does not match the in-flight thread
 - `POST /api/planning/messages/interrupt` — Interrupt current agent turn. `?thread=<id>` must match the in-flight thread (409 otherwise)
@@ -274,8 +274,8 @@ Ideation is implemented as a routine task (`Kind=routine`, `Tags=["system:ideati
 - `GET /api/planning/commands` — List available slash commands for UI autocomplete
 
 ### Planning Chat Threads
-- `GET /api/planning/threads` — List planning chat threads for the current workspace group; returns `{threads, active_id}`. Pass `?includeArchived=true` to include archived threads.
-- `POST /api/planning/threads` — Create a new thread. Body `{name?}`; when omitted, a default `Chat N` name is used.
+- `GET /api/planning/threads` — List planning chat threads for the current workspace group; returns `{threads, active_id}`. Each thread includes `mode: "spec"|"task"` and `task_id` (non-empty when mode is "task"). Pass `?includeArchived=true` to include archived threads.
+- `POST /api/planning/threads` — Create a new thread. Body `{name?, focused_task?}`; when `name` is omitted a default `Chat N` name is used. When `focused_task` (a valid task UUID) is supplied, the thread is pinned to task-mode immediately.
 - `PATCH /api/planning/threads/{id}` — Rename a thread (body `{name}`).
 - `POST /api/planning/threads/{id}/archive` — Archive a thread (hides it from the tab bar; files are retained). 409 if the thread is in-flight.
 - `POST /api/planning/threads/{id}/unarchive` — Restore an archived thread.

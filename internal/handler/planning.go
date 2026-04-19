@@ -17,6 +17,7 @@ import (
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/spec"
 	"changkun.de/x/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 // selectPlanningSystemPrompt returns the planning-agent prompt prefix
@@ -199,6 +200,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Message     string `json:"message"`
 		FocusedSpec string `json:"focused_spec"`
+		FocusedTask string `json:"focused_task"`
 		Thread      string `json:"thread"`
 	}](w, r)
 	if !ok {
@@ -207,6 +209,29 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.Message) == "" {
 		http.Error(w, "message is required", http.StatusBadRequest)
 		return
+	}
+
+	// Exactly one of focused_spec / focused_task may be set.
+	if req.FocusedSpec != "" && req.FocusedTask != "" {
+		http.Error(w, "focused_spec and focused_task are mutually exclusive", http.StatusUnprocessableEntity)
+		return
+	}
+
+	// Resolve and validate focused_task UUID.
+	var focusedTaskID string
+	if ft := strings.TrimSpace(req.FocusedTask); ft != "" {
+		taskUUID, parseErr := uuid.Parse(ft)
+		if parseErr != nil {
+			http.Error(w, "focused_task: invalid UUID", http.StatusBadRequest)
+			return
+		}
+		if h.store != nil {
+			if _, lookupErr := h.store.GetTask(r.Context(), taskUUID); lookupErr != nil {
+				http.Error(w, "focused_task: task not found", http.StatusNotFound)
+				return
+			}
+		}
+		focusedTaskID = taskUUID.String()
 	}
 
 	threadID := strings.TrimSpace(req.Thread)
@@ -219,12 +244,28 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check thread mode pin — reject if the incoming message is for the wrong mode.
+	existingSess, _ := cs.LoadSession()
+	if existingSess.FocusedTask != "" && req.FocusedSpec != "" {
+		httpjson.Write(w, http.StatusConflict, map[string]any{
+			"error": "thread is pinned to task-mode; focused_spec not allowed",
+		})
+		return
+	}
+	if existingSess.FocusedSpec != "" && focusedTaskID != "" {
+		httpjson.Write(w, http.StatusConflict, map[string]any{
+			"error": "thread is pinned to spec-mode; focused_task not allowed",
+		})
+		return
+	}
+
 	// Append user message to conversation store.
 	userMsg := planner.Message{
 		Role:        "user",
 		Content:     req.Message,
 		Timestamp:   time.Now().UTC(),
 		FocusedSpec: req.FocusedSpec,
+		FocusedTask: focusedTaskID,
 	}
 	if err := cs.AppendMessage(userMsg); err != nil {
 		http.Error(w, "failed to persist message", http.StatusInternalServerError)
@@ -232,6 +273,21 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if tm := h.threadsManager(); tm != nil {
 		tm.Touch(threadID)
+	}
+
+	// Pin thread mode before exec so the mode is durable even if exec crashes.
+	if existingSess.FocusedTask == "" && existingSess.FocusedSpec == "" {
+		if focusedTaskID != "" {
+			_ = cs.SaveSession(planner.SessionInfo{
+				SessionID:   existingSess.SessionID,
+				FocusedTask: focusedTaskID,
+			})
+		} else if req.FocusedSpec != "" {
+			_ = cs.SaveSession(planner.SessionInfo{
+				SessionID:   existingSess.SessionID,
+				FocusedSpec: req.FocusedSpec,
+			})
+		}
 	}
 
 	// Expand slash commands before building exec args.
@@ -320,12 +376,21 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		_, _ = handle.Wait()
 
 		// Extract session ID and save for future --resume calls.
+		// Load the existing session first to preserve both mode pins.
+		// Use pinned.FocusedSpec as fallback when req.FocusedSpec is empty so
+		// that spec-mode remains pinned across free-form (non-focused) messages.
 		sessionID := planner.ExtractSessionID(rawStdout)
 		if sessionID != "" {
+			pinned, _ := cs.LoadSession()
+			savedSpec := req.FocusedSpec
+			if savedSpec == "" {
+				savedSpec = pinned.FocusedSpec
+			}
 			_ = cs.SaveSession(planner.SessionInfo{
 				SessionID:   sessionID,
 				LastActive:  time.Now().UTC(),
-				FocusedSpec: req.FocusedSpec,
+				FocusedSpec: savedSpec,
+				FocusedTask: pinned.FocusedTask,
 			})
 		}
 
@@ -333,7 +398,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		// with conversation history prepended to give the agent prior context.
 		if planner.IsErrorResult(rawStdout) && planner.IsStaleSessionError(rawStdout) {
 			slog.Warn("planning: stale session, retrying with history context")
-			_ = cs.SaveSession(planner.SessionInfo{}) // clear session ID only
+			// Preserve mode pin while clearing the stale session ID.
+			pinned, _ := cs.LoadSession()
+			_ = cs.SaveSession(planner.SessionInfo{
+				FocusedSpec: pinned.FocusedSpec,
+				FocusedTask: pinned.FocusedTask,
+			})
 			historyCtx := cs.BuildHistoryContext()
 			retryPrompt := prompt
 			if historyCtx != "" {
@@ -354,10 +424,16 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 
 			sessionID = planner.ExtractSessionID(rawStdout)
 			if sessionID != "" {
+				pinned2, _ := cs.LoadSession()
+				savedSpec2 := req.FocusedSpec
+				if savedSpec2 == "" {
+					savedSpec2 = pinned2.FocusedSpec
+				}
 				_ = cs.SaveSession(planner.SessionInfo{
 					SessionID:   sessionID,
 					LastActive:  time.Now().UTC(),
-					FocusedSpec: req.FocusedSpec,
+					FocusedSpec: savedSpec2,
+					FocusedTask: pinned2.FocusedTask,
 				})
 			}
 		}
@@ -430,6 +506,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 					Content:     resultText,
 					Timestamp:   time.Now().UTC(),
 					FocusedSpec: req.FocusedSpec,
+					FocusedTask: focusedTaskID,
 					RawOutput:   string(rawStdout),
 					PlanRound:   planRound,
 				})

@@ -214,6 +214,62 @@ func TestConversationStore_LoadSession_Missing(t *testing.T) {
 	}
 }
 
+// TestMessageFocusedTask_SerDe verifies that FocusedTask round-trips through
+// the NDJSON log and that old records without the field read back as "".
+func TestMessageFocusedTask_SerDe(t *testing.T) {
+	cs := newTestStore(t)
+
+	taskID := "11111111-1111-1111-1111-111111111111"
+	msg := Message{
+		Role:        "user",
+		Content:     "hello task",
+		Timestamp:   time.Now().Truncate(time.Millisecond),
+		FocusedTask: taskID,
+	}
+	if err := cs.AppendMessage(msg); err != nil {
+		t.Fatalf("AppendMessage: %v", err)
+	}
+
+	// Append a legacy-style record (no focused_task field).
+	legacyLine := `{"role":"user","content":"legacy","timestamp":"2026-01-01T00:00:00Z"}` + "\n"
+	path := filepath.Join(cs.dir, messagesFile)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if _, err := f.WriteString(legacyLine); err != nil {
+		t.Fatalf("write legacy: %v", err)
+	}
+	_ = f.Close()
+
+	got, err := cs.Messages()
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len(Messages) = %d, want 2", len(got))
+	}
+	if got[0].FocusedTask != taskID {
+		t.Errorf("msg[0].FocusedTask = %q, want %q", got[0].FocusedTask, taskID)
+	}
+	if got[1].FocusedTask != "" {
+		t.Errorf("msg[1].FocusedTask = %q, want empty (legacy back-compat)", got[1].FocusedTask)
+	}
+
+	// Also verify SessionInfo round-trips FocusedTask.
+	sess := SessionInfo{FocusedTask: taskID}
+	if err := cs.SaveSession(sess); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+	loaded, err := cs.LoadSession()
+	if err != nil {
+		t.Fatalf("LoadSession: %v", err)
+	}
+	if loaded.FocusedTask != taskID {
+		t.Errorf("SessionInfo.FocusedTask = %q, want %q", loaded.FocusedTask, taskID)
+	}
+}
+
 func TestConversationStore_MalformedLines(t *testing.T) {
 	cs := newTestStore(t)
 

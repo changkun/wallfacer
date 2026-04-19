@@ -16,11 +16,12 @@ import (
 
 // Message is a single entry in the planning conversation log.
 type Message struct {
-	Role        string    `json:"role"`                   // "user" or "assistant"
-	Content     string    `json:"content"`                // message text
-	Timestamp   time.Time `json:"timestamp"`              // when the message was recorded
-	FocusedSpec string    `json:"focused_spec,omitempty"` // spec path focused at the time
-	RawOutput   string    `json:"raw_output,omitempty"`   // raw NDJSON output (assistant only)
+	Role        string    `json:"role"`                    // "user" or "assistant"
+	Content     string    `json:"content"`                 // message text
+	Timestamp   time.Time `json:"timestamp"`               // when the message was recorded
+	FocusedSpec string    `json:"focused_spec,omitempty"`  // spec path focused at the time (spec-mode)
+	FocusedTask string    `json:"focused_task,omitempty"`  // task ID focused at the time (task-mode)
+	RawOutput   string    `json:"raw_output,omitempty"`    // raw NDJSON output (assistant only)
 	// PlanRound, when non-zero, identifies the planning git commit this
 	// assistant message produced — the commit carries a matching
 	// `Plan-Round: N` trailer and a `<primary-path>(plan): …` subject.
@@ -31,9 +32,10 @@ type Message struct {
 
 // SessionInfo tracks the active Claude Code session for --resume.
 type SessionInfo struct {
-	SessionID   string    `json:"session_id"`             // Claude Code session ID
-	LastActive  time.Time `json:"last_active"`            // last interaction timestamp
-	FocusedSpec string    `json:"focused_spec,omitempty"` // last focused spec path
+	SessionID   string    `json:"session_id"`              // Claude Code session ID
+	LastActive  time.Time `json:"last_active"`             // last interaction timestamp
+	FocusedSpec string    `json:"focused_spec,omitempty"`  // last focused spec path (spec-mode)
+	FocusedTask string    `json:"focused_task,omitempty"`  // last focused task ID (task-mode)
 }
 
 // ConversationStore persists planning chat messages and session state

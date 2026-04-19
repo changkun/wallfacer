@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // newPlannerHandlerWithThreads returns a handler backed by a planner
@@ -178,6 +180,118 @@ func TestUndoPlanningRound_NoCommitsForThread(t *testing.T) {
 	h.UndoPlanningRound(rec, req)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409", rec.Code)
+	}
+}
+
+// TestCreateThread_TaskMode verifies that creating a thread with a valid
+// focused_task pins it to task-mode and that the list endpoint returns the
+// correct mode and task_id fields.
+func TestCreateThread_TaskMode(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	// Create a real task in the store so focused_task validation passes.
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt:  "test task for thread",
+		Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	taskID := task.ID.String()
+
+	// Create thread with focused_task.
+	body := strings.NewReader(`{"name":"Task Thread","focused_task":"` + taskID + `"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads", body)
+	h.CreatePlanningThread(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var created map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created["mode"] != "task" {
+		t.Errorf("created mode = %v, want task", created["mode"])
+	}
+	if created["task_id"] != taskID {
+		t.Errorf("created task_id = %v, want %s", created["task_id"], taskID)
+	}
+	createdID := created["id"].(string)
+
+	// List threads and verify mode is preserved.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
+	h.ListPlanningThreads(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var listResp struct {
+		Threads []map[string]any `json:"threads"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	var found bool
+	for _, th := range listResp.Threads {
+		if th["id"] == createdID {
+			found = true
+			if th["mode"] != "task" {
+				t.Errorf("list mode = %v, want task", th["mode"])
+			}
+			if th["task_id"] != taskID {
+				t.Errorf("list task_id = %v, want %s", th["task_id"], taskID)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("created thread %s not found in list", createdID)
+	}
+}
+
+// TestCreateThread_TaskMode_UnknownTask verifies that creating a thread with
+// a non-existent focused_task returns 404.
+func TestCreateThread_TaskMode_UnknownTask(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	body := strings.NewReader(`{"name":"Orphan","focused_task":"00000000-0000-0000-0000-000000000001"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads", body)
+	h.CreatePlanningThread(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d (unknown task)", rec.Code, http.StatusNotFound)
+	}
+}
+
+// TestListPlanningThreads_DefaultMode verifies that the initial "Chat 1"
+// thread has mode "spec" and no task_id.
+func TestListPlanningThreads_DefaultMode(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
+	h.ListPlanningThreads(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Threads []map[string]any `json:"threads"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Threads) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	th := resp.Threads[0]
+	if th["mode"] != "spec" {
+		t.Errorf("mode = %v, want spec", th["mode"])
+	}
+	if th["task_id"] != nil && th["task_id"] != "" {
+		t.Errorf("task_id = %v, want empty for spec-mode thread", th["task_id"])
 	}
 }
 

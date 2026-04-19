@@ -663,3 +663,83 @@ func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	// Must not panic.
 	h.persistPlanningRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
 }
+
+// TestSendPlanningMessage_BothFocusedFields verifies that setting both
+// focused_spec and focused_task in a single message is rejected with 422.
+func TestSendPlanningMessage_BothFocusedFields(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	body := strings.NewReader(`{"message":"hi","focused_spec":"specs/foo.md","focused_task":"11111111-1111-1111-1111-111111111111"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	h.SendPlanningMessage(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d (both focused fields)", rec.Code, http.StatusUnprocessableEntity)
+	}
+}
+
+// TestSendPlanningMessage_UnknownFocusedTask verifies that a focused_task
+// pointing to a non-existent task returns 404.
+func TestSendPlanningMessage_UnknownFocusedTask(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	body := strings.NewReader(`{"message":"hi","focused_task":"00000000-0000-0000-0000-000000000001"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	h.SendPlanningMessage(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d (unknown task)", rec.Code, http.StatusNotFound)
+	}
+}
+
+// TestSendPlanningMessage_ModeMismatch verifies that sending a spec-mode
+// message to a task-mode thread (and vice versa) returns 409.
+func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	// Create a task so we have a valid task ID.
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt:  "test task",
+		Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	taskID := task.ID.String()
+
+	tm := h.planner.Threads()
+	threadList := tm.List(false)
+	if len(threadList) == 0 {
+		t.Fatal("expected at least one thread")
+	}
+	threadID := threadList[0].ID
+
+	// Pin this thread to task-mode by saving a session with FocusedTask.
+	cs, err := tm.Store(threadID)
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskID}); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	// Sending a spec-mode message to a task-mode thread should yield 409.
+	body := strings.NewReader(`{"message":"hi","focused_spec":"specs/foo.md","thread":"` + threadID + `"}`)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	h.SendPlanningMessage(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, want %d (mode mismatch)", rec.Code, http.StatusConflict)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if errMsg, _ := resp["error"].(string); !strings.Contains(errMsg, "task-mode") {
+		t.Errorf("error = %q, want mention of task-mode", errMsg)
+	}
+}
