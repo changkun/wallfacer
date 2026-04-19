@@ -18,6 +18,12 @@ var _lastCheckedSpecIndex = -1;
 var _showArchived =
   localStorage.getItem("wallfacer-spec-show-archived") === "true";
 
+// Disclosure chevrons — kept in sync with explorer.js.
+var _specChevRightSvg =
+  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+var _specChevDownSvg =
+  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
 // getSpecIndex returns the current workspace's roadmap index (the
 // specs/README.md metadata surfaced by GET /api/specs/tree) or null
 // when no roadmap exists. Consumed by downstream modules (explorer
@@ -436,7 +442,7 @@ function renderSpecTree() {
       '<span class="spec-node-toggle" data-path="__track__' +
       escapeHtml(track) +
       '">' +
-      (trackExpanded ? "\u25BE" : "\u25B8") +
+      (trackExpanded ? _specChevDownSvg : _specChevRightSvg) +
       "</span> " +
       '<span class="spec-track-name">' +
       escapeHtml(track) +
@@ -553,7 +559,7 @@ function _renderSpecNode(node, nodesByPath) {
       '<span class="spec-node-toggle" data-path="' +
       escapeHtml(node.path) +
       '">' +
-      (isExpanded ? "\u25BE" : "\u25B8") +
+      (isExpanded ? _specChevDownSvg : _specChevRightSvg) +
       "</span> ";
   } else {
     html += '<span class="spec-node-toggle-placeholder"></span> ';

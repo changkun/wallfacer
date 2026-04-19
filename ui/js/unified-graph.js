@@ -326,27 +326,101 @@
     return Math.max(NODE_H, contentH);
   }
 
-  // Task status → background colour (matches depgraph.js).
-  var TASK_STATUS_COLORS = {
-    backlog: "#6b6560",
-    in_progress: "#2c5f98",
-    waiting: "#a07020",
-    committing: "#5a3d8a",
-    done: "#1a6030",
-    failed: "#8c2020",
-    cancelled: "#5a3d8a",
+  // Status → visual style. Nodes render as tinted-fill rounded rectangles
+  // with a saturated stroke in the same hue; the colour values come from
+  // CSS custom properties on `.depgraph-mode-container` so light/dark
+  // themes can rebalance the palette without touching this file.
+  //
+  // The fallback hex values mirror the light-theme CSS so tests running in
+  // a stub DOM (no getComputedStyle) still produce readable output.
+  var TASK_STATUS_FALLBACK = {
+    backlog: { stroke: "#8e8a80", fill: "rgba(142,138,128,0.12)" },
+    in_progress: { stroke: "#3a6db3", fill: "rgba(58,109,179,0.14)" },
+    waiting: { stroke: "#a56a12", fill: "rgba(165,106,18,0.14)" },
+    committing: { stroke: "#6a4aa3", fill: "rgba(106,74,163,0.14)" },
+    done: { stroke: "#3f7a4a", fill: "rgba(63,122,74,0.14)" },
+    failed: { stroke: "#a32d2d", fill: "rgba(163,45,45,0.14)" },
+    cancelled: { stroke: "#7a766e", fill: "rgba(122,118,110,0.12)" },
+  };
+  var SPEC_STATUS_FALLBACK = {
+    vague: { stroke: "#7a5418", fill: "rgba(122,84,24,0.10)" },
+    drafted: { stroke: "#a56a12", fill: "rgba(165,106,18,0.12)" },
+    validated: { stroke: "#2d6d5a", fill: "rgba(45,109,90,0.12)" },
+    complete: { stroke: "#3f7a4a", fill: "rgba(63,122,74,0.12)" },
+    stale: { stroke: "#a32d2d", fill: "rgba(163,45,45,0.12)" },
+    archived: { stroke: "#7a766e", fill: "rgba(122,118,110,0.10)" },
+  };
+  var EDGE_FALLBACK = {
+    containment: "#9a948a",
+    dispatch: "#3a6db3",
+    spec_dep: "#b07045",
+    task_dep: "#4a7a4f",
   };
 
-  // Spec status → background colour. Specs use a separate palette so they
-  // read as a different node kind at a glance.
-  var SPEC_STATUS_COLORS = {
-    vague: "#5d4f42",
-    drafted: "#6f5632",
-    validated: "#2f5a4c",
-    complete: "#2a4a2a",
-    stale: "#5a3030",
-    archived: "#3d3a36",
-  };
+  // _cssVarReader reads `--*` custom properties off the host element
+  // (defaulting to the `.depgraph-mode-container` ancestor) once per
+  // render so we only pay the getComputedStyle cost a bounded number of
+  // times per frame.
+  function _cssVarReader(svg) {
+    var host = null;
+    if (svg && typeof svg.closest === "function") {
+      host = svg.closest(".depgraph-mode-container");
+    }
+    if (!host && typeof document !== "undefined" && document.documentElement) {
+      host = document.documentElement;
+    }
+    if (
+      !host ||
+      typeof getComputedStyle !== "function"
+    ) {
+      return function () {
+        return "";
+      };
+    }
+    var cs;
+    try {
+      cs = getComputedStyle(host);
+    } catch (_e) {
+      return function () {
+        return "";
+      };
+    }
+    var cache = {};
+    return function (name) {
+      if (cache[name] !== undefined) return cache[name];
+      var v = "";
+      try {
+        v = (cs.getPropertyValue(name) || "").trim();
+      } catch (_e) {
+        v = "";
+      }
+      cache[name] = v;
+      return v;
+    };
+  }
+
+  function _nodeStyle(readVar, kind, status) {
+    var table =
+      kind === "spec" ? SPEC_STATUS_FALLBACK : TASK_STATUS_FALLBACK;
+    var fb = table[status] || { stroke: "#7a766e", fill: "rgba(0,0,0,0.05)" };
+    var prefix = kind === "spec" ? "--dg-spec-" : "--dg-task-";
+    var key = status === "in_progress" ? "progress" : status;
+    var stroke = readVar(prefix + key) || fb.stroke;
+    var fill = readVar(prefix + key + "-tint") || fb.fill;
+    return { stroke: stroke, fill: fill };
+  }
+
+  function _edgeColor(readVar, kind) {
+    var name =
+      kind === "containment"
+        ? "--dg-edge-containment"
+        : kind === "dispatch"
+          ? "--dg-edge-dispatch"
+          : kind === "spec_dep"
+            ? "--dg-edge-spec-dep"
+            : "--dg-edge-task-dep";
+    return readVar(name) || EDGE_FALLBACK[kind] || "#7a7570";
+  }
 
   // Edge styling per kind. containment and dispatch are structural so they
   // read as thin solid lines; spec_dep and task_dep are design/runtime
@@ -354,16 +428,11 @@
   //
   // task_dep has a secondary state — when the prerequisite task is already
   // done, the edge goes solid to signal "this dependency is satisfied."
-  // See _edgeStyle() which consults the source node's status.
-  //
-  // NOTE: these colours are duplicated in ui/css/docs.css for the header
-  // legend (`.depgraph-mode__legend-edge--*`). Keep the two in sync when
-  // tweaking the palette; a future theme refactor should consolidate them.
   var EDGE_STYLES = {
-    containment: { color: "#7a7570", width: 1.2, dash: null },
-    dispatch: { color: "#3b82c4", width: 1.5, dash: null },
-    spec_dep: { color: "#b07045", width: 1.5, dash: "6 3" },
-    task_dep: { color: "#5a9058", width: 1.5, dash: "4 2" },
+    containment: { width: 1.2, dash: null },
+    dispatch: { width: 1.5, dash: null },
+    spec_dep: { width: 1.5, dash: "6 3" },
+    task_dep: { width: 1.5, dash: "4 2" },
   };
 
   function svgNs(tag) {
@@ -1827,6 +1896,34 @@
     });
     svg.appendChild(backdrop);
 
+    // Read theme tokens once per render. Node/edge styles call this
+    // closure so a single getComputedStyle() fans out into dozens of
+    // var lookups with no additional reflow cost.
+    var readVar = _cssVarReader(svg);
+
+    // Arrow markers — one per edge kind so every edge points from its
+    // prerequisite to its dependant without us having to compute arrow
+    // geometry per segment. `auto-start-reverse` + `refX=9` positions the
+    // tip flush with the destination node's perimeter.
+    var defs = svgNs("defs");
+    ["containment", "dispatch", "spec_dep", "task_dep"].forEach(function (k) {
+      var m = svgNs("marker");
+      m.setAttribute("id", "dg-arr-" + k.replace("_", "-"));
+      m.setAttribute("viewBox", "0 0 10 10");
+      m.setAttribute("refX", "9");
+      m.setAttribute("refY", "5");
+      m.setAttribute("markerWidth", "6");
+      m.setAttribute("markerHeight", "6");
+      m.setAttribute("orient", "auto-start-reverse");
+      m.setAttribute("markerUnits", "userSpaceOnUse");
+      var p = svgNs("path");
+      p.setAttribute("d", "M0,0 L10,5 L0,10 z");
+      p.setAttribute("fill", _edgeColor(readVar, k));
+      m.appendChild(p);
+      defs.appendChild(m);
+    });
+    svg.appendChild(defs);
+
     // Per-node mutable position index — live-updated during drag so
     // incident edges can be re-routed without touching the layout cache.
     // Each value points to the SAME object stored on the DOM-backed
@@ -1860,7 +1957,11 @@
       if (!pts || pts.length < 2) return;
 
       var base = EDGE_STYLES[e.kind] || EDGE_STYLES.task_dep;
-      var style = { color: base.color, width: base.width, dash: base.dash };
+      var style = {
+        color: _edgeColor(readVar, e.kind),
+        width: base.width,
+        dash: base.dash,
+      };
       if (e.kind === "task_dep") {
         var src = nodeById.get(e.from);
         if (src && src.kind === "task" && src.status === "done") {
@@ -1873,6 +1974,11 @@
       path.setAttribute("stroke", style.color);
       path.setAttribute("stroke-width", String(style.width));
       path.setAttribute("fill", "none");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute(
+        "marker-end",
+        "url(#dg-arr-" + e.kind.replace("_", "-") + ")",
+      );
       if (style.dash) path.setAttribute("stroke-dasharray", style.dash);
       path.setAttribute("data-kind", e.kind);
       path.setAttribute("data-from", e.from);
@@ -1964,34 +2070,36 @@
       var body = svgNs("g");
       body.style.cursor = "grab";
 
+      var ns = _nodeStyle(readVar, n.kind, n.status);
+      var inkColor = readVar("--text") || "#1b1916";
+      var mutedColor = readVar("--text-muted") || "#7a766e";
+
       var rect = svgNs("rect");
       rect.setAttribute("x", String(x));
       rect.setAttribute("y", String(y));
       rect.setAttribute("width", String(NODE_W));
       rect.setAttribute("height", String(h));
-      rect.setAttribute("rx", n.kind === "spec" ? "12" : "6");
-      rect.setAttribute(
-        "fill",
-        n.kind === "spec"
-          ? SPEC_STATUS_COLORS[n.status] || "#4a4540"
-          : TASK_STATUS_COLORS[n.status] || "#4B5563",
-      );
+      rect.setAttribute("rx", n.kind === "spec" ? "10" : "6");
+      rect.setAttribute("fill", ns.fill);
+      rect.setAttribute("stroke", ns.stroke);
+      rect.setAttribute("stroke-width", "1.25");
       if (n.kind === "task" && n.extra && n.extra.dispatched) {
-        rect.setAttribute("stroke", "#3b82c4");
-        rect.setAttribute("stroke-width", "1.5");
+        rect.setAttribute("stroke-width", "1.75");
       }
       if (focusedId === n.id) {
-        rect.setAttribute("stroke", "#f7c466");
+        rect.setAttribute("stroke", readVar("--accent") || "#c45a33");
         rect.setAttribute("stroke-width", "2");
       }
       body.appendChild(rect);
 
       var chip = svgNs("text");
-      chip.setAttribute("x", String(x + 8));
-      chip.setAttribute("y", String(y + 14));
-      chip.setAttribute("font-size", "10");
+      chip.setAttribute("x", String(x + 10));
+      chip.setAttribute("y", String(y + 15));
+      chip.setAttribute("font-size", "9");
       chip.setAttribute("font-family", "system-ui, sans-serif");
-      chip.setAttribute("fill", "#ffffffb3");
+      chip.setAttribute("font-weight", "600");
+      chip.setAttribute("letter-spacing", "0.08em");
+      chip.setAttribute("fill", ns.stroke);
       chip.textContent = n.kind === "spec" ? "SPEC" : "TASK";
       body.appendChild(chip);
 
@@ -2013,7 +2121,7 @@
       label.setAttribute("text-anchor", "middle");
       label.setAttribute("font-size", "12");
       label.setAttribute("font-family", "system-ui, sans-serif");
-      label.setAttribute("fill", "#ffffff");
+      label.setAttribute("fill", inkColor);
       for (var li = 0; li < lines.length; li++) {
         var tspan = svgNs("tspan");
         tspan.setAttribute("x", String(labelCenterX));
@@ -2026,10 +2134,10 @@
       // Pin marker on the top-left corner for user-pinned nodes.
       if (pinnedIds && pinnedIds.has(n.id)) {
         var pin = svgNs("circle");
-        pin.setAttribute("cx", String(x + 4));
-        pin.setAttribute("cy", String(y + 4));
+        pin.setAttribute("cx", String(x + 6));
+        pin.setAttribute("cy", String(y + 6));
         pin.setAttribute("r", "3");
-        pin.setAttribute("fill", "#f7c466");
+        pin.setAttribute("fill", readVar("--accent") || "#c45a33");
         body.appendChild(pin);
       }
 
@@ -2040,7 +2148,11 @@
       g.appendChild(body);
 
       if (hasToggle) {
-        var handle = _makeToggleHandle(n, x, y, h, opts);
+        var handle = _makeToggleHandle(n, x, y, h, opts, {
+          stroke: ns.stroke,
+          ink: inkColor,
+          bg: readVar("--bg-raised") || readVar("--bg") || "#ffffff",
+        });
         if (handle) g.appendChild(handle);
       }
 
@@ -2243,7 +2355,7 @@
   // _makeToggleHandle returns an <g> containing the +/- chip that
   // expands/collapses a spec's children. Click handler stops propagation
   // so the main body's spec-focus click doesn't also fire.
-  function _makeToggleHandle(n, x, y, h, opts) {
+  function _makeToggleHandle(n, x, y, h, opts, colors) {
     // Keep the toggle near the top of tall wrapped nodes so it stays
     // within a comfortable click reach regardless of how many label
     // lines the spec's title occupies.
@@ -2255,6 +2367,10 @@
     var collapsed = !!(n.extra && n.extra.collapsed);
     var cx = x + NODE_W - 16;
     var cy = y + Math.min(26, nodeH / 2);
+    var c = colors || {};
+    var stroke = c.stroke || "#7a766e";
+    var ink = c.ink || "#1b1916";
+    var bg = c.bg || "#ffffff";
     var handle = svgNs("g");
     handle.style.cursor = "pointer";
     handle.setAttribute("data-role", "toggle");
@@ -2264,8 +2380,8 @@
     circle.setAttribute("cx", String(cx));
     circle.setAttribute("cy", String(cy));
     circle.setAttribute("r", "9");
-    circle.setAttribute("fill", "#ffffff1a");
-    circle.setAttribute("stroke", "#ffffff66");
+    circle.setAttribute("fill", bg);
+    circle.setAttribute("stroke", stroke);
     circle.setAttribute("stroke-width", "1");
     handle.appendChild(circle);
 
@@ -2275,7 +2391,7 @@
     glyph.setAttribute("text-anchor", "middle");
     glyph.setAttribute("font-size", "13");
     glyph.setAttribute("font-family", "system-ui, sans-serif");
-    glyph.setAttribute("fill", "#ffffff");
+    glyph.setAttribute("fill", ink);
     glyph.textContent = collapsed ? "+" : "\u2212"; // − (minus)
     handle.appendChild(glyph);
 

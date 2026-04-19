@@ -216,6 +216,10 @@ function _loadExplorerRoots() {
   }
   _explorerLoaded = true;
   _renderTree();
+  // Auto-expand root workspace directories so the tree opens by default.
+  for (var r = 0; r < _explorerRoots.length; r++) {
+    _expandNode(_explorerRoots[r]);
+  }
 }
 
 function _expandNode(node) {
@@ -767,6 +771,12 @@ function _renderTree() {
 var _iconSvgAttrs =
   'width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 
+// Disclosure chevrons matching the reference design.
+var _chevRightSvg =
+  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+var _chevDownSvg =
+  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
 function _svgWrap(color, paths) {
   return (
     "<svg " + _iconSvgAttrs + ' stroke="' + color + '">' + paths + "</svg>"
@@ -987,7 +997,7 @@ function _renderNode(node, depth, container) {
       toggle.textContent = "\u22EF"; // ellipsis
       toggle.className += " explorer-node--loading";
     } else {
-      toggle.textContent = node.expanded ? "\u25BC" : "\u25B6";
+      toggle.innerHTML = node.expanded ? _chevDownSvg : _chevRightSvg;
     }
   }
   el.appendChild(toggle);
