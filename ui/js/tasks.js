@@ -260,25 +260,99 @@ function applyHostModeToComposer() {
   }
 }
 
-// applyTaskKindToComposer mirrors the current Type select value onto
-// the composer root's data-task-kind attribute and updates the prompt
-// placeholder. The CSS reads data-task-kind to show only the activity
-// overrides that actually execute for the selected kind (Implement
-// uses every stage except Ideas; Brainstorm runs only Ideas), so the
-// single source of truth for "which controls are relevant" lives in
-// the attribute rather than duplicated show/hide JS.
-function applyTaskKindToComposer() {
+// Cached /api/flows payload, populated on first composer open. Null
+// until the first fetch completes; handlers fall back to
+// implement/brainstorm literals so the composer remains usable even
+// before the flow list arrives.
+var _flowsCache = null;
+var _flowsFetchInFlight = null;
+
+function _flowBySlug(slug) {
+  if (!_flowsCache) return null;
+  for (var i = 0; i < _flowsCache.length; i++) {
+    if (_flowsCache[i].slug === slug) return _flowsCache[i];
+  }
+  return null;
+}
+
+// _flowAllowsEmptyPrompt mirrors the server-side rule on POST
+// /api/tasks: a brainstorm flow (legacy idea-agent spawn kind)
+// accepts an empty prompt because the agent builds its own prompt
+// from workspace signals. All other flows require a prompt.
+function _flowAllowsEmptyPrompt(slug) {
+  if (slug === "brainstorm") return true;
+  var f = _flowBySlug(slug);
+  return !!(f && f.spawn_kind === "idea-agent");
+}
+
+// populateFlowSelect swaps the composer's flow dropdown options to
+// match the cached /api/flows response. Idempotent — callers invoke
+// this after the cache is populated and again whenever a flow is
+// added.
+function populateFlowSelect() {
+  var el = document.getElementById("new-task-flow");
+  if (!el || !_flowsCache) return;
+  var previous = el.value || "implement";
+  el.innerHTML = "";
+  _flowsCache.forEach(function (flow) {
+    var opt = document.createElement("option");
+    opt.value = flow.slug;
+    opt.textContent = flow.name || flow.slug;
+    el.appendChild(opt);
+  });
+  // Restore previous selection if still present; otherwise default
+  // to "implement".
+  var restore = _flowBySlug(previous) ? previous : "implement";
+  el.value = restore;
+  applyTaskFlowToComposer();
+}
+
+function _ensureFlowsLoaded() {
+  if (_flowsCache) {
+    populateFlowSelect();
+    return Promise.resolve(_flowsCache);
+  }
+  if (_flowsFetchInFlight) return _flowsFetchInFlight;
+  _flowsFetchInFlight = api(Routes.flows.list(), { method: "GET" })
+    .then(function (rows) {
+      _flowsCache = Array.isArray(rows) ? rows : [];
+      populateFlowSelect();
+      return _flowsCache;
+    })
+    .catch(function () {
+      // Leave the fallback <option value="implement">Implement</option>
+      // in place; the composer still submits successfully with the
+      // default selection.
+      return null;
+    })
+    .finally(function () {
+      _flowsFetchInFlight = null;
+    });
+  return _flowsFetchInFlight;
+}
+
+// applyTaskFlowToComposer mirrors the Flow select value onto the
+// composer root's data-task-flow attribute and updates the prompt
+// placeholder. Brainstorm flows show the ideation placeholder
+// (prompt optional); every other flow shows the normal task
+// placeholder.
+function applyTaskFlowToComposer() {
   var form = document.getElementById("new-task-form");
-  var kindEl = document.getElementById("new-task-kind");
-  if (!form || !kindEl) return;
-  var kind = kindEl.value || "";
-  form.setAttribute("data-task-kind", kind);
+  var flowEl = document.getElementById("new-task-flow");
+  if (!form || !flowEl) return;
+  var slug = flowEl.value || "implement";
+  form.setAttribute("data-task-flow", slug);
   var textarea = document.getElementById("new-prompt");
   if (textarea) {
-    var placeholder =
-      kind === "idea-agent"
-        ? textarea.getAttribute("data-prompt-placeholder-ideation")
-        : textarea.getAttribute("data-prompt-placeholder-task");
+    var ideation = _flowAllowsEmptyPrompt(slug);
+    var placeholder = ideation
+      ? textarea.getAttribute("data-prompt-placeholder-ideation")
+      : textarea.getAttribute("data-prompt-placeholder-task");
+    // Flow-specific override: use the flow's description when one
+    // is available and it isn't the built-in brainstorm (whose
+    // description reads as a label, not a prompting hint).
+    var f = _flowBySlug(slug);
+    if (!ideation && f && f.description) placeholder = f.description;
     if (placeholder) textarea.placeholder = placeholder;
   }
 }
@@ -287,13 +361,13 @@ function applyTaskKindToComposer() {
 
 async function createTask() {
   const textarea = document.getElementById("new-prompt");
-  const kindEl = document.getElementById("new-task-kind");
-  const kind = kindEl ? kindEl.value : "";
+  const flowEl = document.getElementById("new-task-flow");
+  const flow = flowEl ? flowEl.value || "implement" : "implement";
   const prompt = textarea.value.trim();
-  // Idea-agent tasks build their own prompt from workspace signals at
-  // execution time; the composer field is optional for that type.
-  // For any other task kind the prompt must be non-empty.
-  if (!prompt && kind !== "idea-agent") {
+  // Brainstorm-style flows build their own prompt from workspace
+  // signals at execution time; the composer field is optional for
+  // those. Every other flow requires a non-empty prompt.
+  if (!prompt && !_flowAllowsEmptyPrompt(flow)) {
     textarea.focus();
     textarea.style.borderColor = "#dc2626";
     setTimeout(() => (textarea.style.borderColor = ""), 2000);
@@ -307,7 +381,6 @@ async function createTask() {
       "new-mount-worktrees",
     ).checked;
     const sandbox = document.getElementById("new-sandbox").value;
-    const sandbox_by_activity = collectSandboxByActivity("new-sandbox-");
     const tags = getTagValues("new-task-tag-input");
     const max_cost_usd =
       parseFloat(document.getElementById("new-max-cost-usd").value) || 0;
@@ -330,10 +403,11 @@ async function createTask() {
     if (makeRoutine) {
       const interval_minutes =
         (repeatMinutesEl && parseInt(repeatMinutesEl.value, 10)) || 60;
-      // Routines for the ideation type get spawn_kind=idea-agent so
-      // every fire spawns a brainstorm task. For regular routines the
-      // server defaults spawn_kind to "".
-      const spawn_kind = kind === "idea-agent" ? "idea-agent" : "";
+      // Routines for brainstorm flows spawn idea-agent tasks; other
+      // flows fall back to the runner's default spawn_kind. Once the
+      // routine-spawn-flow-migration task lands, this can pass the
+      // flow slug directly instead of translating back to spawn_kind.
+      const spawn_kind = _flowAllowsEmptyPrompt(flow) ? "idea-agent" : "";
       const routinePrompt =
         prompt || "Brainstorm improvement ideas for the current workspace.";
       const routine = await api(Routes.routines.create(), {
@@ -361,11 +435,10 @@ async function createTask() {
       method: "POST",
       body: JSON.stringify({
         prompt,
-        kind,
+        flow,
         timeout,
         mount_worktrees,
         sandbox,
-        sandbox_by_activity,
         tags,
         max_cost_usd,
         max_input_tokens,
@@ -425,18 +498,9 @@ function showNewTaskForm() {
     });
   }
   const sandboxSelect = document.getElementById("new-sandbox");
-  bindTaskSandboxInheritance("new-sandbox", "new-sandbox-");
   if (sandboxSelect) {
     sandboxSelect.value = defaultSandbox || "";
   }
-  // Do not prefill per-activity overrides on new tasks. Empty values inherit
-  // from task default sandbox, preventing stale global overrides (e.g. claude)
-  // from shadowing an explicit task sandbox (e.g. codex).
-  applySandboxByActivity("new-sandbox-", {});
-  setActivityOverrideDefaultSandbox(
-    "new-sandbox-",
-    sandboxSelect && sandboxSelect.value ? sandboxSelect.value : "",
-  );
   initTagInput("new-task-tag-input", []);
   var depsRow = document.getElementById("new-depends-on-row");
   populateDependsOnPicker("new-depends-on-picker", null, []);
@@ -447,13 +511,16 @@ function showNewTaskForm() {
   // sandbox is in play. Idempotent: called again on every open.
   applyHostModeToComposer();
 
-  // Sync task-kind-driven visibility (which override rows show, which
-  // prompt placeholder) and wire the select's change event once.
-  applyTaskKindToComposer();
-  var kindEl = document.getElementById("new-task-kind");
-  if (kindEl && !kindEl._composerKindBound) {
-    kindEl._composerKindBound = true;
-    kindEl.addEventListener("change", applyTaskKindToComposer);
+  // Fetch the flow catalog (cached after first success) and wire
+  // the select's change event once. Even before the fetch resolves
+  // the fallback <option value="implement">Implement</option> keeps
+  // the composer functional.
+  _ensureFlowsLoaded();
+  applyTaskFlowToComposer();
+  var flowEl = document.getElementById("new-task-flow");
+  if (flowEl && !flowEl._composerFlowBound) {
+    flowEl._composerFlowBound = true;
+    flowEl.addEventListener("change", applyTaskFlowToComposer);
   }
 
   // Wire the "Repeat on a schedule" toggle once per form open so the
@@ -481,22 +548,17 @@ function hideNewTaskForm() {
   if (sandboxSelect) {
     sandboxSelect.value = defaultSandbox || "";
   }
-  applySandboxByActivity("new-sandbox-", {});
-  setActivityOverrideDefaultSandbox(
-    "new-sandbox-",
-    sandboxSelect && sandboxSelect.value ? sandboxSelect.value : "",
-  );
   const maxCostEl = document.getElementById("new-max-cost-usd");
   if (maxCostEl) maxCostEl.value = "";
   const maxTokensEl = document.getElementById("new-max-input-tokens");
   if (maxTokensEl) maxTokensEl.value = "";
   const scheduledAtEl = document.getElementById("new-scheduled-at");
   if (scheduledAtEl) scheduledAtEl.value = "";
-  const kindEl = document.getElementById("new-task-kind");
-  if (kindEl) kindEl.value = "";
-  // Resync the composer's data-task-kind so the next open starts in
+  const flowEl = document.getElementById("new-task-flow");
+  if (flowEl) flowEl.value = "implement";
+  // Resync the composer's data-task-flow so the next open starts in
   // the Implement state regardless of what was selected last time.
-  applyTaskKindToComposer();
+  applyTaskFlowToComposer();
   const repeatToggle = document.getElementById("new-repeat-toggle");
   const repeatMinutesEl = document.getElementById("new-repeat-minutes");
   const repeatMinutesRow = document.getElementById("new-repeat-minutes-row");
