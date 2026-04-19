@@ -526,7 +526,12 @@ function makeSigninContext(fetchImpl) {
       readyState: "complete",
       body: { style: {} },
     },
-    window: {},
+    window: {
+      addEventListener() {},
+      removeEventListener() {},
+      innerHeight: 800,
+      innerWidth: 1200,
+    },
     localStorage: { getItem: () => null, setItem: () => {} },
     fetch: fetchImpl,
     tasks: [],
@@ -615,7 +620,9 @@ describe("renderSigninBadge", () => {
     expect(avatar.src).toBe("https://cdn/a.png");
     expect(avatar.getAttribute("referrerpolicy")).toBe("no-referrer");
 
-    const textCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const textCol = wrap.children.find(
+      (c) => c.className === "sb-signin__text",
+    );
     const nameSpan = textCol.children.find(
       (c) => c.className === "sb-signin__name",
     );
@@ -654,7 +661,9 @@ describe("renderSigninBadge", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const textCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const textCol = wrap.children.find(
+      (c) => c.className === "sb-signin__text",
+    );
     const nameSpan = textCol.children.find(
       (c) => c.className === "sb-signin__name",
     );
@@ -681,7 +690,9 @@ describe("renderSigninBadge", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const textCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const textCol = wrap.children.find(
+      (c) => c.className === "sb-signin__text",
+    );
     const nameSpan = textCol.children.find(
       (c) => c.className === "sb-signin__name",
     );
@@ -824,7 +835,9 @@ describe("renderSigninBadge org switcher", () => {
       (c) => c.className === "sb-signin__user",
     );
     // The visible view label shows the current org name, not "Personal".
-    const viewCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const viewCol = wrap.children.find(
+      (c) => c.className === "sb-signin__text",
+    );
     const viewLabel = viewCol.children.find(
       (c) => c.className === "sb-signin__view-label",
     );
@@ -866,7 +879,9 @@ describe("renderSigninBadge org switcher", () => {
       (c) => c.className === "sb-signin__user",
     );
     // The view label stays "Personal" when there's no active org.
-    const viewCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const viewCol = wrap.children.find(
+      (c) => c.className === "sb-signin__text",
+    );
     const viewLabel = viewCol.children.find(
       (c) => c.className === "sb-signin__view-label",
     );
@@ -909,7 +924,9 @@ describe("renderSigninBadge org switcher", () => {
     const wrap = signinEl.children.find(
       (c) => c.className === "sb-signin__user",
     );
-    const viewCol = wrap.children.find((c) => c.className === "sb-signin__text");
+    const viewCol = wrap.children.find(
+      (c) => c.className === "sb-signin__text",
+    );
     const viewLabel = viewCol.children.find(
       (c) => c.className === "sb-signin__view-label",
     );

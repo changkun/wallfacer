@@ -33,8 +33,8 @@ Cloud Platform — 0/9
   ○ Multi-User Collaboration       ○ Billing Idempotency
   ○ Telemetry Queue Backpressure
 
-Shared Design — 2/21 complete
-  ◐ Authentication (Phase 1)       ✅ Agent Abstraction
+Shared Design — 3/21 complete
+  ✅ Authentication                ✅ Agent Abstraction
   ○ Agent Token Exchange           ○ Audit Log
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
@@ -178,7 +178,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 | Spec | Status | Serves | Delivers |
 |------|--------|--------|----------|
-| [authentication.md](shared/authentication.md) | In progress (Phase 1 shipped; Phase 2 drafted) | Both | OAuth2/OIDC login, session management, user identity. Phase 1 shipped: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2 (drafted): JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching — unblocks the cloud move. |
+| [authentication.md](shared/authentication.md) | **Complete** | Both | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Unblocks cloud multi-tenant and multi-user collaboration. Phase 3 (third-party OIDC, remote control) deferred. |
 | [agent-token-exchange.md](shared/agent-token-exchange.md) | Drafted | Both | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login; does not block the cloud move. |
 | [audit-log.md](shared/audit-log.md) | Drafted | Both | Cross-entity mutation history — uniform `audit.Record` write surface covering task transitions, workspace edits, config changes, admin actions; per-workspace JSONL storage; cloud-gated read API. Future effort; depends on auth Phase 2 for principal context. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
