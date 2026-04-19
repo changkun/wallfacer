@@ -2,7 +2,7 @@
 title: "Telemetry & Flow Observability — Closing the Signal-to-Code Loop"
 status: drafted
 depends_on:
-  - shared/agent-abstraction.md
+  - specs/shared/agent-abstraction.md
 affects:
   - internal/metrics/
   - internal/runner/
