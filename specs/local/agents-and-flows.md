@@ -1,6 +1,6 @@
 ---
 title: Agents & Flows
-status: drafted
+status: complete
 depends_on:
   - specs/shared/agent-abstraction.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - docs/guide/
 effort: xlarge
 created: 2026-04-18
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
@@ -409,16 +409,16 @@ Each task preserves the green-tree acceptance criterion:
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Extract internal/agents](agents-and-flows/extract-agents-package.md) | — | medium | validated |
-| [Agents API + tab (read-only)](agents-and-flows/agents-api-and-tab.md) | extract-agents-package | medium | validated |
-| [Flow data model](agents-and-flows/flow-data-model.md) | extract-agents-package | medium | validated |
-| [Task.FlowID + resolver](agents-and-flows/task-flow-field.md) | flow-data-model | small | validated |
-| [Flow engine](agents-and-flows/flow-engine.md) | flow-data-model, task-flow-field | large | validated |
-| [Flows API + tab (read-only)](agents-and-flows/flows-api-and-tab.md) | flow-data-model, agents-api-and-tab | medium | validated |
-| [Composer flow picker](agents-and-flows/composer-flow-picker.md) | flows-api-and-tab, task-flow-field | medium | validated |
-| [Runner → flow-engine wiring](agents-and-flows/runner-flow-integration.md) | flow-engine, composer-flow-picker | large | validated |
-| [Editable agents + flows (follow-up)](agents-and-flows/editable-agents-and-flows.md) | runner-flow-integration | large | validated |
-| [Routine.SpawnFlow migration (follow-up)](agents-and-flows/routine-spawn-flow-migration.md) | runner-flow-integration | small | validated |
+| [Extract internal/agents](agents-and-flows/extract-agents-package.md) | — | medium | complete |
+| [Agents API + tab (read-only)](agents-and-flows/agents-api-and-tab.md) | extract-agents-package | medium | complete |
+| [Flow data model](agents-and-flows/flow-data-model.md) | extract-agents-package | medium | complete |
+| [Task.FlowID + resolver](agents-and-flows/task-flow-field.md) | flow-data-model | small | complete |
+| [Flow engine](agents-and-flows/flow-engine.md) | flow-data-model, task-flow-field | large | complete |
+| [Flows API + tab (read-only)](agents-and-flows/flows-api-and-tab.md) | flow-data-model, agents-api-and-tab | medium | complete |
+| [Composer flow picker](agents-and-flows/composer-flow-picker.md) | flows-api-and-tab, task-flow-field | medium | complete |
+| [Runner → flow-engine wiring](agents-and-flows/runner-flow-integration.md) | flow-engine, composer-flow-picker | large | complete |
+| [Editable agents + flows (follow-up)](agents-and-flows/editable-agents-and-flows.md) | runner-flow-integration | large | complete |
+| [Routine.SpawnFlow migration (follow-up)](agents-and-flows/routine-spawn-flow-migration.md) | runner-flow-integration | small | complete |
 
 ```mermaid
 graph LR
@@ -455,6 +455,87 @@ graph LR
    composer, runner, and UI are all Flow-aware end-to-end.
 8. **Follow-ups** ship independently when the MVP is stable:
    editable agents/flows and routine.SpawnFlow migration.
+
+## Outcome
+
+The Agents & Flows track is complete. All ten child specs landed
+between 2026-04-18 and 2026-04-19, moving the runner from a
+hardcoded Refine → Impl → Test → Commit pipeline onto a
+Flow-driven dispatcher while keeping the existing built-in
+behaviour byte-identical for tasks that don't opt into a custom
+flow.
+
+### What Shipped
+
+- **Packages**: `internal/agents` (descriptor + built-in catalog
+  + YAML loader + merged registry), `internal/flow` (Flow /
+  Step data model + engine + registry + YAML loader). Seven
+  built-in agents and four built-in flows are seeded in-process;
+  `~/.wallfacer/{agents,flows}/*.yaml` layers user-authored
+  definitions on top.
+- **Runner**: `Runner.RunAgent` adapter satisfies
+  `flow.AgentLauncher`; `dispatchFlow` in `execute.go` routes
+  each task through implement-turn-loop / brainstorm /
+  flow-engine branches based on `flow.Registry.ResolveForTask`.
+- **HTTP API**: `/api/agents`, `/api/agents/{slug}`,
+  `/api/flows`, `/api/flows/{slug}` support GET/POST/PUT/DELETE
+  with slug + step validation, built-in shadow guards, and
+  runner-reload-on-success.
+- **UI**: Agents + Flows sidebar tabs render the merged catalog.
+  The composer's Flow dropdown replaces the old Type picker;
+  the Agent (Claude/Codex) dropdown retired after the harness
+  pin landed on the agent descriptor.
+- **Routines**: Routine cards carry `RoutineSpawnFlow`
+  alongside the legacy `RoutineSpawnKind`; the fire path wires
+  `FlowID` onto instance tasks so routines inherit the new
+  dispatch.
+- **Tests**: 880 runner + 785 handler + 23 flow + 14 agents
+  backend cases, plus 66 composer coverage tests, seven new
+  Flows-tab tests, and three Harness-pin tests. All green.
+- **Docs**: `docs/guide/board-and-tasks.md` documents the Flow
+  picker and the harness-on-agent retirement of the Agent
+  selector.
+
+### Design Evolution
+
+1. **AgentLauncher moved from `internal/runner` to
+   `internal/flow`** (`flow-engine` task). The original spec
+   placed the interface in runner, but that would have forced
+   `internal/flow` to import runner at `runner-flow-integration`
+   time — a cycle. Putting it in flow and relying on Go's
+   structural interface satisfaction lets the runner implement
+   the interface without importing flow-internal types. See
+   commit `34fac4dc`.
+2. **`Task.FlowSnapshot` deferred indefinitely**. The spec
+   originally called for a stored deep-copy of the flow at
+   dispatch time to immunise the engine against concurrent
+   registry edits. The engine achieves the same guarantee by
+   calling `cloneFlow` at the start of `Execute`, with no new
+   persisted field (which would have tangled with the store's
+   import graph).
+3. **`AgentLauncher.RunAgent` takes a slug string, not an
+   `agents.Role` value**. Same import-cycle reason — the flow
+   package stays free of agent-type imports. The runner maps
+   slug → Role privately.
+4. **`Harness` field, not `CLI` / `Sandbox` / `Model`** (raised
+   mid-implementation). Model would collide with the existing
+   LLM model concept; Sandbox reads as internal jargon; Harness
+   reads naturally and doesn't overload either.
+5. **`POST /api/tasks sandbox` retained as a back-compat hint**
+   rather than rejected with 400. The e2e scripts and CLI still
+   pass it; removing it would have broken external callers. A
+   future deprecation follow-up can remove it.
+6. **fsnotify hot-reload deferred**. The runner reloads the
+   registry on explicit `POST/PUT/DELETE /api/{agents,flows}`
+   via new `Runner.Reload{Agents,Flows}()` methods. Disk edits
+   require an API touch or restart today — fsnotify would add
+   a dependency without load-bearing benefit now that the write
+   path is covered.
+7. **Inline clone/edit UI not yet live**. Backend CRUD is
+   complete; the UI's "Clone" button is still a stub. Power
+   users can edit YAML directly or curl the API. A follow-up
+   spec picks up the inline editor once the YAML workflow has
+   been stress-tested.
 
 ## Testing Strategy
 
