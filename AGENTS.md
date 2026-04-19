@@ -212,13 +212,6 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `POST /api/git/create-branch` — Create a new branch
 - `POST /api/git/open-folder` — Open workspace directory in the OS file manager
 
-### Refinement
-- `POST /api/tasks/{id}/refine` — Start prompt refinement via sandbox agent
-- `DELETE /api/tasks/{id}/refine` — Cancel active refinement
-- `GET /api/tasks/{id}/refine/logs` — Stream refinement container logs
-- `POST /api/tasks/{id}/refine/apply` — Apply refined prompt to task
-- `POST /api/tasks/{id}/refine/dismiss` — Dismiss refinement result without applying
-
 ### Agents
 - `GET /api/agents` — List merged built-in + user-authored agent catalog
 - `GET /api/agents/{slug}` — Get one agent's full descriptor including its prompt template body
@@ -406,7 +399,7 @@ Optional variables (also in `.env`):
 - `OPENAI_BASE_URL` — custom OpenAI API endpoint
 - `CODEX_DEFAULT_MODEL` — default model for Codex sandbox containers
 - `CODEX_TITLE_MODEL` — model for Codex title generation
-- Sandbox routing: `WALLFACER_DEFAULT_SANDBOX`, `WALLFACER_SANDBOX_IMPLEMENTATION`, `WALLFACER_SANDBOX_TESTING`, `WALLFACER_SANDBOX_REFINEMENT`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_OVERSIGHT`, `WALLFACER_SANDBOX_COMMIT_MESSAGE`, `WALLFACER_SANDBOX_IDEA_AGENT`
+- Sandbox routing: `WALLFACER_DEFAULT_SANDBOX`, `WALLFACER_SANDBOX_IMPLEMENTATION`, `WALLFACER_SANDBOX_TESTING`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_OVERSIGHT`, `WALLFACER_SANDBOX_COMMIT_MESSAGE`, `WALLFACER_SANDBOX_IDEA_AGENT`
 - `WALLFACER_CLOUD` — enable cloud-gated UI surfaces (latere.ai sign-in badge, future cloud toggles); shell env only, not edited from the UI. Defaults to `false` (pure local mode). See [`docs/cloud/README.md`](docs/cloud/README.md) for the full env-var reference, deployment constraints, and Phase 1 scope; [`specs/shared/authentication.md`](specs/shared/authentication.md) covers the long-range design.
 - `AUTH_JWKS_URL` — JWKS endpoint used to validate `Authorization: Bearer <jwt>` headers on `/api/*` in cloud mode. Auto-derived from `AUTH_URL + /.well-known/jwks.json` when unset.
 - `AUTH_ISSUER` — expected `iss` claim on incoming JWTs. Auto-derived from `AUTH_URL` when unset.

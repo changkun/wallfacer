@@ -44,7 +44,7 @@ type MockRunner struct {
 	// Optional override for ContainerName return value.
 	// When nil the method returns "" (no container active), matching the default
 	// behaviour expected by most tests.
-	ContainerNameFn       func(taskID uuid.UUID) string
+	ContainerNameFn func(taskID uuid.UUID) string
 
 	// GenerateCommitMessageFn lets tests stub the task-free commit-message
 	// generator. When nil the method returns an empty string and a nil

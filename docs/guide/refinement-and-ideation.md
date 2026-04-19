@@ -1,70 +1,50 @@
 # Refinement and Ideation
 
-Wallfacer includes two AI-powered features that help you work with tasks before they execute: **Prompt Refinement** sharpens a task prompt into a detailed implementation spec by analyzing your codebase, and **Ideation** proposes entirely new task ideas by exploring your workspace for improvement opportunities. Both run inside read-only sandbox containers and never modify your code.
-
-> **Under the hood these are just flows.** Refinement is a dedicated `refine` agent; the **Refine** tab in the task modal dispatches it directly against the backlog task. Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. The rest of this guide focuses on the surface behaviour. If you want to clone either agent, pin a harness, or build a flow that includes refinement as one step of a larger pipeline, see [Agents & Flows](agents-and-flows.md).
+Wallfacer includes two AI-powered features that help you work with tasks before they execute: **Prompt Refinement** lets you iterate on a task's prompt inside the Plan task-mode chat, and **Ideation** proposes entirely new task ideas by exploring your workspace for improvement opportunities. Ideation runs inside a read-only sandbox container and never modifies your code; refinement is a chat thread whose agent writes back to the task prompt through a bounded tool endpoint.
 
 ---
 
 ## Essentials
 
-### Prompt Refinement
+### Prompt Refinement (Plan task-mode)
 
-Prompt refinement launches a sandbox agent that reads your codebase, understands the existing patterns and constraints, and rewrites your task prompt into a detailed implementation specification. The agent mounts your workspaces read-only and produces a structured spec with an objective, background context, implementation plan, files to change, and edge cases.
+Prompt iteration now happens inside the Plan panel, pinned to a specific task. The agent reads your workspaces, discusses the prompt with you in chat, and writes rewrites straight to the task's prompt field through the `update_task_prompt` tool. There is no separate "Refine" modal and no before/apply preview step: every round is a commit that you can undo.
 
-Refinement is only available for tasks in the **Backlog** column. Once a task moves to In Progress, it can no longer be refined.
+Task-mode planning is available for tasks in the **Backlog** or **Waiting** columns. Once a task moves to In Progress, locking kicks in (see [Automation → Task lock & cascade](automation.md)) and the thread shows the live state without offering further writes.
 
-#### Starting a Refinement
+#### Opening Plan for a Task
 
-1. Click a Backlog task card to open its detail panel.
-2. Switch to the **Refine** tab.
-3. Optionally enter **user instructions** in the text area to focus the agent (for example, "keep backward compatibility" or "prioritize performance over readability").
-4. Click **Start Refinement**.
+Two entry points open the same task-mode thread:
 
-The agent begins running in a sandbox container. You will see live log output streamed in real time.
+1. **From the card** — click the **Plan** action on a Backlog or Waiting card. The Plan panel opens with the task pinned, its current prompt rendered, and a fresh chat thread ready for input.
+2. **From the explorer** — open the Plan panel (press **P**), switch the left pane to the **Task Prompts** section, and pick the task. The section lists every Backlog task in the active workspace group (and, optionally, Waiting tasks) as virtual entries; selecting one opens or reuses its task-mode thread.
 
-#### Live Log Streaming
+If a thread for that task already exists, it is re-opened; otherwise a new one is created. Thread tabs are persistent across sessions.
 
-While the refinement agent runs, its output streams into the Refine tab. Two display modes are available:
+#### Iterating in Chat
 
-- **Pretty** -- formatted, syntax-highlighted output (default)
-- **Raw** -- plain text with ANSI escape codes stripped
+Type normally to talk to the agent. When you ask for a rewrite ("Make this more specific about error handling", "Merge the last two goals", …) the agent responds with the new prompt and calls `update_task_prompt`. The edit lands atomically on the task and the Spec panel updates immediately.
 
-Switch between them using the tabs above the log area. The view auto-scrolls to follow new output.
+Each round is numbered (round 1, round 2, …). The tool call records the round number and thread ID so the undo pipeline can rewind by exactly one commit. The agent never invokes `update_task_prompt` without the user asking; you can keep the conversation open-ended (exploring the codebase, asking questions) without producing a rewrite.
 
-#### Reviewing the Result
+#### Undoing a Round
 
-When the agent finishes, the result appears as an editable spec, which typically includes:
+Click **Undo** above the chat input, or use the task-mode undo shortcut. The server runs `git revert` against the commit produced by the latest `update_task_prompt` call for that thread:
 
-- **Backlog Outcome** -- whether the task should be kept, rewritten, or closed
-- **Objective** -- what the task should achieve and why
-- **Background** -- relevant codebase context discovered by the agent
-- **Implementation Plan** -- numbered steps
-- **Files to Change** -- specific files and required modifications
-- **Edge Cases and Considerations** -- things to watch for
+- The task prompt rolls back to its previous value.
+- The git history keeps both the original commit and the revert — there is no force-push.
+- If the reverted commit carried a `dispatched_task_id` that referred to a task added in that round, those tasks are cancelled.
+- A revert conflict aborts cleanly and surfaces as a 409; the working tree stays clean.
 
-You can freely edit the spec before deciding what to do with it.
-
-#### Applying or Dismissing
-
-After reviewing (and optionally editing) the refined prompt, choose one of two actions:
-
-| Action | Effect |
-|---|---|
-| **Apply as Prompt** | Replaces the task's prompt with the refined spec. The task title is regenerated to match. The original prompt is saved to the refinement history. |
-| **Dismiss** | Discards the refinement result. The task prompt remains unchanged and you can start a new refinement or run the task as-is. |
-
-#### Canceling a Running Refinement
-
-Click the **Cancel** button that appears while the agent is running. The sandbox container is killed immediately and the refinement job is marked as failed (cancelled). You can start a new refinement at any time.
+Undo is scoped per thread: undoing in thread A leaves thread B's rounds intact.
 
 ### Ideation / Brainstorm Agent
 
 The ideation agent analyzes your workspace -- reading source files, project manifests, recent git history, churn hotspots, TODO/FIXME comments, and failed task signals -- and proposes up to three high-impact improvement ideas as new backlog cards.
 
-#### How it works (after the routine-tasks rollout)
+#### How it works
 
-Ideation is now one instance of the generic **routine task** primitive. The server materializes a `system:ideation`-tagged routine card on first boot; its schedule and enabled flag live on the card itself, and the scheduler engine fires it to spawn instance tasks against the built-in `brainstorm` flow. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and dispatch identically via the legacy-kind mapper.
+Ideation is one instance of the generic **routine task** primitive. The server materializes a `system:ideation`-tagged routine card on first boot; its schedule and enabled flag live on the card itself, and the scheduler engine fires it to spawn instance tasks against the built-in `brainstorm` flow. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and dispatch identically via the legacy-kind mapper.
 
 Two control surfaces exist, and both edit the same underlying routine:
 
@@ -130,54 +110,26 @@ This kills the container and marks the brainstorm instance task as cancelled. Th
 
 ## Advanced Topics
 
-### Refinement History
+### Plan task-mode thread lifecycle
 
-Each time you apply a refinement, the session is recorded. The Refine tab shows a collapsible history section listing all past refinement sessions with:
+Task-mode threads are distinct from the general planning threads. They are pinned to a specific task ID, rendered with a dedicated system prompt (`task_prompt_refine.tmpl`), and surface the task's current metadata (prompt, status, age) to the agent on every turn.
 
-- The starting prompt before refinement
-- The sandbox-generated spec (before any manual edits)
-- The final prompt that was applied
-- A **Show diff** button to see a line-level diff between the starting prompt and the applied prompt
-- A **Revert to this version** button to load a previous prompt back into the result area for re-application
+Thread tabs persist across sessions; archive a thread to hide it while keeping its files on disk. Creating a thread from a card that already has an active task-mode thread reuses the existing thread rather than spawning a duplicate.
 
-### Auto-Refine
-
-When **Auto-Refine** is enabled in the Automation menu, Wallfacer automatically refines any backlog task that has not yet been refined. This runs in the background as tasks are created, so they arrive at execution time with a detailed spec rather than a short prompt.
-
-Toggle Auto-Refine from the **Automation** menu (lightning bolt icon) in the header bar.
-
-### Refinement Sandbox Configuration
-
-By default, the refinement agent uses the Claude sandbox. You can change which sandbox runs refinement by cloning the `refine` agent from the **Agents** sidebar tab, setting its **Harness** field to `codex` (or back to `claude`), and referencing the clone in a flow. The legacy workspace-wide `WALLFACER_SANDBOX_REFINEMENT` env var is still read by the 4-tier resolver when an agent has no explicit Harness pin, but the Agents-tab pin is the recommended path.
-
-If the Claude sandbox hits a token or rate limit during refinement, Wallfacer automatically falls back to the Codex sandbox and retries.
-
-The refinement container has a fixed 30-minute timeout.
-
-### Automatic Interval
-
-When ideation is enabled, you can set an automatic repeat interval so brainstorm runs happen periodically without manual intervention. Available intervals:
-
-| Interval | Behavior |
-|---|---|
-| 0 (default) | Run immediately when the previous brainstorm completes |
-| 15 min | Schedule the next run 15 minutes after the previous one finishes |
-| 30 min, 1h, 2h, 4h, 8h, 24h | Correspondingly longer intervals |
-
-Configure the interval from the Automation menu or Settings > Execution. When an interval is set and a brainstorm is not currently running, the header displays a countdown showing when the next run is scheduled (for example, "Next brainstorm in 23m").
+When the pinned task transitions out of Backlog / Waiting (for example, you drag it to In Progress), the thread keeps rendering but the `update_task_prompt` tool refuses with a 422 — task movement locks the prompt until the task returns to an editable state.
 
 ### Ideation Sandbox Configuration
 
-The ideation agent defaults to the Claude sandbox. Configure it globally with the `WALLFACER_SANDBOX_IDEA_AGENT` environment variable. Like refinement, if the Claude sandbox hits a token limit, the agent automatically retries with the Codex sandbox.
+The ideation agent defaults to the Claude sandbox. Configure it globally with the `WALLFACER_SANDBOX_IDEA_AGENT` environment variable, or clone the `ideate` agent from the Agents tab and pin a `Harness`. If the Claude sandbox hits a token limit, the agent automatically retries with the Codex sandbox.
 
 ### System Prompt Customization
 
-Both refinement and ideation use built-in system prompt templates that control how the agents behave:
+Ideation and task-mode planning use built-in system prompt templates:
 
 | Template | Purpose |
 |---|---|
-| `refinement.tmpl` | Instructs the refinement agent to explore the codebase and produce an implementation spec |
-| `ideation.tmpl` | Instructs the brainstorm agent to explore the workspace, generate candidates, self-critique, and output ranked ideas |
+| `task_prompt_refine.tmpl` | Instructs the task-mode planning agent how to iterate on a pinned task's prompt, including when to call `update_task_prompt`. |
+| `ideation.tmpl` | Instructs the brainstorm agent to explore the workspace, generate candidates, self-critique, and output ranked ideas. |
 
 To customize either template:
 
@@ -195,21 +147,34 @@ You can also manage overrides via the API:
 
 For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 
+### Automatic Ideation Interval
+
+When ideation is enabled, you can set an automatic repeat interval so brainstorm runs happen periodically without manual intervention. Available intervals:
+
+| Interval | Behavior |
+|---|---|
+| 0 (default) | Run immediately when the previous brainstorm completes |
+| 15 min | Schedule the next run 15 minutes after the previous one finishes |
+| 30 min, 1h, 2h, 4h, 8h, 24h | Correspondingly longer intervals |
+
+Configure the interval from the Automation menu or Settings > Execution. When an interval is set and a brainstorm is not currently running, the header displays a countdown showing when the next run is scheduled (for example, "Next brainstorm in 23m").
+
 ### Configuration Variables
 
-Sandbox routing for these agents is controlled by `WALLFACER_SANDBOX_REFINEMENT` and `WALLFACER_SANDBOX_IDEA_AGENT` (both inherit from `WALLFACER_DEFAULT_SANDBOX`). See [Configuration → Sandbox Routing](configuration.md#sandbox-routing) for the full routing table.
+Sandbox routing for the ideation agent is controlled by `WALLFACER_SANDBOX_IDEA_AGENT` (inheriting from `WALLFACER_DEFAULT_SANDBOX`). Task-mode planning inherits the sandbox pinned on the surrounding planning thread. See [Configuration → Sandbox Routing](configuration.md#sandbox-routing) for the full routing table.
 
 Automation toggles (set via `PUT /api/config`):
 
 | Config Field | Description |
 |---|---|
-| `autorefine` | Automatically refine unrefined backlog tasks |
 | `ideation` | Enable periodic brainstorm runs |
 | `ideation_interval` | Minutes between brainstorm runs (0 = run immediately on completion) |
 
+There is no longer an `autorefine` field: task-mode planning is user-driven and does not have an auto-promoted refine step.
+
 ### Planning Chat for Spec Iteration
 
-For spec-level iteration, see the Planning Chat in Plan Mode (press **P** to switch, then **C** for chat). The planning agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
+For spec-level iteration (as opposed to task-level), see the Planning Chat in Plan Mode (press **P** to switch, then **C** for chat). The planning agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
 
 ---
 

@@ -28,7 +28,6 @@ header bar. The menu contains a horizontal strip of toggle switches:
 | Toggle | Label in menu | What it controls |
 |--------|---------------|------------------|
 | Ideate | **Ideate** | Recurring brainstorm agent (see [Refinement & Ideation](refinement-and-ideation.md#ideation--brainstorm-agent)) |
-| Auto-refine | **Refine** | Automatic prompt refinement for backlog tasks |
 | Autopilot | **Implement** | Automatic promotion of backlog tasks to In Progress |
 | Catch Up | **Catch Up** | Automatic rebase of waiting tasks onto latest branch |
 | Auto-test | **Test** | Automatic test verification of waiting tasks |
@@ -46,7 +45,7 @@ global and continues to persist via the env file.
 > group**, and parallel limits are budgeted **per group** rather than
 > globally. Tasks already running in other groups keep executing to
 > completion, but no new auto-promote / auto-test / auto-submit /
-> auto-sync / auto-retry / auto-refine actions fire against them, and
+> auto-sync / auto-retry actions fire against them, and
 > their in-flight count does not consume the current group's
 > concurrency budget. Switch groups via the workspace selector to
 > direct automation at a different backlog.
@@ -125,20 +124,6 @@ attempt.
 ## Advanced Topics
 
 ### Stage Reference (Deep Dive)
-
-#### Refine (Auto-refine)
-
-When enabled, the auto-refiner scans the backlog every 30 seconds. For
-each task that has never been refined and does not have a refinement
-currently running, it launches the refinement agent to produce a
-detailed implementation spec. Only one refinement is triggered per poll
-cycle to avoid overwhelming the system.
-
-Tasks created by the brainstorm flow (whose own sub-agent is the `ideate` role) are skipped, along with legacy records carrying `Kind = idea-agent`.
-
-**When to use:** Enable this when you want every task to be refined
-before execution, especially useful when combined with Autopilot so
-that tasks enter execution with well-specified prompts.
 
 #### Implement (Autopilot)
 
@@ -388,7 +373,7 @@ details.
 
 Automation-related environment variables (`WALLFACER_MAX_PARALLEL`, `WALLFACER_MAX_TEST_PARALLEL`, `WALLFACER_AUTO_PUSH`, `WALLFACER_AUTO_PUSH_THRESHOLD`, `WALLFACER_CONTAINER_CB_THRESHOLD`, `WALLFACER_CONTAINER_CB_OPEN_SECONDS`) are documented, with defaults, in [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
 
-All automation toggles (except Auto-push) are also available via `PUT /api/config` with the fields `autopilot`, `autotest`, `autosubmit`, `autosync`, and `autorefine`.
+All automation toggles (except Auto-push) are also available via `PUT /api/config` with the fields `autopilot`, `autotest`, `autosubmit`, and `autosync`.
 
 For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 

@@ -49,11 +49,10 @@ flowchart TD
         C4["h.StartWaitingSyncWatcher(ctx)"]
         C5["h.StartAutoTester(ctx)"]
         C6["h.StartAutoSubmitter(ctx)"]
-        C7["h.StartAutoRefiner(ctx)"]
     end
 
     A1 --> A2 --> B1 --> B2 --> B3 --> B4
-    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7
+    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6
 ```
 
 ### Recovery Scans
@@ -67,7 +66,7 @@ Before watchers begin, two recovery operations run synchronously:
 
 All handler-level watchers follow one of two patterns:
 
-**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, auto-submitter, and auto-refiner call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
+**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, and auto-submitter call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
 
 ```go
 // Auto-promoter pattern
@@ -217,52 +216,9 @@ Multiple workspace paths can be passed at startup or switched at runtime via `PU
 
 Non-git directories are supported as plain mount targets (no worktree, no commit pipeline for that workspace).
 
-## Auto-Refine
+## Task-Mode Planning (Replaces the Retired Refine Subsystem)
 
-The `StartAutoRefiner` watcher monitors backlog tasks and can automatically trigger prompt refinement via a sandbox agent before execution begins. When enabled, it launches the same refinement flow that users can trigger manually.
-
-`POST /api/tasks/{id}/refine` launches a sandbox container to analyse the codebase and produce a detailed implementation spec:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Handler
-    participant Runner
-    participant Container
-
-    User->>Handler: POST /api/tasks/{id}/refine
-    Handler->>Runner: RunRefinementBackground()
-    Handler-->>User: 202 Accepted
-
-    User->>Handler: GET /api/tasks/{id}/refine/logs (SSE)
-    Runner->>Container: Launch sandbox
-    Container-->>Handler: Stream output
-    Handler-->>User: SSE events
-
-    alt Container succeeds
-        Container-->>Runner: Result = refined spec
-        Runner->>Runner: Status = "done"
-    else Container fails
-        Container-->>Runner: Error
-        Runner->>Runner: Status = "failed"
-    end
-
-    alt User applies
-        User->>Handler: POST /refine/apply {prompt}
-        Handler->>Handler: Save RefinementSession
-        Handler->>Handler: Prompt to PromptHistory
-        Handler->>Handler: Set Prompt = refined
-        Handler->>Runner: Trigger title regeneration
-    else User dismisses
-        User->>Handler: POST /refine/dismiss
-        Handler->>Handler: Clear CurrentRefinement
-    else User cancels
-        User->>Handler: DELETE /refine
-        Handler->>Container: Kill container
-    end
-```
-
-Both `RefineSessions []RefinementSession` (past history) and `CurrentRefinement *RefinementJob` (present job) live on the Task struct. `RefineSessions` grows over time as each refinement is applied (capped at `DefaultRefineSessionsLimit` = 5); `CurrentRefinement` is replaced on each new run and cleared on dismiss.
+Prompt iteration is now driven from Plan task-mode threads (pinned to a specific task via the **Send to Plan** card action or the explorer **Task Prompts** section). The planning agent edits the task's prompt through the `POST /api/planning/tool/update_task_prompt` tool endpoint; every call is a committed round that `POST /api/planning/undo` can rewind with `git revert`. There is no longer a `POST /api/tasks/{id}/refine*` family, no auto-refine watcher, and no `autorefine` config flag — see [Refinement & Ideation](../guide/refinement-and-ideation.md) for the user-facing surface.
 
 ## Oversight Generation
 
