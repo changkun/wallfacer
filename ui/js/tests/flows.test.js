@@ -91,14 +91,25 @@ function makeContext(overrides = {}) {
     fetch: vi.fn(),
     document: doc,
     window: { CSS: { escape: (s) => s }, setTimeout: (fn) => fn() },
+    Routes: {
+      agents: {
+        list: () => "/api/agents",
+        get: () => "/api/agents/{slug}",
+        create: () => "/api/agents",
+        update: () => "/api/agents/{slug}",
+        delete: () => "/api/agents/{slug}",
+      },
+      flows: {
+        list: () => "/api/flows",
+        get: () => "/api/flows/{slug}",
+        create: () => "/api/flows",
+        update: () => "/api/flows/{slug}",
+        delete: () => "/api/flows/{slug}",
+      },
+    },
     ...overrides,
   };
-  ctx.window.apiRoutes = {
-    flows: {
-      list: () => "/api/flows",
-      get: () => "/api/flows/{slug}",
-    },
-  };
+  ctx.window.apiRoutes = ctx.Routes;
   ctx._rootList = rootList;
   vm.createContext(ctx);
   return ctx;
@@ -187,6 +198,73 @@ describe("flows.js", () => {
       { agent_slug: "refine", agent_name: "Refine", optional: true },
     ]);
     expect(chain.children[0].textContent).toBe("Refine?");
+  });
+
+  it("built-in flow renders a Clone action, user-authored flow renders Edit+Delete", () => {
+    const builtIn = ctx.window.__flows_test.renderFlow({
+      slug: "implement",
+      name: "Implement",
+      builtin: true,
+      steps: [{ agent_slug: "impl", agent_name: "Impl" }],
+    });
+    const builtInActions = builtIn.children[0].children[2];
+    expect(builtInActions.children[0].textContent).toBe("Clone");
+
+    const user = ctx.window.__flows_test.renderFlow({
+      slug: "tdd-loop",
+      name: "TDD Loop",
+      builtin: false,
+      steps: [{ agent_slug: "test" }],
+    });
+    const userActions = user.children[0].children[2];
+    const labels = userActions.children.map((c) => c.textContent);
+    expect(labels).toContain("Edit");
+    expect(labels).toContain("Delete");
+    expect(user.classList.contains("flows-row--user")).toBe(true);
+  });
+
+  it("readFlowPayload serialises the steps array verbatim", () => {
+    // Build a minimal form shape the helper walks.
+    const input = (name, value) => ({
+      name,
+      value,
+      querySelector(sel) {
+        return null;
+      },
+    });
+    const form = {
+      queryByName: new Map([
+        ["slug", { value: "tdd-copy" }],
+        ["name", { value: "TDD (copy)" }],
+        ["description", { value: "Test first." }],
+      ]),
+      querySelector(sel) {
+        // Match [name="..."] selectors.
+        const m = sel.match(/^\[name="([^"]+)"\]$/);
+        if (m && this.queryByName.has(m[1])) return this.queryByName.get(m[1]);
+        return null;
+      },
+    };
+    void input; // silence unused-var on CI
+    const steps = [
+      {
+        agent_slug: "test",
+        optional: false,
+        input_from: "",
+        run_in_parallel_with: [],
+      },
+      {
+        agent_slug: "impl",
+        optional: true,
+        input_from: "test",
+        run_in_parallel_with: [],
+      },
+    ];
+    const payload = ctx.window.__flows_test.readFlowPayload(form, steps);
+    expect(payload.slug).toBe("tdd-copy");
+    expect(payload.steps.length).toBe(2);
+    expect(payload.steps[1].input_from).toBe("test");
+    expect(payload.steps[1].optional).toBe(true);
   });
 
   it("loadFlows fetches /api/flows and renders one card per flow", async () => {
