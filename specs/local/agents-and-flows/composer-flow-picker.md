@@ -1,6 +1,6 @@
 ---
 title: Composer Flow picker replaces Type picker and Agent overrides
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/flows-api-and-tab.md
   - specs/local/agents-and-flows/task-flow-field.md
@@ -15,6 +15,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Composer Flow picker replaces Type picker and Agent overrides
 

@@ -1,6 +1,6 @@
 ---
 title: Extract internal/agents package from runner
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/agents/
@@ -13,10 +13,11 @@ affects:
   - internal/runner/container.go
 effort: medium
 created: 2026-04-19
-updated: 2026-04-18
+updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Extract internal/agents package from runner
 

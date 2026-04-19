@@ -1,6 +1,6 @@
 ---
 title: User-editable agents and flows (follow-up)
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/runner-flow-integration.md
 affects:
@@ -22,6 +22,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # User-editable agents and flows (follow-up)
 

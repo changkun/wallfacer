@@ -1,6 +1,6 @@
 ---
 title: Task.FlowID + legacy Kind→Flow resolver
-status: complete
+status: archived
 depends_on:
   - specs/local/agents-and-flows/flow-data-model.md
 affects:
@@ -14,6 +14,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Task.FlowID + legacy Kind→Flow resolver
 
