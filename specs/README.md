@@ -33,7 +33,7 @@ Cloud Platform — 0/9
   ○ Telemetry Queue Backpressure
 
 Shared Design — 2/19 complete
-  ○ Authentication                 ✅ Agent Abstraction
+  ◐ Authentication (Phase 1)       ✅ Agent Abstraction
   ○ Overlay Snapshots              ○ Native Sandbox (Linux)
   ○ Native Sandbox (macOS)         ○ Native Sandbox (Windows)
   ✅ Host Exec Mode                ○ Telemetry & Observability
@@ -174,7 +174,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 | Spec | Status | Serves | Delivers |
 |------|--------|--------|----------|
-| [authentication.md](shared/authentication.md) | Not started | Both | OAuth2/OIDC login, session management, user identity. Locally: replaces static API key with real login. Cloud: prerequisite for multi-tenant. |
+| [authentication.md](shared/authentication.md) | In progress (Phase 1 shipped) | Both | OAuth2/OIDC login, session management, user identity. Phase 1 landed: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/logout/notify`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2+ (JWT middleware, `org_id`/`principal_id`, agent token exchange) still to do. |
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
 | [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |

@@ -3,7 +3,7 @@ title: Authentication & Identity
 status: drafted
 depends_on: [latere.ai/auth, latere.ai/pkg]
 affects: [internal/auth/, internal/handler/, ui/]
-effort: small
+effort: large
 created: 2026-03-28
 updated: 2026-04-19
 author: changkun
@@ -43,157 +43,64 @@ This spec does **not** cover:
 
 ---
 
-## Phase 1 — Cloud-Gated Sign-In Badge
+## Phase 1 — Cloud-Gated Sign-In Badge (shipped)
 
-The first shippable slice is intentionally narrow: **let a user sign in to
-latere.ai and see their avatar + username in the status bar**. Nothing else
-changes. No routes become authenticated. No data is keyed on `principal_id`.
-No `org_id` is stored. Anonymous usage remains fully supported.
+The first shippable slice — **let a user sign in to latere.ai and see their
+avatar + username in the status bar** — is implemented and in the codebase.
+It validated the `latere.ai/x/pkg/oidc` integration end-to-end and drew the
+cloud/local partition line ahead of the tenant-filesystem and k8s-sandbox
+work. Anonymous usage remains fully supported.
 
-This slice exists to (a) validate the `latere.ai/x/pkg/oidc` integration
-end-to-end, and (b) start drawing a visible line between **local-only**
-features and **cloud** features in the UI ahead of the tenant-filesystem
-and k8s-sandbox work.
+### Already implemented
 
-### Feature flag — `WALLFACER_CLOUD`
+- **`WALLFACER_CLOUD` flag** — parsed in `internal/envconfig/envconfig.go`;
+  gates every cloud-only UI surface and route. Unset/`false` → local mode
+  (no sign-in affordance, no auth routes). `true` → cloud mode; `AUTH_URL`
+  + `AUTH_CLIENT_ID` + `AUTH_CLIENT_SECRET` required or startup fails.
+- **`internal/auth/` re-export** — thin wrapper over
+  `latere.ai/x/pkg/oidc` exposing `Client`, `User`, `Session`, `Config`,
+  `LoadConfig`, `New`, `ClearSession`.
+- **HTTP routes** (`internal/handler/login.go`, mounted only when cloud
+  mode is on):
+  - `GET /login` → `HandleLogin` (503 when auth client is nil).
+  - `GET /callback` → `HandleCallback`.
+  - `GET /logout` → `HandleLogout`; falls back to `ClearSession + redirect /`
+    when the client is nil.
+  - `GET /logout/notify` → `ClearSession`; 200 OK front-channel target.
+  - `GET /api/auth/me` → 200 `{sub,email,name,picture}` or 204.
+- **`GET /api/config`** — exposes `cloud: bool` and (when signed in)
+  `auth_url: string` (`internal/handler/config.go:223`).
+- **Status-bar badge** (`ui/js/status-bar.js`, `ui/js/tests/status-bar.test.js`)
+  — signed-out "Sign in" link / signed-in avatar + name + dropdown; only
+  mounted when `config.cloud === true`. Hidden front-channel logout
+  iframe pointed at `{auth_url}/logout`.
+- **Backend tests** — `internal/handler/login_test.go`,
+  `internal/auth/auth_test.go`, `internal/envconfig/envconfig_test.go`
+  cover the nil-client 503 branch, 200/204 branches of `/api/auth/me`,
+  and `WALLFACER_CLOUD` parsing.
+- **Docs** — `docs/cloud/README.md` (env-var reference, deployment
+  constraints, Phase 1 scope); "Cloud mode" subsection in
+  `docs/guide/configuration.md`; pointers in `AGENTS.md` and `CLAUDE.md`.
 
-A new environment variable gates every cloud-only UI surface and route.
+All four child specs (envconfig-and-auth-package, http-routes-and-api-config,
+status-bar-sign-in-badge, docs-cloud-mode) reached `validated` and their
+work is landed. They can be wrapped up via `wf-spec-wrapup`.
 
-| Value | Behavior |
-|-------|----------|
-| unset / `false` (default) | Local mode. No sign-in affordance rendered, no `/login` or `/callback` routes registered, no `/api/auth/me`. `WALLFACER_SERVER_API_KEY` continues to work exactly as today. |
-| `true` | Cloud mode. Sign-in badge rendered in the status bar. `/login`, `/callback`, `/logout`, `/api/auth/me` mounted. `AUTH_URL` + `AUTH_CLIENT_ID` + `AUTH_CLIENT_SECRET` required; wallfacer fails fast on startup if `WALLFACER_CLOUD=true` but they are missing. |
+### Deliberately deferred past Phase 1
 
-`WALLFACER_CLOUD` is also exposed to the frontend via
-`GET /api/config` (new boolean field `cloud`) so the status-bar renderer can
-decide whether to mount the sign-in partial without a second round trip.
-
-Rationale for a dedicated flag (vs. "infer from `AUTH_URL` set"):
-- Cloud surfaces beyond login (remote control placeholder, tenant filesystem
-  toggles, billing links) will need the same gate. One flag keeps the
-  partition crisp.
-- Makes local development with a running auth service possible without
-  polluting the UI with cloud affordances.
-
-### Platform integration (as of `latere.ai/x/pkg/oidc`)
-
-The platform package is the single integration surface. Relevant API
-(confirmed against `~/dev/latere.ai/pkg/oidc/`):
-
-```go
-// Config populated from env; required fields: ClientID, ClientSecret, RedirectURL.
-cfg := oidc.LoadConfig()   // reads AUTH_URL (default https://auth.latere.ai),
-                           // AUTH_CLIENT_ID, AUTH_CLIENT_SECRET,
-                           // AUTH_REDIRECT_URL, AUTH_COOKIE_KEY.
-
-client := oidc.New(cfg)    // returns *Client, or nil if cfg.Enabled() == false
-                           // (graceful degrade — no panic, no error).
-
-client.HandleLogin(w, r)     // GET /login
-client.HandleCallback(w, r)  // GET /callback
-client.HandleLogout(w, r)    // GET /logout
-client.UserFromRequest(w, r) // returns *oidc.User or nil; auto-refreshes
-                             // expired access tokens and re-sets cookie.
-oidc.ClearSession(w)         // used by front-channel /logout/notify.
-client.AuthURL()             // base URL of the auth service (for UI links).
-
-type User struct { Sub, Email, Name, Picture string }
-```
-
-The reference consumer is `~/dev/latere.ai/latere-ai` (see
-`internal/auth/auth.go`, `internal/handler/auth.go`,
-`internal/handler/handler.go`, `internal/server/server.go`). Wallfacer
-should mirror its wiring — a thin `internal/auth/` re-export and
-nil-checked handler methods.
-
-### Phase 1 scope
-
-In scope for the first implementation task:
-
-1. Add `WALLFACER_CLOUD` parsing to `internal/envconfig/` and plumb into
-   the server config snapshot. Also surface `AuthURL` (from
-   `oidc.Client.AuthURL()`) for the UI.
-2. Add the `latere.ai/x/pkg/oidc` dependency to `go.mod` (vanity path
-   resolves to `github.com/latere-ai/pkg`; a `go-import` meta is served
-   by latere-ai).
-3. Create `internal/auth/` as a thin re-export of the platform package
-   (`Client = oidc.Client`, `User = oidc.User`, `LoadConfig`, `New`,
-   `ClearSession`), matching latere-ai's pattern. Pass an
-   `*auth.Client` (nullable) through `handler.New`.
-4. Register these routes **only when `WALLFACER_CLOUD=true`**:
-   - `GET /login` → `client.HandleLogin` (503 if client is nil)
-   - `GET /callback` → `client.HandleCallback`
-   - `GET /logout` → `client.HandleLogout`, falling back to
-     `auth.ClearSession(w) + redirect /` when client is nil
-   - `GET /logout/notify` → `auth.ClearSession(w)`; 200 OK. Front-channel
-     logout target invoked from the auth service via hidden iframe when
-     the user signs out at `auth.latere.ai`.
-   - `GET /api/auth/me` → 200 `{sub,email,name,picture}` from
-     `UserFromRequest`, or `204 No Content` when unauthenticated.
-5. Startup validation: if `WALLFACER_CLOUD=true` but `oidc.New` returns
-   nil (required env unset), the server logs a fatal error and exits.
-   If `WALLFACER_CLOUD=false`, no cloud routes are mounted at all
-   regardless of auth env vars.
-6. Extend `GET /api/config` response with `cloud: bool` and, when cloud
-   mode is on, `auth_url: string` (from `client.AuthURL()`).
-7. Render sign-in badge in `ui/partials/status-bar.html`:
-   - Signed out: "Sign in" link → `/login`.
-   - Signed in: avatar (from `picture`, `<img>` with `referrerpolicy="no-referrer"`
-     for Google/GitHub CDN hosts) + username (from `name`, falling back
-     to `email`). Click reveals dropdown with "Sign out" → `/logout`.
-   - Badge is only mounted when `config.cloud === true`; otherwise the
-     JS skips the entire block and the partial renders nothing.
-   - Install a hidden iframe `src="{auth_url}/logout" name="latere-logout-iframe"`
-     only when signed in, so the auth service's front-channel broadcast
-     hits `/logout/notify` on this origin. (Follows the platform's
-     front-channel logout pattern; see `test_frontchannel_logout.sh` in
-     latere-ai for the end-to-end check.)
-8. Frontend regression tests in `ui/js/tests/status-bar.test.js` covering:
-   badge hidden when `cloud=false`; "Sign in" shown when `cloud=true` and
-   `/api/auth/me` returns 204; avatar + name shown when it returns 200;
-   username falls back to `email` when `name` is empty.
-9. Backend tests in `internal/handler/` covering the 204/200 branches of
-   `/api/auth/me` with a fake `oidc.Client`, and the nil-client → 503
-   branch for `/login`.
-10. Docs: `docs/guide/configuration.md` gains a "Cloud mode" subsection
-    describing `WALLFACER_CLOUD`, the five `AUTH_*` vars, and the
-    sign-in badge. Add a pointer in `AGENTS.md` / `CLAUDE.md` noting
-    the cloud/local partition.
-
-Explicitly **out of scope for Phase 1** (covered by later phases in this
-same spec):
+Still out of scope; tracked by later phases in this spec:
 
 - JWT middleware on API routes (`pkg/jwtauth`)
 - `org_id` / `principal_id` columns on workspace/task records
 - Authorization checks (`IsSuperadmin`, scope gating)
 - Agent token exchange
 - Org switching
-- Login redirect for unauthenticated browser requests (Phase 1 just shows
+- Login redirect for unauthenticated browser requests (Phase 1 only shows
   a sign-in link; it never forces a redirect)
-
-### Task Breakdown (Phase 1)
-
-| Child spec | Depends on | Effort | Status |
-|------------|-----------|--------|--------|
-| [WALLFACER_CLOUD + internal/auth re-export](authentication/envconfig-and-auth-package.md) | — | small | validated |
-| [Cloud-gated routes + /api/auth/me + /api/config](authentication/http-routes-and-api-config.md) | envconfig-and-auth-package | medium | validated |
-| [Status-bar sign-in badge](authentication/status-bar-sign-in-badge.md) | http-routes-and-api-config | medium | validated |
-| [Cloud mode documentation](authentication/docs-cloud-mode.md) | status-bar-sign-in-badge | small | validated |
-
-```mermaid
-graph LR
-  A[envconfig + auth pkg] --> B[HTTP routes + /api/config]
-  B --> C[Status-bar badge]
-  C --> D[Docs]
-```
-
-Later phases (JWT middleware, data-model migration, agent token exchange,
-remote control, etc.) remain design-level and are not part of this
-breakdown.
 
 ---
 
-## Design
+## Design (long-range, not yet implemented)
 
 ### Overview
 
@@ -558,16 +465,17 @@ When auth is not configured, the UI behaves exactly as today.
 
 ## Implementation Order
 
-1. **Add `latere.ai/x/pkg` dependency** — Add `pkg/oidc` and
-   `pkg/jwtauth` to `go.mod`
-2. **Browser login flow** — Wire `oidc.Client` handlers at `/login`,
-   `/callback`, `/logout`; add login redirect for unauthenticated
-   browser requests
+1. ~~**Add `latere.ai/x/pkg` dependency**~~ — Done (`pkg/oidc` in `go.mod`;
+   `pkg/jwtauth` still to be added when Phase 2 starts).
+2. ~~**Browser login flow**~~ — Done for Phase 1 (`/login`, `/callback`,
+   `/logout`, `/logout/notify`). Login redirect for unauthenticated
+   browser requests is still deferred.
 3. **JWT middleware** — Initialize `jwtauth.Validator`, apply middleware
-   to API routes; add `checkTokenInfo` wrapper for agent tokens
+   to API routes; add `checkTokenInfo` wrapper for agent tokens.
 4. **Data model migration** — Add `org_id` and `created_by` columns
-   to workspace/task tables; add org_id filtering
-5. **UI integration** — Login redirect, header with user info, sign-out
+   to workspace/task tables; add org_id filtering.
+5. **UI integration beyond the badge** — Forced login redirect, user
+   info on task cards (`created_by`), org switcher.
 
 ### Dependencies
 
