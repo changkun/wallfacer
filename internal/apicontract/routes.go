@@ -221,6 +221,21 @@ var Routes = []Route{
 		Tags:        []string{"agents"},
 	},
 
+	// --- Flows ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/flows", Name: "ListFlows",
+		JSName:      "list",
+		Description: "List all registered flows (built-in catalog).",
+		Tags:        []string{"flows"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/flows/{slug}", Name: "GetFlow",
+		JSName:      "get",
+		Description: "Get one flow's full descriptor including its step chain and agent names.",
+		Tags:        []string{"flows"},
+	},
+
 	// --- Spec tree ---
 
 	{

@@ -818,6 +818,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ListAgents": h.ListAgents,
 		"GetAgent":   h.GetAgent,
 
+		// Flows catalog (read-only for v1).
+		"ListFlows": h.ListFlows,
+		"GetFlow":   h.GetFlow,
+
 		// Routines.
 		"ListRoutines":          h.ListRoutines,
 		"CreateRoutine":         h.CreateRoutine,

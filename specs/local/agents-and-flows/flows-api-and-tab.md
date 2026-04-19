@@ -1,6 +1,6 @@
 ---
 title: /api/flows endpoints and sidebar Flows tab (read-only)
-status: validated
+status: complete
 depends_on:
   - specs/local/agents-and-flows/flow-data-model.md
   - specs/local/agents-and-flows/agents-api-and-tab.md

@@ -137,6 +137,17 @@ var Routes = {
     },
   },
 
+  flows: {
+    // GET /api/flows
+    list: function () {
+      return "/api/flows";
+    },
+    // GET /api/flows/{slug}
+    get: function () {
+      return "/api/flows/{slug}";
+    },
+  },
+
   specs: {
     // GET /api/specs/tree
     tree: function () {
