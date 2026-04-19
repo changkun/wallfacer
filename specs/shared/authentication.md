@@ -215,25 +215,28 @@ Richer RBAC (role matrix, team-level ACLs) lives in
 
 | Child spec | Depends on | Effort |
 |------------|-----------|--------|
-| [jwt-middleware.md](authentication/jwt-middleware.md), `pkg/jwtauth` on `/api/*`, `OptionalAuth`, `PrincipalFromContext` | Phase 1 | medium |
-| [principal-context.md](authentication/principal-context.md), cookie-path principals flow into same `Claims` context | jwt-middleware | small |
-| [data-model-principal-org.md](authentication/data-model-principal-org.md), `CreatedBy` + `OrgID` on task/workspace, org-scoped queries |, | medium |
-| [cloud-forced-login.md](authentication/cloud-forced-login.md), anonymous HTML GET → `/login?next=`, API stays 401 | principal-context | small |
-| [scope-and-superadmin.md](authentication/scope-and-superadmin.md), `RequireSuperadmin` + `RequireScope`; apply to `/api/admin/*` | jwt-middleware | small |
-| [org-switching.md](authentication/org-switching.md), `/api/auth/orgs`, `/api/auth/switch-org`, badge submenu | data-model-principal-org, jwt-middleware | medium |
+| [jwt-middleware.md](authentication/jwt-middleware.md): `pkg/jwtauth` on `/api/*`, `OptionalAuth`, `PrincipalFromContext` | Phase 1 | medium |
+| [principal-context.md](authentication/principal-context.md): cookie-path principals flow into same `Claims` context | jwt-middleware | small |
+| [data-model-principal-org.md](authentication/data-model-principal-org.md): `CreatedBy` + `OrgID` on task/workspace, org-scoped queries | — | medium |
+| [cloud-forced-login.md](authentication/cloud-forced-login.md): anonymous HTML GET → `/login?next=`, API stays 401 | principal-context | small |
+| [scope-and-superadmin.md](authentication/scope-and-superadmin.md): `RequireSuperadmin` + `RequireScope`; apply to `/api/admin/*` | jwt-middleware | small |
+| [org-switching.md](authentication/org-switching.md): `/api/auth/orgs`, `/api/auth/switch-org`, badge submenu | data-model-principal-org, jwt-middleware | medium |
+| [task-event-actor-sub.md](authentication/task-event-actor-sub.md): stamp `ActorSub` + `ActorType` on per-task events; hook point for `audit-log.md` | jwt-middleware | small |
 
 ```mermaid
 graph LR
   J[jwt-middleware] --> P[principal-context]
   J --> SA[scope-and-superadmin]
+  J --> AS[task-event-actor-sub]
   P --> FL[cloud-forced-login]
   D[data-model-principal-org] --> OS[org-switching]
   J --> OS
 ```
 
 `data-model-principal-org` has no spec-level dependency and can run in
-parallel with `jwt-middleware`. Everything else fans out from those two
-roots.
+parallel with `jwt-middleware`; it ships in two stages (fields + filter
+now, populate-on-create after `jwt-middleware`). Everything else fans
+out from those two roots.
 
 ### Explicitly out of scope for Phase 2
 

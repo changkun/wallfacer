@@ -1,6 +1,6 @@
 ---
 title: Org switching for users belonging to multiple orgs
-status: drafted
+status: validated
 depends_on:
   - specs/shared/authentication/data-model-principal-org.md
   - specs/shared/authentication/jwt-middleware.md

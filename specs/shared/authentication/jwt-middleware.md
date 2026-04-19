@@ -1,6 +1,6 @@
 ---
 title: JWT validation middleware on API routes
-status: drafted
+status: validated
 depends_on:
   - specs/shared/authentication/http-routes-and-api-config.md
 affects:

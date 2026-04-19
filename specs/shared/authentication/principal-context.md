@@ -1,6 +1,6 @@
 ---
 title: Unify browser session and JWT into a single principal context
-status: drafted
+status: validated
 depends_on:
   - specs/shared/authentication/jwt-middleware.md
 affects:

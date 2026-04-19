@@ -1,6 +1,6 @@
 ---
 title: Force login for unauthenticated browser requests in cloud mode
-status: drafted
+status: validated
 depends_on:
   - specs/shared/authentication/principal-context.md
 affects:
