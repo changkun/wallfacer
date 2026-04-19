@@ -2,7 +2,7 @@
 title: Third-party OIDC providers for self-hosted deployments
 status: vague
 depends_on:
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
 affects:
   - internal/auth/
   - internal/handler/login.go

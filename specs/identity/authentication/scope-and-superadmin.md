@@ -2,7 +2,7 @@
 title: Superadmin and scope gating for admin API routes
 status: archived
 depends_on:
-  - specs/shared/authentication/jwt-middleware.md
+  - specs/identity/authentication/jwt-middleware.md
 affects:
   - internal/handler/
   - internal/auth/
@@ -65,7 +65,7 @@ when `cfg.Cloud == false`.
 ## Boundaries
 
 - Do not introduce a role matrix or a policy engine. Single-claim checks
-  only. Richer RBAC lives in `cloud/multi-user-collaboration.md`.
+  only. Richer RBAC lives in `identity/multi-user-collaboration.md`.
 - Do not apply `RequireScope` to any existing route. Scope assignments
   belong with the teams that own each route.
 - Do not log claims on 403. 403 response is "denied"; the audit log is a

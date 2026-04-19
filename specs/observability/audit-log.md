@@ -2,7 +2,7 @@
 title: Audit Log
 status: drafted
 depends_on:
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
 affects:
   - internal/store/
   - internal/handler/
@@ -20,7 +20,7 @@ dispatched_task_id: null
 ## Problem
 
 Wallfacer has no cross-entity record of *who did what, when*. Phase 2 of
-`shared/authentication.md` delivers `CreatedBy` + `OrgID` on task and
+`identity/authentication.md` delivers `CreatedBy` + `OrgID` on task and
 workspace records, which answers *who originated this record* but not:
 
 - Who transitioned task T from `in_progress` → `cancelled` at 14:02?
@@ -30,7 +30,7 @@ workspace records, which answers *who originated this record* but not:
 
 These answers matter for three audiences:
 
-1. **Cloud multi-user operators**, the `cloud/multi-user-collaboration.md`
+1. **Cloud multi-user operators**, the `identity/multi-user-collaboration.md`
    spec already flags an audit log as an expected deliverable; teams need
    attribution for coordination and dispute resolution.
 2. **Compliance-interested single-host deployments**, regulated users
@@ -77,11 +77,11 @@ this spec sits one layer above.
 
 ## Prerequisites
 
-- `shared/authentication.md` **Phase 2 complete**, handlers must have
+- `identity/authentication.md` **Phase 2 complete**, handlers must have
   `*jwtauth.Claims` in `ctx` to stamp actors. Before Phase 2 lands, the
   `actor_sub` field of an audit event is either empty (anonymous local)
   or populated from the API key path (`"apikey"` sentinel).
-- `local/data-boundary-enforcement.md`, if that ships first, the cloud
+- `identity/data-boundary-enforcement.md`, if that ships first, the cloud
   path for audit events inherits its boundary rules. Not a hard
   dependency; this spec can ship in either order.
 

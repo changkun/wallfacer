@@ -2,7 +2,7 @@
 title: Force login for unauthenticated browser requests in cloud mode
 status: archived
 depends_on:
-  - specs/shared/authentication/principal-context.md
+  - specs/identity/authentication/principal-context.md
 affects:
   - internal/handler/
   - internal/cli/

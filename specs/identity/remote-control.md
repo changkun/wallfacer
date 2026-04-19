@@ -2,7 +2,7 @@
 title: Remote control of signed-in local wallfacer instances
 status: vague
 depends_on:
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
 affects:
   - internal/auth/
   - internal/handler/

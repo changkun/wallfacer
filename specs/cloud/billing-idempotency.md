@@ -3,7 +3,7 @@ title: Billing Idempotency
 status: drafted
 depends_on:
   - specs/cloud/cloud-infrastructure.md
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
 affects:
   - internal/billing/
   - internal/cloud/

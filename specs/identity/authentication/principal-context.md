@@ -2,7 +2,7 @@
 title: Unify browser session and JWT into a single principal context
 status: archived
 depends_on:
-  - specs/shared/authentication/jwt-middleware.md
+  - specs/identity/authentication/jwt-middleware.md
 affects:
   - internal/auth/
   - internal/handler/

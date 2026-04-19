@@ -3,7 +3,7 @@ title: Cloud Multi-Tenant
 status: drafted
 depends_on:
   - specs/cloud/cloud-infrastructure.md
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
 affects: [internal/handler/, internal/runner/, internal/store/]
 effort: xlarge
 created: 2026-03-23
@@ -20,7 +20,7 @@ Wallfacer is a single-user, single-process server. Multiple users cannot share a
 
 ## Deployment Modes
 
-Authentication (see `specs/shared/authentication.md`) is opt-in at every mode. The deployment question is **where wallfacer runs** and **who manages its lifecycle**:
+Authentication (see `specs/identity/authentication.md`) is opt-in at every mode. The deployment question is **where wallfacer runs** and **who manages its lifecycle**:
 
 | Mode | Runs on | Auth | Managed by |
 |------|---------|------|------------|
@@ -68,7 +68,7 @@ This is a near-complete rewrite of the server. The per-instance model avoids all
 
 ### Relationship to the remote-control placeholder
 
-The remote-control mechanism in `specs/shared/authentication.md` and the cloud-hosted control plane in this spec can share the same latere.ai-side routing logic: in both cases, a request arriving at the latere.ai web UI must be routed to "the wallfacer instance for this user." The difference is only where that instance lives (user's machine vs. latere.ai cluster). When both are eventually implemented, the routing layer is shared.
+The remote-control mechanism in `specs/identity/authentication.md` and the cloud-hosted control plane in this spec can share the same latere.ai-side routing logic: in both cases, a request arriving at the latere.ai web UI must be routed to "the wallfacer instance for this user." The difference is only where that instance lives (user's machine vs. latere.ai cluster). When both are eventually implemented, the routing layer is shared.
 
 ---
 

@@ -107,14 +107,14 @@ Create a new spec for the auth system
 === Turn 1 (assistant) ===
 I'll create a new spec file...
 [Read specs/README.md]
-[Write specs/shared/authentication.md]
-Created specs/shared/authentication.md with...
+[Write specs/identity/authentication.md]
+Created specs/identity/authentication.md with...
 
 === Turn 2 (user) ===
 Break it down into tasks
 
 === Turn 2 (assistant) ===
-[Read specs/shared/authentication.md]
+[Read specs/identity/authentication.md]
 ...
 ```
 

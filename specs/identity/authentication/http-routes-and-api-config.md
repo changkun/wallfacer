@@ -2,7 +2,7 @@
 title: Cloud-gated auth routes, /api/auth/me, and /api/config extension
 status: archived
 depends_on:
-  - specs/shared/authentication/envconfig-and-auth-package.md
+  - specs/identity/authentication/envconfig-and-auth-package.md
 affects:
   - internal/handler/
   - internal/apicontract/routes.go

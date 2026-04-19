@@ -2,7 +2,7 @@
 title: Stamp actor principal on task event trace
 status: archived
 depends_on:
-  - specs/shared/authentication/jwt-middleware.md
+  - specs/identity/authentication/jwt-middleware.md
 affects:
   - internal/store/
   - internal/handler/

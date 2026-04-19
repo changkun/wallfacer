@@ -1,6 +1,6 @@
 ---
 title: Task Card Send to Plan Action
-status: validated
+status: complete
 depends_on:
   - specs/local/refinement-into-plan/explorer-task-prompts-section.md
 affects:
@@ -12,6 +12,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: eaad28c7-8434-4cec-b437-223a6cc0464c
 ---
+
 
 
 # Task Card Send to Plan Action

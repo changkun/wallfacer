@@ -2,7 +2,7 @@
 title: Telemetry Queue Backpressure
 status: drafted
 depends_on:
-  - specs/local/data-boundary-enforcement.md
+  - specs/identity/data-boundary-enforcement.md
 affects:
   - internal/cloud/
   - internal/store/

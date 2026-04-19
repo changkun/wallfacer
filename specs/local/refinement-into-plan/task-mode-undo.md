@@ -1,6 +1,6 @@
 ---
 title: Task-Mode Undo via Event Rewind
-status: validated
+status: complete
 depends_on:
   - specs/local/refinement-into-plan/update-task-prompt-tool.md
   - specs/local/refinement-into-plan/prompt-round-events.md
@@ -13,6 +13,7 @@ updated: 2026-04-19
 author: changkun
 dispatched_task_id: 51c1b36a-55b1-477f-b588-b6e8672c355f
 ---
+
 
 
 # Task-Mode Undo via Event Rewind

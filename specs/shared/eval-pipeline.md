@@ -186,7 +186,7 @@ Determinism hooks: every judge run records `(judge_model, rubric_version, prompt
 
 Projects a set of tasks into a training/evaluation-ready dataset: one record per task, columns for prompt, environment, trajectory (normalized), metrics, judge scores, final diff, and (optionally) ground truth. Emits JSONL by default; Parquet behind a build tag if the user opts in.
 
-Filters: by workspace, sandbox type, date range, status, tag, dependency scope. Redaction: re-uses the planned `specs/local/data-boundary-enforcement.md` redaction hooks — nothing ships out of a workspace without going through the configured redactor.
+Filters: by workspace, sandbox type, date range, status, tag, dependency scope. Redaction: re-uses the planned `specs/identity/data-boundary-enforcement.md` redaction hooks — nothing ships out of a workspace without going through the configured redactor.
 
 ### Benchmark runner — `internal/eval/benchmark/`
 
@@ -326,7 +326,7 @@ All three modes are visible in the report rather than swallowed. Bias from drop-
 
 - **Training agents.** This spec does not implement RLVR, SFT, or reward-model training. It produces the substrate such work would consume.
 - **Real-time evaluation during task execution.** Evaluation is post-hoc. Runtime anomaly detection is `specs/observability/telemetry-observability.md`'s concern.
-- **Cross-organization dataset sharing.** Redaction and boundary enforcement are handled by `specs/local/data-boundary-enforcement.md`; this spec only plugs into their hooks.
+- **Cross-organization dataset sharing.** Redaction and boundary enforcement are handled by `specs/identity/data-boundary-enforcement.md`; this spec only plugs into their hooks.
 - **General-purpose scientific experiment framework.** We target agent-trajectory evaluation specifically; we won't try to be Weights & Biases.
 
 ## Open Questions

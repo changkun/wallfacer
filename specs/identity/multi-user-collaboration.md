@@ -2,7 +2,7 @@
 title: Multi-User Collaboration (Org-Scoped Board)
 status: drafted
 depends_on:
-  - specs/shared/authentication.md
+  - specs/identity/authentication.md
   - specs/cloud/multi-tenant.md
   - specs/foundations/storage-backends.md
 affects:
@@ -78,7 +78,7 @@ Local authenticated benefits from the identity plumbing (event timeline shows *"
 
 ## Identity Model
 
-Wallfacer consumes identity produced by the `auth.latere.ai` auth service (`specs/shared/authentication.md`). The JWT claims — `sub`, `org_id`, `roles[]`, `email`, `principal_type`, `is_superadmin` — are already defined there. This spec is **purely a consumer** of those claims; it adds no user model, no org model, no password storage, no invite flow. All of that is owned by the auth service.
+Wallfacer consumes identity produced by the `auth.latere.ai` auth service (`specs/identity/authentication.md`). The JWT claims — `sub`, `org_id`, `roles[]`, `email`, `principal_type`, `is_superadmin` — are already defined there. This spec is **purely a consumer** of those claims; it adds no user model, no org model, no password storage, no invite flow. All of that is owned by the auth service.
 
 ### Identity types wallfacer persists
 
@@ -522,7 +522,7 @@ Sequenced to deliver value at each step and avoid a year-long landing. Each step
 
 1. **Identity plumbing through the server** — `Actor` type, `ctx.Actor()` helper, JWT → Actor resolution, fallback `principal:local` in anonymous mode. Lands without any UI change.
 2. **Actor fields on all store records + migration** — additive only; tests ensure rehydration of existing per-task directories yields `principal:local` as creator. Lands on `main` with no user-visible change other than event timeline entries gaining a muted *"(unknown)"* chip for legacy events.
-3. **Authentication wire-up** — Consume `specs/shared/authentication.md` in earnest: apply `jwtauth.Middleware` to every route; keep `WALLFACER_SERVER_API_KEY` as a coexisting fallback per the auth spec.
+3. **Authentication wire-up** — Consume `specs/identity/authentication.md` in earnest: apply `jwtauth.Middleware` to every route; keep `WALLFACER_SERVER_API_KEY` as a coexisting fallback per the auth spec.
 4. **RBAC middleware + matrix enforcement** — `authz.Require(…)` wired on every mutating route per the matrix. Table-driven test on every route.
 5. **Service actors on automation loops** — Replace the automation-loop context plumbing so every write picks up `service:<name>`.
 6. **Audit log infrastructure** — Backend append, `GET /api/audit`, admin-only UI tab.
@@ -537,7 +537,7 @@ Steps 1–5 form the **RBAC-on-rails** minimum viable milestone. Any cloud-hoste
 
 ### Dispatch split
 
-This spec is large enough that it should be broken down into child specs under `specs/cloud/multi-user-collaboration/` before dispatch. Proposed children:
+This spec is large enough that it should be broken down into child specs under `specs/identity/multi-user-collaboration/` before dispatch. Proposed children:
 
 - `identity-plumbing.md` (steps 1–2)
 - `rbac-matrix.md` (steps 3–4)
