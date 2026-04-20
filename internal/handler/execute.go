@@ -368,7 +368,79 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		h.cascadeCancelRoutineChildren(r.Context(), id)
 	}
 
+	// If this is the last live instance spawned by a routine, disable the
+	// routine so it stops spawning new instances. Users expect "I cancelled
+	// the thing, now make it go away" — leaving the parent routine armed
+	// keeps creating new instances on the next tick and is confusing.
+	h.cascadeDisableRoutineIfLastLiveInstance(r.Context(), *task)
+
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+// spawnedByRoutineID extracts the parent routine id from a task's tags,
+// returning uuid.Nil if the task is not a routine-spawned instance.
+func spawnedByRoutineID(t store.Task) uuid.UUID {
+	const prefix = "spawned-by:"
+	for _, tag := range t.Tags {
+		if strings.HasPrefix(tag, prefix) {
+			if id, err := uuid.Parse(strings.TrimPrefix(tag, prefix)); err == nil {
+				return id
+			}
+		}
+	}
+	return uuid.Nil
+}
+
+// cascadeDisableRoutineIfLastLiveInstance disables the parent routine card
+// when the just-cancelled instance was its last live child. "Live" here
+// means backlog, in_progress, or waiting — terminal siblings (done, failed,
+// cancelled) do not count because they can't produce more work. If the
+// routine is already disabled or itself in a stopped status, this is a
+// no-op. The engine timer is explicitly unregistered in addition to
+// flipping RoutineEnabled so the next scheduled fire is cancelled
+// synchronously rather than waiting for the 250ms reconcile settle.
+func (h *Handler) cascadeDisableRoutineIfLastLiveInstance(ctx context.Context, canceled store.Task) {
+	routineID := spawnedByRoutineID(canceled)
+	if routineID == uuid.Nil {
+		return
+	}
+	routine, err := h.store.GetTask(ctx, routineID)
+	if err != nil || routine == nil || !routine.IsRoutine() {
+		return
+	}
+	if !routine.RoutineEnabled || isRoutineStoppedStatus(routine.Status) {
+		return
+	}
+	wantTag := "spawned-by:" + routineID.String()
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		logger.Handler.Warn("cascade disable routine: list tasks", "routine", routineID, "error", err)
+		return
+	}
+	for _, t := range tasks {
+		if t.ID == canceled.ID || t.ID == routineID {
+			continue
+		}
+		if !slices.Contains(t.Tags, wantTag) {
+			continue
+		}
+		switch t.Status {
+		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
+			return // a live sibling exists — keep the routine armed
+		}
+	}
+	if err := h.store.UpdateRoutineEnabled(ctx, routineID, false); err != nil {
+		logger.Handler.Warn("cascade disable routine: update", "routine", routineID, "error", err)
+		return
+	}
+	h.unregisterRoutine(routineID)
+	h.insertEventOrLog(ctx, routineID, store.EventTypeSystem, map[string]any{
+		"kind":     "routine:auto_disabled",
+		"reason":   "last_live_instance_cancelled",
+		"instance": canceled.ID.String(),
+	})
+	logger.Handler.Info("routine auto-disabled after last live instance cancelled",
+		"routine", routineID, "instance", canceled.ID)
 }
 
 // cancelTaskInternal runs the full cancel pipeline (container kill, store

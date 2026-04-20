@@ -1262,3 +1262,102 @@ func TestCancelTask_NonRoutineDoesNotCascade(t *testing.T) {
 		t.Errorf("non-routine cancel must not cascade; child status %q", got.Status)
 	}
 }
+
+// TestCancelTask_CascadeDisablesRoutineOnLastLiveInstance verifies the
+// bug-fix requested by the user: cancelling the last live instance of a
+// routine also disables the routine so it stops spawning new instances.
+// Terminal siblings (failed/done/cancelled) do not count as live.
+func TestCancelTask_CascadeDisablesRoutineOnLastLiveInstance(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	routine, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "hourly scan", Timeout: 30,
+		Kind:                   store.TaskKindRoutine,
+		RoutineIntervalSeconds: 3600, RoutineEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("create routine: %v", err)
+	}
+	tag := "spawned-by:" + routine.ID.String()
+
+	// One live instance + one already-failed sibling. Cancelling the live
+	// one should disable the routine because no live sibling remains.
+	live, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "live", Timeout: 30, Tags: []string{tag}})
+	if err != nil {
+		t.Fatalf("create live: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, live.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("force live in_progress: %v", err)
+	}
+	dead, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dead", Timeout: 30, Tags: []string{tag}})
+	if err != nil {
+		t.Fatalf("create dead: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, dead.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("force dead failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+live.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, live.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("cancel instance: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, err := h.store.GetTask(ctx, routine.ID)
+	if err != nil || got == nil {
+		t.Fatalf("reload routine: %v", err)
+	}
+	if got.RoutineEnabled {
+		t.Error("routine should be disabled after last live instance cancelled")
+	}
+}
+
+// TestCancelTask_PreservesRoutineWhenSiblingStillLive verifies that we do
+// NOT disable the routine when another live instance remains — users may
+// have multiple instances running in parallel and only want to cancel one.
+func TestCancelTask_PreservesRoutineWhenSiblingStillLive(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	routine, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "hourly scan", Timeout: 30,
+		Kind:                   store.TaskKindRoutine,
+		RoutineIntervalSeconds: 3600, RoutineEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("create routine: %v", err)
+	}
+	tag := "spawned-by:" + routine.ID.String()
+
+	a, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 30, Tags: []string{tag}})
+	if err != nil {
+		t.Fatalf("create a: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, a.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("force a: %v", err)
+	}
+	b, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 30, Tags: []string{tag}})
+	if err != nil {
+		t.Fatalf("create b: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, b.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("force b: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, a.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("cancel a: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, err := h.store.GetTask(ctx, routine.ID)
+	if err != nil || got == nil {
+		t.Fatalf("reload routine: %v", err)
+	}
+	if !got.RoutineEnabled {
+		t.Error("routine must stay enabled while sibling b is still live")
+	}
+}
