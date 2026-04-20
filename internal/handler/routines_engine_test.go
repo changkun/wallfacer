@@ -241,6 +241,70 @@ func TestReconcileRoutines_UnregistersCancelledRoutines(t *testing.T) {
 	}
 }
 
+// TestFireRoutine_StoppedRoutineSelfUnregisters is the regression guard
+// for the recurring "cancelled routine keeps firing" class of bug. It
+// exercises the path where a routine's status transitions to cancelled
+// via any route that does NOT call unregisterRoutine (runner recovery
+// paths, autopilot bulk transitions, a future handler that forgets, or
+// the 250 ms reconcile settle window). A timer that later fires must
+// both refuse to spawn AND drop the engine entry so no further timers
+// are armed. Otherwise the entry keeps re-arming forever and the UI
+// keeps showing a next-run countdown on a dead routine.
+//
+// Prior fixes — db9f851c, 09e1733e, db1316ff, dbd7ce40 — patched
+// individual handlers to call unregisterRoutine explicitly. This test
+// pins the invariant at the engine level so no future handler needs to
+// remember.
+func TestFireRoutine_StoppedRoutineSelfUnregisters(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "daily", Timeout: 30, Kind: store.TaskKindRoutine,
+		RoutineIntervalSeconds: 60, RoutineEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("create routine: %v", err)
+	}
+	h.reconcileRoutines(ctx)
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; !ok {
+		t.Fatalf("pre-condition: routine must be registered")
+	}
+
+	// Flip status to cancelled WITHOUT going through any handler. This
+	// simulates every code path that doesn't know about the engine
+	// (runner recovery, autopilot, future handlers) and the race window
+	// before reconcile notices.
+	if err := s.ForceUpdateTaskStatus(ctx, routineTask.ID, store.TaskStatusCancelled); err != nil {
+		t.Fatalf("force cancel: %v", err)
+	}
+
+	// Simulate the engine's timer firing. Under the old design this is
+	// exactly the leak: the guard at the top of fireRoutine prevents
+	// the spawn, but the engine entry keeps re-arming because fireRoutine
+	// does not signal the engine to drop it.
+	h.fireRoutine(ctx, routineTask.ID)
+
+	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; ok {
+		t.Fatalf("stopped routine must self-unregister on fire; engine still has entry")
+	}
+
+	// Sanity: no instance was spawned and RunBackground was not called.
+	tasks, _ := s.ListTasks(ctx, false)
+	for _, tk := range tasks {
+		for _, tag := range tk.Tags {
+			if tag == "spawned-by:"+routineTask.ID.String() {
+				t.Fatalf("cancelled routine spawned instance task %s", tk.ID)
+			}
+		}
+	}
+	if calls := mock.RunCalls(); len(calls) != 0 {
+		t.Fatalf("expected no RunBackground calls, got %d", len(calls))
+	}
+}
+
 // TestFireRoutine_CancelledRoutineDoesNotSpawn guards against a race where
 // an engine timer dispatches fireRoutine onto a goroutine while the user
 // concurrently cancels the routine card. The fire must bail out without

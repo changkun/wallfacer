@@ -190,27 +190,35 @@ func (h *Handler) unregisterRoutine(id uuid.UUID) {
 // with no locks held. The flow mirrors createIdeaAgentTask: build the
 // instance task via CreateTaskWithOptions, promote to in_progress, emit
 // the state-change event, then hand off to the runner.
+//
+// Every early-return path that detects a card the engine should not keep
+// tracking (card missing, no longer a routine, in a stopped lane, or
+// archived) MUST call unregisterRoutine before returning. That single
+// chokepoint replaces the historical web of per-handler unregister calls.
+// If any code path transitions a routine to a terminal status without
+// notifying the engine (runner recovery, autopilot bulk transitions, a
+// future handler that forgets, or the 250 ms reconcile settle window),
+// the next timer tick self-cleans here. Bugs of the shape "cancelled
+// routine keeps firing" are prevented systemically, not per call site.
 func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 	s, ok := h.currentStore()
 	if !ok {
 		logger.Handler.Warn("routine: fire without active store", "routine", routineID)
+		h.unregisterRoutine(routineID)
 		return
 	}
 	routineTask, err := s.GetTask(ctx, routineID)
 	if err != nil {
 		logger.Handler.Warn("routine: fire task not found", "routine", routineID, "error", err)
+		h.unregisterRoutine(routineID)
 		return
 	}
 	if !routineTask.IsRoutine() {
+		h.unregisterRoutine(routineID)
 		return
 	}
-	// A stopped or archived routine card must not spawn instance tasks.
-	// A fire can still land here if the user moves the card out of the
-	// active lanes after the engine's timer has already dispatched onto
-	// its own goroutine, and the reconcile-driven Unregister relies on
-	// archived rows being absent from ListTasks(false) — a
-	// timing-fragile guarantee.
 	if isRoutineStoppedStatus(routineTask.Status) || routineTask.Archived {
+		h.unregisterRoutine(routineID)
 		return
 	}
 
