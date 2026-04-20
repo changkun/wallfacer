@@ -798,6 +798,9 @@ async function startTask() {
 function sendCurrentTaskToPlan() {
   const id = getOpenModalTaskId();
   if (!id) return;
+  // Close the detail modal first so the Plan pane behind it is visible. The
+  // modal was blocking the view after openPlanForTask swapped to spec mode.
+  if (typeof closeModal === "function") closeModal();
   openPlanForTask(id);
 }
 

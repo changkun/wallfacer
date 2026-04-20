@@ -554,6 +554,11 @@ function openPlanForTask(taskId, title, status) {
   _focusedTaskTitle = (cached && cached.title) || title || "";
   _focusedTaskStatus = (cached && cached.status) || status || "";
   var promptText = cached && typeof cached.prompt === "string" ? cached.prompt : "";
+  // Clear spec focus so subsequent spec-tree refreshes do not re-pin the
+  // previously-focused spec and overwrite the task prompt body.
+  _focusedSpecPath = null;
+  _focusedSpecWorkspace = null;
+  _focusedSpecContent = null;
   clearWorkspaceIsNew();
 
   // Update breadcrumb + render the task prompt in the markdown view BEFORE
@@ -592,22 +597,36 @@ function openPlanForTask(taskId, title, status) {
           }
         });
       }
-      // No existing thread: create one pinned to this task. Create returns
-      // the thread with active_id implicitly set server-side so reload focuses
-      // the new tab.
+      // No existing thread: create one pinned to this task, then activate
+      // it explicitly. POST /threads creates but does not flip active_id,
+      // so without the activate call the chat pane would keep focus on
+      // whichever thread was active before.
       var name = "Task prompt: " + (_focusedTaskTitle || taskId);
       return api(Routes.planning.createThread(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name, focused_task: taskId }),
-      }).then(function () {
-        if (
-          typeof PlanningChat !== "undefined" &&
-          typeof PlanningChat.reload === "function"
-        ) {
-          PlanningChat.reload();
-        }
-      });
+      })
+        .then(function (created) {
+          if (!created || !created.id) return null;
+          return fetch(
+            Routes.planning.activateThread().replace("{id}", created.id),
+            {
+              method: "POST",
+              headers: withBearerHeaders({
+                "Content-Type": "application/json",
+              }),
+            },
+          );
+        })
+        .then(function () {
+          if (
+            typeof PlanningChat !== "undefined" &&
+            typeof PlanningChat.reload === "function"
+          ) {
+            PlanningChat.reload();
+          }
+        });
     })
     .catch(function (err) {
       console.error("openPlanForTask:", err);
@@ -672,6 +691,9 @@ function focusSpec(specPath, workspace) {
   _focusedSpecPath = specPath;
   _focusedSpecWorkspace = workspace;
   _focusedSpecContent = null; // reset so loading indicator shows
+  // Clear any lingering task-mode focus so subsequent spec-tree refreshes
+  // no longer skip the README (see _updateSpecPaneVisibility guard).
+  _focusedTaskId = null;
   specModeState.focusedSpecPath = specPath || "";
 
   // Show loading state in the focused view with a crossfade so the
@@ -1105,8 +1127,9 @@ function _updateSpecPaneVisibility(hasSpecs) {
   _applyLayout();
 
   // Auto-show README.md as the default focused content when specs exist
-  // but nothing is focused yet.
-  if (hasSpecs && !_focusedSpecPath) {
+  // but nothing is focused yet. Skip when a task prompt is focused — that
+  // path owns the body content via _updateTaskBreadcrumb.
+  if (hasSpecs && !_focusedSpecPath && !_focusedTaskId) {
     _showSpecReadme();
   }
 }
