@@ -685,7 +685,9 @@ describe("openPlanForTask", () => {
   it("shows an empty-prompt placeholder when the task has no prompt", async () => {
     const ctx = makeOpenPlanContext({
       threadsResponse: { threads: [], active_id: null },
-      tasks: [{ id: "task-empty", title: "Empty", status: "backlog", prompt: "" }],
+      tasks: [
+        { id: "task-empty", title: "Empty", status: "backlog", prompt: "" },
+      ],
     });
 
     ctx.openPlanForTask("task-empty");

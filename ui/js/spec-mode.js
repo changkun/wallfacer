@@ -553,7 +553,8 @@ function openPlanForTask(taskId, title, status) {
   _focusedTaskId = taskId;
   _focusedTaskTitle = (cached && cached.title) || title || "";
   _focusedTaskStatus = (cached && cached.status) || status || "";
-  var promptText = cached && typeof cached.prompt === "string" ? cached.prompt : "";
+  var promptText =
+    cached && typeof cached.prompt === "string" ? cached.prompt : "";
   // Clear spec focus so subsequent spec-tree refreshes do not re-pin the
   // previously-focused spec and overwrite the task prompt body.
   _focusedSpecPath = null;

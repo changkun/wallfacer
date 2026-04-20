@@ -201,5 +201,4 @@ describe("sendToPlanButton_invokesHelper", () => {
     const html = ctx.buildCardActions({ status: "backlog", id: "task-abc" });
     expect(html).toContain("openPlanForTask('task-abc')");
   });
-
 });
