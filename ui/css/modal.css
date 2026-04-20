@@ -373,6 +373,23 @@
   border-color: var(--accent);
 }
 
+/* Success (Mark as Done): green fill — this is the terminal positive CTA
+   for a waiting task. Matches the .card-action-done palette on board cards
+   so the two surfaces read as the same action. */
+.aside-action--success {
+  background: var(--tint-green);
+  border-color: color-mix(in oklab, var(--tint-green-ink), transparent 70%);
+  color: var(--tint-green-ink);
+}
+.aside-action--success .aside-action__hint {
+  color: color-mix(in oklab, var(--tint-green-ink), transparent 30%);
+}
+.aside-action--success:hover {
+  background: color-mix(in oklab, var(--tint-green) 88%, #000);
+  border-color: color-mix(in oklab, var(--tint-green-ink), transparent 50%);
+  color: var(--tint-green-ink);
+}
+
 .aside-action--warn {
   color: #b8671c;
   border-color: color-mix(in srgb, #b8671c 35%, var(--border));
