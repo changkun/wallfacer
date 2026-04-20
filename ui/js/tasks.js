@@ -826,13 +826,46 @@ function syncCancelButtonForTask(taskId) {
   if (hint) hint.textContent = pending ? "" : "discard changes";
 }
 
+// buildCancelConfirmMessage returns the confirmation prompt shown before a
+// task is cancelled. For tasks spawned by a routine card it names the
+// parent routine and notes that cancelling the last live instance also
+// disables the routine, so users are not surprised when the routine stops
+// spawning new tasks after they cancel.
+function buildCancelConfirmMessage(taskId) {
+  var base =
+    "Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.";
+  if (!taskId || typeof tasks === "undefined" || !Array.isArray(tasks)) {
+    return base;
+  }
+  var current = tasks.find(function (t) {
+    return t.id === taskId;
+  });
+  if (!current || !Array.isArray(current.tags)) return base;
+  var parentId = null;
+  for (var i = 0; i < current.tags.length; i++) {
+    var tag = current.tags[i];
+    if (typeof tag === "string" && tag.indexOf("spawned-by:") === 0) {
+      parentId = tag.slice("spawned-by:".length);
+      break;
+    }
+  }
+  if (!parentId) return base;
+  var parent = tasks.find(function (t) {
+    return t.id === parentId;
+  });
+  var parentLabel =
+    (parent && (parent.title || parent.prompt)) || "the parent routine";
+  if (parentLabel.length > 80) parentLabel = parentLabel.slice(0, 77) + "...";
+  return (
+    "Cancel this task? It was spawned by routine \u201C" +
+    parentLabel +
+    "\u201D. If this is its last live instance, the routine will also be disabled so it stops spawning new tasks. The sandbox will be cleaned up and prepared changes discarded."
+  );
+}
+
 async function cancelTask() {
   if (!getOpenModalTaskId()) return;
-  if (
-    !(await showConfirm(
-      "Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.",
-    ))
-  )
+  if (!(await showConfirm(buildCancelConfirmMessage(getOpenModalTaskId()))))
     return;
   const taskId = getOpenModalTaskId();
   // Show a "cancelling…" indicator on the board card immediately, before the

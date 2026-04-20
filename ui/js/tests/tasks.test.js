@@ -202,3 +202,50 @@ describe("sendToPlanButton_invokesHelper", () => {
     expect(html).toContain("openPlanForTask('task-abc')");
   });
 });
+
+// ---------------------------------------------------------------------------
+// buildCancelConfirmMessage: names the parent routine and flags
+// auto-disable when the cancelled task was spawned by a routine card.
+// ---------------------------------------------------------------------------
+describe("buildCancelConfirmMessage", () => {
+  function tasksContext() {
+    const ctx = createContext({
+      document: {
+        getElementById: () => ({
+          addEventListener: () => {},
+          querySelector: () => null,
+        }),
+        createElement: () => ({ innerHTML: "" }),
+        querySelectorAll: () => [],
+        addEventListener: () => {},
+        readyState: "complete",
+      },
+    });
+    loadScript("tasks.js", ctx);
+    return ctx;
+  }
+
+  it("uses the plain message for a standalone task", () => {
+    const ctx = tasksContext();
+    ctx.tasks = [{ id: "t1", prompt: "hello", tags: [] }];
+    const msg = ctx.buildCancelConfirmMessage("t1");
+    expect(msg).toContain("Cancel this task?");
+    expect(msg).not.toContain("spawned by routine");
+  });
+
+  it("names the parent routine when the task has a spawned-by tag", () => {
+    const ctx = tasksContext();
+    ctx.tasks = [
+      {
+        id: "routine-1",
+        title: "Nightly scan",
+        prompt: "scan the repo",
+        kind: "routine",
+      },
+      { id: "child-1", prompt: "instance", tags: ["spawned-by:routine-1"] },
+    ];
+    const msg = ctx.buildCancelConfirmMessage("child-1");
+    expect(msg).toContain("Nightly scan");
+    expect(msg).toContain("routine will also be disabled");
+  });
+});
