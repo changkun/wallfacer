@@ -892,16 +892,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			h.runner.RunBackground(id, task.Prompt, sessionID, false)
 		}
 
-		// Moving a routine card into a stopped lane (Done, Failed,
-		// Cancelled) must halt its schedule immediately. The reconciler
-		// would eventually drop the engine entry once it wakes, but that
-		// 250 ms settle window is wide enough for an armed timer to
-		// dispatch one more fire. Unregister synchronously to close the
-		// race. A subsequent move back to Backlog re-enters this code
-		// path with newStatus=Backlog, so reconcile re-registers.
-		if task.IsRoutine() && isRoutineStoppedStatus(newStatus) && !isRoutineStoppedStatus(oldStatus) {
-			h.unregisterRoutine(id)
-		}
 	}
 
 	updated, err := s.GetTask(r.Context(), id)
@@ -929,13 +919,6 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if task, err := s.GetTask(r.Context(), id); err == nil {
 		if len(task.WorktreePaths) > 0 {
 			h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
-		}
-		// Soft-deleting a routine card must stop its timer synchronously.
-		// Otherwise the engine entry, still armed, can dispatch one more
-		// fire through the 250 ms reconcile settle window and spawn an
-		// instance whose parent routine no longer exists in s.tasks.
-		if task.IsRoutine() {
-			h.unregisterRoutine(id)
 		}
 	}
 	if err := s.DeleteTask(r.Context(), id, req.Reason); err != nil {

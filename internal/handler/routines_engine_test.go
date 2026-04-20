@@ -2,8 +2,6 @@ package handler
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"slices"
 	"testing"
 	"time"
@@ -365,80 +363,6 @@ func TestFireRoutine_ArchivedRoutineDoesNotSpawn(t *testing.T) {
 	}
 	if calls := mock.RunCalls(); len(calls) != 0 {
 		t.Fatalf("expected no RunBackground calls for archived routine, got %d", len(calls))
-	}
-}
-
-// TestArchiveTask_UnregistersRoutineSynchronously pins that archiving a
-// routine card drops the engine entry immediately, not via the 250 ms
-// reconcile settle window. Regression guard for the bug where an archived
-// routine could keep spawning instances because the engine timer was still
-// armed until the next wake-driven reconcile.
-func TestArchiveTask_UnregistersRoutineSynchronously(t *testing.T) {
-	mock := &runner.MockRunner{}
-	h, s := newTestHandlerWithMockRunner(t, mock)
-	installRoutineEngine(h, nil, h.fireRoutine)
-
-	ctx := context.Background()
-	// Routine must be in a terminal state for ArchiveTask to accept it.
-	routineTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt: "daily", Timeout: 10, Kind: store.TaskKindRoutine,
-		RoutineIntervalSeconds: 60, RoutineEnabled: true,
-	})
-	if err != nil {
-		t.Fatalf("create routine: %v", err)
-	}
-	h.reconcileRoutines(ctx)
-	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; !ok {
-		t.Fatalf("pre-condition: routine should be registered")
-	}
-	if err := s.CancelTask(ctx, routineTask.ID); err != nil {
-		t.Fatalf("cancel: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineTask.ID.String()+"/archive", nil)
-	w := httptest.NewRecorder()
-	h.ArchiveTask(w, req, routineTask.ID)
-	if w.Code != http.StatusOK {
-		t.Fatalf("ArchiveTask: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Engine entry must be gone BEFORE any reconcile has a chance to run.
-	// If it lingers, an already-armed timer could still dispatch a fire
-	// and spawn a child task during the settle window.
-	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; ok {
-		t.Fatalf("archived routine must be unregistered from engine synchronously")
-	}
-}
-
-// TestDeleteTask_UnregistersRoutineSynchronously is the soft-delete analog
-// of the archive test above.
-func TestDeleteTask_UnregistersRoutineSynchronously(t *testing.T) {
-	mock := &runner.MockRunner{}
-	h, s := newTestHandlerWithMockRunner(t, mock)
-	installRoutineEngine(h, nil, h.fireRoutine)
-
-	ctx := context.Background()
-	routineTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt: "daily", Timeout: 10, Kind: store.TaskKindRoutine,
-		RoutineIntervalSeconds: 60, RoutineEnabled: true,
-	})
-	if err != nil {
-		t.Fatalf("create routine: %v", err)
-	}
-	h.reconcileRoutines(ctx)
-	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; !ok {
-		t.Fatalf("pre-condition: routine should be registered")
-	}
-
-	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+routineTask.ID.String(), nil)
-	w := httptest.NewRecorder()
-	h.DeleteTask(w, req, routineTask.ID)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("DeleteTask: expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	if _, ok := h.routineEngine.NextRuns()[routineTask.ID]; ok {
-		t.Fatalf("deleted routine must be unregistered from engine synchronously")
 	}
 }
 
