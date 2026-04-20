@@ -207,6 +207,13 @@ var PlanningChat = (function () {
           id: t.id,
           name: t.name,
           archived: !!t.archived,
+          // Thread mode ("spec" | "task") and the task_id pin are exposed by
+          // the thread list endpoint. sendMessage needs them to pick the
+          // right focused_* field — without them, every send to a task-mode
+          // thread would include focused_spec and trigger a mode-mismatch
+          // 409 ("thread is pinned to task-mode").
+          mode: t.mode || existing.mode || "",
+          task_id: t.task_id || existing.task_id || "",
           queue: existing.queue || [],
           enqueuedAt: existing.enqueuedAt || 0,
           lastViewedAt: existing.lastViewedAt || 0,
@@ -673,25 +680,44 @@ var PlanningChat = (function () {
       _scrollToBottom(true);
     }
 
-    // Get focused spec from spec mode state.
-    var focusedSpec = "";
-    if (typeof specModeState !== "undefined" && specModeState.focusedSpecPath) {
-      focusedSpec = specModeState.focusedSpecPath;
+    // Task-mode threads must NOT send focused_spec or the server rejects
+    // the request with 409 (mode mismatch). Derive the mode/pin from the
+    // cached thread record populated by _loadThreads.
+    var threadRec = _threads[threadID] || {};
+    var body = { message: text, thread: threadID };
+    if (threadRec.mode === "task") {
+      if (threadRec.task_id) body.focused_task = threadRec.task_id;
+    } else {
+      var focusedSpec = "";
+      if (
+        typeof specModeState !== "undefined" &&
+        specModeState.focusedSpecPath
+      ) {
+        focusedSpec = specModeState.focusedSpecPath;
+      }
+      body.focused_spec = focusedSpec;
     }
 
     try {
       var res = await fetch(Routes.planning.sendMessage(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          focused_spec: focusedSpec,
-          thread: threadID,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.status === 409) {
-        _appendSystemMessage("Agent is busy — try again shortly.");
+        // The planning handler returns 409 for multiple distinct reasons
+        // (agent busy, thread mode mismatch, etc). Surface the server's
+        // error string so users see what actually failed instead of a
+        // generic "busy" line that obscures the real cause.
+        var conflictText = "Agent is busy — try again shortly.";
+        try {
+          var body409 = await res.json();
+          if (body409 && typeof body409.error === "string") {
+            conflictText = body409.error;
+          }
+        } catch (_) {}
+        _appendSystemMessage(conflictText);
         _input.focus();
         return;
       }
