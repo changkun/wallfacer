@@ -379,3 +379,149 @@
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
+/* --- Task Prompts virtual section --- */
+/* Appears above the workspace/spec tree. Matches .explorer-node sizing so
+   backlog/waiting task entries sit next to regular file entries without
+   feeling like a different widget. */
+.explorer-task-prompts {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.explorer-task-prompts__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.explorer-task-prompts__header:hover {
+  background: var(--bg-hover, var(--bg-raised));
+  color: var(--text);
+}
+.explorer-task-prompts__header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.explorer-task-prompts__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Waiting-tasks toggle: compact pill, same visual weight as the other small
+   action chips in the sidebar. */
+.explorer-task-prompts__waiting-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  text-transform: lowercase;
+  cursor: pointer;
+}
+.explorer-task-prompts__waiting-toggle:hover {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+.explorer-task-prompts__waiting-toggle[aria-pressed="true"] {
+  background: var(--tint-amber);
+  border-color: color-mix(
+    in oklab,
+    var(--tint-amber-ink),
+    transparent 70%
+  );
+  color: var(--tint-amber-ink);
+  text-transform: uppercase;
+}
+.explorer-task-prompts__empty {
+  padding: 4px 8px 4px 22px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+/* Each backlog/waiting entry row. Mirrors .explorer-node spacing so the
+   rows align with the workspace tree below. */
+.explorer-task-prompts__entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 22px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.explorer-task-prompts__entry:hover {
+  background: var(--bg-hover, var(--bg-raised));
+  color: var(--text);
+}
+.explorer-task-prompts__entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.explorer-task-prompts__entry.active,
+.explorer-task-prompts__entry--active {
+  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
+  color: var(--text);
+}
+/* Status badge: tiny uppercase pill tinted per status. */
+.explorer-task-prompts__badge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+}
+.explorer-task-prompts__badge--backlog {
+  background: var(--tint-plum, var(--bg-raised));
+  color: var(--tint-plum-ink, var(--text-muted));
+}
+.explorer-task-prompts__badge--waiting {
+  background: var(--tint-amber, var(--bg-raised));
+  color: var(--tint-amber-ink, var(--text-muted));
+}
+.explorer-task-prompts__badge--failed {
+  background: color-mix(in srgb, var(--err, #b33b3b) 15%, transparent);
+  color: var(--err, #b33b3b);
+}
+.explorer-task-prompts__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-task-prompts__time {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
