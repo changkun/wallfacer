@@ -1390,6 +1390,15 @@ var PlanningChat = (function () {
     await _loadHistory();
   }
 
+  // switchThread is the public, stream-safe way to flip the active thread.
+  // It delegates to _switchToThread, which no-ops when the target is already
+  // active and only aborts the local stream reader if the streaming thread
+  // differs from the target. openPlanForTask uses this instead of reload()
+  // so clicking a Task Prompts entry does not kill an in-flight agent turn.
+  function switchThread(id) {
+    return _switchToThread(id);
+  }
+
   return {
     init: init,
     sendMessage: sendMessage,
@@ -1397,5 +1406,6 @@ var PlanningChat = (function () {
     isStreaming: isStreaming,
     getQueue: getQueue,
     reload: reload,
+    switchThread: switchThread,
   };
 })();

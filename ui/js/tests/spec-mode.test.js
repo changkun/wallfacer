@@ -529,6 +529,7 @@ function makeOpenPlanContext(opts = {}) {
   const apiCalls = [];
   const fetchCalls = [];
   const reloadCalls = [];
+  const switchThreadCalls = [];
 
   const threadsResponse =
     opts.threadsResponse !== undefined
@@ -579,6 +580,10 @@ function makeOpenPlanContext(opts = {}) {
         reloadCalls.push(true);
         return Promise.resolve();
       },
+      switchThread: (id) => {
+        switchThreadCalls.push(id);
+        return Promise.resolve();
+      },
     },
     withBearerHeaders: (h) => h,
     renderMarkdown: (t) => "<p>" + t + "</p>",
@@ -597,6 +602,7 @@ function makeOpenPlanContext(opts = {}) {
     apiCalls,
     fetchCalls,
     reloadCalls,
+    switchThreadCalls,
   };
   vm.createContext(ctx);
   vm.runInContext(code, ctx);
@@ -619,19 +625,19 @@ describe("openPlanForTask", () => {
     ctx.openPlanForTask("task-abc", "my task", "backlog");
     await new Promise((r) => setTimeout(r, 30));
 
-    // Should have called activate endpoint, NOT createThread POST.
-    const activateCalls = ctx.fetchCalls.filter(
-      (c) => c.url.indexOf("activate") !== -1 && c.method === "POST",
-    );
-    expect(activateCalls.length).toBeGreaterThanOrEqual(1);
+    // For an existing thread we take the stream-safe switchThread path
+    // instead of calling the /activate endpoint + reload. No createThread
+    // POST is issued either.
+    expect(ctx.switchThreadCalls).toContain("thread-999");
 
     const createCalls = ctx.apiCalls.filter(
       (c) => c.url === "/api/planning/threads" && c.method === "POST",
     );
     expect(createCalls.length).toBe(0);
 
-    // PlanningChat.reload should have been called.
-    expect(ctx.reloadCalls.length).toBeGreaterThanOrEqual(1);
+    // reload must NOT have been called in the reuse path — doing so would
+    // abort any in-flight agent turn in another thread.
+    expect(ctx.reloadCalls.length).toBe(0);
 
     // Should have switched to spec mode.
     expect(ctx.getCurrentMode()).toBe("spec");

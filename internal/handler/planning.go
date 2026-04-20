@@ -105,6 +105,50 @@ func archivedSpecGuard(workspaces []string, focusedSpec string) string {
 		"the spec first using the Unarchive button in the focused view.\n\n"
 }
 
+// applyTaskPromptRound writes the assistant's output as the new task.Prompt
+// and records a prompt_round event. It mirrors the logic in the explicit
+// /api/planning/tool/update_task_prompt HTTP bridge so both entry points
+// produce the same durable state, and is invoked automatically at the end
+// of a task-mode planning turn (the agent has no way to reach back and
+// call the HTTP bridge itself). Returns the round number assigned, or 0
+// on failure — errors are logged, never bubbled up.
+func (h *Handler) applyTaskPromptRound(ctx context.Context, pinnedTaskID, threadID, newPrompt string) int {
+	s, ok := h.currentStore()
+	if !ok {
+		return 0
+	}
+	taskUUID, err := uuid.Parse(pinnedTaskID)
+	if err != nil {
+		return 0
+	}
+	// Count existing prompt_round events to number this one.
+	events, err := s.GetEvents(ctx, taskUUID)
+	if err != nil {
+		slog.Warn("task-mode: read events", "task", pinnedTaskID, "err", err)
+		return 0
+	}
+	round := 1
+	for _, ev := range events {
+		if ev.EventType == store.EventTypePromptRound {
+			round++
+		}
+	}
+	trimmed := strings.TrimSpace(newPrompt)
+	if trimmed == "" {
+		return 0
+	}
+	prevPrompt, resumeHint, err := s.UpdateTaskPromptDirect(ctx, taskUUID, trimmed)
+	if err != nil {
+		slog.Warn("task-mode: update prompt", "task", pinnedTaskID, "err", err)
+		return 0
+	}
+	payload := store.NewPromptRoundEvent(threadID, round, prevPrompt, trimmed, resumeHint)
+	if err := s.InsertEvent(ctx, taskUUID, store.EventTypePromptRound, payload); err != nil {
+		slog.Warn("task-mode: insert prompt_round event", "task", pinnedTaskID, "err", err)
+	}
+	return round
+}
+
 // buildTaskModeSystemPrompt renders the task-prompt refinement system prompt
 // for the pinned task UUID. Returns empty when the task cannot be resolved
 // (non-fatal: the turn still runs with the user message as context).
@@ -497,57 +541,69 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		// Parse response text and append assistant message (skip errors).
 		if !planner.IsErrorResult(rawStdout) {
 			resultText := planner.ExtractResultText(rawStdout)
-			// Scan the agent's assistant-text blocks for /spec-new
-			// directives. Scaffold each one into the first mounted
-			// workspace so the file is present before commitPlanningRound
-			// runs (and therefore included in the round's git commit).
-			// Scaffold errors surface as `system`-role messages; the
-			// agent's original text still flows through to the assistant
-			// log untouched.
-			dirScanner := &DirectiveScanner{}
-			for _, line := range extractAssistantLines(rawStdout) {
-				dirScanner.ScanLine(line)
-			}
-			directives := dirScanner.Directives()
-			if len(directives) > 0 {
-				workspaces := h.currentWorkspaces()
-				var scaffoldWs string
-				if len(workspaces) > 0 {
-					scaffoldWs = workspaces[0]
-				}
-				now := time.Now().UTC()
-				for _, sysMsg := range processDirectives(
-					scaffoldWs, directives, req.FocusedSpec, now,
-				) {
-					_ = cs.AppendMessage(sysMsg)
-				}
-			}
-			// Commit any spec writes from this round to git so the undo
-			// stack has a distinct commit per round. Best-effort: log and
-			// continue on failure, never block the conversation log. The
-			// max round across workspaces attributes the assistant message
-			// for UI undo affordances.
-			commitCtx := context.Background()
 			planRound := 0
-			// h.runner may be nil in narrow test setups; a nil generator
-			// makes commitPlanningRound fall back to its deterministic path.
-			var genCommit commitMessageGenerator
-			if h.runner != nil {
-				genCommit = h.runner.GenerateCommitMessage
-			}
-			for _, ws := range h.currentWorkspaces() {
-				n, cerr := commitPlanningRound(commitCtx, ws, req.Message, resultText, genCommit, threadID)
-				if cerr != nil {
-					slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
-					continue
+
+			// Task-mode: the agent's output IS the new task prompt. Write it
+			// through to task.Prompt and record a prompt_round event so the
+			// task's timeline reflects the refinement and undo has something
+			// to rewind. Spec-mode continues to emit /spec-new scaffolds and
+			// commit a round to git.
+			if pinnedTaskID != "" && resultText != "" {
+				planRound = h.applyTaskPromptRound(
+					context.Background(), pinnedTaskID, threadID, resultText,
+				)
+			} else {
+				// Scan the agent's assistant-text blocks for /spec-new
+				// directives. Scaffold each one into the first mounted
+				// workspace so the file is present before commitPlanningRound
+				// runs (and therefore included in the round's git commit).
+				// Scaffold errors surface as `system`-role messages; the
+				// agent's original text still flows through to the assistant
+				// log untouched.
+				dirScanner := &DirectiveScanner{}
+				for _, line := range extractAssistantLines(rawStdout) {
+					dirScanner.ScanLine(line)
 				}
-				if n > planRound {
-					planRound = n
+				directives := dirScanner.Directives()
+				if len(directives) > 0 {
+					workspaces := h.currentWorkspaces()
+					var scaffoldWs string
+					if len(workspaces) > 0 {
+						scaffoldWs = workspaces[0]
+					}
+					now := time.Now().UTC()
+					for _, sysMsg := range processDirectives(
+						scaffoldWs, directives, req.FocusedSpec, now,
+					) {
+						_ = cs.AppendMessage(sysMsg)
+					}
 				}
-				// Auto-push after a successful planning commit, mirroring the
-				// behaviour of the task "mark as done" flow.
-				if n > 0 && h.runner != nil {
-					h.runner.MaybeAutoPushWorkspace(commitCtx, ws)
+				// Commit any spec writes from this round to git so the undo
+				// stack has a distinct commit per round. Best-effort: log and
+				// continue on failure, never block the conversation log. The
+				// max round across workspaces attributes the assistant message
+				// for UI undo affordances.
+				commitCtx := context.Background()
+				// h.runner may be nil in narrow test setups; a nil generator
+				// makes commitPlanningRound fall back to its deterministic path.
+				var genCommit commitMessageGenerator
+				if h.runner != nil {
+					genCommit = h.runner.GenerateCommitMessage
+				}
+				for _, ws := range h.currentWorkspaces() {
+					n, cerr := commitPlanningRound(commitCtx, ws, req.Message, resultText, genCommit, threadID)
+					if cerr != nil {
+						slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
+						continue
+					}
+					if n > planRound {
+						planRound = n
+					}
+					// Auto-push after a successful planning commit, mirroring the
+					// behaviour of the task "mark as done" flow.
+					if n > 0 && h.runner != nil {
+						h.runner.MaybeAutoPushWorkspace(commitCtx, ws)
+					}
 				}
 			}
 			if resultText != "" {
