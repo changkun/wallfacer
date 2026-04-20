@@ -1072,6 +1072,14 @@ async function openModal(id) {
     startBtn.title = "";
   }
 
+  // Mark as Done (waiting only). Promoted from the inline feedback toolbar
+  // to the aside so it aligns with Start / Archive / Cancel as a terminal
+  // task action.
+  const markDoneSection = document.getElementById("modal-mark-done-section");
+  if (markDoneSection) {
+    markDoneSection.classList.toggle("hidden", task.status !== "waiting");
+  }
+
   // Cancel section (backlog / in_progress / waiting / failed)
   const cancelSection = document.getElementById("modal-cancel-section");
   const cancellable = ["backlog", "in_progress", "waiting", "failed"];
