@@ -544,9 +544,9 @@ describe("render.js buildCardActions", () => {
     expect(html).toContain("Start");
   });
 
-  it("includes Send to Plan, Test and Done buttons for waiting", () => {
+  it("includes Test and Done buttons for waiting, no Send to Plan", () => {
     const html = ctx.buildCardActions({ status: "waiting", id: "t1" });
-    expect(html).toContain("card-action-send-to-plan");
+    expect(html).not.toContain("card-action-send-to-plan");
     expect(html).toContain("Test");
     expect(html).toContain("Done");
     expect(html).not.toContain("card-action-resume");

@@ -345,44 +345,11 @@ describe("events.js", () => {
   });
 
   describe("new-prompt textarea", () => {
-    it("creates task on Ctrl+Enter", () => {
-      const ctx = makeContext();
-      loadScript(ctx);
-      const handler = getElListener(ctx, "new-prompt", "keydown");
-      handler({
-        key: "Enter",
-        ctrlKey: true,
-        metaKey: false,
-        preventDefault: vi.fn(),
-      });
-      expect(ctx.createTask).toHaveBeenCalled();
-    });
-
-    it("creates task on Cmd+Enter", () => {
-      const ctx = makeContext();
-      loadScript(ctx);
-      const handler = getElListener(ctx, "new-prompt", "keydown");
-      handler({
-        key: "Enter",
-        ctrlKey: false,
-        metaKey: true,
-        preventDefault: vi.fn(),
-      });
-      expect(ctx.createTask).toHaveBeenCalled();
-    });
-
-    it("hides form on Escape", () => {
-      const ctx = makeContext();
-      loadScript(ctx);
-      const handler = getElListener(ctx, "new-prompt", "keydown");
-      handler({
-        key: "Escape",
-        ctrlKey: false,
-        metaKey: false,
-        preventDefault: vi.fn(),
-      });
-      expect(ctx.hideNewTaskForm).toHaveBeenCalled();
-    });
+    // Ctrl/Cmd+Enter submit and Escape cancel handlers used to live in
+    // events.js but duplicated the composer-scoped handler in tasks.js,
+    // causing cmd+Enter to create two tasks per press. They were removed
+    // (see ui/js/tests/composer-submit-shortcut.test.js for the regression
+    // guard). The behavior is exercised by tasks.test.js + tasks-coverage.
 
     it("auto-grows and saves draft on input", () => {
       const ctx = makeContext();

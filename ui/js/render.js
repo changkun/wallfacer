@@ -819,9 +819,6 @@ function buildCardActions(t) {
       `<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`,
     );
   } else if (t.status === "waiting") {
-    parts.push(
-      `<button class="card-action-btn card-action-send-to-plan" onclick="event.stopPropagation();openPlanForTask('${t.id}')" title="Send to Plan">&#9997; Plan</button>`,
-    );
     if (t.session_id) {
       parts.push(
         `<button class="card-action-btn card-action-resume" onclick="event.stopPropagation();quickResumeTask('${t.id}',${t.timeout || 15})" title="Resume in existing session">&#8635; Resume</button>`,

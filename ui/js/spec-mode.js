@@ -531,12 +531,36 @@ var _focusedTaskStatus = null;
 // openPlanForTask opens Plan mode with the planning thread pinned to taskId.
 // It reuses an existing non-archived task-mode thread for the task if one
 // exists; otherwise it creates a new thread. Then it switches to Plan mode.
+//
+// The markdown view shows the task's current prompt so the user sees what
+// they are refining. The chat tab bar auto-focuses the activated thread via
+// PlanningChat.reload (which reads active_id from the thread list).
 function openPlanForTask(taskId, title, status) {
   if (!taskId) return;
+
+  // Resolve the live task record from the in-memory cache so we have the
+  // freshest prompt text. Fall back to the call-site args if the cache does
+  // not yet contain the task (e.g. right after a page load).
+  var cached = null;
+  if (typeof tasks !== "undefined" && Array.isArray(tasks)) {
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i] && tasks[i].id === taskId) {
+        cached = tasks[i];
+        break;
+      }
+    }
+  }
   _focusedTaskId = taskId;
-  _focusedTaskTitle = title || "";
-  _focusedTaskStatus = status || "";
+  _focusedTaskTitle = (cached && cached.title) || title || "";
+  _focusedTaskStatus = (cached && cached.status) || status || "";
+  var promptText = cached && typeof cached.prompt === "string" ? cached.prompt : "";
   clearWorkspaceIsNew();
+
+  // Update breadcrumb + render the task prompt in the markdown view BEFORE
+  // switching modes, so the user sees the right content the moment the pane
+  // appears.
+  _updateTaskBreadcrumb(promptText);
+  switchMode("spec");
 
   // Fetch existing threads, find a non-archived task-mode thread for this task.
   api(Routes.planning.listThreads() + "?includeArchived=false")
@@ -551,7 +575,8 @@ function openPlanForTask(taskId, title, status) {
         }
       }
       if (match) {
-        // Activate existing thread then reload.
+        // Activate existing thread then reload. The reload's _loadThreads call
+        // reads active_id from the server and the tab bar focuses it.
         return fetch(
           Routes.planning.activateThread().replace("{id}", match.id),
           {
@@ -567,7 +592,9 @@ function openPlanForTask(taskId, title, status) {
           }
         });
       }
-      // No existing thread: create one pinned to this task.
+      // No existing thread: create one pinned to this task. Create returns
+      // the thread with active_id implicitly set server-side so reload focuses
+      // the new tab.
       var name = "Task prompt: " + (_focusedTaskTitle || taskId);
       return api(Routes.planning.createThread(), {
         method: "POST",
@@ -585,15 +612,12 @@ function openPlanForTask(taskId, title, status) {
     .catch(function (err) {
       console.error("openPlanForTask:", err);
     });
-
-  // Update breadcrumb and switch to Plan mode.
-  _updateTaskBreadcrumb();
-  switchMode("spec");
 }
 
-// _updateTaskBreadcrumb sets the Plan view header breadcrumb elements for the
-// currently focused task. Called by openPlanForTask after state is set.
-function _updateTaskBreadcrumb() {
+// _updateTaskBreadcrumb sets the Plan view header breadcrumb elements and
+// renders the task prompt in the markdown body. Called by openPlanForTask
+// after state is set.
+function _updateTaskBreadcrumb(promptText) {
   var pathEl = document.getElementById("spec-focused-path");
   var titleEl = document.getElementById("spec-focused-title");
   var statusEl = document.getElementById("spec-focused-status");
@@ -608,11 +632,16 @@ function _updateTaskBreadcrumb() {
       (_focusedTaskTitle ? " \u00b7 " + _focusedTaskTitle : "") +
       (_focusedTaskStatus ? " (" + _focusedTaskStatus + ")" : "");
   if (titleEl) titleEl.textContent = _focusedTaskTitle || "";
-  if (statusEl) statusEl.textContent = "";
-  if (kindEl) kindEl.textContent = "";
+  if (statusEl) statusEl.textContent = _focusedTaskStatus || "";
+  if (kindEl) kindEl.textContent = "task prompt";
   if (effortEl) effortEl.textContent = "";
   if (metaEl) metaEl.innerHTML = "";
-  if (bodyInner) bodyInner.innerHTML = "";
+  if (bodyInner) {
+    var text = typeof promptText === "string" ? promptText : "";
+    bodyInner.innerHTML = text
+      ? renderMarkdown(text)
+      : '<p class="muted">This task has no prompt yet.</p>';
+  }
 }
 
 // --- Focused spec view ---

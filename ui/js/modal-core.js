@@ -1053,15 +1053,14 @@ async function openModal(id) {
     resumeSection.classList.add("hidden");
   }
 
-  // Send to Plan section (backlog and waiting)
+  // Send to Plan section (backlog only — moving a task out of backlog is
+  // the only transition the plan tool can affect. Waiting tasks resume or
+  // cancel instead.)
   const sendToPlanSection = document.getElementById(
     "modal-send-to-plan-section",
   );
   if (sendToPlanSection) {
-    sendToPlanSection.classList.toggle(
-      "hidden",
-      task.status !== "backlog" && task.status !== "waiting",
-    );
+    sendToPlanSection.classList.toggle("hidden", task.status !== "backlog");
   }
 
   // Start section (backlog only)
