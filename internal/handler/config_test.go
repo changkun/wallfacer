@@ -21,6 +21,18 @@ import (
 	"changkun.de/x/wallfacer/internal/workspace"
 )
 
+// workspacesBody returns a JSON body for POST /api/workspaces containing the
+// provided paths. It uses json.Marshal so that path separators are escaped
+// correctly on Windows (backslashes would otherwise produce invalid JSON).
+func workspacesBody(t *testing.T, paths ...string) *bytes.Reader {
+	t.Helper()
+	b, err := json.Marshal(map[string][]string{"workspaces": paths})
+	if err != nil {
+		t.Fatalf("marshal workspaces body: %v", err)
+	}
+	return bytes.NewReader(b)
+}
+
 // syncResponseWriter wraps httptest.ResponseRecorder with a mutex so that
 // concurrent writes (from an SSE handler goroutine) and reads (from the test
 // goroutine polling for events) do not race on the underlying bytes.Buffer.
@@ -1234,8 +1246,7 @@ func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
 
 	// Switch to a second workspace group (B).
 	newWS := t.TempDir()
-	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
 	w := httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
 	if w.Code != http.StatusOK {
@@ -1324,8 +1335,7 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 
 	// Switch to group B (A stays active via its in-progress tasks).
 	newWS := t.TempDir()
-	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
 	w := httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
 	if w.Code != http.StatusOK {
@@ -1437,8 +1447,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 
 	// Switch to a fresh group B.
 	wsB := t.TempDir()
-	body := strings.NewReader(`{"workspaces":["` + wsB + `"]}`)
-	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, wsB))
 	w = httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
 	if w.Code != http.StatusOK {
@@ -1465,8 +1474,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	}
 
 	// Switch back to A and the toggles must return to their saved state.
-	body = strings.NewReader(`{"workspaces":["` + wsA + `"]}`)
-	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, wsA))
 	w = httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
 	if w.Code != http.StatusOK {

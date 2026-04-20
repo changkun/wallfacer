@@ -64,12 +64,22 @@ func setupTestRunner(t *testing.T, workspaces []string) (*store.Store, *Runner) 
 // with the board subscription goroutine that reads workspaceManager.
 func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspace.Manager) (*store.Store, *Runner) {
 	t.Helper()
-	dataDir := t.TempDir()
+	// Use os.MkdirTemp so that late trace writes from background goroutines
+	// (which race with shutdown) don't cause TempDir cleanup failures on
+	// platforms that surface "directory not empty" errors (e.g. macOS).
+	dataDir, err := os.MkdirTemp("", "wallfacer-runner-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Cleanups run LIFO: we want Shutdown -> WaitBackground -> WaitCompaction
+	// -> Close -> RemoveAll, so register in reverse order.
+	t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
 	t.Cleanup(func() { s.Close() })
+	t.Cleanup(s.WaitCompaction)
 
 	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
@@ -84,6 +94,7 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 		WorktreesDir:     worktreesDir,
 		WorkspaceManager: mgr,
 	})
+	t.Cleanup(runner.WaitBackground)
 	t.Cleanup(func() { runner.Shutdown() })
 	return s, runner
 }
