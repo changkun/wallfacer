@@ -581,22 +581,25 @@ function openPlanForTask(taskId, title, status) {
         }
       }
       if (match) {
-        // Activate existing thread then reload. The reload's _loadThreads call
-        // reads active_id from the server and the tab bar focuses it.
+        // Use the stream-safe switchThread path instead of reload(): reload
+        // aborts any in-flight stream, which would kill the agent's current
+        // turn when the user clicks the Task Prompts entry mid-response.
+        // switchThread is a no-op when the target is already active.
+        if (
+          typeof PlanningChat !== "undefined" &&
+          typeof PlanningChat.switchThread === "function"
+        ) {
+          return PlanningChat.switchThread(match.id);
+        }
+        // Fallback when switchThread is not exposed (older bundles): still
+        // activate server-side so the tab bar catches up on the next load.
         return fetch(
           Routes.planning.activateThread().replace("{id}", match.id),
           {
             method: "POST",
             headers: withBearerHeaders({ "Content-Type": "application/json" }),
           },
-        ).then(function () {
-          if (
-            typeof PlanningChat !== "undefined" &&
-            typeof PlanningChat.reload === "function"
-          ) {
-            PlanningChat.reload();
-          }
-        });
+        );
       }
       // No existing thread: create one pinned to this task, then activate
       // it explicitly. POST /threads creates but does not flip active_id,
