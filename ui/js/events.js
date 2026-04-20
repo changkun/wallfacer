@@ -85,19 +85,9 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// New task textarea: Ctrl/Cmd+Enter to save, Escape to cancel
-document.getElementById("new-prompt").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    createTask();
-  }
-  if (e.key === "Escape") {
-    e.preventDefault();
-    hideNewTaskForm();
-  }
-});
-
 // New task textarea: auto-grow height and save draft
+// (Ctrl/Cmd+Enter submit and Escape cancel are bound by showNewTaskForm in
+// tasks.js so the composer handlers live with the rest of its lifecycle.)
 document.getElementById("new-prompt").addEventListener("input", (e) => {
   e.target.style.height = "";
   e.target.style.height = e.target.scrollHeight + "px";
