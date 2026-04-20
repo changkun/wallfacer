@@ -639,8 +639,8 @@ describe("planning-chat.js", () => {
           method: "POST",
           body: JSON.stringify({
             message: "test message",
-            focused_spec: "",
             thread: "t1",
+            focused_spec: "",
           }),
         }),
       );
@@ -676,11 +676,83 @@ describe("planning-chat.js", () => {
         expect.objectContaining({
           body: JSON.stringify({
             message: "hello",
-            focused_spec: "specs/local/test.md",
             thread: "t1",
+            focused_spec: "specs/local/test.md",
           }),
         }),
       );
+    });
+
+    it("omits focused_spec and sends focused_task for task-mode threads", async () => {
+      // Regression: sending with focused_spec set on a task-mode thread
+      // returned 409 ("thread is pinned to task-mode") and the UI surfaced
+      // it as "Agent is busy". The client must send focused_task instead.
+      const elems = makeStandardElements();
+      const ctx = makeContext({
+        elements: elems,
+        specModeState: { focusedSpecPath: "specs/local/leaking.md" },
+      });
+      // Make the thread list return a task-mode thread so _loadThreads
+      // records mode="task" and task_id on the active thread.
+      ctx.api = vi.fn().mockImplementation((url) => {
+        if (
+          typeof url === "string" &&
+          url.indexOf("/api/planning/threads") !== -1
+        ) {
+          return Promise.resolve({
+            threads: [
+              {
+                id: "t1",
+                name: "Task prompt: xyz",
+                archived: false,
+                active: true,
+                mode: "task",
+                task_id: "task-xyz",
+              },
+            ],
+            active_id: "t1",
+          });
+        }
+        return Promise.resolve([]);
+      });
+      loadPlanningChat(ctx);
+      ctx.PlanningChat.init();
+      await new Promise((r) => setTimeout(r, 10));
+
+      ctx.fetch.mockResolvedValueOnce({ ok: true, status: 202, text: vi.fn() });
+      await ctx.PlanningChat.sendMessage("refine me");
+
+      const call = ctx.fetch.mock.calls[0];
+      if (!call) throw new Error("fetch was not called");
+      const body = JSON.parse(call[1].body);
+      expect(body.focused_spec).toBeUndefined();
+      expect(body.focused_task).toBe("task-xyz");
+    });
+
+    it("surfaces the server error string on 409 instead of the generic busy label", async () => {
+      const elems = makeStandardElements();
+      const elemMap = new Map(elems);
+      const messagesEl = elemMap.get("spec-chat-messages");
+      const ctx = makeContext({ elements: elems });
+      loadPlanningChat(ctx);
+      ctx.PlanningChat.init();
+      await new Promise((r) => setTimeout(r, 10));
+
+      ctx.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: () =>
+          Promise.resolve({
+            error: "thread is pinned to task-mode; focused_spec not allowed",
+          }),
+      });
+      await ctx.PlanningChat.sendMessage("hi");
+
+      // The last child (system message) should contain the server's error.
+      const last = messagesEl.children[messagesEl.children.length - 1];
+      const asText =
+        (last && (last.textContent || last.innerText || last.innerHTML)) || "";
+      expect(asText).toContain("thread is pinned to task-mode");
     });
 
     it("handles 409 conflict", async () => {
