@@ -193,3 +193,28 @@ func TestCommandRegistry_Expand_Status(t *testing.T) {
 		t.Errorf("expanded prompt missing state: %q", expanded)
 	}
 }
+
+func TestCommandRegistry_Expand_Refine(t *testing.T) {
+	r := NewCommandRegistry()
+
+	// Without additional feedback.
+	expanded, ok := r.Expand("/refine", "specs/local/foo.md")
+	if !ok {
+		t.Fatal("expected refine to be recognized")
+	}
+	if !strings.Contains(expanded, "specs/local/foo.md") {
+		t.Errorf("expanded prompt missing focused spec path: %q", expanded)
+	}
+
+	// With additional feedback — args should appear in the expansion.
+	expanded, ok = r.Expand("/refine focus on the API section", "specs/local/foo.md")
+	if !ok {
+		t.Fatal("expected refine with args to be recognized")
+	}
+	if !strings.Contains(expanded, "specs/local/foo.md") {
+		t.Errorf("expanded prompt missing focused spec path: %q", expanded)
+	}
+	if !strings.Contains(expanded, "focus on the API section") {
+		t.Errorf("expanded prompt missing feedback args: %q", expanded)
+	}
+}
