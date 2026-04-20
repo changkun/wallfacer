@@ -67,6 +67,10 @@ type SandboxProxy struct {
 	Validator *auth.Validator
 }
 
+// NewSandboxProxy constructs a trust-plane proxy from config and an
+// optional JWT validator. When the validator is nil (local mode) the
+// routes skip JWT checks; callers still rely on cfg.Enabled to 503
+// requests until credentials are configured.
 func NewSandboxProxy(cfg SandboxProxyConfig, v *auth.Validator) *SandboxProxy {
 	return &SandboxProxy{
 		Cfg:       cfg,
@@ -149,7 +153,7 @@ func (p *SandboxProxy) GitHubToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<14))
 		http.Error(w, string(b), resp.StatusCode)
@@ -215,7 +219,7 @@ func (p *SandboxProxy) forwardLLM(
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	for k, vs := range resp.Header {
 		for _, v := range vs {
