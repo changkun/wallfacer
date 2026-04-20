@@ -170,12 +170,11 @@ func routineNextRunEqual(a, b *time.Time) bool {
 	return d < 500*time.Millisecond
 }
 
-// unregisterRoutine immediately drops any engine timer for the given task
-// id. Safe to call with a non-routine id (the engine silently ignores
-// unknown entries) and safe to call before StartRoutineEngine has run
-// (the engine pointer is nil). Callers that archive, delete, or cancel a
-// routine card should invoke this so the next tick does not slip past the
-// asynchronous reconcile's 250 ms settle window.
+// unregisterRoutine drops any engine timer for the given task id. Safe
+// to call with a non-routine id (the engine silently ignores unknown
+// entries) and safe to call before StartRoutineEngine has run (the
+// engine pointer is nil). Called from fireRoutine to self-clean when a
+// timer fires against a card the engine shouldn't track anymore.
 func (h *Handler) unregisterRoutine(id uuid.UUID) {
 	h.routineMu.Lock()
 	eng := h.routineEngine
