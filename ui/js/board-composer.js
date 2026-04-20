@@ -1,4 +1,4 @@
-/* global populateSandboxSelects, openTemplatesPicker, api, Routes,
+/* global openTemplatesPicker, api, Routes,
    switchMode, clearWorkspaceIsNew, showAlert, DEFAULT_TASK_TIMEOUT,
    attachMentionAutocomplete */
 //
@@ -74,12 +74,10 @@ var BoardComposer = (function () {
       "</div>" +
       "</div>" +
       '<div class="board-composer__advanced hidden">' +
-      '<label class="board-composer__field">' +
-      "<span>Sandbox</span>" +
-      '<select id="board-composer-sandbox" class="select" data-sandbox-select="true">' +
-      '<option value="">Default</option>' +
-      "</select>" +
-      "</label>" +
+      // Sandbox/harness is no longer a create-time field on POST /api/tasks
+      // (the server pins it on the agent). The old sandbox select was
+      // dropped here; users who need a non-default agent configure it via
+      // the Agents tab, and the default flow is applied at task launch.
       '<label class="board-composer__field">' +
       "<span>Timeout (min)</span>" +
       '<input type="number" id="board-composer-timeout" class="field" min="1" max="600" />' +
@@ -131,10 +129,6 @@ var BoardComposer = (function () {
     if (timeoutInput) {
       timeoutInput.value =
         typeof DEFAULT_TASK_TIMEOUT !== "undefined" ? DEFAULT_TASK_TIMEOUT : 60;
-    }
-
-    if (typeof populateSandboxSelects === "function") {
-      populateSandboxSelects();
     }
 
     var submit = el.querySelector(".board-composer__submit");
@@ -231,18 +225,16 @@ var BoardComposer = (function () {
         : typeof DEFAULT_TASK_TIMEOUT !== "undefined"
           ? DEFAULT_TASK_TIMEOUT
           : 60;
-    var sandboxEl = el.querySelector("#board-composer-sandbox");
-    var sandbox = sandboxEl ? sandboxEl.value : "";
-
     // Body shape mirrors the existing task-create flow (see tasks.js
-    // createTask). Fields not surfaced in the composer use sensible
-    // defaults that match the wider UI.
+    // createTask). Sandbox/harness is no longer accepted on POST; the
+    // server pins it through the agent the flow step references, so we
+    // omit both sandbox and sandbox_by_activity here and let the default
+    // flow run. Users who need a non-default agent configure it in the
+    // Agents tab.
     var body = {
       prompt: text,
       timeout: timeout,
       mount_worktrees: true,
-      sandbox: sandbox,
-      sandbox_by_activity: {},
       tags: [],
       max_cost_usd: 0,
       max_input_tokens: 0,
