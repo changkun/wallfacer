@@ -1109,6 +1109,31 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// WebSocket upgrades don't follow REST request/response semantics.
 	mux.HandleFunc("GET /api/terminal/ws", h.HandleTerminalWS)
 
+	// Sandbox trust-plane proxy. Not in apicontract because these
+	// are server-to-server calls the sandbox credential sidecar
+	// makes, not part of the browser client contract. Handlers 503
+	// when SandboxProxyConfig.Enabled is false (local / no
+	// credentials configured), so it's safe to wire them
+	// unconditionally.
+	//
+	// The JWT validator is built from SANDBOX_PROXY_AUTH_URL (= the
+	// auth service's base URL). If unset, validation is skipped and
+	// the trust-plane endpoints rely solely on the Enabled flag —
+	// acceptable in single-tenant local runs.
+	var sandboxProxyValidator *auth.Validator
+	if u := os.Getenv("SANDBOX_PROXY_AUTH_URL"); u != "" {
+		sandboxProxyValidator = auth.BuildValidator(
+			auth.Config{AuthURL: u},
+			os.Getenv("SANDBOX_PROXY_AUTH_JWKS_URL"),
+			os.Getenv("SANDBOX_PROXY_AUTH_ISSUER"),
+		)
+	}
+	sandboxProxy := handler.NewSandboxProxy(
+		handler.LoadSandboxProxyConfig(), sandboxProxyValidator)
+	mux.HandleFunc("POST /internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
+	mux.HandleFunc("POST /internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
+	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", sandboxProxy.GitHubToken)
+
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
