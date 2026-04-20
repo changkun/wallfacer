@@ -129,6 +129,20 @@ function _stopTaskPromptsStream() {
   }
 }
 
+// _rerenderActiveExplorer re-renders whichever view currently owns the
+// #explorer-tree element. In Plan (spec) mode the spec-explorer owns it;
+// elsewhere the workspace explorer does. Task-prompt state changes need
+// to refresh whichever view is active without overwriting the other.
+function _rerenderActiveExplorer() {
+  var inSpecMode =
+    typeof getCurrentMode === "function" && getCurrentMode() === "spec";
+  if (inSpecMode && typeof renderSpecTree === "function") {
+    renderSpecTree();
+  } else {
+    _renderTree();
+  }
+}
+
 function _loadTaskPrompts() {
   if (!Routes || !Routes.explorer || !Routes.explorer.taskPrompts) return;
   var url = Routes.explorer.taskPrompts();
@@ -138,7 +152,7 @@ function _loadTaskPrompts() {
   api(url)
     .then(function (data) {
       _taskPrompts = Array.isArray(data) ? data : [];
-      _renderTree();
+      _rerenderActiveExplorer();
     })
     .catch(function () {});
 }
@@ -184,13 +198,13 @@ function _renderTaskPromptsSection(container) {
 
   header.addEventListener("click", function () {
     _taskPromptsExpanded = !_taskPromptsExpanded;
-    _renderTree();
+    _rerenderActiveExplorer();
   });
   header.addEventListener("keydown", function (e) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       _taskPromptsExpanded = !_taskPromptsExpanded;
-      _renderTree();
+      _rerenderActiveExplorer();
     }
   });
 
@@ -913,12 +927,11 @@ function _renderTree() {
 
   container.setAttribute("role", "tree");
 
-  // Render Task Prompts section above workspace roots in workspace mode.
-  var inSpecMode =
-    typeof getCurrentMode === "function" && getCurrentMode() === "spec";
-  if (!inSpecMode) {
-    _renderTaskPromptsSection(container);
-  }
+  // Task Prompts virtual section renders above the workspace roots. It used
+  // to be suppressed in Plan mode on the assumption that Plan showed its own
+  // tree, but that made the entries unreachable from Plan — users ended up
+  // with no way to switch back to a task prompt once they navigated away.
+  _renderTaskPromptsSection(container);
 
   for (var i = 0; i < _explorerRoots.length; i++) {
     _renderNode(_explorerRoots[i], 0, container);
@@ -1363,6 +1376,11 @@ window._setTaskPrompts = function (entries) {
 };
 window._renderTaskPromptsSection = _renderTaskPromptsSection;
 window._renderTaskPromptEntry = _renderTaskPromptEntry;
+// Exposed so Plan mode can (re)fetch the list and keep the SSE-driven
+// refresh alive when its spec-tree explorer is the active view.
+window._loadTaskPrompts = _loadTaskPrompts;
+window._startTaskPromptsStream = _startTaskPromptsStream;
+window._stopTaskPromptsStream = _stopTaskPromptsStream;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", _initExplorer);
