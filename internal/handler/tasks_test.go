@@ -2778,19 +2778,24 @@ func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 	close(gate)
 	wg.Wait()
 
-	// With max_concurrent=1 exactly one task should have been promoted.
+	// With max_concurrent=1 exactly one task should have been promoted out of
+	// backlog. We count "non-backlog" tasks rather than "in_progress"
+	// specifically because the real runner started by RunBackground may
+	// transition the task from in_progress to failed very quickly in
+	// environments without a container runtime (e.g. CI without podman/docker),
+	// which would make an "in_progress == 1" check flaky.
 	tasks, err := h.store.ListTasks(ctx, false)
 	if err != nil {
 		t.Fatalf("list tasks: %v", err)
 	}
-	inProgress := 0
+	promoted := 0
 	for _, task := range tasks {
-		if task.Status == store.TaskStatusInProgress {
-			inProgress++
+		if task.Status != store.TaskStatusBacklog {
+			promoted++
 		}
 	}
-	if inProgress != 1 {
-		t.Errorf("expected exactly 1 task in_progress after concurrent promotion, got %d", inProgress)
+	if promoted != 1 {
+		t.Errorf("expected exactly 1 task promoted out of backlog after concurrent promotion, got %d", promoted)
 	}
 }
 
