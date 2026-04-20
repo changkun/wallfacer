@@ -806,6 +806,26 @@ function sendCurrentTaskToPlan() {
 
 // --- Cancel ---
 
+// syncCancelButtonForTask mirrors the modal's cancel button against the
+// per-task pendingCancelTaskIds set. It must be called whenever the modal
+// opens for a (possibly different) task and whenever pendingCancelTaskIds
+// changes, because the button is a DOM singleton shared across every task's
+// detail modal. Without this sync, a cancel that is still in flight would
+// leave "Shutting down…" stuck on every subsequent modal.
+function syncCancelButtonForTask(taskId) {
+  const btn = document.getElementById("modal-cancel-btn");
+  if (!btn) return;
+  const label = btn.querySelector(".aside-action__label");
+  const hint = btn.querySelector(".aside-action__hint");
+  const pending =
+    !!taskId &&
+    typeof pendingCancelTaskIds !== "undefined" &&
+    pendingCancelTaskIds.has(taskId);
+  btn.disabled = pending;
+  if (label) label.textContent = pending ? "Shutting down\u2026" : "Cancel";
+  if (hint) hint.textContent = pending ? "" : "discard changes";
+}
+
 async function cancelTask() {
   if (!getOpenModalTaskId()) return;
   if (
@@ -815,15 +835,10 @@ async function cancelTask() {
   )
     return;
   const taskId = getOpenModalTaskId();
-  const btn = document.getElementById("modal-cancel-btn");
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML =
-      '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Shutting down…';
-  }
   // Show a "cancelling…" indicator on the board card immediately, before the
   // SSE update arrives confirming the status change.
   pendingCancelTaskIds.add(taskId);
+  syncCancelButtonForTask(taskId);
   scheduleRender();
   try {
     await api(task(taskId).cancel(), { method: "POST" });
@@ -838,18 +853,15 @@ async function cancelTask() {
       var delay = Math.max(0, minDisplayEnd - Date.now());
       setTimeout(function () {
         pendingCancelTaskIds.delete(taskId);
+        syncCancelButtonForTask(getOpenModalTaskId());
         scheduleRender();
       }, delay);
     });
   } catch (e) {
     pendingCancelTaskIds.delete(taskId);
+    syncCancelButtonForTask(getOpenModalTaskId());
     scheduleRender();
     showAlert("Error cancelling task: " + e.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = "Cancel task";
-    }
   }
 }
 

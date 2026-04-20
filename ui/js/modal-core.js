@@ -1076,6 +1076,12 @@ async function openModal(id) {
   const cancelSection = document.getElementById("modal-cancel-section");
   const cancellable = ["backlog", "in_progress", "waiting", "failed"];
   cancelSection.classList.toggle("hidden", !cancellable.includes(task.status));
+  // The cancel button is a DOM singleton. Sync its label and disabled state
+  // to the currently-displayed task so an in-flight cancel on task A does
+  // not leak "Shutting down…" into task B's modal.
+  if (typeof syncCancelButtonForTask === "function") {
+    syncCancelButtonForTask(task.id);
+  }
 
   // Retry section (done / failed / waiting / cancelled)
   const retrySection = document.getElementById("modal-retry-section");
