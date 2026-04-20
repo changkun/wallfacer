@@ -535,8 +535,11 @@ function makeOpenPlanContext(opts = {}) {
       ? opts.threadsResponse
       : { threads: [], active_id: null };
 
+  const tasksCache = opts.tasks || [];
+
   const ctx = {
     document: dom,
+    tasks: tasksCache,
     localStorage: {
       getItem: (k) => storage.get(k) ?? null,
       setItem: (k, v) => storage.set(k, v),
@@ -655,5 +658,38 @@ describe("openPlanForTask", () => {
     expect(ctx.reloadCalls.length).toBeGreaterThanOrEqual(1);
 
     expect(ctx.getCurrentMode()).toBe("spec");
+  });
+
+  it("renders the task prompt in the markdown body when the task is cached", async () => {
+    const ctx = makeOpenPlanContext({
+      threadsResponse: { threads: [], active_id: null },
+      tasks: [
+        {
+          id: "task-abc",
+          title: "Refactor the thing",
+          status: "backlog",
+          prompt: "## Goal\n\nSplit foo.go into helpers.",
+        },
+      ],
+    });
+
+    ctx.openPlanForTask("task-abc");
+    // Body rendering happens synchronously before the mode switch.
+    const body = ctx.document.getElementById("spec-focused-body-inner");
+    expect(body.innerHTML).toContain("Split foo.go");
+    const pathEl = ctx.document.getElementById("spec-focused-path");
+    expect(pathEl.textContent).toContain("Refactor the thing");
+    expect(pathEl.textContent).toContain("backlog");
+  });
+
+  it("shows an empty-prompt placeholder when the task has no prompt", async () => {
+    const ctx = makeOpenPlanContext({
+      threadsResponse: { threads: [], active_id: null },
+      tasks: [{ id: "task-empty", title: "Empty", status: "backlog", prompt: "" }],
+    });
+
+    ctx.openPlanForTask("task-empty");
+    const body = ctx.document.getElementById("spec-focused-body-inner");
+    expect(body.innerHTML).toContain("no prompt");
   });
 });

@@ -151,9 +151,9 @@ describe("sendToPlanButton_visibleStates", () => {
     expect(html).toContain("card-action-send-to-plan");
   });
 
-  it("renders Send to Plan button for waiting tasks", () => {
+  it("does not render Send to Plan for waiting tasks", () => {
     const html = ctx.buildCardActions({ status: "waiting", id: "t1" });
-    expect(html).toContain("card-action-send-to-plan");
+    expect(html).not.toContain("card-action-send-to-plan");
   });
 
   it("does not render Send to Plan for in_progress tasks", () => {
@@ -202,8 +202,4 @@ describe("sendToPlanButton_invokesHelper", () => {
     expect(html).toContain("openPlanForTask('task-abc')");
   });
 
-  it("waiting card button calls openPlanForTask with the task id", () => {
-    const html = ctx.buildCardActions({ status: "waiting", id: "task-xyz" });
-    expect(html).toContain("openPlanForTask('task-xyz')");
-  });
 });

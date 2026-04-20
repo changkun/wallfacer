@@ -94,6 +94,13 @@
   color: var(--tint-plum-ink);
   border-color: color-mix(in oklab, var(--tint-plum-ink), transparent 70%);
 }
+/* Send to Plan: neutral warm tint, distinct from Start (green) and
+   Resume (blue) since it is a sibling action on the backlog card. */
+.card-action-send-to-plan {
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
+  border-color: color-mix(in oklab, var(--tint-amber-ink), transparent 70%);
+}
 /* --- Status accents (left border) ---
    Applied per task.status so every card reads its state at a glance. */
 .card-in_progress {
