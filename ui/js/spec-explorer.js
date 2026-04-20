@@ -145,6 +145,16 @@ function switchExplorerRoot(mode) {
     if (typeof _stopExplorerRefreshPoll === "function") {
       _stopExplorerRefreshPoll();
     }
+    // Task Prompts appear in the spec tree too (see renderSpecTree). Keep
+    // the list fresh by (re)loading and subscribing to the task-stream.
+    if (typeof window !== "undefined") {
+      if (typeof window._loadTaskPrompts === "function") {
+        window._loadTaskPrompts();
+      }
+      if (typeof window._startTaskPromptsStream === "function") {
+        window._startTaskPromptsStream();
+      }
+    }
     loadSpecTree();
     _startSpecTreePoll();
   } else {
@@ -437,6 +447,22 @@ function renderSpecTree() {
   }
 
   treeEl.innerHTML = html;
+
+  // Prepend the Task Prompts virtual section so Plan-mode users can jump
+  // into a task-mode thread from the same explorer that shows specs. The
+  // renderer in explorer.js owns the DOM structure and per-entry click
+  // wiring; we just inject the node at the top.
+  var renderTaskPrompts =
+    (typeof window !== "undefined" && window._renderTaskPromptsSection) ||
+    (typeof _renderTaskPromptsSection === "function"
+      ? _renderTaskPromptsSection
+      : null);
+  if (typeof renderTaskPrompts === "function") {
+    var taskPromptsHolder = document.createElement("div");
+    renderTaskPrompts(taskPromptsHolder);
+    var section = taskPromptsHolder.firstChild;
+    if (section) treeEl.insertBefore(section, treeEl.firstChild);
+  }
 
   // Attach click handlers.
   var nodeEls = treeEl.querySelectorAll("[data-spec-path]");
