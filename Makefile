@@ -163,8 +163,8 @@ ui-ts:
 # Run the TypeScript type checker without emitting output. Runs as part
 # of `make lint` so pre-commit catches type errors before shipping.
 typecheck-js:
-	cd ui && npx --no-install tsc --noEmit || \
-		(cd ui && npm install --no-audit --no-fund && npx --no-install tsc --noEmit)
+	cd ui && (npx --no-install tsc --noEmit || \
+		(npm install --no-audit --no-fund && npx --no-install tsc --noEmit))
 
 # Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
 # Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
