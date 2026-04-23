@@ -98,6 +98,37 @@ func TestCSRFMiddleware(t *testing.T) {
 	}
 }
 
+// TestCSRFMiddlewareRemoteAccess verifies that a browser accessing the server
+// via a hostname or IP other than "localhost" is still allowed through,
+// as long as Origin matches the Host header (same-origin from the browser's
+// perspective).
+func TestCSRFMiddlewareRemoteAccess(t *testing.T) {
+	mw := CSRFMiddleware("localhost:8080")
+	next := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	// Simulate a browser accessing via IP: Origin and Host both say the IP.
+	req := httptest.NewRequest(http.MethodPut, "/api/workspaces", nil)
+	req.Host = "192.168.1.10:8080"
+	req.Header.Set("Origin", "http://192.168.1.10:8080")
+	w := httptest.NewRecorder()
+	next.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("remote same-origin: status = %d, want %d body=%s", w.Code, http.StatusNoContent, w.Body.String())
+	}
+
+	// Cross-origin from a different host must still be rejected.
+	req2 := httptest.NewRequest(http.MethodPut, "/api/workspaces", nil)
+	req2.Host = "192.168.1.10:8080"
+	req2.Header.Set("Origin", "http://evil.example")
+	w2 := httptest.NewRecorder()
+	next.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusForbidden {
+		t.Fatalf("cross-origin: status = %d, want %d", w2.Code, http.StatusForbidden)
+	}
+}
+
 // TestBearerAuthMiddleware validates bearer-token auth across public routes,
 // SSE query-token paths, and standard Authorization header paths.
 func TestBearerAuthMiddleware(t *testing.T) {

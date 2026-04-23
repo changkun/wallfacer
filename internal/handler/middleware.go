@@ -31,9 +31,12 @@ func MaxBytesMiddleware(limit int64) func(http.Handler) http.Handler {
 
 // CSRFMiddleware validates the Origin/Referer header against the expected host.
 // Safe methods (GET, HEAD, OPTIONS) are always allowed. State-changing methods
-// require the Origin or Referer header to match the server's host:port. When
-// neither header is present the request is allowed through — this covers API
-// clients and tools that don't send browser-style origin headers.
+// require the Origin or Referer header to match either the server's known
+// host:port or the request's own Host header. The latter handles remote access
+// where the browser-visible address differs from the bind address (e.g. IP,
+// custom hostname, port-forwarding). When neither Origin nor Referer is present
+// the request is allowed through — this covers API clients and tools that
+// don't send browser-style origin headers.
 func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 	allowedHost := strings.TrimSpace(serverHostPort)
 	return func(next http.Handler) http.Handler {
@@ -60,11 +63,19 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 				raw = referer
 			}
 			parsed, err := url.Parse(raw)
-			if err != nil || parsed.Host == "" || parsed.Host != allowedHost {
+			if err != nil || parsed.Host == "" {
 				httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "forbidden: invalid origin"})
 				return
 			}
-			next.ServeHTTP(w, r)
+			// Accept if the origin matches either the server's known host:port
+			// or the Host header of this request (same-origin check). The Host
+			// header reflects the address the user actually typed, so this
+			// covers remote/IP access without weakening CSRF protection.
+			if parsed.Host == allowedHost || (r.Host != "" && parsed.Host == r.Host) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "forbidden: invalid origin"})
 		})
 	}
 }
