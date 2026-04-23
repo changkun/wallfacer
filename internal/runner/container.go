@@ -475,14 +475,18 @@ func containerGitPointerFile(wt, gitDir, altGitDir string) string {
 		return ""
 	}
 	origGitdir := strings.TrimSpace(trimmed[len(pfx):])
-	// origGitdir is an absolute path like /workspace/foo/.git/worktrees/<name>.
-	// We extract the sub-path relative to gitDir (e.g. "worktrees/<name>") and
-	// repoint it under altGitDir so git inside the container finds the gitdir.
-	rel, err := filepath.Rel(gitDir, origGitdir)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	// origGitdir is an absolute container path like
+	// /workspace/foo/.git/worktrees/<name>. We extract the sub-path relative
+	// to gitDir (e.g. "worktrees/<name>") and repoint it under altGitDir so
+	// git inside the container finds the gitdir. Both gitDir and altGitDir
+	// are Linux container paths, so operate on them with forward slashes
+	// even when the host is Windows (avoid filepath which uses backslashes).
+	prefix := strings.TrimRight(gitDir, "/") + "/"
+	if !strings.HasPrefix(origGitdir, prefix) {
 		return ""
 	}
-	newContent := "gitdir: " + filepath.Join(altGitDir, rel) + "\n"
+	rel := origGitdir[len(prefix):]
+	newContent := "gitdir: " + strings.TrimRight(altGitDir, "/") + "/" + rel + "\n"
 	dst := wt + ".container-git"
 	if err := os.WriteFile(dst, []byte(newContent), 0o600); err != nil {
 		return ""

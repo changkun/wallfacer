@@ -284,7 +284,7 @@ func TestContainerGitPointerFile(t *testing.T) {
 	if pf == "" {
 		t.Fatal("containerGitPointerFile returned empty string")
 	}
-	t.Cleanup(func() { os.Remove(pf) })
+	t.Cleanup(func() { _ = os.Remove(pf) })
 
 	got, err := os.ReadFile(pf)
 	if err != nil {
@@ -334,7 +334,7 @@ func TestBuildContainerSpecGitConflict(t *testing.T) {
 	if err != nil {
 		t.Skip("cannot create test workspace in /workspace: " + err.Error())
 	}
-	t.Cleanup(func() { os.RemoveAll(ws) })
+	t.Cleanup(func() { _ = os.RemoveAll(ws) })
 
 	// Make ws/.git a directory (the main repo's .git).
 	wsGit := filepath.Join(ws, ".git")
