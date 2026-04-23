@@ -1,5 +1,5 @@
 SHELL            := /bin/bash
-PODMAN           := /opt/podman/bin/podman
+PODMAN           := $(shell command -v /opt/podman/bin/podman 2>/dev/null || command -v podman)
 # Resolve the latest versioned tag (e.g. v0.0.4) of latere-ai/images.
 # Tries the GitHub releases API first (one HTTP call); on failure — rate-limit,
 # offline, jq missing, field absent — falls back to `git ls-remote --tags` on
