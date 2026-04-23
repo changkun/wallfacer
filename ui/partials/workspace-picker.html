@@ -30,6 +30,7 @@
             class="field ws-picker__path-input"
             type="text"
             placeholder="/absolute/path"
+            autocomplete="off"
             onkeydown="workspaceBrowserPathKeydown(event)"
           />
           <button
@@ -83,6 +84,7 @@
               type="search"
               placeholder="Filter..."
               oninput="setWorkspaceBrowserFilter(this.value)"
+            autocomplete="off"
             />
           </div>
           <div id="workspace-browser-entries"></div>
