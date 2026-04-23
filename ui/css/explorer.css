@@ -444,11 +444,7 @@
 }
 .explorer-task-prompts__waiting-toggle[aria-pressed="true"] {
   background: var(--tint-amber);
-  border-color: color-mix(
-    in oklab,
-    var(--tint-amber-ink),
-    transparent 70%
-  );
+  border-color: color-mix(in oklab, var(--tint-amber-ink), transparent 70%);
   color: var(--tint-amber-ink);
   text-transform: uppercase;
 }
