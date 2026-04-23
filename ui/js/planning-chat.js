@@ -27,6 +27,7 @@ var PlanningChat = (function () {
 
   // DOM references (set in init).
   var _input = null;
+  var _savedCaret = 0; // cursor position saved on textarea blur (for button handlers)
   var _sendBtn = null;
   var _interruptBtn = null;
   var _messagesEl = null;
@@ -43,6 +44,15 @@ var PlanningChat = (function () {
 
     _input.addEventListener("keydown", _onInputKeydown);
     _input.addEventListener("input", _autoGrow);
+    _input.addEventListener("blur", function () {
+      _savedCaret = _input.selectionStart;
+    });
+    _input.addEventListener("keyup", function () {
+      _savedCaret = _input.selectionStart;
+    });
+    _input.addEventListener("click", function () {
+      _savedCaret = _input.selectionStart;
+    });
     if (_sendBtn) {
       _sendBtn.addEventListener("click", function () {
         var text = _input.value.trim();
@@ -67,8 +77,14 @@ var PlanningChat = (function () {
         shouldActivate: function (textarea) {
           var v = textarea.value;
           if (v.indexOf("\n") !== -1) return null;
-          if (v[0] !== "/") return null;
-          return { query: v.slice(1), startIdx: 0 };
+          var pos = textarea.selectionStart;
+          var before = v.slice(0, pos);
+          var lastSlash = before.lastIndexOf("/");
+          if (lastSlash === -1) return null;
+          if (lastSlash > 0 && !/\s/.test(before[lastSlash - 1])) return null;
+          var query = before.slice(lastSlash + 1);
+          if (/\s/.test(query)) return null;
+          return { query: query, startIdx: lastSlash };
         },
         fetchItems: async function (match) {
           var commands = await _fetchCommands();
@@ -91,8 +107,13 @@ var PlanningChat = (function () {
           item.appendChild(descEl);
           return item;
         },
-        onSelect: function (cmd, textarea) {
-          textarea.value = "/" + cmd.name + " ";
+        onSelect: function (cmd, textarea, match) {
+          var v = textarea.value;
+          var pos = textarea.selectionStart;
+          var inserted = "/" + cmd.name + " ";
+          textarea.value = v.slice(0, match.startIdx) + inserted + v.slice(pos);
+          var newPos = match.startIdx + inserted.length;
+          textarea.setSelectionRange(newPos, newPos);
           textarea.focus();
         },
       });
@@ -117,21 +138,35 @@ var PlanningChat = (function () {
     }
 
     // Wire / and @ shortcut buttons.
+    // Use mousedown + preventDefault so the textarea never loses focus (avoiding
+    // the autocomplete widget's 150 ms blur→closeDropdown timer).
     var slashBtn = document.getElementById("spec-chat-slash-hint");
     if (slashBtn) {
-      slashBtn.addEventListener("click", function () {
-        if (!_input.value.startsWith("/")) {
-          _input.value = "/" + _input.value;
-        }
+      slashBtn.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var s =
+          document.activeElement === _input
+            ? _input.selectionStart
+            : _savedCaret;
+        var v = _input.value;
+        _input.value = v.slice(0, s) + "/" + v.slice(s);
         _input.focus();
+        _input.setSelectionRange(s + 1, s + 1);
         _input.dispatchEvent(new Event("input"));
       });
     }
     var atBtn = document.getElementById("spec-chat-at-hint");
     if (atBtn) {
-      atBtn.addEventListener("click", function () {
-        _input.value += "@";
+      atBtn.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var s =
+          document.activeElement === _input
+            ? _input.selectionStart
+            : _savedCaret;
+        var v = _input.value;
+        _input.value = v.slice(0, s) + "@" + v.slice(s);
         _input.focus();
+        _input.setSelectionRange(s + 1, s + 1);
         _input.dispatchEvent(new Event("input"));
       });
     }

@@ -21,6 +21,12 @@ function makeElement(tag, overrides = {}) {
     className: "",
     textContent: "",
     value: "",
+    selectionStart: 0,
+    selectionEnd: 0,
+    setSelectionRange(s, e) {
+      el.selectionStart = s;
+      el.selectionEnd = e;
+    },
     dataset: {},
     style: {},
     children,
@@ -356,7 +362,7 @@ describe("planning-chat.js", () => {
       ctx.PlanningChat.init();
 
       const slashBtn = elemMap.get("spec-chat-slash-hint");
-      expect(slashBtn._listeners["click"]).toBeDefined();
+      expect(slashBtn._listeners["mousedown"]).toBeDefined();
     });
 
     it("wires at-mention shortcut button", () => {
@@ -367,7 +373,7 @@ describe("planning-chat.js", () => {
       ctx.PlanningChat.init();
 
       const atBtn = elemMap.get("spec-chat-at-hint");
-      expect(atBtn._listeners["click"]).toBeDefined();
+      expect(atBtn._listeners["mousedown"]).toBeDefined();
     });
 
     it("calls attachMentionAutocomplete", () => {
@@ -476,7 +482,7 @@ describe("planning-chat.js", () => {
   });
 
   describe("init - slash button", () => {
-    it("sets input value to / and triggers input change", () => {
+    it("inserts / at saved caret position and triggers input change", () => {
       const elems = makeStandardElements();
       const elemMap = new Map(elems);
       const ctx = makeContext({ elements: elems });
@@ -484,26 +490,37 @@ describe("planning-chat.js", () => {
       ctx.PlanningChat.init();
 
       const input = elemMap.get("spec-chat-input");
+      input.value = "hello world";
+      input.selectionStart = 5;
+      input.selectionEnd = 5;
+      // Fire keyup to save _savedCaret = 5.
+      input._fire("keyup");
       const slashBtn = elemMap.get("spec-chat-slash-hint");
-      slashBtn._fire("click");
-      expect(input.value).toBe("/");
+      slashBtn._fire("mousedown", { preventDefault: vi.fn() });
+      expect(input.value).toBe("hello/ world");
+      expect(input.selectionStart).toBe(6);
       expect(input.focus).toHaveBeenCalled();
     });
   });
 
   describe("init - at button", () => {
-    it("appends @ to input value", () => {
+    it("inserts @ at saved caret position", () => {
       const elems = makeStandardElements();
       const elemMap = new Map(elems);
       const input = elemMap.get("spec-chat-input");
-      input.value = "hello ";
+      input.value = "hello world";
+      input.selectionStart = 6;
+      input.selectionEnd = 6;
       const ctx = makeContext({ elements: elems });
       loadPlanningChat(ctx);
       ctx.PlanningChat.init();
 
+      // Fire click on input to save _savedCaret = 6.
+      input._fire("click");
       const atBtn = elemMap.get("spec-chat-at-hint");
-      atBtn._fire("click");
-      expect(input.value).toBe("hello @");
+      atBtn._fire("mousedown", { preventDefault: vi.fn() });
+      expect(input.value).toBe("hello @world");
+      expect(input.selectionStart).toBe(7);
       expect(input.focus).toHaveBeenCalled();
     });
   });
@@ -1247,6 +1264,8 @@ describe("planning-chat.js", () => {
 
       // Type "/" to trigger autocomplete.
       input.value = "/";
+      input.selectionStart = 1;
+      input.selectionEnd = 1;
       // Trigger the input event handler.
       input._fire("input");
       await new Promise((r) => setTimeout(r, 50));
