@@ -139,22 +139,42 @@ func (r *Runner) buildContainerSpecForSandbox(
 			// On macOS, /var is a symlink to /private/var, so git may store
 			// the resolved path in the worktree's .git file. Mount at both
 			// the original and resolved paths to handle this.
-			if _, isWorktree := worktreeOverrides[ws]; isWorktree {
+			if wt, isWorktree := worktreeOverrides[ws]; isWorktree {
 				gitDir := filepath.Join(ws, ".git")
 				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
-					spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
-						Host:      gitDir,
-						Container: gitDir,
-						Options:   mountOpts("z"),
-					})
-					// Also mount at the symlink-resolved path if it differs
-					// (e.g. macOS /var -> /private/var).
-					if resolved, err := filepath.EvalSymlinks(gitDir); err == nil && resolved != gitDir {
+					wtContainerPath := "/workspace/" + basename
+					// Detect conflict: the .git directory's container path falls
+					// under the worktree's own container mount path. This happens
+					// when the workspace already lives under /workspace/ on the host
+					// (e.g. repos bind-mounted at /workspace/ in a container-in-
+					// container setup). Mounting a directory onto the .git FILE from
+					// the worktree bind-mount would fail with "Not a directory".
+					// Fix: mount ws/.git at an alternate container path and replace
+					// the worktree's .git FILE via a file-over-file bind-mount so
+					// git inside the container resolves the gitdir correctly.
+					if strings.HasPrefix(gitDir, wtContainerPath+"/") {
+						altGitDir := "/wallfacer-git/" + basename
+						if pf := containerGitPointerFile(wt, gitDir, altGitDir); pf != "" {
+							spec.Volumes = append(spec.Volumes,
+								sandbox.VolumeMount{Host: gitDir, Container: altGitDir, Options: mountOpts("z")},
+								sandbox.VolumeMount{Host: pf, Container: wtContainerPath + "/.git", Options: mountOpts("z")},
+							)
+						}
+					} else {
 						spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 							Host:      gitDir,
-							Container: resolved,
+							Container: gitDir,
 							Options:   mountOpts("z"),
 						})
+						// Also mount at the symlink-resolved path if it differs
+						// (e.g. macOS /var -> /private/var).
+						if resolved, err := filepath.EvalSymlinks(gitDir); err == nil && resolved != gitDir {
+							spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+								Host:      gitDir,
+								Container: resolved,
+								Options:   mountOpts("z"),
+							})
+						}
 					}
 				}
 			}
@@ -435,6 +455,39 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 	spec.CPUs = r.resolvedContainerCPUs()
 	spec.Memory = r.resolvedContainerMemory()
 	return spec
+}
+
+// containerGitPointerFile writes a patched git-pointer file next to the
+// worktree at <wt>.container-git. The file redirects the gitdir reference
+// from the original absolute host path to altGitDir, which is the container-
+// internal mount point for the main .git directory. It is used when the
+// normal .git container path would conflict with the worktree bind-mount
+// (both fall under /workspace/<basename>). The file is cleaned up together
+// with the task worktree directory. Returns "" on any error.
+func containerGitPointerFile(wt, gitDir, altGitDir string) string {
+	data, err := os.ReadFile(filepath.Join(wt, ".git"))
+	if err != nil {
+		return ""
+	}
+	trimmed := strings.TrimSpace(string(data))
+	const pfx = "gitdir: "
+	if !strings.HasPrefix(trimmed, pfx) {
+		return ""
+	}
+	origGitdir := strings.TrimSpace(trimmed[len(pfx):])
+	// origGitdir is an absolute path like /workspace/foo/.git/worktrees/<name>.
+	// We extract the sub-path relative to gitDir (e.g. "worktrees/<name>") and
+	// repoint it under altGitDir so git inside the container finds the gitdir.
+	rel, err := filepath.Rel(gitDir, origGitdir)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return ""
+	}
+	newContent := "gitdir: " + filepath.Join(altGitDir, rel) + "\n"
+	dst := wt + ".container-git"
+	if err := os.WriteFile(dst, []byte(newContent), 0o600); err != nil {
+		return ""
+	}
+	return dst
 }
 
 // dependencyCacheVolumes are the common dependency cache directories

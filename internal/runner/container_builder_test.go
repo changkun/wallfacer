@@ -267,6 +267,117 @@ func TestBuildBaseContainerSpecRuntimeNotInBuild(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// containerGitPointerFile — unit tests
+// ---------------------------------------------------------------------------
+
+func TestContainerGitPointerFile(t *testing.T) {
+	// Set up a fake worktree whose .git FILE references a gitdir path.
+	wt := t.TempDir()
+	gitDir := "/workspace/myrepo/.git"
+	gitdirEntry := gitDir + "/worktrees/task-abc"
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+gitdirEntry+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	altGitDir := "/wallfacer-git/myrepo"
+	pf := containerGitPointerFile(wt, gitDir, altGitDir)
+	if pf == "" {
+		t.Fatal("containerGitPointerFile returned empty string")
+	}
+	t.Cleanup(func() { os.Remove(pf) })
+
+	got, err := os.ReadFile(pf)
+	if err != nil {
+		t.Fatalf("reading patched file: %v", err)
+	}
+	want := "gitdir: " + altGitDir + "/worktrees/task-abc\n"
+	if string(got) != want {
+		t.Errorf("patched content = %q, want %q", string(got), want)
+	}
+
+	// Verify the file is placed next to the worktree (not inside it).
+	if pf != wt+".container-git" {
+		t.Errorf("pf = %q, want %q", pf, wt+".container-git")
+	}
+}
+
+func TestContainerGitPointerFileMalformed(t *testing.T) {
+	wt := t.TempDir()
+	// .git file without "gitdir: " prefix → should return "".
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("not a gitdir file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := containerGitPointerFile(wt, "/workspace/repo/.git", "/wallfacer-git/repo"); got != "" {
+		t.Errorf("expected empty string for malformed .git file, got %q", got)
+	}
+}
+
+// TestBuildContainerSpecGitConflict verifies that when the workspace is at
+// /workspace/<name> on the host (container-in-container setups), the .git
+// directory mount uses an alternate container path and a file-over-file patch
+// is added, avoiding the "Not a directory" OCI error.
+//
+// The conflict only fires when the workspace path already starts with
+// /workspace/ so the container path and host path coincide. This requires
+// /workspace/ to exist and be writable, which is true in typical container
+// environments but not on macOS dev machines — skip there.
+func TestBuildContainerSpecGitConflict(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("path semantics differ on Windows")
+	}
+	if _, err := os.Stat("/workspace"); err != nil {
+		t.Skip("/workspace not available on this host")
+	}
+
+	// Create workspace directly under /workspace/ to match the real scenario.
+	ws, err := os.MkdirTemp("/workspace", "wallfacer-test-")
+	if err != nil {
+		t.Skip("cannot create test workspace in /workspace: " + err.Error())
+	}
+	t.Cleanup(func() { os.RemoveAll(ws) })
+
+	// Make ws/.git a directory (the main repo's .git).
+	wsGit := filepath.Join(ws, ".git")
+	if err := os.MkdirAll(filepath.Join(wsGit, "worktrees", "task-abc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a fake wallfacer worktree with a .git FILE pointing into wsGit.
+	wt := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+wsGit+"/worktrees/task-abc\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	r := newRunnerForArgTest(t, RunnerConfig{
+		Command:      "podman",
+		SandboxImage: "sandbox-agents:latest",
+		Workspaces:   []string{ws},
+	})
+	spec := r.buildContainerSpecForSandbox("test-c", "", "prompt", "", map[string]string{ws: wt}, "", nil, "", "claude")
+	args := spec.Build()
+	joined := strings.Join(args, "\x00")
+
+	basename := filepath.Base(ws)
+	altGitDir := "/wallfacer-git/" + basename
+	wtContainerPath := "/workspace/" + basename
+
+	// The alternate .git directory mount must be present.
+	if !strings.Contains(joined, altGitDir) {
+		t.Errorf("args missing alternate git dir %q: %v", altGitDir, args)
+	}
+	// The file-over-file patch mount must target <wtContainerPath>/.git.
+	patchTarget := wtContainerPath + "/.git"
+	if !strings.Contains(joined, patchTarget) {
+		t.Errorf("args missing git patch mount target %q: %v", patchTarget, args)
+	}
+	// The conflicting direct mount (Container == ws/.git, which is under the
+	// worktree mount path) must NOT appear.
+	if strings.Contains(joined, "dst="+wsGit) {
+		t.Errorf("args must not contain conflicting mount dst=%s: %v", wsGit, args)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // buildIdeationContainerArgs — table-driven parity tests
 // ---------------------------------------------------------------------------
 
