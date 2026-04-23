@@ -120,7 +120,9 @@ var PlanningChat = (function () {
     var slashBtn = document.getElementById("spec-chat-slash-hint");
     if (slashBtn) {
       slashBtn.addEventListener("click", function () {
-        _input.value = "/";
+        if (!_input.value.startsWith("/")) {
+          _input.value = "/" + _input.value;
+        }
         _input.focus();
         _input.dispatchEvent(new Event("input"));
       });
