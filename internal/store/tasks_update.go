@@ -69,7 +69,10 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 // notified of the done transition. GetOversight reads directly from disk and
 // does not acquire s.mu, so it is safe to call here.
 func (s *Store) buildAndSaveSummary(task Task) {
-	oversight, _ := s.GetOversight(task.ID)
+	oversight, oversightErr := s.GetOversight(task.ID)
+	if oversightErr != nil {
+		logger.Store.Warn("buildAndSaveSummary: GetOversight failed", "task", task.ID, "error", oversightErr)
+	}
 	phaseCount := 0
 	if oversight != nil {
 		phaseCount = len(oversight.Phases)

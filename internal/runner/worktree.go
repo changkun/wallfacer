@@ -66,7 +66,10 @@ func (r *Runner) ensureTaskWorktrees(taskID uuid.UUID, existing map[string]strin
 			}
 			logger.Runner.Warn("worktree directory exists but is not a valid git repo, removing",
 				"workspace", ws, "path", worktreePath)
-			_ = os.RemoveAll(worktreePath)
+			if removeErr := os.RemoveAll(worktreePath); removeErr != nil {
+				logger.Runner.Warn("failed to remove broken worktree directory",
+					"workspace", ws, "path", worktreePath, "error", removeErr)
+			}
 
 		}
 
