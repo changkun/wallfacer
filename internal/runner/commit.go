@@ -76,7 +76,10 @@ func (r *Runner) commit(
 
 		"result": "Phase 1/3: Staging and committing changes...",
 	})
-	task, _ := r.taskStore(taskID).GetTask(bgCtx, taskID)
+	task, getErr := r.taskStore(taskID).GetTask(bgCtx, taskID)
+	if getErr != nil {
+		logger.Runner.Warn("autoCommit: GetTask failed", "task", taskID, "error", getErr)
+	}
 	taskPrompt := ""
 	if task != nil {
 		taskPrompt = task.Prompt
@@ -788,7 +791,10 @@ func (r *Runner) resolveConflicts(
 
 	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil, "", activityCommitMessage)
 
-	task, _ := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
+	task, getErr := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
+	if getErr != nil {
+		logger.Runner.Warn("resolveConflictWithContainer: GetTask failed", "task", taskID, "error", getErr)
+	}
 	turns := 0
 	if task != nil {
 		turns = task.Turns + 1
