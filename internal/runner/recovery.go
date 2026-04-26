@@ -43,17 +43,21 @@ func missingRecoveryWorktrees(t store.Task) []string {
 func markTaskFailedForMissingWorktrees(ctx context.Context, s *store.Store, task store.Task, from store.TaskStatus, trigger store.Trigger) {
 	message := fmt.Sprintf("task worktree missing for: %s", strings.Join(missingRecoveryWorktrees(task), ", "))
 	logger.Recovery.Warn("task worktree missing during recovery", "task", task.ID, "from", from, "error", message)
-	_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
-
-	_ = s.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryWorktree)
-
-	_ = s.InsertEvent(ctx, task.ID, store.EventTypeError, map[string]string{
-
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		logger.Recovery.Warn("markTaskFailed: ForceUpdateTaskStatus", "task", task.ID, "error", err)
+	}
+	if err := s.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryWorktree); err != nil {
+		logger.Recovery.Warn("markTaskFailed: SetTaskFailureCategory", "task", task.ID, "error", err)
+	}
+	if err := s.InsertEvent(ctx, task.ID, store.EventTypeError, map[string]string{
 		"error": message,
-	})
-	_ = s.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
-
-		store.NewStateChangeData(from, store.TaskStatusFailed, trigger, nil))
+	}); err != nil {
+		logger.Recovery.Warn("markTaskFailed: InsertEvent error", "task", task.ID, "error", err)
+	}
+	if err := s.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData(from, store.TaskStatusFailed, trigger, nil)); err != nil {
+		logger.Recovery.Warn("markTaskFailed: InsertEvent stateChange", "task", task.ID, "error", err)
+	}
 }
 
 // RecoverOrphanedTasks reconciles in_progress/committing tasks on startup by

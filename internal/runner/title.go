@@ -26,6 +26,10 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		logger.Runner.Warn("GenerateTitle get task failed", "task", taskID, "error", err)
 		return
 	}
+	if task == nil {
+		logger.Runner.Warn("GenerateTitle: task not found", "task", taskID)
+		return
+	}
 	if task.Title != "" {
 		return
 	}

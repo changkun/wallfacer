@@ -240,7 +240,10 @@ func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTur
 	slices.Sort(turnKeys)
 
 	// Build a turn→timestamp index from output events.
-	events, _ := r.taskStore(taskID).GetEvents(ctx, taskID)
+	events, err := r.taskStore(taskID).GetEvents(ctx, taskID)
+	if err != nil {
+		logger.Runner.Warn("oversight: GetEvents failed", "task", taskID, "error", err)
+	}
 	turnTimestamps := buildTurnTimestamps(events)
 
 	var activities []turnActivity
