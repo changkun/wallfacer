@@ -119,6 +119,7 @@ func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category 
 		return false
 	}
 	if err := r.taskStore(taskID).IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
+		logger.Runner.Warn("tryAutoRetry: IncrementAutoRetryCount failed", "task", taskID, "category", category, "error", err)
 		return false
 	}
 	// Re-read to get the updated count for the event message.
@@ -803,7 +804,10 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			return
 		}
 
-		n, _ := gitutil.CommitsBehind(repoPath, worktreePath)
+		n, behindErr := gitutil.CommitsBehind(repoPath, worktreePath)
+		if behindErr != nil {
+			logger.Runner.Warn("CommitsBehind failed, skipping rebase", "task", taskID, "repo", filepath.Base(repoPath), "error", behindErr)
+		}
 		if n == 0 {
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
