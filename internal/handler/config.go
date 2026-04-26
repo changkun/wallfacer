@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/auth"
-
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -373,7 +373,9 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			if *req.Autopush {
 				v = "true"
 			}
-			_ = envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v})
+			if err := envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v}); err != nil {
+				logger.Handler.Warn("config: failed to persist autopush setting to .env", "error", err)
+			}
 		}
 	}
 	if req.IdeationExploitRatio != nil {
