@@ -1,10 +1,16 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -137,6 +143,7 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 		}
 	}
 	taskWorktreeDir := filepath.Join(r.worktreesDir, taskID.String())
+	killWorktreeProcesses(taskWorktreeDir)
 	if err := os.RemoveAll(taskWorktreeDir); err != nil && !os.IsNotExist(err) {
 		logger.Runner.Warn("remove worktree dir", "task", taskID, "error", err)
 	}
@@ -209,4 +216,61 @@ func (r *Runner) PruneUnknownWorktrees() {
 	//
 	// Stale worktree entries are cleaned up by the periodic GC
 	// (StartWorktreeGC) and by RemoveWorktree during normal task cleanup.
+}
+
+// killWorktreeProcesses sends SIGTERM (then SIGKILL after 3 s) to any host
+// processes whose working directory is inside dir. This cleans up servers and
+// watchers started during interactive Claude Code sessions before the worktree
+// directory is deleted.
+//
+// On systems without lsof, or if lsof returns an error, the function is a
+// silent no-op. The self-PID guard prevents wallfacer from killing itself.
+func killWorktreeProcesses(dir string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// lsof -a -d cwd -F pn: list only the cwd file descriptor for each
+	// process, in field format (p<pid>, n<path>).
+	out, err := exec.CommandContext(ctx, "lsof", "-a", "-d", "cwd", "-F", "pn").Output()
+	if err != nil {
+		return
+	}
+
+	var pids []int
+	var curPID int
+	for _, line := range strings.Split(string(out), "\n") {
+		switch {
+		case strings.HasPrefix(line, "p"):
+			pid, err := strconv.Atoi(strings.TrimPrefix(line, "p"))
+			if err == nil {
+				curPID = pid
+			}
+		case strings.HasPrefix(line, "n"):
+			cwdPath := strings.TrimPrefix(line, "n")
+			if strings.HasPrefix(cwdPath, dir) && curPID != 0 && curPID != os.Getpid() {
+				pids = append(pids, curPID)
+			}
+		}
+	}
+
+	if len(pids) == 0 {
+		return
+	}
+
+	logger.Runner.Info("killing orphaned host processes in worktree", "dir", dir, "pids", pids)
+
+	for _, pid := range pids {
+		if proc, err := os.FindProcess(pid); err == nil {
+			_ = proc.Signal(syscall.SIGTERM)
+		}
+	}
+
+	// Give processes 3 s to exit gracefully before force-killing.
+	time.Sleep(3 * time.Second)
+
+	for _, pid := range pids {
+		if proc, err := os.FindProcess(pid); err == nil {
+			_ = proc.Signal(syscall.SIGKILL)
+		}
+	}
 }
