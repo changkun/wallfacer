@@ -223,6 +223,7 @@ func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID
 			}
 		}
 
+		killWorktreeProcesses(taskDir)
 		if err := os.RemoveAll(taskDir); err != nil && !os.IsNotExist(err) {
 			logger.Runner.Warn("worktree GC: remove task dir", "task", id, "error", err)
 			continue
