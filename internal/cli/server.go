@@ -173,7 +173,13 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
 	}
 
-	resolvedImage := ensureImage(cfg.ContainerCmd, cfg.SandboxImage)
+	// Skip image pull entirely when running in host mode: tasks run directly
+	// via the host claude/codex binary, so the sandbox container image is never
+	// used. Pulling it wastes bandwidth and time on every startup.
+	resolvedImage := cfg.SandboxImage
+	if cfg.SandboxBackend != "host" {
+		resolvedImage = ensureImage(cfg.ContainerCmd, cfg.SandboxImage)
+	}
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
