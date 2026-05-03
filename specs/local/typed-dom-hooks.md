@@ -1,6 +1,6 @@
 ---
 title: Typed DOM Hooks
-status: vague
+status: archived
 depends_on:
   - specs/local/typescript-migration.md
 affects:
