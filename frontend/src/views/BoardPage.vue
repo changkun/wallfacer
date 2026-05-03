@@ -16,6 +16,24 @@ const doneCost = computed(() =>
   store.done.reduce((sum, t) => sum + (t.usage?.cost_usd || 0), 0),
 );
 
+const doneInputTokens = computed(() =>
+  store.done.reduce((sum, t) => sum + (t.usage?.input_tokens || 0), 0),
+);
+
+const doneOutputTokens = computed(() =>
+  store.done.reduce((sum, t) => sum + (t.usage?.output_tokens || 0), 0),
+);
+
+const doneStats = computed(() => {
+  const i = doneInputTokens.value;
+  const o = doneOutputTokens.value;
+  const c = doneCost.value;
+  if (!i && !o && !c) return '';
+  return `${i.toLocaleString()} in / ${o.toLocaleString()} out / $${c.toFixed(2)}`;
+});
+
+const maxParallel = computed(() => store.config?.max_parallel ?? 5);
+
 async function archiveAllDone() {
   await api('POST', '/api/tasks/archive-done');
 }
@@ -60,6 +78,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-dot" aria-hidden="true" />
         <span class="col-name">Backlog</span>
         <span class="col-count">{{ store.backlog.length }}</span>
+        <span class="col-btn" title="Backlog sort order">Sort: Manual</span>
       </div>
       <div class="column col-bg">
         <TaskComposer />
@@ -76,6 +95,13 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-dot" aria-hidden="true" />
         <span class="col-name">In Progress</span>
         <span class="col-count">{{ store.inProgress.length }}</span>
+        <span class="max-parallel-tag" title="Max parallel tasks for this workspace group">max {{ maxParallel }}</span>
+        <span class="col-icon-btn" aria-hidden="true" title="Sandbox Monitor">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+        </span>
       </div>
       <div class="column col-bg">
         <draggable :list="store.inProgress" group="board" item-key="id" class="col-list" :animation="150" :sort="false" @change="onInProgressAdd">
@@ -102,7 +128,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-dot" aria-hidden="true" />
         <span class="col-name">Done</span>
         <span class="col-count">{{ store.done.length }}</span>
-        <span class="col-stats">${{ doneCost.toFixed(2) }}</span>
+        <span v-if="doneStats" class="col-stats">{{ doneStats }}</span>
         <button v-if="store.done.length > 0" class="col-btn" @click="archiveAllDone">Archive all</button>
       </div>
       <div class="column col-bg">

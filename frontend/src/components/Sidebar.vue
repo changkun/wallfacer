@@ -10,14 +10,6 @@ const { theme, cycle } = useTheme();
 
 defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers: []; palette: [] }>();
-
-function themeLabel(): string {
-  switch (theme.value) {
-    case 'light': return 'Light';
-    case 'dark': return 'Dark';
-    default: return 'Auto';
-  }
-}
 </script>
 
 <template>
@@ -165,13 +157,7 @@ function themeLabel(): string {
         </span>
         <span>Analytics</span>
       </router-link>
-    </div>
 
-    <div class="sb-spacer"></div>
-
-    <!-- Bottom nav: Docs, Settings, Theme, Workspaces, Containers -->
-    <div class="sb-divider"></div>
-    <div class="sb-nav">
       <button type="button" class="sb-nav-item" @click="emit('workspaces')">
         <span class="sb-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -194,6 +180,22 @@ function themeLabel(): string {
         </span>
         <span>Containers</span>
       </button>
+    </div>
+
+    <div class="sb-spacer"></div>
+
+    <!-- Bottom nav: Docs, Settings (with theme toggle icon) -->
+    <div class="sb-divider"></div>
+    <div class="sb-nav">
+      <a href="https://wf.latere.ai/docs" target="_blank" rel="noopener noreferrer" class="sb-nav-item" title="Docs">
+        <span class="sb-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+        </span>
+        <span>Docs</span>
+      </a>
 
       <button type="button" class="sb-nav-item" @click="emit('settings')" title="Settings">
         <span class="sb-icon">
@@ -206,10 +208,8 @@ function themeLabel(): string {
       </button>
 
       <button type="button" class="sb-nav-item" :title="'Theme: ' + theme" @click="cycle">
-        <span class="sb-icon">
-          {{ theme === 'light' ? '☀' : theme === 'dark' ? '☾' : '◐' }}
-        </span>
-        <span>{{ themeLabel() }}</span>
+        <span class="sb-icon" aria-hidden="true">{{ theme === 'light' ? '☀' : theme === 'dark' ? '☾' : '◐' }}</span>
+        <span>Theme</span>
       </button>
     </div>
   </aside>

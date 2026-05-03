@@ -5,8 +5,19 @@ import { api } from '../api/client';
 
 const props = defineProps<{ connected: boolean }>();
 
+interface GitWorkspace {
+  path: string;
+  name?: string;
+  branch: string;
+  ahead_count?: number;
+  behind_count?: number;
+  has_remote?: boolean;
+  main_branch?: string;
+}
+
 const store = useTaskStore();
-const gitBranch = ref('');
+const workspaces = ref<GitWorkspace[]>([]);
+const pushing = ref<Record<string, boolean>>({});
 
 const connDotClass = computed(() =>
   props.connected ? 'status-bar-conn-dot--ok' : 'status-bar-conn-dot--closed',
@@ -18,15 +29,30 @@ const workspaceLabel = computed(() => {
   return ws.map((w) => w.split('/').pop()).join(', ');
 });
 
-onMounted(async () => {
+async function refreshGitStatus() {
   try {
-    const status = await api<{ workspaces: { branch: string }[] }>('GET', '/api/git/status');
-    if (status?.workspaces?.length) {
-      gitBranch.value = status.workspaces[0].branch || '';
-    }
+    const status = await api<{ workspaces: GitWorkspace[] }>('GET', '/api/git/status');
+    workspaces.value = status?.workspaces ?? [];
   } catch {
     /* git status optional */
   }
+}
+
+async function pushWorkspace(ws: GitWorkspace) {
+  if (pushing.value[ws.path]) return;
+  pushing.value[ws.path] = true;
+  try {
+    await api('POST', '/api/git/push', { workspace: ws.path });
+    await refreshGitStatus();
+  } catch {
+    /* surface failures via status refresh; no modal in Vue UI yet */
+  } finally {
+    pushing.value[ws.path] = false;
+  }
+}
+
+onMounted(() => {
+  refreshGitStatus();
 });
 </script>
 
@@ -41,15 +67,39 @@ onMounted(async () => {
       <span class="status-bar-conn-label">{{ connLabel }}</span>
       <span v-if="workspaceLabel" class="status-bar-workspace">{{ workspaceLabel }}</span>
       <span
-        v-if="gitBranch"
+        v-if="workspaces.length"
         class="status-bar-branches"
         aria-label="Workspace branches"
       >
-        <span class="status-bar-branch-group">
-          <span class="status-bar-branch">
-            <span class="status-bar-branch__glyph">⑂</span>
-            <span class="status-bar-branch__name">{{ gitBranch }}</span>
+        <span
+          v-for="ws in workspaces"
+          :key="ws.path"
+          class="status-bar-branch-group"
+        >
+          <span class="status-bar-branch" :title="`${ws.path || ws.name || ''}\nBranch: ${ws.branch}`">
+            <span class="status-bar-branch__glyph">⎇</span>
+            <span class="status-bar-branch__name">{{ ws.branch }}</span>
           </span>
+          <template v-if="ws.has_remote">
+            <span
+              v-if="(ws.behind_count ?? 0) > 0"
+              class="status-bar-branch__badge status-bar-branch__badge--behind"
+              :title="`${ws.behind_count} commits behind upstream`"
+            >{{ ws.behind_count }}↓</span>
+            <span
+              v-if="(ws.ahead_count ?? 0) > 0"
+              class="status-bar-branch__badge status-bar-branch__badge--ahead"
+              :title="`${ws.ahead_count} commits ahead of upstream`"
+            >{{ ws.ahead_count }}↑</span>
+            <button
+              v-if="(ws.ahead_count ?? 0) > 0"
+              type="button"
+              class="status-bar-branch__action status-bar-branch__action--push"
+              :disabled="pushing[ws.path]"
+              :title="`Push ${ws.ahead_count} commits to upstream`"
+              @click="pushWorkspace(ws)"
+            >{{ pushing[ws.path] ? '...' : 'Push' }}</button>
+          </template>
         </span>
       </span>
     </div>
