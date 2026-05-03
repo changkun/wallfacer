@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useBootStore } from '../stores/boot';
 import { useSse } from '../composables/useSse';
 import TaskCard from '../components/TaskCard.vue';
+import TaskComposer from '../components/TaskComposer.vue';
+import TaskDetail from '../components/TaskDetail.vue';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const boot = useBootStore();
+const selectedTask = ref<Task | null>(null);
 
 onMounted(async () => {
   await Promise.all([store.fetchTasks(), store.fetchConfig()]);
@@ -20,14 +23,25 @@ useSse({
       store.setTasks(data as Task[]);
     },
     'task-updated': (data) => {
-      store.updateTask(data as Task);
+      const t = data as Task;
+      store.updateTask(t);
+      if (selectedTask.value?.id === t.id) {
+        selectedTask.value = t;
+      }
     },
     'task-deleted': (data) => {
       const d = data as { id: string };
       store.removeTask(d.id);
+      if (selectedTask.value?.id === d.id) {
+        selectedTask.value = null;
+      }
     },
   },
 });
+
+function selectTask(t: Task) {
+  selectedTask.value = t;
+}
 
 function statusColor(status: string): string {
   switch (status) {
@@ -58,10 +72,8 @@ function statusColor(status: string): string {
           <span class="column-count">{{ store.backlog.length }}</span>
         </div>
         <div class="column-body">
-          <TaskCard v-for="t in store.backlog" :key="t.id" :task="t" />
-          <div v-if="!store.loading && store.backlog.length === 0" class="column-empty">
-            No tasks
-          </div>
+          <TaskComposer />
+          <TaskCard v-for="t in store.backlog" :key="t.id" :task="t" @click="selectTask(t)" />
         </div>
       </section>
 
@@ -72,10 +84,8 @@ function statusColor(status: string): string {
           <span class="column-count">{{ store.inProgress.length }}</span>
         </div>
         <div class="column-body">
-          <TaskCard v-for="t in store.inProgress" :key="t.id" :task="t" />
-          <div v-if="store.inProgress.length === 0" class="column-empty">
-            Idle
-          </div>
+          <TaskCard v-for="t in store.inProgress" :key="t.id" :task="t" @click="selectTask(t)" />
+          <div v-if="store.inProgress.length === 0" class="column-empty">Idle</div>
         </div>
       </section>
 
@@ -86,10 +96,8 @@ function statusColor(status: string): string {
           <span class="column-count">{{ store.waiting.length }}</span>
         </div>
         <div class="column-body">
-          <TaskCard v-for="t in store.waiting" :key="t.id" :task="t" />
-          <div v-if="store.waiting.length === 0" class="column-empty">
-            None
-          </div>
+          <TaskCard v-for="t in store.waiting" :key="t.id" :task="t" @click="selectTask(t)" />
+          <div v-if="store.waiting.length === 0" class="column-empty">None</div>
         </div>
       </section>
 
@@ -100,15 +108,19 @@ function statusColor(status: string): string {
           <span class="column-count">{{ store.done.length }}</span>
         </div>
         <div class="column-body">
-          <TaskCard v-for="t in store.done" :key="t.id" :task="t" />
-          <div v-if="store.done.length === 0" class="column-empty">
-            None
-          </div>
+          <TaskCard v-for="t in store.done" :key="t.id" :task="t" @click="selectTask(t)" />
+          <div v-if="store.done.length === 0" class="column-empty">None</div>
         </div>
       </section>
     </div>
 
     <div v-if="store.loading" class="board-loading">Loading tasks...</div>
+
+    <TaskDetail
+      v-if="selectedTask"
+      :task="selectedTask"
+      @close="selectedTask = null"
+    />
   </div>
 </template>
 
@@ -132,10 +144,7 @@ function statusColor(status: string): string {
   border-bottom: 1px solid var(--rule);
   flex-shrink: 0;
 }
-.board-title {
-  font-weight: 600;
-  font-size: 14px;
-}
+.board-title { font-weight: 600; font-size: 14px; }
 .board-version {
   color: var(--ink-4);
   font-size: 11px;
@@ -157,7 +166,6 @@ function statusColor(status: string): string {
   background: var(--bg);
   overflow: hidden;
 }
-
 .column-header {
   display: flex;
   align-items: center;
@@ -183,13 +191,11 @@ function statusColor(status: string): string {
   font-size: 10px;
   color: var(--ink-4);
 }
-
 .column-body {
   flex: 1;
   overflow-y: auto;
   padding: 6px;
 }
-
 .column-empty {
   padding: 20px 12px;
   text-align: center;
