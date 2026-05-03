@@ -1,10 +1,108 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{ task: Task }>();
+
+const ROUTINE_INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
+const ROUTINE_STOPPED_STATUSES = new Set(['cancelled', 'done', 'failed']);
+
+const isRoutine = computed(() => props.task.kind === 'routine');
+
+const routineMinutes = computed(() => {
+  const sec = props.task.routine_interval_seconds || 0;
+  return Math.max(1, Math.round(sec / 60));
+});
+
+const routineEnabled = computed(() => !!props.task.routine_enabled);
+
+const routineSpawnLabel = computed(() => {
+  return props.task.routine_spawn_flow || props.task.routine_spawn_kind || 'task';
+});
+
+const routineIntervalChoices = computed(() => {
+  const set = new Set<number>(ROUTINE_INTERVAL_OPTIONS);
+  if (routineMinutes.value > 0) set.add(routineMinutes.value);
+  return Array.from(set).sort((a, b) => a - b);
+});
+
+const now = ref(Date.now());
+let tickerHandle: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  tickerHandle = setInterval(() => { now.value = Date.now(); }, 1000);
+});
+
+onBeforeUnmount(() => {
+  if (tickerHandle !== null) clearInterval(tickerHandle);
+});
+
+const routineCountdown = computed(() => {
+  const t = props.task;
+  if (t.archived) return 'stopped (archived)';
+  if (t.status && ROUTINE_STOPPED_STATUSES.has(t.status)) return 'stopped';
+  if (!routineEnabled.value) return 'paused';
+  const nextRun = t.routine_next_run;
+  if (!nextRun) return 're-arming...';
+  const next = new Date(nextRun).getTime();
+  if (Number.isNaN(next)) return '-';
+  const diffMs = next - now.value;
+  if (diffMs <= 0) return 'fired just now';
+  const total = Math.floor(diffMs / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `in ${h}h ${m}m`;
+  if (m > 0) return `in ${m}m ${s}s`;
+  return `in ${s}s`;
+});
+
+const routineLastFired = computed(() => {
+  const iso = props.task.routine_last_fired_at;
+  if (!iso) return '';
+  const fired = new Date(iso).getTime();
+  if (Number.isNaN(fired)) return '';
+  const diffMs = now.value - fired;
+  if (diffMs < 0) return '';
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return `fired ${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `fired ${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `fired ${hr}h ago`;
+  return `fired ${Math.floor(hr / 24)}d ago`;
+});
+
+async function onRoutineIntervalChange(e: Event) {
+  const target = e.target as HTMLSelectElement;
+  const minutes = parseInt(target.value, 10);
+  if (!Number.isFinite(minutes) || minutes < 1) return;
+  try {
+    await api('PATCH', `/api/routines/${props.task.id}/schedule`, { interval_minutes: minutes });
+  } catch (err) {
+    console.error('Error updating routine interval:', err);
+  }
+}
+
+async function onRoutineEnabledChange(e: Event) {
+  const target = e.target as HTMLInputElement;
+  try {
+    await api('PATCH', `/api/routines/${props.task.id}/schedule`, { enabled: target.checked });
+  } catch (err) {
+    console.error('Error toggling routine:', err);
+  }
+}
+
+async function onRoutineTrigger(e: Event) {
+  e.stopPropagation();
+  try {
+    await api('POST', `/api/routines/${props.task.id}/trigger`);
+  } catch (err) {
+    console.error('Error triggering routine:', err);
+  }
+}
 
 function statusLabel(task: Task): string {
   if (task.archived) return 'archived';
@@ -24,6 +122,7 @@ function cardClasses(task: Task): Record<string, boolean> {
     [`card-${task.status}`]: true,
     'card-failed-waiting': task.status === 'failed',
     'card-cancelled-done': task.status === 'cancelled',
+    'card-routine': task.kind === 'routine',
   };
 }
 
@@ -217,9 +316,48 @@ async function doneTask(e: Event) {
       >{{ props.task.session_id.slice(0, 7) }}</span>
     </div>
 
-    <!-- Row 8: action buttons -->
+    <!-- Row 8a: routine footer (replaces action buttons for routine cards) -->
+    <div v-if="isRoutine" class="routine-footer" @click.stop>
+      <div class="routine-footer-row">
+        <span class="badge badge-routine" title="Routine schedule">routine</span>
+        <span class="badge badge-routine-spawn" :title="'Spawns ' + routineSpawnLabel + ' tasks'">{{ routineSpawnLabel }}</span>
+        <span class="routine-next-run" title="Next scheduled fire">{{ routineCountdown }}</span>
+      </div>
+      <div class="routine-footer-row">
+        <label class="routine-interval-label">
+          Every
+          <select
+            class="routine-interval-select"
+            :value="routineMinutes"
+            aria-label="Routine interval"
+            @change="onRoutineIntervalChange"
+          >
+            <option v-for="m in routineIntervalChoices" :key="m" :value="m">{{ m }} min</option>
+          </select>
+        </label>
+        <label class="routine-enabled-label">
+          <input
+            type="checkbox"
+            class="routine-enabled-toggle"
+            :checked="routineEnabled"
+            aria-label="Routine enabled"
+            @change="onRoutineEnabledChange"
+          />
+          <span>Enabled</span>
+        </label>
+        <button
+          type="button"
+          class="routine-trigger-btn"
+          title="Spawn an instance task now"
+          @click="onRoutineTrigger"
+        >Run now</button>
+      </div>
+      <div v-if="routineLastFired" class="routine-footer-row routine-last-fired">{{ routineLastFired }}</div>
+    </div>
+
+    <!-- Row 8b: action buttons (non-routine) -->
     <div
-      v-if="!props.task.archived && (props.task.status === 'backlog' || props.task.status === 'waiting' || props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done')"
+      v-else-if="!props.task.archived && (props.task.status === 'backlog' || props.task.status === 'waiting' || props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done')"
       class="card-actions"
     >
       <button v-if="props.task.status === 'backlog'" class="card-action-btn card-action-start" @click="startTask">&#9654; Start</button>

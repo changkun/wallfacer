@@ -1,11 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 
 const store = useTaskStore();
 const prompt = ref('');
 const submitting = ref(false);
+const expanded = ref(false);
+const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
+
+async function expand() {
+  expanded.value = true;
+  await nextTick();
+  textareaRef.value?.focus();
+}
+
+function collapse() {
+  expanded.value = false;
+  prompt.value = '';
+}
 
 async function submit() {
   const text = prompt.value.trim();
@@ -14,6 +27,7 @@ async function submit() {
   try {
     await store.createTask(text);
     prompt.value = '';
+    expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
   } finally {
@@ -29,13 +43,27 @@ function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
     e.preventDefault();
     submit();
+    return;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    collapse();
   }
 }
 </script>
 
 <template>
-  <form class="composer" @submit.prevent="submit">
+  <button
+    v-if="!expanded"
+    type="button"
+    class="composer-add"
+    @click="expand"
+  >
+    + New Task
+  </button>
+  <form v-else class="composer" @submit.prevent="submit">
     <textarea
+      ref="textareaRef"
       v-model="prompt"
       class="composer__prompt"
       :placeholder="`Describe the task… (Markdown supported, ${modKey}↵ to save)`"
@@ -43,6 +71,13 @@ function onKeydown(e: KeyboardEvent) {
       @keydown="onKeydown"
     />
     <div class="composer__actions">
+      <button
+        type="button"
+        class="composer__btn composer__btn--ghost"
+        @click="collapse"
+      >
+        Cancel
+      </button>
       <button
         type="button"
         class="composer__btn composer__btn--ghost"

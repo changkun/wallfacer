@@ -8,15 +8,13 @@ import WorkspacePicker from '../components/WorkspacePicker.vue';
 import ContainerMonitor from '../components/ContainerMonitor.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 import { useKeyboard } from '../composables/useKeyboard';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
+const ui = useUiStore();
 const sidebarCollapsed = ref(false);
-const showSettings = ref(false);
-const showPalette = ref(false);
-const showWorkspaces = ref(false);
-const showContainers = ref(false);
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
@@ -32,9 +30,9 @@ const { connected } = useSse({
 });
 
 useKeyboard({
-  onSearch: () => { showPalette.value = true; },
+  onSearch: () => { ui.showPalette = true; },
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
-  onSettings: () => { showSettings.value = !showSettings.value; },
+  onSettings: () => { ui.showSettings = !ui.showSettings; },
 });
 </script>
 
@@ -43,23 +41,23 @@ useKeyboard({
     <Sidebar
       :collapsed="sidebarCollapsed"
       @toggle="sidebarCollapsed = !sidebarCollapsed"
-      @settings="showSettings = true"
-      @palette="showPalette = true"
-      @workspaces="showWorkspaces = true"
-      @containers="showContainers = true"
+      @settings="ui.showSettings = true"
+      @palette="ui.showPalette = true"
+      @workspaces="ui.showWorkspaces = true"
+      @containers="ui.showContainers = true"
     />
     <div class="app-main">
       <slot :connected="connected" />
       <StatusBar :connected="connected" />
     </div>
     <SettingsModal
-      v-if="showSettings"
-      @close="showSettings = false"
-      @workspaces="showSettings = false; showWorkspaces = true"
+      v-if="ui.showSettings"
+      @close="ui.showSettings = false"
+      @workspaces="ui.showSettings = false; ui.showWorkspaces = true"
     />
-    <CommandPalette v-model="showPalette" />
-    <WorkspacePicker v-model="showWorkspaces" />
-    <ContainerMonitor v-model="showContainers" />
+    <CommandPalette v-model="ui.showPalette" />
+    <WorkspacePicker v-model="ui.showWorkspaces" />
+    <ContainerMonitor v-model="ui.showContainers" />
   </div>
 </template>
 
