@@ -135,7 +135,7 @@ func (sc *ServerComponents) Shutdown() {
 // RunServer and RunDesktop. It creates the workspace manager, runner, handler,
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
-func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerComponents {
+func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS) *ServerComponents {
 	logger.Init(cfg.LogFormat)
 	initConfigDir(configDir, cfg.EnvFile)
 
@@ -446,7 +446,12 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		uiFS = prefixFS{inner: os.DirFS(absUI), prefix: "ui"}
 	}
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
+	vueUI := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_VUE_UI"))
+	var vueDistFS fs.FS
+	if vueUI {
+		vueDistFS = vueDist
+	}
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS, vueDistFS, cloudMode)
 
 	if cfg.SkipCSRF {
 		// Desktop mode: the Wails asset server reverse-proxies HTTP requests
@@ -497,7 +502,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 // RunServer implements the `wallfacer run` subcommand.
 // uiFS and docsFS are the embedded (or on-disk) filesystems containing the
 // ui/ and docs/ directory trees respectively.
-func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
+func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
@@ -533,7 +538,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		EnvFile:        *envFile,
 		UIDir:          *uiDir,
 		SandboxBackend: sandboxBackend,
-	}, uiFS, docsFS)
+	}, uiFS, vueDist, docsFS)
 	defer sc.Stop()
 
 	if !*noBrowser {
@@ -581,6 +586,50 @@ func resolveBackendFlag(raw string) (string, error) {
 	}
 }
 
+// mountVueSPA overlays Vue SPA routes onto an existing mux, overriding
+// the legacy Go-templated UI for the root path and static assets. The
+// API routes registered by BuildMux are preserved because the SPA handler
+// only claims GET / and the /assets/ prefix, not /api/*.
+func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMode bool) {
+	dist, err := fs.Sub(vueDist, "frontend/dist")
+	if err != nil {
+		logger.Main.Warn("vue-ui: no frontend/dist embedded", "error", err)
+		return
+	}
+	if _, err := fs.Stat(dist, "index.html"); err != nil {
+		logger.Main.Warn("vue-ui: frontend/dist has no index.html; run 'cd frontend && bun run build'")
+		return
+	}
+
+	mode := "local"
+	if cloudMode {
+		mode = "cloud"
+	}
+	apiKey := serverAPIKey
+	version := Version
+
+	serveVueIndex := func(w http.ResponseWriter, _ *http.Request) {
+		b, err := fs.ReadFile(dist, "index.html")
+		if err != nil {
+			http.Error(w, "vue spa unavailable", http.StatusInternalServerError)
+			return
+		}
+		inject := fmt.Sprintf(
+			`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
+			mode, apiKey, version,
+		)
+		html := strings.Replace(string(b), "</head>", inject+"</head>", 1)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(html))
+	}
+
+	files := http.FS(dist)
+	mux.HandleFunc("GET /", serveVueIndex)
+	mux.Handle("GET /assets/", http.FileServer(files))
+	logger.Main.Info("vue-ui: serving Vue SPA (WALLFACER_VUE_UI=true)", "mode", mode)
+}
+
 // BuildMux constructs the HTTP request router.
 //
 // All API routes are registered from apicontract.Routes (the single source of
@@ -588,56 +637,56 @@ func resolveBackendFlag(raw string) (string, error) {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, uiFS, docsFS fs.FS) *http.ServeMux {
+func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, uiFS, docsFS, vueDist fs.FS, cloudMode bool) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Static files (task board UI).
-	uiSub, err := fs.Sub(uiFS, "ui")
-	if err != nil {
-		logger.Fatal("sub ui fs", "error", err)
-	}
-	// In dev mode (ui served from disk), re-parse templates on every
-	// request so edits to index.html and partials are picked up live.
-	_, devMode := uiFS.(prefixFS)
-	parseIndexTemplates := func() (*template.Template, error) {
-		return template.New("index.html").ParseFS(uiSub, "index.html", "partials/*.html")
-	}
-	indexTemplates, err := parseIndexTemplates()
-	if err != nil {
-		logger.Fatal("parse ui templates", "error", err)
-	}
-	serveIndex := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-			http.NotFound(w, r)
-			return
+	if vueDist != nil {
+		mountVueSPA(mux, vueDist, indexData.ServerAPIKey, cloudMode)
+	} else {
+		// Legacy UI: Go templates served from the embedded ui/ directory.
+		uiSub, err := fs.Sub(uiFS, "ui")
+		if err != nil {
+			logger.Fatal("sub ui fs", "error", err)
 		}
-		tpl := indexTemplates
-		if devMode {
-			t, err := parseIndexTemplates()
-			if err != nil {
-				logger.Main.Error("reparse ui templates", "error", err)
-				http.Error(w, "failed to parse templates", http.StatusInternalServerError)
+		_, devMode := uiFS.(prefixFS)
+		parseIndexTemplates := func() (*template.Template, error) {
+			return template.New("index.html").ParseFS(uiSub, "index.html", "partials/*.html")
+		}
+		indexTemplates, err := parseIndexTemplates()
+		if err != nil {
+			logger.Fatal("parse ui templates", "error", err)
+		}
+		serveIndex := func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/" && r.URL.Path != "/index.html" {
+				http.NotFound(w, r)
 				return
 			}
-			tpl = t
+			tpl := indexTemplates
+			if devMode {
+				t, err := parseIndexTemplates()
+				if err != nil {
+					logger.Main.Error("reparse ui templates", "error", err)
+					http.Error(w, "failed to parse templates", http.StatusInternalServerError)
+					return
+				}
+				tpl = t
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := tpl.ExecuteTemplate(w, "index.html", indexData); err != nil {
+				logger.Main.Error("render index", "error", err)
+				http.Error(w, "failed to render index", http.StatusInternalServerError)
+			}
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := tpl.ExecuteTemplate(w, "index.html", indexData); err != nil {
-			logger.Main.Error("render index", "error", err)
-			http.Error(w, "failed to render index", http.StatusInternalServerError)
-		}
-	}
-	mux.HandleFunc("GET /", serveIndex)
+		mux.HandleFunc("GET /", serveIndex)
 
-	// Static asset directories served from the embedded (or on-disk) filesystem.
-	staticFS := http.FileServer(http.FS(uiSub))
-	if devMode {
-		// Prevent browsers from caching stale assets during frontend edits.
-		staticFS = noCacheMiddleware(staticFS)
+		staticFS := http.FileServer(http.FS(uiSub))
+		if devMode {
+			staticFS = noCacheMiddleware(staticFS)
+		}
+		mux.Handle("GET /css/", staticFS)
+		mux.Handle("GET /js/", staticFS)
+		mux.Handle("GET /assets/", staticFS)
 	}
-	mux.Handle("GET /css/", staticFS)
-	mux.Handle("GET /js/", staticFS)
-	mux.Handle("GET /assets/", staticFS)
 
 	// Docs API — list and serve embedded documentation.
 	//

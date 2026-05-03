@@ -37,7 +37,7 @@ func TestInitServer(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
@@ -129,7 +129,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	paths := []struct {
 		method string
@@ -314,7 +314,7 @@ func TestBuildMux_DocsEndpoints(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	// GET /api/docs should return a JSON array.
 	rr := httptest.NewRecorder()
@@ -374,7 +374,7 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
@@ -404,7 +404,7 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
@@ -434,7 +434,7 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -467,7 +467,7 @@ func TestBuildMux_DocsInternals(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	// GET /api/docs/internals/internals should return the internals index.
 	rr := httptest.NewRecorder()
@@ -497,7 +497,7 @@ func TestBuildMux_IndexHTML(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/index.html", nil)
@@ -529,7 +529,7 @@ func TestBuildMux_StaticAssets(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	// A known CSS file should be served.
 	rr := httptest.NewRecorder()
@@ -560,7 +560,7 @@ func TestBuildMux_IndexNonRoot(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
@@ -805,7 +805,7 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	// Start the server in the background.
@@ -852,7 +852,7 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.ActualPort == 0 {
@@ -885,7 +885,7 @@ func TestInitServer_PortFallback(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	// It should have found a different port.
@@ -914,7 +914,7 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
@@ -938,7 +938,7 @@ func TestShutdown_WithPlannerRunning(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 
 	// Planner is initialized but not running, so Shutdown should handle it.
 	sc.Shutdown()
@@ -960,7 +960,7 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 		ContainerCmd: "true",
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 
 	// Start serving so that Shutdown has something to shut down.
 	go func() { _ = sc.Srv.Serve(sc.Ln) }()
@@ -985,7 +985,7 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 		SkipCSRF:     true,
-	}, testFS(t), testFS(t))
+	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.ActualPort == 0 {
@@ -1227,7 +1227,7 @@ func TestBuildMux_UIDevModeReloadsOnDiskEdits(t *testing.T) {
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 
 	uiFS := prefixFS{inner: os.DirFS(uiRoot), prefix: "ui"}
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, uiFS, testFS(t))
+	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, uiFS, testFS(t), nil, false)
 
 	get := func(path string) *httptest.ResponseRecorder {
 		t.Helper()
