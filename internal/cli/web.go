@@ -12,8 +12,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/webserver"
-	"latere.ai/x/pkg/oidc"
 )
 
 func RunWeb(args []string) {
@@ -27,7 +27,17 @@ func RunWeb(args []string) {
 		*addr = env
 	}
 
-	authClient := oidc.New(oidc.LoadConfig())
+	authCfg := auth.Config{
+		AuthURL:      os.Getenv("AUTH_URL"),
+		ClientID:     os.Getenv("AUTH_CLIENT_ID"),
+		ClientSecret: os.Getenv("AUTH_CLIENT_SECRET"),
+		RedirectURL:  os.Getenv("AUTH_REDIRECT_URL"),
+		CookieKey:    os.Getenv("AUTH_COOKIE_KEY"),
+	}
+	if authCfg.AuthURL == "" {
+		authCfg.AuthURL = "https://auth.latere.ai"
+	}
+	authClient := auth.New(authCfg)
 
 	mux := http.NewServeMux()
 
@@ -43,7 +53,7 @@ func RunWeb(args []string) {
 		mux.HandleFunc("GET /callback", authClient.HandleCallback)
 		mux.HandleFunc("GET /logout", authClient.HandleLogout)
 		mux.HandleFunc("GET /logout/notify", func(w http.ResponseWriter, _ *http.Request) {
-			oidc.ClearSession(w)
+			auth.ClearSession(w)
 			w.WriteHeader(http.StatusOK)
 		})
 		mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
@@ -57,11 +67,14 @@ func RunWeb(args []string) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			resp := struct {
-				*oidc.User
+				*auth.User
 				AuthURL string `json:"auth_url,omitempty"`
 			}{User: user, AuthURL: authClient.AuthURL()}
 			_ = json.NewEncoder(w).Encode(resp)
 		})
+		slog.Info("auth: OIDC enabled", "auth_url", authCfg.AuthURL)
+	} else {
+		slog.Info("auth: disabled (no AUTH_CLIENT_ID)")
 	}
 
 	webserver.MountSPA(mux)
