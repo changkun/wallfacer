@@ -4,11 +4,8 @@ import { api } from '../api/client';
 
 const loading = ref(true);
 const usage = ref<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number } | null>(null);
-interface StatusBucket { count: number; cost_usd: number; input_tokens: number; output_tokens: number }
+import { type StatusBucket, statusCount } from '../lib/stats';
 const stats = ref<{ total: number; by_status: Record<string, number | StatusBucket>; workspace_costs?: { workspace: string; cost_usd: number }[] } | null>(null);
-function statusCount(v: number | StatusBucket): number {
-  return typeof v === 'number' ? v : (v?.count ?? 0);
-}
 
 onMounted(async () => {
   try {

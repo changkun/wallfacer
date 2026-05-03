@@ -595,8 +595,8 @@ func stripSSGContent(html string) string {
 	// Insert a classic (non-deferred) script right before the first module
 	// script. It runs synchronously before Vue's deferred module, clearing
 	// the stale SSG content so Vue does a fresh mount.
-	const clear = `<script>var e=document.getElementById("app");if(e)e.textContent=""</script>`
-	html = strings.Replace(html, `<script type="module"`, clear+`<script type="module"`, 1)
+	const clearScript = `<script>var e=document.getElementById("app");if(e)e.textContent=""</script>`
+	html = strings.Replace(html, `<script type="module"`, clearScript+`<script type="module"`, 1)
 	return html
 }
 
