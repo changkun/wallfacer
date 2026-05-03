@@ -104,6 +104,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Stub frontend dist
+        run: mkdir -p frontend/dist && echo '<!DOCTYPE html>' > frontend/dist/index.html
+
       - name: Build
         run: go build ./...
 
@@ -123,6 +126,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      - name: Stub frontend dist
+        run: |
+          New-Item -ItemType Directory -Force -Path frontend/dist | Out-Null
+          Set-Content -Path frontend/dist/index.html -Value '<!DOCTYPE html>'
 
       - name: Build
         run: go build ./...
