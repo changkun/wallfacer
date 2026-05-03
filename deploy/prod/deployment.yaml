@@ -15,11 +15,9 @@ spec:
       labels:
         app: wallfacerd
     spec:
-      imagePullSecrets:
-        - name: ghcr-secret
       containers:
         - name: wallfacerd
-          image: ghcr.io/latere-ai/wallfacerd:main
+          image: ghcr.io/changkun/wallfacerd:main
           ports:
             - containerPort: 8080
           resources:

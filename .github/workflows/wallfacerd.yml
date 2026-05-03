@@ -41,6 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -59,12 +60,12 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.LATERE_GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/latere-ai/wallfacerd
+          images: ghcr.io/changkun/wallfacerd
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}

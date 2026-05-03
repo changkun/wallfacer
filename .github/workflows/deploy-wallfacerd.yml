@@ -32,5 +32,5 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           kubectl -n latere set image deployment/wallfacerd \
-            wallfacerd=ghcr.io/latere-ai/wallfacerd:${TAG}
+            wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
           kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
