@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -14,20 +14,12 @@ import (
 	"changkun.de/x/wallfacer/internal/webserver"
 )
 
-var version = "dev"
-
-func main() {
-	if err := run(); err != nil {
-		slog.Error("server error", "error", err)
-		os.Exit(1)
-	}
-}
-
-func run() error {
+func RunWeb(args []string) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	addr := flag.String("addr", ":8080", "listen address")
-	flag.Parse()
+	fs := flag.NewFlagSet("web", flag.ExitOnError)
+	addr := fs.String("addr", ":8080", "listen address")
+	_ = fs.Parse(args)
 
 	if env := os.Getenv("WALLFACERD_ADDR"); env != "" {
 		*addr = env
@@ -36,11 +28,9 @@ func run() error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
@@ -51,10 +41,11 @@ func run() error {
 
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
-		return fmt.Errorf("listen %s: %w", *addr, err)
+		fmt.Fprintf(os.Stderr, "wallfacer web: listen %s: %v\n", *addr, err)
+		os.Exit(1)
 	}
 
-	slog.Info("wallfacerd started", "addr", ln.Addr().String(), "version", version)
+	slog.Info("wallfacer web started", "addr", ln.Addr().String())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -65,7 +56,7 @@ func run() error {
 	}()
 
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-		return err
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
-	return nil
 }

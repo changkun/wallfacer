@@ -242,10 +242,10 @@ web-frontend:                                                            ## Buil
 	cp -r frontend/dist internal/webserver/spa/dist
 
 web-run: web-frontend                                                    ## Run wallfacerd locally (embedded SPA)
-	go run ./cmd/wallfacerd -addr :8080
+	go run . web -addr :8080
 
 web-dev:                                                                 ## Run wallfacerd dev stack (Go :8080 + Vite :5173)
-	go run ./cmd/wallfacerd -addr :8080 & cd frontend && npm run dev
+	go run . web -addr :8080 & cd frontend && npm run dev
 
 web-docker:                                                              ## Build wallfacerd Docker image
 	docker build -f Dockerfile.wallfacerd -t wallfacerd:dev .

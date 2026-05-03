@@ -32,8 +32,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
-      - run: go build -o /dev/null ./cmd/wallfacerd/
-      - run: go vet ./cmd/wallfacerd/ ./internal/webserver/...
+      - run: go build -o /dev/null .
+      - run: go vet ./internal/webserver/...
 
   build:
     needs: [verify-frontend, verify-go]

@@ -14,12 +14,12 @@ COPY . .
 RUN rm -rf internal/webserver/spa/dist
 COPY --from=frontend /src/dist internal/webserver/spa/dist/
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /wallfacerd ./cmd/wallfacerd
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /wallfacer .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
-COPY --from=build /wallfacerd .
+COPY --from=build /wallfacer .
 EXPOSE 8080
-ENTRYPOINT ["./wallfacerd"]
+ENTRYPOINT ["./wallfacer", "web"]
 CMD ["-addr", ":8080"]
