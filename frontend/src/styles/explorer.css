@@ -1,0 +1,523 @@
+/* ===== Explorer Panel ===== */
+
+/* Flex wrapper: explorer panel + board grid side by side */
+.board-with-explorer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.board-with-explorer > .board-grid,
+.board-with-explorer > .spec-mode-container,
+.board-with-explorer > .depgraph-mode-container,
+.board-with-explorer > .docs-mode-container {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Panel shell */
+.explorer-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  min-width: 200px;
+  max-width: 50vw;
+  border-right: 1px solid var(--border);
+  background: var(--bg-sunk, var(--bg-raised, var(--bg)));
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Title bar */
+.explorer-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.explorer-panel__title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Scrollable tree container */
+.explorer-panel__tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 4px;
+}
+
+/* Vertical resize handle on right edge */
+.explorer-panel__resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+.explorer-panel__resize-handle:hover,
+.explorer-panel__resize-handle--active {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+/* --- Tree node styles --- */
+.explorer-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.explorer-node:hover {
+  background: var(--bg-hover, var(--bg-raised));
+  color: var(--text);
+}
+.explorer-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.explorer-node--active,
+.explorer-node.active {
+  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
+  color: var(--text);
+}
+.explorer-node--active .explorer-node__icon,
+.explorer-node.active .explorer-node__icon {
+  color: var(--accent);
+}
+.explorer-node--dir {
+  font-weight: 500;
+}
+.explorer-node--file {
+  font-weight: 400;
+}
+.explorer-node--hidden {
+  opacity: 0.55;
+}
+
+/* Disclosure triangle */
+.explorer-node__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  font-size: 8px;
+  color: var(--text-muted);
+}
+.explorer-node__toggle svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+.explorer-node--loading .explorer-node__toggle,
+.explorer-node__toggle.explorer-node--loading {
+  font-size: 10px;
+  animation: explorer-pulse 1s infinite;
+}
+@keyframes explorer-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* File/folder icon */
+.explorer-node__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.explorer-node__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Name label */
+.explorer-node__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== File Preview Modal ===== */
+.explorer-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+}
+[data-theme="dark"] .explorer-preview-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.explorer-preview {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: min(80vw, 1100px);
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.explorer-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.explorer-preview__path {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-preview__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.explorer-preview__close:hover {
+  color: var(--text);
+}
+.explorer-preview__content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.explorer-preview__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.explorer-preview__code {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  background: transparent;
+}
+.explorer-preview__code code {
+  display: block;
+}
+.explorer-preview__line {
+  display: flex;
+  padding: 0 12px 0 0;
+}
+.explorer-preview__line:hover {
+  background: var(--bg-raised);
+}
+.explorer-preview__ln {
+  display: inline-block;
+  width: 48px;
+  min-width: 48px;
+  text-align: right;
+  padding-right: 12px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+}
+.explorer-preview__lc {
+  white-space: pre;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Header actions row (Edit/Save/Discard/Close) */
+.explorer-preview__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.explorer-preview__edit-btn,
+.explorer-preview__save-btn,
+.explorer-preview__discard-btn {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  line-height: 1.5;
+}
+.explorer-preview__edit-btn:hover,
+.explorer-preview__discard-btn:hover {
+  background: var(--bg-raised);
+}
+.explorer-preview__save-btn {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.explorer-preview__save-btn:hover {
+  background: var(--accent-hover);
+}
+.explorer-preview__save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Edit textarea */
+.explorer-preview__textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  background: var(--bg);
+  color: var(--text);
+  tab-size: 4;
+}
+
+/* Rendered markdown view */
+.explorer-preview__markdown {
+  padding: 16px 24px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.explorer-preview__markdown pre {
+  background: var(--bg-raised);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.explorer-preview__markdown code {
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  font-size: 0.9em;
+}
+.explorer-preview__markdown pre code {
+  font-size: inherit;
+}
+.explorer-preview__markdown a {
+  color: var(--accent);
+}
+.explorer-preview__markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  color: var(--text-muted);
+  margin: 8px 0;
+}
+.explorer-preview__markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+.explorer-preview__markdown th,
+.explorer-preview__markdown td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 12px;
+}
+.explorer-preview__markdown th {
+  background: var(--bg-raised);
+  font-weight: 600;
+}
+.explorer-preview__markdown img {
+  max-width: 100%;
+}
+
+/* Inline error message */
+.explorer-preview__error {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #d44;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* --- Task Prompts virtual section --- */
+/* Appears above the workspace/spec tree. Matches .explorer-node sizing so
+   backlog/waiting task entries sit next to regular file entries without
+   feeling like a different widget. */
+.explorer-task-prompts {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.explorer-task-prompts__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.explorer-task-prompts__header:hover {
+  background: var(--bg-hover, var(--bg-raised));
+  color: var(--text);
+}
+.explorer-task-prompts__header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.explorer-task-prompts__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Waiting-tasks toggle: compact pill, same visual weight as the other small
+   action chips in the sidebar. */
+.explorer-task-prompts__waiting-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  text-transform: lowercase;
+  cursor: pointer;
+}
+.explorer-task-prompts__waiting-toggle:hover {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+.explorer-task-prompts__waiting-toggle[aria-pressed="true"] {
+  background: var(--tint-amber);
+  border-color: color-mix(in oklab, var(--tint-amber-ink), transparent 70%);
+  color: var(--tint-amber-ink);
+  text-transform: uppercase;
+}
+.explorer-task-prompts__empty {
+  padding: 4px 8px 4px 22px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+/* Each backlog/waiting entry row. Mirrors .explorer-node spacing so the
+   rows align with the workspace tree below. */
+.explorer-task-prompts__entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 22px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.explorer-task-prompts__entry:hover {
+  background: var(--bg-hover, var(--bg-raised));
+  color: var(--text);
+}
+.explorer-task-prompts__entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.explorer-task-prompts__entry.active,
+.explorer-task-prompts__entry--active {
+  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
+  color: var(--text);
+}
+/* Status badge: tiny uppercase pill tinted per status. */
+.explorer-task-prompts__badge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+}
+.explorer-task-prompts__badge--backlog {
+  background: var(--tint-plum, var(--bg-raised));
+  color: var(--tint-plum-ink, var(--text-muted));
+}
+.explorer-task-prompts__badge--waiting {
+  background: var(--tint-amber, var(--bg-raised));
+  color: var(--tint-amber-ink, var(--text-muted));
+}
+.explorer-task-prompts__badge--failed {
+  background: color-mix(in srgb, var(--err, #b33b3b) 15%, transparent);
+  color: var(--err, #b33b3b);
+}
+.explorer-task-prompts__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-task-prompts__time {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  opacity: 0.7;
+}

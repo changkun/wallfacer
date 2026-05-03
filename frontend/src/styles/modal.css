@@ -1,0 +1,656 @@
+/* --- Modal --- */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+}
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 760px;
+  width: 100%;
+  max-height: 95vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.modal-card.modal-wide {
+  max-width: min(96vw, 1600px);
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal-card.modal-wide > .p-6 {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.modal-wide #modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+.modal-wide #main-tabs {
+  flex: 0 0 auto;
+}
+.modal-wide #modal-row {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.modal-wide #modal-main-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Flattened layout — modal-main-content is now a single scrolling column.
+   Each data-main-tab-section child renders full-width; the attribute
+   selector below hides non-matching sections. */
+.modal-wide #modal-main-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+.modal-wide #modal-backlog-right {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+.modal-wide #modal-backlog-right.hidden {
+  display: none;
+}
+/* ---------- Activity tab: full-width vertical stack, Impl | Testing sub-tabs ----------
+   Selecting a sub-tab shows one agent (turns then oversight, full width).
+   Typography-driven; no rounded wrapping cards. */
+.activity-sub-tabs {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 2px;
+  margin-bottom: 16px;
+}
+.activity-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 4px 0 16px;
+}
+/* Tailwind's `.hidden { display: none }` loads before this sheet, so the
+   class alone wouldn't win over `.activity-agent { display: flex }` (same
+   specificity, later rule wins). Explicit combined selector restores the
+   expected hide behavior for the Impl/Testing sub-tab switch. */
+.activity-agent.hidden {
+  display: none;
+}
+.activity-block {
+  min-width: 0;
+}
+.activity-block__label,
+.activity-block__label-row {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.activity-block__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.activity-block--oversight {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+/* Higher specificity (id + class) to override the `#modal-logs-section`
+   rule in task-detail.css that would otherwise force `overflow: hidden`
+   + `display: flex` (that rule was written for the old modal-right layout
+   where the section filled a flex column). */
+#modal-logs-section.activity-oversight-box,
+#modal-test-logs-section.activity-oversight-box {
+  display: block;
+  flex: none;
+  min-height: 0;
+  max-height: 420px;
+  overflow-y: auto;
+  background: transparent;
+  font-size: 12px;
+}
+#modal-logs-section.activity-oversight-box .logs-block,
+#modal-test-logs-section.activity-oversight-box .logs-block {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: none;
+  min-height: 0;
+  flex: none;
+  border-radius: 4px;
+  /* background / color inherit from .logs-block (terminal) or
+     .logs-block.oversight-mode (prose) based on the active mode. */
+}
+/* Tone down the Impl oversight's search bar — remove its standalone
+   dark strip so it sits flush with the scrolling region below. */
+#modal-logs-section.activity-oversight-box #log-search-bar {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 !important;
+  padding: 4px 0 !important;
+}
+#modal-logs-section.activity-oversight-box #log-search-input {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.activity-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+  height: 0;
+}
+.modal-wide .logs-block {
+  max-height: none;
+}
+
+/* ---------- Design refresh: flatten modal content chrome ----------
+   Many modal sections used to sit in rounded/filled boxes (.code-block,
+   .usage-grid, bordered sandbox-override panels). The redesign lets the
+   content sit directly on the modal canvas, separated by typography and
+   thin 1px rules — no nested card backgrounds. */
+#modal .section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+#modal .code-block:not(pre):not(.logs-block) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+#modal pre.code-block:not(.logs-block) {
+  background: transparent;
+  border-radius: 0;
+  padding: 8px 0;
+  color: var(--text);
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+}
+#modal .usage-grid {
+  background: transparent;
+  padding: 0;
+  gap: 4px 24px;
+  font-size: 12px;
+}
+/* Compress the "Per-activity sandbox overrides" sub-panel — the filled
+   bordered box was the heaviest chrome in the Spec tab. */
+#modal details > div[style*="border"] {
+  border: none !important;
+  padding: 8px 0 !important;
+}
+
+/* --- Main tab bar (Spec / Activity / Changes / Flamegraph / Timeline / Events) --- */
+.modal-wide #main-tabs {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+.main-tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.main-tab:hover:not(.active) {
+  color: var(--text-secondary);
+}
+.main-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* --- Main-tab section visibility ---
+   Each section declares the main tab(s) it belongs to via
+   data-main-tab-section="spec" (or "activity events" for multi-tab). The modal
+   carries data-main-tab on the outer container; non-matching sections hide. */
+#modal[data-main-tab="spec"]
+  [data-main-tab-section]:not([data-main-tab-section~="spec"]),
+#modal[data-main-tab="activity"]
+  [data-main-tab-section]:not([data-main-tab-section~="activity"]),
+#modal[data-main-tab="changes"]
+  [data-main-tab-section]:not([data-main-tab-section~="changes"]),
+#modal[data-main-tab="flamegraph"]
+  [data-main-tab-section]:not([data-main-tab-section~="flamegraph"]),
+#modal[data-main-tab="timeline"]
+  [data-main-tab-section]:not([data-main-tab-section~="timeline"]),
+#modal[data-main-tab="events"]
+  [data-main-tab-section]:not([data-main-tab-section~="events"]) {
+  display: none !important;
+}
+
+/* --- Right-side aside (agent / budget / git / links) --- */
+.modal-wide .modal-aside {
+  flex: 0 0 260px;
+  min-width: 260px;
+  max-width: 260px;
+  margin-left: 20px;
+  padding-left: 20px;
+  padding-top: 4px;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.modal-aside .mdl-section {
+  margin-bottom: 20px;
+}
+/* Terminal actions rendered as a stack of card-style buttons at the top
+   of the aside. Each row is an explicit, clickable surface (border +
+   icon + label + hint) so the user sees them as actions rather than as
+   informational rows. */
+.modal-aside__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-aside__actions > div:empty,
+.modal-aside__actions > div.hidden {
+  display: none;
+}
+.aside-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    transform 0.06s ease;
+}
+.aside-action:hover {
+  background: var(--bg-card);
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+}
+.aside-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.aside-action:active {
+  transform: translateY(1px);
+}
+.aside-action[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.aside-action[disabled]:hover {
+  background: var(--bg-input);
+  border-color: var(--border);
+}
+.aside-action__icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  color: currentColor;
+  opacity: 0.85;
+}
+.aside-action__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.aside-action__label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.aside-action__hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+
+/* Primary (Start task): filled accent surface — this is the forward CTA
+   for a backlog task, so it gets the strongest affordance. */
+.aside-action--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.aside-action--primary .aside-action__hint {
+  color: rgba(255, 255, 255, 0.78);
+}
+.aside-action--primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+  border-color: color-mix(in srgb, var(--accent) 88%, #000);
+}
+.aside-action--primary[disabled]:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Success (Mark as Done): green fill — this is the terminal positive CTA
+   for a waiting task. Matches the .card-action-done palette on board cards
+   so the two surfaces read as the same action. */
+.aside-action--success {
+  background: var(--tint-green);
+  border-color: color-mix(in oklab, var(--tint-green-ink), transparent 70%);
+  color: var(--tint-green-ink);
+}
+.aside-action--success .aside-action__hint {
+  color: color-mix(in oklab, var(--tint-green-ink), transparent 30%);
+}
+.aside-action--success:hover {
+  background: color-mix(in oklab, var(--tint-green) 88%, #000);
+  border-color: color-mix(in oklab, var(--tint-green-ink), transparent 50%);
+  color: var(--tint-green-ink);
+}
+
+.aside-action--warn {
+  color: #b8671c;
+  border-color: color-mix(in srgb, #b8671c 35%, var(--border));
+}
+.aside-action--warn:hover {
+  background: color-mix(in srgb, #b8671c 12%, var(--bg-input));
+  border-color: color-mix(in srgb, #b8671c 55%, var(--border));
+  color: #b8671c;
+}
+.aside-action--danger {
+  color: #b33b3b;
+  border-color: color-mix(in srgb, #b33b3b 35%, var(--border));
+}
+.aside-action--danger:hover {
+  background: color-mix(in srgb, #b33b3b 12%, var(--bg-input));
+  border-color: color-mix(in srgb, #b33b3b 55%, var(--border));
+  color: #b33b3b;
+}
+.modal-aside .mdl-h {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.modal-aside .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.modal-aside .row .k {
+  color: var(--text-muted);
+  width: 78px;
+  flex-shrink: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.modal-aside .row .v {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.modal-aside .row .v.mono {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+}
+.modal-aside .row .v a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.modal-aside .row .v a:hover {
+  text-decoration: underline;
+}
+.modal-aside .bar {
+  height: 3px;
+  background: var(--bg-input);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.modal-aside .bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+/* Environment section — uses dt/dd grid emitted by _renderModalEnvironment */
+.modal-aside__env {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  font-size: 11px;
+  align-items: baseline;
+}
+.modal-aside__env dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.modal-aside__env dd {
+  margin: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.modal-aside__env dd code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Collapse aside on narrow viewports — the main split already competes for
+   space and an extra 260px rail becomes unreadable under ~1200px. */
+@media (max-width: 1200px) {
+  .modal-wide .modal-aside {
+    display: none;
+  }
+}
+
+/* ===== Analytics tab pill group =====
+   Segmented control: a single rounded track that holds all tabs; the
+   active tab is a raised pill within it. Designed to sit on the right
+   side of the mode header. */
+.analytics-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--bg-sunk, var(--bg-raised));
+  border: 1px solid var(--border);
+}
+.analytics-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.analytics-tab:hover {
+  color: var(--text);
+}
+.analytics-tab.active {
+  background: var(--bg-card, var(--bg));
+  color: var(--text);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .analytics-tab.active {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.analytics-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ===== Analytics mode (inline page, not modal) =====
+   When the analytics view is active, the three legacy modal partials live
+   inside #analytics-panels and are rendered as a page. The .modal-overlay
+   chrome (fixed positioning, backdrop, centred card) is neutralised here. */
+.analytics-mode {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+.analytics-mode__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 28px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.analytics-mode__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.analytics-mode__eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.analytics-mode__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.analytics-mode__panels {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.analytics-mode__panels > .modal-overlay {
+  position: static;
+  inset: auto;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  z-index: auto;
+  align-items: stretch;
+  justify-content: stretch;
+  /* Neutralise the backdrop click-to-close: the overlay itself must not
+     receive pointer events in this inline layout, otherwise clicking
+     empty space inside the analytics page closes the panel via the
+     bindModalBackdropClose handler registered in each module's init. */
+  pointer-events: none;
+}
+.analytics-mode__panels > .modal-overlay > * {
+  pointer-events: auto;
+}
+.analytics-mode__panels > .modal-overlay.hidden {
+  display: none;
+}
+.analytics-mode__panels > .modal-overlay > .modal-card {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+/* Hide the redundant close (×) button and inner title inside each panel. */
+.analytics-mode__panels .modal-overlay h3 {
+  display: none;
+}
+.analytics-mode__panels
+  .modal-overlay
+  .p-6
+  > div:first-child
+  > button:last-child,
+.analytics-mode__panels
+  .modal-overlay
+  .p-6
+  > div:first-child
+  > div
+  > button:last-child {
+  display: none;
+}
