@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue';
+import { ref, onMounted, markRaw, type Component } from 'vue';
+import ProductPage from './ProductPage.vue';
 
-const ProductPage = defineAsyncComponent(() => import('./ProductPage.vue'));
-const BoardPage = defineAsyncComponent(() => import('./BoardPage.vue'));
+const page = ref<Component>(ProductPage);
 
-const isLocal = computed(() => {
-  if (typeof window !== 'undefined' && window.__WALLFACER__) {
-    return window.__WALLFACER__.mode === 'local';
+onMounted(async () => {
+  if (window.__WALLFACER__?.mode === 'local') {
+    const mod = await import('./BoardPage.vue');
+    page.value = markRaw(mod.default);
   }
-  return false;
 });
 </script>
 
 <template>
-  <BoardPage v-if="isLocal" />
-  <ProductPage v-else />
+  <component :is="page" />
 </template>
