@@ -76,13 +76,17 @@ h1 em, h2 em {
     text-align: center;
     font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
 }
-.section-title {
+/* Marketing-page section headings — scope to product hero / docs landing
+   so they don't override the modal's left-aligned .section-title. */
+.product-section .section-title,
+.landing-section .section-title {
     text-align: center;
     margin-bottom: 32px;
     font-size: 1.5rem;
     letter-spacing: -0.03em;
 }
-.section-subtitle {
+.product-section .section-subtitle,
+.landing-section .section-subtitle {
     text-align: center;
     font-size: 14px;
     color: var(--text-secondary);
