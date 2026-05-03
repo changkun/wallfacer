@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue';
 import { api } from '../api/client';
+import { computeHidden } from '../lib/specTree';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -62,20 +63,8 @@ const sortedNodes = computed(() => {
 
 // Determine which nodes are visible based on collapse state.
 const visibleNodes = computed(() => {
-  const hidden = new Set<string>();
-  for (const node of sortedNodes.value) {
-    if (hidden.has(node.path)) continue;
-    const children = node.children ?? [];
-    if (collapsed.value.has(node.path) && children.length > 0) {
-      const queue = [...children];
-      while (queue.length) {
-        const p = queue.shift()!;
-        hidden.add(p);
-        const child = nodes.value.find(n => n.path === p);
-        if (child) queue.push(...(child.children ?? []));
-      }
-    }
-  }
+  const index = new Map(nodes.value.map(n => [n.path, n] as const));
+  const hidden = computeHidden(sortedNodes.value, collapsed.value, index);
   return sortedNodes.value.filter(n => !hidden.has(n.path));
 });
 

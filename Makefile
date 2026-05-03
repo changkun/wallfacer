@@ -204,16 +204,22 @@ lint-js: typecheck-js
 	cd ui && bunx --bun @biomejs/biome@1.9.4 lint --max-diagnostics=5000 js partials
 
 # Run all checks (fmt + lint + backend tests + frontend tests)
-test: fmt lint test-backend test-frontend
+test: fmt lint test-backend test-frontend test-frontend-vue
 
 # Run Go unit tests
 test-backend:
 	go test ./...
 
-# Run frontend JavaScript unit tests. Depends on ui-ts so vm-based
+# Run legacy ui/ JavaScript unit tests. Depends on ui-ts so vm-based
 # tests that readFileSync the compiled .js twins see fresh output.
 test-frontend: ui-ts
 	cd ui && bunx vitest@2 run
+
+# Run Vue SPA unit tests under frontend/. Kept separate from
+# test-frontend so the legacy and Vue suites stay independent during
+# the migration.
+test-frontend-vue:
+	cd frontend && bunx vitest run
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex sandboxes.
 # Requires a running wallfacer server with valid credentials.
