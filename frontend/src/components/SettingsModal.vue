@@ -6,9 +6,10 @@ import { useTheme } from '../composables/useTheme';
 
 const emit = defineEmits<{ close: [] }>();
 const store = useTaskStore();
-const { theme, cycle } = useTheme();
+const { theme } = useTheme();
 
-const activeTab = ref('execution');
+type TabKey = 'appearance' | 'execution' | 'about';
+const activeTab = ref<TabKey>('appearance');
 const saving = ref(false);
 
 const autopilot = ref(false);
@@ -51,75 +52,177 @@ async function saveExecution() {
   }
 }
 
-function onBackdrop(e: MouseEvent) {
-  if ((e.target as HTMLElement).classList.contains('modal-backdrop')) emit('close');
+function onOverlayClick(e: MouseEvent) {
+  if ((e.target as HTMLElement).classList.contains('modal-overlay')) emit('close');
 }
 
-const tabs = [
-  { key: 'execution', label: 'Execution' },
+function setTheme(mode: 'light' | 'dark' | 'auto') {
+  theme.value = mode;
+}
+
+const tabs: { key: TabKey; label: string }[] = [
   { key: 'appearance', label: 'Appearance' },
+  { key: 'execution', label: 'Execution' },
   { key: 'about', label: 'About' },
 ];
 </script>
 
 <template>
-  <div class="modal-backdrop" @click="onBackdrop">
-    <div class="modal">
-      <header class="modal-header">
-        <h2>Settings</h2>
-        <button class="modal-close" @click="emit('close')">&times;</button>
-      </header>
-
-      <div class="modal-body">
-        <nav class="modal-tabs">
+  <div class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" @click="onOverlayClick">
+    <div class="modal-card settings-modal-card" style="max-width: 840px; width: 100%">
+      <div class="p-6 settings-modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+          <h3 style="font-size: 16px; font-weight: 600; margin: 0">Settings</h3>
           <button
-            v-for="tab in tabs" :key="tab.key"
-            :class="{ active: activeTab === tab.key }"
-            @click="activeTab = tab.key"
-          >{{ tab.label }}</button>
-        </nav>
+            type="button"
+            @click="emit('close')"
+            style="background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-muted); line-height: 1"
+            aria-label="Close settings"
+          >&times;</button>
+        </div>
 
-        <div class="modal-content">
-          <div v-if="activeTab === 'execution'" class="tab-content">
-            <div class="setting-row">
-              <label><input type="checkbox" v-model="autopilot" /> Autopilot</label>
-              <span class="setting-desc">Auto-promote backlog tasks to in-progress</span>
-            </div>
-            <div class="setting-row">
-              <label><input type="checkbox" v-model="autotest" /> Auto-test</label>
-              <span class="setting-desc">Run test agent after implementation</span>
-            </div>
-            <div class="setting-row">
-              <label><input type="checkbox" v-model="autosubmit" /> Auto-submit</label>
-              <span class="setting-desc">Auto-commit when agent finishes</span>
-            </div>
-            <div class="setting-row">
-              <label><input type="checkbox" v-model="autosync" /> Auto-sync</label>
-              <span class="setting-desc">Rebase worktrees on main before execution</span>
-            </div>
-            <div class="setting-row">
-              <label><input type="checkbox" v-model="autopush" /> Auto-push</label>
-              <span class="setting-desc">Push after commit pipeline completes</span>
-            </div>
-            <button class="save-btn" @click="saveExecution" :disabled="saving">
-              {{ saving ? 'Saving...' : 'Save' }}
-            </button>
+        <div class="settings-layout">
+          <div class="settings-tab-list" role="tablist" aria-label="Settings tabs">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              type="button"
+              class="settings-tab"
+              :class="{ active: activeTab === tab.key }"
+              role="tab"
+              :aria-selected="activeTab === tab.key"
+              @click="activeTab = tab.key"
+            >{{ tab.label }}</button>
           </div>
 
-          <div v-else-if="activeTab === 'appearance'" class="tab-content">
-            <div class="setting-row">
-              <span>Theme</span>
-              <button class="theme-btn" @click="cycle">
-                {{ theme === 'light' ? '☀ Light' : theme === 'dark' ? '☾ Dark' : '◐ Auto' }}
-              </button>
+          <div class="settings-tab-content-wrap">
+            <div
+              v-show="activeTab === 'appearance'"
+              class="settings-tab-content"
+              :class="{ active: activeTab === 'appearance' }"
+              data-settings-tab="appearance"
+            >
+              <div class="settings-card">
+                <div class="settings-card-head">
+                  <h4>Theme</h4>
+                  <p>Choose the interface color mode for the current session.</p>
+                </div>
+                <div class="theme-switch settings-theme-switch" role="group" aria-label="Theme mode">
+                  <button
+                    type="button"
+                    data-mode="light"
+                    :class="{ active: theme === 'light' }"
+                    @click="setTheme('light')"
+                  >Light</button>
+                  <button
+                    type="button"
+                    data-mode="dark"
+                    :class="{ active: theme === 'dark' }"
+                    @click="setTheme('dark')"
+                  >Dark</button>
+                  <button
+                    type="button"
+                    data-mode="auto"
+                    :class="{ active: theme === 'auto' }"
+                    @click="setTheme('auto')"
+                  >Auto</button>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div v-else-if="activeTab === 'about'" class="tab-content">
-            <div class="about-info">
-              <p><strong>Wallfacer</strong></p>
-              <p>Autonomous engineering platform.</p>
-              <p class="about-meta">Task board runner for AI agents.</p>
+            <div
+              v-show="activeTab === 'execution'"
+              class="settings-tab-content"
+              :class="{ active: activeTab === 'execution' }"
+              data-settings-tab="execution"
+            >
+              <div class="settings-card">
+                <div class="settings-card-head">
+                  <h4>Automation</h4>
+                  <p>Toggle which automation steps run for new tasks.</p>
+                </div>
+                <label class="settings-toggle">
+                  <input type="checkbox" v-model="autopilot" />
+                  Autopilot (auto-promote backlog tasks to in-progress)
+                </label>
+                <label class="settings-toggle">
+                  <input type="checkbox" v-model="autotest" />
+                  Auto-test (run test agent after implementation)
+                </label>
+                <label class="settings-toggle">
+                  <input type="checkbox" v-model="autosubmit" />
+                  Auto-submit (auto-commit when agent finishes)
+                </label>
+                <label class="settings-toggle">
+                  <input type="checkbox" v-model="autosync" />
+                  Auto-sync (rebase worktrees on main before execution)
+                </label>
+                <label class="settings-toggle">
+                  <input type="checkbox" v-model="autopush" />
+                  Auto-push (push after commit pipeline completes)
+                </label>
+                <div style="margin-top: 10px">
+                  <button
+                    type="button"
+                    class="btn-icon"
+                    style="font-size: 12px; padding: 4px 12px"
+                    :disabled="saving"
+                    @click="saveExecution"
+                  >{{ saving ? 'Saving...' : 'Save' }}</button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-show="activeTab === 'about'"
+              class="settings-tab-content"
+              :class="{ active: activeTab === 'about' }"
+              data-settings-tab="about"
+            >
+              <div style="margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px">
+                About
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
+                <div style="width: 32px; height: 32px; border-radius: 7px; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+                  <span style="color: white; font-size: 15px; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; line-height: 1">W</span>
+                </div>
+                <div>
+                  <a
+                    href="https://github.com/changkun/wallfacer"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="font-size: 13px; font-weight: 400; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.3; text-decoration: none; display: block"
+                  >Wallfacer</a>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px">
+                    Dispatch AI agents. Collect merged code.
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text-muted)">
+                <a
+                  href="https://github.com/changkun/wallfacer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style="display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink: 0; opacity: 0.7">
+                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+                  </svg>
+                  github.com/changkun/wallfacer
+                </a>
+                <div style="display: inline-flex; align-items: center; gap: 6px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; opacity: 0.7">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  MIT License &middot; Copyright &copy; 2026
+                  <a
+                    href="https://changkun.de"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: inherit; text-decoration: none"
+                  >Changkun Ou</a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -127,135 +230,3 @@ const tabs = [
     </div>
   </div>
 </template>
-
-<style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-.modal {
-  width: 520px;
-  max-width: 90vw;
-  max-height: 80vh;
-  background: var(--bg);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-lg, 10px);
-  box-shadow: var(--sh-pop, 0 12px 40px rgba(0,0,0,0.18));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--rule);
-}
-.modal-header h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-.modal-close:hover { color: var(--ink); }
-
-.modal-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-.modal-tabs {
-  display: flex;
-  flex-direction: column;
-  padding: 12px 0;
-  border-right: 1px solid var(--rule);
-  min-width: 120px;
-}
-.modal-tabs button {
-  padding: 6px 16px;
-  background: none;
-  border: none;
-  text-align: left;
-  font-size: 12px;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-.modal-tabs button:hover { background: var(--bg-hover); }
-.modal-tabs button.active {
-  color: var(--ink);
-  font-weight: 500;
-  background: var(--bg-active);
-}
-
-.modal-content {
-  flex: 1;
-  padding: 16px 20px;
-  overflow-y: auto;
-}
-
-.tab-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.setting-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.setting-row label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.setting-desc {
-  font-size: 11px;
-  color: var(--ink-3);
-  padding-left: 24px;
-}
-
-.save-btn {
-  align-self: flex-start;
-  margin-top: 8px;
-  padding: 5px 16px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-sm);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.save-btn:hover { background: var(--accent-2); }
-.save-btn:disabled { opacity: 0.4; }
-
-.theme-btn {
-  padding: 4px 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-card);
-  color: var(--ink);
-  font-size: 12px;
-  cursor: pointer;
-  align-self: flex-start;
-}
-.theme-btn:hover { background: var(--bg-hover); }
-
-.about-info p { margin: 4px 0; font-size: 13px; }
-.about-meta { color: var(--ink-3); font-size: 12px; }
-</style>

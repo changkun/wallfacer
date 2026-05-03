@@ -15,41 +15,46 @@ function onKeydown(e: KeyboardEvent) {
     (e.target as HTMLInputElement).blur();
   }
 }
+
+function clearQuery() {
+  query.value = '';
+}
 </script>
 
 <template>
-  <div class="search-bar">
+  <div class="task-search-wrapper app-header__search">
+    <span class="task-search-icon">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </span>
     <input
       v-model="query"
-      class="search-input"
-      type="text"
-      placeholder="Filter tasks... or @search"
+      type="search"
+      class="task-search-input"
+      placeholder="Filter tasks… or @search server"
+      autocomplete="off"
       @keydown="onKeydown"
     />
+    <button
+      v-show="query.length > 0"
+      type="button"
+      class="task-search-clear"
+      style="display: block"
+      title="Clear search"
+      @click="clearQuery"
+    >
+      &times;
+    </button>
   </div>
 </template>
-
-<style scoped>
-.search-bar {
-  padding: 0 var(--sp-5);
-  display: flex;
-  align-items: center;
-  height: var(--h-header);
-  border-bottom: 1px solid var(--rule);
-  flex-shrink: 0;
-}
-.search-input {
-  width: 100%;
-  max-width: 400px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-sunk);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  padding: 4px 10px;
-  outline: none;
-}
-.search-input:focus { border-color: var(--accent); }
-.search-input::placeholder { color: var(--ink-4); }
-</style>

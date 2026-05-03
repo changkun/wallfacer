@@ -47,7 +47,12 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
 </script>
 
 <template>
-  <SearchBar />
+  <header class="app-header">
+    <div class="app-header__spacer"></div>
+    <div class="app-header__actions">
+      <SearchBar />
+    </div>
+  </header>
 
   <main class="board-grid" id="board">
     <div class="col col-backlog">
