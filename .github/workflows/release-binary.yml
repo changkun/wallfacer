@@ -47,6 +47,10 @@ jobs:
         run: node scripts/build-ts.mjs
         working-directory: ui
 
+      - name: Build Vue frontend
+        run: bun install --frozen-lockfile && bun run build
+        working-directory: frontend
+
       - name: Resolve sandbox image tag
         id: sandbox_tag
         run: |
