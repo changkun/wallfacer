@@ -15,3 +15,8 @@ internal/webserver/spa/dist/
 frontend/node_modules/
 frontend/dist/
 .DS_Store
+
+# Local Playwright captures
+*.png
+.playwright-mcp/
+frontend/test-results/
