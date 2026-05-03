@@ -57,7 +57,7 @@ make clean          # Remove all sandbox images
 make run PROMPT="…" # Headless one-shot Claude execution with a prompt
 make test           # Run all tests (backend + frontend)
 make test-backend   # Run Go unit tests (go test ./...)
-make test-frontend  # Run frontend JS unit tests (cd ui && npx vitest@2 run)
+make test-frontend  # Run frontend JS unit tests (cd ui && bunx vitest@2 run)
 make ui-css         # Regenerate Tailwind CSS from UI sources
 make api-contract   # Regenerate API route artifacts from apicontract/routes.go
 make e2e-lifecycle              # E2E: task lifecycle for both sandboxes (requires running server)
@@ -108,7 +108,7 @@ make test-frontend  # vitest in ui/
 go build -o wallfacer .
 go vet ./...
 go test ./...
-cd ui && npx --yes vitest@2 run
+cd ui && bunx --bun vitest@2 run
 ```
 
 The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
