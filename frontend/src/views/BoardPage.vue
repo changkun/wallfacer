@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
 import { useBootStore } from '../stores/boot';
 import { useSse } from '../composables/useSse';
+import { useTheme } from '../composables/useTheme';
+import { api } from '../api/client';
 import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
@@ -10,37 +13,61 @@ import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const boot = useBootStore();
+const { theme, cycle } = useTheme();
 const selectedTask = ref<Task | null>(null);
 
 onMounted(async () => {
   await Promise.all([store.fetchTasks(), store.fetchConfig()]);
 });
 
-useSse({
+const { connected } = useSse({
   url: '/api/tasks/stream',
   listeners: {
-    snapshot: (data) => {
-      store.setTasks(data as Task[]);
-    },
+    snapshot: (data) => store.setTasks(data as Task[]),
     'task-updated': (data) => {
       const t = data as Task;
       store.updateTask(t);
-      if (selectedTask.value?.id === t.id) {
-        selectedTask.value = t;
-      }
+      if (selectedTask.value?.id === t.id) selectedTask.value = t;
     },
     'task-deleted': (data) => {
       const d = data as { id: string };
       store.removeTask(d.id);
-      if (selectedTask.value?.id === d.id) {
-        selectedTask.value = null;
-      }
+      if (selectedTask.value?.id === d.id) selectedTask.value = null;
     },
   },
 });
 
+const totalCost = computed(() => {
+  const sum = store.tasks.reduce((s, t) => s + (t.usage?.cost_usd || 0), 0);
+  if (sum === 0) return '';
+  return '$' + sum.toFixed(2);
+});
+
+const themeIcon = computed(() => {
+  switch (theme.value) {
+    case 'light': return '☀';
+    case 'dark': return '☾';
+    default: return '◐';
+  }
+});
+
 function selectTask(t: Task) {
   selectedTask.value = t;
+}
+
+async function onBacklogChange(evt: { added?: { element: Task }; moved?: { element: Task; newIndex: number } }) {
+  if (evt.moved) {
+    const ids = store.backlog.map(t => t.id);
+    for (let i = 0; i < ids.length; i++) {
+      api('PATCH', `/api/tasks/${ids[i]}`, { position: i });
+    }
+  }
+}
+
+async function onInProgressAdd(evt: { added?: { element: Task } }) {
+  if (evt.added) {
+    await api('PATCH', `/api/tasks/${evt.added.element.id}`, { status: 'in_progress' });
+  }
 }
 
 function statusColor(status: string): string {
@@ -62,6 +89,10 @@ function statusColor(status: string): string {
     <header class="board-header">
       <span class="board-title">Wallfacer</span>
       <span class="board-version">{{ boot.version || 'dev' }}</span>
+      <span class="header-spacer" />
+      <span v-if="totalCost" class="header-cost">{{ totalCost }}</span>
+      <span class="header-dot" :class="connected ? 'dot-ok' : 'dot-off'" :title="connected ? 'Connected' : 'Disconnected'" />
+      <button class="header-theme" @click="cycle" :title="'Theme: ' + theme">{{ themeIcon }}</button>
     </header>
 
     <div class="board-columns">
@@ -73,7 +104,18 @@ function statusColor(status: string): string {
         </div>
         <div class="column-body">
           <TaskComposer />
-          <TaskCard v-for="t in store.backlog" :key="t.id" :task="t" @click="selectTask(t)" />
+          <draggable
+            :list="store.backlog"
+            group="board"
+            item-key="id"
+            class="drag-zone"
+            :animation="150"
+            @change="onBacklogChange"
+          >
+            <template #item="{ element }">
+              <TaskCard :task="element" @click="selectTask(element)" />
+            </template>
+          </draggable>
         </div>
       </section>
 
@@ -84,7 +126,19 @@ function statusColor(status: string): string {
           <span class="column-count">{{ store.inProgress.length }}</span>
         </div>
         <div class="column-body">
-          <TaskCard v-for="t in store.inProgress" :key="t.id" :task="t" @click="selectTask(t)" />
+          <draggable
+            :list="store.inProgress"
+            group="board"
+            item-key="id"
+            class="drag-zone"
+            :animation="150"
+            :sort="false"
+            @change="onInProgressAdd"
+          >
+            <template #item="{ element }">
+              <TaskCard :task="element" @click="selectTask(element)" />
+            </template>
+          </draggable>
           <div v-if="store.inProgress.length === 0" class="column-empty">Idle</div>
         </div>
       </section>
@@ -150,6 +204,28 @@ function statusColor(status: string): string {
   font-size: 11px;
   font-family: var(--font-mono);
 }
+.header-spacer { flex: 1; }
+.header-cost {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.header-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.dot-ok { background: var(--ok); }
+.dot-off { background: var(--err); }
+.header-theme {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  color: var(--ink-3);
+}
+.header-theme:hover { color: var(--ink); }
 
 .board-columns {
   display: grid;
@@ -201,6 +277,10 @@ function statusColor(status: string): string {
   text-align: center;
   color: var(--ink-4);
   font-size: 12px;
+}
+
+.drag-zone {
+  min-height: 40px;
 }
 
 .board-loading {
