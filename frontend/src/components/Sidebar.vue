@@ -6,7 +6,7 @@ const store = useTaskStore();
 const { theme, cycle } = useTheme();
 
 defineProps<{ collapsed: boolean }>();
-const emit = defineEmits<{ toggle: [] }>();
+const emit = defineEmits<{ toggle: []; settings: [] }>();
 
 function themeLabel(): string {
   switch (theme.value) {
@@ -49,6 +49,10 @@ function themeLabel(): string {
     </div>
 
     <div class="sb-bottom">
+      <button v-if="!collapsed" class="sb-btn" @click="emit('settings')">
+        <span class="sb-icon">⚙</span>
+        <span>Settings</span>
+      </button>
       <button v-if="!collapsed" class="sb-btn" @click="cycle" :title="'Theme: ' + theme">
         {{ theme === 'light' ? '☀' : theme === 'dark' ? '☾' : '◐' }}
         <span>{{ themeLabel() }}</span>
