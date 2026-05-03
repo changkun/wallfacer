@@ -12,6 +12,8 @@ const cloudRoutes: RouteRecordRaw[] = [
 
 const localRoutes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/BoardPage.vue') },
+  { path: '/agents', component: () => import('./views/AgentsPage.vue') },
+  { path: '/flows', component: () => import('./views/FlowsPage.vue') },
 ];
 
 function readMode(): 'local' | 'cloud' {

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { useTheme } from '../composables/useTheme';
+
+const route = useRoute();
 
 const store = useTaskStore();
 const { theme, cycle } = useTheme();
@@ -27,10 +30,18 @@ function themeLabel(): string {
     </div>
 
     <nav v-if="!collapsed" class="sb-nav">
-      <a class="sb-item active">
+      <router-link to="/" class="sb-item" :class="{ active: route.path === '/' }">
         <span class="sb-icon">☰</span>
         <span>Board</span>
-      </a>
+      </router-link>
+      <router-link to="/agents" class="sb-item" :class="{ active: route.path === '/agents' }">
+        <span class="sb-icon">◆</span>
+        <span>Agents</span>
+      </router-link>
+      <router-link to="/flows" class="sb-item" :class="{ active: route.path === '/flows' }">
+        <span class="sb-icon">→</span>
+        <span>Flows</span>
+      </router-link>
     </nav>
 
     <div v-if="!collapsed" class="sb-stats">

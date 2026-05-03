@@ -2,48 +2,19 @@
 import { ref, onMounted } from 'vue';
 import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
-import { useSse } from '../composables/useSse';
 import { api } from '../api/client';
 import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
-import Sidebar from '../components/Sidebar.vue';
-import StatusBar from '../components/StatusBar.vue';
 import SearchBar from '../components/SearchBar.vue';
-import SettingsModal from '../components/SettingsModal.vue';
-import { useKeyboard } from '../composables/useKeyboard';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const selectedTask = ref<Task | null>(null);
-const sidebarCollapsed = ref(false);
-const showSettings = ref(false);
-
-useKeyboard({
-  onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
-  onSearch: () => document.querySelector<HTMLInputElement>('.search-input')?.focus(),
-  onSettings: () => { showSettings.value = !showSettings.value; },
-});
 
 onMounted(async () => {
-  await Promise.all([store.fetchTasks(), store.fetchConfig()]);
-});
-
-const { connected } = useSse({
-  url: '/api/tasks/stream',
-  listeners: {
-    snapshot: (data) => store.setTasks(data as Task[]),
-    'task-updated': (data) => {
-      const t = data as Task;
-      store.updateTask(t);
-      if (selectedTask.value?.id === t.id) selectedTask.value = t;
-    },
-    'task-deleted': (data) => {
-      const d = data as { id: string };
-      store.removeTask(d.id);
-      if (selectedTask.value?.id === d.id) selectedTask.value = null;
-    },
-  },
+  if (!store.tasks.length) await store.fetchTasks();
+  if (!store.config) await store.fetchConfig();
 });
 
 function selectTask(t: Task) {
@@ -77,97 +48,79 @@ function statusColor(status: string): string {
 </script>
 
 <template>
-  <div class="board-shell">
-    <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" @settings="showSettings = true" />
+  <div class="board">
+    <SearchBar />
 
-    <div class="board">
-      <SearchBar />
+    <div class="board-columns">
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('backlog') }" />
+          <span class="column-label">Backlog</span>
+          <span class="column-count">{{ store.backlog.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskComposer />
+          <draggable :list="store.backlog" group="board" item-key="id" class="drag-zone" :animation="150" @change="onBacklogChange">
+            <template #item="{ element }">
+              <TaskCard :task="element" @click="selectTask(element)" />
+            </template>
+          </draggable>
+        </div>
+      </section>
 
-      <div class="board-columns">
-        <section class="column">
-          <div class="column-header">
-            <span class="column-dot" :style="{ background: statusColor('backlog') }" />
-            <span class="column-label">Backlog</span>
-            <span class="column-count">{{ store.backlog.length }}</span>
-          </div>
-          <div class="column-body">
-            <TaskComposer />
-            <draggable :list="store.backlog" group="board" item-key="id" class="drag-zone" :animation="150" @change="onBacklogChange">
-              <template #item="{ element }">
-                <TaskCard :task="element" @click="selectTask(element)" />
-              </template>
-            </draggable>
-          </div>
-        </section>
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('in_progress') }" />
+          <span class="column-label">In Progress</span>
+          <span class="column-count">{{ store.inProgress.length }}</span>
+        </div>
+        <div class="column-body">
+          <draggable :list="store.inProgress" group="board" item-key="id" class="drag-zone" :animation="150" :sort="false" @change="onInProgressAdd">
+            <template #item="{ element }">
+              <TaskCard :task="element" @click="selectTask(element)" />
+            </template>
+          </draggable>
+          <div v-if="store.inProgress.length === 0" class="column-empty">Idle</div>
+        </div>
+      </section>
 
-        <section class="column">
-          <div class="column-header">
-            <span class="column-dot" :style="{ background: statusColor('in_progress') }" />
-            <span class="column-label">In Progress</span>
-            <span class="column-count">{{ store.inProgress.length }}</span>
-          </div>
-          <div class="column-body">
-            <draggable :list="store.inProgress" group="board" item-key="id" class="drag-zone" :animation="150" :sort="false" @change="onInProgressAdd">
-              <template #item="{ element }">
-                <TaskCard :task="element" @click="selectTask(element)" />
-              </template>
-            </draggable>
-            <div v-if="store.inProgress.length === 0" class="column-empty">Idle</div>
-          </div>
-        </section>
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('waiting') }" />
+          <span class="column-label">Waiting</span>
+          <span class="column-count">{{ store.waiting.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskCard v-for="t in store.waiting" :key="t.id" :task="t" @click="selectTask(t)" />
+          <div v-if="store.waiting.length === 0" class="column-empty">None</div>
+        </div>
+      </section>
 
-        <section class="column">
-          <div class="column-header">
-            <span class="column-dot" :style="{ background: statusColor('waiting') }" />
-            <span class="column-label">Waiting</span>
-            <span class="column-count">{{ store.waiting.length }}</span>
-          </div>
-          <div class="column-body">
-            <TaskCard v-for="t in store.waiting" :key="t.id" :task="t" @click="selectTask(t)" />
-            <div v-if="store.waiting.length === 0" class="column-empty">None</div>
-          </div>
-        </section>
-
-        <section class="column">
-          <div class="column-header">
-            <span class="column-dot" :style="{ background: statusColor('done') }" />
-            <span class="column-label">Done</span>
-            <span class="column-count">{{ store.done.length }}</span>
-          </div>
-          <div class="column-body">
-            <TaskCard v-for="t in store.done" :key="t.id" :task="t" @click="selectTask(t)" />
-            <div v-if="store.done.length === 0" class="column-empty">None</div>
-          </div>
-        </section>
-      </div>
-
-      <div v-if="store.loading" class="board-loading">Loading tasks...</div>
-
-      <StatusBar :connected="connected" />
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('done') }" />
+          <span class="column-label">Done</span>
+          <span class="column-count">{{ store.done.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskCard v-for="t in store.done" :key="t.id" :task="t" @click="selectTask(t)" />
+          <div v-if="store.done.length === 0" class="column-empty">None</div>
+        </div>
+      </section>
     </div>
 
+    <div v-if="store.loading" class="board-loading">Loading tasks...</div>
     <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
-    <SettingsModal v-if="showSettings" @close="showSettings = false" />
   </div>
 </template>
 
 <style scoped>
-.board-shell {
-  display: flex;
-  height: 100vh;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 13px;
-}
-
 .board {
   display: flex;
   flex-direction: column;
   flex: 1;
   overflow: hidden;
 }
-
 .board-columns {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -219,10 +172,9 @@ function statusColor(status: string): string {
   font-size: 12px;
 }
 .drag-zone { min-height: 40px; }
-
 .board-loading {
   position: fixed;
-  bottom: 16px;
+  bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 16px;
