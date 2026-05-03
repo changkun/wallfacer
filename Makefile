@@ -234,6 +234,22 @@ ifndef WORKSPACE
 endif
 	sh scripts/e2e-dependency-dag.sh $(WORKSPACE)
 
+# ---- wallfacerd (wf.latere.ai) ----
+
+web-frontend:                                                            ## Build wallfacerd frontend and copy dist for embedding
+	cd frontend && npm run build
+	rm -rf internal/webserver/spa/dist
+	cp -r frontend/dist internal/webserver/spa/dist
+
+web-run: web-frontend                                                    ## Run wallfacerd locally (embedded SPA)
+	go run ./cmd/wallfacerd -addr :8080
+
+web-dev:                                                                 ## Run wallfacerd dev stack (Go :8080 + Vite :5173)
+	go run ./cmd/wallfacerd -addr :8080 & cd frontend && npm run dev
+
+web-docker:                                                              ## Build wallfacerd Docker image
+	docker build -f Dockerfile.wallfacerd -t wallfacerd:dev .
+
 # Remove sandbox images
 clean:
 	-$(PODMAN) rmi $(IMAGE) $(GHCR_IMAGE) $(CODEX_IMAGE) $(GHCR_CODEX_IMAGE)
