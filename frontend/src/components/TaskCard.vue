@@ -4,186 +4,123 @@ import type { Task } from '../api/types';
 
 const props = defineProps<{ task: Task }>();
 
-function shortId(id: string): string {
-  return id.slice(0, 8);
-}
-
 function statusLabel(task: Task): string {
-  if (task.status === 'in_progress') return 'running';
+  if (task.archived) return 'archived';
+  if (task.status === 'in_progress') return 'in progress';
   if (task.status === 'committing') return 'committing';
   return task.status;
 }
 
-function statusClass(task: Task): string {
-  const map: Record<string, string> = {
-    in_progress: 'status-progress', committing: 'status-progress',
-    waiting: 'status-waiting', failed: 'status-failed',
-    done: 'status-done', cancelled: 'status-cancelled',
-  };
-  return map[task.status] || 'status-backlog';
+function badgeClass(task: Task): string {
+  if (task.archived) return 'badge-archived';
+  return `badge-${task.status}`;
 }
 
-function costDisplay(usd: number): string {
-  if (usd === 0) return '';
-  if (usd < 0.01) return '<$0.01';
-  return '$' + usd.toFixed(2);
+function cardClasses(task: Task): Record<string, boolean> {
+  return {
+    card: true,
+    [`card-${task.status}`]: true,
+    'card-failed-waiting': task.status === 'failed',
+    'card-cancelled-done': task.status === 'cancelled',
+  };
+}
+
+function formatTimeout(minutes: number): string {
+  if (!minutes) return '5m';
+  if (minutes < 60) return minutes + 'm';
+  if (minutes % 60 === 0) return (minutes / 60) + 'h';
+  return Math.floor(minutes / 60) + 'h' + (minutes % 60) + 'm';
 }
 
 function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const sec = Math.floor(ms / 1000);
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (sec < 60) return 'just now';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return min + 'm ago';
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return hr + 'h ago';
-  const d = Math.floor(hr / 24);
-  return d + 'd ago';
+  if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
+  if (sec < 86400) return Math.floor(sec / 3600) + 'h ago';
+  return Math.floor(sec / 86400) + 'd ago';
 }
 
 function errorSnippet(task: Task): string {
   if (task.status !== 'failed' || !task.result) return '';
-  return task.result.slice(0, 200);
+  return task.result.length > 160 ? task.result.slice(0, 160) + '…' : task.result;
 }
 
-function formatTimeout(seconds: number): string {
-  if (seconds >= 3600) return Math.floor(seconds / 3600) + 'h';
-  if (seconds >= 60) return Math.floor(seconds / 60) + 'm';
-  return seconds + 's';
+function tagStyle(tag: string): string {
+  let sum = 0;
+  for (let i = 0; i < tag.length; i++) sum += tag.charCodeAt(i);
+  const n = sum % 12;
+  return `background:var(--tag-bg-${n});color:var(--tag-text-${n});`;
+}
+
+function isSpawnedByTag(tag: string): boolean {
+  return tag.toLowerCase().startsWith('spawned-by:');
+}
+
+function promptPreview(task: Task): string {
+  if (!task.prompt) return '';
+  return task.prompt.length > 200 ? task.prompt.slice(0, 200) + '…' : task.prompt;
+}
+
+function showSpinner(task: Task): boolean {
+  return task.status === 'in_progress' || task.status === 'committing';
+}
+
+async function startTask(e: Event) {
+  e.stopPropagation();
+  await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'in_progress' });
 }
 
 async function retryTask(e: Event) {
   e.stopPropagation();
   await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'backlog' });
 }
+
+async function doneTask(e: Event) {
+  e.stopPropagation();
+  await api('POST', `/api/tasks/${props.task.id}/done`);
+}
 </script>
 
 <template>
-  <div class="card" :class="statusClass(props.task)">
-    <div class="card-header">
-      <span class="card-title">{{ props.task.title || props.task.prompt.slice(0, 80) }}</span>
+  <div :class="cardClasses(props.task)">
+    <!-- Title -->
+    <div v-if="props.task.title" class="card-title">{{ props.task.title }}</div>
+
+    <!-- Status badge row -->
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+      <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
+      <span v-if="showSpinner(props.task)" class="spinner"></span>
+      <span v-if="props.task.sandbox" class="badge" style="font-size:9px;">{{ props.task.sandbox }}</span>
+      <span v-if="props.task.timeout" style="font-size:10px;color:var(--ink-4);">{{ formatTimeout(props.task.timeout) }}</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--ink-4);">{{ timeAgo(props.task.created_at) }}</span>
     </div>
 
-    <div v-if="props.task.status === 'failed' && errorSnippet(props.task)" class="card-error">
-      {{ errorSnippet(props.task) }}
+    <!-- Prompt preview (backlog) -->
+    <div v-if="props.task.status === 'backlog' && !props.task.title && props.task.prompt" class="card-prose" style="max-height:4.5em;overflow:hidden;font-size:12px;">
+      {{ promptPreview(props.task) }}
     </div>
 
-    <div v-if="props.task.tags?.length" class="card-tags">
-      <span v-for="tag in props.task.tags.slice(0, 3)" :key="tag" class="card-tag">{{ tag }}</span>
+    <!-- Error (failed) -->
+    <div v-if="props.task.status === 'failed' && errorSnippet(props.task)" class="card-error-reason">
+      <span class="card-error-label">ERROR</span><span class="card-error-text">{{ errorSnippet(props.task) }}</span>
     </div>
 
-    <div class="card-meta">
-      <span class="card-id">{{ shortId(props.task.id) }}</span>
-      <span class="card-status">{{ statusLabel(props.task) }}</span>
-      <span v-if="props.task.sandbox" class="card-sandbox">{{ props.task.sandbox }}</span>
-      <span v-if="props.task.timeout" class="card-timeout">{{ formatTimeout(props.task.timeout) }}</span>
-      <span v-if="props.task.usage.cost_usd" class="card-cost">{{ costDisplay(props.task.usage.cost_usd) }}</span>
-      <span class="card-time">{{ timeAgo(props.task.updated_at) }}</span>
+    <!-- Tags -->
+    <div v-if="props.task.tags?.length" class="tag-chip-row">
+      <span
+        v-for="tag in props.task.tags"
+        :key="tag"
+        :class="['tag-chip', { 'badge-routine-spawn': isSpawnedByTag(tag) }]"
+        :style="isSpawnedByTag(tag) ? '' : tagStyle(tag)"
+        :title="'Tag: ' + tag"
+      >{{ tag }}</span>
     </div>
 
-    <div v-if="props.task.status === 'failed' || props.task.status === 'cancelled'" class="card-actions">
-      <button class="card-action-btn" @click="retryTask">Retry</button>
+    <!-- Actions -->
+    <div v-if="!props.task.archived && (props.task.status === 'backlog' || props.task.status === 'waiting' || props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done')" class="card-actions">
+      <button v-if="props.task.status === 'backlog'" class="card-action-btn card-action-start" @click="startTask">&#9654; Start</button>
+      <button v-if="props.task.status === 'waiting'" class="card-action-btn card-action-done" @click="doneTask">&#10003; Done</button>
+      <button v-if="props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done'" class="card-action-btn card-action-retry" @click="retryTask">&#8617; Retry</button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.card {
-  padding: 8px 10px;
-  margin-bottom: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition: box-shadow 0.1s, border-color 0.1s;
-}
-.card:hover {
-  box-shadow: var(--sh-2);
-  border-color: var(--ink-4);
-}
-
-.card-header { margin-bottom: 4px; }
-.card-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
-}
-
-.card-error {
-  margin: 4px 0;
-  padding: 4px 6px;
-  background: rgba(163, 45, 45, 0.08);
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--err);
-  line-height: 1.4;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-}
-
-.card-tags {
-  display: flex;
-  gap: 3px;
-  margin: 4px 0;
-  flex-wrap: wrap;
-}
-.card-tag {
-  padding: 1px 5px;
-  background: var(--accent-tint);
-  color: var(--accent);
-  border-radius: 2px;
-  font-size: 9px;
-  font-weight: 500;
-}
-
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  color: var(--ink-4);
-  font-family: var(--font-mono);
-}
-.card-id { opacity: 0.7; }
-.card-status {
-  padding: 1px 4px;
-  border-radius: 2px;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.status-progress .card-status { color: var(--col-progress); background: rgba(58, 109, 179, 0.1); }
-.status-waiting .card-status { color: var(--col-waiting); background: rgba(165, 106, 18, 0.1); }
-.status-failed .card-status { color: var(--err); background: rgba(163, 45, 45, 0.1); }
-.status-done .card-status { color: var(--col-done); background: rgba(63, 122, 74, 0.1); }
-.status-cancelled .card-status { color: var(--ink-3); background: var(--bg-hover); }
-.status-backlog .card-status { color: var(--col-backlog); }
-.card-sandbox { color: var(--ink-3); font-size: 9px; }
-.card-timeout { color: var(--ink-3); font-size: 9px; }
-.card-cost { color: var(--ink-3); }
-.card-time { margin-left: auto; }
-
-.card-actions {
-  margin-top: 6px;
-  display: flex;
-  gap: 4px;
-}
-.card-action-btn {
-  padding: 2px 8px;
-  background: var(--bg-hover);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  font-size: 10px;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-.card-action-btn:hover { background: var(--bg-active); color: var(--ink); }
-</style>
