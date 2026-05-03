@@ -1,0 +1,1730 @@
+/* ===== Spec Mode Layout ===== */
+
+/* Three-pane container: focused markdown view + resize handle + chat stream */
+.spec-mode-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/*
+ * Layout state machine (layout-state-machine spec).
+ *
+ * [data-layout="three-pane"] (default) — explorer + focused view + chat.
+ * [data-layout="chat-first"] — no specs and no Roadmap: chat takes the
+ *   full Plan-mode width. Explorer + focused view + resize handle animate
+ *   out to width:0 with a short deceleration curve; the reverse
+ *   transition uses a longer acceleration/exit curve for subtlety.
+ */
+.spec-focused-view,
+.spec-chat-stream {
+  transition:
+    width 260ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 260ms cubic-bezier(0.2, 0, 0, 1),
+    transform 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.spec-mode-container[data-layout="chat-first"] .spec-focused-view {
+  /* Override the default flex:1 so the collapsed focused-view doesn't
+     eat horizontal space and push the centered chat card off-axis. */
+  flex: 0 0 0;
+  width: 0;
+  opacity: 0;
+  transform: translateX(-12px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.spec-mode-container[data-layout="chat-first"] #spec-chat-resize {
+  display: none;
+}
+
+/* Chat-first mirrors the empty-Board composer's spatial language: a
+   centered card with padding around it, not a full-width slab. The
+   parent flex centers the card; the card itself has a max-width that
+   matches the empty-Board composer family so both modes' empty states
+   read as visually continuous. */
+.spec-mode-container[data-layout="chat-first"] {
+  justify-content: center;
+  align-items: stretch;
+  padding: 32px 16px;
+  transition-timing-function: cubic-bezier(0.3, 0, 0.8, 0.15);
+  transition-duration: 200ms;
+}
+
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream {
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card, var(--bg));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+/* Suppress the redundant "PLANNING CHAT" header row in chat-first —
+   the thread tab bar already labels the pane and the card framing
+   makes the explicit header look like visual noise. */
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream__header {
+  display: none;
+}
+
+/* The "/create" hint slot sits between the messages area and the
+   composer. Only renders when the chat has no messages (JS toggles
+   the .spec-chat-empty-hint--visible modifier). */
+.spec-chat-empty-hint {
+  display: none;
+  padding: 8px 14px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.spec-mode-container[data-layout="chat-first"] .spec-chat-empty-hint--visible {
+  display: block;
+}
+.spec-chat-empty-hint__cmd {
+  font-family: var(--font-mono, monospace);
+  color: var(--text);
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spec-focused-view,
+  .spec-chat-stream {
+    transition-duration: 0s;
+  }
+}
+
+/* The `spec-mode--chat-only` class is still toggled by
+ * _updateSpecPaneVisibility for backwards compat with external hooks
+ * and tests that assert on its presence, but all layout CSS is now
+ * driven by the [data-layout] attribute above. */
+
+/* Center pane: focused markdown view */
+.spec-focused-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Header adopts the mockup's two-row layout: a slim chrome bar (path,
+   tags, actions) and a display title rendered as huge italic serif. */
+.spec-focused-view__header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 28px 18px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.spec-focused-view__chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+}
+
+.spec-focused-view__path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__title {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: 52em;
+  word-break: break-word;
+}
+
+.spec-focused-view__status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  text-transform: lowercase;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+}
+
+.spec-focused-view__kind {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  text-transform: lowercase;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+/* Collapse tag/path chips entirely when there is no content — the
+   Roadmap index has no frontmatter, so the chrome should not render
+   empty pills as solid shapes. */
+.spec-focused-view__path:empty,
+.spec-focused-view__status:empty,
+.spec-focused-view__kind:empty,
+.spec-focused-view__effort:empty {
+  display: none;
+}
+
+.spec-kind--design {
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
+}
+
+.spec-kind--impl {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.spec-focused-view__effort {
+  font-size: 11px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__spacer {
+  flex: 1;
+}
+
+/* Pinned Roadmap (specs/README.md) in the focused view: hide every
+   spec-only affordance — status chip, kind/effort badges, metadata bar,
+   dispatch/breakdown/archive buttons, archived banner. The Roadmap is a
+   plain markdown document with no lifecycle. */
+/* Spec-only affordances: always have a transition so toggling the
+   Roadmap marker class (.spec-focused-view--index) slides them out
+   with a subtle translateY + opacity dissolve rather than snapping.
+   Honouring reduced motion collapses the transition to zero. */
+.spec-focused-view__path,
+.spec-focused-view__status,
+.spec-focused-view__kind,
+.spec-focused-view__effort,
+.spec-focused-view__meta,
+#spec-dispatch-btn,
+#spec-summarize-btn,
+#spec-archive-btn,
+#spec-unarchive-btn,
+#spec-archived-banner {
+  transition:
+    opacity 220ms cubic-bezier(0.2, 0, 0, 1),
+    transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+.spec-focused-view--index .spec-focused-view__path,
+.spec-focused-view--index .spec-focused-view__status,
+.spec-focused-view--index .spec-focused-view__kind,
+.spec-focused-view--index .spec-focused-view__effort,
+.spec-focused-view--index .spec-focused-view__meta,
+.spec-focused-view--index #spec-dispatch-btn,
+.spec-focused-view--index #spec-summarize-btn,
+.spec-focused-view--index #spec-archive-btn,
+.spec-focused-view--index #spec-unarchive-btn,
+.spec-focused-view--index #spec-archived-banner {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  /* Keep the elements out of the flow so the index view reads as a
+     pure markdown document without reserved button-sized gaps. */
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spec-focused-view__path,
+  .spec-focused-view__status,
+  .spec-focused-view__kind,
+  .spec-focused-view__effort,
+  .spec-focused-view__meta,
+  #spec-dispatch-btn,
+  #spec-summarize-btn,
+  #spec-archive-btn,
+  #spec-unarchive-btn,
+  #spec-archived-banner,
+  #spec-focused-body-inner {
+    transition-duration: 0s !important;
+  }
+}
+
+/* First-spec bootstrap toast — slides in from the top centre when a
+   chat-first workspace transitions to three-pane on the very first
+   /spec-new. Differentiated from the bottom-right dispatch toast to
+   avoid visual confusion during onboarding. */
+.bootstrap-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  opacity: 0;
+  z-index: 1150;
+  max-width: 520px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent, #6366f1);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  animation: bootstrap-toast-in 200ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+.bootstrap-toast--no-motion,
+.bootstrap-toast.bootstrap-toast--no-motion {
+  animation: none;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+@keyframes bootstrap-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bootstrap-toast {
+    animation: none;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Chat messages crossfade on thread switch — triggered by the
+   `.spec-chat-stream__messages--swapping` class added in
+   planning-chat.js::_switchToThread. */
+#spec-chat-messages {
+  transition: opacity 120ms linear;
+}
+.spec-chat-stream__messages--swapping {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  #spec-chat-messages {
+    transition: none;
+  }
+}
+
+.spec-focused-view__meta {
+  padding: 8px 28px 10px;
+  font-size: 11px;
+  color: var(--ink-4);
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__meta:empty {
+  display: none;
+}
+
+.spec-status--complete {
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
+}
+
+.spec-status--validated {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.spec-status--drafted {
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
+}
+
+.spec-status--vague {
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+}
+
+.spec-status--stale {
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
+}
+
+.spec-status--archived {
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+  opacity: 0.7;
+}
+
+.spec-archived-banner {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-left: 4px solid #6c757d;
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem 16px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+/* Override loaded-later display:flex so the .hidden utility still hides the banner. */
+.spec-archived-banner.hidden {
+  display: none;
+}
+
+.spec-archived-banner__text {
+  flex: 1;
+}
+
+.spec-archive-toasts {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 360px;
+  pointer-events: none;
+}
+
+.spec-archive-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  animation: spec-archive-toast-in 0.18s ease-out;
+}
+
+.spec-archive-toast__text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spec-archive-toast__close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.spec-archive-toast__close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+@keyframes spec-archive-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Table of contents — absolutely positioned; JS exclusion keeps text clear */
+.spec-toc {
+  position: absolute;
+  top: 72px;
+  right: 12px;
+  width: 180px;
+  max-height: calc(100% - 88px);
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  z-index: 2;
+  opacity: 0.85;
+  pointer-events: auto;
+}
+
+.spec-toc:hover {
+  opacity: 1;
+}
+
+.spec-toc__title {
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.spec-toc__link {
+  display: block;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 1px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.spec-toc__link:hover {
+  color: var(--text);
+}
+
+.spec-toc__link--active {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.spec-toc__link--h1 {
+  padding-left: 0;
+}
+
+.spec-toc__link--h2 {
+  padding-left: 8px;
+}
+
+.spec-toc__link--h3 {
+  padding-left: 16px;
+}
+
+.spec-toc__link--h4 {
+  padding-left: 24px;
+}
+
+/* Secondary header actions — muted text links, no border, no fill.
+   Dispatch stands out as the dark primary call-to-action. */
+.spec-summarize-btn,
+.spec-chat-toggle-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.spec-summarize-btn:hover,
+.spec-chat-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+
+/* When the chat pane is folded, emphasise the toggle so the user
+   can easily find their way back to the chat. */
+.spec-chat-toggle-btn--folded {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.spec-chat-toggle-btn--folded:hover {
+  background: var(--accent-tint);
+  color: var(--accent-2);
+}
+
+.spec-dispatch-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--r-md);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+
+.spec-dispatch-btn:hover {
+  background: color-mix(in oklab, var(--ink) 85%, var(--accent) 15%);
+  border-color: color-mix(in oklab, var(--ink) 85%, var(--accent) 15%);
+  color: var(--bg);
+}
+
+.spec-focused-view__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.spec-focused-view__body-inner {
+  max-width: 52em;
+  padding: 20px 28px 80px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Mockup's drop cap: first letter of the first paragraph rendered as a
+   large italic serif in the clay accent colour. Only applied to the spec
+   body — docs and chat retain flat paragraph starts. */
+.spec-focused-view__body-inner.prose-content > p:first-of-type::first-letter {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 3em;
+  line-height: 0.9;
+  float: left;
+  padding: 4px 10px 0 0;
+  color: var(--accent);
+}
+
+.spec-focused-view__body-inner.prose-content > p:first-of-type {
+  font-size: 15px;
+  line-height: 1.72;
+}
+
+/* Section headings inside the spec body — sans for legibility. Serif
+   italic is reserved for the display title above so long-form reading
+   stays comfortable. */
+.spec-focused-view__body-inner.prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.005em;
+  margin: 28px 0 10px;
+}
+.spec-focused-view__body-inner.prose-content h3 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--ink);
+  text-transform: none;
+  margin: 22px 0 8px;
+}
+
+/* Reusable prose class — single source of truth for markdown rendering.
+   Paper-ink style: Instrument Serif italic headings, Inter body, clay accent.
+   Canonical tier is compact (modal / chat scale). The .docs-mode__content
+   scope in docs.css scales up to display sizes with inverted code blocks. */
+.prose-content {
+  color: var(--ink);
+  font-size: var(--fs-md);
+  line-height: 1.65;
+}
+
+/* Headings default to sans for legibility. Serif italic is only used on
+   display titles (the spec header title, docs h1 hero) — those are opted
+   in by scoped overrides, not by default. */
+.prose-content h1,
+.prose-content h2,
+.prose-content h3,
+.prose-content h4,
+.prose-content h5,
+.prose-content h6 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.prose-content h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 10px;
+}
+.prose-content h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  margin: 22px 0 8px;
+}
+.prose-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 18px 0 6px;
+}
+.prose-content h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 14px 0 4px;
+}
+.prose-content h5,
+.prose-content h6 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin: 12px 0 4px;
+}
+
+.prose-content p {
+  margin: 0 0 12px;
+}
+.prose-content p:first-child {
+  margin-top: 0;
+}
+.prose-content p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-content strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose-content em {
+  font-style: italic;
+}
+
+.prose-content ul,
+.prose-content ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.prose-content ul {
+  list-style-type: disc;
+}
+.prose-content ol {
+  list-style-type: decimal;
+}
+.prose-content ul ul {
+  list-style-type: circle;
+}
+.prose-content li {
+  margin: 2px 0;
+}
+.prose-content li > p {
+  margin: 2px 0;
+}
+
+.prose-content code {
+  background: var(--bg-input);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.prose-content pre {
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  margin: 0 0 14px;
+  color: var(--ink-2);
+}
+.prose-content pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  border-radius: 0;
+}
+
+.prose-content blockquote {
+  border-left: 2px solid var(--accent);
+  margin: 0 0 14px;
+  padding: 2px 0 2px 14px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 1em;
+  line-height: 1.55;
+}
+
+/* Emphasis (markdown *italic*) stays italic but uses the default sans —
+   the italic variant of Inter is easier to read than Instrument Serif
+   italic for inline emphasis. */
+.prose-content em {
+  font-family: var(--font-sans);
+  font-style: italic;
+}
+
+.prose-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 14px;
+  font-size: 12px;
+}
+.prose-content th,
+.prose-content td {
+  border: 1px solid var(--rule);
+  padding: 6px 12px;
+  text-align: left;
+}
+.prose-content th {
+  background: var(--bg-input);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prose-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.prose-content a:hover {
+  text-decoration: underline;
+}
+
+.prose-content img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.prose-content hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 20px 0;
+}
+
+/* Mermaid diagram blocks */
+
+/* Right pane: chat stream */
+.spec-chat-stream {
+  width: 360px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.spec-chat-stream__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.spec-chat-stream__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.spec-chat-stream__header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.spec-chat-clear-btn,
+.spec-chat-fold-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  line-height: 1.4;
+}
+
+.spec-chat-clear-btn:hover,
+.spec-chat-fold-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.spec-chat-send-group {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.spec-chat-send-group .spec-chat-send-btn {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.spec-chat-mode-btn {
+  font-size: 10px;
+  padding: 5px 5px;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.spec-chat-mode-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-chat-stream__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Thread tab bar above chat messages. Mirrors the workspace-group-tab
+ * look (see ui/css/header.css) so multi-tab UX is consistent across
+ * the header and the specs chat. */
+.spec-chat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+
+.spec-chat-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.spec-chat-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-chat-tab--active {
+  color: var(--text);
+  background: var(--bg-card);
+  border-color: var(--border);
+  position: relative;
+  /* Nudge the active tab down so its bottom border meets the
+   * container's border-bottom and appears to "sit on" the content. */
+  margin-bottom: -1px;
+  border-bottom: 1px solid var(--bg-card);
+}
+
+.spec-chat-tab__label {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 160px;
+}
+
+.spec-chat-tab__unread {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #2b7cff);
+  display: inline-block;
+}
+
+.spec-chat-tab__pencil,
+.spec-chat-tab__close {
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.5;
+  line-height: 1;
+}
+
+.spec-chat-tab__pencil:hover,
+.spec-chat-tab__close:hover {
+  opacity: 1;
+}
+
+.spec-chat-tab__new-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.spec-chat-tab__new,
+.spec-chat-tab__archived-trigger {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  font-size: 14px;
+}
+
+.spec-chat-tab__new:hover,
+.spec-chat-tab__archived-trigger:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-chat-tab__rename-input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-input, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: 120px;
+  outline: none;
+}
+
+.spec-chat-archived-menu {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  min-width: 180px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  padding: 4px 0;
+  z-index: 10000;
+}
+
+.spec-chat-archived-menu__header {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.spec-chat-archived-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.spec-chat-archived-menu__item:hover {
+  background: var(--bg-hover);
+}
+
+/* Composer: Slack-style bordered container with textarea + action bar */
+.spec-chat-composer {
+  margin: 6px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input, var(--bg));
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.spec-chat-composer:focus-within {
+  border-color: var(--accent);
+}
+
+.spec-chat-composer__input {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px 4px;
+  min-height: 24px;
+  max-height: 160px;
+  resize: none;
+  overflow-y: auto;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.spec-chat-composer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 6px;
+}
+
+.spec-chat-composer__actions {
+  display: flex;
+  gap: 2px;
+}
+
+.spec-chat-composer__action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.spec-chat-composer__action:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.spec-chat-composer__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-chat-composer__hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.spec-chat-send-group {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.spec-chat-composer__send {
+  padding: 4px 10px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px 0 0 4px;
+  cursor: pointer;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  line-height: 1;
+}
+
+.spec-chat-composer__send:hover {
+  opacity: 0.9;
+}
+
+.spec-chat-composer__send-toggle {
+  padding: 4px 5px;
+  font-size: 10px;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  line-height: 1;
+}
+
+.spec-chat-composer__send-toggle:hover {
+  opacity: 0.9;
+}
+
+/* Resize handle between focused view and chat */
+.spec-chat-resize {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.spec-chat-resize:hover {
+  background: var(--accent);
+}
+
+/* ===== Spec Explorer Tree ===== */
+
+.spec-loading {
+  padding: 12px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Pinned Roadmap entry at the top of the spec explorer — stable visual
+   anchor for specs/README.md, regardless of track filter. */
+.spec-explorer-pinned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+.spec-explorer-pinned:hover {
+  background: var(--bg-hover);
+}
+.spec-explorer-pinned:focus {
+  outline: none;
+  background: var(--bg-hover);
+}
+.spec-explorer-pinned--focused {
+  border-left: 2px solid var(--accent);
+  background: var(--bg-hover);
+}
+
+.spec-track-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-top: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.spec-track-header:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spec-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spec-node:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.spec-node--focused {
+  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
+  color: var(--text);
+}
+.spec-node--focused .spec-node-icon {
+  color: var(--accent);
+}
+
+.spec-node--archived {
+  opacity: 0.6;
+  color: #6c757d;
+}
+
+.spec-show-archived {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.spec-show-archived.hidden {
+  display: none;
+}
+
+.spec-node-toggle {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  border-radius: 3px;
+}
+
+.spec-node-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.spec-node-toggle svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+.spec-node-toggle-placeholder {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.spec-node-icon {
+  flex-shrink: 0;
+}
+
+.spec-node-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.spec-node-progress {
+  color: var(--text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.spec-select-checkbox {
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.spec-select-checkbox:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.spec-dispatch-bar {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.spec-dispatch-selected-btn {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.spec-dispatch-selected-btn:hover {
+  background: var(--accent-hover, #1d4ed8);
+}
+
+.spec-dispatch-selected-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spec-status-filter {
+  font-size: 10px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+/* ===== Planning Chat Bubbles ===== */
+
+.planning-chat-bubble {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  max-width: 100%;
+  position: relative;
+  font-size: 13px;
+}
+
+.planning-chat-bubble__av {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--bg-sunk);
+  color: var(--text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.planning-chat-bubble--user .planning-chat-bubble__av {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.planning-chat-bubble--assistant .planning-chat-bubble__av {
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-card));
+  color: var(--accent);
+}
+
+.planning-chat-bubble__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.planning-chat-bubble__meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.planning-chat-bubble__time {
+  font-weight: 500;
+}
+
+.planning-chat-bubble__time:not(:empty)::before {
+  content: "·";
+  margin: 0 4px;
+}
+
+.planning-chat-bubble__content {
+  color: var(--text);
+  line-height: 1.55;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.planning-chat-bubble__content > :first-child {
+  margin-top: 0;
+}
+
+.planning-chat-bubble__content > :last-child {
+  margin-bottom: 0;
+}
+
+/* Scale down prose headings inside chat bubbles so they don't dominate.
+   Chat flow reads more naturally with sans headings — override the serif
+   italic from the canonical .prose-content. */
+.planning-chat-bubble--assistant .prose-content h1,
+.planning-chat-bubble--assistant .prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.planning-chat-bubble--assistant .prose-content h1 {
+  font-size: 15px;
+  margin: 8px 0 6px;
+}
+.planning-chat-bubble--assistant .prose-content h2 {
+  font-size: 14px;
+  margin: 8px 0 6px;
+}
+.planning-chat-bubble--assistant .prose-content h3 {
+  font-size: 12px;
+  margin: 6px 0 4px;
+}
+.planning-chat-bubble--assistant .prose-content h4 {
+  font-size: 13px;
+  margin: 6px 0 4px;
+}
+.planning-chat-bubble--assistant .prose-content p {
+  margin: 0 0 8px;
+}
+
+.planning-chat-bubble__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.planning-chat-bubble:hover .planning-chat-bubble__actions,
+.planning-chat-bubble:focus-within .planning-chat-bubble__actions {
+  opacity: 1;
+}
+
+.planning-chat-bubble__undo {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.planning-chat-bubble__undo:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.planning-chat-bubble__undo:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.planning-chat-bubble--reverted .planning-chat-bubble__content {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--text-muted);
+}
+
+.planning-chat-system {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 0;
+  font-style: italic;
+}
+
+.planning-chat-system--undo {
+  text-align: left;
+  font-style: normal;
+  background: var(--bg-card);
+  border-left: 2px solid var(--border);
+  padding: 6px 10px;
+  margin: 4px 0;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.planning-chat-system__files {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.planning-chat-system__files li {
+  list-style: disc;
+  margin: 0;
+  padding: 0;
+}
+
+.planning-chat-error {
+  background: var(--bg-card);
+  border: 1px solid var(--danger, #e53e3e);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--danger, #e53e3e);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.planning-chat-interrupted {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 2px 0 8px;
+}
+
+.planning-chat-activity {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.planning-chat-activity summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Timeline-style activity log — left accent border, no outer box. */
+.planning-chat-activity__log {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--border);
+}
+
+/* Flatten tool results inside chat activity — no indent, inline flow.
+   Override .prose-content pre styling so <pre class="cc-result-text">
+   renders the same way as in the task detail panel (no box). */
+.planning-chat-activity .cc-tool-result {
+  padding-left: 0;
+}
+
+.planning-chat-activity pre.cc-result-text {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.planning-chat-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.planning-chat-thinking {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.planning-chat-thinking__dots span {
+  animation: planning-chat-dot 1.4s infinite;
+  opacity: 0.2;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.planning-chat-thinking__dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.planning-chat-thinking__dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes planning-chat-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* Queue chips */
+.planning-chat-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.planning-chat-queue:empty {
+  display: none;
+}
+
+.planning-chat-queue__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  max-width: 200px;
+}
+
+.planning-chat-queue__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.planning-chat-queue__text:hover {
+  color: var(--accent);
+}
+
+.planning-chat-queue__remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+
+.planning-chat-queue__remove:hover {
+  color: var(--danger, #e53e3e);
+}
+
+.planning-chat-queue__edit {
+  font-size: 11px;
+  padding: 1px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+}
+
+.planning-chat-interrupt-btn {
+  background: var(--danger, #e53e3e) !important;
+}
+
+.planning-chat-interrupt-btn:hover {
+  opacity: 0.85;
+}
+
+/* Slash command autocomplete — reuses mention-dropdown styling */

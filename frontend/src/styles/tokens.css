@@ -1,45 +1,217 @@
 @import './fonts.css';
 
-/* ===== Wallfacer Theme (default) ===== */
-:root {
-    --bg: #f0ede6;
-    --bg-surface: #faf8f4;
-    --bg-raised: #e8e4dc;
-    --bg-code: #e4e0d8;
-    --accent: #d97757;
-    --accent-hover: #c4623f;
-    --accent-subtle: rgba(217, 119, 87, 0.08);
-    --accent-glow: rgba(217, 119, 87, 0.15);
-    --accent-glow-strong: rgba(217, 119, 87, 0.3);
-    --text: #1f1d1a;
-    --text-secondary: #5c5851;
-    --text-muted: #9c9890;
-    --border: rgba(0,0,0,0.08);
-    --border-strong: #d4cfc6;
-    --shadow: 0 1px 3px rgba(0,0,0,0.07);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-    --shadow-lg: 0 8px 24px rgba(0,0,0,0.11);
-    --grid-color: rgba(0,0,0,0.035);
+/* =======================================================================
+   Wallfacer — Design Tokens
+   Paper-ink palette with clay accent. Ported from the redesign mock.
+   Existing CSS reads legacy aliases (--text, --border, --accent-hover, ...)
+   which are defined alongside the new canonical tokens.
+   ======================================================================= */
+
+:root,
+[data-theme="light"] {
+  /* Typography */
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, monospace;
+
+  --fs-9: 10px;
+  --fs-10: 11px;
+  --fs-base: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --fs-xl: 16px;
+  --fs-2xl: 20px;
+  --fs-3xl: 28px;
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+
+  /* Space */
+  --sp-1: 4px;
+  --sp-2: 6px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 20px;
+  --sp-7: 28px;
+
+  /* Chrome heights */
+  --h-header: 40px;
+  --h-status: 24px;
+  --h-row: 28px;
+
+  /* Sidebar widths */
+  --sb-w: 208px;
+  --sb-w-icon: 48px;
+
+  /* Surfaces (paper-ink) */
+  --bg: #f4f1ea; /* canvas */
+  --bg-sunk: #ebe7de; /* recessed (inputs, empty zones) */
+  --bg-elevated: #faf8f3; /* slightly raised */
+  --bg-card: #ffffff; /* cards / popovers */
+  --bg-sidebar: #ece8de; /* sidebar chrome */
+  --bg-hover: rgba(31, 29, 26, 0.045);
+  --bg-active: rgba(31, 29, 26, 0.08);
+
+  /* Legacy --bg-raised held "recessed" semantics in existing CSS;
+     keep that meaning so badges/buttons/mentions don't invert. */
+  --bg-raised: var(--bg-sunk);
+  --bg-input: var(--bg-sunk);
+
+  /* Ink */
+  --ink: #1b1916;
+  --ink-2: #4c4842;
+  --ink-3: #7a766e;
+  --ink-4: #a8a399;
+
+  /* Rules */
+  --rule: #d9d3c5;
+  --rule-2: #c7c0af;
+
+  /* Accent — clay */
+  --accent: #c45a33;
+  --accent-2: #a84e2e;
+  --accent-soft: #f3dccf;
+  --accent-tint: rgba(196, 90, 51, 0.08);
+
+  /* Semantic */
+  --ok: #3f7a4a;
+  --warn: #a56a12;
+  --info: #3a6db3;
+  --err: #a32d2d;
+  --purple: #6a4aa3;
+
+  /* Status column chips */
+  --col-backlog: #8e8a80;
+  --col-progress: #3a6db3;
+  --col-waiting: #a56a12;
+  --col-done: #3f7a4a;
+
+  /* Shadows */
+  --sh-1: 0 1px 0 rgba(27, 25, 22, 0.04);
+  --sh-2: 0 1px 2px rgba(27, 25, 22, 0.06), 0 1px 0 rgba(27, 25, 22, 0.03);
+  --sh-pop:
+    0 12px 40px -12px rgba(27, 25, 22, 0.18), 0 2px 6px rgba(27, 25, 22, 0.06);
+
+  /* Chart / badge tints */
+  --tint-blue: #e4eaf4;
+  --tint-blue-ink: #2d538a;
+  --tint-amber: #f1e7cf;
+  --tint-amber-ink: #7a5418;
+  --tint-green: #d9e6d6;
+  --tint-green-ink: #2d5a36;
+  --tint-plum: #e6dde9;
+  --tint-plum-ink: #573f77;
+  --tint-red: #f0d9d5;
+  --tint-red-ink: #822020;
+  --tint-neutral: #e7e2d4;
+  --tint-neutral-ink: #5c574d;
+
+  /* Legacy aliases consumed by existing CSS */
+  --text: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --border: var(--rule);
+  --accent-hover: var(--accent-2);
+  --shadow: var(--sh-2);
+  --shadow-md: var(--sh-2);
+  --shadow-lg: var(--sh-pop);
+
+  /* Cloud-page tokens (used by landing/docs styles in app.css) */
+  --bg-surface: var(--bg-elevated);
+  --accent-subtle: var(--accent-tint);
+  --accent-glow: rgba(196, 90, 51, 0.15);
+  --accent-glow-strong: rgba(196, 90, 51, 0.3);
+  --grid-color: rgba(0, 0, 0, 0.035);
+
+  /* Terminal surface — always dark, does not swap with theme. */
+  --terminal-bg: #1b1916;
+  --terminal-fg: #f4f1ea;
+  --terminal-rule: #2a2720;
+  --terminal-ink-muted: rgba(244, 241, 234, 0.55);
+  --terminal-ink-dim: rgba(244, 241, 234, 0.45);
+  --terminal-tab-hover: #24221d;
+  --terminal-tab-active: #2a2823;
 }
 
-/* ===== Dark Mode ===== */
 [data-theme="dark"] {
-    --bg: #1a1917;
-    --bg-surface: #272420;
-    --bg-raised: #211f1c;
-    --bg-code: #252320;
-    --accent: #d97757;
-    --accent-hover: #e08a68;
-    --accent-subtle: rgba(217, 119, 87, 0.08);
-    --accent-glow: rgba(217, 119, 87, 0.1);
-    --accent-glow-strong: rgba(217, 119, 87, 0.2);
-    --text: #f0ede6;
-    --text-secondary: #a8a49c;
-    --text-muted: #908c86;
-    --border: rgba(255,255,255,0.06);
-    --border-strong: #302e2a;
-    --shadow: 0 1px 3px rgba(0,0,0,0.35);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
-    --shadow-lg: 0 8px 24px rgba(0,0,0,0.55);
-    --grid-color: rgba(255,255,255,0.025);
+  --bg: #15140f;
+  --bg-sunk: #100f0c;
+  --bg-elevated: #1c1a15;
+  --bg-card: #1e1c17;
+  --bg-sidebar: #100f0c;
+  --bg-hover: rgba(244, 241, 234, 0.04);
+  --bg-active: rgba(244, 241, 234, 0.08);
+  --bg-raised: var(--bg-sunk);
+  --bg-input: #191712;
+
+  --ink: #ece6d6;
+  --ink-2: #b9b2a0;
+  --ink-3: #857f6f;
+  --ink-4: #5a5449;
+
+  --rule: #2a2720;
+  --rule-2: #3a362c;
+
+  --accent: #e07a51;
+  --accent-2: #f08961;
+  --accent-soft: #3a1f14;
+  --accent-tint: rgba(224, 122, 81, 0.12);
+
+  --ok: #6fb37f;
+  --warn: #d4a050;
+  --info: #7aa3d9;
+  --err: #dc7878;
+  --purple: #a389d4;
+
+  --col-backlog: #858070;
+  --col-progress: #7aa3d9;
+  --col-waiting: #d4a050;
+  --col-done: #6fb37f;
+
+  --sh-1: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  --tint-blue: #1a2638;
+  --tint-blue-ink: #9bbce8;
+  --tint-amber: #2e2412;
+  --tint-amber-ink: #d9a868;
+  --tint-green: #1a2a1e;
+  --tint-green-ink: #8bc78f;
+  --tint-plum: #261e33;
+  --tint-plum-ink: #b49de0;
+  --tint-red: #2e1818;
+  --tint-red-ink: #e09090;
+  --tint-neutral: #2a2620;
+  --tint-neutral-ink: #a39e90;
+
+  --text: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --border: var(--rule);
+  --accent-hover: var(--accent-2);
+  --shadow: var(--sh-2);
+  --shadow-md: var(--sh-2);
+  --shadow-lg: var(--sh-pop);
+
+  --bg-surface: var(--bg-elevated);
+  --accent-subtle: var(--accent-tint);
+  --accent-glow: rgba(224, 122, 81, 0.10);
+  --accent-glow-strong: rgba(224, 122, 81, 0.20);
+  --grid-color: rgba(255, 255, 255, 0.025);
+}
+
+.serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+.mono {
+  font-family: var(--font-mono);
 }
