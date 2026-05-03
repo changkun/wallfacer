@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
@@ -11,6 +11,14 @@ import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const selectedTask = ref<Task | null>(null);
+
+const doneCost = computed(() =>
+  store.done.reduce((sum, t) => sum + (t.usage?.cost_usd || 0), 0),
+);
+
+async function archiveAllDone() {
+  await api('POST', '/api/tasks/archive-done');
+}
 
 onMounted(async () => {
   if (!store.tasks.length) await store.fetchTasks();
@@ -100,6 +108,8 @@ function statusColor(status: string): string {
         <div class="column-header">
           <span class="column-dot" :style="{ background: statusColor('done') }" />
           <span class="column-label">Done</span>
+          <span class="column-cost">${{ doneCost.toFixed(2) }}</span>
+          <button v-if="store.done.length > 0" class="archive-all-btn" @click="archiveAllDone">Archive all</button>
           <span class="column-count">{{ store.done.length }}</span>
         </div>
         <div class="column-body">
@@ -153,6 +163,27 @@ function statusColor(status: string): string {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+.column-cost {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+.archive-all-btn {
+  font-size: 10px;
+  color: var(--ink-4);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm, 4px);
+  padding: 1px 6px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+.archive-all-btn:hover {
+  color: var(--ink-2);
+  border-color: var(--ink-4);
 }
 .column-count {
   margin-left: auto;

@@ -9,7 +9,7 @@ const store = useTaskStore();
 const { theme, cycle } = useTheme();
 
 defineProps<{ collapsed: boolean }>();
-const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers: [] }>();
+const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers: []; palette: [] }>();
 
 function themeLabel(): string {
   switch (theme.value) {
@@ -29,38 +29,51 @@ function themeLabel(): string {
       </div>
     </div>
 
+    <div v-if="!collapsed" class="sb-workspace-select">
+      <span class="sb-ws-icon">W</span>
+      <span class="sb-ws-name">{{ store.config?.workspaces?.[0]?.split('/').pop() || 'No workspace' }}</span>
+    </div>
+
+    <div v-if="!collapsed" class="sb-cmd-hint" @click="emit('palette')">
+      <span>Search or command</span>
+      <kbd>&#x2318;K</kbd>
+    </div>
+
     <nav v-if="!collapsed" class="sb-nav">
+      <div class="sb-section-label">WORKSPACE</div>
       <router-link to="/" class="sb-item" :class="{ active: route.path === '/' }">
-        <span class="sb-icon">☰</span>
+        <span class="sb-icon">&#x2630;</span>
         <span>Board</span>
       </router-link>
       <router-link to="/agents" class="sb-item" :class="{ active: route.path === '/agents' }">
-        <span class="sb-icon">◆</span>
+        <span class="sb-icon">&#x25C6;</span>
         <span>Agents</span>
       </router-link>
       <router-link to="/flows" class="sb-item" :class="{ active: route.path === '/flows' }">
-        <span class="sb-icon">→</span>
+        <span class="sb-icon">&#x2192;</span>
         <span>Flows</span>
       </router-link>
       <router-link to="/plan" class="sb-item" :class="{ active: route.path === '/plan' }">
-        <span class="sb-icon">◎</span>
+        <span class="sb-icon">&#x25CE;</span>
         <span>Plan</span>
       </router-link>
       <router-link to="/explorer" class="sb-item" :class="{ active: route.path === '/explorer' }">
-        <span class="sb-icon">⊞</span>
+        <span class="sb-icon">&#x229E;</span>
         <span>Explorer</span>
       </router-link>
+      <router-link to="/office" class="sb-item" :class="{ active: route.path === '/office' }">
+        <span class="sb-icon">&#x25A0;</span>
+        <span>Office</span>
+      </router-link>
+
+      <div class="sb-section-label">INSPECT</div>
       <router-link to="/terminal" class="sb-item" :class="{ active: route.path === '/terminal' }">
-        <span class="sb-icon">▸</span>
+        <span class="sb-icon">&#x25B8;</span>
         <span>Terminal</span>
       </router-link>
       <router-link to="/analytics" class="sb-item" :class="{ active: route.path === '/analytics' }">
-        <span class="sb-icon">▪</span>
+        <span class="sb-icon">&#x25AA;</span>
         <span>Analytics</span>
-      </router-link>
-      <router-link to="/office" class="sb-item" :class="{ active: route.path === '/office' }">
-        <span class="sb-icon">■</span>
-        <span>Office</span>
       </router-link>
     </nav>
 
@@ -150,8 +163,74 @@ function themeLabel(): string {
   white-space: nowrap;
 }
 
+.sb-workspace-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 8px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  cursor: default;
+}
+.sb-ws-icon {
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.sb-ws-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-cmd-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 8px 0;
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.sb-cmd-hint:hover {
+  background: var(--bg-hover);
+  color: var(--ink-3);
+}
+.sb-cmd-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+}
+
+.sb-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-4);
+  letter-spacing: 0.05em;
+  padding: 10px 8px 4px;
+}
+
 .sb-nav {
-  padding: 8px;
+  padding: 0 8px 8px;
   flex: 1;
 }
 .sb-item {

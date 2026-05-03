@@ -43,9 +43,13 @@ function timeAgo(iso: string): string {
 
 function errorSnippet(task: Task): string {
   if (task.status !== 'failed' || !task.result) return '';
-  const lines = task.result.split('\n').filter(l => l.trim());
-  const err = lines.find(l => /error|fatal|panic|fail/i.test(l)) || lines[0] || '';
-  return err.slice(0, 120);
+  return task.result.slice(0, 200);
+}
+
+function formatTimeout(seconds: number): string {
+  if (seconds >= 3600) return Math.floor(seconds / 3600) + 'h';
+  if (seconds >= 60) return Math.floor(seconds / 60) + 'm';
+  return seconds + 's';
 }
 
 async function retryTask(e: Event) {
@@ -72,6 +76,7 @@ async function retryTask(e: Event) {
       <span class="card-id">{{ shortId(props.task.id) }}</span>
       <span class="card-status">{{ statusLabel(props.task) }}</span>
       <span v-if="props.task.sandbox" class="card-sandbox">{{ props.task.sandbox }}</span>
+      <span v-if="props.task.timeout" class="card-timeout">{{ formatTimeout(props.task.timeout) }}</span>
       <span v-if="props.task.usage.cost_usd" class="card-cost">{{ costDisplay(props.task.usage.cost_usd) }}</span>
       <span class="card-time">{{ timeAgo(props.task.updated_at) }}</span>
     </div>
@@ -120,7 +125,7 @@ async function retryTask(e: Event) {
   line-height: 1.4;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
 }
 
@@ -162,6 +167,7 @@ async function retryTask(e: Event) {
 .status-cancelled .card-status { color: var(--ink-3); background: var(--bg-hover); }
 .status-backlog .card-status { color: var(--col-backlog); }
 .card-sandbox { color: var(--ink-3); font-size: 9px; }
+.card-timeout { color: var(--ink-3); font-size: 9px; }
 .card-cost { color: var(--ink-3); }
 .card-time { margin-left: auto; }
 
