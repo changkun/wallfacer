@@ -65,13 +65,14 @@ const visibleNodes = computed(() => {
   const hidden = new Set<string>();
   for (const node of sortedNodes.value) {
     if (hidden.has(node.path)) continue;
-    if (collapsed.value.has(node.path) && node.children.length > 0) {
-      const queue = [...node.children];
+    const children = node.children ?? [];
+    if (collapsed.value.has(node.path) && children.length > 0) {
+      const queue = [...children];
       while (queue.length) {
         const p = queue.shift()!;
         hidden.add(p);
         const child = nodes.value.find(n => n.path === p);
-        if (child) queue.push(...child.children);
+        if (child) queue.push(...(child.children ?? []));
       }
     }
   }
@@ -267,7 +268,7 @@ onUnmounted(() => {
           @click="selectSpec(node.path)"
         >
           <span
-            v-if="node.children.length > 0"
+            v-if="(node.children?.length ?? 0) > 0"
             class="tree-chevron"
             :class="{ open: !collapsed.has(node.path) }"
             @click.stop="toggleCollapse(node.path)"
