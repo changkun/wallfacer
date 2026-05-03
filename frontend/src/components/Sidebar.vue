@@ -42,6 +42,14 @@ function themeLabel(): string {
         <span class="sb-icon">→</span>
         <span>Flows</span>
       </router-link>
+      <router-link to="/plan" class="sb-item" :class="{ active: route.path === '/plan' }">
+        <span class="sb-icon">◎</span>
+        <span>Plan</span>
+      </router-link>
+      <router-link to="/explorer" class="sb-item" :class="{ active: route.path === '/explorer' }">
+        <span class="sb-icon">⊞</span>
+        <span>Explorer</span>
+      </router-link>
       <router-link to="/terminal" class="sb-item" :class="{ active: route.path === '/terminal' }">
         <span class="sb-icon">▸</span>
         <span>Terminal</span>

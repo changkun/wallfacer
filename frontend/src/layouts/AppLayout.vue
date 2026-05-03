@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
 import SettingsModal from '../components/SettingsModal.vue';
+import CommandPalette from '../components/CommandPalette.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useKeyboard } from '../composables/useKeyboard';
@@ -11,6 +12,11 @@ import type { Task } from '../api/types';
 const store = useTaskStore();
 const sidebarCollapsed = ref(false);
 const showSettings = ref(false);
+const showPalette = ref(false);
+
+onMounted(async () => {
+  if (!store.config) await store.fetchConfig();
+});
 
 const { connected } = useSse({
   url: '/api/tasks/stream',
@@ -22,7 +28,7 @@ const { connected } = useSse({
 });
 
 useKeyboard({
-  onSearch: () => document.querySelector<HTMLInputElement>('.search-input')?.focus(),
+  onSearch: () => { showPalette.value = true; },
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
   onSettings: () => { showSettings.value = !showSettings.value; },
 });
@@ -36,6 +42,7 @@ useKeyboard({
       <StatusBar :connected="connected" />
     </div>
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <CommandPalette v-model="showPalette" />
   </div>
 </template>
 
