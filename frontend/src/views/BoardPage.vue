@@ -1,41 +1,213 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
+import { useTaskStore } from '../stores/tasks';
 import { useBootStore } from '../stores/boot';
+import { useSse } from '../composables/useSse';
+import TaskCard from '../components/TaskCard.vue';
+import type { Task } from '../api/types';
 
+const store = useTaskStore();
 const boot = useBootStore();
+
+onMounted(async () => {
+  await Promise.all([store.fetchTasks(), store.fetchConfig()]);
+});
+
+useSse({
+  url: '/api/tasks/stream',
+  listeners: {
+    snapshot: (data) => {
+      store.setTasks(data as Task[]);
+    },
+    'task-updated': (data) => {
+      store.updateTask(data as Task);
+    },
+    'task-deleted': (data) => {
+      const d = data as { id: string };
+      store.removeTask(d.id);
+    },
+  },
+});
+
+function statusColor(status: string): string {
+  switch (status) {
+    case 'backlog': return 'var(--col-backlog)';
+    case 'in_progress':
+    case 'committing': return 'var(--col-progress)';
+    case 'waiting':
+    case 'failed': return 'var(--col-waiting)';
+    case 'done':
+    case 'cancelled': return 'var(--col-done)';
+    default: return 'var(--ink-3)';
+  }
+}
 </script>
 
 <template>
-  <div class="board-placeholder">
-    <div class="board-placeholder-inner">
-      <h1>Wallfacer</h1>
-      <p>Task board coming soon.</p>
-      <p class="board-placeholder-meta">
-        Mode: {{ boot.mode }} &middot; Version: {{ boot.version || 'dev' }}
-      </p>
+  <div class="board">
+    <header class="board-header">
+      <span class="board-title">Wallfacer</span>
+      <span class="board-version">{{ boot.version || 'dev' }}</span>
+    </header>
+
+    <div class="board-columns">
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('backlog') }" />
+          <span class="column-label">Backlog</span>
+          <span class="column-count">{{ store.backlog.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskCard v-for="t in store.backlog" :key="t.id" :task="t" />
+          <div v-if="!store.loading && store.backlog.length === 0" class="column-empty">
+            No tasks
+          </div>
+        </div>
+      </section>
+
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('in_progress') }" />
+          <span class="column-label">In Progress</span>
+          <span class="column-count">{{ store.inProgress.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskCard v-for="t in store.inProgress" :key="t.id" :task="t" />
+          <div v-if="store.inProgress.length === 0" class="column-empty">
+            Idle
+          </div>
+        </div>
+      </section>
+
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('waiting') }" />
+          <span class="column-label">Waiting</span>
+          <span class="column-count">{{ store.waiting.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskCard v-for="t in store.waiting" :key="t.id" :task="t" />
+          <div v-if="store.waiting.length === 0" class="column-empty">
+            None
+          </div>
+        </div>
+      </section>
+
+      <section class="column">
+        <div class="column-header">
+          <span class="column-dot" :style="{ background: statusColor('done') }" />
+          <span class="column-label">Done</span>
+          <span class="column-count">{{ store.done.length }}</span>
+        </div>
+        <div class="column-body">
+          <TaskCard v-for="t in store.done" :key="t.id" :task="t" />
+          <div v-if="store.done.length === 0" class="column-empty">
+            None
+          </div>
+        </div>
+      </section>
     </div>
+
+    <div v-if="store.loading" class="board-loading">Loading tasks...</div>
   </div>
 </template>
 
 <style scoped>
-.board-placeholder {
+.board {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.board-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  background: var(--bg, #f4f1ea);
-  color: var(--text, #1b1916);
-  font-family: var(--font-sans, system-ui, sans-serif);
+  gap: 8px;
+  height: var(--h-header);
+  padding: 0 var(--sp-5);
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
 }
-.board-placeholder-inner {
+.board-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.board-version {
+  color: var(--ink-4);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.board-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  flex: 1;
+  overflow: hidden;
+  background: var(--rule);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.column-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+.column-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.column-empty {
+  padding: 20px 12px;
   text-align: center;
+  color: var(--ink-4);
+  font-size: 12px;
 }
-.board-placeholder-inner h1 {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-}
-.board-placeholder-meta {
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  opacity: 0.5;
+
+.board-loading {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  color: var(--ink-3);
+  font-size: 12px;
+  box-shadow: var(--sh-2);
 }
 </style>
