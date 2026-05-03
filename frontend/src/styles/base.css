@@ -1,0 +1,132 @@
+/* --- Tag palette ---
+   All task-tag slots cycle through the design-system's 6 tint pairs
+   (blue / amber / green / plum / red / neutral) defined in tokens.css.
+   Dark-mode values come from the same token definitions automatically. */
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+  --tag-bg-0: var(--tint-blue);
+  --tag-text-0: var(--tint-blue-ink);
+  --tag-bg-1: var(--tint-amber);
+  --tag-text-1: var(--tint-amber-ink);
+  --tag-bg-2: var(--tint-green);
+  --tag-text-2: var(--tint-green-ink);
+  --tag-bg-3: var(--tint-plum);
+  --tag-text-3: var(--tint-plum-ink);
+  --tag-bg-4: var(--tint-red);
+  --tag-text-4: var(--tint-red-ink);
+  --tag-bg-5: var(--tint-neutral);
+  --tag-text-5: var(--tint-neutral-ink);
+  --tag-bg-6: var(--tint-blue);
+  --tag-text-6: var(--tint-blue-ink);
+  --tag-bg-7: var(--tint-amber);
+  --tag-text-7: var(--tint-amber-ink);
+  --tag-bg-8: var(--tint-green);
+  --tag-text-8: var(--tint-green-ink);
+  --tag-bg-9: var(--tint-plum);
+  --tag-text-9: var(--tint-plum-ink);
+  --tag-bg-10: var(--tint-red);
+  --tag-text-10: var(--tint-red-ink);
+  --tag-bg-11: var(--tint-neutral);
+  --tag-text-11: var(--tint-neutral-ink);
+}
+
+::selection {
+  background: rgba(80, 130, 190, 0.3);
+  color: inherit;
+}
+[data-theme="dark"] ::selection {
+  background: rgba(100, 160, 220, 0.35);
+  color: inherit;
+}
+
+/* --- Custom scrollbars --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s;
+}
+
+*:hover {
+  scrollbar-color: var(--border) transparent;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* --- Spinner --- */
+.spinner {
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--accent);
+    opacity: 0.7;
+  }
+}
+
+/* --- Utility --- */
+.text-v-primary {
+  color: var(--text);
+}
+.text-v-secondary {
+  color: var(--text-secondary);
+}
+.text-v-muted {
+  color: var(--text-muted);
+}
+.border-v {
+  border-color: var(--border);
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
