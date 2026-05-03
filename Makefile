@@ -150,7 +150,7 @@ shell:
 # The route registration test verifies every contract route has a handler in BuildMux.
 api-contract:
 	go run scripts/gen-api-contract.go
-	npx --yes prettier@3 --write ui/js/generated/
+	bunx --bun prettier@3 --write ui/js/generated/
 	go test ./internal/cli/ -run TestContractRoutes_AllRegisteredInMux -count=1
 
 # Transpile TypeScript sources under ui/js/ to sibling .js files so the
@@ -163,13 +163,13 @@ ui-ts:
 # Run the TypeScript type checker without emitting output. Runs as part
 # of `make lint` so pre-commit catches type errors before shipping.
 typecheck-js:
-	cd ui && (npx --no-install tsc --noEmit || \
-		(npm install --no-audit --no-fund && npx --no-install tsc --noEmit))
+	cd ui && (bunx --bun tsc --noEmit || \
+		(bun install && bunx --bun tsc --noEmit))
 
 # Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
 # Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
 ui-css:
-	npx tailwindcss@3 -i ui/tailwind.input.css -o ui/css/tailwind.css \
+	bunx --bun tailwindcss@3 -i ui/tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
 
 # Format all source files (Go + frontend)
@@ -181,7 +181,7 @@ fmt-go:
 
 # Format frontend JS, HTML, and CSS files
 fmt-js:
-	npx --yes prettier@3 --write 'ui/**/*.{js,html,css}' '!ui/index.html' '!ui/js/vendor/**' '!ui/js/build/**' '!ui/css/vendor/**'
+	bunx --bun prettier@3 --write 'ui/**/*.{js,html,css}' '!ui/index.html' '!ui/js/vendor/**' '!ui/js/build/**' '!ui/css/vendor/**'
 
 # Run all linters (Go + frontend)
 lint: lint-go lint-js
@@ -197,7 +197,7 @@ lint-go:
 
 # Run frontend linter (Biome) over ui/js and ui/partials, plus TypeScript typecheck.
 lint-js: typecheck-js
-	cd ui && npx --yes @biomejs/biome@1.9.4 lint --max-diagnostics=5000 js partials
+	cd ui && bunx --bun @biomejs/biome@1.9.4 lint --max-diagnostics=5000 js partials
 
 # Run all checks (fmt + lint + backend tests + frontend tests)
 test: fmt lint test-backend test-frontend
@@ -209,7 +209,7 @@ test-backend:
 # Run frontend JavaScript unit tests. Depends on ui-ts so vm-based
 # tests that readFileSync the compiled .js twins see fresh output.
 test-frontend: ui-ts
-	cd ui && npx --yes vitest@2 run
+	cd ui && bunx vitest@2 run
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex sandboxes.
 # Requires a running wallfacer server with valid credentials.
@@ -237,7 +237,7 @@ endif
 # ---- wallfacerd (wf.latere.ai) ----
 
 web-frontend:                                                            ## Build wallfacerd frontend and copy dist for embedding
-	cd frontend && npm run build
+	cd frontend && bun run build
 	rm -rf internal/webserver/spa/dist
 	cp -r frontend/dist internal/webserver/spa/dist
 
@@ -245,7 +245,7 @@ web-run: web-frontend                                                    ## Run 
 	go run . web -addr :8080
 
 web-dev:                                                                 ## Run wallfacerd dev stack (Go :8080 + Vite :5173)
-	go run . web -addr :8080 & cd frontend && npm run dev
+	go run . web -addr :8080 & cd frontend && bun run dev
 
 web-docker:                                                              ## Build wallfacerd Docker image
 	docker build -f Dockerfile.wallfacerd -t wallfacerd:dev .

@@ -12,12 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: cd frontend && npm ci
-      - run: cd frontend && npx vue-tsc --noEmit
-      - run: cd frontend && npx vite-ssg build
+      - uses: oven-sh/setup-bun@v2
+      - run: cd frontend && bun install --frozen-lockfile
+      - run: cd frontend && bunx --bun vue-tsc --noEmit
+      - run: cd frontend && bunx --bun vite-ssg build
       - uses: actions/upload-artifact@v4
         if: success()
         with:

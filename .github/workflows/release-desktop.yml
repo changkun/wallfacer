@@ -35,15 +35,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install UI dependencies
-        run: npm ci --no-audit --no-fund
+        run: bun install --frozen-lockfile
         working-directory: ui
 
       - name: Compile TypeScript sources

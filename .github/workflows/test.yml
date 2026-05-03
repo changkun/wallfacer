@@ -18,15 +18,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install frontend dependencies
-        run: npm ci --no-audit --no-fund
+        run: bun install --frozen-lockfile
         working-directory: ui
 
       - name: Compile TypeScript sources
@@ -55,7 +51,7 @@ jobs:
         # whole pipeline when front-end coverage is below threshold.
         continue-on-error: true
         run: |
-          npx vitest run --coverage --coverage.reportsDirectory=coverage-js --coverage.reporter=lcov --coverage.reporter=json-summary || true
+          bunx vitest run --coverage --coverage.reportsDirectory=coverage-js --coverage.reporter=lcov --coverage.reporter=json-summary || true
           js_total=0
           if [ -f coverage-js/coverage-summary.json ]; then
             js_total=$(node -e "const fs = require('node:fs'); const summary = JSON.parse(fs.readFileSync('coverage-js/coverage-summary.json', 'utf8')); process.stdout.write(String(summary.total.lines.pct));")
