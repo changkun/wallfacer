@@ -21,6 +21,10 @@ async function submit() {
   }
 }
 
+function clear() {
+  prompt.value = '';
+}
+
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
     e.preventDefault();
@@ -33,62 +37,27 @@ function onKeydown(e: KeyboardEvent) {
   <form class="composer" @submit.prevent="submit">
     <textarea
       v-model="prompt"
-      class="composer-input"
-      placeholder="Describe a task..."
-      rows="3"
+      class="composer__prompt"
+      :placeholder="`Describe the task… (Markdown supported, ${modKey}↵ to save)`"
+      rows="4"
       @keydown="onKeydown"
     />
-    <div class="composer-footer">
-      <span class="composer-hint">{{ modKey }}+Enter to submit</span>
-      <button type="submit" class="composer-btn" :disabled="!prompt.trim() || submitting">
-        {{ submitting ? 'Creating...' : 'Create Task' }}
+    <div class="composer__actions">
+      <button
+        type="button"
+        class="composer__btn composer__btn--ghost"
+        :disabled="!prompt.trim() || submitting"
+        @click="clear"
+      >
+        Clear
+      </button>
+      <button
+        type="submit"
+        class="composer__btn composer__btn--primary"
+        :disabled="!prompt.trim() || submitting"
+      >
+        {{ submitting ? 'Saving…' : 'Save' }}
       </button>
     </div>
   </form>
 </template>
-
-<style scoped>
-.composer {
-  padding: 8px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  margin: 6px;
-}
-.composer-input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  resize: vertical;
-  outline: none;
-  line-height: 1.5;
-}
-.composer-input::placeholder {
-  color: var(--ink-4);
-}
-.composer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 6px;
-}
-.composer-hint {
-  font-size: 10px;
-  color: var(--ink-4);
-}
-.composer-btn {
-  padding: 4px 12px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-sm);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.composer-btn:hover { background: var(--accent-2); }
-.composer-btn:disabled { opacity: 0.4; cursor: default; }
-</style>

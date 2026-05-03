@@ -96,120 +96,59 @@ function onOverlayClick(e: MouseEvent) {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="cp-overlay" @click="onOverlayClick" @keydown="onKeydown">
-      <div class="cp-dialog">
+    <div
+      v-if="modelValue"
+      class="modal-overlay command-palette"
+      @click="onOverlayClick"
+      @keydown="onKeydown"
+    >
+      <div class="command-palette-panel">
+        <div class="command-palette-header">
+          <span class="command-palette-label">
+            <strong>Command palette</strong>
+          </span>
+          <span class="command-palette-hints">&#8984;/ Ctrl+K</span>
+        </div>
         <input
           ref="inputRef"
           v-model="query"
-          class="cp-input"
           type="text"
-          placeholder="Type a command..."
+          class="command-palette-input"
+          placeholder="Search commands"
+          autocomplete="off"
         />
-        <ul v-if="filtered.length" class="cp-list">
-          <li
-            v-for="(cmd, i) in filtered"
-            :key="cmd.path"
-            class="cp-item"
-            :class="{ active: i === activeIndex }"
-            @click="select(cmd)"
-            @mouseenter="activeIndex = i"
-          >
-            <span class="cp-icon">{{ cmd.icon }}</span>
-            <span class="cp-label">{{ cmd.label }}</span>
-            <span class="cp-path">{{ cmd.path }}</span>
-          </li>
-        </ul>
-        <div v-else class="cp-empty">No results</div>
+        <div class="command-palette-results">
+          <div v-if="filtered.length" class="command-palette-section">
+            <div class="command-palette-section-title">Navigation</div>
+            <button
+              v-for="(cmd, i) in filtered"
+              :key="cmd.path"
+              type="button"
+              class="command-palette-row"
+              :class="{ active: i === activeIndex }"
+              @click="select(cmd)"
+              @mouseenter="activeIndex = i"
+            >
+              <div class="command-palette-row-title">
+                <span class="cp-row-icon">{{ cmd.icon }}</span>
+                {{ cmd.label }}
+              </div>
+              <div class="command-palette-row-meta">{{ cmd.path }}</div>
+            </button>
+          </div>
+          <div v-else class="command-palette-empty">No results</div>
+        </div>
       </div>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-.cp-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 20vh;
-}
-
-.cp-dialog {
-  width: 100%;
-  max-width: 480px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-lg);
-  box-shadow: var(--sh-pop);
-  overflow: hidden;
-}
-
-.cp-input {
-  width: 100%;
-  padding: 12px 16px;
-  border: none;
-  border-bottom: 1px solid var(--rule);
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  outline: none;
-}
-
-.cp-input::placeholder {
-  color: var(--ink-4);
-}
-
-.cp-list {
-  list-style: none;
-  margin: 0;
-  padding: 4px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.cp-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--ink-2);
-}
-
-.cp-item:hover,
-.cp-item.active {
-  background: var(--bg-hover);
-  color: var(--ink);
-}
-
-.cp-icon {
-  flex-shrink: 0;
-  width: 20px;
+.cp-row-icon {
+  display: inline-block;
+  width: 18px;
   text-align: center;
-  font-size: 14px;
-}
-
-.cp-label {
-  flex: 1;
-  font-weight: 500;
-}
-
-.cp-path {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
-}
-
-.cp-empty {
-  padding: 16px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--ink-3);
+  margin-right: 6px;
+  opacity: 0.85;
 }
 </style>
