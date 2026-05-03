@@ -42,6 +42,14 @@ function themeLabel(): string {
         <span class="sb-icon">→</span>
         <span>Flows</span>
       </router-link>
+      <router-link to="/terminal" class="sb-item" :class="{ active: route.path === '/terminal' }">
+        <span class="sb-icon">▸</span>
+        <span>Terminal</span>
+      </router-link>
+      <router-link to="/analytics" class="sb-item" :class="{ active: route.path === '/analytics' }">
+        <span class="sb-icon">▪</span>
+        <span>Analytics</span>
+      </router-link>
     </nav>
 
     <div v-if="!collapsed" class="sb-stats">
