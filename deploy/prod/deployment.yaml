@@ -18,6 +18,16 @@ spec:
       containers:
         - name: wallfacerd
           image: ghcr.io/changkun/wallfacerd:main
+          args: ["web", "-addr", ":8080"]
+          envFrom:
+            - secretRef:
+                name: wallfacerd-auth
+                optional: true
+          env:
+            - name: AUTH_URL
+              value: https://auth.latere.ai
+            - name: AUTH_REDIRECT_URL
+              value: https://wf.latere.ai/callback
           ports:
             - containerPort: 8080
           resources:
