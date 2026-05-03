@@ -4,7 +4,11 @@ import { api } from '../api/client';
 
 const loading = ref(true);
 const usage = ref<{ total_cost_usd: number; total_input_tokens: number; total_output_tokens: number } | null>(null);
-const stats = ref<{ total: number; by_status: Record<string, number>; workspace_costs?: { workspace: string; cost_usd: number }[] } | null>(null);
+interface StatusBucket { count: number; cost_usd: number; input_tokens: number; output_tokens: number }
+const stats = ref<{ total: number; by_status: Record<string, number | StatusBucket>; workspace_costs?: { workspace: string; cost_usd: number }[] } | null>(null);
+function statusCount(v: number | StatusBucket): number {
+  return typeof v === 'number' ? v : (v?.count ?? 0);
+}
 
 onMounted(async () => {
   try {
@@ -63,12 +67,12 @@ const statusColors: Record<string, string> = {
         <section v-if="stats?.by_status" class="section">
           <h2>By Status</h2>
           <div class="status-list">
-            <div v-for="(count, status) in stats.by_status" :key="status" class="status-row">
+            <div v-for="(bucket, status) in stats.by_status" :key="status" class="status-row">
               <span class="status-dot" :style="{ background: statusColors[status as string] || 'var(--ink-4)' }" />
               <span class="status-name">{{ status }}</span>
-              <span class="status-count">{{ count }}</span>
+              <span class="status-count">{{ statusCount(bucket) }}</span>
               <div class="status-bar-track">
-                <div class="status-bar-fill" :style="{ width: (stats.total ? (count as number) / stats.total * 100 : 0) + '%', background: statusColors[status as string] || 'var(--ink-4)' }" />
+                <div class="status-bar-fill" :style="{ width: (stats.total ? statusCount(bucket) / stats.total * 100 : 0) + '%', background: statusColors[status as string] || 'var(--ink-4)' }" />
               </div>
             </div>
           </div>
