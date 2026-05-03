@@ -44,6 +44,7 @@ useKeyboard({
       :collapsed="sidebarCollapsed"
       @toggle="sidebarCollapsed = !sidebarCollapsed"
       @settings="showSettings = true"
+      @palette="showPalette = true"
       @workspaces="showWorkspaces = true"
       @containers="showContainers = true"
     />

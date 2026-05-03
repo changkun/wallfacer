@@ -32,6 +32,10 @@ onMounted(async () => {
     <span class="sb-text sb-count" title="Waiting / Failed">◎ {{ store.waiting.length }}</span>
     <span class="sb-sep" />
     <span class="sb-text sb-count" title="In Progress">● {{ store.inProgress.length }}</span>
+    <span class="sb-sep" />
+    <router-link to="/office" class="sb-link">Office</router-link>
+    <span class="sb-sep" />
+    <router-link to="/terminal" class="sb-link">Terminal</router-link>
   </footer>
 </template>
 
@@ -57,4 +61,6 @@ onMounted(async () => {
 .sb-sep { width: 1px; height: 10px; background: var(--rule); }
 .sb-spacer { flex: 1; }
 .sb-count { font-family: var(--font-mono); font-size: 10px; }
+.sb-link { font-size: 10px; color: var(--ink-3); text-decoration: none; cursor: pointer; }
+.sb-link:hover { color: var(--ink); }
 </style>
