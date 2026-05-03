@@ -11,12 +11,19 @@ import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
 import SearchBar from '../components/SearchBar.vue';
 import SettingsModal from '../components/SettingsModal.vue';
+import { useKeyboard } from '../composables/useKeyboard';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const selectedTask = ref<Task | null>(null);
 const sidebarCollapsed = ref(false);
 const showSettings = ref(false);
+
+useKeyboard({
+  onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
+  onSearch: () => document.querySelector<HTMLInputElement>('.search-input')?.focus(),
+  onSettings: () => { showSettings.value = !showSettings.value; },
+});
 
 onMounted(async () => {
   await Promise.all([store.fetchTasks(), store.fetchConfig()]);
