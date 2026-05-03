@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 
 	"changkun.de/x/wallfacer/internal/webserver"
+	"latere.ai/x/pkg/oidc"
 )
 
 func RunWeb(args []string) {
@@ -25,6 +27,8 @@ func RunWeb(args []string) {
 		*addr = env
 	}
 
+	authClient := oidc.New(oidc.LoadConfig())
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -33,6 +37,32 @@ func RunWeb(args []string) {
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
+
+	if authClient != nil {
+		mux.HandleFunc("GET /login", authClient.HandleLogin)
+		mux.HandleFunc("GET /callback", authClient.HandleCallback)
+		mux.HandleFunc("GET /logout", authClient.HandleLogout)
+		mux.HandleFunc("GET /logout/notify", func(w http.ResponseWriter, _ *http.Request) {
+			oidc.ClearSession(w)
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
+			user := authClient.UserFromRequest(w, r)
+			if user == nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"not authenticated"}`))
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store")
+			resp := struct {
+				*oidc.User
+				AuthURL string `json:"auth_url,omitempty"`
+			}{User: user, AuthURL: authClient.AuthURL()}
+			_ = json.NewEncoder(w).Encode(resp)
+		})
+	}
 
 	webserver.MountSPA(mux)
 	webserver.SPAFallback(mux)
