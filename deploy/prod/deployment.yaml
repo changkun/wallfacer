@@ -18,7 +18,7 @@ spec:
       containers:
         - name: wallfacerd
           image: ghcr.io/changkun/wallfacerd:main
-          args: ["web", "-addr", ":8080"]
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: wallfacerd-auth
