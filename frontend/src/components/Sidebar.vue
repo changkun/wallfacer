@@ -9,7 +9,7 @@ const store = useTaskStore();
 const { theme, cycle } = useTheme();
 
 defineProps<{ collapsed: boolean }>();
-const emit = defineEmits<{ toggle: []; settings: [] }>();
+const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers: [] }>();
 
 function themeLabel(): string {
   switch (theme.value) {
@@ -58,6 +58,10 @@ function themeLabel(): string {
         <span class="sb-icon">▪</span>
         <span>Analytics</span>
       </router-link>
+      <router-link to="/office" class="sb-item" :class="{ active: route.path === '/office' }">
+        <span class="sb-icon">■</span>
+        <span>Office</span>
+      </router-link>
     </nav>
 
     <div v-if="!collapsed" class="sb-stats">
@@ -76,6 +80,14 @@ function themeLabel(): string {
     </div>
 
     <div class="sb-bottom">
+      <button v-if="!collapsed" class="sb-btn" @click="emit('workspaces')">
+        <span class="sb-icon">⊡</span>
+        <span>Workspaces</span>
+      </button>
+      <button v-if="!collapsed" class="sb-btn" @click="emit('containers')">
+        <span class="sb-icon">⊟</span>
+        <span>Containers</span>
+      </button>
       <button v-if="!collapsed" class="sb-btn" @click="emit('settings')">
         <span class="sb-icon">⚙</span>
         <span>Settings</span>
