@@ -16,6 +16,7 @@ import (
 	"changkun.de/x/wallfacer/internal/webserver"
 )
 
+// RunWeb starts the wallfacer web frontend server with OIDC authentication.
 func RunWeb(args []string) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
@@ -91,7 +92,6 @@ func RunWeb(args []string) {
 	slog.Info("wallfacer web started", "addr", ln.Addr().String())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	go func() {
 		<-ctx.Done()
@@ -100,6 +100,8 @@ func RunWeb(args []string) {
 
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		slog.Error("server error", "error", err)
+		stop()
 		os.Exit(1)
 	}
+	stop()
 }

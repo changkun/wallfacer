@@ -1,3 +1,4 @@
+// Package webserver serves the wallfacer SPA frontend from embedded assets.
 package webserver
 
 import (
@@ -10,6 +11,7 @@ import (
 	spaembed "changkun.de/x/wallfacer/internal/webserver/spa"
 )
 
+// MountSPA registers handlers for static asset paths from the embedded SPA dist.
 func MountSPA(mux *http.ServeMux) bool {
 	dist, err := fs.Sub(spaembed.FS, "dist")
 	if err != nil {
@@ -48,12 +50,13 @@ func MountSPA(mux *http.ServeMux) bool {
 	return true
 }
 
+// SPAFallback registers a catch-all GET handler that serves index.html for client-side routing.
 func SPAFallback(mux *http.ServeMux) {
 	dist, err := fs.Sub(spaembed.FS, "dist")
 	if err != nil {
 		return
 	}
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, _ *http.Request) {
 		serveSPAIndex(w, dist)
 	})
 }
