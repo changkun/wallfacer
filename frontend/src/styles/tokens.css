@@ -1,0 +1,45 @@
+@import './fonts.css';
+
+/* ===== Wallfacer Theme (default) ===== */
+:root {
+    --bg: #f0ede6;
+    --bg-surface: #faf8f4;
+    --bg-raised: #e8e4dc;
+    --bg-code: #e4e0d8;
+    --accent: #d97757;
+    --accent-hover: #c4623f;
+    --accent-subtle: rgba(217, 119, 87, 0.08);
+    --accent-glow: rgba(217, 119, 87, 0.15);
+    --accent-glow-strong: rgba(217, 119, 87, 0.3);
+    --text: #1f1d1a;
+    --text-secondary: #5c5851;
+    --text-muted: #9c9890;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: #d4cfc6;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.11);
+    --grid-color: rgba(0,0,0,0.035);
+}
+
+/* ===== Dark Mode ===== */
+[data-theme="dark"] {
+    --bg: #1a1917;
+    --bg-surface: #272420;
+    --bg-raised: #211f1c;
+    --bg-code: #252320;
+    --accent: #d97757;
+    --accent-hover: #e08a68;
+    --accent-subtle: rgba(217, 119, 87, 0.08);
+    --accent-glow: rgba(217, 119, 87, 0.1);
+    --accent-glow-strong: rgba(217, 119, 87, 0.2);
+    --text: #f0ede6;
+    --text-secondary: #a8a49c;
+    --text-muted: #908c86;
+    --border: rgba(255,255,255,0.06);
+    --border-strong: #302e2a;
+    --shadow: 0 1px 3px rgba(0,0,0,0.35);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.55);
+    --grid-color: rgba(255,255,255,0.025);
+}

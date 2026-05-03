@@ -1,0 +1,33 @@
+{
+  "name": "wallfacer-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "wf.latere.ai website SPA",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite-ssg build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@unhead/vue": "^2.0.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "mermaid": "^11.14.0",
+    "pinia": "^2.2.6",
+    "vite-ssg": "^28.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "happy-dom": "^20.9.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3",
+    "vitest": "^4.1.5",
+    "vue-tsc": "^2.1.10"
+  }
+}
