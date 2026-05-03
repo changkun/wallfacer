@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { api } from '../api/client';
 
 interface Agent {
@@ -15,116 +15,190 @@ const agents = ref<Agent[]>([]);
 const loading = ref(true);
 const selectedAgent = ref<Agent | null>(null);
 const agentDetail = ref<{ prompt_template?: string } | null>(null);
+const search = ref('');
+
+const builtinAgents = computed(() =>
+  agents.value.filter((a) => a.builtin && matchesSearch(a)),
+);
+const userAgents = computed(() =>
+  agents.value.filter((a) => !a.builtin && matchesSearch(a)),
+);
+
+function matchesSearch(a: Agent): boolean {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    a.slug.toLowerCase().includes(q) ||
+    (a.name || '').toLowerCase().includes(q) ||
+    (a.description || '').toLowerCase().includes(q)
+  );
+}
 
 onMounted(async () => {
   try {
     agents.value = await api<Agent[]>('GET', '/api/agents');
-  } catch (e) { console.error('agents:', e); }
+  } catch (e) {
+    console.error('agents:', e);
+  }
   loading.value = false;
 });
 
 async function selectAgent(a: Agent) {
   selectedAgent.value = a;
+  agentDetail.value = null;
   try {
     agentDetail.value = await api('GET', `/api/agents/${a.slug}`);
-  } catch (e) { console.error('agent detail:', e); }
+  } catch (e) {
+    console.error('agent detail:', e);
+  }
 }
 </script>
 
 <template>
-  <div class="agents-page">
-    <header class="page-header">
-      <h1>Agents</h1>
-    </header>
-
-    <div class="agents-layout">
-      <div class="agents-list">
-        <div v-if="loading" class="agents-empty">Loading...</div>
-        <div
-          v-for="a in agents" :key="a.slug"
-          class="agent-row"
-          :class="{ selected: selectedAgent?.slug === a.slug }"
-          @click="selectAgent(a)"
-        >
-          <div class="agent-name">
-            {{ a.name || a.slug }}
-            <span v-if="a.builtin" class="agent-badge">built-in</span>
-          </div>
-          <div class="agent-desc">{{ a.description }}</div>
-          <div class="agent-meta">
-            <span v-if="a.sandbox">{{ a.sandbox }}</span>
-            <span v-if="a.model">{{ a.model }}</span>
+  <div class="agents-mode-container">
+    <div class="agents-mode__inner">
+      <header class="agents-mode__header">
+        <div class="agents-mode__header-row">
+          <div>
+            <h2 class="agents-mode__title">Agents</h2>
+            <p class="agents-mode__subtitle">
+              Sub-agent roles each flow step invokes. Clone a built-in or start
+              from scratch to pin a harness, tune capabilities, or override the
+              system prompt.
+            </p>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div v-if="selectedAgent && agentDetail" class="agent-detail">
-        <h2>{{ selectedAgent.name || selectedAgent.slug }}</h2>
-        <p class="detail-desc">{{ selectedAgent.description }}</p>
-        <div class="detail-meta">
-          <span>Sandbox: {{ selectedAgent.sandbox || 'default' }}</span>
-          <span>Model: {{ selectedAgent.model || 'default' }}</span>
-        </div>
-        <div v-if="agentDetail.prompt_template" class="detail-prompt">
-          <h3>Prompt Template</h3>
-          <pre>{{ agentDetail.prompt_template }}</pre>
-        </div>
+      <div class="agents-mode__split">
+        <aside class="agents-mode__rail">
+          <div class="agents-mode__search">
+            <input
+              v-model="search"
+              type="search"
+              placeholder="Search agents..."
+              aria-label="Search agents"
+              autocomplete="off"
+            />
+          </div>
+          <div class="agents-mode__rail-list">
+            <p v-if="loading" class="agents-mode__empty">Loading agents...</p>
+            <template v-else>
+              <template v-if="builtinAgents.length">
+                <div class="agents-rail__group">Built-in</div>
+                <button
+                  v-for="a in builtinAgents"
+                  :key="a.slug"
+                  type="button"
+                  class="agents-rail__item"
+                  :class="{
+                    'agents-rail__item--active':
+                      selectedAgent?.slug === a.slug,
+                  }"
+                  @click="selectAgent(a)"
+                >
+                  <span class="agents-rail__name">{{ a.name || a.slug }}</span>
+                  <span v-if="a.sandbox" class="agents-rail__meta">{{
+                    a.sandbox
+                  }}</span>
+                </button>
+              </template>
+
+              <template v-if="userAgents.length">
+                <div class="agents-rail__group">User</div>
+                <button
+                  v-for="a in userAgents"
+                  :key="a.slug"
+                  type="button"
+                  class="agents-rail__item agents-rail__item--user"
+                  :class="{
+                    'agents-rail__item--active':
+                      selectedAgent?.slug === a.slug,
+                  }"
+                  @click="selectAgent(a)"
+                >
+                  <span class="agents-rail__name">{{ a.name || a.slug }}</span>
+                  <span v-if="a.sandbox" class="agents-rail__meta">{{
+                    a.sandbox
+                  }}</span>
+                </button>
+              </template>
+
+              <p
+                v-if="!builtinAgents.length && !userAgents.length"
+                class="agents-mode__empty"
+              >
+                No agents found.
+              </p>
+            </template>
+          </div>
+        </aside>
+
+        <section class="agents-mode__detail">
+          <div v-if="!selectedAgent" class="agents-mode__empty-detail">
+            <p>Pick an agent on the left.</p>
+          </div>
+          <template v-else-if="agentDetail">
+            <div class="agents-detail__head">
+              <div>
+                <h3 class="agents-detail__title">
+                  {{ selectedAgent.name || selectedAgent.slug }}
+                </h3>
+                <div class="agents-detail__subtitle">
+                  <code>{{ selectedAgent.slug }}</code>
+                  <span
+                    class="agents-detail__badge"
+                    :class="{
+                      'agents-detail__badge--user': !selectedAgent.builtin,
+                    }"
+                  >
+                    {{ selectedAgent.builtin ? 'Built-in' : 'User' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="agents-detail__body">
+              <div v-if="selectedAgent.description" class="agents-detail__kv">
+                <div class="agents-detail__kv-key">Description</div>
+                <div class="agents-detail__kv-value">
+                  {{ selectedAgent.description }}
+                </div>
+              </div>
+              <div class="agents-detail__kv">
+                <div class="agents-detail__kv-key">Sandbox</div>
+                <div class="agents-detail__kv-value">
+                  {{ selectedAgent.sandbox || 'default' }}
+                </div>
+              </div>
+              <div class="agents-detail__kv">
+                <div class="agents-detail__kv-key">Model</div>
+                <div class="agents-detail__kv-value">
+                  {{ selectedAgent.model || 'default' }}
+                </div>
+              </div>
+
+              <div class="agents-detail__section">
+                <div class="agents-detail__section-label">Prompt Template</div>
+                <pre
+                  v-if="agentDetail.prompt_template"
+                  class="agents-detail__tmpl"
+                  >{{ agentDetail.prompt_template }}</pre
+                >
+                <p
+                  v-else
+                  class="agents-detail__tmpl agents-detail__tmpl--empty"
+                >
+                  No prompt template.
+                </p>
+              </div>
+            </div>
+          </template>
+          <div v-else class="agents-mode__empty-detail">
+            <p>Loading...</p>
+          </div>
+        </section>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.agents-page {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-.page-header {
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--rule);
-}
-.page-header h1 { margin: 0; font-size: 15px; font-weight: 600; }
-
-.agents-layout {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-.agents-list {
-  width: 360px;
-  border-right: 1px solid var(--rule);
-  overflow-y: auto;
-}
-.agents-empty { padding: 20px; text-align: center; color: var(--ink-4); }
-.agent-row {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--rule);
-  cursor: pointer;
-}
-.agent-row:hover { background: var(--bg-hover); }
-.agent-row.selected { background: var(--bg-active); }
-.agent-name { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-.agent-badge {
-  font-size: 9px; padding: 1px 5px; border-radius: 2px;
-  background: var(--accent-tint); color: var(--accent); font-weight: 500;
-}
-.agent-desc { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
-.agent-meta { font-size: 10px; color: var(--ink-4); font-family: var(--font-mono); margin-top: 4px; display: flex; gap: 8px; }
-
-.agent-detail {
-  flex: 1;
-  padding: 16px 20px;
-  overflow-y: auto;
-}
-.agent-detail h2 { margin: 0 0 4px; font-size: 16px; }
-.detail-desc { color: var(--ink-2); font-size: 13px; margin: 0 0 12px; }
-.detail-meta { font-size: 12px; color: var(--ink-3); font-family: var(--font-mono); display: flex; gap: 16px; margin-bottom: 16px; }
-.detail-prompt h3 { font-size: 11px; text-transform: uppercase; color: var(--ink-3); margin: 0 0 6px; }
-.detail-prompt pre {
-  font-family: var(--font-mono); font-size: 11px; color: var(--ink-2);
-  background: var(--bg-sunk); padding: 12px; border-radius: var(--r-sm);
-  white-space: pre-wrap; word-break: break-word; line-height: 1.5; margin: 0;
-}
-</style>

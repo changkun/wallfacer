@@ -105,6 +105,11 @@ function fileName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+function previewLines(): string[] {
+  if (fileContent.value == null) return [];
+  return fileContent.value.split('\n');
+}
+
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   if (workspace()) await loadRoot();
@@ -116,185 +121,77 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
 </script>
 
 <template>
-  <div class="explorer-page">
-    <header class="page-header">
-      <h1>Explorer</h1>
-    </header>
-
-    <div class="explorer-layout">
-      <div class="tree-pane">
-        <div v-if="treeLoading" class="tree-empty">Loading...</div>
-        <div v-else-if="errorMsg" class="tree-empty tree-error">{{ errorMsg }}</div>
-        <div v-else-if="!children.get('')?.length" class="tree-empty">No files found.</div>
-        <div v-else class="tree-list">
+  <div class="board-with-explorer explorer-page-root">
+    <aside class="explorer-panel">
+      <div class="explorer-panel__header">
+        <span class="explorer-panel__title">Explorer</span>
+      </div>
+      <div class="explorer-panel__tree">
+        <div v-if="treeLoading" class="explorer-panel__empty">Loading...</div>
+        <div v-else-if="errorMsg" class="explorer-panel__empty explorer-panel__empty--error">{{ errorMsg }}</div>
+        <div v-else-if="!children.get('')?.length" class="explorer-panel__empty">No files found.</div>
+        <template v-else>
           <div
             v-for="{ entry, depth } in visibleEntries()"
             :key="entry.path"
-            class="tree-row"
-            :class="{ selected: selectedPath === entry.path }"
-            :style="{ paddingLeft: (12 + depth * 16) + 'px' }"
+            class="explorer-node"
+            :class="[
+              entry.is_dir ? 'explorer-node--dir' : 'explorer-node--file',
+              { 'explorer-node--active': selectedPath === entry.path },
+            ]"
+            :style="{ paddingLeft: (8 + depth * 14) + 'px' }"
             @click="entry.is_dir ? toggleDir(entry) : selectFile(entry)"
           >
-            <span v-if="entry.is_dir" class="tree-icon dir-icon">
-              {{ expanded.has(entry.path) ? '▼' : '▶' }}
+            <span class="explorer-node__toggle">
+              <template v-if="entry.is_dir">{{ expanded.has(entry.path) ? '▼' : '▶' }}</template>
             </span>
-            <span v-else class="tree-icon file-icon">─</span>
-            <span class="tree-name">{{ entry.name }}</span>
+            <span class="explorer-node__icon">{{ entry.is_dir ? '▣' : '·' }}</span>
+            <span class="explorer-node__name">{{ entry.name }}</span>
           </div>
-        </div>
+        </template>
       </div>
+    </aside>
 
-      <div class="content-pane">
-        <div v-if="fileLoading" class="content-empty">Loading...</div>
-        <div v-else-if="!selectedPath" class="content-empty">Select a file to view its contents.</div>
-        <div v-else class="content-view">
-          <div class="content-header">
-            <span class="content-path">{{ fileName(selectedPath) }}</span>
-            <span class="content-fullpath">{{ selectedPath }}</span>
-          </div>
-          <pre class="content-code">{{ fileContent }}</pre>
-        </div>
+    <section class="explorer-content-pane">
+      <div v-if="fileLoading" class="explorer-preview__placeholder">Loading...</div>
+      <div v-else-if="!selectedPath" class="explorer-preview__placeholder">
+        Select a file to view its contents.
       </div>
-    </div>
+      <template v-else>
+        <div class="explorer-preview__header">
+          <span class="explorer-preview__path" :title="selectedPath">
+            {{ fileName(selectedPath) }}
+          </span>
+        </div>
+        <div class="explorer-preview__content">
+          <pre class="explorer-preview__code"><code>
+            <div
+              v-for="(line, idx) in previewLines()"
+              :key="idx"
+              class="explorer-preview__line"
+            ><span class="explorer-preview__ln">{{ idx + 1 }}</span><span class="explorer-preview__lc">{{ line }}</span></div>
+          </code></pre>
+        </div>
+      </template>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.explorer-page {
-  display: flex;
-  flex-direction: column;
+.explorer-page-root {
   height: 100%;
   overflow: hidden;
 }
-.page-header {
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--rule);
-  flex-shrink: 0;
-}
-.page-header h1 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.explorer-layout {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* Tree pane */
-.tree-pane {
+.explorer-page-root :deep(.explorer-panel) {
   width: 280px;
-  min-width: 280px;
-  border-right: 1px solid var(--rule);
-  overflow-y: auto;
-  background: var(--bg);
+  min-width: 220px;
 }
-.tree-empty {
-  padding: 20px;
-  text-align: center;
-  color: var(--ink-4);
-  font-size: 12px;
-}
-.tree-error {
-  color: var(--accent);
-}
-.tree-list {
-  padding: 4px 0;
-}
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 12px;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: var(--font-sans);
-  color: var(--ink);
-  line-height: 1.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tree-row:hover {
-  background: var(--bg-hover);
-}
-.tree-row.selected {
-  background: var(--bg-active);
-}
-.tree-icon {
-  flex-shrink: 0;
-  width: 14px;
-  text-align: center;
-  font-size: 9px;
-  color: var(--ink-3);
-}
-.file-icon {
-  font-size: 10px;
-  color: var(--ink-4);
-}
-.tree-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Content pane */
-.content-pane {
+.explorer-content-pane {
   flex: 1;
-  overflow: hidden;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
-}
-.content-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--ink-4);
-  font-size: 13px;
-}
-.content-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-.content-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--bg-card);
-  flex-shrink: 0;
-}
-.content-path {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-}
-.content-fullpath {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--ink-4);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.content-code {
-  flex: 1;
-  margin: 0;
-  padding: 12px 16px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-2);
-  background: var(--bg-sunk);
-  overflow: auto;
-  white-space: pre;
-  tab-size: 4;
-  border-radius: 0;
 }
 </style>
