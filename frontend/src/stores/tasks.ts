@@ -7,25 +7,36 @@ export const useTaskStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([]);
   const config = ref<ServerConfig | null>(null);
   const loading = ref(true);
+  const filterQuery = ref('');
+
+  function matchesFilter(t: Task): boolean {
+    const q = filterQuery.value;
+    if (!q) return true;
+    return (t.title || '').toLowerCase().includes(q)
+      || t.prompt.toLowerCase().includes(q)
+      || t.id.startsWith(q)
+      || t.tags?.some(tag => tag.toLowerCase().includes(q))
+      || false;
+  }
 
   const backlog = computed(() =>
     tasks.value
-      .filter(t => t.status === 'backlog' && !t.archived)
+      .filter(t => t.status === 'backlog' && !t.archived && matchesFilter(t))
       .sort((a, b) => a.position - b.position),
   );
   const inProgress = computed(() =>
     tasks.value.filter(t =>
-      (t.status === 'in_progress' || t.status === 'committing') && !t.archived,
+      (t.status === 'in_progress' || t.status === 'committing') && !t.archived && matchesFilter(t),
     ),
   );
   const waiting = computed(() =>
     tasks.value.filter(t =>
-      (t.status === 'waiting' || t.status === 'failed') && !t.archived,
+      (t.status === 'waiting' || t.status === 'failed') && !t.archived && matchesFilter(t),
     ),
   );
   const done = computed(() =>
     tasks.value.filter(t =>
-      (t.status === 'done' || t.status === 'cancelled') && !t.archived,
+      (t.status === 'done' || t.status === 'cancelled') && !t.archived && matchesFilter(t),
     ),
   );
 
@@ -85,7 +96,7 @@ export const useTaskStore = defineStore('tasks', () => {
   }
 
   return {
-    tasks, config, loading,
+    tasks, config, loading, filterQuery,
     backlog, inProgress, waiting, done,
     setTasks, updateTask, removeTask,
     fetchTasks, fetchConfig,

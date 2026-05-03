@@ -9,6 +9,7 @@ import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
+import SearchBar from '../components/SearchBar.vue';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
@@ -71,7 +72,7 @@ function statusColor(status: string): string {
     <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
 
     <div class="board">
-      <!-- header reserved for search -->
+      <SearchBar />
 
       <div class="board-columns">
         <section class="column">
