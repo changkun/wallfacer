@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { api } from '../api/client';
 import type { Task } from '../api/types';
+import { renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{ task: Task }>();
 
@@ -66,11 +68,6 @@ function isSpawnedByTag(tag: string): boolean {
   return tag.toLowerCase().startsWith('spawned-by:');
 }
 
-function promptPreview(task: Task): string {
-  if (!task.prompt) return '';
-  return task.prompt.length > 200 ? task.prompt.slice(0, 200) + '…' : task.prompt;
-}
-
 function showSpinner(task: Task): boolean {
   return task.status === 'in_progress' || task.status === 'committing';
 }
@@ -84,6 +81,43 @@ function formatCost(usd: number): string {
 function showCostMeta(task: Task): boolean {
   return !!(task.usage && task.usage.cost_usd > 0);
 }
+
+function sandboxLabel(task: Task): string {
+  return task.sandbox || 'default';
+}
+
+const promptHtml = computed(() => {
+  const t = props.task;
+  if (!t.prompt) return '';
+  // Show prompt preview only when there's no title shown above (mirrors old UI's
+  // cardDisplayPrompt behavior in spirit) and for non-result statuses.
+  return renderMarkdown(t.prompt);
+});
+
+const resultHtml = computed(() => {
+  const t = props.task;
+  if (!t.result) return '';
+  return renderMarkdown(t.result);
+});
+
+const showPromptPreview = computed(() => {
+  const t = props.task;
+  if (!t.prompt) return false;
+  // Suppress when we already render a result block below (failed/waiting/done/cancelled).
+  if (t.status === 'failed' && t.result) return false;
+  if (t.status === 'waiting' && t.result) return false;
+  if ((t.status === 'done' || t.status === 'cancelled') && t.result) return false;
+  return true;
+});
+
+const showResultPreview = computed(() => {
+  const t = props.task;
+  if (!t.result) return false;
+  if (t.status === 'in_progress') return false;
+  if (t.status === 'failed') return false;
+  if (t.status === 'waiting') return false;
+  return true;
+});
 
 async function startTask(e: Event) {
   e.stopPropagation();
@@ -103,64 +137,95 @@ async function doneTask(e: Event) {
 
 <template>
   <div :class="cardClasses(props.task)">
-    <!-- Title -->
-    <div v-if="props.task.title" class="card-title">{{ props.task.title }}</div>
-
-    <!-- Status badge row -->
-    <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
-      <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
-      <span v-if="showSpinner(props.task)" class="spinner"></span>
-      <div class="card-meta-right" style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-        <span v-if="props.task.sandbox" :title="'Sandbox: ' + props.task.sandbox">{{ props.task.sandbox }}</span>
-        <span v-if="props.task.timeout" title="Timeout">{{ formatTimeout(props.task.timeout) }}</span>
-        <span :title="'Created ' + props.task.created_at">{{ timeAgo(props.task.created_at) }}</span>
+    <!-- Row 1: status badge + meta-right (sandbox, timeout, time) -->
+    <div class="flex items-center justify-between mb-1">
+      <div class="flex items-center gap-1.5">
+        <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
+        <span v-if="showSpinner(props.task)" class="spinner"></span>
+        <span
+          v-if="props.task.failure_category"
+          class="badge badge-failure-category"
+          :title="'Failure reason: ' + props.task.failure_category"
+          style="font-family:monospace;font-size:9px;"
+        >{{ props.task.failure_category }}</span>
+      </div>
+      <div class="flex items-center gap-1.5 card-meta-right">
+        <span
+          class="text-xs text-v-muted"
+          :title="'Sandbox: ' + sandboxLabel(props.task)"
+        >{{ sandboxLabel(props.task) }}</span>
+        <span class="text-xs text-v-muted" title="Timeout">{{ formatTimeout(props.task.timeout) }}</span>
+        <span class="text-xs text-v-muted" :title="'Created ' + props.task.created_at">{{ timeAgo(props.task.created_at) }}</span>
       </div>
     </div>
 
-    <!-- Prompt preview (backlog) -->
-    <div v-if="props.task.status === 'backlog' && !props.task.title && props.task.prompt" class="card-prose" style="max-height:4.5em;overflow:hidden;font-size:12px;">
-      {{ promptPreview(props.task) }}
-    </div>
+    <!-- Row 2: title -->
+    <div v-if="props.task.title" class="card-title">{{ props.task.title }}</div>
 
-    <!-- Tags -->
+    <!-- Row 3: tags -->
     <div v-if="props.task.tags?.length" class="tag-chip-row">
       <span
         v-for="tag in props.task.tags"
         :key="tag"
         :class="['tag-chip', { 'badge-routine-spawn': isSpawnedByTag(tag) }]"
+        :data-tag="tag"
         :style="isSpawnedByTag(tag) ? '' : tagStyle(tag)"
-        :title="'Tag: ' + tag"
+        :title="tag"
       >{{ tag }}</span>
     </div>
 
-    <!-- Error (failed) -->
-    <div v-if="props.task.status === 'failed' && errorSnippet(props.task)" class="card-error-reason">
-      <span class="card-error-label">Error</span><span class="card-error-text">{{ errorSnippet(props.task) }}</span>
-    </div>
+    <!-- Row 4: prompt preview (markdown) -->
+    <div
+      v-if="showPromptPreview"
+      class="text-xs card-prose overflow-hidden"
+      style="max-height:4.5em;"
+      v-html="promptHtml"
+    ></div>
 
-    <!-- Stop reason chip (failed) -->
-    <div v-if="props.task.status === 'failed' && props.task.stop_reason" style="margin-top:4px;">
-      <span class="badge badge-failed" style="font-size:9px;">{{ props.task.stop_reason }}</span>
-    </div>
+    <!-- Row 5 (failed): error block + stop reason -->
+    <template v-if="props.task.status === 'failed' && props.task.result">
+      <div class="card-error-reason">
+        <span class="card-error-label">Error</span><span class="card-error-text">{{ errorSnippet(props.task) }}</span>
+      </div>
+      <div v-if="props.task.stop_reason" style="margin-top:4px;">
+        <span class="badge badge-failed" style="font-size:9px;">{{ props.task.stop_reason }}</span>
+      </div>
+    </template>
 
-    <!-- Output (waiting) -->
-    <div v-if="props.task.status === 'waiting' && waitingSnippet(props.task)" class="card-output-reason">
+    <!-- Row 5 (waiting): output block -->
+    <div v-else-if="props.task.status === 'waiting' && props.task.result" class="card-output-reason">
       <span class="card-output-label">Output</span><span class="card-output-text">{{ waitingSnippet(props.task) }}</span>
     </div>
 
-    <!-- Cost / activity meta (in_progress, waiting, done) -->
+    <!-- Row 5 (done/cancelled): result preview (markdown) -->
+    <div
+      v-else-if="showResultPreview"
+      class="text-xs text-v-secondary mt-1 card-prose overflow-hidden"
+      style="max-height:3.2em;"
+      v-html="resultHtml"
+    ></div>
+
+    <!-- Row 7: meta footer (turns, cost, session id) -->
     <div
       v-if="showCostMeta(props.task) && (props.task.status === 'in_progress' || props.task.status === 'waiting' || props.task.status === 'done')"
       class="card-meta"
       style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:10px;color:var(--ink-4);"
     >
       <span v-if="props.task.turns > 0" class="card-meta-time" :title="'Turns: ' + props.task.turns">{{ props.task.turns }} turn{{ props.task.turns === 1 ? '' : 's' }}</span>
-      <span class="card-meta-cost" :title="'Total cost'">{{ formatCost(props.task.usage.cost_usd) }}</span>
-      <span v-if="props.task.session_id" class="card-meta-session" style="margin-left:auto;font-family:var(--font-mono);" :title="'Session: ' + props.task.session_id">{{ props.task.session_id.slice(0, 7) }}</span>
+      <span class="card-meta-cost" title="Total cost">{{ formatCost(props.task.usage.cost_usd) }}</span>
+      <span
+        v-if="props.task.session_id"
+        class="card-meta-session"
+        style="margin-left:auto;font-family:var(--font-mono);"
+        :title="'Session: ' + props.task.session_id"
+      >{{ props.task.session_id.slice(0, 7) }}</span>
     </div>
 
-    <!-- Actions -->
-    <div v-if="!props.task.archived && (props.task.status === 'backlog' || props.task.status === 'waiting' || props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done')" class="card-actions">
+    <!-- Row 8: action buttons -->
+    <div
+      v-if="!props.task.archived && (props.task.status === 'backlog' || props.task.status === 'waiting' || props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done')"
+      class="card-actions"
+    >
       <button v-if="props.task.status === 'backlog'" class="card-action-btn card-action-start" @click="startTask">&#9654; Start</button>
       <button v-if="props.task.status === 'waiting'" class="card-action-btn card-action-done" @click="doneTask">&#10003; Done</button>
       <button v-if="props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done'" class="card-action-btn card-action-retry" @click="retryTask">&#8617; Retry</button>
