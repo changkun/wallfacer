@@ -4,6 +4,8 @@ import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
 import SettingsModal from '../components/SettingsModal.vue';
 import CommandPalette from '../components/CommandPalette.vue';
+import WorkspacePicker from '../components/WorkspacePicker.vue';
+import ContainerMonitor from '../components/ContainerMonitor.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useKeyboard } from '../composables/useKeyboard';
@@ -13,6 +15,8 @@ const store = useTaskStore();
 const sidebarCollapsed = ref(false);
 const showSettings = ref(false);
 const showPalette = ref(false);
+const showWorkspaces = ref(false);
+const showContainers = ref(false);
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
@@ -36,13 +40,21 @@ useKeyboard({
 
 <template>
   <div class="app-shell">
-    <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" @settings="showSettings = true" />
+    <Sidebar
+      :collapsed="sidebarCollapsed"
+      @toggle="sidebarCollapsed = !sidebarCollapsed"
+      @settings="showSettings = true"
+      @workspaces="showWorkspaces = true"
+      @containers="showContainers = true"
+    />
     <div class="app-main">
       <slot :connected="connected" />
       <StatusBar :connected="connected" />
     </div>
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
     <CommandPalette v-model="showPalette" />
+    <WorkspacePicker v-model="showWorkspaces" />
+    <ContainerMonitor v-model="showContainers" />
   </div>
 </template>
 
