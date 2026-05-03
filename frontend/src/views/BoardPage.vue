@@ -8,6 +8,7 @@ import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import Sidebar from '../components/Sidebar.vue';
+import StatusBar from '../components/StatusBar.vue';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
@@ -70,10 +71,7 @@ function statusColor(status: string): string {
     <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
 
     <div class="board">
-      <header class="board-header">
-        <span class="header-spacer" />
-        <span class="header-dot" :class="connected ? 'dot-ok' : 'dot-off'" :title="connected ? 'Connected' : 'Disconnected'" />
-      </header>
+      <!-- header reserved for search -->
 
       <div class="board-columns">
         <section class="column">
@@ -134,6 +132,8 @@ function statusColor(status: string): string {
       </div>
 
       <div v-if="store.loading" class="board-loading">Loading tasks...</div>
+
+      <StatusBar :connected="connected" />
     </div>
 
     <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
@@ -156,24 +156,6 @@ function statusColor(status: string): string {
   flex: 1;
   overflow: hidden;
 }
-
-.board-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: var(--h-header);
-  padding: 0 var(--sp-5);
-  border-bottom: 1px solid var(--rule);
-  flex-shrink: 0;
-}
-.header-spacer { flex: 1; }
-.header-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-.dot-ok { background: var(--ok); }
-.dot-off { background: var(--err); }
 
 .board-columns {
   display: grid;
