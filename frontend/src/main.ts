@@ -28,6 +28,7 @@ import './styles/docs.css';
 import './styles/agents.css';
 import './styles/flows.css';
 import './styles/syntax.css';
+import './styles/utilities.css';
 import './styles/app.css';
 
 export const createApp = ViteSSG(App, { routes }, ({ app }) => {
