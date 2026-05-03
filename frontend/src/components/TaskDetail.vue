@@ -7,7 +7,9 @@ import type { Task } from '../api/types';
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
 
-const activeTab = ref<'info' | 'logs'>('info');
+type MainTab = 'spec' | 'activity' | 'events';
+const mainTab = ref<MainTab>('spec');
+
 const feedback = ref('');
 const submittingFeedback = ref(false);
 const logContainer = ref<HTMLElement | null>(null);
@@ -25,24 +27,35 @@ watch(lines, async () => {
 }, { deep: true });
 
 watch(() => props.task.status, (s) => {
-  if (s === 'in_progress' || s === 'committing') activeTab.value = 'logs';
+  if (s === 'in_progress' || s === 'committing') mainTab.value = 'activity';
 });
 
 const costDisplay = computed(() => {
-  const usd = props.task.usage.cost_usd;
+  const usd = props.task.usage?.cost_usd ?? 0;
   if (usd === 0) return 'no cost';
   if (usd < 0.01) return '<$0.01';
   return '$' + usd.toFixed(2);
 });
 
-const totalTokens = computed(() => {
-  const u = props.task.usage;
-  return (u.input_tokens + u.output_tokens).toLocaleString();
-});
+const tokenCount = (n: number) => (n || 0).toLocaleString();
 
 function timeStr(iso: string): string {
+  if (!iso) return '—';
   return new Date(iso).toLocaleString();
 }
+
+function relativeTime(iso: string): string {
+  if (!iso) return '';
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diff = Math.floor((now - then) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+const elapsedDisplay = computed(() => relativeTime(props.task.updated_at));
 
 async function startTask() {
   await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'in_progress' });
@@ -58,6 +71,9 @@ async function completeTask() {
 }
 async function archiveTask() {
   await api('POST', `/api/tasks/${props.task.id}/archive`);
+}
+async function unarchiveTask() {
+  await api('POST', `/api/tasks/${props.task.id}/unarchive`);
 }
 async function deleteTask() {
   await api('DELETE', `/api/tasks/${props.task.id}`);
@@ -78,7 +94,7 @@ async function submitFeedback() {
 }
 
 function onBackdrop(e: MouseEvent) {
-  if ((e.target as HTMLElement).classList.contains('detail-backdrop')) emit('close');
+  if ((e.target as HTMLElement).classList.contains('modal-overlay')) emit('close');
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -88,324 +104,379 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('keydown', onKeydown);
   if (props.task.status === 'in_progress' || props.task.status === 'committing') {
-    activeTab.value = 'logs';
+    mainTab.value = 'activity';
   }
 });
 onUnmounted(() => document.removeEventListener('keydown', onKeydown));
+
+const status = computed(() => props.task.status);
+const isBacklog = computed(() => status.value === 'backlog');
+const isWaiting = computed(() => status.value === 'waiting');
+const isInProgress = computed(() => status.value === 'in_progress' || status.value === 'committing');
+const isFailed = computed(() => status.value === 'failed');
+const isDone = computed(() => status.value === 'done');
+const isCancelled = computed(() => status.value === 'cancelled');
+const isArchived = computed(() => !!props.task.archived);
 </script>
 
 <template>
-  <div class="detail-backdrop" @click="onBackdrop">
-    <aside class="detail-panel">
-      <header class="detail-header">
-        <h2 class="detail-title">{{ props.task.title || 'Untitled' }}</h2>
-        <button class="detail-close" @click="emit('close')">&times;</button>
-      </header>
+  <div
+    class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+    @click="onBackdrop"
+  >
+    <div id="modal" class="modal-card modal-wide" :data-main-tab="mainTab">
+      <div class="p-6">
+        <!-- Header row: badge / id / time / close -->
+        <div class="flex items-start justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <span class="badge" :class="'badge-' + status">{{ status }}</span>
+            <span v-if="task.sandbox" class="badge badge-priority">{{ task.sandbox }}</span>
+            <span class="text-xs text-v-muted">{{ relativeTime(task.updated_at) }}</span>
+            <span class="text-xs text-v-muted font-mono" title="Task ID">{{ task.id.slice(0, 8) }}</span>
+          </div>
+          <button
+            type="button"
+            class="modal-close-btn"
+            aria-label="Close"
+            @click="emit('close')"
+          >&times;</button>
+        </div>
 
-      <div class="detail-meta">
-        <span class="detail-id">{{ props.task.id.slice(0, 8) }}</span>
-        <span class="detail-status" :class="'s-' + props.task.status">{{ props.task.status }}</span>
-        <span v-if="props.task.sandbox" class="detail-sandbox">{{ props.task.sandbox }}</span>
-        <span class="detail-cost">{{ costDisplay }}</span>
-      </div>
+        <h2 v-if="task.title" class="modal-title">{{ task.title }}</h2>
 
-      <div class="detail-tabs">
-        <button :class="{ active: activeTab === 'info' }" @click="activeTab = 'info'">Info</button>
-        <button :class="{ active: activeTab === 'logs' }" @click="activeTab = 'logs'">
-          Logs
-          <span v-if="streaming" class="pulse" />
-        </button>
-      </div>
-
-      <div class="detail-body" v-if="activeTab === 'info'">
-        <section class="detail-section">
-          <h3>Prompt</h3>
-          <pre class="detail-pre">{{ props.task.prompt }}</pre>
-        </section>
-
-        <section v-if="props.task.result" class="detail-section">
-          <h3>Result</h3>
-          <pre class="detail-pre">{{ props.task.result }}</pre>
-        </section>
-
-        <section v-if="props.task.status === 'waiting'" class="detail-section">
-          <h3>Feedback</h3>
-          <form class="feedback-form" @submit.prevent="submitFeedback">
-            <textarea v-model="feedback" class="feedback-input" placeholder="Send feedback to the agent..." rows="3" />
-            <button type="submit" class="feedback-btn" :disabled="!feedback.trim() || submittingFeedback">
-              {{ submittingFeedback ? 'Sending...' : 'Send Feedback' }}
+        <div id="modal-body">
+          <!-- Main tabs -->
+          <div id="main-tabs" class="main-tabs" role="tablist">
+            <button
+              type="button"
+              class="main-tab"
+              :class="{ active: mainTab === 'spec' }"
+              @click="mainTab = 'spec'"
+            >Spec</button>
+            <button
+              type="button"
+              class="main-tab"
+              :class="{ active: mainTab === 'activity' }"
+              @click="mainTab = 'activity'"
+            >
+              Activity
+              <span v-if="streaming" class="pulse-dot" />
             </button>
-          </form>
-        </section>
-
-        <section class="detail-section">
-          <h3>Usage</h3>
-          <div class="detail-kv">
-            <span>Cost</span><span>{{ costDisplay }}</span>
-            <span>Tokens</span><span>{{ totalTokens }}</span>
-            <span>Turns</span><span>{{ props.task.turns }}</span>
+            <button
+              type="button"
+              class="main-tab"
+              :class="{ active: mainTab === 'events' }"
+              @click="mainTab = 'events'"
+            >Events</button>
           </div>
-        </section>
 
-        <section class="detail-section">
-          <h3>Timeline</h3>
-          <div class="detail-kv">
-            <span>Created</span><span>{{ timeStr(props.task.created_at) }}</span>
-            <span>Updated</span><span>{{ timeStr(props.task.updated_at) }}</span>
-          </div>
-        </section>
-      </div>
+          <div id="modal-row">
+            <!-- Main pane -->
+            <div id="modal-main-pane">
+              <div id="modal-main-content">
+                <!-- SPEC tab -->
+                <div data-main-tab-section="spec">
+                  <h3 class="section-title">Spec</h3>
+                  <pre class="code-block mb-4">{{ task.prompt }}</pre>
 
-      <div class="detail-body detail-logs" v-else-if="activeTab === 'logs'">
-        <div ref="logContainer" class="log-scroll">
-          <div v-if="!streaming && lines.length === 0" class="log-empty">
-            {{ props.task.status === 'in_progress' ? 'Connecting...' : 'No logs (task not running)' }}
+                  <template v-if="task.result">
+                    <h3 class="section-title">Result</h3>
+                    <pre class="code-block mb-4">{{ task.result }}</pre>
+                  </template>
+
+                  <div v-if="isWaiting" class="mb-4">
+                    <h3 class="section-title">Provide Feedback</h3>
+                    <textarea
+                      v-model="feedback"
+                      rows="3"
+                      placeholder="Type your response..."
+                      class="field"
+                    />
+                    <div class="flex items-center gap-2 mt-2">
+                      <button
+                        type="button"
+                        class="btn btn-yellow"
+                        :disabled="!feedback.trim() || submittingFeedback"
+                        @click="submitFeedback"
+                      >
+                        {{ submittingFeedback ? 'Sending…' : 'Submit Feedback' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ACTIVITY tab -->
+                <div data-main-tab-section="activity">
+                  <section class="activity-agent">
+                    <div class="activity-block activity-block--oversight">
+                      <div class="activity-block__label-row">
+                        <span class="activity-block__label">Logs</span>
+                        <span v-if="streaming" class="text-xs text-v-muted">streaming…</span>
+                      </div>
+                      <div class="activity-oversight-box" id="modal-logs-section">
+                        <pre ref="logContainer" class="logs-block">
+<span v-if="!streaming && lines.length === 0" class="cc-result-empty">{{ isInProgress ? 'Connecting…' : 'No logs (task not running)' }}</span><template v-for="(line, i) in lines" :key="i">{{ line }}
+</template></pre>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <!-- EVENTS tab -->
+                <div data-main-tab-section="events">
+                  <h3 class="section-title">Usage</h3>
+                  <div class="usage-grid mb-4">
+                    <div class="flex justify-between">
+                      <span class="usage-label">Input tokens</span>
+                      <span class="usage-value">{{ tokenCount(task.usage?.input_tokens) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Output tokens</span>
+                      <span class="usage-value">{{ tokenCount(task.usage?.output_tokens) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Cache read</span>
+                      <span class="usage-value">{{ tokenCount(task.usage?.cache_read_input_tokens) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Cache creation</span>
+                      <span class="usage-value">{{ tokenCount(task.usage?.cache_creation_input_tokens) }}</span>
+                    </div>
+                    <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;">
+                      <span class="usage-label">Total cost</span>
+                      <span class="usage-value">{{ costDisplay }}</span>
+                    </div>
+                  </div>
+
+                  <h3 class="section-title">Timeline</h3>
+                  <div class="usage-grid">
+                    <div class="flex justify-between">
+                      <span class="usage-label">Created</span>
+                      <span class="usage-value">{{ timeStr(task.created_at) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Updated</span>
+                      <span class="usage-value">{{ timeStr(task.updated_at) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="usage-label">Turns</span>
+                      <span class="usage-value">{{ task.turns ?? 0 }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right aside -->
+            <aside class="modal-aside">
+              <div class="mdl-section modal-aside__actions">
+                <div class="mdl-h">Actions</div>
+
+                <div v-if="isBacklog">
+                  <button type="button" class="aside-action aside-action--primary" @click="startTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Start task</span>
+                      <span class="aside-action__hint">move to In Progress</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="isWaiting">
+                  <button type="button" class="aside-action aside-action--success" @click="completeTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#10003;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Mark as Done</span>
+                      <span class="aside-action__hint">commit and close</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="isFailed || isCancelled">
+                  <button type="button" class="aside-action" @click="retryTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#8634;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Retry</span>
+                      <span class="aside-action__hint">move back to Backlog</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="(isDone || isCancelled) && !isArchived">
+                  <button type="button" class="aside-action" @click="archiveTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Archive</span>
+                      <span class="aside-action__hint">hide from board</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="isArchived">
+                  <button type="button" class="aside-action" @click="unarchiveTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Unarchive</span>
+                      <span class="aside-action__hint">restore to board</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="isInProgress || isWaiting">
+                  <button type="button" class="aside-action aside-action--warn" @click="cancelTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#9209;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Cancel</span>
+                      <span class="aside-action__hint">discard changes</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div>
+                  <button type="button" class="aside-action aside-action--danger" @click="deleteTask">
+                    <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Delete</span>
+                      <span class="aside-action__hint">remove permanently</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="mdl-section">
+                <div class="mdl-h">Agent</div>
+                <div class="row">
+                  <span class="k">sandbox</span>
+                  <span class="v">{{ task.sandbox || '—' }}</span>
+                </div>
+                <div class="row">
+                  <span class="k">model</span>
+                  <span class="v">{{ task.model || '—' }}</span>
+                </div>
+                <div class="row">
+                  <span class="k">status</span>
+                  <span class="v">{{ status }}</span>
+                </div>
+                <div class="row">
+                  <span class="k">elapsed</span>
+                  <span class="v">{{ elapsedDisplay }}</span>
+                </div>
+              </div>
+
+              <div class="mdl-section">
+                <div class="mdl-h">Budget</div>
+                <div class="row">
+                  <span class="k">tokens</span>
+                  <span class="v mono">{{ tokenCount((task.usage?.input_tokens || 0) + (task.usage?.output_tokens || 0)) }}</span>
+                </div>
+                <div class="row">
+                  <span class="k">cost</span>
+                  <span class="v mono">{{ costDisplay }}</span>
+                </div>
+                <div class="row">
+                  <span class="k">turns</span>
+                  <span class="v mono">{{ task.turns ?? 0 }}</span>
+                </div>
+              </div>
+            </aside>
           </div>
-          <pre v-for="(line, i) in lines" :key="i" class="log-line">{{ line }}</pre>
         </div>
       </div>
-
-      <section class="detail-actions">
-        <button v-if="props.task.status === 'backlog'" class="act-btn act-primary" @click="startTask">Start</button>
-        <button v-if="props.task.status === 'in_progress'" class="act-btn act-danger" @click="cancelTask">Cancel</button>
-        <button v-if="props.task.status === 'waiting'" class="act-btn act-primary" @click="completeTask">Mark Done</button>
-        <button v-if="props.task.status === 'waiting'" class="act-btn act-danger" @click="cancelTask">Cancel</button>
-        <button v-if="props.task.status === 'failed' || props.task.status === 'cancelled'" class="act-btn" @click="retryTask">Retry</button>
-        <button v-if="props.task.status === 'done' || props.task.status === 'cancelled'" class="act-btn" @click="archiveTask">Archive</button>
-        <button class="act-btn act-ghost" @click="deleteTask">Delete</button>
-      </section>
-    </aside>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.detail-backdrop {
+.modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  justify-content: flex-end;
-  z-index: 100;
+  z-index: 50;
 }
-.detail-panel {
-  width: 520px;
-  max-width: 90vw;
-  height: 100%;
-  background: var(--bg);
-  border-left: 1px solid var(--rule);
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px 0;
-}
-.detail-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ink);
-  margin: 0;
-  line-height: 1.3;
-}
-.detail-close {
+.modal-close-btn {
   background: none;
   border: none;
-  font-size: 20px;
-  color: var(--ink-3);
   cursor: pointer;
-  padding: 0 4px;
+  font-size: 22px;
   line-height: 1;
+  color: var(--text-muted);
+  padding: 0 4px;
 }
-.detail-close:hover { color: var(--ink); }
+.modal-close-btn:hover { color: var(--text); }
 
-.detail-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 20px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-}
-.detail-id { color: var(--ink-4); }
-.detail-status {
-  padding: 2px 6px;
-  border-radius: 3px;
-  text-transform: uppercase;
-  font-size: 10px;
+.modal-title {
+  font-size: 15px;
   font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
 }
-.s-backlog { color: var(--col-backlog); background: var(--bg-hover); }
-.s-in_progress, .s-committing { color: var(--col-progress); background: rgba(58, 109, 179, 0.1); }
-.s-waiting { color: var(--col-waiting); background: rgba(165, 106, 18, 0.1); }
-.s-failed { color: var(--err); background: rgba(163, 45, 45, 0.1); }
-.s-done { color: var(--col-done); background: rgba(63, 122, 74, 0.1); }
-.s-cancelled { color: var(--ink-3); background: var(--bg-hover); }
-.detail-sandbox { color: var(--ink-3); }
-.detail-cost { margin-left: auto; color: var(--ink-3); }
 
-.detail-tabs {
-  display: flex;
-  gap: 0;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--rule);
+.text-v-muted { color: var(--text-muted); }
+.text-xs { font-size: 11px; }
+.font-mono { font-family: var(--font-mono); }
+
+.flex { display: flex; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mt-2 { margin-top: 8px; }
+.fixed { position: fixed; }
+.inset-0 { inset: 0; }
+.z-50 { z-index: 50; }
+.p-4 { padding: 16px; }
+.p-6 { padding: 24px; }
+
+.field {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
 }
-.detail-tabs button {
+.field:focus { border-color: var(--accent); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 14px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--ink-3);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
-.detail-tabs button.active {
-  color: var(--ink);
-  border-bottom-color: var(--accent);
+.btn:hover { background: var(--bg-hover); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-yellow {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #fff;
 }
-.detail-tabs button:hover { color: var(--ink); }
+.btn-yellow:hover { opacity: 0.9; background: var(--warn); }
 
-.pulse {
+.pulse-dot {
+  display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--ok);
+  margin-left: 6px;
   animation: pulse-anim 1.5s infinite;
 }
 @keyframes pulse-anim {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
-
-.detail-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.detail-section h3 {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-3);
-  margin: 0 0 6px 0;
-}
-.detail-pre {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink);
-  background: var(--bg-sunk);
-  padding: 10px;
-  border-radius: var(--r-sm);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 200px;
-  overflow-y: auto;
-  margin: 0;
-  line-height: 1.5;
-}
-.detail-kv {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 12px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-}
-.detail-kv span:nth-child(odd) { color: var(--ink-3); }
-.detail-kv span:nth-child(even) { color: var(--ink-2); }
-
-.feedback-form {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.feedback-input {
-  width: 100%;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-sunk);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  padding: 8px;
-  resize: vertical;
-  outline: none;
-}
-.feedback-input:focus { border-color: var(--accent); }
-.feedback-btn {
-  align-self: flex-end;
-  padding: 4px 12px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-sm);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.feedback-btn:hover { background: var(--accent-2); }
-.feedback-btn:disabled { opacity: 0.4; cursor: default; }
-
-.detail-logs {
-  padding: 0;
-}
-.log-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-  background: var(--bg-sunk);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-.log-empty {
-  padding: 20px;
-  text-align: center;
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: 12px;
-}
-.log-line {
-  margin: 0;
-  padding: 0;
-  line-height: 1.6;
-  color: var(--ink-2);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.detail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 12px 20px;
-  border-top: 1px solid var(--rule);
-  flex-shrink: 0;
-}
-.act-btn {
-  padding: 5px 14px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-card);
-  color: var(--ink);
-  font-size: 12px;
-  cursor: pointer;
-}
-.act-btn:hover { background: var(--bg-hover); }
-.act-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-.act-primary:hover { background: var(--accent-2); }
-.act-danger { background: var(--err); color: #fff; border-color: var(--err); }
-.act-danger:hover { opacity: 0.9; }
-.act-ghost { border-color: transparent; color: var(--ink-3); }
-.act-ghost:hover { color: var(--err); }
 </style>
