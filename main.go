@@ -12,7 +12,7 @@ import (
 //go:embed ui
 var uiFiles embed.FS // uiFiles holds the frontend assets (HTML, JS, CSS) served by the web server.
 
-//go:embed frontend/dist
+//go:embed all:frontend/dist
 var vueDist embed.FS // vueDist holds the Vue SPA dist (used when WALLFACER_VUE_UI=true).
 
 //go:embed docs
