@@ -83,7 +83,11 @@ function showCostMeta(task: Task): boolean {
 }
 
 function sandboxLabel(task: Task): string {
-  return task.sandbox || 'default';
+  const id = task.sandbox;
+  if (!id) return 'Default';
+  if (id === 'claude') return 'Claude';
+  if (id === 'codex') return 'Codex';
+  return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
 const promptHtml = computed(() => {
@@ -100,15 +104,7 @@ const resultHtml = computed(() => {
   return renderMarkdown(t.result);
 });
 
-const showPromptPreview = computed(() => {
-  const t = props.task;
-  if (!t.prompt) return false;
-  // Suppress when we already render a result block below (failed/waiting/done/cancelled).
-  if (t.status === 'failed' && t.result) return false;
-  if (t.status === 'waiting' && t.result) return false;
-  if ((t.status === 'done' || t.status === 'cancelled') && t.result) return false;
-  return true;
-});
+const showPromptPreview = computed(() => !!props.task.prompt);
 
 const showResultPreview = computed(() => {
   const t = props.task;
