@@ -24,12 +24,17 @@ jobs:
           retention-days: 1
 
   verify-go:
+    needs: [verify-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
       - run: go build -o /dev/null .
       - run: go vet ./internal/webserver/...
 
