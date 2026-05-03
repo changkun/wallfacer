@@ -6,6 +6,9 @@ import SettingsModal from '../components/SettingsModal.vue';
 import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import ContainerMonitor from '../components/ContainerMonitor.vue';
+import InstructionsEditor from '../components/InstructionsEditor.vue';
+import SystemPromptsManager from '../components/SystemPromptsManager.vue';
+import TemplatesManager from '../components/TemplatesManager.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -58,6 +61,9 @@ useKeyboard({
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
     <ContainerMonitor v-model="ui.showContainers" />
+    <InstructionsEditor v-model="ui.showInstructions" />
+    <SystemPromptsManager v-model="ui.showSystemPrompts" />
+    <TemplatesManager v-model="ui.showTemplates" />
   </div>
 </template>
 
