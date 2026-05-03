@@ -1,6 +1,6 @@
 ---
 title: TypeScript Migration
-status: drafted
+status: archived
 depends_on: []
 affects:
   - ui/
