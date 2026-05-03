@@ -10,11 +10,13 @@ import TaskDetail from '../components/TaskDetail.vue';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
 import SearchBar from '../components/SearchBar.vue';
+import SettingsModal from '../components/SettingsModal.vue';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const selectedTask = ref<Task | null>(null);
 const sidebarCollapsed = ref(false);
+const showSettings = ref(false);
 
 onMounted(async () => {
   await Promise.all([store.fetchTasks(), store.fetchConfig()]);
@@ -69,7 +71,7 @@ function statusColor(status: string): string {
 
 <template>
   <div class="board-shell">
-    <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
+    <Sidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" @settings="showSettings = true" />
 
     <div class="board">
       <SearchBar />
@@ -138,6 +140,7 @@ function statusColor(status: string): string {
     </div>
 
     <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
+    <SettingsModal v-if="showSettings" @close="showSettings = false" />
   </div>
 </template>
 
