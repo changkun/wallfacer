@@ -10,4 +10,8 @@ ui/js/build/
 ui/wailsjs/
 build/bin/
 build/appicon.png
+wallfacerd
+internal/webserver/spa/dist/
+frontend/node_modules/
+frontend/dist/
 .DS_Store
