@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router';
 
-export const routes: RouteRecordRaw[] = [
-  { path: '/', component: () => import('./views/HomePage.vue') },
+const cloudRoutes: RouteRecordRaw[] = [
+  { path: '/', component: () => import('./views/ProductPage.vue') },
   { path: '/pricing', component: () => import('./views/PricingPage.vue') },
   { path: '/docs', component: () => import('./views/DocsIndex.vue') },
   { path: '/docs/:slug', component: () => import('./views/DocPage.vue'), props: true },
@@ -9,3 +9,16 @@ export const routes: RouteRecordRaw[] = [
   { path: '/dashboard', component: () => import('./views/BoardPage.vue') },
   { path: '/:pathMatch(.*)*', component: () => import('./views/NotFoundPage.vue') },
 ];
+
+const localRoutes: RouteRecordRaw[] = [
+  { path: '/', component: () => import('./views/BoardPage.vue') },
+];
+
+function readMode(): 'local' | 'cloud' {
+  if (typeof window !== 'undefined' && window.__WALLFACER__) {
+    return window.__WALLFACER__.mode || 'cloud';
+  }
+  return 'cloud';
+}
+
+export const routes: RouteRecordRaw[] = readMode() === 'local' ? localRoutes : cloudRoutes;

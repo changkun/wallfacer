@@ -586,6 +586,20 @@ func resolveBackendFlag(raw string) (string, error) {
 	}
 }
 
+// stripSSGContent disables vite-ssg hydration and injects a script that
+// clears the pre-rendered HTML before Vue mounts. This prevents the
+// hydration mismatch when the SSG-rendered page (ProductPage for cloud)
+// differs from the client route (BoardPage for local).
+func stripSSGContent(html string) string {
+	html = strings.Replace(html, `data-server-rendered="true"`, "", 1)
+	// Insert a classic (non-deferred) script right before the first module
+	// script. It runs synchronously before Vue's deferred module, clearing
+	// the stale SSG content so Vue does a fresh mount.
+	const clear = `<script>var e=document.getElementById("app");if(e)e.textContent=""</script>`
+	html = strings.Replace(html, `<script type="module"`, clear+`<script type="module"`, 1)
+	return html
+}
+
 // mountVueSPA overlays Vue SPA routes onto an existing mux, overriding
 // the legacy Go-templated UI for the root path and static assets. The
 // API routes registered by BuildMux are preserved because the SPA handler
@@ -608,20 +622,26 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 	apiKey := serverAPIKey
 	version := Version
 
+	rawHTML, err := fs.ReadFile(dist, "index.html")
+	if err != nil {
+		logger.Main.Warn("vue-ui: failed to read index.html", "error", err)
+		return
+	}
+	inject := fmt.Sprintf(
+		`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
+		mode, apiKey, version,
+	)
+	indexHTML := strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1)
+	if !cloudMode {
+		// Strip SSG pre-rendered content so Vue does a fresh client-side
+		// render instead of hydrating the wrong page component.
+		indexHTML = stripSSGContent(indexHTML)
+	}
+
 	serveVueIndex := func(w http.ResponseWriter, _ *http.Request) {
-		b, err := fs.ReadFile(dist, "index.html")
-		if err != nil {
-			http.Error(w, "vue spa unavailable", http.StatusInternalServerError)
-			return
-		}
-		inject := fmt.Sprintf(
-			`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
-			mode, apiKey, version,
-		)
-		html := strings.Replace(string(b), "</head>", inject+"</head>", 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_, _ = w.Write([]byte(html))
+		_, _ = w.Write([]byte(indexHTML))
 	}
 
 	files := http.FS(dist)
