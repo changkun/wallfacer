@@ -29,7 +29,7 @@ import (
 )
 
 // RunDesktop launches the native desktop window backed by the wallfacer HTTP server.
-func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
+func RunDesktop(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) error {
 	fs := flag.NewFlagSet("desktop", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
@@ -55,7 +55,7 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		SandboxImage: *sandboxImage,
 		EnvFile:      *envFile,
 		SkipCSRF:     true,
-	}, uiFS, docsFS)
+	}, uiFS, vueDist, docsFS)
 
 	go func() {
 		if err := sc.Srv.Serve(sc.Ln); err != nil && err != http.ErrServerClosed {

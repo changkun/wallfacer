@@ -12,6 +12,9 @@ import (
 //go:embed ui
 var uiFiles embed.FS // uiFiles holds the frontend assets (HTML, JS, CSS) served by the web server.
 
+//go:embed frontend/dist
+var vueDist embed.FS // vueDist holds the Vue SPA dist (used when WALLFACER_VUE_UI=true).
+
 //go:embed docs
 var docsFiles embed.FS // docsFiles holds the user-facing documentation served at /docs.
 
@@ -47,9 +50,9 @@ func main() {
 	case "exec":
 		cli.RunExec(configDir, args)
 	case "run":
-		cli.RunServer(configDir, args, uiFiles, docsFiles)
+		cli.RunServer(configDir, args, uiFiles, vueDist, docsFiles)
 	case "desktop":
-		if err := cli.RunDesktop(configDir, args, uiFiles, docsFiles); err != nil {
+		if err := cli.RunDesktop(configDir, args, uiFiles, vueDist, docsFiles); err != nil {
 			fmt.Fprintln(os.Stderr, "wallfacer:", err)
 			os.Exit(1)
 		}

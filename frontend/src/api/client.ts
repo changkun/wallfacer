@@ -8,12 +8,23 @@ export class ApiError extends Error {
   }
 }
 
+function getServerApiKey(): string {
+  if (typeof window !== 'undefined' && window.__WALLFACER__) {
+    return window.__WALLFACER__.serverApiKey || '';
+  }
+  return '';
+}
+
 export async function api<T = unknown>(
   method: string,
   path: string,
   body?: unknown,
 ): Promise<T> {
   const headers: Record<string, string> = { 'Accept': 'application/json' };
+  const key = getServerApiKey();
+  if (key) {
+    headers['Authorization'] = `Bearer ${key}`;
+  }
   let payload: BodyInit | undefined;
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
