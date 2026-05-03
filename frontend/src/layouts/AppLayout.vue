@@ -52,7 +52,11 @@ useKeyboard({
       <slot :connected="connected" />
       <StatusBar :connected="connected" />
     </div>
-    <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <SettingsModal
+      v-if="showSettings"
+      @close="showSettings = false"
+      @workspaces="showSettings = false; showWorkspaces = true"
+    />
     <CommandPalette v-model="showPalette" />
     <WorkspacePicker v-model="showWorkspaces" />
     <ContainerMonitor v-model="showContainers" />

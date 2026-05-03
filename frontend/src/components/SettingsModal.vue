@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useTheme } from '../composables/useTheme';
+import type { Task } from '../api/types';
 
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; workspaces: [] }>();
 const store = useTaskStore();
 const { theme } = useTheme();
 
-type TabKey = 'appearance' | 'execution' | 'about';
+type TabKey = 'appearance' | 'execution' | 'sandbox' | 'workspace' | 'trash' | 'about';
 const activeTab = ref<TabKey>('appearance');
 const saving = ref(false);
 
@@ -18,17 +19,44 @@ const autosubmit = ref(false);
 const autosync = ref(false);
 const autopush = ref(false);
 
+// Sandbox tab state
+const defaultSandbox = ref('');
+const savingSandbox = ref(false);
+const sandboxStatus = ref('');
+const sandboxes = computed(() => store.config?.sandboxes ?? []);
+
+// Workspace tab state
+const workspaces = computed(() => store.config?.workspaces ?? []);
+
+// Trash tab state
+const deletedTasks = ref<Task[]>([]);
+const trashLoading = ref(false);
+const trashError = ref('');
+const restoring = ref<Record<string, boolean>>({});
+
 onMounted(() => {
-  if (store.config) {
-    autopilot.value = store.config.autopilot;
-    autotest.value = store.config.autotest;
-    autosubmit.value = store.config.autosubmit;
-    autosync.value = store.config.autosync;
-    autopush.value = store.config.autopush;
-  }
+  syncFromConfig();
   document.addEventListener('keydown', onKey);
 });
 onUnmounted(() => document.removeEventListener('keydown', onKey));
+
+function syncFromConfig() {
+  if (!store.config) return;
+  autopilot.value = store.config.autopilot;
+  autotest.value = store.config.autotest;
+  autosubmit.value = store.config.autosubmit;
+  autosync.value = store.config.autosync;
+  autopush.value = store.config.autopush;
+  defaultSandbox.value = store.config.default_sandbox || '';
+}
+
+watch(() => store.config, syncFromConfig);
+
+watch(activeTab, (tab) => {
+  if (tab === 'trash') {
+    void loadDeletedTasks();
+  }
+});
 
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close');
@@ -60,9 +88,69 @@ function setTheme(mode: 'light' | 'dark' | 'auto') {
   theme.value = mode;
 }
 
+async function saveDefaultSandbox(value: string) {
+  defaultSandbox.value = value;
+  savingSandbox.value = true;
+  sandboxStatus.value = '';
+  try {
+    await api('PUT', '/api/config', { default_sandbox: value });
+    await store.fetchConfig();
+    sandboxStatus.value = 'Saved';
+    setTimeout(() => { sandboxStatus.value = ''; }, 2000);
+  } catch (e) {
+    console.error('save default sandbox:', e);
+    sandboxStatus.value = 'Failed to save';
+  } finally {
+    savingSandbox.value = false;
+  }
+}
+
+function openWorkspacePicker() {
+  emit('workspaces');
+}
+
+async function loadDeletedTasks() {
+  trashLoading.value = true;
+  trashError.value = '';
+  try {
+    deletedTasks.value = await api<Task[]>('GET', '/api/tasks/deleted');
+  } catch (e) {
+    console.error('load deleted tasks:', e);
+    trashError.value = e instanceof Error ? e.message : 'Failed to load';
+  } finally {
+    trashLoading.value = false;
+  }
+}
+
+async function restoreTask(id: string) {
+  restoring.value = { ...restoring.value, [id]: true };
+  try {
+    await api('POST', `/api/tasks/${id}/restore`);
+    deletedTasks.value = deletedTasks.value.filter((t) => t.id !== id);
+    await store.fetchTasks();
+  } catch (e) {
+    console.error('restore task:', e);
+    trashError.value = e instanceof Error ? e.message : 'Failed to restore';
+  } finally {
+    const next = { ...restoring.value };
+    delete next[id];
+    restoring.value = next;
+  }
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'appearance', label: 'Appearance' },
   { key: 'execution', label: 'Execution' },
+  { key: 'sandbox', label: 'Sandbox' },
+  { key: 'workspace', label: 'Workspace' },
+  { key: 'trash', label: 'Trash' },
   { key: 'about', label: 'About' },
 ];
 </script>
@@ -169,6 +257,136 @@ const tabs: { key: TabKey; label: string }[] = [
                     :disabled="saving"
                     @click="saveExecution"
                   >{{ saving ? 'Saving...' : 'Save' }}</button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-show="activeTab === 'sandbox'"
+              class="settings-tab-content"
+              :class="{ active: activeTab === 'sandbox' }"
+              data-settings-tab="sandbox"
+            >
+              <div class="settings-card">
+                <div class="settings-card-head">
+                  <h4>Sandbox</h4>
+                  <p>Choose the default sandbox runtime used for new tasks.</p>
+                </div>
+                <div v-if="sandboxes.length === 0" style="font-size: 12px; color: var(--text-muted)">
+                  No sandboxes are configured.
+                </div>
+                <div v-else class="settings-list">
+                  <div
+                    v-for="name in sandboxes"
+                    :key="name"
+                    class="settings-row"
+                    style="display: flex; align-items: center; justify-content: space-between; gap: 8px"
+                  >
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span style="font-size: 12px; font-weight: 600">{{ name }}</span>
+                      <span
+                        v-if="name === defaultSandbox"
+                        style="font-size: 10px; padding: 2px 6px; border-radius: 999px; background: var(--tint-accent, var(--bg-secondary)); color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px"
+                      >Default</span>
+                    </div>
+                    <button
+                      v-if="name !== defaultSandbox"
+                      type="button"
+                      class="btn-icon"
+                      style="font-size: 12px; padding: 4px 10px"
+                      :disabled="savingSandbox"
+                      @click="saveDefaultSandbox(name)"
+                    >Set as default</button>
+                  </div>
+                </div>
+                <div
+                  v-if="sandboxStatus"
+                  style="margin-top: 8px; font-size: 11px; color: var(--text-muted)"
+                >{{ sandboxStatus }}</div>
+              </div>
+            </div>
+
+            <div
+              v-show="activeTab === 'workspace'"
+              class="settings-tab-content"
+              :class="{ active: activeTab === 'workspace' }"
+              data-settings-tab="workspace"
+            >
+              <div class="settings-card">
+                <div class="settings-card-head">
+                  <h4>Active Workspaces</h4>
+                  <p>Workspaces mounted into every task container for the current group.</p>
+                </div>
+                <div v-if="workspaces.length === 0" style="font-size: 12px; color: var(--text-muted)">
+                  No workspaces selected.
+                </div>
+                <div v-else class="settings-list">
+                  <div
+                    v-for="path in workspaces"
+                    :key="path"
+                    class="settings-row"
+                    style="font-family: monospace; font-size: 12px; color: var(--text-secondary); word-break: break-all"
+                  >{{ path }}</div>
+                </div>
+                <div style="margin-top: 12px">
+                  <button
+                    type="button"
+                    class="btn-icon"
+                    style="font-size: 12px; padding: 4px 12px"
+                    @click="openWorkspacePicker"
+                  >Change workspaces...</button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-show="activeTab === 'trash'"
+              class="settings-tab-content"
+              :class="{ active: activeTab === 'trash' }"
+              data-settings-tab="trash"
+            >
+              <div class="settings-card">
+                <div class="settings-card-head">
+                  <h4>Deleted Tasks</h4>
+                  <p>Soft-deleted tasks remain recoverable for 7 days.</p>
+                </div>
+                <div
+                  v-if="trashError"
+                  role="alert"
+                  style="margin-bottom: 10px; padding: 8px 10px; border-radius: 6px; background: var(--tint-danger, #fde7e7); color: var(--danger, #a02929); font-size: 12px"
+                >{{ trashError }}</div>
+                <div
+                  v-if="trashLoading"
+                  style="font-size: 12px; color: var(--text-muted)"
+                >Loading deleted tasks...</div>
+                <div
+                  v-else-if="deletedTasks.length === 0"
+                  style="font-size: 12px; color: var(--text-muted)"
+                >Trash is empty</div>
+                <div v-else class="settings-list" role="list">
+                  <div
+                    v-for="task in deletedTasks"
+                    :key="task.id"
+                    class="settings-row"
+                    role="listitem"
+                    style="display: flex; align-items: center; justify-content: space-between; gap: 12px"
+                  >
+                    <div style="min-width: 0; flex: 1">
+                      <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+                        {{ task.title || task.prompt || task.id }}
+                      </div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px">
+                        {{ task.status }} &middot; updated {{ formatDate(task.updated_at) }}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn-icon"
+                      style="font-size: 12px; padding: 4px 10px"
+                      :disabled="!!restoring[task.id]"
+                      @click="restoreTask(task.id)"
+                    >{{ restoring[task.id] ? 'Restoring...' : 'Restore' }}</button>
+                  </div>
                 </div>
               </div>
             </div>
