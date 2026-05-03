@@ -1,0 +1,36 @@
+name: Deploy wallfacerd
+
+on:
+  workflow_run:
+    workflows: [wallfacerd]
+    types: [completed]
+    branches: ['v*']
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://wf.latere.ai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - run: doctl kubernetes cluster kubeconfig save latere-k8s
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f deploy/prod/service.yaml
+          kubectl apply -f deploy/prod/ingress.yaml
+          kubectl apply -f deploy/prod/deployment.yaml
+
+      - name: Roll new image
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          kubectl -n latere set image deployment/wallfacerd \
+            wallfacerd=ghcr.io/latere-ai/wallfacerd:${TAG}
+          kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
