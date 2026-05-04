@@ -191,12 +191,18 @@ watch(planningWindowDays, () => fetchAndRender());
     <div
       style="
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         margin-bottom: 16px;
+        gap: 12px;
       "
     >
-      <h3 style="font-size: 16px; font-weight: 600; margin: 0">Analytics</h3>
+      <div>
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0">Tokens &amp; cost</h3>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px">
+          Aggregate token usage and dollar cost across tasks, activities, workspaces, and planning rounds.
+        </div>
+      </div>
     </div>
 
     <div style="flex: 1; min-height: 0; overflow-y: auto">
