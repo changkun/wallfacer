@@ -5,6 +5,10 @@
   overflow-y: auto;
   padding: 1.75rem 2rem 2rem;
   background: var(--bg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body, 14px);
+  line-height: 1.55;
+  color: var(--text);
 }
 
 .settings-page-inner {
@@ -21,18 +25,21 @@
   gap: 0.25rem;
 }
 .settings-page-eyebrow {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow, 11px);
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.15em;
 }
 .settings-page-title {
-  font-size: 22px;
+  font-family: var(--font-sans);
+  font-size: 28px;
   font-weight: 600;
   color: var(--text);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
 }
 
 .set-grid {
@@ -41,8 +48,8 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--bg-card);
-  min-height: 520px;
+  background: var(--bg-surface);
+  min-height: 540px;
 }
 .set-side {
   border-right: 1px solid var(--border);
@@ -50,11 +57,12 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: var(--bg);
+  background: var(--bg-sunken);
 }
 .set-tab {
   padding: 7px 10px;
   border-radius: 6px;
+  font-family: var(--font-sans);
   font-size: 12.5px;
   color: var(--text-secondary);
   display: flex;
@@ -65,11 +73,10 @@
   border: none;
   text-align: left;
   width: 100%;
-  font-family: inherit;
 }
 .set-tab:hover { background: var(--bg-raised); color: var(--text); }
 .set-tab.is-active {
-  background: var(--bg-card);
+  background: var(--bg-surface);
   color: var(--text);
   font-weight: 500;
   box-shadow: var(--shadow);
@@ -88,10 +95,72 @@
   padding: 1.5rem 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
   min-width: 0;
   overflow-y: auto;
+  background: var(--bg-surface);
 }
+
+/* sandbox-style section/row primitives — opt-in via .set-section / .set-row.
+   We keep the existing `.settings-card`, `.settings-section`, `.settings-toggle`
+   classes for the still-modal-styled tab content; new tabs can adopt these. */
+.set-section { display: flex; flex-direction: column; gap: 0.625rem; }
+.set-section-h {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.set-section-d {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.set-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+.set-row:first-of-type { border-top: 0; padding-top: 0; }
+.set-row-label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.set-row-help {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.chip-row { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.chip {
+  padding: 4px 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); color: var(--text); }
+.chip.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+/* When a Settings tab content lives inside .set-body, its inner cards no longer
+   need their own border/padding (the .set-grid frame already provides them). */
+.set-body .settings-tab-content { padding: 0; }
+.set-body .settings-tab-content.active { display: flex; flex-direction: column; gap: 1.25rem; }
 
 @media (max-width: 720px) {
   .set-grid { grid-template-columns: 1fr; }
