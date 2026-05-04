@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
 
 const props = defineProps<{ connected: boolean }>();
@@ -16,6 +17,7 @@ interface GitWorkspace {
 }
 
 const store = useTaskStore();
+const ui = useUiStore();
 const workspaces = ref<GitWorkspace[]>([]);
 const pushing = ref<Record<string, boolean>>({});
 
@@ -134,12 +136,16 @@ onMounted(() => {
       </span>
     </div>
     <div class="status-bar__right">
-      <router-link to="/office" class="status-bar-btn" title="Open office">
-        Office
-      </router-link>
-      <router-link to="/terminal" class="status-bar-btn" title="Open terminal">
-        Terminal
-      </router-link>
+      <button
+        type="button"
+        class="status-bar-btn"
+        title="Toggle terminal panel (Ctrl+`)"
+        :aria-expanded="ui.showTerminal"
+        aria-controls="status-bar-panel"
+        @click="ui.toggleTerminal()"
+      >
+        Terminal <kbd class="status-bar-kbd">^`</kbd>
+      </button>
     </div>
   </footer>
 </template>
