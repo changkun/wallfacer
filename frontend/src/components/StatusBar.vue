@@ -5,6 +5,7 @@ import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
 
 const props = defineProps<{ connected: boolean }>();
+defineEmits<{ shortcuts: [] }>();
 
 interface GitWorkspace {
   path: string;
@@ -136,6 +137,16 @@ onMounted(() => {
       </span>
     </div>
     <div class="status-bar__right">
+      <router-link to="/map" class="status-bar-btn" title="Open map">Map</router-link>
+      <button
+        type="button"
+        class="status-bar-btn"
+        title="Keyboard shortcuts"
+        aria-label="Show keyboard shortcuts"
+        @click="$emit('shortcuts')"
+      >
+        Shortcuts <kbd class="status-bar-kbd">?</kbd>
+      </button>
       <button
         type="button"
         class="status-bar-btn"

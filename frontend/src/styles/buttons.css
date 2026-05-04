@@ -1,4 +1,18 @@
 /* --- Buttons --- */
+/* Tailwind-preflight-style global reset so a bare <button> matches an <a>
+   in chrome — no UA background-color, border, or font-family bleeding through.
+   The legacy ui/ pulled this in via @tailwind base; the Vue port did not. */
+button {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  -webkit-appearance: button;
+}
 button:focus {
   outline: none;
 }
