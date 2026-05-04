@@ -5,6 +5,7 @@ export interface KeyboardActions {
   onSearch?: () => void;
   onSettings?: () => void;
   onTerminal?: () => void;
+  onShortcuts?: () => void;
 }
 
 export function useKeyboard(actions: KeyboardActions) {
@@ -32,6 +33,12 @@ export function useKeyboard(actions: KeyboardActions) {
     }
 
     if (inInput) return;
+
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      e.preventDefault();
+      actions.onShortcuts?.();
+      return;
+    }
 
     if (e.key === 'n') {
       e.preventDefault();

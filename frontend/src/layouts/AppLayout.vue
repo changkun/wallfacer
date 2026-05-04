@@ -10,6 +10,7 @@ import InstructionsEditor from '../components/InstructionsEditor.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
 import TemplatesManager from '../components/TemplatesManager.vue';
 import TerminalPanel from '../components/TerminalPanel.vue';
+import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -39,6 +40,7 @@ useKeyboard({
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
   onSettings: () => { void router.push('/settings'); },
   onTerminal: () => { ui.toggleTerminal(); },
+  onShortcuts: () => { ui.openShortcuts(); },
 });
 </script>
 
@@ -54,7 +56,7 @@ useKeyboard({
     <div class="app-main">
       <slot :connected="connected" />
       <TerminalPanel />
-      <StatusBar :connected="connected" />
+      <StatusBar :connected="connected" @shortcuts="ui.openShortcuts()" />
     </div>
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
@@ -62,6 +64,7 @@ useKeyboard({
     <InstructionsEditor v-model="ui.showInstructions" />
     <SystemPromptsManager v-model="ui.showSystemPrompts" />
     <TemplatesManager v-model="ui.showTemplates" />
+    <KeyboardShortcutsModal v-model="ui.showShortcuts" />
   </div>
 </template>
 
