@@ -123,10 +123,25 @@
 
   /* Cloud-page tokens (used by landing/docs styles in app.css) */
   --bg-surface: var(--bg-elevated);
+  --bg-sunken: var(--bg-sunk);
   --accent-subtle: var(--accent-tint);
   --accent-glow: rgba(196, 90, 51, 0.15);
   --accent-glow-strong: rgba(196, 90, 51, 0.3);
+  --accent-deep: var(--accent-2);
+  --border-strong: var(--rule-2);
+  --border-emphasis: var(--rule-2);
   --grid-color: rgba(0, 0, 0, 0.035);
+
+  /* Sandbox-aligned typography helpers */
+  --fs-eyebrow: 11px;
+  --fs-micro: 12px;
+  --fs-body-sm: 13px;
+  --fs-body: 14px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --tracking-label: 0.06em;
 
   /* Terminal surface — always dark, does not swap with theme. */
   --terminal-bg: #1b1916;
@@ -200,9 +215,13 @@
   --shadow-lg: var(--sh-pop);
 
   --bg-surface: var(--bg-elevated);
+  --bg-sunken: var(--bg-sunk);
   --accent-subtle: var(--accent-tint);
   --accent-glow: rgba(224, 122, 81, 0.10);
   --accent-glow-strong: rgba(224, 122, 81, 0.20);
+  --accent-deep: var(--accent-2);
+  --border-strong: var(--rule-2);
+  --border-emphasis: var(--rule-2);
   --grid-color: rgba(255, 255, 255, 0.025);
 }
 
