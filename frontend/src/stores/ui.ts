@@ -19,6 +19,7 @@ export const useUiStore = defineStore('ui', () => {
   const showSystemPrompts = ref(false);
   const showTemplates = ref(false);
   const showTerminal = ref(false);
+  const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
   function setShowArchived(v: boolean) {
@@ -44,11 +45,13 @@ export const useUiStore = defineStore('ui', () => {
   function openTerminal() { showTerminal.value = true; }
   function closeTerminal() { showTerminal.value = false; }
   function toggleTerminal() { showTerminal.value = !showTerminal.value; }
+  function openShortcuts() { showShortcuts.value = true; }
+  function closeShortcuts() { showShortcuts.value = false; }
 
   return {
     showSettings, showWorkspaces, showPalette, showContainers,
     showInstructions, showSystemPrompts, showTemplates, showTerminal,
-    showArchived, setShowArchived,
+    showShortcuts, showArchived, setShowArchived,
     openSettings, closeSettings,
     openWorkspaces, closeWorkspaces,
     openPalette, closePalette,
@@ -57,5 +60,6 @@ export const useUiStore = defineStore('ui', () => {
     openSystemPrompts, closeSystemPrompts,
     openTemplates, closeTemplates,
     openTerminal, closeTerminal, toggleTerminal,
+    openShortcuts, closeShortcuts,
   };
 });
