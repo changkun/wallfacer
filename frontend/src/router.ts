@@ -17,7 +17,10 @@ const localRoutes: RouteRecordRaw[] = [
   { path: '/analytics', component: () => import('./views/AnalyticsPage.vue') },
   { path: '/plan', component: () => import('./views/PlanPage.vue') },
   { path: '/explorer', component: () => import('./views/ExplorerPage.vue') },
+  { path: '/map', component: () => import('./views/MapPage.vue') },
   { path: '/settings', component: () => import('./views/SettingsPage.vue') },
+  { path: '/docs', component: () => import('./views/DocsIndex.vue') },
+  { path: '/docs/:slug', component: () => import('./views/DocPage.vue'), props: true },
 ];
 
 function readMode(): 'local' | 'cloud' {
