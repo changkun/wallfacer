@@ -4,6 +4,8 @@ import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import type { Task } from '../../api/types';
 
+const TRASH_BIN_RETENTION_DAYS = 7;
+
 const store = useTaskStore();
 
 const deletedTasks = ref<Task[]>([]);
@@ -37,22 +39,64 @@ async function restoreTask(id: string) {
   } catch (e) {
     console.error('restore task:', e);
     trashError.value = e instanceof Error ? e.message : 'Failed to restore';
-  } finally {
     const next = { ...restoring.value };
     delete next[id];
     restoring.value = next;
+    return;
   }
+  const next = { ...restoring.value };
+  delete next[id];
+  restoring.value = next;
 }
 
 function dismissError() {
   trashError.value = '';
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+function trashTitle(task: Task): string {
+  if (task.title) return task.title;
+  if (task.prompt) {
+    return task.prompt.length > 60
+      ? task.prompt.slice(0, 60) + '…'
+      : task.prompt;
+  }
+  return task.id || 'Untitled task';
+}
+
+function statusLabel(task: Task): string {
+  const s = task.status || 'backlog';
+  return s.replace(/_/g, ' ');
+}
+
+function statusBadgeClass(task: Task): string {
+  return 'badge badge-' + (task.status || 'backlog');
+}
+
+function deletedAgo(task: Task): string {
+  const updatedAt = task.updated_at ? Date.parse(task.updated_at) : NaN;
+  if (!Number.isFinite(updatedAt)) return 'unknown';
+  const seconds = Math.floor((Date.now() - updatedAt) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    return minutes === 1 ? '1 minute ago' : minutes + ' minutes ago';
+  }
+  if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    return hours === 1 ? '1 hour ago' : hours + ' hours ago';
+  }
+  const days = Math.floor(seconds / 86400);
+  return days === 1 ? '1 day ago' : days + ' days ago';
+}
+
+function remainingDays(task: Task): string {
+  const updatedAt = task.updated_at ? Date.parse(task.updated_at) : NaN;
+  let days = 0;
+  if (Number.isFinite(updatedAt)) {
+    const elapsed = Math.floor((Date.now() - updatedAt) / 86400000);
+    days = Math.max(0, TRASH_BIN_RETENTION_DAYS - elapsed);
+  }
+  return days === 1 ? '1 day remaining' : days + ' days remaining';
 }
 </script>
 
@@ -100,13 +144,14 @@ function formatDate(iso: string): string {
         :key="task.id"
         class="trash-bin-row"
         role="listitem"
+        :data-task-id="task.id"
       >
         <div class="trash-bin-row__main">
-          <div class="trash-bin-row__title">
-            {{ task.title || task.prompt || task.id }}
-          </div>
+          <div class="trash-bin-row__title">{{ trashTitle(task) }}</div>
           <div class="trash-bin-row__meta">
-            {{ task.status }} &middot; updated {{ formatDate(task.updated_at) }}
+            <span :class="statusBadgeClass(task)">{{ statusLabel(task) }}</span>
+            <span>{{ deletedAgo(task) }}</span>
+            <span class="trash-bin-row__retention">{{ remainingDays(task) }}</span>
           </div>
         </div>
         <button

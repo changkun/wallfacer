@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
+import { renderMarkdown } from '../lib/markdown';
 import type { PromptTemplate } from '../api/types';
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -16,6 +17,9 @@ const newName = ref('');
 const newBody = ref('');
 const addStatus = ref('');
 const saving = ref(false);
+const bodyTab = ref<'edit' | 'preview'>('edit');
+
+const bodyPreviewHtml = computed(() => renderMarkdown(newBody.value || ''));
 
 watch(
   () => props.modelValue,
@@ -24,6 +28,7 @@ watch(
     newName.value = '';
     newBody.value = '';
     addStatus.value = '';
+    bodyTab.value = 'edit';
     await refresh();
   },
 );
@@ -54,6 +59,7 @@ async function saveNewTemplate() {
     await api('POST', '/api/templates', { name, body });
     newName.value = '';
     newBody.value = '';
+    bodyTab.value = 'edit';
     addStatus.value = 'Saved.';
     setTimeout(() => {
       if (addStatus.value === 'Saved.') addStatus.value = '';
@@ -95,16 +101,16 @@ function onOverlayClick(e: MouseEvent) {
   >
     <div
       class="modal-card"
-      style="max-width: 600px; width: 100%; max-height: 90vh; display: flex; flex-direction: column;"
+      style="max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;"
     >
-      <div class="p-6" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+      <div class="p-6" style="display:flex;flex-direction:column;flex:1;min-height:0;">
         <div
-          style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;"
+          style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;"
         >
-          <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Prompt Templates</h3>
+          <h3 style="font-size:16px;font-weight:600;margin:0;">Prompt Templates</h3>
           <button
             type="button"
-            style="background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-muted); line-height: 1;"
+            style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1;"
             aria-label="Close"
             @click="close"
           >
@@ -112,58 +118,91 @@ function onOverlayClick(e: MouseEvent) {
           </button>
         </div>
 
+        <!-- Add form -->
         <div
-          style="border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px;"
+          id="tmpl-add-form"
+          style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;"
         >
           <div
-            style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;"
+            style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;"
           >
             Add Template
           </div>
           <input
             v-model="newName"
             type="text"
-            placeholder="Name…"
+            placeholder="Name&hellip;"
             class="field"
-            style="font-size: 12px; padding: 5px 8px; margin-bottom: 6px; width: 100%; box-sizing: border-box;"
+            style="font-size:12px;padding:5px 8px;margin-bottom:6px;width:100%;box-sizing:border-box;"
           />
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;"
+          >
+            <span class="text-xs text-v-muted">Body</span>
+            <div class="logs-tabs">
+              <button
+                type="button"
+                class="logs-tab"
+                :class="{ active: bodyTab === 'edit' }"
+                @click="bodyTab = 'edit'"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                class="logs-tab"
+                :class="{ active: bodyTab === 'preview' }"
+                @click="bodyTab = 'preview'"
+              >
+                Preview
+              </button>
+            </div>
+          </div>
           <textarea
+            v-show="bodyTab === 'edit'"
             v-model="newBody"
             rows="4"
-            placeholder="Prompt body…"
-            class="field"
-            style="font-size: 12px; padding: 5px 8px; width: 100%; box-sizing: border-box; resize: vertical;"
+            placeholder="Prompt body&hellip;"
+            class="field editable-field"
+            style="font-size:12px;padding:5px 8px;width:100%;box-sizing:border-box;resize:vertical;"
           ></textarea>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+          <div
+            v-show="bodyTab === 'preview'"
+            class="code-block prose-content editable-preview"
+            style="font-size:12px;"
+            v-html="bodyPreviewHtml"
+          ></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
             <button
               type="button"
               class="btn btn-accent"
-              style="font-size: 12px;"
+              style="font-size:12px;"
               :disabled="saving"
               @click="saveNewTemplate"
             >
               Save
             </button>
-            <span style="font-size: 11px; color: var(--text-muted);">{{ addStatus }}</span>
+            <span style="font-size:11px;color:var(--text-muted);">{{ addStatus }}</span>
           </div>
         </div>
 
-        <div style="overflow-y: auto; flex: 1; min-height: 0;">
+        <!-- Existing templates list -->
+        <div id="tmpl-list" style="overflow-y:auto;flex:1;min-height:0;">
           <div
             v-if="loading"
-            style="font-size: 12px; color: var(--text-muted); padding: 8px 0;"
+            style="font-size:12px;color:var(--text-muted);padding:8px 0;"
           >
             Loading&hellip;
           </div>
           <div
             v-else-if="loadError"
-            style="font-size: 12px; color: var(--text-muted); padding: 8px 0;"
+            style="font-size:12px;color:var(--text-muted);padding:8px 0;"
           >
             Error loading templates.
           </div>
           <div
             v-else-if="templates.length === 0"
-            style="font-size: 12px; color: var(--text-muted); padding: 8px 0;"
+            style="font-size:12px;color:var(--text-muted);padding:8px 0;"
           >
             No templates yet. Add one above.
           </div>
@@ -171,14 +210,14 @@ function onOverlayClick(e: MouseEvent) {
             v-for="t in templates"
             v-else
             :key="t.id"
-            style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);"
+            style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);"
           >
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 500; color: var(--text-primary);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:500;color:var(--text-primary);">
                 {{ t.name }}
               </div>
               <div
-                style="font-size: 11px; color: var(--text-muted); margin-top: 3px; white-space: pre-wrap; word-break: break-word; max-height: 48px; overflow: hidden;"
+                style="font-size:11px;color:var(--text-muted);margin-top:3px;white-space:pre-wrap;word-break:break-word;max-height:48px;overflow:hidden;"
               >
                 {{ t.body }}
               </div>
@@ -186,7 +225,7 @@ function onOverlayClick(e: MouseEvent) {
             <button
               type="button"
               class="btn-icon"
-              style="font-size: 11px; padding: 3px 8px; flex-shrink: 0; color: var(--text-muted);"
+              style="font-size:11px;padding:3px 8px;flex-shrink:0;color:var(--text-muted);"
               @click="deleteTemplate(t.id)"
             >
               Delete

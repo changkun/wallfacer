@@ -1,4 +1,112 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { api } from '../../api/client';
+
+interface ContainerCircuit {
+  state: string;
+  failures: number;
+}
+
+interface ActivityStats {
+  execs?: number;
+  creates?: number;
+}
+
+interface WorkerStats {
+  enabled?: boolean;
+  active_workers?: number;
+  creates?: number;
+  execs?: number;
+  fallbacks?: number;
+  by_activity?: Record<string, ActivityStats>;
+}
+
+interface TaskStates {
+  in_progress?: number;
+  waiting?: number;
+  backlog?: number;
+  done?: number;
+  failed?: number;
+}
+
+interface RuntimeStatus {
+  go_goroutine_count?: number;
+  go_heap_alloc_bytes?: number;
+  active_containers?: number;
+  container_circuit?: ContainerCircuit;
+  worker_stats?: WorkerStats;
+  task_states?: TaskStates;
+}
+
+const status = ref<RuntimeStatus | null>(null);
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  const KB = 1024,
+    MB = KB * 1024,
+    GB = MB * 1024;
+  if (bytes < MB) return (bytes / KB).toFixed(2) + ' KB';
+  if (bytes < GB) return (bytes / MB).toFixed(2) + ' MB';
+  return (bytes / GB).toFixed(2) + ' GB';
+}
+
+function circuitColor(state: string): string {
+  return state === 'closed' ? 'var(--text-muted)' : 'var(--accent)';
+}
+
+function reuseRatio(ws: WorkerStats): number {
+  const execs = ws.execs || 0;
+  const fallbacks = ws.fallbacks || 0;
+  const total = execs + fallbacks;
+  return total > 0 ? Math.round((execs / total) * 100) : 0;
+}
+
+function showWorkerExtras(ws: WorkerStats): boolean {
+  return (ws.creates || 0) > 0 || (ws.execs || 0) > 0;
+}
+
+function activityBreakdown(ws: WorkerStats): string {
+  if (!ws.by_activity) return '';
+  const parts: string[] = [];
+  for (const act in ws.by_activity) {
+    const a = ws.by_activity[act];
+    let label = act + ': ' + (a.execs || 0) + ' exec';
+    if ((a.creates || 0) > 0) {
+      label += ' (' + a.creates + ' triggered worker)';
+    }
+    parts.push(label);
+  }
+  return parts.join(' · ');
+}
+
+function hasActivityBreakdown(ws: WorkerStats): boolean {
+  return !!ws.by_activity && Object.keys(ws.by_activity).length > 0;
+}
+
+function taskStatesText(ts: TaskStates): string {
+  const parts: string[] = [];
+  if (ts.in_progress) parts.push(ts.in_progress + ' running');
+  if (ts.waiting) parts.push(ts.waiting + ' waiting');
+  if (ts.backlog) parts.push(ts.backlog + ' backlog');
+  if (ts.done) parts.push(ts.done + ' done');
+  if (ts.failed) parts.push(ts.failed + ' failed');
+  return parts.join(' · ');
+}
+
+function hasTaskStates(ts: TaskStates | undefined): boolean {
+  if (!ts) return false;
+  return !!(ts.in_progress || ts.waiting || ts.backlog || ts.done || ts.failed);
+}
+
+onMounted(async () => {
+  try {
+    const data = await api<RuntimeStatus>('GET', '/api/debug/runtime');
+    status.value = data;
+  } catch {
+    status.value = null;
+  }
+});
+</script>
 
 <template>
   <div class="settings-tab-content active" data-settings-tab="about">
@@ -133,6 +241,64 @@
           style="color: inherit; text-decoration: none; transition: color 0.15s"
           >Changkun Ou</a
         >
+      </div>
+    </div>
+    <div
+      v-if="status"
+      style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);"
+    >
+      <div
+        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;"
+      >
+        System Status
+      </div>
+      <div
+        style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted);"
+      >
+        <div>
+          Goroutines: <strong>{{ status.go_goroutine_count || 0 }}</strong>
+          &middot; Heap:
+          <strong>{{ formatBytes(status.go_heap_alloc_bytes || 0) }}</strong>
+        </div>
+        <div>
+          Active containers:
+          <strong>{{ status.active_containers || 0 }}</strong>
+        </div>
+        <div v-if="status.container_circuit">
+          Circuit breaker:
+          <strong :style="{ color: circuitColor(status.container_circuit.state) }">{{
+            status.container_circuit.state
+          }}</strong>
+          <template v-if="status.container_circuit.failures > 0">
+            ({{ status.container_circuit.failures }} failures)
+          </template>
+        </div>
+        <template v-if="status.worker_stats">
+          <div>
+            Task workers:
+            <strong>{{ status.worker_stats.enabled ? 'enabled' : 'disabled' }}</strong>
+            &middot; Active:
+            <strong>{{ status.worker_stats.active_workers || 0 }}</strong>
+            <template v-if="showWorkerExtras(status.worker_stats)">
+              &middot; Creates: {{ status.worker_stats.creates || 0 }} &middot;
+              Execs: {{ status.worker_stats.execs || 0 }}
+              <template v-if="(status.worker_stats.fallbacks || 0) > 0">
+                &middot; Fallbacks: {{ status.worker_stats.fallbacks }}
+              </template>
+              &middot; Reuse:
+              <strong>{{ reuseRatio(status.worker_stats) }}%</strong>
+            </template>
+          </div>
+          <div
+            v-if="hasActivityBreakdown(status.worker_stats)"
+            style="padding-left: 12px;"
+          >
+            {{ activityBreakdown(status.worker_stats) }}
+          </div>
+        </template>
+        <div v-if="hasTaskStates(status.task_states)">
+          Tasks: {{ taskStatesText(status.task_states!) }}
+        </div>
       </div>
     </div>
   </div>

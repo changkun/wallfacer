@@ -1,6 +1,15 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
+const SHOW_ARCHIVED_KEY = 'wallfacer-show-archived';
+
+function readShowArchived(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(SHOW_ARCHIVED_KEY) === 'true';
+  } catch { return false; }
+}
+
 export const useUiStore = defineStore('ui', () => {
   const showSettings = ref(false);
   const showWorkspaces = ref(false);
@@ -9,6 +18,13 @@ export const useUiStore = defineStore('ui', () => {
   const showInstructions = ref(false);
   const showSystemPrompts = ref(false);
   const showTemplates = ref(false);
+  const showArchived = ref(readShowArchived());
+
+  function setShowArchived(v: boolean) {
+    showArchived.value = v;
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(SHOW_ARCHIVED_KEY, String(v)); }
+    catch { /* ignore */ }
+  }
 
   function openSettings() { showSettings.value = true; }
   function closeSettings() { showSettings.value = false; }
@@ -28,6 +44,7 @@ export const useUiStore = defineStore('ui', () => {
   return {
     showSettings, showWorkspaces, showPalette, showContainers,
     showInstructions, showSystemPrompts, showTemplates,
+    showArchived, setShowArchived,
     openSettings, closeSettings,
     openWorkspaces, closeWorkspaces,
     openPalette, closePalette,
