@@ -128,8 +128,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.hideDependencyGraph?.();
   window._resetMapCentering?.();
-  // Mark Map mode inactive so any lingering pan/zoom listeners no-op.
-  window.depGraphEnabled = false;
+  // restoreShims() sets depGraphEnabled back to its prior value
+  // (undefined in normal operation), which falsy-checks the same as
+  // false in the legacy pan/zoom guards.
   restoreShims();
 });
 
