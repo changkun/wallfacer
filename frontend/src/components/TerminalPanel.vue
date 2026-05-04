@@ -307,14 +307,21 @@ function onPickerOutsideClick(e: MouseEvent) {
 }
 
 watch(() => ui.showTerminal, async (open) => {
-  if (open) {
-    await nextTick();
-    if (!initialized) await init();
-    setTimeout(() => {
-      try { fitAddon?.fit(); } catch { /* ignore */ }
-      term?.focus();
-    }, 60);
+  if (!open) return;
+  await nextTick();
+  if (!initialized) {
+    await init();
+  } else if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+    // Panel was reopened after the last session was closed (server cleanly
+    // hung up the WS). Wipe the stale screen and request a fresh PTY — the
+    // server auto-creates an initial session on every new connection.
+    clearTermScreen();
+    connect();
   }
+  setTimeout(() => {
+    try { fitAddon?.fit(); } catch { /* ignore */ }
+    term?.focus();
+  }, 60);
 });
 
 watch(containerPickerOpen, (open) => {
