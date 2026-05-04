@@ -19,8 +19,8 @@ const localRoutes: RouteRecordRaw[] = [
   { path: '/explorer', component: () => import('./views/ExplorerPage.vue') },
   { path: '/map', component: () => import('./views/MapPage.vue') },
   { path: '/settings', component: () => import('./views/SettingsPage.vue') },
-  { path: '/docs', component: () => import('./views/DocsIndex.vue') },
-  { path: '/docs/:slug', component: () => import('./views/DocPage.vue'), props: true },
+  { path: '/docs', component: () => import('./views/LocalDocsPage.vue') },
+  { path: '/docs/:slug(.*)', component: () => import('./views/LocalDocsPage.vue') },
 ];
 
 function readMode(): 'local' | 'cloud' {
