@@ -64,7 +64,13 @@ onMounted(() => {
           <rect x="11" y="12" width="5" height="4" fill="var(--accent)" />
         </svg>
       </span>
-      <span class="sb-brand-name">Wallfacer</span>
+      <a
+        href="https://github.com/changkun/wallfacer"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="sb-brand-name"
+        @click.stop
+      >Wallfacer</a>
       <button
         v-if="!collapsed"
         type="button"
@@ -150,7 +156,7 @@ onMounted(() => {
         <span>Flows</span>
       </router-link>
 
-      <router-link to="/explorer" class="sb-nav-item" :class="{ active: route.path === '/explorer' }">
+      <router-link to="/map" class="sb-nav-item" :class="{ active: route.path === '/map' }" title="Dependency map">
         <span class="sb-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="5" cy="6" r="2"></circle>
@@ -160,7 +166,7 @@ onMounted(() => {
             <line x1="19" y1="8" x2="12" y2="16"></line>
           </svg>
         </span>
-        <span>Explorer</span>
+        <span>Map</span>
       </router-link>
     </div>
 
@@ -200,7 +206,7 @@ onMounted(() => {
     <!-- Bottom nav: Docs, Settings, optional account chip -->
     <div class="sb-divider"></div>
     <div class="sb-nav">
-      <a href="https://wf.latere.ai/docs" target="_blank" rel="noopener noreferrer" class="sb-nav-item" title="Docs">
+      <router-link to="/docs" class="sb-nav-item" :class="{ active: route.path.startsWith('/docs') }" title="Docs">
         <span class="sb-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
@@ -208,7 +214,7 @@ onMounted(() => {
           </svg>
         </span>
         <span>Docs</span>
-      </a>
+      </router-link>
 
       <router-link to="/settings" class="sb-nav-item" :class="{ active: route.path === '/settings' }" title="Settings">
         <span class="sb-icon">
