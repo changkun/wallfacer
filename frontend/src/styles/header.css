@@ -353,6 +353,57 @@ html.wails-desktop .app-sidebar {
   margin: var(--sp-3) 10px;
 }
 
+/* Account chip (cloud-mode footer) */
+.sb-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 10px 10px;
+  padding: 6px 8px;
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--bg-elevated);
+  border: 1px solid var(--rule);
+  transition: background 0.12s;
+}
+.sb-account:hover { background: var(--bg-hover); }
+.sb-account-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.sb-account-avatar--mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sb-account-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sb-account-name {
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-account-meta {
+  font-size: var(--fs-9);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.sb-account--signin .sb-account-name { color: var(--accent); }
+
 /* Collapsed sidebar */
 .app-sidebar.collapsed .sb-brand-name,
 .app-sidebar.collapsed .sb-collapse,
@@ -369,6 +420,11 @@ html.wails-desktop .app-sidebar {
   padding: 6px 0 14px;
   cursor: pointer;
 }
+.app-sidebar.collapsed .sb-brand:hover .sb-logo {
+  filter: brightness(1.08);
+}
+.app-sidebar.collapsed .sb-account,
+.app-sidebar.collapsed .sb-account-text { display: none; }
 .app-sidebar.collapsed .sb-search {
   margin: 0 8px var(--sp-3);
   justify-content: center;

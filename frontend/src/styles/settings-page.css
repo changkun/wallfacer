@@ -157,6 +157,74 @@
   background: var(--accent-subtle);
 }
 
+.switch {
+  width: 32px;
+  height: 18px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: transform 0.15s;
+}
+.switch.is-on { background: var(--accent); border-color: var(--accent); }
+.switch.is-on::after { transform: translateX(13px); background: #fff; }
+
+.field-input,
+.field-select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 0.4375rem 0.625rem;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  width: 100%;
+}
+.field-input.mono { font-family: var(--font-mono); }
+.field-input:focus,
+.field-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.field-input::placeholder { color: var(--text-muted); }
+.field-help { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+.field-status { font-size: 11.5px; color: var(--text-muted); margin-left: 8px; min-height: 1em; }
+.field-status.is-err { color: var(--err); }
+.field-status.is-ok { color: var(--ok); }
+
+.flash {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.flash-err {
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
+  border: 1px solid var(--tint-red-ink);
+}
+.flash-ok {
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
+  border: 1px solid var(--tint-green-ink);
+}
+
 /* When a Settings tab content lives inside .set-body, its inner cards no longer
    need their own border/padding (the .set-grid frame already provides them). */
 .set-body .settings-tab-content { padding: 0; }
