@@ -13,6 +13,7 @@ import './styles/buttons.css';
 import './styles/board.css';
 import './styles/modal.css';
 import './styles/settings-modal.css';
+import './styles/settings-page.css';
 import './styles/task-detail.css';
 import './styles/mermaid.css';
 import './styles/diffs.css';

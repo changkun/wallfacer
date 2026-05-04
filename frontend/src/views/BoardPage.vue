@@ -7,11 +7,9 @@ import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import SearchBar from '../components/SearchBar.vue';
-import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
-const ui = useUiStore();
 const selectedTask = ref<Task | null>(null);
 
 const doneCost = computed(() =>
@@ -87,11 +85,10 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
             <line x1="9" y1="9" x2="9" y2="21"></line>
           </svg>
         </router-link>
-        <button
-          type="button"
+        <router-link
+          to="/settings?tab=execution"
           class="settings-btn"
           title="Automation"
-          @click="ui.openSettings()"
         >
           <svg
             width="18"
@@ -105,7 +102,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
           >
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
-        </button>
+        </router-link>
       </div>
     </div>
   </header>
