@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { api } from '../api/client';
 import { computeHidden } from '../lib/specTree';
 
@@ -228,8 +229,17 @@ function statusColor(status: string): string {
 
 // ── Lifecycle ──────────────────────────────────────────────────────
 
+const route = useRoute();
+
 onMounted(async () => {
   await fetchTree();
+  // Honour ?spec=<path> from MapPage so shift+click on a spec node opens
+  // it here. Only auto-select when the path actually resolves to a known
+  // spec; otherwise leave the user on the default empty pane.
+  const focusPath = typeof route.query.spec === 'string' ? route.query.spec : null;
+  if (focusPath && nodes.value.some(n => n.path === focusPath)) {
+    selectSpec(focusPath);
+  }
   await loadMessages();
 });
 

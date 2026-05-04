@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
@@ -11,26 +11,46 @@ interface GitWorkspace {
   path: string;
   name?: string;
   branch: string;
+  is_git_repo?: boolean;
   ahead_count?: number;
   behind_count?: number;
   has_remote?: boolean;
   main_branch?: string;
+  behind_main_count?: number;
 }
 
 const store = useTaskStore();
 const ui = useUiStore();
 const workspaces = ref<GitWorkspace[]>([]);
-const pushing = ref<Record<string, boolean>>({});
+const busy = ref<Record<string, string>>({}); // ws.path -> 'push' | 'sync' | 'rebase'
 
 const connDotClass = computed(() =>
   props.connected ? 'status-bar-conn-dot--ok' : 'status-bar-conn-dot--closed',
 );
 const connLabel = computed(() => (props.connected ? 'Connected' : 'Disconnected'));
+
 const workspaceLabel = computed(() => {
-  const ws = store.config?.workspaces;
-  if (!ws || !ws.length) return '';
-  return ws.map((w) => w.split('/').pop()).join(', ');
+  const ws = store.config?.workspaces ?? [];
+  if (!ws.length) return '';
+  const groups = store.config?.workspace_groups ?? [];
+  const matched = groups.find(g =>
+    Array.isArray(g.workspaces)
+      && g.workspaces.length === ws.length
+      && g.workspaces.every((p, i) => p === ws[i]),
+  );
+  if (matched?.name) return matched.name;
+  const first = ws[0].replace(/\/+$/, '').split('/');
+  return first[first.length - 1] || ws[0];
 });
+
+const renderableWorkspaces = computed(() =>
+  workspaces.value.filter(w => (w.is_git_repo ?? true) && w.branch),
+);
+const isMulti = computed(() => renderableWorkspaces.value.length > 1);
+
+function branchLabel(ws: GitWorkspace): string {
+  return isMulti.value && ws.name ? `${ws.name}:${ws.branch}` : ws.branch;
+}
 
 async function refreshGitStatus() {
   try {
@@ -41,21 +61,50 @@ async function refreshGitStatus() {
   }
 }
 
-async function pushWorkspace(ws: GitWorkspace) {
-  if (pushing.value[ws.path]) return;
-  pushing.value[ws.path] = true;
+async function runAction(ws: GitWorkspace, kind: 'push' | 'sync' | 'rebase') {
+  if (busy.value[ws.path]) return;
+  busy.value[ws.path] = kind;
   try {
-    await api('POST', '/api/git/push', { workspace: ws.path });
+    const route = kind === 'push'
+      ? '/api/git/push'
+      : kind === 'sync'
+        ? '/api/git/sync'
+        : '/api/git/rebase-on-main';
+    await api('POST', route, { workspace: ws.path });
     await refreshGitStatus();
   } catch {
-    /* surface failures via status refresh; no modal in Vue UI yet */
+    /* error surfaced via stale state; status SSE will re-emit */
   } finally {
-    pushing.value[ws.path] = false;
+    delete busy.value[ws.path];
+  }
+}
+
+let sse: EventSource | null = null;
+function startGitStream() {
+  if (typeof EventSource === 'undefined') return;
+  try {
+    let url = '/api/git/stream';
+    const key = window.__WALLFACER__?.serverApiKey;
+    if (key) url += `?token=${encodeURIComponent(key)}`;
+    sse = new EventSource(url);
+    sse.addEventListener('git-status', (ev) => {
+      try {
+        const msg = JSON.parse((ev as MessageEvent<string>).data) as { workspaces?: GitWorkspace[] };
+        if (Array.isArray(msg.workspaces)) workspaces.value = msg.workspaces;
+      } catch { /* ignore */ }
+    });
+  } catch {
+    /* sse optional */
   }
 }
 
 onMounted(() => {
   refreshGitStatus();
+  startGitStream();
+});
+
+onUnmounted(() => {
+  sse?.close();
 });
 </script>
 
@@ -70,19 +119,23 @@ onMounted(() => {
       <span class="status-bar-conn-label">{{ connLabel }}</span>
       <span v-if="workspaceLabel" class="status-bar-workspace">{{ workspaceLabel }}</span>
       <span
-        v-if="workspaces.length"
+        v-if="renderableWorkspaces.length"
         class="status-bar-branches"
         aria-label="Workspace branches"
       >
         <span
-          v-for="ws in workspaces"
+          v-for="ws in renderableWorkspaces"
           :key="ws.path"
           class="status-bar-branch-group"
         >
-          <span class="status-bar-branch" :title="`${ws.path || ws.name || ''}\nBranch: ${ws.branch}`">
+          <button
+            type="button"
+            class="status-bar-branch"
+            :title="`${ws.path || ws.name || ''}\nBranch: ${ws.branch}`"
+          >
             <span class="status-bar-branch__glyph">⎇</span>
-            <span class="status-bar-branch__name">{{ ws.branch }}</span>
-          </span>
+            <span class="status-bar-branch__name">{{ branchLabel(ws) }}</span>
+          </button>
           <template v-if="ws.has_remote">
             <span
               v-if="(ws.behind_count ?? 0) > 0"
@@ -95,13 +148,29 @@ onMounted(() => {
               :title="`${ws.ahead_count} commits ahead of upstream`"
             >{{ ws.ahead_count }}↑</span>
             <button
+              v-if="(ws.behind_count ?? 0) > 0"
+              type="button"
+              class="status-bar-branch__action status-bar-branch__action--sync"
+              :disabled="!!busy[ws.path]"
+              :title="`Pull ${ws.behind_count} commits from upstream`"
+              @click="runAction(ws, 'sync')"
+            >{{ busy[ws.path] === 'sync' ? '…' : 'Sync' }}</button>
+            <button
               v-if="(ws.ahead_count ?? 0) > 0"
               type="button"
               class="status-bar-branch__action status-bar-branch__action--push"
-              :disabled="pushing[ws.path]"
+              :disabled="!!busy[ws.path]"
               :title="`Push ${ws.ahead_count} commits to upstream`"
-              @click="pushWorkspace(ws)"
-            >{{ pushing[ws.path] ? '...' : 'Push' }}</button>
+              @click="runAction(ws, 'push')"
+            >{{ busy[ws.path] === 'push' ? '…' : 'Push' }}</button>
+            <button
+              v-if="ws.main_branch && ws.branch !== ws.main_branch"
+              type="button"
+              class="status-bar-branch__action status-bar-branch__action--rebase"
+              :disabled="!!busy[ws.path]"
+              :title="`Fetch origin/${ws.main_branch} and rebase current branch on top`"
+              @click="runAction(ws, 'rebase')"
+            ><template v-if="(ws.behind_main_count ?? 0) > 0">{{ ws.behind_main_count }}↓ </template>{{ busy[ws.path] === 'rebase' ? '…' : `Rebase on ${ws.main_branch}` }}</button>
           </template>
         </span>
       </span>

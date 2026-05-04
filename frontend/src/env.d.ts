@@ -17,3 +17,10 @@ interface WallfacerBootConfig {
 interface Window {
   __WALLFACER__?: WallfacerBootConfig;
 }
+
+// Legacy IIFE modules vendored from ui/js/ (depgraph, unified-graph) have
+// no exports; Vite imports them for side effects so they attach renderer
+// functions to `window`. The shape of those window functions is declared
+// at the call site (frontend/src/views/MapPage.vue).
+declare module '*/ui/js/depgraph.js';
+declare module '*/ui/js/unified-graph.js';
