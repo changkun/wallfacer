@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
+import BranchDropdown from './BranchDropdown.vue';
 
 const props = defineProps<{ connected: boolean }>();
 defineEmits<{ shortcuts: [] }>();
@@ -23,6 +24,22 @@ const store = useTaskStore();
 const ui = useUiStore();
 const workspaces = ref<GitWorkspace[]>([]);
 const busy = ref<Record<string, string>>({}); // ws.path -> 'push' | 'sync' | 'rebase'
+
+const dropdownOpen = ref(false);
+const dropdownWs = ref<GitWorkspace | null>(null);
+const dropdownAnchor = ref<{ top: number; left: number } | null>(null);
+
+function openBranchDropdown(ws: GitWorkspace, e: MouseEvent) {
+  e.stopPropagation();
+  if (dropdownOpen.value && dropdownWs.value?.path === ws.path) {
+    dropdownOpen.value = false;
+    return;
+  }
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  dropdownAnchor.value = { top: rect.bottom + 4, left: rect.left };
+  dropdownWs.value = ws;
+  dropdownOpen.value = true;
+}
 
 const connDotClass = computed(() =>
   props.connected ? 'status-bar-conn-dot--ok' : 'status-bar-conn-dot--closed',
@@ -135,6 +152,7 @@ onUnmounted(() => {
             type="button"
             class="status-bar-branch"
             :title="`${ws.path || ws.name || ''}\nBranch: ${ws.branch}`"
+            @click="openBranchDropdown(ws, $event)"
           >
             <span class="status-bar-branch__glyph">⎇</span>
             <span class="status-bar-branch__name">{{ branchLabel(ws) }}</span>
@@ -231,4 +249,12 @@ onUnmounted(() => {
       </button>
     </div>
   </footer>
+  <BranchDropdown
+    v-if="dropdownWs"
+    v-model="dropdownOpen"
+    :workspace-path="dropdownWs.path"
+    :current-branch="dropdownWs.branch"
+    :anchor="dropdownAnchor"
+    @switched="refreshGitStatus"
+  />
 </template>
