@@ -19,6 +19,7 @@ const localRoutes: RouteRecordRaw[] = [
   { path: '/plan', component: () => import('./views/PlanPage.vue') },
   { path: '/explorer', component: () => import('./views/ExplorerPage.vue') },
   { path: '/office', component: () => import('./views/OfficePage.vue') },
+  { path: '/settings', component: () => import('./views/SettingsPage.vue') },
 ];
 
 function readMode(): 'local' | 'cloud' {

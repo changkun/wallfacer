@@ -9,7 +9,7 @@ const store = useTaskStore();
 const { theme, cycle } = useTheme();
 
 defineProps<{ collapsed: boolean }>();
-const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers: []; palette: [] }>();
+const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: [] }>();
 </script>
 
 <template>
@@ -197,7 +197,7 @@ const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers:
         <span>Docs</span>
       </a>
 
-      <button type="button" class="sb-nav-item" @click="emit('settings')" title="Settings">
+      <router-link to="/settings" class="sb-nav-item" title="Settings">
         <span class="sb-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
@@ -205,7 +205,7 @@ const emit = defineEmits<{ toggle: []; settings: []; workspaces: []; containers:
           </svg>
         </span>
         <span>Settings</span>
-      </button>
+      </router-link>
 
       <button type="button" class="sb-nav-item" :title="'Theme: ' + theme" @click="cycle">
         <span class="sb-icon" aria-hidden="true">{{ theme === 'light' ? '☀' : theme === 'dark' ? '☾' : '◐' }}</span>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
-import SettingsModal from '../components/SettingsModal.vue';
 import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import ContainerMonitor from '../components/ContainerMonitor.vue';
@@ -17,6 +17,7 @@ import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const ui = useUiStore();
+const router = useRouter();
 const sidebarCollapsed = ref(false);
 
 onMounted(async () => {
@@ -35,7 +36,7 @@ const { connected } = useSse({
 useKeyboard({
   onSearch: () => { ui.showPalette = true; },
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
-  onSettings: () => { ui.showSettings = !ui.showSettings; },
+  onSettings: () => { void router.push('/settings'); },
 });
 </script>
 
@@ -44,7 +45,6 @@ useKeyboard({
     <Sidebar
       :collapsed="sidebarCollapsed"
       @toggle="sidebarCollapsed = !sidebarCollapsed"
-      @settings="ui.showSettings = true"
       @palette="ui.showPalette = true"
       @workspaces="ui.showWorkspaces = true"
       @containers="ui.showContainers = true"
@@ -53,11 +53,6 @@ useKeyboard({
       <slot :connected="connected" />
       <StatusBar :connected="connected" />
     </div>
-    <SettingsModal
-      v-if="ui.showSettings"
-      @close="ui.showSettings = false"
-      @workspaces="ui.showSettings = false; ui.showWorkspaces = true"
-    />
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
     <ContainerMonitor v-model="ui.showContainers" />
