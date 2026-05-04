@@ -3,10 +3,12 @@ import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
+import { useUiStore } from '../stores/ui';
 
 const route = useRoute();
 const store = useTaskStore();
 const auth = useAuthStore();
+const ui = useUiStore();
 
 const props = defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: [] }>();
@@ -165,7 +167,12 @@ onMounted(() => {
     <!-- Inspect section -->
     <div class="sb-section">Inspect</div>
     <div class="sb-nav">
-      <router-link to="/terminal" class="sb-nav-item" :class="{ active: route.path === '/terminal' }">
+      <button
+        type="button"
+        class="sb-nav-item"
+        :class="{ active: store.config && false }"
+        @click="ui.toggleTerminal()"
+      >
         <span class="sb-icon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="4 17 10 11 4 5"></polyline>
@@ -174,7 +181,7 @@ onMounted(() => {
         </span>
         <span>Terminal</span>
         <span class="kbd">&#x2303;`</span>
-      </router-link>
+      </button>
 
       <router-link to="/analytics" class="sb-nav-item" :class="{ active: route.path === '/analytics' }">
         <span class="sb-icon">

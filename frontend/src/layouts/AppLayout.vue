@@ -9,6 +9,7 @@ import ContainerMonitor from '../components/ContainerMonitor.vue';
 import InstructionsEditor from '../components/InstructionsEditor.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
 import TemplatesManager from '../components/TemplatesManager.vue';
+import TerminalPanel from '../components/TerminalPanel.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -37,6 +38,7 @@ useKeyboard({
   onSearch: () => { ui.showPalette = true; },
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
   onSettings: () => { void router.push('/settings'); },
+  onTerminal: () => { ui.toggleTerminal(); },
 });
 </script>
 
@@ -51,6 +53,7 @@ useKeyboard({
     />
     <div class="app-main">
       <slot :connected="connected" />
+      <TerminalPanel />
       <StatusBar :connected="connected" />
     </div>
     <CommandPalette v-model="ui.showPalette" />
