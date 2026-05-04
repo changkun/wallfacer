@@ -54,8 +54,9 @@ function branchLabel(ws: GitWorkspace): string {
 
 async function refreshGitStatus() {
   try {
-    const status = await api<{ workspaces: GitWorkspace[] }>('GET', '/api/git/status');
-    workspaces.value = status?.workspaces ?? [];
+    // /api/git/status returns a bare array of WorkspaceGitStatus.
+    const list = await api<GitWorkspace[]>('GET', '/api/git/status');
+    workspaces.value = Array.isArray(list) ? list : [];
   } catch {
     /* git status optional */
   }
@@ -87,12 +88,14 @@ function startGitStream() {
     const key = window.__WALLFACER__?.serverApiKey;
     if (key) url += `?token=${encodeURIComponent(key)}`;
     sse = new EventSource(url);
-    sse.addEventListener('git-status', (ev) => {
+    // GitStatusStream sends `data: <bare array>` events with no event name,
+    // so the default `message` listener is the one we want.
+    sse.onmessage = (ev) => {
       try {
-        const msg = JSON.parse((ev as MessageEvent<string>).data) as { workspaces?: GitWorkspace[] };
-        if (Array.isArray(msg.workspaces)) workspaces.value = msg.workspaces;
+        const list = JSON.parse(ev.data) as GitWorkspace[];
+        if (Array.isArray(list)) workspaces.value = list;
       } catch { /* ignore */ }
-    });
+    };
   } catch {
     /* sse optional */
   }

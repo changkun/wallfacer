@@ -15,6 +15,13 @@ import MapPage from './MapPage.vue';
 import { useTaskStore } from '../stores/tasks';
 import type { Task } from '../api/types';
 
+// Stub the legacy IIFE side-effect imports — happy-dom can't render the
+// SVG layout pipeline (no getBBox / partial getComputedStyle). The bridge
+// shims under test are installed by MapPage itself before these imports
+// run, so making the imports no-ops doesn't reduce coverage of the wiring.
+vi.mock('../../../ui/js/unified-graph.js', () => ({}));
+vi.mock('../../../ui/js/depgraph.js', () => ({}));
+
 function makeTask(id: string, overrides: Partial<Task> = {}): Task {
   return {
     id,
@@ -85,9 +92,11 @@ async function mountMapPage(): Promise<MountedPage> {
 }
 
 let originalFetch: typeof globalThis.fetch;
+let activePinia: Pinia;
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  activePinia = createPinia();
+  setActivePinia(activePinia);
   originalFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
@@ -141,11 +150,11 @@ describe('MapPage', () => {
 
     app.unmount();
     host.remove();
-    // depGraphEnabled is reset; the other shims are restored to their
-    // previous (undefined) values.
-    expect(window.depGraphEnabled).toBe(false);
+    // After unmount the shims are restored to whatever was there before
+    // mount (undefined in this test environment).
     expect(window.openTaskModal).toBeUndefined();
     expect(window.focusSpec).toBeUndefined();
+    expect(window.specModeState).toBeUndefined();
   });
 
   it('opens TaskDetail overlay when openTaskModal is invoked', async () => {
@@ -153,14 +162,10 @@ describe('MapPage', () => {
     store.setTasks([makeTask('abc-123', { title: 'Hello' })]);
     const { app, host } = await mountMapPage();
 
-    expect(host.querySelector('.task-detail-modal, .task-detail, [data-testid="task-detail"]')).toBeNull();
+    expect(host.querySelector('#modal')).toBeNull();
     window.openTaskModal!('abc-123');
     await nextTick();
-    // TaskDetail renders into the same root; assert the v-if conditional
-    // produced a visible child by checking the root has more than just
-    // the depgraph container.
-    const rootChildren = host.firstElementChild?.children.length ?? 0;
-    expect(rootChildren).toBeGreaterThan(1);
+    expect(host.querySelector('#modal')).not.toBeNull();
 
     app.unmount();
     host.remove();
@@ -170,8 +175,9 @@ describe('MapPage', () => {
     const { app, router, host } = await mountMapPage();
 
     window.focusSpec!('specs/local/foo.md');
-    await nextTick();
-
+    for (let i = 0; i < 5; i++) {
+      await new Promise(r => setTimeout(r, 0));
+    }
     expect(router.currentRoute.value.path).toBe('/plan');
     expect(router.currentRoute.value.query.spec).toBe('specs/local/foo.md');
 
