@@ -170,7 +170,7 @@ onMounted(() => {
       <button
         type="button"
         class="sb-nav-item"
-        :class="{ active: store.config && false }"
+        :class="{ active: ui.showTerminal }"
         @click="ui.toggleTerminal()"
       >
         <span class="sb-icon">

@@ -285,15 +285,21 @@ html.wails-desktop .app-sidebar {
   padding: 6px 10px;
   border-radius: var(--r-md);
   color: var(--ink-2);
+  font-family: inherit;
   font-size: var(--fs-md);
   font-weight: 400;
   text-align: left;
   white-space: nowrap;
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
   transition:
     background 0.1s,
     color 0.1s;
   position: relative;
 }
+button.sb-nav-item { appearance: none; }
 .sb-nav-item:hover {
   background: var(--bg-hover);
   color: var(--ink);
