@@ -1,21 +1,53 @@
 <script setup lang="ts">
+import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
-import { useTheme } from '../composables/useTheme';
+import { useAuthStore } from '../stores/auth';
 
 const route = useRoute();
-
 const store = useTaskStore();
-const { theme, cycle } = useTheme();
+const auth = useAuthStore();
 
-defineProps<{ collapsed: boolean }>();
+const props = defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: [] }>();
+
+const cloudMode = computed(() => store.config?.cloud_mode === true);
+
+const activeWorkspaceLabel = computed(() => {
+  const ws = store.config?.workspaces;
+  if (!ws || ws.length === 0) return 'No workspace';
+  const groups = store.config?.workspace_groups ?? [];
+  const key = JSON.stringify(ws);
+  const matched = groups.find(g => JSON.stringify(g.workspaces) === key);
+  if (matched?.name) return matched.name;
+  if (ws.length === 1) {
+    const parts = ws[0].replace(/\/+$/, '').split('/');
+    return parts[parts.length - 1] || ws[0];
+  }
+  return ws.map(p => {
+    const parts = p.replace(/\/+$/, '').split('/');
+    return parts[parts.length - 1] || p;
+  }).join(' + ');
+});
+
+function onBrandClick() {
+  if (props.collapsed) emit('toggle');
+}
+
+onMounted(() => {
+  if (cloudMode.value && !auth.loaded) void auth.fetchMe();
+});
 </script>
 
 <template>
   <aside class="app-sidebar" :class="{ collapsed }">
-    <!-- Brand -->
-    <div class="sb-brand">
+    <!-- Brand: clickable when collapsed to unfold -->
+    <div
+      class="sb-brand"
+      :class="{ 'is-collapsed-toggle': collapsed }"
+      :title="collapsed ? 'Expand sidebar' : ''"
+      @click="onBrandClick"
+    >
       <span class="sb-logo" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;image-rendering:pixelated">
           <rect x="0" y="0" width="6" height="3" fill="var(--accent)" />
@@ -31,7 +63,13 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
         </svg>
       </span>
       <span class="sb-brand-name">Wallfacer</span>
-      <button type="button" class="sb-collapse" title="Collapse sidebar" @click.stop="emit('toggle')">
+      <button
+        v-if="!collapsed"
+        type="button"
+        class="sb-collapse"
+        title="Collapse sidebar"
+        @click.stop="emit('toggle')"
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
           <line x1="9" y1="3" x2="9" y2="21"></line>
@@ -42,7 +80,7 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
     <!-- Workspace group switcher -->
     <button type="button" class="sb-ws-switch" title="Switch workspace group" @click="emit('workspaces')">
       <span class="ws-dot">W</span>
-      <span class="ws-name">{{ store.config?.workspaces?.[0]?.split('/').pop() || 'No workspace' }}</span>
+      <span class="ws-name">{{ activeWorkspaceLabel }}</span>
       <span class="ws-caret">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="6 9 12 15 18 9"></polyline>
@@ -122,15 +160,6 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
         </span>
         <span>Explorer</span>
       </router-link>
-
-      <router-link to="/office" class="sb-nav-item" :class="{ active: route.path === '/office' }">
-        <span class="sb-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          </svg>
-        </span>
-        <span>Office</span>
-      </router-link>
     </div>
 
     <!-- Inspect section -->
@@ -157,34 +186,11 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
         </span>
         <span>Analytics</span>
       </router-link>
-
-      <button type="button" class="sb-nav-item" @click="emit('workspaces')">
-        <span class="sb-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="2" width="8" height="8" rx="1"></rect>
-            <rect x="14" y="2" width="8" height="8" rx="1"></rect>
-            <rect x="2" y="14" width="8" height="8" rx="1"></rect>
-            <rect x="14" y="14" width="8" height="8" rx="1"></rect>
-          </svg>
-        </span>
-        <span>Workspaces</span>
-      </button>
-
-      <button type="button" class="sb-nav-item" @click="emit('containers')">
-        <span class="sb-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-            <line x1="6" y1="10" x2="6" y2="14"></line>
-            <line x1="10" y1="10" x2="10" y2="14"></line>
-          </svg>
-        </span>
-        <span>Containers</span>
-      </button>
     </div>
 
     <div class="sb-spacer"></div>
 
-    <!-- Bottom nav: Docs, Settings (with theme toggle icon) -->
+    <!-- Bottom nav: Docs, Settings, optional account chip -->
     <div class="sb-divider"></div>
     <div class="sb-nav">
       <a href="https://wf.latere.ai/docs" target="_blank" rel="noopener noreferrer" class="sb-nav-item" title="Docs">
@@ -197,7 +203,7 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
         <span>Docs</span>
       </a>
 
-      <router-link to="/settings" class="sb-nav-item" title="Settings">
+      <router-link to="/settings" class="sb-nav-item" :class="{ active: route.path === '/settings' }" title="Settings">
         <span class="sb-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
@@ -206,11 +212,36 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
         </span>
         <span>Settings</span>
       </router-link>
-
-      <button type="button" class="sb-nav-item" :title="'Theme: ' + theme" @click="cycle">
-        <span class="sb-icon" aria-hidden="true">{{ theme === 'light' ? '☀' : theme === 'dark' ? '☾' : '◐' }}</span>
-        <span>Theme</span>
-      </button>
     </div>
+
+    <!-- Cloud-mode account chip (only when /api/me responds) -->
+    <a
+      v-if="cloudMode && auth.me"
+      class="sb-account"
+      :href="auth.me.auth_url ? auth.me.auth_url + '/me' : '#'"
+      target="_blank"
+      rel="noopener"
+      :title="auth.me.email"
+    >
+      <img v-if="auth.me.picture" class="sb-account-avatar" :src="auth.me.picture" alt="" />
+      <span v-else class="sb-account-avatar sb-account-avatar--mono">
+        {{ (auth.me.name || auth.me.email || '?').slice(0, 1).toUpperCase() }}
+      </span>
+      <span class="sb-account-text">
+        <span class="sb-account-name">{{ auth.me.name || auth.me.email }}</span>
+        <span class="sb-account-meta">Signed in</span>
+      </span>
+    </a>
+    <a
+      v-else-if="cloudMode && auth.loaded && !auth.me && store.config?.workspaces"
+      class="sb-account sb-account--signin"
+      href="/login"
+    >
+      <span class="sb-account-avatar sb-account-avatar--mono">→</span>
+      <span class="sb-account-text">
+        <span class="sb-account-name">Sign in</span>
+        <span class="sb-account-meta">Not signed in</span>
+      </span>
+    </a>
   </aside>
 </template>

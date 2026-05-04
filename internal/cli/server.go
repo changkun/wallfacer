@@ -645,8 +645,18 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 	}
 
 	files := http.FS(dist)
+	fileServer := http.FileServer(files)
 	mux.HandleFunc("GET /", serveVueIndex)
-	mux.Handle("GET /assets/", http.FileServer(files))
+	mux.Handle("GET /assets/", fileServer)
+	mux.Handle("GET /fonts/", fileServer)
+	mux.Handle("GET /static/", fileServer)
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := fs.Stat(dist, "favicon.ico"); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	})
 	logger.Main.Info("vue-ui: serving Vue SPA (WALLFACER_VUE_UI=true)", "mode", mode)
 }
 
