@@ -1,14 +1,20 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { api } from '../api/client';
+import { renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
+
+type EditTab = 'edit' | 'preview';
 
 const content = ref('');
 const path = ref('');
 const status = ref('');
 const statusError = ref(false);
+const activeTab = ref<EditTab>('preview');
+
+const previewHtml = computed(() => renderMarkdown(content.value || ''));
 
 let statusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -35,9 +41,14 @@ function onOverlayClick(e: MouseEvent) {
   if (e.target === e.currentTarget) close();
 }
 
+function switchTab(mode: EditTab) {
+  activeTab.value = mode;
+}
+
 async function loadAll() {
   content.value = '';
   path.value = '';
+  activeTab.value = 'preview';
   setStatus('Loading…');
   try {
     const config = await api<{ instructions_path?: string }>('GET', '/api/config');
@@ -49,6 +60,7 @@ async function loadAll() {
     const data = await api<{ content?: string }>('GET', '/api/instructions');
     content.value = data.content || '';
     setStatus('');
+    activeTab.value = 'preview';
   } catch (e) {
     setStatus(`Error loading: ${(e as Error).message}`, true);
   }
@@ -87,6 +99,7 @@ watch(
     } else {
       content.value = '';
       path.value = '';
+      activeTab.value = 'preview';
       if (statusTimer) {
         clearTimeout(statusTimer);
         statusTimer = null;
@@ -107,14 +120,21 @@ watch(
     >
       <div
         class="modal-card"
-        :style="{ maxWidth: '800px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }"
+        style="max-width: 720px; width: 100%; max-height: 90vh; display: flex; flex-direction: column;"
       >
-        <div class="p-6" :style="{ display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0' }">
-          <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }">
-            <h3 :style="{ fontSize: '16px', fontWeight: 600, margin: '0' }">AGENTS.md</h3>
+        <div
+          class="p-6"
+          style="display: flex; flex-direction: column; flex: 1; min-height: 0;"
+        >
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;"
+          >
+            <h3 style="font-size: 16px; font-weight: 600; margin: 0;">
+              Workspace AGENTS.md
+            </h3>
             <button
               type="button"
-              :style="{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text-muted)', lineHeight: '1' }"
+              style="background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-muted); line-height: 1;"
               aria-label="Close"
               @click="close"
             >
@@ -122,24 +142,65 @@ watch(
             </button>
           </div>
 
-          <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px', fontSize: '12px' }">
-            <code
-              :style="{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1', minWidth: '0' }"
-            >{{ path }}</code>
-            <span :style="{ color: statusError ? '#d46868' : 'var(--text-muted)', whiteSpace: 'nowrap' }">{{ status }}</span>
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;"
+          >
+            <div
+              style="font-size: 11px; color: var(--text-muted); font-family: monospace; word-break: break-all;"
+            >
+              {{ path }}
+            </div>
+            <div class="logs-tabs">
+              <button
+                type="button"
+                class="logs-tab"
+                :class="{ active: activeTab === 'edit' }"
+                @click="switchTab('edit')"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                class="logs-tab"
+                :class="{ active: activeTab === 'preview' }"
+                @click="switchTab('preview')"
+              >
+                Preview
+              </button>
+            </div>
           </div>
 
           <textarea
+            v-show="activeTab === 'edit'"
             v-model="content"
-            rows="20"
+            rows="22"
             spellcheck="false"
-            :style="{ flex: '1', minHeight: '0', width: '100%', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: '12px', lineHeight: '1.5', resize: 'none' }"
+            class="field"
+            style='font-family: "SF Mono", "Fira Code", "Consolas", monospace; font-size: 12px; flex: 1; min-height: 0; resize: none;'
+          />
+          <div
+            v-show="activeTab === 'preview'"
+            class="code-block prose-content editable-preview"
+            style="flex: 1; min-height: 0;"
+            v-html="previewHtml"
           />
 
-          <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }">
-            <button type="button" class="btn-icon" @click="reinit">Re-init</button>
-            <button type="button" class="btn-icon" @click="close">Cancel</button>
+          <div
+            style="display: flex; align-items: center; gap: 8px; margin-top: 12px;"
+          >
             <button type="button" class="btn btn-accent" @click="save">Save</button>
+            <button type="button" class="btn-ghost" @click="close">Cancel</button>
+            <button
+              type="button"
+              class="btn-icon"
+              style="margin-left: 8px; font-size: 12px; padding: 4px 10px;"
+              @click="reinit"
+            >
+              Re-init from repos
+            </button>
+            <span
+              :style="{ fontSize: '12px', color: statusError ? '#d46868' : 'var(--text-muted)', marginLeft: 'auto' }"
+            >{{ status }}</span>
           </div>
         </div>
       </div>

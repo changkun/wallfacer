@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { api } from '../api/client';
+import { useUiStore } from './ui';
 import type { Task, ServerConfig } from '../api/types';
 
 export const useTaskStore = defineStore('tasks', () => {
@@ -8,6 +9,7 @@ export const useTaskStore = defineStore('tasks', () => {
   const config = ref<ServerConfig | null>(null);
   const loading = ref(true);
   const filterQuery = ref('');
+  const ui = useUiStore();
 
   function matchesFilter(t: Task): boolean {
     const q = filterQuery.value;
@@ -36,7 +38,9 @@ export const useTaskStore = defineStore('tasks', () => {
   );
   const done = computed(() =>
     tasks.value.filter(t =>
-      (t.status === 'done' || t.status === 'cancelled') && !t.archived && matchesFilter(t),
+      (t.status === 'done' || t.status === 'cancelled')
+      && (ui.showArchived || !t.archived)
+      && matchesFilter(t),
     ),
   );
 

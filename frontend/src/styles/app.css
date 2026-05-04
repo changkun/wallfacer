@@ -254,7 +254,7 @@ h1 em, h2 em {
 }
 .btn-ghost:hover { color: var(--text); }
 
-.btn-sm { padding: 5px 12px; font-size: 12px; }
+/* .btn-sm intentionally undefined to match old UI — inline font-size on call sites controls the look */
 .btn-lg { padding: 9px 18px; font-size: 14px; font-weight: 500; }
 
 /* ===== Hero ===== */
