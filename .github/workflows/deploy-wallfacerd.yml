@@ -20,7 +20,9 @@ jobs:
         with:
           token: ${{ secrets.DO_TOKEN }}
 
-      - run: doctl kubernetes cluster kubeconfig save latere-k8s
+      # --expiry-seconds makes doctl use the ephemeral /credentials
+      # endpoint; the default behavior mints a persistent PAT per run.
+      - run: doctl kubernetes cluster kubeconfig save latere-k8s --expiry-seconds 3600
 
       - name: Apply manifests
         run: |
