@@ -346,3 +346,5 @@ howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 h1:eeH1AIcPvSc0Z25ThsYF+Xo
 howett.net/plist v1.0.2-0.20250314012144-ee69052608d9/go.mod h1:fyFX5Hj5tP1Mpk8obqA9MZgXT416Q5711SDT7dQLTLk=
 latere.ai/x/pkg v0.10.2 h1:eRhy73gA6/w31gH1Bf0/iSWGPtipBOpVX82aq56xi+c=
 latere.ai/x/pkg v0.10.2/go.mod h1:e8oig1uMlfGH4m+KUNS0lqGyaeF94zKYtldD4XhyIEc=
+latere.ai/x/pkg v0.10.4 h1:r6Ahd2HdW5/D9MvXxZFU+Ot3KjJbrr9hUtAf+FQ8g4E=
+latere.ai/x/pkg v0.10.4/go.mod h1:e8oig1uMlfGH4m+KUNS0lqGyaeF94zKYtldD4XhyIEc=
