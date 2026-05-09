@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"latere.ai/x/pkg/scopes"
+
 	"changkun.de/x/wallfacer/internal/auth"
 )
 
@@ -75,12 +77,12 @@ func TestRequireSuperadmin_NoClaims_Unauthorized(t *testing.T) {
 
 func TestRequireScope_WithScope_Passes(t *testing.T) {
 	inner, reached := ok200()
-	h := auth.RequireScope("admin:tasks")(inner)
+	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
 	r = r.WithContext(auth.WithClaims(r.Context(), &auth.Claims{
 		Sub:    "alice",
-		Scopes: []string{"read:projects", "admin:tasks"},
+		Scopes: []string{scopes.ProjectsRead.Name, scopes.TasksAdmin.Name},
 	}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -95,12 +97,12 @@ func TestRequireScope_WithScope_Passes(t *testing.T) {
 
 func TestRequireScope_WithoutScope_Forbidden(t *testing.T) {
 	inner, reached := ok200()
-	h := auth.RequireScope("admin:tasks")(inner)
+	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
 	r = r.WithContext(auth.WithClaims(r.Context(), &auth.Claims{
 		Sub:    "alice",
-		Scopes: []string{"read:projects"},
+		Scopes: []string{scopes.ProjectsRead.Name},
 	}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -115,7 +117,7 @@ func TestRequireScope_WithoutScope_Forbidden(t *testing.T) {
 
 func TestRequireScope_NoClaims_Unauthorized(t *testing.T) {
 	inner, reached := ok200()
-	h := auth.RequireScope("admin:tasks")(inner)
+	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
 	w := httptest.NewRecorder()

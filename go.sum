@@ -348,3 +348,5 @@ latere.ai/x/pkg v0.10.2 h1:eRhy73gA6/w31gH1Bf0/iSWGPtipBOpVX82aq56xi+c=
 latere.ai/x/pkg v0.10.2/go.mod h1:e8oig1uMlfGH4m+KUNS0lqGyaeF94zKYtldD4XhyIEc=
 latere.ai/x/pkg v0.10.4 h1:r6Ahd2HdW5/D9MvXxZFU+Ot3KjJbrr9hUtAf+FQ8g4E=
 latere.ai/x/pkg v0.10.4/go.mod h1:e8oig1uMlfGH4m+KUNS0lqGyaeF94zKYtldD4XhyIEc=
+latere.ai/x/pkg v0.10.9 h1:1VJyKkXxNSxug4tH8j25RLEIKpCQA1QQJPeABIWFRbM=
+latere.ai/x/pkg v0.10.9/go.mod h1:e8oig1uMlfGH4m+KUNS0lqGyaeF94zKYtldD4XhyIEc=

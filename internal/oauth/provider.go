@@ -1,5 +1,7 @@
 package oauth
 
+import "latere.ai/x/pkg/scopes"
+
 // Provider holds the OAuth 2.0 configuration for an identity provider.
 type Provider struct {
 	Name         string   // display name (e.g. "claude", "codex")
@@ -35,7 +37,7 @@ var CodexProvider = Provider{
 	AuthorizeURL: "https://auth.openai.com/oauth/authorize",
 	TokenURL:     "https://auth.openai.com/oauth/token",
 	ClientID:     "app_EMoamEEZ73f0CkXaXp7hrann",
-	Scopes:       []string{"openid", "profile", "email", "offline_access"},
+	Scopes:       []string{scopes.OpenID.Name, scopes.Profile.Name, scopes.Email.Name, scopes.OfflineAccess.Name},
 	TokenEnvKey:  "OPENAI_API_KEY",
 	FixedPort:    1455,
 	CallbackPath: "/auth/callback",
