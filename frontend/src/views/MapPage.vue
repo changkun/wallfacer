@@ -20,22 +20,8 @@ interface SpecMeta { status: string; dispatched_task_id: string | null }
 interface SpecNode { path: string; spec: SpecMeta; children: string[]; is_leaf: boolean; depth: number }
 interface SpecTreeResponse { nodes: SpecNode[] }
 
-declare global {
-  interface Window {
-    specModeState?: { tree: SpecNode[]; index: unknown };
-    depGraphEnabled?: boolean;
-    openTaskModal?: (id: string) => void;
-    focusSpec?: (path: string) => void;
-    switchMode?: (mode: string, opts?: { persist?: boolean }) => void;
-    scheduleRender?: () => void;
-    renderDependencyGraph?: (tasks: Task[]) => void;
-    hideDependencyGraph?: () => void;
-    setMapShowArchived?: (v: boolean) => void;
-    setMapSearch?: (q: string) => void;
-    resetMapLayout?: () => void;
-    _resetMapCentering?: () => void;
-  }
-}
+// The window shims these legacy renderers expect are declared ambiently in
+// src/env.d.ts so test files can reference them without importing this SFC.
 
 const store = useTaskStore();
 const router = useRouter();
