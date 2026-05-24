@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"latere.ai/x/pkg/otel"
 
 	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/webserver"
@@ -18,7 +19,18 @@ import (
 
 // RunWeb starts the wallfacer web frontend server with OIDC authentication.
 func RunWeb(args []string) {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	if err := runWeb(args); err != nil {
+		slog.Error("server error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func runWeb(args []string) error {
+	logger, shutdown, logsErr := otel.Bootstrap(context.Background(), otel.Config{ServiceName: "wallfacer-web"})
+	if logsErr != nil {
+		logger.Warn("otlp logs init failed; continuing on stdout", "err", logsErr)
+	}
+	defer func() { _ = shutdown(context.Background()) }()
 
 	fs := flag.NewFlagSet("web", flag.ExitOnError)
 	addr := fs.String("addr", ":8080", "listen address")
@@ -81,27 +93,13 @@ func RunWeb(args []string) {
 	webserver.MountSPA(mux)
 	webserver.SPAFallback(mux)
 
-	srv := &http.Server{Addr: *addr, Handler: mux}
-
-	ln, err := net.Listen("tcp", *addr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "wallfacer web: listen %s: %v\n", *addr, err)
-		os.Exit(1)
-	}
-
-	slog.Info("wallfacer web started", "addr", ln.Addr().String())
+	// otel.Handler wraps the mux with server-request tracing/metrics and the
+	// X-Trace-Id response header.
+	srv := &http.Server{Addr: *addr, Handler: otel.Handler(mux, "wallfacer-web")}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	go func() {
-		<-ctx.Done()
-		_ = srv.Shutdown(context.Background())
-	}()
-
-	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-		slog.Error("server error", "error", err)
-		stop()
-		os.Exit(1)
-	}
-	stop()
+	slog.Info("wallfacer web started", "addr", *addr)
+	return otel.RunServer(ctx, srv, 10*time.Second, nil)
 }
