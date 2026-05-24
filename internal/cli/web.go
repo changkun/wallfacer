@@ -54,6 +54,11 @@ func runWeb(args []string) error {
 
 	mux := http.NewServeMux()
 
+	// Same-origin RUM ingest for the SPA; forwards browser OTLP to the
+	// in-cluster collector. POST-scoped to avoid a ServeMux conflict with the
+	// SPA's GET / fallback.
+	mux.Handle("POST /v1/telemetry/", otel.TelemetryProxy("/v1/telemetry"))
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
