@@ -31,8 +31,14 @@ jobs:
           kubectl apply -f deploy/prod/deployment.yaml
 
       - name: Roll new image
+        env:
+          # workflow_run runs in the default-branch context, so GITHUB_REF_NAME
+          # is "main", not the release tag. The triggering tag is in
+          # workflow_run.head_branch (e.g. v0.0.7-alpha.6); the image build
+          # publishes the semver tag without the leading "v".
+          REF: ${{ github.event.workflow_run.head_branch }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${REF#v}"
           kubectl -n latere set image deployment/wallfacerd \
             wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
           kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
