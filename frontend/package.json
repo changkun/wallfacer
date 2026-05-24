@@ -12,6 +12,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/context-zone": "^2.7.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
+    "@opentelemetry/instrumentation": "^0.218.0",
+    "@opentelemetry/instrumentation-document-load": "^0.63.0",
+    "@opentelemetry/instrumentation-fetch": "^0.218.0",
+    "@opentelemetry/instrumentation-xml-http-request": "^0.218.0",
+    "@opentelemetry/resources": "^2.7.1",
+    "@opentelemetry/sdk-trace-web": "^2.7.1",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
     "@unhead/vue": "^2.0.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
