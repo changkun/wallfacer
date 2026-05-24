@@ -10,6 +10,9 @@ const docSlugs = [
 
 export default defineConfig({
   plugins: [vue()],
+  // latere-ui ships source SFCs; compile them for the SSG build and keep one Vue copy.
+  resolve: { dedupe: ['vue'] },
+  ssr: { noExternal: ['latere-ui'] },
   ssgOptions: {
     includedRoutes(paths: string[]) {
       return [
@@ -37,6 +40,6 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: false,
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
   },
 });
