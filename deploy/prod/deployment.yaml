@@ -24,6 +24,8 @@ spec:
                 name: wallfacerd-auth
                 optional: true
           env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability.svc:4318
             - name: AUTH_URL
               value: https://auth.latere.ai
             - name: AUTH_REDIRECT_URL
