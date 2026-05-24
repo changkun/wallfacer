@@ -2,6 +2,7 @@ import { ViteSSG } from 'vite-ssg';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import { routes } from './router';
+import { initTelemetry } from './telemetry';
 import './styles/tokens.css';
 import './styles/board-tokens.css';
 import './styles/base.css';
@@ -32,6 +33,11 @@ import './styles/syntax.css';
 import './styles/utilities.css';
 import './styles/app.css';
 
-export const createApp = ViteSSG(App, { routes }, ({ app }) => {
+export const createApp = ViteSSG(App, { routes }, ({ app, isClient }) => {
   app.use(createPinia());
+  // Browser RUM: client-side only (this setup also runs in Node during SSG)
+  // and production-only (no telemetry proxy in dev).
+  if (isClient && import.meta.env.PROD) {
+    initTelemetry('wallfacer-spa');
+  }
 });
