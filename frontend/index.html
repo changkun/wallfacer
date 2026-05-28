@@ -3,11 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/instrument-serif-regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin />
     <title>Wallfacer</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="icon" type="image/png" href="https://latere.ai/static/latere-logo-light.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="https://latere.ai/static/latere-logo-dark.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="https://latere.ai/static/latere-logo-light.png" />
     <script>
       (function() {
-        var t = localStorage.getItem('latere-theme') || 'auto';
+        // Unified storage key with the legacy ui/ — both surfaces honour
+        // the same preference so cross-tab paints don't disagree.
+        var t = localStorage.getItem('wallfacer-theme') || 'auto';
         if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', t);
       })();

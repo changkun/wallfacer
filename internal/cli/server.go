@@ -646,9 +646,10 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 
 	files := http.FS(dist)
 	fileServer := http.FileServer(files)
+	cachedFileServer := withAssetCache(fileServer)
 	mux.HandleFunc("GET /", serveVueIndex)
-	mux.Handle("GET /assets/", fileServer)
-	mux.Handle("GET /fonts/", fileServer)
+	mux.Handle("GET /assets/", cachedFileServer)
+	mux.Handle("GET /fonts/", cachedFileServer)
 	mux.Handle("GET /static/", fileServer)
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fs.Stat(dist, "favicon.ico"); err == nil {
@@ -658,6 +659,36 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 		http.NotFound(w, r)
 	})
 	logger.Main.Info("vue-ui: serving Vue SPA (WALLFACER_VUE_UI=true)", "mode", mode)
+}
+
+const (
+	immutableAssetCache = "public, max-age=31536000, immutable"
+	staticAssetCache    = "public, max-age=604800, stale-while-revalidate=86400"
+)
+
+// assetCacheControl returns the Cache-Control value for a static asset
+// path, or "" when none applies. Hashed /assets/* are immutable; the
+// preloaded /fonts/ get a long stale-while-revalidate so the FOUT fix
+// benefits repeat visits too.
+func assetCacheControl(p string) string {
+	if strings.HasPrefix(p, "/assets/") {
+		return immutableAssetCache
+	}
+	if strings.HasPrefix(p, "/fonts/") {
+		return staticAssetCache
+	}
+	return ""
+}
+
+// withAssetCache wraps a file server, stamping a Cache-Control header
+// on hashed assets and preloaded fonts before delegating.
+func withAssetCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if cc := assetCacheControl(r.URL.Path); cc != "" {
+			w.Header().Set("Cache-Control", cc)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // BuildMux constructs the HTTP request router.
