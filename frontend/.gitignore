@@ -3,3 +3,7 @@ dist/
 *.tsbuildinfo
 src/**/*.js
 src/**/*.vue.js
+
+# Local migration verification tooling (not product)
+.parity/
+package-lock.json
