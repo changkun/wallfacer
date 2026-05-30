@@ -2,190 +2,93 @@
 title: Cloud Infrastructure
 status: drafted
 depends_on:
-  - specs/foundations/sandbox-backends.md
   - specs/foundations/storage-backends.md
+  - specs/cloud/latere-integration.md
 affects:
   - deploy/
-effort: large
+effort: medium
 created: 2026-03-28
-updated: 2026-04-12
+updated: 2026-05-30
 author: changkun
 dispatched_task_id: null
 ---
 
 # Cloud Infrastructure
 
+> **Rescoped 2026-05-30.** This spec previously had wallfacer provision its own
+> K8s sandbox execution (RBAC for Jobs, a dedicated sandbox node pool,
+> NetworkPolicy for sandbox pods, a `K8sBackend` creating Jobs directly). That
+> half is gone: **Cella owns sandbox runtime** — wallfacer dispatches to it
+> through the runtime seam ([latere-integration/cella-runtime.md](latere-integration/cella-runtime.md)),
+> it does not schedule sandboxes itself. What remains is the part that is
+> genuinely wallfacer's: **deploying the task-board server into the existing
+> `latere` cluster**, reusing the proven `wallfacerd` web deployment pattern.
+
 ## Problem
 
-Wallfacer runs locally today — a Go binary on the host, launching containers via podman/docker, storing task data on the local filesystem. To run wallfacer as a hosted service under latere.ai, it needs to be deployed as a workload in an existing Kubernetes cluster alongside latere.ai's other services.
+Wallfacer runs locally today — a Go binary on the host, storing task data on the
+local filesystem. To offer a hosted task board under latere.ai, the **task-board
+server** (`wallfacer run`) must be deployed as a workload in the existing DOKS
+`latere` cluster, alongside the other latere.ai services.
 
-Latere.ai already operates a DigitalOcean infrastructure (see `latere.ai/terraform/`) that provisions a DOKS cluster, Spaces (S3-compatible) storage, DNS, TLS, and an observability stack. Wallfacer doesn't need to provision its own infrastructure — it needs K8s manifests that deploy it into this existing cluster, and clear documentation of what cluster-level resources (RBAC, PVCs, Secrets) must be added to the latere.ai terraform.
+The deploy *mechanics* are already proven: the public site (`wallfacer web`)
+ships today as the `wallfacerd` Deployment at `wf.latere.ai`
+(`deploy/prod/{deployment,service,ingress}.yaml`, `Dockerfile.wallfacerd`,
+`.github/workflows/wallfacerd.yml` → `deploy-wallfacerd.yml`). It runs in the
+`latere` namespace with cert-manager TLS, nginx ingress, OTLP export, and
+`AUTH_URL`/`AUTH_REDIRECT_URL` wired to Identity. The task-board server is a
+second workload following the same pattern, plus the one thing the stateless
+website doesn't need: **durable task-data storage**.
 
-## Current Infrastructure (latere.ai)
+## What's already deployed vs. what this spec adds
 
-The latere.ai terraform provisions (all in DigitalOcean, `fra1` region):
+| Component | State |
+|-----------|-------|
+| DOKS cluster, nginx ingress, cert-manager, Spaces, DNS, OTEL→ClickHouse→Grafana | exists (latere.ai/terraform) |
+| `wallfacerd` = `wallfacer web` (public site) at `wf.latere.ai` | **deployed** |
+| Deploy pattern (Deployment/Service/Ingress + TLS + OTLP into `latere` ns) | **proven by `wallfacerd`** |
+| **task-board server** (`wallfacer run`) Deployment + PVC for task data | **this spec** |
 
-| Resource | Name/Type | Cost |
-|----------|-----------|------|
-| K8s cluster | `latere-k8s`, single node pool (`s-2vcpu-4gb`) | ~$24/mo |
-| Load balancer | nginx-ingress-controller | ~$12/mo |
-| Object storage | `latere-storage` Spaces bucket + CDN | ~$2/mo |
-| TLS | cert-manager + Let's Encrypt (ClusterIssuer) | Free |
-| DNS | DigitalOcean DNS for `latere.ai` | Free |
-| Observability | ClickHouse + OTEL Collector + Grafana (in-cluster) | $0 (runs on existing node) |
-| Container registry | ghcr.io (GitHub Container Registry) | Free tier |
-| File storage service | fs.latere.ai (cold: Spaces/S3, hot: local disk) | Included |
+## Ownership boundary
 
-fs.latere.ai is the platform's **user data plane** — a two-tier file storage and workspace service. Cold tier persists files durably in S3; hot tier stages files onto compute nodes for fast I/O. Its Workspace API (`POST /workspaces`, `DELETE /workspaces/{id}`) provides sandboxes with locked, mounted working copies. Wallfacer integrates as a consumer of this API for per-tenant repo storage and sandbox file mounts.
+| Concern | Owner |
+|---------|-------|
+| K8s cluster, node pools, Spaces, DNS, TLS ClusterIssuer | latere.ai/terraform |
+| **Sandbox runtime** (scheduling, pods, warm pools, egress, hardening, RBAC for Jobs) | **Cella** (`latere.ai/sandbox`) — consumed via [cella-runtime.md](latere-integration/cella-runtime.md) |
+| Identity / sign-in | Identity (auth.latere.ai), already wired in `wallfacerd` |
+| Workspace files | FS (fs.latere.ai), see [tenant-filesystem.md](tenant-filesystem.md) |
+| Task-board server Deployment, Service, Ingress, PVC, Secret | **wallfacer** (`deploy/`) |
 
-**What latere.ai does NOT currently have:**
-- **fs.latere.ai Phase 5 (Workspace API)** — wallfacer needs the workspace endpoints for staging repos to the hot tier before sandbox execution; this API is spec'd but implementation is in progress
-- **RBAC for Job creation** — wallfacer's K8s sandbox backend needs a ServiceAccount with permission to create/watch/delete Jobs and Pods
-- **Dedicated node pool for sandbox pods** — sandbox containers (Claude, Codex) are resource-heavy; running them on the same node as the control plane risks resource contention
+Wallfacer does **not** add RBAC for Job creation, a sandbox node pool, or a
+sandbox NetworkPolicy — those moved to Cella with the runtime seam.
 
-## Architecture: Two Layers
+## What the task-board server needs in the cluster
 
-The "two layers" model remains correct, but with a key clarification: latere.ai owns the infrastructure layer, and wallfacer owns the application layer.
+### 1. Deployment
 
-```
-┌──────────────────────────────────────────────────────┐
-│  Application Layer (wallfacer's K8s manifests)       │
-│                                                      │
-│  wallfacer Deployment ──▶ K8s API (sandbox Jobs)     │
-│                       ──▶ fs.latere.ai (file storage)│
-│                       ──▶ PG or filesystem (tasks)   │
-│                       ──▶ S3 API (blobs)             │
-│                                                      │
-│  Lives in: wallfacer repo (deploy/)                  │
-└──────────────────────────────┬───────────────────────┘
-                               │
-                               │ Secrets, ConfigMaps, RBAC
-                               │
-┌──────────────────────────────▼───────────────────────┐
-│  Infrastructure Layer (latere.ai terraform)          │
-│                                                      │
-│  K8s cluster, Spaces bucket, DNS records,            │
-│  TLS certs, node pools, ServiceAccounts              │
-│                                                      │
-│  Lives in: latere.ai/terraform/                      │
-└──────────────────────────────────────────────────────┘
-```
+A second Deployment in `latere` running the task-board server, modeled on
+`wallfacerd`. Differences from the website workload:
 
-### Ownership Boundary
+- Command `wallfacer run` (not `web`), serving the board API/UI on `:8080`.
+- Larger resource requests than the website's `10m`/`32Mi` (it holds the store
+  and runs automation loops) — size from load, start modest.
+- A mounted data volume (see PVC below).
+- Runtime backend selects **Cella** in cloud mode (`--backend cella`), not local
+  podman — so the pod needs no container runtime or privileged access.
+- Env: LLM creds (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, optional
+  `OPENAI_API_KEY`), `WALLFACER_SERVER_API_KEY`, `WALLFACER_CLOUD=true`,
+  `AUTH_*` (as `wallfacerd` already sets), `CELLA_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
-| Concern | Owner | Location |
-|---------|-------|----------|
-| K8s cluster, node pools | latere.ai terraform | `latere.ai/terraform/main.tf` |
-| Spaces bucket | latere.ai terraform | `latere.ai/terraform/main.tf` |
-| DNS records (`wallfacer.latere.ai`) | latere.ai terraform | `latere.ai/terraform/main.tf` |
-| TLS certificates | latere.ai terraform | cert-manager ClusterIssuer |
-| ServiceAccount + RBAC for sandbox Jobs | latere.ai terraform | New resources in `main.tf` |
-| Wallfacer Deployment, Service, Ingress | wallfacer repo | `deploy/` |
-| Wallfacer ConfigMap/Secret | wallfacer repo | `deploy/` |
-| PVC for task data | wallfacer repo | `deploy/` |
-| NetworkPolicy for sandbox pods | wallfacer repo | `deploy/` |
+### 2. Service + Ingress + TLS
 
----
+ClusterIP Service and an Ingress for the board host (e.g. `app.latere.ai` or a
+subpath), reusing the `letsencrypt-prod` ClusterIssuer and nginx ingress class
+exactly as `wallfacerd` does.
 
-## Decision Point: Storage Backend
+### 3. PVC for task data (the one genuinely new piece)
 
-Wallfacer has two storage concerns with different strategies:
-
-### Repo / workspace files → fs.latere.ai
-
-Per-tenant repositories, worktrees, and workspace config are managed by fs.latere.ai. Wallfacer's `RepoProvisioner` clones repos onto the hot tier via the Workspace API; sandbox Jobs mount the hot tier path. This replaces the local filesystem's absolute-path workspace model. See `specs/cloud/tenant-filesystem.md` for the full integration design.
-
-### Task metadata and blobs → StorageBackend
-
-Wallfacer's `StorageBackend` interface handles task state, events, and output blobs. Two options:
-
-**Option A: Filesystem on PVC (start here)**
-
-Use `FilesystemBackend` (already implemented) with a PersistentVolumeClaim. Task data lives on a DO Volume mounted into the wallfacer pod.
-
-- **Pros:** No new infrastructure needed, zero migration from local, works immediately
-- **Cons:** Single-pod constraint (ReadWriteOnce volume), no SQL queries across tasks, backup requires volume snapshots
-- **Infrastructure needed:** One PVC (`do-block-storage` StorageClass, ~$0.10/GB/mo)
-
-**Option B: PostgreSQL + S3**
-
-Use `DatabaseBackend` (spec'd, not yet implemented) for task metadata and `ObjectStorageBackend` for blobs.
-
-- **Pros:** Multi-pod ready, SQL queries, horizontal scaling, standard backup/restore
-- **Cons:** Requires implementing database + object storage backends, needs managed PG or in-cluster PG
-- **Infrastructure needed:**
-  - Managed DO PostgreSQL (`db-s-1vcpu-1gb`, ~$15/mo) — or in-cluster via CloudNativePG operator
-  - Spaces bucket access (already exists: `latere-storage`, or a dedicated bucket)
-
-**Recommendation:** Start with Option A for task metadata. Repo/workspace files go through fs.latere.ai regardless. Transition task storage to Option B when multi-instance scaling is needed.
-
----
-
-## What Wallfacer Needs in the Cluster
-
-### 1. Wallfacer Server Pod
-
-A Deployment running the wallfacer binary with environment variables for configuration.
-
-```yaml
-# deploy/deployment.yaml (simplified)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: wallfacer
-  namespace: latere
-spec:
-  replicas: 1
-  template:
-    spec:
-      serviceAccountName: wallfacer
-      containers:
-        - name: wallfacer
-          image: ghcr.io/changkun/wallfacer:latest
-          ports:
-            - containerPort: 8080
-          envFrom:
-            - secretRef:
-                name: wallfacer-env
-          volumeMounts:
-            - name: data
-              mountPath: /data
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: wallfacer-data
-```
-
-### 2. Ingress + TLS
-
-An Ingress resource routing `wallfacer.latere.ai` to the wallfacer Service, using the existing cert-manager ClusterIssuer.
-
-### 3. ServiceAccount + RBAC
-
-Wallfacer's K8s sandbox backend creates Jobs to run sandbox containers. The server pod needs RBAC permissions:
-
-```yaml
-# deploy/rbac.yaml (simplified)
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: wallfacer-sandbox
-  namespace: latere
-rules:
-  - apiGroups: ["batch"]
-    resources: ["jobs"]
-    verbs: ["create", "get", "list", "watch", "delete"]
-  - apiGroups: [""]
-    resources: ["pods", "pods/log", "pods/exec"]
-    verbs: ["get", "list", "watch", "create"]
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["create", "get", "list", "delete"]
-```
-
-### 4. PVC for Task Data
-
-A PersistentVolumeClaim using DO's `do-block-storage` StorageClass:
+`FilesystemBackend` (already implemented) on a `do-block-storage` PVC mounted
+into the pod:
 
 ```yaml
 apiVersion: v1
@@ -201,121 +104,70 @@ spec:
       storage: 20Gi
 ```
 
-### 5. Secrets
+`ReadWriteOnce` ties the server to a single replica — fine for v1. Multi-replica
+(a Postgres/object-storage `StorageBackend`) is deferred; see
+[storage-backends.md](../foundations/storage-backends.md) (those backend tasks
+are archived until multi-instance scaling is actually needed).
 
-Environment variables injected via K8s Secret:
+### 4. Secret
 
-- `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` — LLM credentials
-- `OPENAI_API_KEY` — for Codex sandbox (optional)
-- `WALLFACER_SERVER_API_KEY` — server auth
-- `FS_LATERE_AI_URL` + `FS_LATERE_AI_TOKEN` — fs.latere.ai endpoint and JWT for Workspace API
-- `DATABASE_URL` — if using PG backend (Option B)
+A K8s Secret (mirroring `wallfacerd-auth`) supplying the env above.
 
-### 6. Sandbox Image Availability
-
-Sandbox images (Claude Code, Codex) must be pullable from within the cluster. Options:
-- Pull from public registries (Docker Hub, ghcr.io) — simplest
-- Mirror to a private registry and use imagePullSecrets — more control
-
-### 7. Node Pool Sizing
-
-Sandbox pods are resource-intensive. The current single `s-2vcpu-4gb` node is insufficient for running wallfacer + sandbox containers concurrently. Options:
-
-- **Dedicated sandbox node pool:** Add a pool of larger nodes (e.g., `s-4vcpu-8gb` or `g-2vcpu-8gb`) with taints so only sandbox Jobs schedule there
-- **Autoscaling node pool:** DOKS supports node pool autoscaling (min 1, max N); sandbox Jobs trigger scale-up, nodes drain after idle timeout
-- **Start small:** Use the existing node for wallfacer server only; launch sandbox containers on a single additional node, scale up manually as needed
-
----
-
-## Infrastructure Changes to latere.ai Terraform
-
-The following resources need to be added to `latere.ai/terraform/main.tf`:
-
-### Required
-
-1. **DNS record** for `wallfacer.latere.ai` → load balancer IP (A record, same pattern as existing subdomains)
-2. **TLS certificate** for `wallfacer.latere.ai` (cert-manager Certificate resource, same pattern as `latere-tls`)
-3. **Sandbox node pool** (new `digitalocean_kubernetes_node_pool`) — at minimum one `s-4vcpu-8gb` node for sandbox Jobs
-
-### Optional (for Option B storage)
-
-4. **Managed PostgreSQL** (`digitalocean_database_cluster`, engine `pg`, size `db-s-1vcpu-1gb`)
-5. **Dedicated Spaces bucket** for wallfacer blobs (or reuse `latere-storage` with a key prefix)
-
----
-
-## Manifest Structure
+## Manifest structure
 
 ```
 deploy/
-├── namespace.yaml            # Skip if using existing 'latere' namespace
-├── deployment.yaml           # Wallfacer server Deployment
-├── service.yaml              # ClusterIP Service
-├── ingress.yaml              # Ingress for wallfacer.latere.ai
-├── pvc.yaml                  # PersistentVolumeClaim for task data
-├── rbac.yaml                 # ServiceAccount, Role, RoleBinding for sandbox Jobs
-├── secret.yaml.example       # Template for wallfacer-env Secret
-├── networkpolicy.yaml        # Restrict sandbox pod egress
-└── kustomization.yaml        # Kustomize overlay for environment variants
+├── prod/
+│   ├── deployment.yaml      # wallfacerd (website) — exists
+│   ├── service.yaml         # exists
+│   ├── ingress.yaml         # exists
+│   ├── board-deployment.yaml  # NEW: task-board server
+│   ├── board-service.yaml     # NEW
+│   ├── board-ingress.yaml     # NEW
+│   └── board-pvc.yaml         # NEW: task-data volume
+└── secret.yaml.example      # template for the board Secret
 ```
 
----
+(No `rbac.yaml`, no `networkpolicy.yaml` — sandbox concerns are Cella's.)
 
-## Implementation Tasks
+## Implementation tasks
 
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
-| 1 | Write `deploy/` K8s manifests (Deployment, Service, Ingress, PVC, RBAC, NetworkPolicy) | Sandbox backend interface (done) | Medium |
-| 2 | Build wallfacer container image + CI pipeline (Dockerfile, GitHub Actions) | — | Medium |
-| 3 | Add DNS record + TLS cert + sandbox node pool to latere.ai terraform | 1 | Small |
-| 4 | End-to-end deployment test: deploy to latere.ai cluster, create task, run sandbox | 1, 2, 3 | Medium |
-| 5 | Document deployment workflow (terraform changes, manifest apply, secrets setup) | 4 | Small |
+| 1 | Add board `Deployment`/`Service`/`Ingress`/`PVC` manifests under `deploy/prod/`, modeled on `wallfacerd` | runtime seam defined ([cella-runtime.md](latere-integration/cella-runtime.md)) | Small |
+| 2 | Extend the existing `wallfacerd` CI to build/push the board image (or reuse the same image, different command) | — | Small |
+| 3 | Board Ingress host + TLS cert in terraform (DNS A record + Certificate, same pattern as `wf.latere.ai`) | 1 | Small |
+| 4 | E2E: deploy to `latere`, sign in, create a task, run it via Cella, verify task data persists across pod restart | 1, 2, 3, Cella backend | Medium |
+| 5 | Document the deploy workflow (manifests, secrets, terraform additions) | 4 | Small |
 
-Tasks 1 and 2 are independent and can proceed in parallel.
+## Cost (DigitalOcean, incremental over the existing latere.ai baseline)
 
----
+| Item | Cost |
+|------|------|
+| Task-board server pod | +$0 (fits existing node pool) |
+| `wallfacer-data` PVC (20Gi `do-block-storage`) | ~$2/mo |
+| Sandbox compute | **$0 here** — owned and billed by Cella, not this spec |
 
-## Cost Estimates (DigitalOcean)
-
-| Scale | Cost | Notes |
-|-------|------|-------|
-| **Single node** (current latere.ai baseline) | ~$38/mo | K8s + LB + Spaces; shared with other latere.ai services |
-| **+ wallfacer server** | +$0 | Runs on existing node pool within spare capacity |
-| **+ sandbox node pool** (1× `s-4vcpu-8gb`) | +$48/mo | Dedicated node for sandbox Jobs |
-| **+ managed PG** (Option B storage) | +$15/mo | `db-s-1vcpu-1gb` — only if transitioning away from FilesystemBackend |
-| **5 concurrent tenants** (cloud-hosted) | ~$320/mo | 3 sandbox worker nodes, shared PG, shared Spaces |
-| **10 concurrent tenants** | ~$430/mo | 4 sandbox worker nodes; idle tenants cost ~$0 (hibernated) |
-| **20 concurrent tenants** | ~$530/mo | Cost per tenant drops as density grows |
-
-The single-node baseline ($38/mo) already exists as part of latere.ai. Adding wallfacer for internal/beta use only requires the sandbox node pool (+$48/mo). Managed PG and further scaling are incremental decisions.
-
----
-
-## Future Work (deferred)
-
-- **Multi-cloud support** (AWS, GCP, Alibaba): Not needed now. The application layer is cloud-agnostic by design; adding another provider means writing new terraform + adjusting manifests, not changing wallfacer code.
-- **PostgreSQL + S3 storage backend**: Implement when scaling beyond single-instance. Requires database backend implementation (see `specs/foundations/storage-backends/`).
-- **Autoscaling sandbox node pool**: Configure DOKS autoscaler when sandbox utilization justifies it.
-- **Self-hosted / on-prem deployment guide**: Write when there's demand. The K8s manifests work on any cluster; only StorageClass and Ingress differ.
-
----
+The sandbox node-pool line items from the previous version are gone: Cella runs
+sandboxes on its own (tainted) pool and accounts for that compute.
 
 ## Dependencies
 
-- **Sandbox Backend Interface** (`specs/foundations/sandbox-backends.md`) — defines the `Backend` interface that `K8sBackend` will implement (complete)
-- **Storage Backend Interface** (`specs/foundations/storage-backends.md`) — defines `StorageBackend`; `FilesystemBackend` is implemented (complete)
-- **External sandbox runtime** ([`latere.ai/sandbox`](https://github.com/latere-ai/sandbox)) — implements the `Runtime` interface wallfacer dispatches tasks through (K8s Jobs, egress policies, hardening); must be deployed before sandbox tasks work in-cluster
+- [storage-backends.md](../foundations/storage-backends.md) — `FilesystemBackend` on the PVC (complete).
+- [latere-integration.md](latere-integration.md) — the umbrella; the runtime
+  ([cella-runtime.md](latere-integration/cella-runtime.md)) and FS
+  ([tenant-filesystem.md](tenant-filesystem.md)) seams the deployed server consumes.
+- Identity (auth.latere.ai) — already wired into `wallfacerd`; the board server reuses the same `AUTH_*` config.
 
 ## What depends on this
 
-- **Multi-Tenant** (`specs/cloud/multi-tenant.md`) — control plane deployment requires working cloud infrastructure
+- The cloud integration track's runnable surface: once the board server is
+  deployed, the Cella runtime and FS seams have somewhere to run.
 
----
+## Future work (deferred)
 
-## Note: Cloud Track Alignment
-
-The other cloud track specs (`tenant-filesystem.md`, `k8s-sandbox.md`, `multi-tenant.md`, `tenant-api.md`) are being aligned with latere.ai's real infrastructure. Key shifts:
-
-- **tenant-filesystem.md**: Integrates with fs.latere.ai for per-tenant storage (cold tier for config persistence, hot tier for runtime workspace). No standalone tenant PVC needed — fs.latere.ai owns storage allocation.
-- **k8s-sandbox.md**: RBAC and namespace assumptions should match the latere.ai cluster setup. Volume mounts point at fs.latere.ai hot tier paths instead of standalone PVCs.
-- **multi-tenant.md**: Control plane runs in the same latere.ai cluster, not a separate provisioning system; scoped to cloud-hosted mode only.
+- Postgres + S3 `StorageBackend` for multi-replica scaling (storage tasks are
+  archived until demand exists).
+- Autoscaling / multi-region — terraform concerns, not wallfacer's.
+- Self-hosted deployment guide — the manifests work on any cluster; only
+  StorageClass and Ingress differ.
