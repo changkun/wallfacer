@@ -20,8 +20,8 @@ dispatched_task_id: null
 
 When a handler writes an event to a task's trace (`state_change`, `feedback`,
 `error`, `system`, etc.), record *who* caused the event. This gives Phase 2
-task-scoped attribution out of the box and provides the hook that
-`observability/audit-log.md` will later extend to cross-entity mutation history.
+task-scoped attribution out of the box and provides a hook a future
+cross-entity mutation history could later extend.
 
 Local anonymous mode writes an empty actor string, which is the same
 attribution today's events carry, so no behavior change.
@@ -76,11 +76,10 @@ attribution today's events carry, so no behavior change.
   etc.). Only add fields.
 - Do not persist email or display name on the event. Only the principal
   sub. Display-name resolution is a read-path concern.
-- Do not fan out to workspaces, config, or admin actions, that is
-  [`observability/audit-log.md`](../observability/audit-log.md)'s job. This spec covers only
-  the per-task event trace.
-- Do not add a read filter by actor. Cross-entity queries belong in
-  the audit-log spec.
+- Do not fan out to workspaces, config, or admin actions. This spec
+  covers only the per-task event trace.
+- Do not add a read filter by actor. Cross-entity queries are out of
+  scope here.
 
 ## Outcome
 
@@ -131,9 +130,8 @@ trips unchanged thanks to omitempty.
    sweep than this spec's "small" effort allows. Runner-initiated
    writes continue to write empty attribution, which is visually
    distinguishable from request-initiated writes now that the user
-   branch is populated. When `observability/audit-log.md` lands it will
-   sweep the remaining call sites during its operation-catalog
-   rollout.
+   branch is populated. A future cross-entity audit effort can sweep
+   the remaining call sites.
 
 4. **API-key branch stamps anonymous, not ActorAPIKey.** The
    `ActorAPIKey` constant exists in the enum, but the static-key

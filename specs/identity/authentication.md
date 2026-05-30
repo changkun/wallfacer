@@ -222,7 +222,7 @@ Richer RBAC (role matrix, team-level ACLs) lives in
 | [cloud-forced-login.md](authentication/cloud-forced-login.md): anonymous HTML GET → `/login?next=`, API stays 401 | principal-context | small |
 | [scope-and-superadmin.md](authentication/scope-and-superadmin.md): `RequireSuperadmin` + `RequireScope`; apply to `/api/admin/*` | jwt-middleware | small |
 | [org-switching.md](authentication/org-switching.md): `/api/auth/orgs`, `/api/auth/switch-org`, badge submenu | data-model-principal-org, jwt-middleware | medium |
-| [task-event-actor-sub.md](authentication/task-event-actor-sub.md): stamp `ActorSub` + `ActorType` on per-task events; hook point for `audit-log.md` | jwt-middleware | small |
+| [task-event-actor-sub.md](authentication/task-event-actor-sub.md): stamp `ActorSub` + `ActorType` on per-task events | jwt-middleware | small |
 
 ```mermaid
 graph LR
@@ -327,10 +327,10 @@ path still works exactly as before.
    ([`agent-token-exchange.md`](agent-token-exchange.md)) during Phase 2
    planning. It depends on the Phase 2 principal context but does not
    gate the cloud-track unblock.
-8. **Audit log extracted** to `observability/audit-log.md`. Phase 2 only lays
+8. **Audit log deferred** to a follow-up spec. Phase 2 only lays
    down one hook (`actor_sub` on the per-task event trace via
-   `task-event-actor-sub.md`); the broader cross-entity log is a
-   follow-up spec.
+   `task-event-actor-sub.md`); the broader cross-entity log is out
+   of scope for this spec.
 9. **Sign-in badge redesigned** from an inline pill to a two-line stack
    (name on top, scope subtitle below) after display names like
    "Changkun Ou" were being truncated by the competing org pill. The
@@ -354,21 +354,6 @@ unblocked by Phase 2:
   UI or a mobile client observe and operate a user's signed-in local
   wallfacer instances. Phase 2 laid down the identity link; Phase 3
   builds the transport.
-
-### Audit Log (cross-entity mutation history)
-
-Not a Phase 3 item itself, but the third future spec that depends on
-Phase 2's principal context: `CreatedBy` + `OrgID` on records answers
-*who originated this record*; it does not answer *who edited it,
-when, and to what*. Cross-entity mutation history, task state
-transitions, workspace config edits, admin actions, lives in its own
-spec: [`observability/audit-log.md`](../observability/audit-log.md).
-
-That spec depends on Phase 2 (needs `*jwtauth.Claims` on every request)
-but is scoped separately so it doesn't balloon the cloud-unblock work.
-Phase 2 only adds one hook for it: an `actor_sub` field on the existing
-per-task event trace, so task-scoped attribution arrives with Phase 2
-and the broader cross-entity log follows later.
 
 ---
 
