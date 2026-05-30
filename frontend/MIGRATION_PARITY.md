@@ -129,7 +129,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | unified-graph.js | DONE | MapPage.vue (vendored) | spec+task merge, archived filter, layout cache |
 | planning-chat.js | PARTIAL | PlanningChatPanel.vue, stores/planning.ts | slash/mention autocomplete robustness, focus restore, revert/stash edge cases |
 | spec-mode.js | PARTIAL | PlanningPage.vue, SpecFocusedView.vue | dispatch button flow + tree refresh + toast, archive/unarchive toast w/ undo |
-| dispatch-toast.js | PARTIAL+ | stores/toast.ts + Toaster.vue | **toast system built** (Pinia store + global Toaster, tested) and used for archive/unarchive **undo**. Pending: planning dispatch-complete toast + "View on Board →" wiring |
+| dispatch-toast.js | DONE | stores/toast.ts + Toaster.vue + SpecFocusedView | toast system (tested) used for archive undo **and spec dispatch-complete "View on Board →"** |
 
 ### Settings/config (envconfig, system-prompts, instructions, templates, images)
 | Module | Status | Vue equivalent | Missing behaviors |
@@ -253,6 +253,8 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
   Verified on the completed task. modal-oversight DONE.
 - 2026-05-30: **Feedback @-mention** — wired `useMentions` into TaskDetail
   feedback textarea (same tested composable as composer). mention.js DONE.
+- 2026-05-30: **Spec dispatch toast** — focused-view dispatch shows a "View on
+  Board →" success toast. dispatch-toast DONE.
 - 2026-05-30: **Board unread dot** — sidebar Board nav lights when new tasks
   arrive off-board (tested `hasUnseen`); cleared on board view. sidebar-badge DONE.
 - 2026-05-30: **Docs in command palette** — Docs section (filters docIndex,
