@@ -1211,6 +1211,39 @@ func TestCancelTask_CascadesToLiveRoutineChildren(t *testing.T) {
 	}
 }
 
+// TestCancelTask_DisablesRoutineCard is the regression test for the reported
+// bug: a routine card that the user cancelled kept RoutineEnabled=true, so it
+// lingered in the routines list flagged enabled (looking like it was still
+// firing) and would silently resume spawning if its status were ever moved
+// back to an active lane. Cancelling must clear the enabled flag.
+func TestCancelTask_DisablesRoutineCard(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	routineID, _, _ := makeRoutineWithChildren(t, h)
+
+	if before, _ := h.store.GetTask(ctx, routineID); before == nil || !before.RoutineEnabled {
+		t.Fatalf("precondition: routine should start enabled")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, routineID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("cancel routine: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, _ := h.store.GetTask(ctx, routineID)
+	if got == nil {
+		t.Fatalf("routine not found after cancel")
+	}
+	if got.Status != store.TaskStatusCancelled {
+		t.Errorf("routine status = %q, want cancelled", got.Status)
+	}
+	if got.RoutineEnabled {
+		t.Error("expected RoutineEnabled cleared after cancel; routine still flagged enabled")
+	}
+}
+
 func TestArchiveTask_CascadesToLiveRoutineChildren(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
@@ -1234,6 +1267,12 @@ func TestArchiveTask_CascadesToLiveRoutineChildren(t *testing.T) {
 		if got == nil || got.Status != store.TaskStatusCancelled {
 			t.Errorf("child in %q after archive: expected cancelled, got %q", status, got.Status)
 		}
+	}
+
+	// Archiving a routine must also clear its enabled flag so it can never
+	// resume firing once put away.
+	if got, _ := h.store.GetTask(ctx, routineID); got == nil || got.RoutineEnabled {
+		t.Error("expected RoutineEnabled cleared after archive")
 	}
 }
 
