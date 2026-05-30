@@ -127,6 +127,24 @@ h1 em, h2 em {
     color: var(--text);
 }
 .logo-icon { flex-shrink: 0; }
+.logo-mark {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.logo-mark-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+    object-position: center;
+}
+.logo-mark-dark { display: none; }
+[data-theme="dark"] .logo-mark-light { display: none; }
+[data-theme="dark"] .logo-mark-dark { display: block; }
 .nav-links {
     display: flex;
     align-items: center;

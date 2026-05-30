@@ -4,7 +4,11 @@ import { computed, ref, watch } from 'vue';
 export type Theme = 'light' | 'dark' | 'auto';
 export type Locale = 'en' | 'zh';
 
-const THEME_KEY = 'latere-theme';
+// Theme key matches the legacy ui/ so both UIs read/write the same
+// preference. Without this, cloud and local mode (and the legacy and Vue
+// surfaces during the migration) end up with disagreeing themes when
+// opened in different tabs.
+const THEME_KEY = 'wallfacer-theme';
 const LOCALE_KEY = 'latere-lang';
 
 function hasStorage(): boolean {
@@ -28,7 +32,11 @@ function readLocale(): Locale {
 
 function resolveTheme(t: Theme): 'light' | 'dark' {
   if (t !== 'auto') return t;
-  if (typeof window === 'undefined') return 'dark';
+  // SSG (vite-ssg) prerenders without `window`. Defaulting to 'dark' here
+  // bakes `<html data-theme="dark">` into the static HTML and forces every
+  // first paint to dark, which then flips on hydration. Default to light
+  // so the prerendered page matches the no-attribute :root tokens.
+  if (typeof window === 'undefined') return 'light';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
