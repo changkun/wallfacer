@@ -1,0 +1,658 @@
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { storeToRefs } from 'pinia';
+import { api } from '../../api/client';
+import { renderMarkdown } from '../../lib/markdown';
+import { enhanceMermaid } from '../../lib/mermaidRender';
+import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
+import { usePlanningStore } from '../../stores/planning';
+import { useTaskStore } from '../../stores/tasks';
+import FloatingToc from './FloatingToc.vue';
+
+defineProps<{ chatVisible: boolean }>();
+const emit = defineEmits<{ toggleChat: []; focusSibling: [path: string]; sendChat: [text: string] }>();
+
+const planning = usePlanningStore();
+const tasks = useTaskStore();
+const {
+  focusedSpecPath, focusedIsIndex, focusedNode, tree,
+  focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
+} = storeToRefs(planning);
+
+const specText = ref<string>('');
+const loading = ref(false);
+const loadEpoch = ref(0);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+const workspace = computed(() => {
+  const ws = tasks.config?.workspaces ?? [];
+  return ws.length > 0 ? ws[0] : '';
+});
+
+function authHeaders(): Record<string, string> {
+  if (typeof window !== 'undefined' && window.__WALLFACER__?.serverApiKey) {
+    return { Authorization: `Bearer ${window.__WALLFACER__.serverApiKey}` };
+  }
+  return {};
+}
+
+async function loadCurrent() {
+  const ws = workspace.value;
+  if (!ws || !focusedSpecPath.value) {
+    specText.value = '';
+    return;
+  }
+  const myEpoch = ++loadEpoch.value;
+  loading.value = true;
+  // For Roadmap (specs/README.md) the path itself is already the file
+  // path; for regular specs the tree gives a workspace-relative path.
+  const absPath = ws + '/' + focusedSpecPath.value;
+  const url =
+    '/api/explorer/file?path=' + encodeURIComponent(absPath) +
+    '&workspace=' + encodeURIComponent(ws);
+  try {
+    const res = await fetch(url, { headers: authHeaders(), credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    if (myEpoch !== loadEpoch.value) return;
+    specText.value = text;
+  } catch (e) {
+    if (myEpoch !== loadEpoch.value) return;
+    console.error('spec load:', e);
+    specText.value = '';
+  } finally {
+    if (myEpoch === loadEpoch.value) loading.value = false;
+  }
+}
+
+function startPoll() {
+  stopPoll();
+  pollTimer = setInterval(loadCurrent, 2000);
+}
+
+function stopPoll() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+watch([focusedSpecPath, focusedIsIndex, focusedTaskId, workspace], () => {
+  // Task-mode focus owns the body; spec poller must stand down so it
+  // doesn't overwrite the task prompt with stale spec content.
+  if (focusedTaskId.value) {
+    stopPoll();
+    specText.value = '';
+    return;
+  }
+  specText.value = '';
+  void loadCurrent();
+  if (focusedSpecPath.value && !focusedIsIndex.value) startPoll();
+  else stopPoll();
+}, { immediate: true });
+
+onUnmounted(stopPoll);
+
+// ── Parsed view ────────────────────────────────────────────────────
+
+const parsed = computed(() => parseSpecFrontmatter(specText.value));
+
+const displayTitle = computed(() => {
+  if (focusedTaskId.value) return focusedTaskTitle.value || 'Task prompt';
+  if (focusedIsIndex.value) return 'Roadmap';
+  return parsed.value.frontmatter.title || focusedSpecPath.value || '';
+});
+
+const displayPath = computed(() => {
+  if (focusedTaskId.value) return 'Task: ' + focusedTaskId.value.slice(0, 8);
+  if (focusedIsIndex.value) return '';
+  if (!focusedSpecPath.value) return '';
+  return focusedSpecPath.value.startsWith('specs/')
+    ? focusedSpecPath.value
+    : 'specs/' + focusedSpecPath.value;
+});
+
+const renderedTaskPrompt = computed(() =>
+  focusedTaskPrompt.value ? renderMarkdown(focusedTaskPrompt.value) : '',
+);
+
+const status = computed(() => parsed.value.frontmatter.status ?? '');
+const effort = computed(() => parsed.value.frontmatter.effort ?? '');
+const isArchived = computed(() => status.value === 'archived');
+
+const isLeaf = computed(() => focusedNode.value?.is_leaf ?? true);
+const kindLabel = computed(() => (isLeaf.value ? 'implementation' : 'design'));
+
+const metaParts = computed(() => {
+  const out: string[] = [];
+  const fm = parsed.value.frontmatter;
+  if (fm.author) out.push('Author: ' + fm.author);
+  if (fm.created) out.push('Created: ' + fm.created);
+  if (fm.updated) out.push('Updated: ' + fm.updated);
+  return out.join(' · ');
+});
+
+const renderedBody = computed(() => {
+  if (!parsed.value.body) return '';
+  let html = renderMarkdown(parsed.value.body);
+  // Strip the leading <h1> and <hr> so they don't duplicate the title bar.
+  html = html.replace(/^\s*<h1\b[^>]*>[\s\S]*?<\/h1>\s*/, '');
+  html = html.replace(/^\s*<hr\s*\/?>\s*/, '');
+  return html;
+});
+
+const showDispatch = computed(
+  () => !focusedIsIndex.value && status.value === 'validated' && isLeaf.value && !isArchived.value,
+);
+const showBreakdown = computed(
+  () => !focusedIsIndex.value && (status.value === 'validated' || status.value === 'drafted') && !isArchived.value,
+);
+const canArchive = computed(
+  () =>
+    !focusedIsIndex.value &&
+    (status.value === 'vague' ||
+      status.value === 'drafted' ||
+      status.value === 'complete' ||
+      status.value === 'stale'),
+);
+
+// ── Action buttons ─────────────────────────────────────────────────
+
+interface DispatchResp {
+  dispatched?: { spec_path: string; task_id: string }[];
+}
+
+const actionBusy = ref(false);
+
+function focusedChildCount(): number {
+  if (!focusedNode.value || focusedNode.value.is_leaf) return 0;
+  let count = 0;
+  const queue = [...(focusedNode.value.children ?? [])];
+  while (queue.length > 0) {
+    const path = queue.shift()!;
+    count++;
+    const child = tree.value.find(n => n.path === path);
+    if (child?.children) queue.push(...child.children);
+  }
+  return count;
+}
+
+async function onDispatch() {
+  if (!focusedSpecPath.value) return;
+  if (!confirm('Dispatch this spec to the task board?')) return;
+  actionBusy.value = true;
+  try {
+    await api<DispatchResp>('POST', '/api/specs/dispatch', {
+      paths: [focusedSpecPath.value],
+      run: false,
+    });
+    await loadCurrent();
+  } catch (e) {
+    alert('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)));
+  } finally {
+    actionBusy.value = false;
+  }
+}
+
+function onBreakdown() {
+  emit('sendChat', '/break-down');
+}
+
+interface ArchiveAction {
+  action: 'archive' | 'unarchive';
+  path: string;
+}
+
+const toasts = ref<{ id: number; text: string; action: ArchiveAction }[]>([]);
+let toastSeq = 0;
+
+function showToast(text: string, action: ArchiveAction) {
+  const id = ++toastSeq;
+  toasts.value.push({ id, text, action });
+  setTimeout(() => dismissToast(id), 8000);
+}
+
+function dismissToast(id: number) {
+  toasts.value = toasts.value.filter(t => t.id !== id);
+}
+
+async function callArchiveEndpoint(url: string, path: string): Promise<boolean> {
+  try {
+    await api('POST', url, { path });
+    return true;
+  } catch (e) {
+    alert(e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}
+
+async function onArchive() {
+  if (!focusedSpecPath.value) return;
+  const childCount = focusedChildCount();
+  if (childCount > 0 && !confirm(`Archiving will hide ${childCount} descendant spec(s). Continue?`)) {
+    return;
+  }
+  const path = focusedSpecPath.value;
+  if (await callArchiveEndpoint('/api/specs/archive', path)) {
+    showToast('Spec archived: ' + path, { action: 'archive', path });
+    await loadCurrent();
+  }
+}
+
+async function onUnarchive() {
+  if (!focusedSpecPath.value) return;
+  const path = focusedSpecPath.value;
+  if (await callArchiveEndpoint('/api/specs/unarchive', path)) {
+    showToast('Spec unarchived: ' + path, { action: 'unarchive', path });
+    await loadCurrent();
+  }
+}
+
+async function undoToast(toast: { id: number; action: ArchiveAction }) {
+  const reverseUrl = toast.action.action === 'archive' ? '/api/specs/unarchive' : '/api/specs/archive';
+  if (await callArchiveEndpoint(reverseUrl, toast.action.path)) {
+    dismissToast(toast.id);
+    await loadCurrent();
+  }
+}
+
+// ── Spec link interception ────────────────────────────────────────
+
+const bodyRef = ref<HTMLElement | null>(null);
+
+function isSpecLink(href: string): boolean {
+  if (!href) return false;
+  if (/^([a-z]+:|#|\/\/)/i.test(href)) return false;
+  return /\.md(\?|#|$)/.test(href);
+}
+
+function resolveSpecHref(href: string): string {
+  // Strip any query/anchor portion, keep just the file path.
+  const cleaned = href.split('#')[0].split('?')[0];
+  if (cleaned.startsWith('specs/')) return cleaned;
+  // Relative to focused spec's directory.
+  const base = focusedSpecPath.value || '';
+  const baseDir = base.includes('/') ? base.slice(0, base.lastIndexOf('/')) : '';
+  if (cleaned.startsWith('./')) return joinPath(baseDir, cleaned.slice(2));
+  if (cleaned.startsWith('../')) {
+    const segs = baseDir.split('/').filter(Boolean);
+    let target = cleaned;
+    while (target.startsWith('../')) {
+      segs.pop();
+      target = target.slice(3);
+    }
+    return [...segs, target].filter(Boolean).join('/');
+  }
+  return joinPath(baseDir, cleaned);
+}
+
+function joinPath(a: string, b: string): string {
+  if (!a) return b;
+  return a.replace(/\/+$/, '') + '/' + b.replace(/^\/+/, '');
+}
+
+function onBodyClick(ev: MouseEvent) {
+  const target = ev.target as HTMLElement;
+  const a = target.closest('a') as HTMLAnchorElement | null;
+  if (!a) return;
+  const href = a.getAttribute('href');
+  if (!href) return;
+  if (!isSpecLink(href)) return;
+  ev.preventDefault();
+  const resolved = resolveSpecHref(href);
+  emit('focusSibling', resolved);
+}
+
+// Re-run mermaid enhancement on every body change. enhanceMermaid is
+// idempotent — already-rendered blocks carry the .mermaid-rendered marker
+// and are skipped on subsequent passes.
+watch([renderedBody, renderedTaskPrompt], () => {
+  void nextTick(() => {
+    if (bodyRef.value) void enhanceMermaid(bodyRef.value);
+  });
+});
+
+onMounted(() => {
+  bodyRef.value?.addEventListener('click', onBodyClick);
+});
+onUnmounted(() => {
+  bodyRef.value?.removeEventListener('click', onBodyClick);
+});
+</script>
+
+<template>
+  <main class="spec-focused">
+    <header class="sf-header">
+      <div class="sf-chrome">
+        <span class="sf-path">{{ displayPath }}</span>
+        <span v-if="status" class="sf-status" :class="'sf-status--' + status">{{ status }}</span>
+        <span
+          v-if="!focusedIsIndex && focusedSpecPath"
+          class="sf-kind"
+          :class="'sf-kind--' + (isLeaf ? 'impl' : 'design')"
+        >{{ kindLabel }}</span>
+        <span v-if="effort" class="sf-effort">{{ effort }}</span>
+        <span class="sf-spacer" />
+        <button
+          v-if="canArchive"
+          type="button"
+          class="sf-action"
+          :disabled="actionBusy"
+          title="Archive this spec (hide from live graph)"
+          @click="onArchive"
+        >Archive</button>
+        <button
+          v-if="isArchived"
+          type="button"
+          class="sf-action"
+          :disabled="actionBusy"
+          title="Unarchive this spec"
+          @click="onUnarchive"
+        >Unarchive</button>
+        <button
+          v-if="showBreakdown"
+          type="button"
+          class="sf-action"
+          :disabled="actionBusy"
+          @click="onBreakdown"
+        >Break Down</button>
+        <button
+          type="button"
+          class="sf-action sf-chat-toggle"
+          :class="{ 'sf-chat-toggle--folded': !chatVisible }"
+          :aria-pressed="chatVisible"
+          :title="chatVisible ? 'Hide chat pane (C)' : 'Show chat pane (C)'"
+          @click="emit('toggleChat')"
+        >Chat</button>
+        <button
+          v-if="showDispatch"
+          type="button"
+          class="sf-action sf-dispatch"
+          :disabled="actionBusy"
+          @click="onDispatch"
+        >Dispatch</button>
+      </div>
+      <span v-if="displayTitle" class="sf-title">{{ displayTitle }}</span>
+    </header>
+
+    <div v-if="metaParts" class="sf-meta">{{ metaParts }}</div>
+
+    <div v-if="isArchived" class="sf-archived-banner" role="status">
+      <span aria-hidden="true">⊘</span>
+      <span>Archived — read-only. Hidden from the live graph and drift checks.</span>
+      <button type="button" class="sf-action" @click="onUnarchive">Unarchive</button>
+    </div>
+
+    <div
+      class="sf-body"
+      :key="(focusedTaskId || focusedSpecPath) + ':' + (focusedIsIndex ? '1' : '0')"
+    >
+      <div v-if="focusedTaskId">
+        <div
+          v-if="renderedTaskPrompt"
+          ref="bodyRef"
+          class="sf-content prose-content"
+          v-html="renderedTaskPrompt"
+        />
+        <div v-else class="sf-loading">No prompt for this task.</div>
+      </div>
+      <template v-else>
+        <div v-if="loading && !specText" class="sf-loading">Loading…</div>
+        <div
+          v-else-if="renderedBody"
+          ref="bodyRef"
+          class="sf-content prose-content"
+          v-html="renderedBody"
+        />
+        <div v-else class="sf-loading">Select a spec from the tree.</div>
+      </template>
+      <FloatingToc :body-el="bodyRef" :content-key="(renderedBody || renderedTaskPrompt)" />
+    </div>
+
+    <div class="sf-toasts" role="status" aria-live="polite">
+      <div v-for="t in toasts" :key="t.id" class="sf-toast">
+        <span class="sf-toast-text">{{ t.text }}</span>
+        <button type="button" class="sf-action" @click="undoToast(t)">Undo</button>
+        <button
+          type="button"
+          class="sf-toast-close"
+          aria-label="Dismiss"
+          @click="dismissToast(t.id)"
+        >✕</button>
+      </div>
+    </div>
+  </main>
+</template>
+
+<style scoped>
+.spec-focused {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  position: relative;
+}
+
+.sf-header {
+  padding: 12px 20px 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sf-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.sf-path {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sf-status,
+.sf-kind {
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sf-status--validated,
+.sf-status--complete { color: var(--ok); border-color: var(--ok); }
+.sf-status--drafted { color: var(--info); border-color: var(--info); }
+.sf-status--stale { color: var(--warn); border-color: var(--warn); }
+.sf-status--archived { color: var(--ink-4); border-color: var(--ink-4); }
+.sf-status--vague { color: var(--ink-3); border-color: var(--ink-3); }
+
+.sf-effort {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+}
+
+.sf-spacer {
+  flex: 1;
+}
+
+.sf-action {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg-card);
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sf-action:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.sf-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sf-dispatch {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.sf-chat-toggle--folded {
+  opacity: 0.7;
+}
+
+.sf-title {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sf-meta {
+  padding: 4px 20px 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sf-archived-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: var(--bg-sunk);
+  font-size: 12px;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sf-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px 80px;
+  animation: sf-fade-in 0.18s ease-out;
+}
+
+@keyframes sf-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sf-loading {
+  color: var(--ink-4);
+  text-align: center;
+  padding: 40px 0;
+  font-size: 13px;
+}
+
+.sf-content :deep(h1),
+.sf-content :deep(h2),
+.sf-content :deep(h3),
+.sf-content :deep(h4) {
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.sf-content :deep(h1) { font-size: 22px; }
+.sf-content :deep(h2) { font-size: 17px; border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
+.sf-content :deep(h3) { font-size: 14px; }
+
+.sf-content :deep(p) { margin: 0.6em 0; line-height: 1.6; }
+.sf-content :deep(ul),
+.sf-content :deep(ol) { margin: 0.6em 0; padding-left: 1.4em; }
+.sf-content :deep(li) { margin: 0.2em 0; line-height: 1.55; }
+.sf-content :deep(code) {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-sunk);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sf-content :deep(pre) {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-sunk);
+  padding: 12px;
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.sf-content :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.sf-content :deep(a) {
+  color: var(--accent);
+  text-decoration: none;
+}
+.sf-content :deep(a:hover) {
+  text-decoration: underline;
+}
+.sf-content :deep(blockquote) {
+  border-left: 3px solid var(--rule);
+  padding-left: 12px;
+  margin: 1em 0;
+  color: var(--ink-3);
+}
+.sf-content :deep(table) {
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 12px;
+}
+.sf-content :deep(th),
+.sf-content :deep(td) {
+  border: 1px solid var(--rule);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.sf-toasts {
+  position: absolute;
+  bottom: 16px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.sf-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.sf-toast-text {
+  flex: 1;
+}
+
+.sf-toast-close {
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+</style>

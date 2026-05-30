@@ -1,355 +1,226 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
-import { api } from '../api/client';
-import { computeHidden } from '../lib/specTree';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
+import { usePlanningStore } from '../stores/planning';
+import type { SpecNode, SpecIndexMeta, SpecProgress } from '../stores/planning';
+import { useTaskStore } from '../stores/tasks';
+import { useSse } from '../composables/useSse';
+import { watchThemeReinit } from '../lib/mermaidRender';
+import SpecTreePanel from '../components/plan/SpecTreePanel.vue';
+import SpecFocusedView from '../components/plan/SpecFocusedView.vue';
+import PlanningChatPanel from '../components/plan/PlanningChatPanel.vue';
 
-// ── Types ──────────────────────────────────────────────────────────
+const route = useRoute();
+const router = useRouter();
+const planning = usePlanningStore();
+const tasks = useTaskStore();
+const { tree, treeIndex, treeLoading, focusedSpecPath } = storeToRefs(planning);
 
-interface SpecMeta {
-  title: string;
-  status: string;
-  depends_on: string[];
-  affects: string[];
-  effort: string;
-  created: string;
-  updated: string;
-  author: string;
-  dispatched_task_id: string | null;
+// ── Layout state machine ───────────────────────────────────────────
+//
+// Mirrors ui/js/spec-mode.js _applyLayout: chat-first when there are no
+// specs and no Roadmap index, three-pane otherwise. Chat-first force-
+// shows the chat pane.
+//
+// While the initial tree fetch is still in flight (treeLoading), keep
+// the three-pane layout so users with specs don't see a flash of
+// chat-first before their tree arrives.
+
+const layout = computed<'chat-first' | 'three-pane'>(() => {
+  if (treeLoading.value) return 'three-pane';
+  const hasSpecs = tree.value.length > 0;
+  const hasIndex = !!treeIndex.value;
+  return hasSpecs || hasIndex ? 'three-pane' : 'chat-first';
+});
+
+// ── Chat pane visibility (persisted) ──────────────────────────────
+
+const CHAT_OPEN_KEY = 'wallfacer-spec-chat-open';
+const chatOpen = ref<boolean>(localStorage.getItem(CHAT_OPEN_KEY) !== '0');
+
+function toggleChat() {
+  chatOpen.value = !chatOpen.value;
+  localStorage.setItem(CHAT_OPEN_KEY, chatOpen.value ? '1' : '0');
 }
 
-interface SpecNode {
-  path: string;
-  spec: SpecMeta;
-  children: string[];
-  is_leaf: boolean;
-  depth: number;
-}
+// In chat-first layout we force the chat to visible.
+const effectiveChatOpen = computed(() => layout.value === 'chat-first' || chatOpen.value);
 
-interface SpecTreeResponse {
-  nodes: SpecNode[];
-  progress: Record<string, { complete: number; total: number }>;
-}
+// ── Chat pane resize (persisted) ──────────────────────────────────
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp?: string;
-}
+const CHAT_WIDTH_KEY = 'wallfacer-spec-chat-width';
+const CHAT_MIN = 280;
+const CHAT_MAX_FRAC = 0.5;
 
-// ── Auth helper (mirrors useSse pattern) ───────────────────────────
+const chatWidth = ref<number>(parseInt(localStorage.getItem(CHAT_WIDTH_KEY) || '360', 10));
 
-function addAuthParam(url: string): string {
-  if (typeof window !== 'undefined' && window.__WALLFACER__?.serverApiKey) {
-    const sep = url.includes('?') ? '&' : '?';
-    return url + sep + 'token=' + encodeURIComponent(window.__WALLFACER__.serverApiKey);
+function startChatResize(ev: MouseEvent) {
+  ev.preventDefault();
+  const startX = ev.clientX;
+  const startW = chatWidth.value;
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+  function onMove(mv: MouseEvent) {
+    const delta = startX - mv.clientX;
+    const maxW = Math.floor(window.innerWidth * CHAT_MAX_FRAC);
+    chatWidth.value = Math.min(maxW, Math.max(CHAT_MIN, startW + delta));
   }
-  return url;
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    localStorage.setItem(CHAT_WIDTH_KEY, String(chatWidth.value));
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
-// ── Spec tree state ────────────────────────────────────────────────
+// ── Hash deep-link redirect ────────────────────────────────────────
+//
+// Old UI used #plan/<path> and #spec/<path> hash anchors to deep-link to
+// a focused spec. The new router uses query-string focusing (`?spec=`),
+// so on first mount we translate any legacy hash into the equivalent
+// query and clear the hash.
 
-const nodes = ref<SpecNode[]>([]);
-const collapsed = ref<Set<string>>(new Set());
-const selectedPath = ref<string | null>(null);
-const treeLoading = ref(true);
+function readHashPath(): string {
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#plan/')) return decodeURIComponent(hash.slice('#plan/'.length));
+  if (hash.startsWith('#spec/')) return decodeURIComponent(hash.slice('#spec/'.length));
+  return '';
+}
 
-const selectedNode = computed(() =>
-  nodes.value.find(n => n.path === selectedPath.value) ?? null,
-);
-
-const sortedNodes = computed(() => {
-  return [...nodes.value].sort((a, b) => a.path.localeCompare(b.path));
+watch(focusedSpecPath, (path) => {
+  // Keep the URL in sync so refresh preserves focus and shift+click into
+  // the Map view round-trips back to the same spec.
+  if (path) {
+    void router.replace({ path: '/plan', query: { spec: path } });
+  } else if (route.query.spec) {
+    void router.replace({ path: '/plan' });
+  }
 });
 
-// Determine which nodes are visible based on collapse state.
-const visibleNodes = computed(() => {
-  const index = new Map(nodes.value.map(n => [n.path, n] as const));
-  const hidden = computeHidden(sortedNodes.value, collapsed.value, index);
-  return sortedNodes.value.filter(n => !hidden.has(n.path));
-});
+// ── Cross-component focus from spec-link clicks ────────────────────
 
-function toggleCollapse(path: string) {
-  const next = new Set(collapsed.value);
-  if (next.has(path)) {
-    next.delete(path);
+function focusSibling(path: string) {
+  // Match against the loaded tree; if unknown, ignore (could be a docs link
+  // we don't render in the tree).
+  if (planning.tree.find(n => n.path === path)) {
+    planning.focusSpec(path);
   } else {
-    next.add(path);
-  }
-  collapsed.value = next;
-}
-
-function selectSpec(path: string) {
-  selectedPath.value = path;
-  loadSpecContent(path);
-}
-
-// ── Spec content (loaded via file explorer API) ────────────────────
-
-const specContent = ref<string>('');
-const specContentLoading = ref(false);
-
-async function loadSpecContent(path: string) {
-  specContentLoading.value = true;
-  specContent.value = '';
-  try {
-    const resp = await api<{ content: string }>(
-      'GET',
-      `/api/explorer/file?path=${encodeURIComponent(path)}`,
-    );
-    specContent.value = resp.content ?? '';
-  } catch {
-    specContent.value = '(Could not load spec content)';
-  }
-  specContentLoading.value = false;
-}
-
-async function fetchTree() {
-  try {
-    const resp = await api<SpecTreeResponse>('GET', '/api/specs/tree');
-    nodes.value = resp.nodes ?? [];
-  } catch (e) {
-    console.error('spec tree:', e);
-  }
-  treeLoading.value = false;
-}
-
-// ── Chat state ─────────────────────────────────────────────────────
-
-const messages = ref<ChatMessage[]>([]);
-const chatInput = ref('');
-const sending = ref(false);
-const messagesEl = ref<HTMLElement | null>(null);
-let streamEs: EventSource | null = null;
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (messagesEl.value) {
-      messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
-    }
-  });
-}
-
-async function loadMessages() {
-  try {
-    const msgs = await api<ChatMessage[]>('GET', '/api/planning/messages');
-    messages.value = msgs ?? [];
-    scrollToBottom();
-  } catch {
-    // No conversation yet.
+    // Fall back to focusing anyway; loadCurrent will surface the error
+    // state if the path is invalid.
+    planning.focusSpec(path);
   }
 }
 
-function closeStream() {
-  if (streamEs) {
-    streamEs.close();
-    streamEs = null;
-  }
-}
+// ── Forward Break Down chat send via the chat panel's expose ──────
 
-function openStream() {
-  closeStream();
-  let buffer = '';
+const chatPanelRef = ref<{ send: (text: string) => void } | null>(null);
 
-  const es = new EventSource(addAuthParam('/api/planning/messages/stream'), {
-    withCredentials: true,
-  });
-  streamEs = es;
-
-  es.onmessage = (ev) => {
-    const text = ev.data as string;
-    if (!text) return;
-
-    buffer += text;
-
-    const last = messages.value[messages.value.length - 1];
-    if (last && last.role === 'assistant') {
-      last.content = buffer;
-    } else {
-      messages.value.push({ role: 'assistant', content: buffer });
-    }
-    scrollToBottom();
-  };
-
-  es.onerror = () => {
-    // Stream ended (normal after response completes) or error.
-    closeStream();
-  };
-}
-
-async function sendMessage() {
-  const text = chatInput.value.trim();
-  if (!text || sending.value) return;
-
-  sending.value = true;
-  chatInput.value = '';
-
-  messages.value.push({ role: 'user', content: text });
-  scrollToBottom();
-
-  // Open the SSE stream before POST so we don't miss early tokens.
-  openStream();
-
-  try {
-    const body: Record<string, string> = { message: text };
-    if (selectedPath.value) {
-      body.focused_spec = selectedPath.value;
-    }
-    await api('POST', '/api/planning/messages', body);
-  } catch (e) {
-    console.error('send message:', e);
-    messages.value.push({
-      role: 'assistant',
-      content: '(Error sending message)',
-    });
-  }
-  sending.value = false;
-}
-
-function handleKeydown(ev: KeyboardEvent) {
-  if (ev.key === 'Enter' && !ev.shiftKey) {
-    ev.preventDefault();
-    sendMessage();
-  }
-}
-
-// ── Status badge helpers ───────────────────────────────────────────
-
-function statusColor(status: string): string {
-  const map: Record<string, string> = {
-    drafted: 'var(--info)',
-    validated: 'var(--ok)',
-    complete: 'var(--ok)',
-    stale: 'var(--warn)',
-    archived: 'var(--ink-4)',
-    vague: 'var(--ink-3)',
-  };
-  return map[status] ?? 'var(--ink-3)';
+function sendChatFromHeader(text: string) {
+  chatPanelRef.value?.send(text);
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────
 
-const route = useRoute();
-
 onMounted(async () => {
-  await fetchTree();
-  // Honour ?spec=<path> from MapPage so shift+click on a spec node opens
-  // it here. Only auto-select when the path actually resolves to a known
-  // spec; otherwise leave the user on the default empty pane.
-  const focusPath = typeof route.query.spec === 'string' ? route.query.spec : null;
-  if (focusPath && nodes.value.some(n => n.path === focusPath)) {
-    selectSpec(focusPath);
+  // The store needs config.workspaces[0] for the explorer/file API.
+  if (!tasks.config) await tasks.fetchConfig();
+
+  // Once mounted, re-render mermaid diagrams whenever the theme attribute
+  // flips so SVGs stay legible against the new palette.
+  watchThemeReinit();
+
+  // Spec-tree fetch + SSE live on the page, not the tree panel, because
+  // SpecTreePanel only mounts under the three-pane layout but the layout
+  // itself is gated on tree.length > 0 || treeIndex. Without an
+  // unconditional initial fetch the page would deadlock on chat-first.
+  void planning.fetchTree();
+
+  // Translate legacy hash deep-link.
+  const hashPath = readHashPath();
+  if (hashPath) {
+    history.replaceState(null, '', window.location.pathname);
+    void router.replace({ path: '/plan', query: { spec: hashPath } });
   }
-  await loadMessages();
+
+  // Honour ?spec=<path> when the tree finishes loading.
+  const focus = typeof route.query.spec === 'string' ? route.query.spec : '';
+  if (focus) {
+    const stop = watch(tree, (v) => {
+      if (v.length === 0) return;
+      if (v.find(n => n.path === focus)) {
+        planning.focusSpec(focus);
+      }
+      stop();
+    }, { immediate: true });
+  }
 });
 
-onUnmounted(() => {
-  closeStream();
+useSse({
+  url: '/api/specs/stream',
+  listeners: {
+    snapshot(data: unknown) {
+      if (data && typeof data === 'object') {
+        const d = data as {
+          nodes?: SpecNode[];
+          index?: SpecIndexMeta | null;
+          progress?: Record<string, SpecProgress>;
+        };
+        planning.applyTree({
+          nodes: d.nodes ?? [],
+          index: d.index ?? null,
+          progress: d.progress ?? {},
+        });
+      }
+    },
+    heartbeat() { /* keepalive */ },
+  },
 });
+
+// ── Keyboard shortcut: C toggles chat ─────────────────────────────
+
+function onKeydown(ev: KeyboardEvent) {
+  // Ignore when typing into a form field.
+  const t = ev.target as HTMLElement;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (ev.key === 'c' || ev.key === 'C') {
+    if (layout.value === 'chat-first') return;
+    ev.preventDefault();
+    toggleChat();
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>
 
 <template>
-  <div class="plan-page">
-    <!-- Left pane: spec tree -->
-    <aside class="tree-pane">
-      <div class="pane-header">
-        <span class="pane-title">Specs</span>
-      </div>
-      <div class="tree-body">
-        <div v-if="treeLoading" class="tree-empty">Loading...</div>
-        <div v-else-if="!nodes.length" class="tree-empty">No specs found</div>
-        <div
-          v-for="node in visibleNodes"
-          :key="node.path"
-          class="tree-row"
-          :class="{ selected: selectedPath === node.path }"
-          :style="{ paddingLeft: 12 + node.depth * 16 + 'px' }"
-          @click="selectSpec(node.path)"
-        >
-          <span
-            v-if="(node.children?.length ?? 0) > 0"
-            class="tree-chevron"
-            :class="{ open: !collapsed.has(node.path) }"
-            @click.stop="toggleCollapse(node.path)"
-          >&#9656;</span>
-          <span v-else class="tree-chevron-spacer" />
-          <span class="tree-label">{{ node.spec.title || node.path.split('/').pop() }}</span>
-          <span
-            class="tree-badge"
-            :style="{ color: statusColor(node.spec.status), borderColor: statusColor(node.spec.status) }"
-          >{{ node.spec.status }}</span>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Center pane: focused spec -->
-    <main class="spec-pane">
-      <div v-if="!selectedNode" class="spec-empty">
-        Select a spec from the tree to view its details.
-      </div>
-      <template v-else>
-        <div class="spec-header">
-          <h2 class="spec-title">{{ selectedNode.spec.title }}</h2>
-          <div class="spec-meta">
-            <span
-              class="spec-status"
-              :style="{ color: statusColor(selectedNode.spec.status), borderColor: statusColor(selectedNode.spec.status) }"
-            >{{ selectedNode.spec.status }}</span>
-            <span v-if="selectedNode.spec.effort" class="spec-effort">{{ selectedNode.spec.effort }}</span>
-            <span v-if="selectedNode.spec.author" class="spec-author">{{ selectedNode.spec.author }}</span>
-          </div>
-          <div v-if="selectedNode.spec.depends_on?.length" class="spec-deps">
-            <span class="spec-deps-label">Depends on:</span>
-            <span
-              v-for="dep in selectedNode.spec.depends_on"
-              :key="dep"
-              class="spec-dep"
-              @click="selectSpec(dep)"
-            >{{ dep.split('/').pop() }}</span>
-          </div>
-        </div>
-        <div class="spec-body">
-          <div v-if="specContentLoading" class="spec-empty">Loading content...</div>
-          <pre v-else class="spec-content">{{ specContent }}</pre>
-        </div>
-      </template>
-    </main>
-
-    <!-- Right pane: planning chat -->
-    <aside class="chat-pane">
-      <div class="pane-header">
-        <span class="pane-title">Planning Chat</span>
-      </div>
-      <div ref="messagesEl" class="chat-messages">
-        <div v-if="!messages.length" class="chat-empty">
-          No messages yet. Start a conversation about the focused spec.
-        </div>
-        <div
-          v-for="(msg, i) in messages"
-          :key="i"
-          class="chat-bubble"
-          :class="msg.role"
-        >
-          <div class="bubble-role">{{ msg.role === 'user' ? 'You' : 'Assistant' }}</div>
-          <div class="bubble-content">{{ msg.content }}</div>
-        </div>
-      </div>
-      <div class="chat-input-area">
-        <textarea
-          v-model="chatInput"
-          class="chat-input"
-          placeholder="Ask about this spec..."
-          rows="2"
-          :disabled="sending"
-          @keydown="handleKeydown"
-        />
-        <button
-          class="chat-send"
-          :disabled="!chatInput.trim() || sending"
-          @click="sendMessage"
-        >Send</button>
-      </div>
-    </aside>
+  <div class="plan-page" :data-layout="layout">
+    <SpecTreePanel v-if="layout === 'three-pane'" />
+    <SpecFocusedView
+      v-if="layout === 'three-pane'"
+      :chat-visible="effectiveChatOpen"
+      @toggle-chat="toggleChat"
+      @focus-sibling="focusSibling"
+      @send-chat="sendChatFromHeader"
+    />
+    <div
+      v-if="layout === 'three-pane' && effectiveChatOpen"
+      class="plan-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      @mousedown="startChatResize"
+    />
+    <PlanningChatPanel
+      ref="chatPanelRef"
+      :visible="effectiveChatOpen"
+      :style="layout === 'three-pane' ? { width: chatWidth + 'px' } : undefined"
+      :class="{ 'chat-first': layout === 'chat-first' }"
+      @toggle="toggleChat"
+    />
   </div>
 </template>
 
@@ -358,316 +229,30 @@ onUnmounted(() => {
   display: flex;
   height: 100%;
   overflow: hidden;
-  font-family: var(--font-sans);
-  color: var(--ink);
   background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
 }
 
-/* ── Left pane: tree ──────────────────────────── */
-
-.tree-pane {
-  width: 280px;
-  min-width: 280px;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--rule);
-  background: var(--bg-card);
-}
-
-.pane-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--rule);
-  display: flex;
-  align-items: center;
-}
-
-.pane-title {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-}
-
-.tree-body {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.tree-empty {
-  padding: 20px 14px;
-  color: var(--ink-4);
-  font-size: 12px;
-  text-align: center;
-}
-
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1.4;
-  border-bottom: 1px solid transparent;
-}
-
-.tree-row:hover {
-  background: var(--bg-hover);
-}
-
-.tree-row.selected {
-  background: var(--bg-active);
-}
-
-.tree-chevron {
-  display: inline-block;
-  width: 14px;
-  text-align: center;
-  font-size: 10px;
-  color: var(--ink-4);
-  cursor: pointer;
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
-
-.tree-chevron.open {
-  transform: rotate(90deg);
-}
-
-.tree-chevron-spacer {
-  display: inline-block;
-  width: 14px;
-  flex-shrink: 0;
-}
-
-.tree-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tree-badge {
-  flex-shrink: 0;
-  font-size: 9px;
-  font-weight: 500;
-  padding: 1px 5px;
-  border: 1px solid;
-  border-radius: 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-/* ── Center pane: spec detail ─────────────────── */
-
-.spec-pane {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.spec-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
+.plan-page[data-layout='chat-first'] {
   justify-content: center;
-  color: var(--ink-4);
-  font-size: 13px;
 }
 
-.spec-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--rule);
+.plan-page[data-layout='chat-first'] :deep(.planning-chat-panel) {
+  border-left: none;
+  width: 100%;
+  max-width: 720px;
 }
 
-.spec-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+.plan-resize-handle {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
 }
 
-.spec-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-  font-size: 11px;
-}
-
-.spec-status {
-  padding: 1px 6px;
-  border: 1px solid;
-  border-radius: 2px;
-  font-weight: 500;
-  font-size: 10px;
-  text-transform: uppercase;
-}
-
-.spec-effort {
-  color: var(--ink-3);
-  font-family: var(--font-mono);
-}
-
-.spec-author {
-  color: var(--ink-3);
-}
-
-.spec-deps {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 11px;
-  flex-wrap: wrap;
-}
-
-.spec-deps-label {
-  color: var(--ink-3);
-}
-
-.spec-dep {
-  color: var(--accent);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-
-.spec-dep:hover {
-  text-decoration: underline;
-}
-
-.spec-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-}
-
-.spec-content {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-2);
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  background: var(--bg-sunk);
-  padding: 14px;
-  border-radius: var(--r-sm);
-}
-
-/* ── Right pane: chat ─────────────────────────── */
-
-.chat-pane {
-  width: 320px;
-  min-width: 320px;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--rule);
-  background: var(--bg-card);
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chat-empty {
-  color: var(--ink-4);
-  font-size: 12px;
-  text-align: center;
-  padding: 20px 10px;
-}
-
-.chat-bubble {
-  max-width: 90%;
-  padding: 8px 12px;
-  border-radius: var(--r-sm);
-  font-size: 12px;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-.chat-bubble.user {
-  align-self: flex-end;
-  background: var(--accent);
-  color: #fff;
-}
-
-.chat-bubble.assistant {
-  align-self: flex-start;
-  background: var(--bg-sunk);
-  color: var(--ink);
-}
-
-.bubble-role {
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 2px;
-  opacity: 0.7;
-}
-
-.bubble-content {
-  white-space: pre-wrap;
-}
-
-.chat-input-area {
-  padding: 10px 12px;
-  border-top: 1px solid var(--rule);
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-}
-
-.chat-input {
-  flex: 1;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  color: var(--ink);
-  resize: none;
-  line-height: 1.4;
-}
-
-.chat-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.chat-input:disabled {
-  opacity: 0.5;
-}
-
-.chat-send {
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chat-send:hover:not(:disabled) {
-  background: var(--accent-2);
-}
-
-.chat-send:disabled {
-  opacity: 0.4;
-  cursor: default;
+.plan-resize-handle:hover {
+  background: var(--rule);
 }
 </style>
