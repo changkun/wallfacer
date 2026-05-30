@@ -136,8 +136,6 @@ React-based canvas library would be a significant architectural decision.
   type instead of a fixed panel.
 - **pixel-agents** — The office view is already a spatial metaphor. Could
   the canvas and the office view coexist or merge?
-- **intelligence-system** — Cross-task awareness and shared world model
-  could benefit from spatial visualization of agent relationships.
 
 ## Open Questions
 

@@ -79,8 +79,7 @@ Either path needs:
   incoming action against the same JWT path regular API calls go
   through. Remote-control is not a bypass.
 - An audit record of every remote action, stamped with the calling
-  principal + the source IP of the control-plane client. Hooks into
-  [`observability/audit-log.md`](../observability/audit-log.md) when that ships.
+  principal + the source IP of the control-plane client.
 
 ## What Phase 2 already delivered
 
@@ -122,6 +121,4 @@ an identity overhaul.
 ## Dependencies
 
 - Authentication Phase 2 (done): principal on every request.
-- Likely benefits from: [`audit-log.md`](../audit-log.md) for
-  per-action attribution, but can ship without it.
 - Does not gate: cloud multi-tenant or any local-track work.

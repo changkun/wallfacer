@@ -1,6 +1,6 @@
 # Specs
 
-Wallfacer roadmap. Three tracks run in parallel, connected by shared design foundations and an Oversight theme that spans both.
+Wallfacer roadmap, organized by track and connected by shared design foundations.
 Completed specs live in the [Archive](#archive) section at the bottom.
 
 ## Status Quo
@@ -29,11 +29,10 @@ Cloud Platform — integration track (consume Latere services, don't absorb)
   ○ Tenant API
   archived: Multi-Tenant, Billing Idempotency (now owned by Cella / Identity)
 
-Shared Design — 2/7 complete
+Shared Design — 2/5 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
-  ○ Overlay Snapshots              ○ Information Inbox
-  ○ Token & Cost Optimization      ○ Extensible Prompts
-  ○ Eval Pipeline & Benchmark
+  ○ Overlay Snapshots              ○ Token & Cost Optimization
+  ○ Extensible Prompts
 
 Intent — 0/3 (every action is a commit; undo and PR build on it)
   ○ Intent-Driven Commits          ○ Task Revert
@@ -44,18 +43,8 @@ Identity — 1/6 (principals, sessions, data boundaries)
   ○ Remote Control                 ○ Agent Token Exchange
   ○ Multi-User Collaboration       ○ Data Boundary Enforcement
 
-Oversight — 0/7 (layered defense & multi-agent deliberation)
-  ○ Defense in Depth (umbrella)    ○ Sandbox Hooks
-  ○ Oversight Risk Scoring         ○ Validation Barrier
-  ○ Visual Verification            ○ Multi-Agent Consensus
-  ○ Multi-Agent Debate
-
-Observability — 0/3 (system telemetry & compliance)
-  ○ Telemetry & Observability      ○ Audit Log
-  ○ Telemetry Queue Backpressure
-
-Intelligence — 0/2 (design-space: shared world model, agent memory)
-  ○ Intelligence System            ○ Agent Memory & Identity
+Oversight — 0/2 (task-level verification gates)
+  ○ Validation Barrier             ○ Visual Verification
 ```
 
 ---
@@ -175,10 +164,8 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [host-exec-mode.md](shared/host-exec-mode.md) | **Complete** | Local | `HostBackend` — opt-in `wallfacer run --backend host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. Covers both agents, live NDJSON streaming, parallel-cap default, Settings UI warning, `make build-host` target, and host-mode E2E harness. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
-| [information-inbox.md](shared/information-inbox.md) | Drafted | Both | External signal aggregation (HN, Reddit, email, GitHub, RSS), agent-assisted triage, priority inbox panel, convert-to-task workflow. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
-| [eval-pipeline.md](shared/eval-pipeline.md) | Drafted | Both | Evaluation pipeline over captured Claude Code / Codex trajectories — vendor-format normalizer, rule-based + LLM-as-judge metrics, first-party benchmark bundles, dataset export, paired comparison reports. Keeps the door open for downstream RL/RLVR without implementing it. |
 
 ### Why these are shared
 
@@ -244,82 +231,14 @@ Ship intent-commits first; revert and PR become noticeably simpler once every ac
 
 ## Oversight
 
-A layered defense stack for agent task orchestration. Defense in Depth is the umbrella composition spec; the other five are the layers it composes (hooks, risk scoring, validation gates, visual verification, multi-agent verification). Spans both local and cloud deployments — any wallfacer instance that runs agents benefits from these.
+Task-level verification gates wallfacer runs around its own agent execution.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [defense-in-depth.md](oversight/defense-in-depth.md) | Drafted | Layered oversight composition (Swiss cheese model), task-level permission modes, pre-dispatch validation, escalation cascade, unified decision audit. Umbrella over the other five. |
-| [sandbox-hooks.md](oversight/sandbox-hooks.md) | Drafted | L6 mechanism layer: Claude Code / Codex lifecycle hooks via HTTP callbacks — output compression, telemetry, stop guards, command guards. Also the delivery path for token-cost compression. |
-| [oversight-risk-scoring.md](oversight/oversight-risk-scoring.md) | Drafted | L8 real-time agent action risk assessment — classifies tool calls, feeds the escalation cascade. |
 | [validation-barrier.md](oversight/validation-barrier.md) | Drafted | Pre-execution gate: user-defined test criteria persisted on tasks for targeted post-run verification. |
 | [visual-verification.md](oversight/visual-verification.md) | Drafted | Post-execution visual check for UI changes — Playwright-based screenshot diffs. |
-| [multi-agent-consensus.md](oversight/multi-agent-consensus.md) | Drafted | L9 cross-provider adversarial verification — voting protocol, disagreement resolution. |
-| [multi-agent-debate.md](oversight/multi-agent-debate.md) | Drafted | Multi-round adversarial deliberation — conversation protocol (vs consensus voting). Use cases: ideation synthesis, telemetry signal triage. Depends on multi-agent-consensus. |
 
-### Oversight dependencies
-
-```mermaid
-graph LR
-  AA[Agent Abstraction ✅] --> MAC[Multi-Agent Consensus]
-  AA --> SH[Sandbox Hooks]
-  MAC --> MAD[Multi-Agent Debate]
-  TO[Telemetry & Observability] --> DID[Defense in Depth]
-  SH --> DID
-  ORS[Oversight Risk Scoring] --> DID
-  MAC --> DID
-  VB[Validation Barrier]
-  VV[Visual Verification]
-
-  style AA fill:#d4edda,stroke:#28a745
-```
-
----
-
-## Observability
-
-System-facing monitoring and compliance: what is the software (including wallfacer itself and its sandboxed agents) doing, and who changed what. Distinct from Oversight, which governs *agent behavior* at dispatch/execution time. Observability feeds Oversight (telemetry anomalies become fix tasks; audit records attribute oversight decisions) but the two themes have different readers and lifetimes.
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [telemetry-observability.md](observability/telemetry-observability.md) | Drafted | Runtime telemetry collection, anomaly-to-task feedback loop. Locally: ring buffer + SQLite + MCP server. Cloud: OTEL Collector + Mimir/Loki/Tempo. |
-| [audit-log.md](observability/audit-log.md) | Drafted | Cross-entity mutation history — uniform `audit.Record` write surface covering task transitions, workspace edits, config changes, admin actions; per-workspace JSONL storage; cloud-gated read API. Depends on auth Phase 2 for principal context. |
-| [telemetry-queue-backpressure.md](observability/telemetry-queue-backpressure.md) | Drafted | Cap on the local telemetry queue when the cloud is unreachable — bounded disk use, defined drop policy, keeps the local UI responsive under long outages. Implementation detail of telemetry-observability. |
-
-### Observability dependencies
-
-```mermaid
-graph LR
-  AUTH[Authentication ✅] --> AL[Audit Log]
-  TO[Telemetry & Observability] --> TQB[Telemetry Queue Backpressure]
-  TO --> DID[Defense in Depth → Oversight]
-  AL --> DID
-
-  style AUTH fill:#d4edda,stroke:#28a745
-```
-
----
-
-## Intelligence
-
-Design-space exploration: what happens when wallfacer stops being a task board and starts being an agent that composes work, remembers prior context, and shares a world model across tasks. Both specs are `vague` and speculative — held in this theme so the design space has one place, not two.
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [intelligence-system.md](intelligence/intelligence-system.md) | Vague | Design space exploration: shared world model, cross-task awareness, proactive task composition, goal-oriented groups, smarter human-in-the-loop, capability registry, context bus, failure pattern learning. The orchestration layer. |
-| [agent-memory-identity.md](intelligence/agent-memory-identity.md) | Vague | Persistent agent memory as identity construction: hierarchical workspace memory, emotional weighting via somatic markers, narrative coherence, co-emergent self-model, memory extraction and lifecycle. The substrate the intelligence system reads and writes against. |
-
-### Intelligence dependencies
-
-```mermaid
-graph LR
-  AM[Agent Memory & Identity] --> IS[Intelligence System]
-  IS -.reads.-> TO[Telemetry → Observability]
-  IS -.reads.-> MAC[Multi-Agent Consensus → Oversight]
-```
-
-Memory is the substrate; the intelligence system's shared world model reads and writes against it. Both stay vague until the primitives they sit on (telemetry signals, consensus decisions, agent abstraction) generate enough data to tell us what's actually worth orchestrating.
-
-Note: `eval-pipeline.md` remains under Shared Design — evaluation is *measurement* (post-hoc grading of trajectories), not cognition. Grouping it here would conflate two different audiences.
+Both are independent, task-scoped, and depend only on the shipped agent abstraction.
 
 ---
 
@@ -328,7 +247,7 @@ Note: `eval-pipeline.md` remains under Shared Design — evaluation is *measurem
 **Within local product:**
 - Spec coordination is in progress (document model, planning UX, and archival complete; drift detection remains).
 - Live serve is independent — start anytime.
-- Oversight (risk scoring, validation barrier, visual verification, defense-in-depth, sandbox hooks, multi-agent consensus) now lives under `specs/oversight/` as a dedicated theme — see the Oversight section.
+- Oversight is two task-scoped gates (validation barrier, visual verification) under `specs/oversight/`.
 
 **Within cloud platform:**
 - [latere-integration.md](cloud/latere-integration.md) is the umbrella — it defines each seam's contract and the consume-don't-absorb rules. Read it first.
