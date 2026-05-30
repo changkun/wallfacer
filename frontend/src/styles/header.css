@@ -1269,3 +1269,13 @@ button.sb-nav-item { appearance: none; }
 .sb-presence-item--self .sb-presence-dot { background: var(--accent); }
 .sb-presence-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
 @keyframes sb-presence-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Board "unread" dot on the sidebar nav. */
+.sb-unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
