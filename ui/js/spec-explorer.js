@@ -6,6 +6,14 @@
 var _specTreeData = null;
 var _specTreeTimer = null;
 var _specStreamHandle = null;
+// _seenSpecSnapshot becomes true after the first spec-tree snapshot of the
+// current stream. The bootstrap choreography ("Your first spec was created…")
+// must only fire on a genuine empty→non-empty transition that happens during
+// the session — never on the first snapshot, which is just the initial load
+// (or a refresh) of a workspace that may already contain specs. Without this
+// guard the toast pops up on every page refresh, because _specTreeData starts
+// null and the first non-empty snapshot looks like a transition.
+var _seenSpecSnapshot = false;
 var _specExpandedPaths = new Set(
   JSON.parse(localStorage.getItem("wallfacer-spec-expanded") || "[]"),
 );
@@ -183,6 +191,9 @@ function _stopSpecTreePoll() {
 
 function _startSpecTreeStream() {
   _stopSpecTreeStream();
+  // Reset the baseline so the first snapshot of this fresh stream (e.g. after
+  // a workspace switch) is treated as the initial load, not a transition.
+  _seenSpecSnapshot = false;
   if (!Routes || !Routes.specs || !Routes.specs.stream) return;
 
   _specStreamHandle = createSSEStream({
@@ -192,11 +203,16 @@ function _startSpecTreeStream() {
         try {
           // Capture the pre-update state so we can detect the
           // chat-first → three-pane transition that triggers the
-          // first-spec bootstrap choreography.
+          // first-spec bootstrap choreography. Gate on _seenSpecSnapshot so
+          // the very first snapshot of the stream (initial load / refresh) is
+          // treated as the baseline and never fires the toast — only a real
+          // empty→non-empty transition during the session counts.
           var prevEmpty =
-            !_specTreeData ||
-            (!(_specTreeData.nodes && _specTreeData.nodes.length > 0) &&
-              !_specTreeData.index);
+            _seenSpecSnapshot &&
+            (!_specTreeData ||
+              (!(_specTreeData.nodes && _specTreeData.nodes.length > 0) &&
+                !_specTreeData.index));
+          _seenSpecSnapshot = true;
 
           _specTreeData = JSON.parse(e.data);
           _syncSpecModeState(_specTreeData);
