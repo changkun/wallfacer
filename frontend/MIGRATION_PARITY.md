@@ -128,7 +128,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | depgraph.js | DONE | MapPage.vue (vendored) | runs legacy module via shims |
 | unified-graph.js | DONE | MapPage.vue (vendored) | spec+task merge, archived filter, layout cache |
 | planning-chat.js | PARTIAL | PlanningChatPanel.vue, stores/planning.ts | slash/mention autocomplete robustness, focus restore, revert/stash edge cases |
-| spec-mode.js | PARTIAL | PlanningPage.vue, SpecFocusedView.vue | dispatch button flow + tree refresh + toast, archive/unarchive toast w/ undo |
+| spec-mode.js | DONE | PlanPage.vue, SpecFocusedView.vue | three-pane layout, dispatch flow + **View-on-Board toast**, archive/unarchive **undo toast** (already present), hash deep-link, chat toggle |
 | dispatch-toast.js | DONE | stores/toast.ts + Toaster.vue + SpecFocusedView | toast system (tested) used for archive undo **and spec dispatch-complete "View on Board →"** |
 
 ### Settings/config (envconfig, system-prompts, instructions, templates, images)
@@ -253,6 +253,8 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
   Verified on the completed task. modal-oversight DONE.
 - 2026-05-30: **Feedback @-mention** — wired `useMentions` into TaskDetail
   feedback textarea (same tested composable as composer). mention.js DONE.
+- 2026-05-30: Confirmed spec **archive/unarchive undo toast** already implemented
+  in SpecFocusedView; with the dispatch toast, spec-mode.js is DONE.
 - 2026-05-30: **Spec dispatch toast** — focused-view dispatch shows a "View on
   Board →" success toast. dispatch-toast DONE.
 - 2026-05-30: **Board unread dot** — sidebar Board nav lights when new tasks
