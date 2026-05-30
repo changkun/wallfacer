@@ -217,6 +217,8 @@ Routine cards are filtered out of auto-promote, auto-refine, and the dependency 
 
 **Cascading cancel on routine cleanup.** Cancelling or archiving a routine card cascades to its spawned instance tasks: any still-live children (backlog, in_progress, waiting) are cancelled automatically so they don't linger on the board. Terminal children (done, failed, cancelled) are left alone so you can review their results and archive them yourself. Instance tasks are identified by the `spawned-by:<routine-id>` tag the runner writes on spawn.
 
+Cancelling or archiving a routine card also **clears its enabled flag** and drops its scheduler timer, so the card's enabled state stays consistent with its status — a cancelled routine no longer shows as enabled in the routines list, and cannot silently resume firing if its status is later moved back to an active lane (you would re-enable it deliberately). This differs from a routine that merely *lands* in Done/Failed: those keep their enabled flag so moving the card back to Backlog re-arms the schedule.
+
 ### Prompt Templates
 
 Save reusable prompt patterns so you do not have to retype common instructions:
