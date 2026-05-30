@@ -366,6 +366,17 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// cancelled) are left alone so the user can still review results.
 	if task.IsRoutine() {
 		h.cascadeCancelRoutineChildren(r.Context(), id)
+		// Cancelling a routine card means "stop this routine for good". Clear
+		// RoutineEnabled and drop its engine timer so the enabled flag stays
+		// consistent with the cancelled status. Otherwise the card lingers in
+		// the routines list still flagged enabled, and would silently resume
+		// spawning instances if its status were ever moved back to an active
+		// lane (Done/Failed routines intentionally keep their flag so a move
+		// back to Backlog re-arms them; an explicit Cancel does not).
+		if err := h.store.UpdateRoutineEnabled(r.Context(), id, false); err != nil {
+			logger.Handler.Warn("cancel routine: clear enabled", "routine", id, "error", err)
+		}
+		h.unregisterRoutine(id)
 	}
 
 	// If this is the last live instance spawned by a routine, disable the
@@ -585,9 +596,14 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		"trigger": string(store.TriggerUser),
 	})
 	// Archiving a routine card should also stop any still-live spawned
-	// instances that were enqueued before the unregister.
+	// instances that were enqueued before the unregister, and clear the
+	// enabled flag so the put-away routine can never resume firing.
 	if task.IsRoutine() {
 		h.cascadeCancelRoutineChildren(r.Context(), id)
+		if err := h.store.UpdateRoutineEnabled(r.Context(), id, false); err != nil {
+			logger.Handler.Warn("archive routine: clear enabled", "routine", id, "error", err)
+		}
+		h.unregisterRoutine(id)
 	}
 	h.cascadeArchiveThreadsForTask(id.String())
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "archived"})
