@@ -7,10 +7,18 @@ import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import SearchBar from '../components/SearchBar.vue';
+import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
 const selectedTask = ref<Task | null>(null);
+
+const backlogSortMode = ref<BacklogSortMode>(loadBacklogSortMode());
+const displayedBacklog = computed(() => sortBacklog(store.backlog, backlogSortMode.value));
+function toggleBacklogSort() {
+  backlogSortMode.value = backlogSortMode.value === 'impact' ? 'manual' : 'impact';
+  saveBacklogSortMode(backlogSortMode.value);
+}
 
 const doneCost = computed(() =>
   store.done.reduce((sum, t) => sum + (t.usage?.cost_usd || 0), 0),
@@ -113,13 +121,28 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-dot" aria-hidden="true" />
         <span class="col-name">Backlog</span>
         <span class="col-count">{{ store.backlog.length }}</span>
-        <span class="col-btn" title="Backlog sort order">Sort: Manual</span>
+        <button
+          type="button"
+          class="col-btn"
+          title="Toggle backlog sort order"
+          @click="toggleBacklogSort"
+        >Sort: {{ backlogSortMode === 'impact' ? 'Impact' : 'Manual' }}</button>
       </div>
       <div class="column col-bg">
         <TaskComposer />
-        <draggable :list="store.backlog" group="board" item-key="id" class="col-list" :animation="150" @change="onBacklogChange">
-          <template #item="{ element }">
-            <TaskCard :task="element" @click="selectTask(element)" />
+        <draggable
+          :list="displayedBacklog"
+          :group="{ name: 'board', pull: true, put: false }"
+          item-key="id"
+          class="col-list"
+          :animation="150"
+          :sort="backlogSortMode !== 'impact'"
+          ghost-class="card-drag-ghost"
+          chosen-class="card-drag-chosen"
+          @change="onBacklogChange"
+        >
+          <template #item="{ element, index }">
+            <TaskCard :task="element" :rank="backlogSortMode === 'impact' ? undefined : index + 1" @click="selectTask(element)" />
           </template>
         </draggable>
       </div>
@@ -139,7 +162,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         </span>
       </div>
       <div class="column col-bg">
-        <draggable :list="store.inProgress" group="board" item-key="id" class="col-list" :animation="150" :sort="false" @change="onInProgressAdd">
+        <draggable :list="store.inProgress" :group="{ name: 'board', pull: false, put: true }" item-key="id" class="col-list" :animation="150" :sort="false" @change="onInProgressAdd">
           <template #item="{ element }">
             <TaskCard :task="element" @click="selectTask(element)" />
           </template>

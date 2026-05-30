@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
+import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 
-const props = defineProps<{ task: Task }>();
+const props = defineProps<{ task: Task; rank?: number }>();
 
 const ROUTINE_INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
 const ROUTINE_STOPPED_STATUSES = new Set(['cancelled', 'done', 'failed']);
@@ -214,19 +216,23 @@ const showResultPreview = computed(() => {
   return true;
 });
 
-async function startTask(e: Event) {
-  e.stopPropagation();
-  await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'in_progress' });
-}
+const cardActions = computed(() =>
+  cardActionsFor(props.task).map((id) => CARD_ACTION_DEFS[id]),
+);
 
-async function retryTask(e: Event) {
-  e.stopPropagation();
-  await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'backlog' });
-}
+const router = useRouter();
 
-async function doneTask(e: Event) {
+async function runCardAction(action: CardAction, e: Event) {
   e.stopPropagation();
-  await api('POST', `/api/tasks/${props.task.id}/done`);
+  const id = props.task.id;
+  switch (action) {
+    case 'plan': router.push({ path: '/plan', query: { task: id } }); break;
+    case 'start': await api('PATCH', `/api/tasks/${id}`, { status: 'in_progress' }); break;
+    case 'retry': await api('PATCH', `/api/tasks/${id}`, { status: 'backlog' }); break;
+    case 'done': await api('POST', `/api/tasks/${id}/done`); break;
+    case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
+    case 'test': await api('POST', `/api/tasks/${id}/test`); break;
+  }
 }
 </script>
 
@@ -235,6 +241,7 @@ async function doneTask(e: Event) {
     <!-- Row 1: status badge + meta-right (sandbox, timeout, time) -->
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
+        <span v-if="props.rank" class="card-rank" title="Backlog position">#{{ props.rank }}</span>
         <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
         <span v-if="showSpinner(props.task)" class="spinner"></span>
         <span
@@ -356,13 +363,15 @@ async function doneTask(e: Event) {
     </div>
 
     <!-- Row 8b: action buttons (non-routine) -->
-    <div
-      v-else-if="!props.task.archived && (props.task.status === 'backlog' || props.task.status === 'waiting' || props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done')"
-      class="card-actions"
-    >
-      <button v-if="props.task.status === 'backlog'" class="card-action-btn card-action-start" @click="startTask">&#9654; Start</button>
-      <button v-if="props.task.status === 'waiting'" class="card-action-btn card-action-done" @click="doneTask">&#10003; Done</button>
-      <button v-if="props.task.status === 'failed' || props.task.status === 'cancelled' || props.task.status === 'done'" class="card-action-btn card-action-retry" @click="retryTask">&#8617; Retry</button>
+    <div v-else-if="cardActions.length" class="card-actions">
+      <button
+        v-for="a in cardActions"
+        :key="a.id"
+        type="button"
+        :class="['card-action-btn', a.cls]"
+        :title="a.title"
+        @click="(e) => runCardAction(a.id, e)"
+      >{{ a.icon }} {{ a.label }}</button>
     </div>
   </div>
 </template>

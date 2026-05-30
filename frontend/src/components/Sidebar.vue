@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
 import { useUiStore } from '../stores/ui';
+import { derivePresence } from '../lib/presence';
 
 const route = useRoute();
 const store = useTaskStore();
@@ -14,6 +15,8 @@ const props = defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: [] }>();
 
 const cloudMode = computed(() => store.config?.cloud_mode === true);
+
+const presence = computed(() => derivePresence(store.inProgress, auth.me));
 
 const activeWorkspaceLabel = computed(() => {
   const ws = store.config?.workspaces;
@@ -156,6 +159,16 @@ onMounted(() => {
         <span>Flows</span>
       </router-link>
 
+      <router-link to="/routines" class="sb-nav-item" :class="{ active: route.path === '/routines' }" title="Scheduled routines">
+        <span class="sb-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <polyline points="12 7 12 12 15 14"></polyline>
+          </svg>
+        </span>
+        <span>Routines</span>
+      </router-link>
+
       <router-link to="/map" class="sb-nav-item" :class="{ active: route.path === '/map' }" title="Dependency map">
         <span class="sb-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -201,6 +214,21 @@ onMounted(() => {
     </div>
 
     <div class="sb-spacer"></div>
+
+    <!-- Presence: one entry per running agent + the signed-in user -->
+    <div v-if="!collapsed && presence.length" class="sb-presence">
+      <div class="sb-presence-label">Presence</div>
+      <div
+        v-for="p in presence"
+        :key="p.id"
+        class="sb-presence-item"
+        :class="'sb-presence-item--' + p.kind"
+        :title="p.kind === 'agent' ? 'Running agent' : 'You'"
+      >
+        <span class="sb-presence-dot" aria-hidden="true" />
+        <span class="sb-presence-name">{{ p.label }}</span>
+      </div>
+    </div>
 
     <!-- Bottom nav: Docs, Settings, optional account chip -->
     <div class="sb-divider"></div>

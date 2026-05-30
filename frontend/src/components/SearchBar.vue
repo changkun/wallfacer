@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 
 const store = useTaskStore();
+const ui = useUiStore();
 const query = ref('');
+const inputRef = ref<HTMLInputElement | null>(null);
 
 watch(query, (q) => {
-  store.filterQuery = q.trim().toLowerCase();
+  const trimmed = q.trim();
+  // "@<query>" hands off to the command palette's server-backed search.
+  if (trimmed.startsWith('@') && trimmed.length > 1) {
+    ui.openPaletteWith(trimmed.slice(1));
+    query.value = '';
+    store.filterQuery = '';
+    return;
+  }
+  store.filterQuery = trimmed.toLowerCase();
 });
 
 function onKeydown(e: KeyboardEvent) {
@@ -19,6 +30,19 @@ function onKeydown(e: KeyboardEvent) {
 function clearQuery() {
   query.value = '';
 }
+
+// Global "/" focuses the filter (unless already typing in a field).
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const el = document.activeElement as HTMLElement | null;
+  const tag = (el?.tagName || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
+  e.preventDefault();
+  inputRef.value?.focus();
+}
+
+onMounted(() => document.addEventListener('keydown', onGlobalKeydown));
+onUnmounted(() => document.removeEventListener('keydown', onGlobalKeydown));
 </script>
 
 <template>
@@ -39,10 +63,11 @@ function clearQuery() {
       </svg>
     </span>
     <input
+      ref="inputRef"
       v-model="query"
       type="search"
       class="task-search-input"
-      placeholder="Filter tasks… or @search server"
+      placeholder="Filter tasks… (/ to focus, @ to search server)"
       autocomplete="off"
       @keydown="onKeydown"
     />

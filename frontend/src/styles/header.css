@@ -1253,3 +1253,19 @@ button.sb-nav-item { appearance: none; }
   padding: 6px 0;
   gap: 0;
 }
+
+/* Sidebar presence (running agents + signed-in user). */
+.sb-presence { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 4px; }
+.sb-presence-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.sb-presence-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); }
+.sb-presence-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex: 0 0 auto; }
+.sb-presence-item--agent .sb-presence-dot { background: var(--ok); animation: sb-presence-pulse 1.6s infinite; }
+.sb-presence-item--self .sb-presence-dot { background: var(--accent); }
+.sb-presence-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+@keyframes sb-presence-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
