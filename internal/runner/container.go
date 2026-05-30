@@ -430,14 +430,50 @@ const sandboxEntrypoint = "/usr/local/bin/entrypoint.sh"
 //
 // Callers set Labels, additional Volumes (workspace directories, instructions
 // file, board context), WorkDir, and Cmd for their specific needs.
+// resolveEnvFile returns the env-file path to hand the sandbox backend,
+// guarding against a configured path that has vanished by launch time.
+//
+// The configured envFile may be overridden (via ENV_FILE / --env-file) to a
+// transient location — most notably a mktemp path under /var/folders that
+// macOS's periodic tmp-reaper purges after ~3 idle days. A long-idle scheduled
+// task that fires after that window would otherwise hand podman a dead
+// --env-file path and die with an opaque exit 125. When the configured path is
+// missing but the canonical default (<configDir>/.env) exists, fall back to it.
+//
+// The fallback only *redirects* to a known-good default; it never silently
+// suppresses a configured path, so an unrelated missing env file still reaches
+// the backend unchanged (preserving prior pass-through behaviour and letting
+// the backend surface its own diagnostic). Returns "" only when envFile itself
+// is empty.
+func (r *Runner) resolveEnvFile() string {
+	if r.envFile == "" {
+		return ""
+	}
+	if fileExists(r.envFile) {
+		return r.envFile
+	}
+	if r.defaultEnvFile != "" && r.defaultEnvFile != r.envFile && fileExists(r.defaultEnvFile) {
+		logger.Runner.Warn("configured env file missing; falling back to default",
+			"configured", r.envFile, "fallback", r.defaultEnvFile)
+		return r.defaultEnvFile
+	}
+	return r.envFile
+}
+
+// fileExists reports whether path names an existing regular (non-directory) file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.Type) sandbox.ContainerSpec {
 	spec := sandbox.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
 		Image:   strings.TrimSpace(r.sandboxImage),
 	}
-	if r.envFile != "" {
-		spec.EnvFile = r.envFile
+	if envFile := r.resolveEnvFile(); envFile != "" {
+		spec.EnvFile = envFile
 	}
 	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
 	if model != "" {

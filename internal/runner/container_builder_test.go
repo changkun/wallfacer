@@ -185,6 +185,96 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 	}
 }
 
+// TestResolveEnvFileFallback covers the env-file resolution guard that keeps
+// long-idle scheduled tasks alive when the configured env file path has
+// vanished by launch time (e.g. a mktemp ENV_FILE under /var/folders that
+// macOS's tmp-reaper purges after a few idle days). Without the fallback,
+// buildBaseContainerSpec hands podman a dead --env-file path and the task dies
+// with an opaque exit 125.
+func TestResolveEnvFileFallback(t *testing.T) {
+	// A real, on-disk default config env file (the survivor).
+	defaultEnv := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(defaultEnv, []byte("CLAUDE_CODE_OAUTH_TOKEN=tok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A configured override path that exists now but is removed below to
+	// simulate the tmp-reaper deleting it out from under a running server.
+	reaped := filepath.Join(t.TempDir(), "tmp.reaped")
+	if err := os.WriteFile(reaped, []byte("X=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A path that never exists (neither configured nor default usable).
+	gone := filepath.Join(t.TempDir(), "gone.env")
+
+	tests := []struct {
+		name       string
+		envFile    string
+		defaultEnv string
+		setup      func()
+		want       string
+	}{
+		{
+			name:       "configured missing, default present -> falls back to default",
+			envFile:    reaped,
+			defaultEnv: defaultEnv,
+			setup:      func() { _ = os.Remove(reaped) },
+			want:       defaultEnv,
+		},
+		{
+			name:       "configured present -> used verbatim, default ignored",
+			envFile:    defaultEnv,
+			defaultEnv: filepath.Join(t.TempDir(), "other.env"),
+			want:       defaultEnv,
+		},
+		{
+			name:       "configured missing, no usable default -> passes through unchanged",
+			envFile:    gone,
+			defaultEnv: "",
+			want:       gone,
+		},
+		{
+			name:       "empty config -> empty (no --env-file)",
+			envFile:    "",
+			defaultEnv: defaultEnv,
+			want:       "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setup != nil {
+				tc.setup()
+			}
+			r := newRunnerForArgTest(t, RunnerConfig{
+				Command:        "podman",
+				SandboxImage:   "sandbox-agents:latest",
+				EnvFile:        tc.envFile,
+				DefaultEnvFile: tc.defaultEnv,
+			})
+
+			if got := r.resolveEnvFile(); got != tc.want {
+				t.Errorf("resolveEnvFile() = %q; want %q", got, tc.want)
+			}
+
+			// The spec built for every activity must carry the resolved path.
+			spec := r.buildBaseContainerSpec("c-test", "", "claude")
+			if spec.EnvFile != tc.want {
+				t.Errorf("spec.EnvFile = %q; want %q", spec.EnvFile, tc.want)
+			}
+			args := spec.Build()
+			if tc.want == "" {
+				if argsContainSubstring(args, "--env-file") {
+					t.Errorf("expected no --env-file; args: %v", args)
+				}
+			} else if !containsConsecutive(args, "--env-file", tc.want) {
+				t.Errorf("expected --env-file %q; args: %v", tc.want, args)
+			}
+		})
+	}
+}
+
 // TestBuildBaseContainerSpecClaudeVsCodexAgentEnv verifies that both
 // claude and codex sandboxes share the unified sandbox-agents image and
 // differ only in the WALLFACER_AGENT env var that the entrypoint reads
