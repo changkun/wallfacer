@@ -6,7 +6,7 @@
   "description": "wf.latere.ai website SPA",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite-ssg build",
+    "build": "vue-tsc --noEmit && vite-ssg build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run"
