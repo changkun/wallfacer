@@ -1,6 +1,6 @@
 ---
 title: Billing Idempotency
-status: drafted
+status: archived
 depends_on:
   - specs/cloud/cloud-infrastructure.md
   - specs/identity/authentication.md
@@ -9,12 +9,26 @@ affects:
   - internal/cloud/
 effort: small
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-05-30
 author: changkun
 dispatched_task_id: null
 ---
 
 # Billing Idempotency
+
+> **Archived 2026-05-30 — billing is owned by Identity (auth), not wallfacer.**
+>
+> This spec proposed that wallfacer call Stripe directly with idempotency keys.
+> Stripe integration, charge/subscription mechanics, and idempotency now live in
+> the **Identity service** (`latere.ai/x/auth`), which already ships a Stripe
+> billing integration. Wallfacer does not hold payment credentials or call
+> Stripe; in cloud mode it consumes billing/subscription state from Identity.
+>
+> Per the product boundary (`latere.ai/specs/products/wallfacer.md`), wallfacer's
+> only remaining billing surface is an optional **subscription/usage UX** "if
+> payment is introduced" — a thin read-only view over Identity's billing state,
+> to be specced when that feature is actually scheduled. The charge-idempotency
+> mechanism in this spec is no longer wallfacer's concern. Retained for context.
 
 ## Problem
 
