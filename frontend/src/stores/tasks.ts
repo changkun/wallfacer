@@ -80,10 +80,23 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function createTask(prompt: string, opts?: { flow?: string; timeout?: number; tags?: string[] }) {
+  async function createTask(
+    prompt: string,
+    opts?: {
+      flow?: string;
+      timeout?: number;
+      tags?: string[];
+      model?: string;
+      maxCostUsd?: number;
+      maxInputTokens?: number;
+    },
+  ) {
     const body: Record<string, unknown> = { prompt, timeout: opts?.timeout ?? 900 };
     if (opts?.flow) body.flow = opts.flow;
     if (opts?.tags?.length) body.tags = opts.tags;
+    if (opts?.model) body.model = opts.model;
+    if (opts?.maxCostUsd && opts.maxCostUsd > 0) body.max_cost_usd = opts.maxCostUsd;
+    if (opts?.maxInputTokens && opts.maxInputTokens > 0) body.max_input_tokens = opts.maxInputTokens;
     return api<Task>('POST', '/api/tasks', body);
   }
 

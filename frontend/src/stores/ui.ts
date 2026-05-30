@@ -32,7 +32,9 @@ export const useUiStore = defineStore('ui', () => {
   function closeSettings() { showSettings.value = false; }
   function openWorkspaces() { showWorkspaces.value = true; }
   function closeWorkspaces() { showWorkspaces.value = false; }
+  const paletteSeed = ref('');
   function openPalette() { showPalette.value = true; }
+  function openPaletteWith(seed: string) { paletteSeed.value = seed; showPalette.value = true; }
   function closePalette() { showPalette.value = false; }
   function openContainers() { showContainers.value = true; }
   function closeContainers() { showContainers.value = false; }
@@ -52,9 +54,10 @@ export const useUiStore = defineStore('ui', () => {
     showSettings, showWorkspaces, showPalette, showContainers,
     showInstructions, showSystemPrompts, showTemplates, showTerminal,
     showShortcuts, showArchived, setShowArchived,
+    paletteSeed,
     openSettings, closeSettings,
     openWorkspaces, closeWorkspaces,
-    openPalette, closePalette,
+    openPalette, openPaletteWith, closePalette,
     openContainers, closeContainers,
     openInstructions, closeInstructions,
     openSystemPrompts, closeSystemPrompts,
