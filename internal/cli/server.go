@@ -197,6 +197,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		Command:          cfg.ContainerCmd,
 		SandboxImage:     resolvedImage,
 		EnvFile:          cfg.EnvFile,
+		DefaultEnvFile:   filepath.Join(configDir, ".env"),
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
 		TmpDir:           tmpDir,

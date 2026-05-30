@@ -74,9 +74,16 @@ func (r *Runner) TaskLogReader(taskID uuid.UUID) *LiveLogReader {
 //
 //nolint:revive // name stutters but renaming would be too invasive
 type RunnerConfig struct {
-	Command          string
-	SandboxImage     string
-	EnvFile          string
+	Command      string
+	SandboxImage string
+	EnvFile      string
+	// DefaultEnvFile is the canonical config env file (typically
+	// <configDir>/.env). It is used as a fallback when EnvFile is set to an
+	// override path that has gone missing at container-launch time — e.g. a
+	// mktemp path under /var/folders that macOS's tmp-reaper purges after a few
+	// idle days, which otherwise kills long-idle scheduled tasks with an opaque
+	// podman "--env-file ... no such file" exit 125. Empty disables the fallback.
+	DefaultEnvFile   string
 	Workspaces       []string // workspace directory paths
 	WorktreesDir     string
 	InstructionsPath string
@@ -140,6 +147,7 @@ type Runner struct {
 	command                string
 	sandboxImage           string
 	envFile                string
+	defaultEnvFile         string // fallback env file when envFile goes missing (see RunnerConfig.DefaultEnvFile)
 	workspaces             []string
 	worktreesDir           string
 	tmpDir                 string
@@ -424,6 +432,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		command:          cfg.Command,
 		sandboxImage:     cfg.SandboxImage,
 		envFile:          cfg.EnvFile,
+		defaultEnvFile:   cfg.DefaultEnvFile,
 		workspaces:       cfg.Workspaces,
 		worktreesDir:     cfg.WorktreesDir,
 		tmpDir:           cfg.TmpDir,
