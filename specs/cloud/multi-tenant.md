@@ -1,18 +1,47 @@
 ---
 title: Cloud Multi-Tenant
-status: drafted
+status: archived
 depends_on:
   - specs/cloud/cloud-infrastructure.md
   - specs/identity/authentication.md
 affects: [internal/handler/, internal/runner/, internal/store/]
 effort: xlarge
 created: 2026-03-23
-updated: 2026-04-12
+updated: 2026-05-30
 author: changkun
 dispatched_task_id: null
 ---
 
 # Cloud Multi-Tenant
+
+> **Archived 2026-05-30 — superseded by the Latere platform boundary.**
+>
+> This spec proposed that wallfacer build its own control plane, per-user
+> instance provisioner, traffic router, hibernation logic, and a
+> policy-controlled sandbox model. The Latere platform now owns every one of
+> those concerns:
+>
+> - **Per-instance runtime, provisioning, warm pools, hibernation, egress
+>   policy** → owned by **Cella** (`latere.ai/sandbox`, cella.latere.ai).
+>   Wallfacer consumes it through the runtime integration seam — see
+>   [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md).
+> - **Cluster, routing, DNS/TLS, node pools** → owned by **terraform** (DOKS).
+>   Wallfacer needs only a thin deploy module — see
+>   [cloud-infrastructure.md](cloud-infrastructure.md).
+> - **Identity / org isolation** → already shipped via Identity Phase 2
+>   (`internal/auth`, `store.Principal{Sub,OrgID}`, org-scoped task filtering).
+> - **Org/team scoping within a shared instance** (the part still genuinely
+>   wallfacer's) → tracked under
+>   [identity/multi-user-collaboration.md](../identity/multi-user-collaboration.md),
+>   not here.
+>
+> The product north star (`latere.ai/specs/products/wallfacer.md`) is explicit:
+> wallfacer is the control plane for autonomous engineering and should
+> **consume** Latere services rather than absorb them; cloud v1 is metadata
+> coordination, not per-tenant instance hosting. The "one wallfacer process per
+> user, provisioned on login" model in this spec is no longer the plan. Retained
+> for historical context. See [latere-integration.md](latere-integration.md) for
+> the current integration approach.
 
 ## Problem
 

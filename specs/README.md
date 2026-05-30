@@ -23,10 +23,11 @@ Local Product — 8 done, 1 in progress, 12 pending
   ○ Rebrand Module Path            ○ Spatial Canvas
   ○ Scoped Command Registry
 
-Cloud Platform — 0/5
-  ○ Tenant Filesystem              ○ Cloud Infrastructure
-  ○ Multi-Tenant (capstone)        ○ Tenant API
-  ○ Billing Idempotency
+Cloud Platform — integration track (consume Latere services, don't absorb)
+  ○ Latere Integration (umbrella)  ○ Runtime → Cella
+  ○ Tenant Filesystem → FS         ○ Cloud Infrastructure
+  ○ Tenant API
+  archived: Multi-Tenant, Billing Idempotency (now owned by Cella / Identity)
 
 Shared Design — 2/7 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
@@ -122,32 +123,33 @@ graph LR
 
 ## Cloud Platform
 
-Multi-tenant hosted service. Builds on storage interfaces and the external sandbox runtime (`latere.ai/sandbox` repo — K8s orchestration, warm pool, egress policies, hardening, native-OS backends).
+Integration track. Wallfacer is the autonomous-engineering control plane; in cloud mode it **consumes** Latere platform services rather than absorbing them (`latere.ai/specs/products/wallfacer.md`). Each integration is a thin client over a service boundary (Identity, Cella, FS), config-gated so local mode is unchanged. The earlier "build our own control plane / instance provisioner / Stripe" specs are archived — Cella and Identity own those concerns now.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | fs.latere.ai integration, repo provisioner, workspace group cloud mapping |
-| [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | K8s manifests for latere.ai cluster deployment (DO) |
-| [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning, policy-controlled sandbox model |
-| [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
-| [billing-idempotency.md](cloud/billing-idempotency.md) | Drafted | Stripe idempotency keys on every charge operation — prevents double-billing under retry, single-charge guarantee for cost-visibility trust story |
+| [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the integration seams (Identity ✅, Runtime→Cella, FS, deploy, Lux, MCP, metadata) and the consume-don't-absorb rules |
+| ↳ [latere-integration/cella-runtime.md](cloud/latere-integration/cella-runtime.md) | Drafted | `CellaBackend` implementing `sandbox.Backend` — a third runtime alongside Local (podman/docker) and Host, selected by `--backend cella`. Maps `ContainerSpec` onto Cella's `/v1/sandboxes` API; worktree transport via FS |
+| [tenant-filesystem.md](cloud/tenant-filesystem.md) | Drafted | fs.latere.ai integration, repo provisioner, workspace cloud mapping. **Blocked on FS Workspace API (Phase 5)** |
+| [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Drafted | Thin deploy module into the existing DOKS `latere` namespace + `pkg/otel` OTLP emit |
+| [tenant-api.md](cloud/tenant-api.md) | Drafted | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
 
 ### Cloud platform dependencies
 
 ```mermaid
 graph LR
-  FS[fs.latere.ai ext] --> TFS[Tenant FS]
-  SBX[latere.ai/sandbox ext] --> MT[Multi-Tenant]
+  AUTH[Identity → Authentication ✅] --> LI[Latere Integration]
+  LI --> CR[Runtime → Cella]
+  LI --> TFS[Tenant FS]
+  LI --> CI[Cloud Infrastructure]
+  LI --> TA[Tenant API]
+  SBX[Cella ext] --> CR
+  FS[fs.latere.ai ext] --> TFS
+  SBI[Sandbox Interface ✅] --> CR
   STI[Storage Interface ✅] --> TFS
-  STI --> CS[Cloud Storage]
-  CS --> MT
-  AUTH[Identity → Authentication ✅] --> MT
-  MUC[Identity → Multi-User Collab] --> MT
-  CI[Cloud Infrastructure] --> MT
-  MT --> TA[Tenant API]
 
-  style STI fill:#d4edda,stroke:#28a745
   style AUTH fill:#d4edda,stroke:#28a745
+  style SBI fill:#d4edda,stroke:#28a745
+  style STI fill:#d4edda,stroke:#28a745
   style FS fill:#e8daef,stroke:#8e44ad
   style SBX fill:#e8daef,stroke:#8e44ad
 ```
@@ -157,10 +159,10 @@ graph LR
 Three modes, auth is opt-in at every mode (see [authentication.md](identity/authentication.md)):
 
 1. **Local anonymous (today):** Wallfacer runs on the user's machine, no auth. Filesystem storage, local containers.
-2. **Local authenticated:** Same binary, signed in to latere.ai. Enables the remote-control placeholder (auth spec) — no other changes.
-3. **Cloud hosted:** Wallfacer runs in latere.ai's K8s cluster. Each user gets a dedicated pod + fs.latere.ai workspace; task containers dispatch as K8s Jobs. See [multi-tenant.md](cloud/multi-tenant.md) and [cloud-infrastructure.md](cloud/cloud-infrastructure.md) for cost estimates.
+2. **Local authenticated:** Same binary, signed in to latere.ai. Adds account linkage and (later) cloud metadata coordination — code stays local, execution stays local.
+3. **Cloud execution (Phase 3+, gated by demand):** Task runtimes dispatch to **Cella** via the runtime seam ([cella-runtime.md](cloud/latere-integration/cella-runtime.md)); workspace files stage through **FS**. Wallfacer asks "run this bounded task"; Cella owns scheduling, warm pools, and hardening.
 
-Why no VM-per-tenant intermediate? The wallfacer binary is identical in all three modes. Building a VM provisioner then replacing it with K8s is wasted work.
+Why no wallfacer-owned K8s control plane? Cella already owns sandbox runtime, lifecycle, quota, and audit. Wallfacer consuming Cella's `Runtime` interface avoids duplicating an entire platform — see [latere-integration.md](cloud/latere-integration.md).
 
 ---
 
@@ -208,13 +210,13 @@ graph LR
   AUTH --> ATE[Agent Token Exchange]
   AUTH --> MUC[Multi-User Collaboration]
   AUTH --> DBE[Data Boundary Enforcement]
-  MUC --> MT[Multi-Tenant → Cloud]
+  MUC --> CH[Cloud team hosting]
   DBE --> TO[Telemetry → Observability]
 
   style AUTH fill:#d4edda,stroke:#28a745
 ```
 
-Multi-user collaboration is the gate for cloud multi-tenant; data-boundary-enforcement is the gate for anything the local instance sends up to observability / cloud.
+Multi-user collaboration is the gate for cloud *team* hosting (org-scoped shared boards); data-boundary-enforcement is the gate for anything the local instance sends up to observability / cloud.
 
 ---
 
@@ -329,11 +331,11 @@ Note: `eval-pipeline.md` remains under Shared Design — evaluation is *measurem
 - Oversight (risk scoring, validation barrier, visual verification, defense-in-depth, sandbox hooks, multi-agent consensus) now lives under `specs/oversight/` as a dedicated theme — see the Oversight section.
 
 **Within cloud platform:**
-- Tenant filesystem first — integrates with fs.latere.ai for config persistence and hot tier workspace allocation. Prerequisite: fs.latere.ai Phase 5 (Workspace API).
-- K8s sandbox consumes the hot tier workspace layout from tenant FS.
-- Cloud storage (PG, S3) can run in parallel with tenant FS / K8s sandbox.
-- Cloud infrastructure (IaC) is a leaf — provisions managed services.
-- Multi-tenant is the capstone wiring everything together. Tenant API comes after.
+- [latere-integration.md](cloud/latere-integration.md) is the umbrella — it defines each seam's contract and the consume-don't-absorb rules. Read it first.
+- Runtime → Cella ([cella-runtime.md](cloud/latere-integration/cella-runtime.md)) is the lead leaf: it generalizes the existing Local/Host backend selection to a cloud runtime via the `sandbox.Backend` interface.
+- Tenant filesystem integrates with fs.latere.ai for config persistence and hot-tier workspace staging. Prerequisite: fs.latere.ai Phase 5 (Workspace API) — the cross-product critical-path blocker. The runtime leaf's worktree transport depends on it.
+- Cloud infrastructure is a thin deploy module into the existing DOKS `latere` namespace, not a from-scratch cluster design.
+- Tenant API comes last — after the runtime + FS seams exist.
 
 **Cross-track:**
 - Identity (authentication, OIDC, remote-control, agent-tokens, multi-user-collab, data-boundary) now lives in `specs/identity/` as its own theme — authentication complete; the rest unblocked by Phase 2.
@@ -342,7 +344,7 @@ Note: `eval-pipeline.md` remains under Shared Design — evaluation is *measurem
 
 **Between tracks:**
 - The two tracks are independent after shared foundations. They can run in parallel.
-- The only hard cross-track dependency: multi-tenant requires authentication.
+- The only hard cross-track dependency: the cloud integration track requires authentication (shipped).
 
 ---
 
@@ -373,3 +375,12 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 | [terminal-container-exec.md](local/terminal-container-exec.md) | Attach to running task containers from the terminal panel |
 | [oauth-token-setup.md](local/oauth-token-setup.md) | Browser-based OAuth sign-in for Claude and Codex credentials |
 | [pixel-agents.md](local/pixel-agents.md) | Pixel art office view — animated characters representing task agents |
+
+### Cloud — Archived (superseded by the Latere platform boundary)
+
+Specs proposing wallfacer build infrastructure that Latere services now own. Replaced by the integration track ([latere-integration.md](cloud/latere-integration.md)). Retained for context.
+
+| Spec | Why archived |
+|------|--------------|
+| [multi-tenant.md](cloud/multi-tenant.md) | Control plane, per-user instance provisioning, routing, and hibernation are owned by **Cella** (runtime) and **terraform** (infra); org/team scoping is Identity's. Wallfacer consumes, not builds. |
+| [billing-idempotency.md](cloud/billing-idempotency.md) | Stripe charge mechanics and idempotency are owned by **Identity** (`latere.ai/x/auth`). Wallfacer's only billing surface is an optional read-only subscription UX, to be specced if/when payment is introduced. |
