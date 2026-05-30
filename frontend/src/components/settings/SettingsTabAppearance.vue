@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { useTheme } from '../../composables/useTheme';
+import { storeToRefs } from 'pinia';
+import { usePrefsStore } from '../../stores/prefs';
 import { useUiStore } from '../../stores/ui';
 
-const { theme } = useTheme();
+const prefs = usePrefsStore();
+const { theme } = storeToRefs(prefs);
 const ui = useUiStore();
 </script>
 
