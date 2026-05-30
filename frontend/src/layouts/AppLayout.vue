@@ -11,6 +11,8 @@ import SystemPromptsManager from '../components/SystemPromptsManager.vue';
 import TemplatesManager from '../components/TemplatesManager.vue';
 import TerminalPanel from '../components/TerminalPanel.vue';
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import Toaster from '../components/Toaster.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -65,6 +67,8 @@ useKeyboard({
     <SystemPromptsManager v-model="ui.showSystemPrompts" />
     <TemplatesManager v-model="ui.showTemplates" />
     <KeyboardShortcutsModal v-model="ui.showShortcuts" />
+    <ConfirmDialog />
+    <Toaster />
   </div>
 </template>
 
