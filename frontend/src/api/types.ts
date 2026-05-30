@@ -36,6 +36,7 @@ export interface Task {
   model: string;
   kind: string;
   tags: string[];
+  impact_score?: number;
   depends_on: string[];
   failure_category: string;
   fresh_start: boolean;

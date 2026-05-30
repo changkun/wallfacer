@@ -89,6 +89,15 @@ async function createBranch() {
   }
 }
 
+async function openFolder() {
+  try {
+    await api('POST', '/api/git/open-folder', { workspace: props.workspacePath });
+    close();
+  } catch (e) {
+    window.alert('Failed to open folder: ' + (e instanceof Error ? e.message : String(e)));
+  }
+}
+
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') { e.preventDefault(); close(); return; }
   if (e.key === 'Enter') {
@@ -184,6 +193,10 @@ onUnmounted(() => document.removeEventListener('mousedown', onOutsideClick));
           >
             <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
             <span>Create branch "{{ query.trim() }}"</span>
+          </button>
+          <button type="button" class="branch-dropdown-create" @click="openFolder">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span>Open workspace folder</span>
           </button>
         </div>
       </template>

@@ -169,3 +169,21 @@
     max-height: calc(100vh - 170px);
   }
 }
+
+/* Inline per-task context actions in command palette rows. */
+.command-palette-row-actions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.command-palette-action-btn {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.command-palette-action-btn:hover { background: var(--bg-hover); }

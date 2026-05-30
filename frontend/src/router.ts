@@ -13,6 +13,7 @@ const localRoutes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/BoardPage.vue') },
   { path: '/agents', component: () => import('./views/AgentsPage.vue') },
   { path: '/flows', component: () => import('./views/FlowsPage.vue') },
+  { path: '/routines', component: () => import('./views/RoutinesPage.vue') },
   { path: '/analytics', component: () => import('./views/AnalyticsPage.vue') },
   { path: '/plan', component: () => import('./views/PlanPage.vue') },
   { path: '/explorer', component: () => import('./views/ExplorerPage.vue') },
