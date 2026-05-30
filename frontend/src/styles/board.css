@@ -881,3 +881,13 @@ select.composer__input {
 .composer__btn--primary:hover {
   filter: brightness(1.04);
 }
+
+/* Backlog position number + drag affordances. */
+.card-rank {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.card-drag-ghost { opacity: 0.4; }
+.card-drag-chosen { box-shadow: 0 0 0 2px var(--accent); }
