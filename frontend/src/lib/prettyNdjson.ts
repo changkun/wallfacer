@@ -99,7 +99,28 @@ export function parseActivity(raw: string): ActivityRow[] {
             summary: truncate(text),
             detail: text.length > MAX_SUMMARY ? text : undefined,
           });
+        } else if (block.type === 'text') {
+          const text = block.text ?? '';
+          if (text.trim()) {
+            out.push({
+              kind: 'system',
+              label: 'text',
+              summary: truncate(text),
+              detail: text.length > MAX_SUMMARY ? text : undefined,
+            });
+          }
         }
+      }
+    } else if (frame.type === 'result') {
+      const text = frame.result ?? '';
+      if (text.trim()) {
+        out.push({
+          kind: 'system',
+          label: frame.is_error ? 'error' : 'result',
+          summary: truncate(text),
+          detail: text.length > MAX_SUMMARY ? text : undefined,
+          defaultOpen: !!frame.is_error,
+        });
       }
     } else if (frame.type === 'user') {
       for (const block of blocks) {
