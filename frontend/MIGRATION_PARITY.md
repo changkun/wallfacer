@@ -101,7 +101,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | Module | Status | Vue equivalent | Missing behaviors |
 |---|---|---|---|
 | task-stream.js | DONE | useSse.ts, AppLayout.vue | snapshot/updated/deleted events covered |
-| tasks.js | PARTIAL+ | stores/tasks.ts, TaskComposer/TaskDetail | flow dropdown ✓, tags ✓, timeout ✓, **model ✓, budget (max $/tokens) ✓**. Pending: dependency picker, batch create, sandbox override, schedule, debounce save, bulk title/oversight |
+| tasks.js | PARTIAL+ | stores/tasks.ts, TaskComposer/TaskDetail | flow ✓, tags ✓, timeout ✓, model ✓, budget ✓, **dependency picker ✓**. Pending: batch create, sandbox override, schedule, debounce save, bulk title/oversight |
 | board-composer.js | MISSING | TaskComposer.vue (partial) | empty-state composer, advanced panel (timeout/templates), @-mention, create animation |
 | dnd.js | DONE | BoardPage.vue + lib/backlogSort.ts | per-column pull/put, ghost/chosen classes, backlog `#N` rank, **impact-sort toggle** (tested sortBacklog + localStorage persistence; drag-sort disabled + rank hidden in impact mode) |
 | status-bar.js | PARTIAL+ | StatusBar.vue, Sidebar.vue | **presence row added** (tested `derivePresence`: agents from in-progress + self). Pending: terminal toggle+resize, org switcher, system status |
