@@ -146,6 +146,14 @@ onMounted(async () => {
     void router.replace({ path: '/plan', query: { spec: hashPath } });
   }
 
+  // Honour ?task=<id>: open task-mode planning pinned to that task.
+  const focusTask = typeof route.query.task === 'string' ? route.query.task : '';
+  if (focusTask) {
+    if (tasks.tasks.length === 0) await tasks.fetchTasks().catch(() => {});
+    const t = tasks.tasks.find(x => x.id === focusTask);
+    void planning.openPlanForTask(focusTask, t?.title ?? '', t?.prompt ?? '');
+  }
+
   // Honour ?spec=<path> when the tree finishes loading.
   const focus = typeof route.query.spec === 'string' ? route.query.spec : '';
   if (focus) {

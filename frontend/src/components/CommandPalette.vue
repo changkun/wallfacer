@@ -3,7 +3,10 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
+import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
+import { docIndex } from '../data/docs';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
@@ -14,6 +17,7 @@ const emit = defineEmits<{
 const router = useRouter();
 const route = useRoute();
 const taskStore = useTaskStore();
+const ui = useUiStore();
 
 const query = ref('');
 const activeIndex = ref(0);
@@ -157,7 +161,8 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      query.value = '';
+      query.value = ui.paletteSeed || '';
+      ui.paletteSeed = '';
       remoteResults.value = [];
       activeIndex.value = 0;
       nextTick(() => inputRef.value?.focus());
@@ -215,6 +220,33 @@ function pick(task: Task) {
     router.push({ path: '/', query: { task: task.id } });
   } else if (route.query.task !== task.id) {
     router.replace({ path: '/', query: { ...route.query, task: task.id } });
+  }
+  close();
+}
+
+const docMatches = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  if (!q) return [];
+  return docIndex.filter((d) => d.title.toLowerCase().includes(q) || d.slug.includes(q)).slice(0, 6);
+});
+
+function pickDoc(slug: string) {
+  router.push({ path: `/docs/${slug}` });
+  close();
+}
+
+function taskActions(task: Task) {
+  return cardActionsFor(task).map((id) => CARD_ACTION_DEFS[id]);
+}
+
+async function runTaskAction(action: CardAction, task: Task) {
+  const id = task.id;
+  switch (action) {
+    case 'start': await api('PATCH', `/api/tasks/${id}`, { status: 'in_progress' }); break;
+    case 'retry': await api('PATCH', `/api/tasks/${id}`, { status: 'backlog' }); break;
+    case 'done': await api('POST', `/api/tasks/${id}/done`); break;
+    case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
+    case 'test': await api('POST', `/api/tasks/${id}/test`); break;
   }
   close();
 }
@@ -313,13 +345,15 @@ onUnmounted(() => {
               class="command-palette-section"
             >
               <div class="command-palette-section-title">{{ section.title }}</div>
-              <button
+              <div
                 v-for="task in section.tasks"
                 :key="task.id"
-                type="button"
+                role="button"
+                tabindex="0"
                 class="command-palette-row command-palette-row-task"
                 :class="{ active: indexFor(task) === activeIndex }"
                 @click="pick(task)"
+                @keydown.enter="pick(task)"
                 @mouseenter="activeIndex = indexFor(task)"
               >
                 <div class="command-palette-row-title">
@@ -335,15 +369,40 @@ onUnmounted(() => {
                   <span class="command-palette-row-hint-time">
                     {{ relativeTime(task.updated_at || task.created_at) }}
                   </span>
+                  <span class="command-palette-row-actions" @click.stop>
+                    <button
+                      v-for="a in taskActions(task)"
+                      :key="a.id"
+                      type="button"
+                      class="command-palette-action-btn"
+                      :class="a.cls"
+                      :title="a.title"
+                      @click="runTaskAction(a.id, task)"
+                    >{{ a.icon }} {{ a.label }}</button>
+                  </span>
                 </div>
                 <div
                   v-if="!task.title && task.prompt"
                   class="command-palette-task-snippet"
                 >{{ task.prompt.slice(0, 180) }}</div>
-              </button>
+              </div>
             </section>
           </template>
-          <div v-else class="command-palette-empty">
+          <section v-if="docMatches.length" class="command-palette-section">
+            <div class="command-palette-section-title">Docs</div>
+            <div
+              v-for="d in docMatches"
+              :key="d.slug"
+              role="button"
+              tabindex="0"
+              class="command-palette-row command-palette-row-task"
+              @click="pickDoc(d.slug)"
+              @keydown.enter="pickDoc(d.slug)"
+            >
+              <div class="command-palette-row-title">📖 {{ d.title }}</div>
+            </div>
+          </section>
+          <div v-if="!sections.length && !docMatches.length" class="command-palette-empty">
             {{ query.trim() ? 'No matches' : 'No tasks yet' }}
           </div>
         </div>

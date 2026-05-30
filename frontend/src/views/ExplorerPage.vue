@@ -19,6 +19,11 @@ const fileContent = ref<string | null>(null);
 const fileLoading = ref(false);
 const treeLoading = ref(true);
 const errorMsg = ref('');
+// Edit mode.
+const editing = ref(false);
+const editBuffer = ref('');
+const saving = ref(false);
+const saveError = ref('');
 
 function workspace(): string {
   return store.config?.workspaces?.[0] ?? '';
@@ -67,11 +72,44 @@ async function toggleDir(entry: TreeEntry) {
   }
 }
 
+function startEdit() {
+  editBuffer.value = fileContent.value ?? '';
+  saveError.value = '';
+  editing.value = true;
+}
+
+function cancelEdit() {
+  editing.value = false;
+  saveError.value = '';
+}
+
+async function saveFile() {
+  const ws = workspace();
+  if (!ws || !selectedPath.value || saving.value) return;
+  saving.value = true;
+  saveError.value = '';
+  try {
+    await api('PUT', '/api/explorer/file', {
+      workspace: ws,
+      path: selectedPath.value,
+      content: editBuffer.value,
+    });
+    fileContent.value = editBuffer.value;
+    editing.value = false;
+  } catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'Failed to save file.';
+  } finally {
+    saving.value = false;
+  }
+}
+
 async function selectFile(entry: TreeEntry) {
   const ws = workspace();
   if (!ws) return;
   selectedPath.value = entry.path;
   fileContent.value = null;
+  editing.value = false;
+  saveError.value = '';
   fileLoading.value = true;
   try {
     const url = `/api/explorer/file?workspace=${encodeURIComponent(ws)}&path=${encodeURIComponent(entry.path)}`;
@@ -162,9 +200,23 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
           <span class="explorer-preview__path" :title="selectedPath">
             {{ fileName(selectedPath) }}
           </span>
+          <span class="explorer-preview__actions">
+            <span v-if="saveError" class="explorer-save-error" :title="saveError">save failed</span>
+            <template v-if="editing">
+              <button type="button" class="explorer-edit-btn" :disabled="saving" @click="saveFile">{{ saving ? 'Saving…' : 'Save' }}</button>
+              <button type="button" class="explorer-edit-btn" :disabled="saving" @click="cancelEdit">Cancel</button>
+            </template>
+            <button v-else type="button" class="explorer-edit-btn" @click="startEdit">Edit</button>
+          </span>
         </div>
         <div class="explorer-preview__content">
-          <pre class="explorer-preview__code"><code>
+          <textarea
+            v-if="editing"
+            v-model="editBuffer"
+            class="explorer-edit-area"
+            spellcheck="false"
+          ></textarea>
+          <pre v-else class="explorer-preview__code"><code>
             <div
               v-for="(line, idx) in previewLines()"
               :key="idx"
