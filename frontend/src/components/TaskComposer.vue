@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
+import { nextTick, ref, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import { parseTags } from '../lib/composer';
@@ -25,6 +25,14 @@ const showMore = ref(false);
 const model = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
+const dependsOn = ref<string[]>([]);
+
+// Candidate dependencies: existing non-archived tasks (most recent first).
+const depCandidates = computed(() =>
+  store.tasks
+    .filter((t) => !t.archived && t.kind !== 'routine')
+    .map((t) => ({ id: t.id, label: (t.title || t.prompt || t.id).slice(0, 60) })),
+);
 
 async function loadFlows() {
   if (flows.value.length) return;
@@ -52,6 +60,7 @@ function collapse() {
   model.value = '';
   maxCostUsd.value = null;
   maxInputTokens.value = null;
+  dependsOn.value = [];
 }
 
 async function submit() {
@@ -59,7 +68,7 @@ async function submit() {
   if (!text || submitting.value) return;
   submitting.value = true;
   try {
-    await store.createTask(text, {
+    const created = await store.createTask(text, {
       flow: flow.value || undefined,
       tags: parseTags(tagsInput.value),
       timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
@@ -67,12 +76,16 @@ async function submit() {
       maxCostUsd: maxCostUsd.value ?? undefined,
       maxInputTokens: maxInputTokens.value ?? undefined,
     });
+    if (created?.id && dependsOn.value.length) {
+      await store.patchTask(created.id, { depends_on: [...dependsOn.value] });
+    }
     prompt.value = '';
     tagsInput.value = '';
     timeoutMin.value = null;
     model.value = '';
     maxCostUsd.value = null;
     maxInputTokens.value = null;
+    dependsOn.value = [];
     expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
@@ -181,6 +194,12 @@ function onInput(e: Event) {
       <label class="composer__opt">
         <span class="composer__opt-label">Max tokens</span>
         <input v-model.number="maxInputTokens" class="composer__input composer__input--num" type="number" min="0" step="1000" placeholder="input" aria-label="Max input tokens" />
+      </label>
+      <label v-if="depCandidates.length" class="composer__opt composer__opt--grow">
+        <span class="composer__opt-label">Depends on</span>
+        <select v-model="dependsOn" class="composer__select" multiple size="3" aria-label="Dependencies">
+          <option v-for="d in depCandidates" :key="d.id" :value="d.id">{{ d.label }}</option>
+        </select>
       </label>
     </div>
     <div class="composer__actions">
