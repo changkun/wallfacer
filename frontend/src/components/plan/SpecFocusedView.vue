@@ -5,8 +5,10 @@ import { api } from '../../api/client';
 import { renderMarkdown } from '../../lib/markdown';
 import { enhanceMermaid } from '../../lib/mermaidRender';
 import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
+import { useRouter } from 'vue-router';
 import { usePlanningStore } from '../../stores/planning';
 import { useTaskStore } from '../../stores/tasks';
+import { useToastStore } from '../../stores/toast';
 import FloatingToc from './FloatingToc.vue';
 
 defineProps<{ chatVisible: boolean }>();
@@ -14,6 +16,8 @@ const emit = defineEmits<{ toggleChat: []; focusSibling: [path: string]; sendCha
 
 const planning = usePlanningStore();
 const tasks = useTaskStore();
+const toast = useToastStore();
+const router = useRouter();
 const {
   focusedSpecPath, focusedIsIndex, focusedNode, tree,
   focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
@@ -182,13 +186,21 @@ async function onDispatch() {
   if (!confirm('Dispatch this spec to the task board?')) return;
   actionBusy.value = true;
   try {
-    await api<DispatchResp>('POST', '/api/specs/dispatch', {
+    const resp = await api<DispatchResp>('POST', '/api/specs/dispatch', {
       paths: [focusedSpecPath.value],
       run: false,
     });
     await loadCurrent();
+    const taskId = resp.dispatched?.[0]?.task_id;
+    if (taskId) {
+      toast.pushWithAction('Spec dispatched to the board', 'View on Board →', () => {
+        router.push({ path: '/', query: { task: taskId } });
+      }, { kind: 'success' });
+    } else {
+      toast.push('Spec dispatched', { kind: 'success' });
+    }
   } catch (e) {
-    alert('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)));
+    toast.push('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
   } finally {
     actionBusy.value = false;
   }
