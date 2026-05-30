@@ -8,7 +8,7 @@ affects:
   - "**/*.go"
 effort: medium
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-05-30
 author: changkun
 dispatched_task_id: null
 ---
@@ -24,7 +24,8 @@ Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere
 | Area | Current | Target |
 |------|---------|--------|
 | Go module path | `changkun.de/x/wallfacer` | `latere.ai/wallfacer` |
-| Container images | `ghcr.io/changkun/wallfacer` | `ghcr.io/latere-ai/sandbox-claude` / `ghcr.io/latere-ai/sandbox-codex` (done, moved to `github.com/latere-ai/images`) |
+| Sandbox images | — | `ghcr.io/latere-ai/sandbox-agents` (done — moved to `github.com/latere-ai/images`) |
+| App image (`wallfacer web`/server) | `ghcr.io/changkun/wallfacerd` | `ghcr.io/latere-ai/wallfacerd` (still pending — referenced in `wallfacerd.yml`, `deploy-wallfacerd.yml`, `deploy/prod/deployment.yaml`) |
 | macOS bundle ID | `ai.latere.wallfacer` | Already correct (set in desktop-app task-08) |
 | Import statements | ~200 files | Bulk rename |
 | CI ldflags | Makefile, release-binary.yml | Update module prefix |
@@ -41,6 +42,6 @@ Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere
 
 ## Open Questions
 
-- ~~Target container registry org~~ — resolved: moved to `ghcr.io/latere-ai/sandbox-claude` and `ghcr.io/latere-ai/sandbox-codex`
+- ~~Target container registry org~~ — resolved: `ghcr.io/latere-ai`. Sandbox images already migrated (`sandbox-agents`); the `wallfacerd` app image still publishes under `ghcr.io/changkun` and is part of this rebrand.
 - Whether to set up a vanity import server at `latere.ai/wallfacer` (like `golang.org/x/` style)
 - Timing relative to other work (standalone migration or bundled with a release)
