@@ -90,7 +90,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | transport.js | DONE | api/client.ts | — bearer token + fetch wrappers covered |
 | theme.js | DONE | stores/prefs.ts | — toggle/persist/OS-listener covered |
 | markdown.js | DONE | lib/markdown.ts | marked+highlight+mermaid placeholders covered |
-| api.js | PARTIAL | api/client.ts, stores/tasks.ts, composables/useSse.ts | archived pagination, deep-link hash, waitForTaskDelta, BroadcastChannel relay, heartbeat staleness, git stream |
+| api.js | PARTIAL+ | api/client.ts, stores/tasks.ts, composables/useSse.ts, lib/hashRoute.ts | **deep-link hash redirect done** (AD-2). Pending: archived pagination, waitForTaskDelta, BroadcastChannel relay, heartbeat staleness, git stream |
 | state.js | PARTIAL | stores/{tasks,ui,prefs}.ts | pendingCancel set, log abort/buffers, workspaceBrowser+group state, gitStatuses, activeGroups, taskChange observers |
 | events.js | PARTIAL | composables/useKeyboard.ts | modal escape cascade, textarea autogrow/draft, global keydown map (n/?/e/p/c/d/b) |
 | utils.js | PARTIAL+ | stores/dialog.ts + ConfirmDialog.vue | **showConfirm/showAlert** done (Pinia dialog store + global ConfirmDialog, tested; wired to Delete/Cancel). Pending: showPrompt (budget raise), hover-row tables, ARIA announce, mobile col nav |
@@ -253,6 +253,8 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
   Verified on the completed task. modal-oversight DONE.
 - 2026-05-30: **Feedback @-mention** — wired `useMentions` into TaskDetail
   feedback textarea (same tested composable as composer). mention.js DONE.
+- 2026-05-30: **Legacy hash deep-link redirect** (AD-2) — App.vue maps #<uuid>
+  and #plan/<path> to history routes (tested hashToRoute). Verified.
 - 2026-05-30: Confirmed spec **archive/unarchive undo toast** already implemented
   in SpecFocusedView; with the dispatch toast, spec-mode.js is DONE.
 - 2026-05-30: **Spec dispatch toast** — focused-view dispatch shows a "View on
