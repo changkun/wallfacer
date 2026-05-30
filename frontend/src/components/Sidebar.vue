@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
 import { useUiStore } from '../stores/ui';
 import { derivePresence } from '../lib/presence';
+import { hasUnseen } from '../lib/unread';
 
 const route = useRoute();
 const store = useTaskStore();
@@ -17,6 +18,25 @@ const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: 
 const cloudMode = computed(() => store.config?.cloud_mode === true);
 
 const presence = computed(() => derivePresence(store.inProgress, auth.me));
+
+// Board "unread" dot: set when new task ids arrive while off the board,
+// cleared (and the seen-set refreshed) whenever the board is viewed.
+const boardUnread = ref(false);
+const seenTaskIds = new Set<string>();
+function markBoardSeen() {
+  seenTaskIds.clear();
+  for (const t of store.tasks) seenTaskIds.add(t.id);
+  boardUnread.value = false;
+}
+watch(
+  () => store.tasks.map(t => t.id),
+  (ids) => {
+    if (route.path === '/') { markBoardSeen(); return; }
+    if (hasUnseen(ids, seenTaskIds)) boardUnread.value = true;
+  },
+  { deep: true },
+);
+watch(() => route.path, (p) => { if (p === '/') markBoardSeen(); });
 
 const activeWorkspaceLabel = computed(() => {
   const ws = store.config?.workspaces;
@@ -41,6 +61,7 @@ function onBrandClick() {
 
 onMounted(() => {
   if (cloudMode.value && !auth.loaded) void auth.fetchMe();
+  if (route.path === '/') markBoardSeen();
 });
 </script>
 
@@ -122,6 +143,7 @@ onMounted(() => {
           </svg>
         </span>
         <span>Board</span>
+        <span v-if="boardUnread && route.path !== '/'" class="sb-unread-dot" title="New tasks" aria-label="New tasks"></span>
       </router-link>
 
       <router-link to="/plan" class="sb-nav-item" :class="{ active: route.path === '/plan' }">
