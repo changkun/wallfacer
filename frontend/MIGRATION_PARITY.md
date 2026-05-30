@@ -105,7 +105,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | board-composer.js | MISSING | TaskComposer.vue (partial) | empty-state composer, advanced panel (timeout/templates), @-mention, create animation |
 | dnd.js | DONE | BoardPage.vue + lib/backlogSort.ts | per-column pull/put, ghost/chosen classes, backlog `#N` rank, **impact-sort toggle** (tested sortBacklog + localStorage persistence; drag-sort disabled + rank hidden in impact mode) |
 | status-bar.js | PARTIAL+ | StatusBar.vue, Sidebar.vue | **presence row added** (tested `derivePresence`: agents from in-progress + self). Pending: terminal toggle+resize, org switcher, system status |
-| sidebar-badge.js | MISSING | — | board unread dot when tasks arrive in Plan mode |
+| sidebar-badge.js | DONE | Sidebar.vue + lib/unread.ts | board unread dot when tasks arrive off-board (tested hasUnseen) |
 
 ### Task-detail modals (modal-*, span-stats)
 | Module | Status | Vue equivalent | Missing behaviors |
@@ -253,6 +253,8 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
   Verified on the completed task. modal-oversight DONE.
 - 2026-05-30: **Feedback @-mention** — wired `useMentions` into TaskDetail
   feedback textarea (same tested composable as composer). mention.js DONE.
+- 2026-05-30: **Board unread dot** — sidebar Board nav lights when new tasks
+  arrive off-board (tested `hasUnseen`); cleared on board view. sidebar-badge DONE.
 - 2026-05-30: **Docs in command palette** — Docs section (filters docIndex,
   → /docs/:slug). Verified. docs.js DONE.
 - 2026-05-30: **Backlog impact-sort toggle** — `lib/backlogSort.ts` (tested
