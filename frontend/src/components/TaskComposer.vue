@@ -26,6 +26,7 @@ const model = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
+const sandbox = ref<'' | 'claude' | 'codex'>('');
 
 // Candidate dependencies: existing non-archived tasks (most recent first).
 const depCandidates = computed(() =>
@@ -61,6 +62,7 @@ function collapse() {
   maxCostUsd.value = null;
   maxInputTokens.value = null;
   dependsOn.value = [];
+  sandbox.value = '';
 }
 
 async function submit() {
@@ -76,8 +78,15 @@ async function submit() {
       maxCostUsd: maxCostUsd.value ?? undefined,
       maxInputTokens: maxInputTokens.value ?? undefined,
     });
-    if (created?.id && dependsOn.value.length) {
-      await store.patchTask(created.id, { depends_on: [...dependsOn.value] });
+    if (created?.id) {
+      const patch: Record<string, unknown> = {};
+      if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
+      // POST /api/tasks rejects sandbox; the server-side path for per-task
+      // sandbox overrides is a follow-up PATCH (see CLAUDE.md task lifecycle).
+      if (sandbox.value) patch.sandbox = sandbox.value;
+      if (Object.keys(patch).length) {
+        await store.patchTask(created.id, patch);
+      }
     }
     prompt.value = '';
     tagsInput.value = '';
@@ -86,6 +95,7 @@ async function submit() {
     maxCostUsd.value = null;
     maxInputTokens.value = null;
     dependsOn.value = [];
+    sandbox.value = '';
     expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
@@ -199,6 +209,14 @@ function onInput(e: Event) {
         <span class="composer__opt-label">Depends on</span>
         <select v-model="dependsOn" class="composer__select" multiple size="3" aria-label="Dependencies">
           <option v-for="d in depCandidates" :key="d.id" :value="d.id">{{ d.label }}</option>
+        </select>
+      </label>
+      <label class="composer__opt">
+        <span class="composer__opt-label">Sandbox</span>
+        <select v-model="sandbox" class="composer__select" aria-label="Sandbox override">
+          <option value="">Default (agent)</option>
+          <option value="claude">Claude</option>
+          <option value="codex">Codex</option>
         </select>
       </label>
     </div>
