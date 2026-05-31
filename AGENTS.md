@@ -211,6 +211,29 @@ Every implementation task MUST complete all three steps before finishing:
 
 3. **Reflect on codebase health** — After implementing, review the files you touched and their immediate surroundings. If you spot a small, safe refactor (dead code, unclear naming, duplicated logic, missing error handling) directly related to your change, include it. Keep refactoring minimal and scoped.
 
+## Release (wallfacerd image)
+
+```sh
+make release-patch    # bump patch, build, push ghcr.io/changkun/wallfacerd:<stripped-v>
+make release-minor    # bump minor
+make release-major    # bump major
+make release WD_VERSION=v0.0.7  # explicit override
+
+make deploy           # apply manifests, set image, rollout, smoke, publish GitHub release
+make deploy WD_VERSION=v0.0.7   # deploy a specific tag
+```
+
+Needs on PATH: `gh`, `podman` (or `docker`), `op`, `doctl`, `kubectl`.
+
+- Image lives at `ghcr.io/changkun/wallfacerd` (changkun namespace, not latere-ai). The tag strips the leading `v` so `v0.0.7` → image tag `0.0.7`, matching the in-cluster manifest convention.
+- gh token must have `write:packages,read:packages`. `gh auth refresh -s write:packages,read:packages` if 403.
+- DO PAT comes from 1Password at `op://LatereAI/Digital Ocean Credentials/PAT`. Passed via `DIGITALOCEAN_ACCESS_TOKEN` for the single doctl call; never written to disk.
+- Builds `linux/amd64` by default (cluster nodes). `Dockerfile.wallfacerd` pins bun + go stages to `$BUILDPLATFORM` so they run native on Apple Silicon (no qemu).
+- `make deploy` runs `tools/smoke/release.sh` against `https://wf.latere.ai` (checks `/`, `/healthz`, `/api/debug/health`), then `tools/release/publish.sh` to push the git tag to origin and create the GitHub release with smoke evidence merged into the body.
+- Pushing the tag during deploy also triggers `release-binary.yml` (multi-platform CLI binaries via goreleaser) and `release-desktop.yml` (Wails desktop builds with macOS notarization + Windows signtool). Both attach their artifacts to the release publish.sh just created.
+- If a release fails partway, the bump tag is rolled back automatically.
+- The legacy `make release-notes-publish RELEASE_VERSION=v0.0.6` flow (commit hand-curated `docs/releases/<version>.md`, tag, push, gh release create) is still available for desktop-only releases that don't ship a new image. Not the standard path.
+
 ## Commit and push strategy
 
 - Before committing, always run `make build` (or at minimum `make fmt && make lint`) and fix any issues they report. `make build` is the full gate.
