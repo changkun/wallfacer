@@ -24,9 +24,8 @@ func TestGetTurnUsage_NoRecords(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/turn-usage", nil)
-	req.SetPathValue("id", task.ID.String())
 	w := httptest.NewRecorder()
-	h.GetTurnUsage(w, req)
+	h.GetTurnUsage(w, req, task.ID)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -63,9 +62,8 @@ func TestGetTurnUsage_WithRecords(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/turn-usage", nil)
-	req.SetPathValue("id", task.ID.String())
 	w := httptest.NewRecorder()
-	h.GetTurnUsage(w, req)
+	h.GetTurnUsage(w, req, task.ID)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -80,19 +78,6 @@ func TestGetTurnUsage_WithRecords(t *testing.T) {
 	}
 	if records[0].InputTokens != 100 {
 		t.Errorf("expected 100 input tokens, got %d", records[0].InputTokens)
-	}
-}
-
-func TestGetTurnUsage_InvalidID(t *testing.T) {
-	h := newTestHandler(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/notauuid/turn-usage", nil)
-	req.SetPathValue("id", "notauuid")
-	w := httptest.NewRecorder()
-	h.GetTurnUsage(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for invalid id, got %d", w.Code)
 	}
 }
 
