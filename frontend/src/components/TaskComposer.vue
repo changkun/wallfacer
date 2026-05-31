@@ -31,6 +31,8 @@ const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
 const sandbox = ref<'' | 'claude' | 'codex'>('');
 const batchMode = ref(false);
+const scheduled = ref(false);
+const intervalMinutes = ref<number | null>(null);
 
 // Candidate dependencies: existing non-archived tasks (most recent first).
 const depCandidates = computed(() =>
@@ -105,6 +107,20 @@ function collapse() {
   dependsOn.value = [];
   sandbox.value = '';
   batchMode.value = false;
+  scheduled.value = false;
+  intervalMinutes.value = null;
+}
+
+async function submitRoutine(text: string): Promise<void> {
+  const minutes = intervalMinutes.value;
+  if (!minutes || minutes <= 0) return;
+  await api('POST', '/api/routines', {
+    prompt: text,
+    interval_minutes: minutes,
+    spawn_flow: flow.value || 'implement',
+    timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
+    tags: parseTags(tagsInput.value),
+  });
 }
 
 async function submit() {
@@ -112,6 +128,11 @@ async function submit() {
   if (!text || submitting.value) return;
   submitting.value = true;
   try {
+    if (scheduled.value) {
+      await submitRoutine(text);
+      collapse();
+      return;
+    }
     const sharedOpts = {
       flow: flow.value || undefined,
       tags: parseTags(tagsInput.value),
@@ -296,11 +317,24 @@ function onInput(e: Event) {
     </div>
     <div class="composer__actions">
       <label class="composer__toggle">
-        <input v-model="batchMode" type="checkbox" />
+        <input v-model="batchMode" type="checkbox" :disabled="scheduled" />
         Batch mode
         <span v-if="batchMode" class="composer__toggle-hint">
           blank-line separated · {{ batchCount }} task{{ batchCount === 1 ? '' : 's' }}
         </span>
+      </label>
+      <label class="composer__toggle">
+        <input v-model="scheduled" type="checkbox" :disabled="batchMode" />
+        Schedule
+        <input
+          v-if="scheduled"
+          v-model.number="intervalMinutes"
+          class="composer__input composer__input--num"
+          type="number"
+          min="1"
+          placeholder="min"
+          aria-label="Interval minutes"
+        />
       </label>
       <span class="composer__spacer" />
       <button
@@ -321,9 +355,22 @@ function onInput(e: Event) {
       <button
         type="submit"
         class="composer__btn composer__btn--primary"
-        :disabled="!prompt.trim() || submitting || (batchMode && batchCount === 0)"
+        :disabled="
+          !prompt.trim() ||
+          submitting ||
+          (batchMode && batchCount === 0) ||
+          (scheduled && (!intervalMinutes || intervalMinutes <= 0))
+        "
       >
-        {{ submitting ? 'Saving…' : batchMode ? `Save ${batchCount}` : 'Save' }}
+        {{
+          submitting
+            ? 'Saving…'
+            : scheduled
+              ? 'Schedule'
+              : batchMode
+                ? `Save ${batchCount}`
+                : 'Save'
+        }}
       </button>
     </div>
   </form>
