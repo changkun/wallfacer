@@ -1,6 +1,6 @@
 ---
 title: Vue Frontend Migration
-status: drafted
+status: done
 depends_on: []
 affects:
   - frontend/
@@ -11,7 +11,7 @@ affects:
   - .github/workflows/
 effort: xlarge
 created: 2026-04-12
-updated: 2026-05-03
+updated: 2026-06-01
 author: changkun
 dispatched_task_id: null
 ---
