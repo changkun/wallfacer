@@ -137,6 +137,77 @@ async function saveFile() {
   }
 }
 
+// Keyboard nav over the explorer tree. The visible-entries list is
+// already a flat preorder traversal, so up/down on the focused row
+// just moves through that list; right expands a closed dir or moves
+// into the first child of an open one; left collapses an open dir or
+// moves to the parent.
+function visibleIndexOf(path: string | null): number {
+  if (path == null) return -1;
+  const list = visibleEntries();
+  return list.findIndex((v) => v.entry.path === path);
+}
+
+async function onTreeKeydown(e: KeyboardEvent, entry: TreeEntry) {
+  const list = visibleEntries();
+  const idx = visibleIndexOf(entry.path);
+  if (idx < 0) return;
+  switch (e.key) {
+    case 'ArrowDown': {
+      e.preventDefault();
+      const next = list[Math.min(list.length - 1, idx + 1)];
+      if (next) focusTreeRow(next.entry.path);
+      return;
+    }
+    case 'ArrowUp': {
+      e.preventDefault();
+      const prev = list[Math.max(0, idx - 1)];
+      if (prev) focusTreeRow(prev.entry.path);
+      return;
+    }
+    case 'ArrowRight': {
+      e.preventDefault();
+      if (entry.is_dir) {
+        if (!expanded.value.has(entry.path)) {
+          await toggleDir(entry);
+        } else {
+          const next = list[idx + 1];
+          if (next) focusTreeRow(next.entry.path);
+        }
+      }
+      return;
+    }
+    case 'ArrowLeft': {
+      e.preventDefault();
+      if (entry.is_dir && expanded.value.has(entry.path)) {
+        await toggleDir(entry); // collapse
+      } else {
+        // Move to parent if visible.
+        const parent = entry.path.split('/').slice(0, -1).join('/');
+        focusTreeRow(parent);
+      }
+      return;
+    }
+    case 'Enter':
+    case ' ': {
+      e.preventDefault();
+      if (entry.is_dir) await toggleDir(entry);
+      else await selectFile(entry);
+      return;
+    }
+  }
+}
+
+function focusTreeRow(path: string) {
+  // Re-query because v-for may have re-rendered after a toggleDir().
+  requestAnimationFrame(() => {
+    const el = document.querySelector<HTMLElement>(
+      `.explorer-node[data-path="${CSS.escape(path)}"]`,
+    );
+    el?.focus();
+  });
+}
+
 async function selectFile(entry: TreeEntry) {
   const ws = workspace();
   if (!ws) return;
@@ -285,7 +356,12 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
               { 'explorer-node--active': selectedPath === entry.path },
             ]"
             :style="{ paddingLeft: (8 + depth * 14) + 'px' }"
+            :data-path="entry.path"
+            tabindex="0"
+            role="treeitem"
+            :aria-expanded="entry.is_dir ? expanded.has(entry.path) : undefined"
             @click="entry.is_dir ? toggleDir(entry) : selectFile(entry)"
+            @keydown="(e) => onTreeKeydown(e, entry)"
           >
             <span class="explorer-node__toggle">
               <template v-if="entry.is_dir">{{ expanded.has(entry.path) ? '▼' : '▶' }}</template>
