@@ -70,10 +70,7 @@ func runWeb(args []string) error {
 		mux.HandleFunc("GET /login", authClient.HandleLogin)
 		mux.HandleFunc("GET /callback", authClient.HandleCallback)
 		mux.HandleFunc("GET /logout", authClient.HandleLogout)
-		mux.HandleFunc("GET /logout/notify", func(w http.ResponseWriter, _ *http.Request) {
-			auth.ClearSession(w)
-			w.WriteHeader(http.StatusOK)
-		})
+		mux.HandleFunc("GET /logout/notify", authClient.HandleLogoutNotify)
 		mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
 			user := authClient.UserFromRequest(w, r)
 			if user == nil {

@@ -18,9 +18,10 @@ import (
 // satisfy the interface.
 type fakeAuthProvider struct{}
 
-func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)    {}
-func (fakeAuthProvider) HandleCallback(http.ResponseWriter, *http.Request) {}
-func (fakeAuthProvider) HandleLogout(http.ResponseWriter, *http.Request)   {}
+func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)        {}
+func (fakeAuthProvider) HandleCallback(http.ResponseWriter, *http.Request)     {}
+func (fakeAuthProvider) HandleLogout(http.ResponseWriter, *http.Request)       {}
+func (fakeAuthProvider) HandleLogoutNotify(http.ResponseWriter, *http.Request) {}
 func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *auth.User {
 	return nil
 }
