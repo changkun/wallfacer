@@ -2,7 +2,7 @@
 import { nextTick, ref, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
-import { parseTags } from '../lib/composer';
+import { parseTags, splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import type { PromptTemplate } from '../api/types';
 
@@ -30,6 +30,7 @@ const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
 const sandbox = ref<'' | 'claude' | 'codex'>('');
+const batchMode = ref(false);
 
 // Candidate dependencies: existing non-archived tasks (most recent first).
 const depCandidates = computed(() =>
@@ -37,6 +38,8 @@ const depCandidates = computed(() =>
     .filter((t) => !t.archived && t.kind !== 'routine')
     .map((t) => ({ id: t.id, label: (t.title || t.prompt || t.id).slice(0, 60) })),
 );
+
+const batchCount = computed(() => (batchMode.value ? splitBatch(prompt.value).length : 0));
 
 async function loadFlows() {
   if (flows.value.length) return;
@@ -101,6 +104,7 @@ function collapse() {
   maxInputTokens.value = null;
   dependsOn.value = [];
   sandbox.value = '';
+  batchMode.value = false;
 }
 
 async function submit() {
@@ -108,24 +112,43 @@ async function submit() {
   if (!text || submitting.value) return;
   submitting.value = true;
   try {
-    const created = await store.createTask(text, {
+    const sharedOpts = {
       flow: flow.value || undefined,
       tags: parseTags(tagsInput.value),
       timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
       model: model.value.trim() || undefined,
       maxCostUsd: maxCostUsd.value ?? undefined,
       maxInputTokens: maxInputTokens.value ?? undefined,
-    });
-    if (created?.id) {
-      const patch: Record<string, unknown> = {};
-      if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
-      // POST /api/tasks rejects sandbox; the server-side path for per-task
-      // sandbox overrides is a follow-up PATCH (see CLAUDE.md task lifecycle).
-      if (sandbox.value) patch.sandbox = sandbox.value;
-      if (Object.keys(patch).length) {
-        await store.patchTask(created.id, patch);
+    } as const;
+
+    if (batchMode.value) {
+      const prompts = splitBatch(text);
+      if (prompts.length === 0) return;
+      const res = await store.batchCreateTasks(prompts, sharedOpts);
+      const created = res?.tasks ?? [];
+      // Apply per-task sandbox / shared dependsOn via follow-up PATCH.
+      if (sandbox.value || dependsOn.value.length) {
+        const patch: Record<string, unknown> = {};
+        if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
+        if (sandbox.value) patch.sandbox = sandbox.value;
+        await Promise.all(
+          created.filter((t) => t.id).map((t) => store.patchTask(t.id, { ...patch })),
+        );
+      }
+    } else {
+      const created = await store.createTask(text, sharedOpts);
+      if (created?.id) {
+        const patch: Record<string, unknown> = {};
+        if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
+        // POST /api/tasks rejects sandbox; the server-side path for per-task
+        // sandbox overrides is a follow-up PATCH (see CLAUDE.md task lifecycle).
+        if (sandbox.value) patch.sandbox = sandbox.value;
+        if (Object.keys(patch).length) {
+          await store.patchTask(created.id, patch);
+        }
       }
     }
+
     prompt.value = '';
     tagsInput.value = '';
     timeoutMin.value = null;
@@ -134,6 +157,7 @@ async function submit() {
     maxInputTokens.value = null;
     dependsOn.value = [];
     sandbox.value = '';
+    batchMode.value = false;
     expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
@@ -271,6 +295,14 @@ function onInput(e: Event) {
       </label>
     </div>
     <div class="composer__actions">
+      <label class="composer__toggle">
+        <input v-model="batchMode" type="checkbox" />
+        Batch mode
+        <span v-if="batchMode" class="composer__toggle-hint">
+          blank-line separated · {{ batchCount }} task{{ batchCount === 1 ? '' : 's' }}
+        </span>
+      </label>
+      <span class="composer__spacer" />
       <button
         type="button"
         class="composer__btn composer__btn--ghost"
@@ -289,9 +321,9 @@ function onInput(e: Event) {
       <button
         type="submit"
         class="composer__btn composer__btn--primary"
-        :disabled="!prompt.trim() || submitting"
+        :disabled="!prompt.trim() || submitting || (batchMode && batchCount === 0)"
       >
-        {{ submitting ? 'Saving…' : 'Save' }}
+        {{ submitting ? 'Saving…' : batchMode ? `Save ${batchCount}` : 'Save' }}
       </button>
     </div>
   </form>
@@ -369,4 +401,15 @@ function onInput(e: Event) {
   padding: 4px 6px;
 }
 .composer__more:hover { color: var(--text); }
+.composer__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.composer__toggle input { margin: 0; accent-color: var(--accent); }
+.composer__toggle-hint { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
+.composer__spacer { flex: 1 1 auto; }
 </style>
