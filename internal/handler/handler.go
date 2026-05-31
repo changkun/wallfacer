@@ -142,6 +142,11 @@ type Handler struct {
 	// authURL caches the auth service base URL for /api/config responses so
 	// handlers don't call back into AuthProvider for every config request.
 	authURL string
+	// deviceAuth, when non-nil, drives the local-mode RFC 8628 device-code
+	// sign-in via /api/auth/device/{start,poll,cancel}. Wired via
+	// SetDeviceAuth in local-mode wiring; nil for cloud-mode deployments
+	// (cloud mode uses /login + the OAuth code flow instead).
+	deviceAuth *DeviceAuth
 
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache

@@ -824,4 +824,22 @@ var Routes = []Route{
 		Description: "Switch active organization; clears session and returns a redirect to /login?org_id=<target>.",
 		Tags:        []string{"login"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/auth/device/start", Name: "AuthDeviceStart",
+		JSName:      "authDeviceStart",
+		Description: "Local-mode RFC 8628 device-code: start a sign-in flow and return the user code + verification URI.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/auth/device/poll", Name: "AuthDevicePoll",
+		JSName:      "authDevicePoll",
+		Description: "Poll the in-flight local-mode device-code flow; returns {status: idle|pending|done|denied|expired}.",
+		Tags:        []string{"login"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/auth/device/cancel", Name: "AuthDeviceCancel",
+		JSName:      "authDeviceCancel",
+		Description: "Cancel the in-flight local-mode device-code flow.",
+		Tags:        []string{"login"},
+	},
 }
