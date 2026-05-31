@@ -1092,11 +1092,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SyncTask":       withID(h.SyncTask),
 		"TestTask":       withID(h.TestTask),
 
-		"TaskDiff":   withID(h.TaskDiff),
-		"StreamLogs": withID(h.StreamLogs),
-
-		// GetTurnUsage reads {id} internally (not via withID).
-		"GetTurnUsage": h.GetTurnUsage,
+		"TaskDiff":     withID(h.TaskDiff),
+		"StreamLogs":   withID(h.StreamLogs),
+		"GetTurnUsage": withID(h.GetTurnUsage),
 
 		// ServeOutput needs both {id} (UUID) and {filename} path values.
 		"ServeOutput": func(w http.ResponseWriter, r *http.Request) {

@@ -12,12 +12,7 @@ import (
 )
 
 // GetTurnUsage returns token usage for a specific task turn.
-func (h *Handler) GetTurnUsage(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "invalid task id", http.StatusBadRequest)
-		return
-	}
+func (h *Handler) GetTurnUsage(w http.ResponseWriter, _ *http.Request, id uuid.UUID) {
 	records, err := h.store.GetTurnUsages(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
