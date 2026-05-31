@@ -1,6 +1,6 @@
 ---
 title: wallfacer — Auth Unification Migration (cloud + local-mode device-code)
-status: in-progress
+status: complete
 depends_on:
   - "auth/specs/auth-unification.md"
   - "auth/specs/auth-unification/authkit-hybrid-identity.md"
