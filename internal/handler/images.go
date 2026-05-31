@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -329,12 +329,6 @@ func (h *Handler) runPull(_ context.Context, cmd string, p *imagePull) {
 
 // StreamImagePull streams pull progress via SSE.
 func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
 	pullID := r.URL.Query().Get("pull_id")
 	p := h.pulls.get(pullID)
 	if p == nil {
@@ -342,9 +336,10 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	stream := sse.NewWriter(w)
+	if stream == nil {
+		return
+	}
 
 	ctx := r.Context()
 	for {
@@ -357,16 +352,15 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// Lines are already JSON-encoded pullProgress structs.
-			if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", line); err != nil {
+			if err := stream.Event("progress", []byte(line)); err != nil {
 				return
 			}
-			flusher.Flush()
 		case <-p.Done:
 			// Drain remaining lines.
 			for {
 				select {
 				case line := <-p.Lines:
-					if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", line); err != nil {
+					if err := stream.Event("progress", []byte(line)); err != nil {
 						return
 					}
 				default:
@@ -375,13 +369,10 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 			}
 		drained:
 			if p.Err != nil {
-				data, _ := json.Marshal(map[string]string{"error": p.Err.Error()})
-				_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", data)
+				_ = stream.JSON("error", map[string]string{"error": p.Err.Error()})
 			} else {
-				data, _ := json.Marshal(map[string]any{"success": true, "image": p.Image})
-				_, _ = fmt.Fprintf(w, "event: done\ndata: %s\n\n", data)
+				_ = stream.JSON("done", map[string]any{"success": true, "image": p.Image})
 			}
-			flusher.Flush()
 			return
 		}
 	}
