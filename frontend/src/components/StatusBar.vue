@@ -227,6 +227,12 @@ onUnmounted(() => {
       </span>
     </div>
     <div class="status-bar__right">
+      <button
+        type="button"
+        class="status-bar-btn"
+        title="View running sandbox containers and runtime status"
+        @click="ui.showContainers = true"
+      >Containers</button>
       <router-link to="/map" class="status-bar-btn" title="Open map">Map</router-link>
       <button
         type="button"
