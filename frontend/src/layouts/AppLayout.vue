@@ -39,6 +39,7 @@ const { connected } = useSse({
 
 useKeyboard({
   onSearch: () => { ui.showPalette = true; },
+  onFocusSearch: () => document.querySelector<HTMLInputElement>('.task-search-input')?.focus(),
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
   onSettings: () => { void router.push('/settings'); },
   onTerminal: () => { ui.toggleTerminal(); },
