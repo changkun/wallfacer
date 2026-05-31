@@ -38,4 +38,35 @@ describe('dialog store', () => {
     d.alert('heads up', 'Notice');
     expect(d.active).toMatchObject({ message: 'heads up', title: 'Notice', alert: true, confirmLabel: 'OK' });
   });
+
+  it('prompt() resolves with edited value on accept', async () => {
+    const d = useDialogStore();
+    const p = d.prompt({ message: 'name?', initial: 'foo' });
+    expect(d.active?.prompt?.initial).toBe('foo');
+    d.setPromptValue('bar');
+    d.accept();
+    await expect(p).resolves.toBe('bar');
+    expect(d.active).toBeNull();
+  });
+
+  it('prompt() resolves with null on dismiss', async () => {
+    const d = useDialogStore();
+    const p = d.prompt({ message: 'name?', initial: 'x' });
+    d.dismiss();
+    await expect(p).resolves.toBeNull();
+  });
+
+  it('prompt() falls back to initial value when not edited', async () => {
+    const d = useDialogStore();
+    const p = d.prompt({ message: 'name?', initial: 'keep' });
+    d.accept();
+    await expect(p).resolves.toBe('keep');
+  });
+
+  it('opening confirm over prompt resolves prompt as null', async () => {
+    const d = useDialogStore();
+    const first = d.prompt({ message: 'name?', initial: 'a' });
+    d.confirm({ message: 'sure?' });
+    await expect(first).resolves.toBeNull();
+  });
 });
