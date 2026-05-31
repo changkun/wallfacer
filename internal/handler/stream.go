@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/logpipe"
+	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -35,26 +36,21 @@ import (
 //	event: task-updated  — a single task was created or mutated (data: Task JSON)
 //	event: task-deleted  — a task was deleted (data: {"id":"<uuid>"})
 func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
 	// Capture the store once so that all operations in this handler (subscribe,
 	// delta replay, snapshot) use the same workspace store. Without this, a
 	// workspace switch mid-handler could cause Subscribe to attach to workspace A
 	// while ListTasksAndSeq reads from workspace B, leaking cross-group tasks.
-	s, ok2 := h.requireStore(w)
-	if !ok2 {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	stream := sse.NewWriter(w)
+	if stream == nil {
 		return
 	}
 
 	includeArchived := r.URL.Query().Get("include_archived") == "true"
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
 
 	// Subscribe BEFORE reading any state so we cannot miss events between the
 	// snapshot/replay phase and the live loop.
@@ -83,13 +79,11 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 					if encErr != nil {
 						continue
 					}
-					eventType := deltaEventType(d.Value)
-					if _, werr := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", d.Seq, eventType, payload); werr != nil {
+					if err := stream.EventID(strconv.FormatInt(d.Seq, 10), deltaEventType(d.Value), payload); err != nil {
 						return
 					}
 					replayUpTo = d.Seq
 				}
-				flusher.Flush()
 				didReplay = true
 			}
 			// If tooOld == true, fall through to the full snapshot below.
@@ -112,16 +106,13 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		replayUpTo = currentSeq
-		if _, err := fmt.Fprintf(w, "id: %d\nevent: snapshot\ndata: %s\n\n", currentSeq, snapshot); err != nil {
+		if err := stream.EventID(strconv.FormatInt(currentSeq, 10), "snapshot", snapshot); err != nil {
 			return
 		}
 		// Include cross-group task counts in the initial payload.
-		if agData, err := json.Marshal(h.activeGroupInfos(r.Context())); err == nil {
-			if _, err := fmt.Fprintf(w, "event: active_groups\ndata: %s\n\n", agData); err != nil {
-				return
-			}
+		if err := stream.JSON("active_groups", h.activeGroupInfos(r.Context())); err != nil {
+			return
 		}
-		flusher.Flush()
 	}
 
 	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
@@ -143,28 +134,23 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			eventType := deltaEventType(delta.Value)
-			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", delta.Seq, eventType, payload); err != nil {
+			if err := stream.EventID(strconv.FormatInt(delta.Seq, 10), deltaEventType(delta.Value), payload); err != nil {
 				return
 			}
 			// Emit cross-group task counts so the frontend can update
 			// workspace tab badges for background groups in real time.
-			if agData, err := json.Marshal(h.activeGroupInfos(r.Context())); err == nil {
-				if _, err := fmt.Fprintf(w, "event: active_groups\ndata: %s\n\n", agData); err != nil {
-					return
-				}
+			if err := stream.JSON("active_groups", h.activeGroupInfos(r.Context())); err != nil {
+				return
 			}
-			flusher.Flush()
 		case <-keepalive.C:
 			// SSE heartbeat event — prevents proxies and OS-level TCP
 			// idle timeouts from silently closing the connection. Sent as
 			// a real "heartbeat" event (not a comment) so the browser's
 			// EventSource dispatches it to JavaScript, allowing the client
 			// to detect stale connections and trigger a recovery fetch.
-			if _, err := fmt.Fprint(w, "event: heartbeat\ndata: \n\n"); err != nil {
+			if err := stream.Heartbeat(); err != nil {
 				return
 			}
-			flusher.Flush()
 		}
 	}
 }
