@@ -169,6 +169,25 @@ function isSpawnedByTag(tag: string): boolean {
   return tag.toLowerCase().startsWith('spawned-by:');
 }
 
+interface RenderedTag { rawTag: string; label: string; cls: string; styled: boolean }
+
+// Mirrors ui/js/render.js's tag taxonomy: priority:* and impact:* tags
+// get dedicated badge classes; spawned-by:* keeps its own class; everything
+// else falls back to the hue-coloured generic chip.
+function renderedTag(rawTag: string): RenderedTag {
+  const lower = rawTag.toLowerCase();
+  if (lower.startsWith('priority:')) {
+    return { rawTag, label: rawTag.slice('priority:'.length).trim() || 'priority', cls: 'badge badge-priority', styled: false };
+  }
+  if (lower.startsWith('impact:')) {
+    return { rawTag, label: `impact ${rawTag.slice('impact:'.length).trim()}`, cls: 'badge badge-impact', styled: false };
+  }
+  if (isSpawnedByTag(rawTag)) {
+    return { rawTag, label: rawTag, cls: 'tag-chip badge-routine-spawn', styled: false };
+  }
+  return { rawTag, label: rawTag, cls: 'tag-chip', styled: true };
+}
+
 function showSpinner(task: Task): boolean {
   return task.status === 'in_progress' || task.status === 'committing';
 }
@@ -345,16 +364,16 @@ function onCardKeydown(e: KeyboardEvent) {
     <!-- Row 2: title -->
     <div v-if="props.task.title" class="card-title">{{ props.task.title }}</div>
 
-    <!-- Row 3: tags -->
+    <!-- Row 3: tags (priority:*/impact:* get dedicated badges) -->
     <div v-if="props.task.tags?.length" class="tag-chip-row">
       <span
         v-for="tag in props.task.tags"
         :key="tag"
-        :class="['tag-chip', { 'badge-routine-spawn': isSpawnedByTag(tag) }]"
+        :class="renderedTag(tag).cls"
         :data-tag="tag"
-        :style="isSpawnedByTag(tag) ? '' : tagStyle(tag)"
-        :title="tag"
-      >{{ tag }}</span>
+        :style="renderedTag(tag).styled ? tagStyle(tag) : ''"
+        :title="`Tag: ${tag}`"
+      >{{ renderedTag(tag).label }}</span>
     </div>
 
     <!-- Row 4: prompt preview (markdown) -->
