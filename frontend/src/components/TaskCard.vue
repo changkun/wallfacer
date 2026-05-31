@@ -234,10 +234,91 @@ async function runCardAction(action: CardAction, e: Event) {
     case 'test': await api('POST', `/api/tasks/${id}/test`); break;
   }
 }
+
+const cardRoot = ref<HTMLDivElement | null>(null);
+
+function focusSibling(direction: 'next' | 'prev' | 'left' | 'right') {
+  const root = cardRoot.value;
+  if (!root) return;
+  // For vertical nav we walk siblings in the same column; for horizontal
+  // we walk by position across columns. Use a flat DOM query and find
+  // ourselves in it — simple, side-effect-free.
+  const all = Array.from(document.querySelectorAll<HTMLElement>('.task-card[tabindex="0"]'));
+  const idx = all.indexOf(root);
+  if (idx < 0 || all.length === 0) return;
+  let nextIdx = idx;
+  if (direction === 'next') nextIdx = Math.min(all.length - 1, idx + 1);
+  else if (direction === 'prev') nextIdx = Math.max(0, idx - 1);
+  else {
+    // Left/Right: find the nearest card whose column differs and whose
+    // vertical centre is closest to ours.
+    const me = root.getBoundingClientRect();
+    const myCol = me.left + me.width / 2;
+    let bestIdx = idx;
+    let bestDist = Infinity;
+    for (let i = 0; i < all.length; i++) {
+      if (i === idx) continue;
+      const r = all[i].getBoundingClientRect();
+      const isLeft = r.right < me.left;
+      const isRight = r.left > me.right;
+      if (direction === 'left' && !isLeft) continue;
+      if (direction === 'right' && !isRight) continue;
+      const dx = Math.abs((r.left + r.width / 2) - myCol);
+      const dy = Math.abs((r.top + r.height / 2) - (me.top + me.height / 2));
+      const d = dx + dy;
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    nextIdx = bestIdx;
+  }
+  if (nextIdx !== idx) all[nextIdx].focus();
+}
+
+function onCardKeydown(e: KeyboardEvent) {
+  // Don't hijack typing inside the routine footer's <select> + spawn icon.
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    cardRoot.value?.click();
+    return;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    cardRoot.value?.blur();
+    return;
+  }
+  if (e.key === 'ArrowDown') { e.preventDefault(); focusSibling('next'); return; }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); focusSibling('prev'); return; }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); focusSibling('left'); return; }
+  if (e.key === 'ArrowRight'){ e.preventDefault(); focusSibling('right'); return; }
+
+  // Per-status quick actions. Only fire when the action is in the matrix
+  // for this card's current status (e.g. "s" → start on backlog only).
+  if (e.key === 's' || e.key === 'd' || e.key === 'r' || e.key === 't' || e.key === 'p') {
+    const wanted: CardAction | null =
+      e.key === 's' ? 'start'
+        : e.key === 'd' ? 'done'
+        : e.key === 'r' ? (props.task.session_id && props.task.status === 'waiting' ? 'resume' : 'retry')
+        : e.key === 't' ? 'test'
+        : 'plan';
+    if (wanted && cardActionsFor(props.task).includes(wanted)) {
+      e.preventDefault();
+      void runCardAction(wanted, e);
+    }
+  }
+}
 </script>
 
 <template>
-  <div :class="cardClasses(props.task)">
+  <div
+    ref="cardRoot"
+    :class="cardClasses(props.task)"
+    tabindex="0"
+    role="button"
+    :aria-label="`Task: ${props.task.title || props.task.prompt || props.task.id}`"
+    @keydown="onCardKeydown"
+  >
     <!-- Row 1: status badge + meta-right (sandbox, timeout, time) -->
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
