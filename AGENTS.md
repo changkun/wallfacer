@@ -213,26 +213,22 @@ Every implementation task MUST complete all three steps before finishing:
 
 ## Release (wallfacerd image)
 
-```sh
-make release-patch    # bump patch, build, push ghcr.io/changkun/wallfacerd:<stripped-v>
-make release-minor    # bump minor
-make release-major    # bump major
-make release WD_VERSION=v0.0.7  # explicit override
+One command ships everything (build → push → deploy → smoke → GitHub release).
 
-make deploy           # apply manifests, set image, rollout, smoke, publish GitHub release
-make deploy WD_VERSION=v0.0.7   # deploy a specific tag
+```sh
+make release-patch    # v0.0.7 → v0.0.8
+make release-minor    # v0.0.7 → v0.1.0
+make release-major    # v0.0.7 → v1.0.0
 ```
 
 Needs on PATH: `gh`, `podman` (or `docker`), `op`, `doctl`, `kubectl`.
 
-- Image lives at `ghcr.io/changkun/wallfacerd` (changkun namespace, not latere-ai). The tag strips the leading `v` so `v0.0.7` → image tag `0.0.7`, matching the in-cluster manifest convention.
-- gh token must have `write:packages,read:packages`. `gh auth refresh -s write:packages,read:packages` if 403.
-- DO PAT comes from 1Password at `op://LatereAI/Digital Ocean Credentials/PAT`. Passed via `DIGITALOCEAN_ACCESS_TOKEN` for the single doctl call; never written to disk.
-- Builds `linux/amd64` by default (cluster nodes). `Dockerfile.wallfacerd` pins bun + go stages to `$BUILDPLATFORM` so they run native on Apple Silicon (no qemu).
-- `make deploy` runs `tools/smoke/release.sh` against `https://wf.latere.ai` (checks `/`, `/healthz`, `/api/debug/health`), then `tools/release/publish.sh` to push the git tag to origin and create the GitHub release with smoke evidence merged into the body.
-- Pushing the tag during deploy also triggers `release-binary.yml` (multi-platform CLI binaries via goreleaser) and `release-desktop.yml` (Wails desktop builds with macOS notarization + Windows signtool). Both attach their artifacts to the release publish.sh just created.
-- If a release fails partway, the bump tag is rolled back automatically.
-- The legacy `make release-notes-publish RELEASE_VERSION=v0.0.6` flow (commit hand-curated `docs/releases/<version>.md`, tag, push, gh release create) is still available for desktop-only releases that don't ship a new image. Not the standard path.
+- Image: `ghcr.io/changkun/wallfacerd` (changkun namespace, not latere-ai). Tag strips leading `v` so `v0.0.7` → image tag `0.0.7`.
+- DO PAT in 1Password at `op://LatereAI/Digital Ocean Credentials/PAT`.
+- Deployment `wallfacerd`, namespace `latere`, prod URL `https://wf.latere.ai`.
+- Builds `linux/amd64` (cluster). Failure at any step rolls back the bump tag.
+- Pushing the tag during the deploy also triggers `release-binary.yml` (CLI binaries) and `release-desktop.yml` (Wails desktop with Apple notarization + Windows signtool) — these stay in GH Actions because the signing keys live there. Both attach their artifacts to the GitHub release that the deploy creates.
+- Internal targets exist if you need to step through (`make release`, `make deploy`, `make ghcr-login`, `make kubeconfig`, `make release-notes-publish` for the legacy hand-curated notes flow) — `release-patch` is the standard path.
 
 ## Commit and push strategy
 
