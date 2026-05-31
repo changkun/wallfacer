@@ -1,13 +1,9 @@
 /*
- * app.css is a barrel that loads design tokens, a global reset, and then
- * re-exports its themed partials. Vite bundles `@import` at build time,
- * so this is equivalent to importing each file directly from main.ts but
- * keeps the public import stable.
+ * app.css is a barrel that loads design tokens, then re-exports its themed
+ * partials. The global reset that used to sit here moved to app/shell.css
+ * because PostCSS requires all @import statements to precede other rules.
  */
 @import './tokens.css';
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 @import './app/shell.css';
 @import './app/navbar-auth.css';
 @import './app/buttons-hero.css';
