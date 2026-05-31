@@ -35,6 +35,11 @@ const { connected } = useSse({
     'task-updated': (data) => store.updateTask(data as Task),
     'task-deleted': (data) => store.removeTask((data as { id: string }).id),
   },
+  // Server emits heartbeats every 15 s. If nothing arrives for 35 s the
+  // connection has likely died silently — the watchdog inside useSse
+  // restarts the stream and we refetch the canonical task list so any
+  // missed delta gets repaired.
+  onStaleRestart: () => { void store.fetchTasks({ includeArchived: ui.showArchived }); },
 });
 
 useKeyboard({
