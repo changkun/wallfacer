@@ -41,9 +41,10 @@ func newAuthHandler(t *testing.T) *Handler {
 // internal/cli so this test doesn't cross the cli package boundary.
 type fakeAuthProvider struct{}
 
-func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)    {}
-func (fakeAuthProvider) HandleCallback(http.ResponseWriter, *http.Request) {}
-func (fakeAuthProvider) HandleLogout(http.ResponseWriter, *http.Request)   {}
+func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)        {}
+func (fakeAuthProvider) HandleCallback(http.ResponseWriter, *http.Request)     {}
+func (fakeAuthProvider) HandleLogout(http.ResponseWriter, *http.Request)       {}
+func (fakeAuthProvider) HandleLogoutNotify(http.ResponseWriter, *http.Request) {}
 func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *auth.User {
 	return nil
 }

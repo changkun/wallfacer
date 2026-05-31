@@ -8,12 +8,18 @@ import (
 )
 
 // AuthProvider is the subset of *auth.Client the HTTP handlers need. Kept
-// as an interface so tests can substitute a fake without spinning up a
-// real OIDC client. An untyped-nil value means auth is not configured.
+// as an interface so tests can substitute a fake without spinning up a real
+// OIDC client. An untyped-nil value means auth is not configured.
+//
+// The Handle* methods stay on the interface so the Login/Callback/Logout/
+// LogoutNotify endpoints can apply wallfacer-specific behavior (503 when
+// unconfigured, fall back to a bare cookie-clear on Logout) that the
+// upstream pkg/oidc handlers do not provide.
 type AuthProvider interface {
 	HandleLogin(http.ResponseWriter, *http.Request)
 	HandleCallback(http.ResponseWriter, *http.Request)
 	HandleLogout(http.ResponseWriter, *http.Request)
+	HandleLogoutNotify(http.ResponseWriter, *http.Request)
 	UserFromRequest(http.ResponseWriter, *http.Request) *auth.User
 	AuthURL() string
 }
@@ -68,9 +74,15 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // LogoutNotify is the front-channel logout target: the auth service loads
 // it in a hidden iframe when a user signs out centrally, and we clear our
 // local session cookie in response. Always returns 200 so the iframe load
-// doesn't flag as an error, and works regardless of whether the
-// AuthProvider is configured (the cookie to clear is always the same).
-func (h *Handler) LogoutNotify(w http.ResponseWriter, _ *http.Request) {
+// doesn't flag as an error. When the AuthProvider is configured, delegates
+// to its HandleLogoutNotify so any product-specific cleanup runs; otherwise
+// falls back to a bare cookie clear (the cookie name doesn't depend on
+// provider state).
+func (h *Handler) LogoutNotify(w http.ResponseWriter, r *http.Request) {
+	if h.auth != nil {
+		h.auth.HandleLogoutNotify(w, r)
+		return
+	}
 	auth.ClearSession(w)
 	w.WriteHeader(http.StatusOK)
 }

@@ -16,9 +16,10 @@ import (
 type fakeAuth struct {
 	user          *auth.User
 	url           string
-	loginCalls    int
-	callbackCalls int
-	logoutCalls   int
+	loginCalls        int
+	callbackCalls     int
+	logoutCalls       int
+	logoutNotifyCalls int
 }
 
 func (f *fakeAuth) HandleLogin(w http.ResponseWriter, _ *http.Request) {
@@ -34,6 +35,12 @@ func (f *fakeAuth) HandleCallback(w http.ResponseWriter, _ *http.Request) {
 func (f *fakeAuth) HandleLogout(w http.ResponseWriter, _ *http.Request) {
 	f.logoutCalls++
 	w.WriteHeader(http.StatusFound)
+}
+
+func (f *fakeAuth) HandleLogoutNotify(w http.ResponseWriter, _ *http.Request) {
+	f.logoutNotifyCalls++
+	auth.ClearSession(w)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (f *fakeAuth) UserFromRequest(_ http.ResponseWriter, _ *http.Request) *auth.User {
