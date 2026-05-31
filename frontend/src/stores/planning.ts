@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { api } from '../api/client';
+import { useToastStore } from './toast';
 
 export interface SpecMeta {
   title?: string;
@@ -101,8 +102,35 @@ export const usePlanningStore = defineStore('planning', () => {
     focusedSpecPath.value ? nodesByPath.value.get(focusedSpecPath.value) ?? null : null,
   );
 
+  // First-spec bootstrap choreography: when a previously empty spec tree
+  // gains its first node, auto-focus that node and surface a toast so the
+  // workspace transition reads as a single fluid event.
+  // Idempotent per session — reconnect-induced re-snapshots are ignored.
+  let bootstrapFired = false;
+
+  function maybeFireBootstrap(nextNodes: SpecNode[]) {
+    if (bootstrapFired) return;
+    if (tree.value.length > 0 || nextNodes.length === 0) return;
+    bootstrapFired = true;
+    const first = [...nextNodes].sort((a, b) => a.path.localeCompare(b.path))[0];
+    if (!first?.path) return;
+    setTimeout(() => focusSpec(first.path), 130);
+    setTimeout(() => {
+      try {
+        useToastStore().push(
+          `Your first spec was created at ${first.path}. Rename or move it anytime.`,
+          { kind: 'success', timeout: 6000 },
+        );
+      } catch {
+        // toast store not ready (e.g. tests without pinia) — silently skip
+      }
+    }, 160);
+  }
+
   function applyTree(data: Partial<SpecTreeData>) {
-    tree.value = data.nodes ?? [];
+    const nextNodes = data.nodes ?? [];
+    maybeFireBootstrap(nextNodes);
+    tree.value = nextNodes;
     treeIndex.value = data.index ?? null;
     treeProgress.value = data.progress ?? {};
     treeLoading.value = false;
