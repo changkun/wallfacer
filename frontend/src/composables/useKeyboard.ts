@@ -3,6 +3,7 @@ import { onMounted, onUnmounted } from 'vue';
 export interface KeyboardActions {
   onNewTask?: () => void;
   onSearch?: () => void;
+  onFocusSearch?: () => void;
   onSettings?: () => void;
   onTerminal?: () => void;
   onShortcuts?: () => void;
@@ -37,6 +38,14 @@ export function useKeyboard(actions: KeyboardActions) {
     if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
       e.preventDefault();
       actions.onShortcuts?.();
+      return;
+    }
+
+    // Bare "/" focuses the search bar — matches the shortcut hint shown in
+    // KeyboardShortcutsModal. Shift+"/" handled above as "?".
+    if (e.key === '/' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      actions.onFocusSearch?.();
       return;
     }
 
