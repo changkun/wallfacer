@@ -29,8 +29,9 @@ Cloud Platform — integration track (consume Latere services, don't absorb)
   ○ Tenant API
   archived: Multi-Tenant, Billing Idempotency (now owned by Cella / Identity)
 
-Shared Design — 2/5 complete
+Shared Design — 2/6 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
+  ○ Host as Only Backend           ○ Harness Abstraction
   ○ Overlay Snapshots              ○ Token & Cost Optimization
   ○ Extensible Prompts
 
@@ -119,6 +120,7 @@ Integration track. Wallfacer is the autonomous-engineering control plane; in clo
 | [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the integration seams (Identity ✅, Runtime→Cella, FS, deploy, Lux, MCP, metadata) and the consume-don't-absorb rules |
 | ↳ [latere-integration/cella-runtime.md](cloud/latere-integration/cella-runtime.md) | Drafted | `CellaBackend` implementing `sandbox.Backend` — a third runtime alongside Local (podman/docker) and Host, selected by `--backend cella`. Maps `ContainerSpec` onto Cella's `/v1/sandboxes` API; worktree transport via FS |
 | ↳ [latere-integration/shared-cella-client.md](cloud/latere-integration/shared-cella-client.md) | Drafted | Extract Cella's wire client into a standalone `latere.ai/x/sandbox/client` package shared by Wallfacer's `CellaBackend` and Topos's `cella.Provider`; abstractions stay split (harness-inside vs harness-outside) |
+| ↳ [latere-integration/topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md) | Drafted | `TopozExecutor` — dispatch task runs to Latere Topos's `/v1/agents` control plane via `--executor topos`. Reuses Latere auth; v1 workspace transport via git push. Topos runs the harness on the remote side; client streams canonical events back. |
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Drafted | fs.latere.ai integration, repo provisioner, workspace cloud mapping. **Blocked on FS Workspace API (Phase 5)** |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Drafted | Thin deploy module into the existing DOKS `latere` namespace + `pkg/otel` OTLP emit |
 | [tenant-api.md](cloud/tenant-api.md) | Drafted | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
@@ -164,6 +166,13 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 |------|--------|--------|----------|
 | [agent-abstraction.md](shared/agent-abstraction.md) | **Complete** | Both | `AgentRole` descriptor + `runAgent` primitive unify the seven sub-agent roles (title, oversight, commit, refinement, ideation, implementation, testing) onto one container launch path. Shipped Option A across 5 migration phases; Options C / D deferred. |
 | [host-exec-mode.md](shared/host-exec-mode.md) | **Complete** | Local | `HostBackend` — opt-in `wallfacer run --backend host` that execs host-installed `claude`/`codex` directly. No image pull, no container; trades isolation for zero install friction. Covers both agents, live NDJSON streaming, parallel-cap default, Settings UI warning, `make build-host` target, and host-mode E2E harness. |
+| [host-default.md](shared/host-default.md) | Drafted | Local | Make host the only local backend — remove `LocalBackend`, the `--backend` flag, image pull plumbing, `codex-agent.sh`, the Sandbox Images UI surface, and `Dockerfile` (agent image). Cloud / Cella path unaffected. |
+| [harness-abstraction.md](shared/harness-abstraction.md) | Drafted | Both | New `internal/harness/` package with a `Harness` interface (BuildArgv / ParseEvent / AuthEnv / Capabilities). Renames `sandbox.Type` → `harness.ID`. Migrates Claude + Codex, then adds Cursor, OpenCode, Pi. Topos is a remote *executor*, not a harness (see cloud track). |
+| ↳ [harness-abstraction/interface.md](shared/harness-abstraction/interface.md) | Drafted | Both | Skeleton package: interface, value types, registry, fake harness for tests. No production caller migrates. |
+| ↳ [harness-abstraction/claude-and-codex-migration.md](shared/harness-abstraction/claude-and-codex-migration.md) | Drafted | Both | Move existing Claude / Codex argv + parse logic into `harness.Claude` and `harness.Codex`; delete `host_codex.go` and Codex's "fake a Claude result line" synthesis. |
+| ↳ [harness-abstraction/cursor.md](shared/harness-abstraction/cursor.md) | Drafted | Both | Cursor (`cursor-agent`) harness — first validation case for the abstraction. |
+| ↳ [harness-abstraction/opencode.md](shared/harness-abstraction/opencode.md) | Drafted | Both | OpenCode (`opencode run`) harness — provider auth managed by the harness itself. |
+| ↳ [harness-abstraction/pi.md](shared/harness-abstraction/pi.md) | Drafted | Both | Pi (`pi` — earendil-works coding agent, not Inflection Pi) harness, JSON mode. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Not started | Both | Cache observability, --resume correctness audit, shell output compression (RTK), consumption regression model, prospective budgeting. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Not started | Both | Discoverable, user-creatable prompt system — replace hardcoded templates with skill-like prompt files that the system discovers at runtime. |
