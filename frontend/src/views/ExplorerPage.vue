@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { renderMarkdown } from '../lib/markdown';
+
+interface TaskPromptEntry {
+  task_id: string;
+  title: string;
+  status: string;
+  updated_at: string;
+}
 
 interface TreeEntry {
   name: string;
@@ -12,6 +20,31 @@ interface TreeEntry {
 }
 
 const store = useTaskStore();
+const router = useRouter();
+
+// Task Prompts virtual section — backlog (+ waiting when toggled on)
+// tasks rendered as clickable entries above the regular file tree. The
+// list reloads on any task SSE event so it stays in sync with the board.
+const taskPrompts = ref<TaskPromptEntry[]>([]);
+const taskPromptsExpanded = ref(true);
+const taskPromptsIncludeWaiting = ref(false);
+
+async function loadTaskPrompts() {
+  try {
+    const status = taskPromptsIncludeWaiting.value ? 'backlog,waiting' : 'backlog';
+    taskPrompts.value = await api<TaskPromptEntry[]>(
+      'GET',
+      `/api/explorer/task-prompts?status=${encodeURIComponent(status)}`,
+    );
+  } catch {
+    // section is optional; failure is silent
+  }
+}
+
+function openTaskPrompt(entry: TaskPromptEntry) {
+  // Deep-link via the hash route handler in App.vue.
+  void router.push({ path: '/', hash: `#${entry.task_id}` });
+}
 
 const children = ref<Map<string, TreeEntry[]>>(new Map());
 const expanded = ref<Set<string>>(new Set());
@@ -184,7 +217,14 @@ onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   if (workspace()) await loadRoot();
   startExplorerStream();
+  await loadTaskPrompts();
 });
+
+// Refresh the Task Prompts virtual section whenever the global task list
+// changes. Watching store.tasks.length is cheap and catches the snapshot
+// + per-task SSE deltas the AppLayout subscribes to.
+watch(() => store.tasks.length, () => { void loadTaskPrompts(); });
+watch(taskPromptsIncludeWaiting, () => { void loadTaskPrompts(); });
 
 onUnmounted(() => { explorerStream?.close(); });
 
@@ -198,6 +238,38 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
     <aside class="explorer-panel">
       <div class="explorer-panel__header">
         <span class="explorer-panel__title">Explorer</span>
+      </div>
+      <div v-if="taskPrompts.length" class="explorer-task-prompts">
+        <button
+          type="button"
+          class="explorer-task-prompts__header"
+          :aria-expanded="taskPromptsExpanded"
+          @click="taskPromptsExpanded = !taskPromptsExpanded"
+        >
+          <span>{{ taskPromptsExpanded ? '▼' : '▶' }}</span>
+          <span>Task Prompts</span>
+          <span class="explorer-task-prompts__count">{{ taskPrompts.length }}</span>
+        </button>
+        <div v-if="taskPromptsExpanded">
+          <label class="explorer-task-prompts__toggle">
+            <input
+              v-model="taskPromptsIncludeWaiting"
+              type="checkbox"
+            />
+            Include waiting
+          </label>
+          <button
+            v-for="entry in taskPrompts"
+            :key="entry.task_id"
+            type="button"
+            class="explorer-task-prompts__item"
+            :title="entry.title"
+            @click="openTaskPrompt(entry)"
+          >
+            <span class="explorer-task-prompts__badge" :data-status="entry.status">{{ entry.status }}</span>
+            <span class="explorer-task-prompts__title">{{ entry.title || entry.task_id.slice(0, 8) }}</span>
+          </button>
+        </div>
       </div>
       <div class="explorer-panel__tree">
         <div v-if="treeLoading" class="explorer-panel__empty">Loading...</div>
@@ -292,5 +364,71 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
+}
+.explorer-task-prompts {
+  border-bottom: 1px solid var(--rule);
+  padding: 4px 6px 6px;
+  font-size: 11px;
+}
+.explorer-task-prompts__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 4px 4px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  text-align: left;
+}
+.explorer-task-prompts__count {
+  margin-left: auto;
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+  padding: 0 5px;
+  border-radius: 999px;
+}
+.explorer-task-prompts__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 6px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.explorer-task-prompts__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 4px 4px;
+  cursor: pointer;
+  color: var(--ink-2);
+  text-align: left;
+}
+.explorer-task-prompts__item:hover { background: var(--bg-hover); }
+.explorer-task-prompts__badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.explorer-task-prompts__badge[data-status="waiting"] { color: var(--warn, #c87b1c); }
+.explorer-task-prompts__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
