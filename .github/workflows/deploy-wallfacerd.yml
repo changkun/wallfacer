@@ -1,10 +1,25 @@
 name: Deploy wallfacerd
 
+# Fires after the wallfacerd image build for a tag push completes.
+# Deploys to the shared `latere` namespace, smokes the SPA + health
+# surface, and creates/edits the GitHub release with the auto-generated
+# changelog plus a smoke evidence block.
+#
+# release-binary.yml + release-desktop.yml ALSO run on the same v* tag
+# and use softprops/action-gh-release to attach their CLI and Wails
+# desktop artifacts to the same release — they tolerate an existing
+# release, so whichever workflow's publish step lands first creates it
+# and the others attach.
+
 on:
   workflow_run:
     workflows: [wallfacerd]
     types: [completed]
     branches: ['v*']
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   deploy:
@@ -15,6 +30,14 @@ jobs:
       url: https://wf.latere.ai
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          check-latest: true
+          cache: false
 
       - uses: digitalocean/action-doctl@v2
         with:
@@ -42,3 +65,57 @@ jobs:
           kubectl -n latere set image deployment/wallfacerd \
             wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
           kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
+
+      - name: Smoke production release
+        env:
+          TAG: ${{ github.event.workflow_run.head_branch }}
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+          BUILD_URL: ${{ github.event.workflow_run.html_url }}
+          DEPLOY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          BASE_URL=https://wf.latere.ai \
+            TAG="$TAG" \
+            COMMIT="$COMMIT" \
+            BUILD_URL="$BUILD_URL" \
+            DEPLOY_URL="$DEPLOY_URL" \
+            OUTPUT_MD=release-evidence/smoke.md \
+            tools/smoke/release.sh
+          cat release-evidence/smoke.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.event.workflow_run.head_branch }}
+          path: release-evidence/
+          if-no-files-found: error
+
+      - name: Publish release evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          go build -o release-evidence/evidence-body ./tools/release
+          evidence=release-evidence/smoke.md
+          body=release-evidence/release-body.md
+          prefix=release-evidence/prefix.md
+          if gh release view "$TAG" --json body --jq .body > "$prefix" 2>/dev/null; then
+            release-evidence/evidence-body \
+              --prefix "$prefix" --evidence "$evidence" --out "$body"
+            gh release edit "$TAG" --notes-file "$body"
+          else
+            gh api "repos/${{ github.repository }}/releases/generate-notes" \
+              -f tag_name="$TAG" \
+              -f target_commitish="$SHA" \
+              --jq .body > "$prefix" || true
+            release-evidence/evidence-body \
+              --prefix "$prefix" --evidence "$evidence" --out "$body"
+            # No --target: the tag already exists at $SHA (the
+            # workflow_run was triggered by its push).
+            gh release create "$TAG" \
+              --title "Wallfacer $TAG" \
+              --notes-file "$body"
+          fi
