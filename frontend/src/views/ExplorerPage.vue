@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { renderMarkdown } from '../lib/markdown';
@@ -159,10 +159,34 @@ const renderedHtml = computed(() =>
 );
 watch(selectedPath, () => { previewMode.value = 'rendered'; });
 
+// Live tree refresh: subscribes to /api/explorer/stream and re-fetches the
+// affected directories whenever the server detects a content change (3 s
+// poll, fingerprint-based). The stream auto-reconnects via EventSource's
+// default behavior; we just close it on unmount.
+let explorerStream: EventSource | null = null;
+function startExplorerStream() {
+  if (typeof EventSource === 'undefined') return;
+  explorerStream?.close();
+  let url = '/api/explorer/stream';
+  const key = window.__WALLFACER__?.serverApiKey;
+  if (key) url += `?token=${encodeURIComponent(key)}`;
+  explorerStream = new EventSource(url);
+  explorerStream.addEventListener('refresh', async () => {
+    // Re-fetch the root + every currently-expanded directory. Children are
+    // keyed by path; collapsed nodes intentionally stay stale until the
+    // user expands them again.
+    await fetchChildren('');
+    for (const p of expanded.value) await fetchChildren(p);
+  });
+}
+
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   if (workspace()) await loadRoot();
+  startExplorerStream();
 });
+
+onUnmounted(() => { explorerStream?.close(); });
 
 watch(() => store.config?.workspaces?.[0], (ws) => {
   if (ws) loadRoot();
