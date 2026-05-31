@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import { useEnvConfig } from '../../composables/useEnvConfig';
+import { claudeModelsFor, codexModelsFor } from '../../lib/knownModels';
 import type {
   EnvConfig,
   EnvUpdatePayload,
@@ -91,6 +92,9 @@ const defaultSandbox = ref('');
 const sandboxFast = ref(true);
 const containerCpus = ref('');
 const containerMemory = ref('');
+
+const claudeModels = computed(() => claudeModelsFor(claudeBaseUrl.value));
+const codexModels = computed(() => codexModelsFor(openaiBaseUrl.value));
 
 const claudeTestStatus = ref('');
 const claudeTestReauth = ref(false);
@@ -602,9 +606,11 @@ function capitalize(s: string): string {
                 style="font-family: monospace; font-size: 12px"
                 placeholder="e.g. claude-sonnet-4.6"
                 autocomplete="off"
-                list="env-model-list"
+                list="env-claude-model-list"
               />
-              <datalist id="env-model-list"></datalist>
+              <datalist id="env-claude-model-list">
+                <option v-for="m in claudeModels" :key="m" :value="m" />
+              </datalist>
               <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
                 Default model for Claude tasks. Clear to use the container
                 default.
@@ -621,7 +627,7 @@ function capitalize(s: string): string {
                 style="font-family: monospace; font-size: 12px"
                 placeholder="e.g. claude-haiku-4.5"
                 autocomplete="off"
-                list="env-model-list"
+                list="env-claude-model-list"
               />
               <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
                 Model for auto-generating task titles. Falls back to the default
@@ -731,8 +737,11 @@ function capitalize(s: string): string {
                 style="font-family: monospace; font-size: 12px"
                 placeholder="e.g. gpt-5-codex"
                 autocomplete="off"
-                list="env-model-list"
+                list="env-codex-model-list"
               />
+              <datalist id="env-codex-model-list">
+                <option v-for="m in codexModels" :key="m" :value="m" />
+              </datalist>
               <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
                 Default model for Codex tasks.
               </div>
@@ -748,7 +757,7 @@ function capitalize(s: string): string {
                 style="font-family: monospace; font-size: 12px"
                 placeholder="e.g. gpt-5-codex"
                 autocomplete="off"
-                list="env-model-list"
+                list="env-codex-model-list"
               />
               <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
                 Model for auto-generating task titles. Falls back to Codex default
