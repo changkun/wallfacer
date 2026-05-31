@@ -21,16 +21,23 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Summary (53 modules + 4 lib)
 
-- **DONE (~19):** transport, theme, markdown, task-stream, terminal, containers,
-  agents, flows, system-prompts, instructions, templates, usage-stats,
-  analytics-tabs, trash-bin, modal-logs, depgraph, unified-graph, spec-explorer.
-- **PARTIAL (~22):** api, state, events, utils, tasks, dnd, status-bar,
-  modal-core, modal-oversight, modal-results, modal-ansi, modal-stats, span-stats,
-  planning-chat, spec-mode, envconfig, images, routines, explorer, git, workspace,
-  search, command-palette, docs.
-- **MISSING (~11):** render*, bootstrap-choreography, sidebar-badge, modal-diff,
-  modal-ndjson, modal-flamegraph, dispatch-toast, ideate†, mention,
-  keyboard-shortcuts‡, board-composer.
+- **DONE (~36):** transport, theme, markdown, task-stream, terminal,
+  containers, agents, flows, system-prompts, instructions, templates,
+  usage-stats, analytics-tabs, trash-bin, modal-logs, modal-diff,
+  modal-ndjson, depgraph, unified-graph, spec-explorer, sidebar-badge,
+  bootstrap-choreography, mention, dispatch-toast, dnd, planning-chat,
+  spec-mode, routines, utils (confirm/alert/prompt), images,
+  board-composer, tasks, envconfig (model dropdown), api (heartbeat +
+  archived pagination), events (`/` focus search), git.
+- **PARTIAL (~14):** explorer (md preview + SSE refresh ✓; task-prompts
+  + keyboard nav pending), status-bar (terminal + presence + sign-in
+  done; org switcher + system status pending), command-palette (task
+  actions done; spec/doc rows + action keyboard-nav pending),
+  modal-core / modal-oversight / modal-results / modal-ansi /
+  modal-stats / span-stats, search, workspace, keyboard-shortcuts
+  (card-level s/d/arrow nav pending).
+- **MISSING (~3):** modal-flamegraph (span timeline Gantt),
+  render (badges live in TaskCard — VERIFY), ideate (RETIRED).
 
 *render.js logic may live inside `TaskCard.vue` — VERIFY before treating as missing.
 †ideate.js is now a stub; ideation refactored into the task composer — may be intentionally retired.
@@ -198,6 +205,20 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Progress log
 
+- 2026-06-01: **Explorer + infra.** Markdown preview toggle (auto-rendered
+  for .md, Source button to flip back), SSE-driven live tree refresh
+  (re-fetches root + every expanded directory on `refresh` events from
+  /api/explorer/stream). Closes most of gap #7.
+- 2026-06-01: **Infra.** fetchTasks accepts {includeArchived,
+  archivedPageSize} and BoardPage watches ui.showArchived → server-side
+  archived pagination working end-to-end. useSse gained a 35 s heartbeat
+  watchdog that tears down + reconnects on silent connection death and
+  fires onStaleRestart (AppLayout refetches the canonical task list).
+  Closes most of gap #15.
+- 2026-06-01: **Planning + bootstrap.** First non-empty spec snapshot now
+  auto-focuses the alphabetically-first spec at +130 ms and pushes a 6 s
+  "Your first spec was created at …" toast at +160 ms, idempotent per
+  session. 3 unit tests. Closes bootstrap-choreography (gap #16).
 - 2026-06-01: **File-size refactor.** Per project convention (max 1000 LOC
   per file): split header.css (1281), app.css (1543), spec-mode.css (1730)
   into themed `.css` partials under matching subfolders, each <500 LOC;
