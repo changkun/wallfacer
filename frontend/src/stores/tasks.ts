@@ -62,9 +62,19 @@ export const useTaskStore = defineStore('tasks', () => {
     tasks.value = tasks.value.filter(t => t.id !== id);
   }
 
-  async function fetchTasks() {
+  /** Fetch tasks for the active workspace. When `includeArchived` is true the
+   *  endpoint also returns the most recent page of archived tasks; the page
+   *  size is sourced from the server's `archived_tasks_per_page` env value
+   *  (see SettingsTabExecution) and clamped server-side to [1, 200]. */
+  async function fetchTasks(opts?: { includeArchived?: boolean; archivedPageSize?: number }) {
     try {
-      const list = await api<Task[]>('GET', '/api/tasks');
+      let url = '/api/tasks';
+      if (opts?.includeArchived) {
+        const size = opts.archivedPageSize ?? 50;
+        url += `?include_archived=true&archived_page_size=${size}`;
+      }
+      const resp = await api<Task[] | { tasks: Task[] }>('GET', url);
+      const list = Array.isArray(resp) ? resp : (resp?.tasks ?? []);
       setTasks(list);
     } catch (e) {
       console.error('fetchTasks:', e);
