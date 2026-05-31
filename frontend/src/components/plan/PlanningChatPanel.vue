@@ -16,6 +16,7 @@ import {
   activityIcon,
   bubbleFromMessage,
 } from '../../lib/planningBubble';
+import { usePlanningAutocomplete } from '../../composables/usePlanningAutocomplete';
 
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
@@ -367,161 +368,15 @@ function drainNextQueued() {
 
 // ── Keyboard handling ──────────────────────────────────────────────
 
-const slashOpen = ref(false);
-const slashItems = ref<{ name: string; description?: string }[]>([]);
-const slashFiltered = ref<{ name: string; description?: string }[]>([]);
-const slashIndex = ref(0);
-const slashStart = ref(-1);
-
-const mentionOpen = ref(false);
-const mentionItems = ref<string[]>([]);
-const mentionFiltered = ref<string[]>([]);
-const mentionIndex = ref(0);
-const mentionStart = ref(-1);
-
-let commandsCache: { name: string; description?: string }[] | null = null;
-async function fetchCommands() {
-  if (commandsCache) return commandsCache;
-  try {
-    commandsCache = await api<{ name: string; description?: string }[]>('GET', '/api/planning/commands');
-    return commandsCache ?? [];
-  } catch {
-    return [];
-  }
-}
-
-let filesCache: string[] | null = null;
-async function fetchFiles() {
-  if (filesCache) return filesCache;
-  try {
-    const resp = await api<{ files: string[] }>('GET', '/api/files');
-    filesCache = resp.files ?? [];
-    return filesCache;
-  } catch {
-    return [];
-  }
-}
-
-function autoGrow() {
-  const el = inputEl.value;
-  if (!el) return;
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-}
-
-async function onInput() {
-  autoGrow();
-  const el = inputEl.value;
-  if (!el) return;
-  const value = el.value;
-  const pos = el.selectionStart ?? value.length;
-  const before = value.slice(0, pos);
-
-  // Slash detection: token starting with / at line start or after whitespace.
-  const slashMatch = before.match(/(^|\s)\/([\w-]*)$/);
-  if (slashMatch) {
-    slashStart.value = before.lastIndexOf('/');
-    const q = slashMatch[2].toLowerCase();
-    if (slashItems.value.length === 0) slashItems.value = await fetchCommands();
-    slashFiltered.value = slashItems.value.filter(c => c.name.toLowerCase().startsWith(q));
-    slashIndex.value = 0;
-    slashOpen.value = slashFiltered.value.length > 0;
-    mentionOpen.value = false;
-    return;
-  }
-  slashOpen.value = false;
-
-  // Mention detection: token starting with @.
-  const atMatch = before.match(/(^|\s)@([\w./-]*)$/);
-  if (atMatch) {
-    mentionStart.value = before.lastIndexOf('@');
-    const q = atMatch[2].toLowerCase();
-    if (mentionItems.value.length === 0) mentionItems.value = await fetchFiles();
-    mentionFiltered.value = mentionItems.value
-      .filter(f => f.toLowerCase().includes(q))
-      .slice(0, 50);
-    mentionIndex.value = 0;
-    mentionOpen.value = mentionFiltered.value.length > 0;
-    return;
-  }
-  mentionOpen.value = false;
-}
-
-function applySlash(cmd: { name: string }) {
-  const el = inputEl.value;
-  if (!el || slashStart.value < 0) return;
-  const v = el.value;
-  const pos = el.selectionStart ?? v.length;
-  const inserted = '/' + cmd.name + ' ';
-  el.value = v.slice(0, slashStart.value) + inserted + v.slice(pos);
-  inputText.value = el.value;
-  const newPos = slashStart.value + inserted.length;
-  el.setSelectionRange(newPos, newPos);
-  el.focus();
-  slashOpen.value = false;
-}
-
-function applyMention(file: string) {
-  const el = inputEl.value;
-  if (!el || mentionStart.value < 0) return;
-  const v = el.value;
-  const pos = el.selectionStart ?? v.length;
-  const inserted = '@' + file + ' ';
-  el.value = v.slice(0, mentionStart.value) + inserted + v.slice(pos);
-  inputText.value = el.value;
-  const newPos = mentionStart.value + inserted.length;
-  el.setSelectionRange(newPos, newPos);
-  el.focus();
-  mentionOpen.value = false;
-}
+const autocomplete = usePlanningAutocomplete({ inputEl, inputText });
+const {
+  slashOpen, slashFiltered, slashIndex,
+  mentionOpen, mentionFiltered, mentionIndex,
+  onInput, applySlash, applyMention, insertChar, autoGrow,
+} = autocomplete;
 
 function onKeydown(ev: KeyboardEvent) {
-  if (slashOpen.value) {
-    if (ev.key === 'ArrowDown') {
-      ev.preventDefault();
-      slashIndex.value = (slashIndex.value + 1) % slashFiltered.value.length;
-      return;
-    }
-    if (ev.key === 'ArrowUp') {
-      ev.preventDefault();
-      slashIndex.value = (slashIndex.value - 1 + slashFiltered.value.length) % slashFiltered.value.length;
-      return;
-    }
-    if (ev.key === 'Enter' || ev.key === 'Tab') {
-      ev.preventDefault();
-      const c = slashFiltered.value[slashIndex.value];
-      if (c) applySlash(c);
-      return;
-    }
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      slashOpen.value = false;
-      return;
-    }
-  }
-  if (mentionOpen.value) {
-    if (ev.key === 'ArrowDown') {
-      ev.preventDefault();
-      mentionIndex.value = (mentionIndex.value + 1) % mentionFiltered.value.length;
-      return;
-    }
-    if (ev.key === 'ArrowUp') {
-      ev.preventDefault();
-      mentionIndex.value = (mentionIndex.value - 1 + mentionFiltered.value.length) % mentionFiltered.value.length;
-      return;
-    }
-    if (ev.key === 'Enter' || ev.key === 'Tab') {
-      ev.preventDefault();
-      const f = mentionFiltered.value[mentionIndex.value];
-      if (f) applyMention(f);
-      return;
-    }
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      mentionOpen.value = false;
-      return;
-    }
-  }
+  if (autocomplete.handleKeydown(ev)) return;
 
   if (ev.key === 'Enter') {
     let shouldSend = false;
@@ -536,18 +391,6 @@ function onKeydown(ev: KeyboardEvent) {
       if (text) void sendMessage(text);
     }
   }
-}
-
-function insertChar(ch: '/' | '@') {
-  const el = inputEl.value;
-  if (!el) return;
-  const pos = el.selectionStart ?? el.value.length;
-  const v = el.value;
-  el.value = v.slice(0, pos) + ch + v.slice(pos);
-  inputText.value = el.value;
-  el.setSelectionRange(pos + 1, pos + 1);
-  el.focus();
-  void onInput();
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────
