@@ -4,6 +4,7 @@ import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import { parseTags } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
+import type { PromptTemplate } from '../api/types';
 
 interface FlowOption { slug: string; name: string }
 
@@ -18,6 +19,8 @@ const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform
 // Advanced fields.
 const flows = ref<FlowOption[]>([]);
 const flow = ref('implement');
+const templates = ref<PromptTemplate[]>([]);
+const templatePick = ref('');
 const tagsInput = ref('');
 const timeoutMin = ref<number | null>(null);
 // Optional overrides (behind a "More" toggle).
@@ -45,9 +48,44 @@ async function loadFlows() {
   }
 }
 
+async function loadTemplates() {
+  if (templates.value.length) return;
+  try {
+    templates.value = await api<PromptTemplate[]>('GET', '/api/templates');
+  } catch (e) {
+    console.error('load templates:', e);
+  }
+}
+
+function insertTemplate() {
+  const id = templatePick.value;
+  if (!id) return;
+  const tmpl = templates.value.find((t) => t.id === id);
+  templatePick.value = '';
+  if (!tmpl) return;
+  const el = textareaRef.value;
+  if (el) {
+    const pos = el.selectionStart ?? el.value.length;
+    const before = el.value.slice(0, pos);
+    const after = el.value.slice(pos);
+    // Insert with a leading newline if the cursor isn't at the start of a
+    // blank line — keeps the inserted block from glueing onto the prior text.
+    const sep = before && !before.endsWith('\n') ? '\n' : '';
+    prompt.value = before + sep + tmpl.body + after;
+    nextTick(() => {
+      const newPos = (before + sep + tmpl.body).length;
+      el.focus();
+      el.setSelectionRange(newPos, newPos);
+    });
+  } else {
+    prompt.value = prompt.value ? prompt.value + '\n' + tmpl.body : tmpl.body;
+  }
+}
+
 async function expand() {
   expanded.value = true;
   loadFlows();
+  loadTemplates();
   await nextTick();
   textareaRef.value?.focus();
 }
@@ -187,6 +225,18 @@ function onInput(e: Event) {
           placeholder="min"
           aria-label="Timeout in minutes"
         />
+      </label>
+      <label v-if="templates.length" class="composer__opt">
+        <span class="composer__opt-label">Template</span>
+        <select
+          v-model="templatePick"
+          class="composer__select"
+          aria-label="Insert template"
+          @change="insertTemplate"
+        >
+          <option value="">Insert…</option>
+          <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
       </label>
       <button type="button" class="composer__more" @click="showMore = !showMore">
         {{ showMore ? '− Less' : '+ More' }}
