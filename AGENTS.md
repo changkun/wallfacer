@@ -54,7 +54,12 @@ wallfacer status [-watch]                    # Print board state
 wallfacer exec <task-id-prefix>              # Attach to running task container
 wallfacer spec validate [-json] [path...]    # Validate spec frontmatter
 wallfacer spec new specs/local/foo.md        # Scaffold a spec with valid defaults
+wallfacer auth login [--org=<uuid>]          # Local-mode sign-in (RFC 8628 device code)
+wallfacer auth whoami                        # Print the saved principal_id / org_id
+wallfacer auth logout                        # Remove the locally stored token
 ```
+
+Local-mode token storage is `<UserConfigDir>/latere/token.json`, shared with the `latere` CLI: signing in via either tool carries over to the other. The local-mode SPA can also drive the same device-code flow without leaving the desktop window via the `POST /api/auth/device/start`, `GET /api/auth/device/poll`, and `POST /api/auth/device/cancel` endpoints (see `internal/handler/device_auth.go`).
 
 The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.
 
