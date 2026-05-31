@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { renderMarkdown } from '../lib/markdown';
 
 interface TreeEntry {
   name: string;
@@ -148,6 +149,16 @@ function previewLines(): string[] {
   return fileContent.value.split('\n');
 }
 
+// Markdown preview: rendered by default for .md / .markdown files; the
+// user can switch back to the line-numbered source view via a toolbar
+// button. Edit mode always shows the raw textarea regardless.
+const isMarkdownFile = computed(() => /\.(md|markdown)$/i.test(selectedPath.value ?? ''));
+const previewMode = ref<'rendered' | 'source'>('rendered');
+const renderedHtml = computed(() =>
+  isMarkdownFile.value && fileContent.value ? renderMarkdown(fileContent.value) : '',
+);
+watch(selectedPath, () => { previewMode.value = 'rendered'; });
+
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   if (workspace()) await loadRoot();
@@ -202,6 +213,12 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
           </span>
           <span class="explorer-preview__actions">
             <span v-if="saveError" class="explorer-save-error" :title="saveError">save failed</span>
+            <button
+              v-if="!editing && isMarkdownFile"
+              type="button"
+              class="explorer-edit-btn"
+              @click="previewMode = previewMode === 'rendered' ? 'source' : 'rendered'"
+            >{{ previewMode === 'rendered' ? 'Source' : 'Render' }}</button>
             <template v-if="editing">
               <button type="button" class="explorer-edit-btn" :disabled="saving" @click="saveFile">{{ saving ? 'Saving…' : 'Save' }}</button>
               <button type="button" class="explorer-edit-btn" :disabled="saving" @click="cancelEdit">Cancel</button>
@@ -216,6 +233,12 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
             class="explorer-edit-area"
             spellcheck="false"
           ></textarea>
+          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+          <div
+            v-else-if="isMarkdownFile && previewMode === 'rendered'"
+            class="explorer-preview__md prose"
+            v-html="renderedHtml"
+          />
           <pre v-else class="explorer-preview__code"><code>
             <div
               v-for="(line, idx) in previewLines()"
