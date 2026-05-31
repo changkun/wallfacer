@@ -1,0 +1,493 @@
+/* ===== Capability Grid (flat, no cards) ===== */
+.cap-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px 32px;
+}
+.cap-item h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.cap-item p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+a.cap-link { color: var(--text); display: block; }
+a.cap-link:hover h3 { color: var(--accent); }
+
+/* ===== Timeline ===== */
+.timeline {
+    max-width: 600px;
+    margin: 0 auto;
+    position: relative;
+    padding-left: 32px;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: var(--border-strong);
+}
+.timeline-item {
+    display: flex;
+    gap: 16px;
+    padding: 16px 0;
+    position: relative;
+}
+.timeline-marker {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
+    color: var(--accent);
+    background: var(--bg);
+    position: relative;
+    z-index: 1;
+    margin-left: -32px;
+}
+.timeline-content h3 {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+.timeline-content p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* ===== Steps List ===== */
+.steps-list {
+    max-width: 720px;
+    margin: 0 auto;
+    list-style: none;
+    padding: 0;
+    counter-reset: step;
+}
+.steps-list li {
+    counter-increment: step;
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+.steps-list li:last-child { border-bottom: none; }
+.steps-list li::before {
+    content: counter(step);
+    font-size: 12px;
+    font-weight: 700;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
+    color: var(--accent);
+    flex-shrink: 0;
+    width: 20px;
+}
+.steps-list strong {
+    color: var(--text);
+    margin-right: 6px;
+}
+
+/* ===== Flat style: no card boxes ===== */
+.product-card,
+.download-card,
+.download-icon-btn,
+.docs-card,
+.docs-grid {
+    border-radius: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+}
+.level-number {
+    border-radius: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 700;
+    width: auto;
+    height: auto;
+}
+.level-card:hover .level-number {
+    background: none;
+    color: var(--text);
+}
+
+/* ===== Product Tour ===== */
+.tour-item {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 32px;
+    align-items: center;
+    margin-bottom: 48px;
+}
+.tour-item:last-child { margin-bottom: 0; }
+.tour-item-reverse { direction: rtl; }
+.tour-item-reverse > * { direction: ltr; }
+.tour-text h2 {
+    font-size: 1.15rem;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+.tour-text p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+.tour-screenshot img {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== Overview Text ===== */
+.overview-text {
+    max-width: 680px;
+    margin: 0 auto;
+    text-align: center;
+}
+.overview-text p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 12px;
+}
+.overview-text p:last-child { margin-bottom: 0; }
+.overview-text strong { color: var(--text); font-weight: 600; }
+
+/* ===== Levels Grid ===== */
+.levels-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+.level-card {
+    padding: 0;
+    position: relative;
+}
+.level-card h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+}
+.level-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* ===== Features Grid ===== */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border-strong);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.feature-card {
+    background: var(--bg);
+    padding: 20px;
+}
+.feature-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+}
+.feature-card p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+/* ===== Install Block ===== */
+.install-block {
+    max-width: 640px;
+    margin: 0 auto 12px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.copy-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+.copy-btn:hover { color: var(--text); }
+.install-block code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+}
+.install-steps {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+.install-steps code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-size: 13px;
+    background: var(--bg-raised);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+/* ===== Why Intro ===== */
+.why-intro {
+    max-width: 720px;
+    margin: 0 auto 24px;
+    text-align: center;
+}
+.why-intro p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+.why-intro strong { color: var(--text); }
+
+/* ===== Capabilities Grid (reuses features-grid) ===== */
+.capabilities-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border-strong);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.capabilities-grid .feature-card {
+    background: var(--bg);
+}
+
+/* ===== Docs Layout ===== */
+.docs-layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 800px);
+    justify-content: center;
+    min-height: calc(100vh - 48px);
+    overflow-x: hidden;
+}
+.docs-sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 48px;
+    height: calc(100vh - 48px);
+    overflow-y: auto;
+}
+.docs-sidebar-header {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.docs-sidebar-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    line-height: 0;
+    transition: color 0.15s, transform 0.2s;
+}
+.docs-sidebar-toggle:hover { color: var(--text); }
+.docs-sidebar-toggle svg { display: inline-block; }
+.docs-back {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.docs-back:hover { color: var(--text); }
+.docs-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.docs-nav-link {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 5px 8px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+.docs-nav-link:hover {
+    color: var(--text);
+    background: var(--bg-raised);
+}
+.docs-nav-link.active {
+    color: var(--text);
+    background: var(--bg-raised);
+    font-weight: 500;
+}
+.docs-main {
+    padding: 32px 48px;
+    max-width: 800px;
+    margin: 0 auto;
+    min-width: 0;
+}
+.docs-article {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+.docs-article h1 {
+    font-size: 1.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+.docs-article h2 {
+    margin-top: 32px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.docs-article h3 {
+    margin-top: 28px;
+    margin-bottom: 12px;
+}
+.docs-article h4 {
+    margin-top: 20px;
+    margin-bottom: 6px;
+}
+.docs-article code {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-size: 13px;
+    background: var(--bg-raised);
+    padding: 1px 5px;
+    border-radius: 3px;
+    word-break: break-word;
+}
+.docs-article pre {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+    max-width: 100%;
+}
+.docs-article pre code {
+    word-break: normal;
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.docs-article table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+}
+.docs-article th, .docs-article td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+}
+.docs-article th {
+    font-weight: 600;
+    color: var(--text);
+}
+.docs-article td {
+    color: var(--text-secondary);
+}
+.docs-article ul,
+.docs-article ol {
+    padding-left: 1.5em;
+    margin: 12px 0;
+}
+.docs-article li {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 4px;
+}
+.docs-article img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 12px 0;
+}
+
+/* ===== Docs List ===== */
+.docs-list {
+    max-width: 720px;
+    margin: 0 auto;
+}
+.docs-list-item {
+    display: block;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    transition: color 0.15s;
+}
+.docs-list-item:last-child { border-bottom: none; }
+.docs-list-item:hover { color: var(--accent); }
+.docs-list-item strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+.docs-list-item span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ===== Docs Grid ===== */
+.docs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border-strong);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.docs-card {
+    background: var(--bg);
+    padding: 20px;
+    color: var(--text);
+    transition: background 0.15s;
+}
+.docs-card:hover {
+    background: var(--bg-raised);
+    color: var(--text);
+}
+.docs-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.docs-card p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
