@@ -1,0 +1,100 @@
+/* --- Settings button --- */
+.settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.settings-btn:hover {
+  color: var(--text);
+}
+
+.command-palette-trigger-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  padding: 5px 9px;
+  gap: 6px;
+}
+
+.command-palette-trigger-kbd {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.command-palette-trigger-text {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.theme-switch {
+  display: flex;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.theme-switch button {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+}
+.theme-switch button.active {
+  background: var(--accent);
+  color: #fff;
+}
+.theme-switch button:hover:not(.active) {
+  color: var(--text);
+}
+.settings-theme-switch {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: color-mix(in oklab, var(--bg-card) 72%, transparent);
+  border-radius: 999px;
+  padding: 3px;
+}
+.settings-theme-switch button {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  padding: 8px 10px;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+.settings-theme-switch button.active {
+  box-shadow: 0 4px 10px -6px rgba(0, 0, 0, 0.45);
+}
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.settings-toggle input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
