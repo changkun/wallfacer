@@ -2,7 +2,6 @@ package handler
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -128,15 +128,10 @@ func (h *Handler) ExplorerTree(w http.ResponseWriter, r *http.Request) {
 // event whenever the content fingerprint changes, so the client can re-fetch
 // only the affected nodes.
 func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+	stream := sse.NewWriter(w)
+	if stream == nil {
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
 
 	// Compute a fingerprint of a directory listing (names + types + sizes + mtimes).
 	fingerprint := func(dirPath string) string {
@@ -162,11 +157,9 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 		prevFingerprints[ws] = fingerprint(ws)
 	}
 
-	// Send initial connected event.
-	if _, err := fmt.Fprintf(w, "event: connected\ndata: {}\n\n"); err != nil {
+	if err := stream.Event("connected", []byte("{}")); err != nil {
 		return
 	}
-	flusher.Flush()
 
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
@@ -179,10 +172,9 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-keepalive.C:
-			if _, err := fmt.Fprintf(w, "event: heartbeat\ndata: {}\n\n"); err != nil {
+			if err := stream.Heartbeat(); err != nil {
 				return
 			}
-			flusher.Flush()
 		case <-ticker.C:
 			// Re-read current workspaces in case they changed.
 			currentWS := h.currentWorkspaces()
@@ -198,11 +190,9 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 			prevFingerprints = newFingerprints
 
 			if len(changed) > 0 {
-				data, _ := json.Marshal(map[string]any{"workspaces": changed})
-				if _, err := fmt.Fprintf(w, "event: refresh\ndata: %s\n\n", data); err != nil {
+				if err := stream.JSON("refresh", map[string]any{"workspaces": changed}); err != nil {
 					return
 				}
-				flusher.Flush()
 			}
 		}
 	}
