@@ -367,8 +367,9 @@ release-patch release-minor release-major:
 	echo "bump: $${latest:-<none>} → $$next"; \
 	git tag -a "$$next" -m "release $$next"
 	@tag=$$(git tag -l 'v*' --sort=-v:refname | head -1); \
-	$(MAKE) release WD_VERSION="$$tag" || { \
-		echo "release: failed; rolling back tag $$tag" >&2; \
+	$(MAKE) release WD_VERSION="$$tag" && \
+	$(MAKE) deploy  WD_VERSION="$$tag" || { \
+		echo "release-patch: pipeline failed; rolling back tag $$tag" >&2; \
 		git tag -d "$$tag"; \
 		exit 1; \
 	}
