@@ -27,6 +27,22 @@ const imagesLoading = ref(false);
 const imagesError = ref('');
 const pulling = ref<Record<string, boolean>>({});
 
+interface PullProgress {
+  phase: string;
+  layersDone: number;
+  line: string;
+}
+const pullProgress = ref<Record<string, PullProgress>>({});
+const pullStreams = new Map<string, EventSource>();
+
+function progressLabel(sandbox: string): string {
+  const p = pullProgress.value[sandbox];
+  if (!p) return '';
+  const phase = p.phase || 'pulling';
+  if (p.layersDone > 0) return `${phase} (${p.layersDone} layer${p.layersDone === 1 ? '' : 's'})`;
+  return phase;
+}
+
 async function loadImages(): Promise<void> {
   imagesLoading.value = true;
   imagesError.value = '';
@@ -40,29 +56,78 @@ async function loadImages(): Promise<void> {
   }
 }
 
+function streamUrlFor(pullId: string): string {
+  const base = `/api/images/pull/stream?pull_id=${encodeURIComponent(pullId)}`;
+  const key = window.__WALLFACER__?.serverApiKey;
+  return key ? `${base}&token=${encodeURIComponent(key)}` : base;
+}
+
+function clearPullState(sandbox: string) {
+  const next = { ...pulling.value };
+  delete next[sandbox];
+  pulling.value = next;
+  const prog = { ...pullProgress.value };
+  delete prog[sandbox];
+  pullProgress.value = prog;
+  pullStreams.get(sandbox)?.close();
+  pullStreams.delete(sandbox);
+}
+
 async function pullImage(sandbox: string): Promise<void> {
   pulling.value = { ...pulling.value, [sandbox]: true };
+  pullProgress.value = { ...pullProgress.value, [sandbox]: { phase: 'starting', layersDone: 0, line: '' } };
   try {
-    await api('POST', '/api/images/pull', { sandbox });
-    // Poll the status endpoint a few times until we see cached: true or
-    // give up after ~120s. The richer SSE stream is intentionally not
-    // wired up in this port.
-    let ticks = 0;
-    const max = 60;
-    const tick = async () => {
-      ticks++;
-      await loadImages();
-      const info = images.value.find((img) => img.sandbox === sandbox);
-      if (info?.cached || ticks >= max) {
-        pulling.value = { ...pulling.value, [sandbox]: false };
-        return;
+    const resp = await api<{ pull_id: string }>('POST', '/api/images/pull', { sandbox });
+    const pullId = resp?.pull_id;
+    if (!pullId || typeof EventSource === 'undefined') {
+      // No pull_id or no SSE support — fall back to one delayed reload.
+      window.setTimeout(async () => {
+        await loadImages();
+        clearPullState(sandbox);
+      }, 4000);
+      return;
+    }
+    const es = new EventSource(streamUrlFor(pullId));
+    pullStreams.set(sandbox, es);
+    es.addEventListener('progress', (ev) => {
+      try {
+        const data = JSON.parse((ev as MessageEvent).data);
+        pullProgress.value = {
+          ...pullProgress.value,
+          [sandbox]: {
+            phase: data.phase ?? '',
+            layersDone: data.layers_done ?? 0,
+            line: data.line ?? '',
+          },
+        };
+      } catch {
+        // skip malformed progress event
       }
-      window.setTimeout(tick, 2000);
-    };
-    window.setTimeout(tick, 2000);
+    });
+    es.addEventListener('done', async () => {
+      await loadImages();
+      clearPullState(sandbox);
+    });
+    es.addEventListener('error', async (ev) => {
+      // The server-sent 'error' event arrives via addEventListener with a
+      // MessageEvent.data payload; raw transport errors come through the
+      // same event but without data. Surface the message if present, then
+      // close out the pull.
+      const raw = (ev as MessageEvent).data;
+      if (typeof raw === 'string' && raw) {
+        try {
+          const obj = JSON.parse(raw);
+          if (obj?.error) imagesError.value = String(obj.error);
+        } catch {
+          imagesError.value = raw;
+        }
+      }
+      await loadImages();
+      clearPullState(sandbox);
+    });
   } catch (e) {
-    pulling.value = { ...pulling.value, [sandbox]: false };
     imagesError.value = e instanceof Error ? e.message : String(e);
+    clearPullState(sandbox);
   }
 }
 
@@ -402,6 +467,8 @@ onUnmounted(() => {
       oauthPollers[provider] = undefined;
     }
   }
+  for (const es of pullStreams.values()) es.close();
+  pullStreams.clear();
 });
 
 function capitalize(s: string): string {
@@ -463,8 +530,9 @@ function capitalize(s: string): string {
             </div>
             <span
               v-if="pulling[img.sandbox]"
+              :title="pullProgress[img.sandbox]?.line || ''"
               style="display: inline-block; padding: 1px 6px; border-radius: 4px; background: #fef9c3; color: #854d0e; font-size: 11px; font-weight: 600;"
-            >Pulling…</span>
+            >{{ progressLabel(img.sandbox) || 'Pulling…' }}</span>
             <span
               v-else-if="img.cached"
               style="display: inline-block; padding: 1px 6px; border-radius: 4px; background: #dcfce7; color: #166534; font-size: 11px; font-weight: 600;"
