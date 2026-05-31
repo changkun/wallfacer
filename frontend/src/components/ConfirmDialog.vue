@@ -1,6 +1,24 @@
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue';
 import { useDialogStore } from '../stores/dialog';
 const dialog = useDialogStore();
+const promptInput = ref<HTMLInputElement | null>(null);
+const promptText = ref('');
+
+watch(() => dialog.active, async (a) => {
+  if (a?.prompt) {
+    promptText.value = a.prompt.initial ?? '';
+    dialog.setPromptValue(promptText.value);
+    await nextTick();
+    promptInput.value?.focus();
+    promptInput.value?.select();
+  }
+}, { immediate: true });
+
+function onPromptInput(e: Event) {
+  promptText.value = (e.target as HTMLInputElement).value;
+  dialog.setPromptValue(promptText.value);
+}
 
 function onKeydown(e: KeyboardEvent) {
   if (!dialog.active) return;
@@ -21,6 +39,15 @@ function onKeydown(e: KeyboardEvent) {
       <div class="confirm-card" role="dialog" aria-modal="true">
         <h3 v-if="dialog.active.title" class="confirm-title">{{ dialog.active.title }}</h3>
         <p class="confirm-message">{{ dialog.active.message }}</p>
+        <input
+          v-if="dialog.active.prompt"
+          ref="promptInput"
+          type="text"
+          class="confirm-input"
+          :value="promptText"
+          :placeholder="dialog.active.prompt.placeholder || ''"
+          @input="onPromptInput"
+        />
         <div class="confirm-actions">
           <button
             v-if="!dialog.active.alert"
@@ -62,6 +89,19 @@ function onKeydown(e: KeyboardEvent) {
 }
 .confirm-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--text); }
 .confirm-message { margin: 0 0 16px; font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+.confirm-input {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  margin: 0 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-input, var(--bg-card));
+  color: var(--text);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.confirm-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .confirm-btn {
   padding: 6px 14px;
