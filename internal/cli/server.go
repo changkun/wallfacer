@@ -1127,6 +1127,15 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"AuthMe":        http.HandlerFunc(h.AuthMe),
 		"AuthOrgs":      http.HandlerFunc(h.AuthOrgs),
 		"AuthSwitchOrg": http.HandlerFunc(h.AuthSwitchOrg),
+
+		// Local-mode RFC 8628 device-code sign-in. The local SPA's prompt
+		// drives the flow over these three routes; the resulting token is
+		// stored at <UserConfigDir>/latere/token.json so it is shared with
+		// the `latere` CLI and the `wallfacer auth login` terminal command.
+		// h.DeviceAuth nil-safe: Mount falls back to 503 stubs.
+		"AuthDeviceStart":  http.HandlerFunc(h.AuthDeviceStart),
+		"AuthDevicePoll":   http.HandlerFunc(h.AuthDevicePoll),
+		"AuthDeviceCancel": http.HandlerFunc(h.AuthDeviceCancel),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
