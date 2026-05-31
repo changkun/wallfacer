@@ -4,13 +4,85 @@ import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
 import { useUiStore } from '../stores/ui';
+import { useDialogStore } from '../stores/dialog';
+import { useToastStore } from '../stores/toast';
+import { api } from '../api/client';
 import { derivePresence } from '../lib/presence';
 import { hasUnseen } from '../lib/unread';
+
+interface WorkspaceGroup {
+  name?: string;
+  workspaces: string[];
+  key?: string;
+}
 
 const route = useRoute();
 const store = useTaskStore();
 const auth = useAuthStore();
 const ui = useUiStore();
+const dialog = useDialogStore();
+const toast = useToastStore();
+
+// Workspace group popover (multi-group create / switch / rename /
+// delete). The "+ Manage workspaces" row still opens the path picker
+// emit('workspaces') for the case where the user wants to compose a
+// brand-new group from scratch.
+const wsPopoverOpen = ref(false);
+const workspaceGroups = computed<WorkspaceGroup[]>(
+  () => store.config?.workspace_groups ?? [],
+);
+function activeKey(): string {
+  return JSON.stringify(store.config?.workspaces ?? []);
+}
+function isActiveGroup(g: WorkspaceGroup): boolean {
+  return JSON.stringify(g.workspaces) === activeKey();
+}
+async function switchToGroup(g: WorkspaceGroup) {
+  wsPopoverOpen.value = false;
+  if (isActiveGroup(g)) return;
+  try {
+    await api('PUT', '/api/workspaces', { workspaces: g.workspaces });
+    await store.fetchConfig();
+    toast.push(`Switched to ${g.name || 'workspace'}`, { kind: 'success' });
+  } catch (e) {
+    toast.push(`Switch failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
+}
+async function renameGroup(g: WorkspaceGroup) {
+  const name = await dialog.prompt({
+    title: 'Rename workspace',
+    message: 'New name:',
+    initial: g.name ?? '',
+    placeholder: 'My workspace',
+  });
+  if (name == null) return;
+  const next = workspaceGroups.value.map((x) =>
+    x.key === g.key ? { ...x, name: name.trim() } : x,
+  );
+  await saveGroups(next, 'Renamed');
+}
+async function deleteGroup(g: WorkspaceGroup) {
+  const ok = await dialog.confirm({
+    title: 'Delete workspace',
+    message: `Remove the ${g.name || 'unnamed'} workspace group? Tasks under it stay on disk but will no longer be reachable until the group is recreated.`,
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+  const next = workspaceGroups.value.filter((x) => x.key !== g.key);
+  await saveGroups(next, 'Deleted');
+}
+async function saveGroups(next: WorkspaceGroup[], verb: string) {
+  try {
+    await api('PUT', '/api/config', {
+      workspace_groups: next.map(({ name, workspaces }) => ({ name, workspaces })),
+    });
+    await store.fetchConfig();
+    toast.push(`${verb} workspace group`, { kind: 'success' });
+  } catch (e) {
+    toast.push(`${verb} failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
+}
 
 const props = defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: [] }>();
@@ -63,6 +135,20 @@ onMounted(() => {
   if (cloudMode.value && !auth.loaded) void auth.fetchMe();
   if (route.path === '/') markBoardSeen();
 });
+
+// Click outside the workspace popover closes it. Only attach the listener
+// while open so we're not doing global work for every click on the page.
+watch(wsPopoverOpen, (open) => {
+  if (!open) return;
+  const handler = (e: MouseEvent) => {
+    const wrap = (e.target as HTMLElement).closest('.sb-ws-switch-wrap');
+    if (!wrap) {
+      wsPopoverOpen.value = false;
+      document.removeEventListener('mousedown', handler);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', handler), 0);
+});
 </script>
 
 <template>
@@ -110,15 +196,67 @@ onMounted(() => {
     </div>
 
     <!-- Workspace group switcher -->
-    <button type="button" class="sb-ws-switch" title="Switch workspace group" @click="emit('workspaces')">
-      <span class="ws-dot">W</span>
-      <span class="ws-name">{{ activeWorkspaceLabel }}</span>
-      <span class="ws-caret">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
-      </span>
-    </button>
+    <div class="sb-ws-switch-wrap">
+      <button
+        type="button"
+        class="sb-ws-switch"
+        title="Switch workspace group"
+        :aria-expanded="wsPopoverOpen"
+        @click="wsPopoverOpen = !wsPopoverOpen"
+      >
+        <span class="ws-dot">W</span>
+        <span class="ws-name">{{ activeWorkspaceLabel }}</span>
+        <span class="ws-caret">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </span>
+      </button>
+      <div
+        v-if="wsPopoverOpen"
+        class="sb-ws-popover sb-ws-popover--inline"
+        role="menu"
+        @click.stop
+      >
+        <button
+          v-for="g in workspaceGroups"
+          :key="g.key ?? g.workspaces.join('|')"
+          type="button"
+          class="sb-ws-popover__item"
+          :class="{ active: isActiveGroup(g) }"
+          role="menuitem"
+          :title="g.workspaces.join(', ')"
+          @click="switchToGroup(g)"
+        >
+          <span class="sb-ws-popover__check">{{ isActiveGroup(g) ? '✓' : '' }}</span>
+          <span class="sb-ws-popover__label">{{ g.name || g.workspaces[0] || 'Workspace' }}</span>
+          <span class="sb-ws-popover__row-actions">
+            <button
+              type="button"
+              class="sb-ws-popover__row-btn"
+              :title="`Rename ${g.name || 'workspace'}`"
+              @click.stop="renameGroup(g)"
+            >✎</button>
+            <button
+              type="button"
+              class="sb-ws-popover__row-btn"
+              :title="`Delete ${g.name || 'workspace'}`"
+              @click.stop="deleteGroup(g)"
+            >×</button>
+          </span>
+        </button>
+        <div class="sb-ws-popover__divider" />
+        <button
+          type="button"
+          class="sb-ws-popover__item sb-ws-popover__add"
+          role="menuitem"
+          @click="wsPopoverOpen = false; emit('workspaces')"
+        >
+          <span class="sb-ws-popover__check">+</span>
+          <span class="sb-ws-popover__label">Add workspace…</span>
+        </button>
+      </div>
+    </div>
 
     <!-- Search / command palette -->
     <button type="button" class="sb-search" title="Search (&#x2318;K)" @click="emit('palette')">

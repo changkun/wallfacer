@@ -132,6 +132,7 @@ html.wails-desktop .app-sidebar {
   transform: rotate(180deg);
 }
 
+.sb-ws-switch-wrap { position: relative; }
 .sb-ws-popover {
   position: fixed;
   z-index: 60;
@@ -143,6 +144,33 @@ html.wails-desktop .app-sidebar {
   box-shadow: var(--sh-pop);
   padding: 4px;
 }
+/* Inline variant anchored beneath the trigger — used when the popover
+   renders inside the sidebar flow rather than being positioned by JS. */
+.sb-ws-popover.sb-ws-popover--inline {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 10px;
+  right: 10px;
+  z-index: 65;
+}
+.sb-ws-popover__row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+.sb-ws-popover__row-btn {
+  background: transparent;
+  border: none;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.sb-ws-popover__row-btn:hover { background: var(--bg-hover); color: var(--ink); }
 .sb-ws-popover[hidden] {
   display: none;
 }
