@@ -1,6 +1,6 @@
 ---
 title: Local-First Build and Deploy (wallfacerd)
-status: planned
+status: abandoned
 depends_on:
   - ../../auth/specs/local-build-deploy.md
   - ../../terraform/specs/local-build-deploy.md
@@ -14,10 +14,19 @@ affects:
 effort: small
 trigger: parent umbrella spec; wallfacerd image and prod deploy only (desktop/binary releases unchanged)
 created: 2026-05-31
-updated: 2026-05-31
+updated: 2026-06-01
 author: changkun
 dispatched_task_id: null
 ---
+
+> **Abandoned 2026-06-01.** Implemented and worked end-to-end, then reverted.
+> The local flow serialised build / push / deploy on the dev machine; GitHub
+> Actions runs them asynchronously off the laptop. Cross-arch image builds
+> (amd64 cluster from arm64 Apple Silicon) also work reliably in GHA without
+> the local qemu / BUILDPLATFORM workarounds. Restored
+> `.github/workflows/{wallfacerd,deploy-wallfacerd}.yml`. The
+> release-evidence pattern (smoke + evidence body + GitHub release) is
+> being lifted into GitHub Actions for every repo as a follow-up.
 
 # Local-First Build and Deploy (wallfacerd)
 
