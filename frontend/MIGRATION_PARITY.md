@@ -57,12 +57,18 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
    hljs syntax highlighting inside the diff (old UI had it; not functional-critical).
 3. **command-palette context actions.** Per-task Start/Resume/Archive/Sync/Retry/
    Cancel rows after selecting a task. Entirely missing; only search/display.
-4. **board-composer + tasks.js creation depth.** Flow picker, dependency picker,
-   batch create, budget overrides (max_cost/tokens), tag input, routine
-   scheduling, model override, per-task sandbox override, template insertion,
-   empty-state composer. Vue composer is a minimal 4-field form.
-5. **utils dialogs — showAlert/showConfirm/showPrompt + ARIA announce.** Many
-   flows depend on these; no consolidated Vue equivalent.
+4. ~~**board-composer + tasks.js creation depth.**~~ ✅ DONE (2026-06-01).
+   Composer now has flow ✓, tags ✓, timeout ✓, model ✓, budget ✓, dependency
+   picker ✓, **template insertion** ✓ (cursor-aware, datalist-backed),
+   **per-task sandbox override** ✓ (claude/codex dropdown → PATCH after create),
+   **batch create** ✓ (blank-line split, `splitBatch` tested, posts to
+   /api/tasks/batch with shared opts), **routine scheduling** ✓ (Schedule
+   toggle → POST /api/routines with interval_minutes).
+   Empty-state composer + advanced timeout panel are minor polish.
+5. ~~**utils dialogs — showAlert/showConfirm/showPrompt + ARIA announce.**~~
+   ✅ DONE (2026-06-01). `dialog` Pinia store now offers confirm/alert/prompt
+   (tested, 8 tests); ConfirmDialog renders a focused text input in prompt
+   mode. Hover-row tables + ARIA announce remain minor polish.
 6. **dnd impact-sort mode + per-column config.** backlog=sort+pull,
    in_progress=put-only, waiting/done/cancelled=no-drag; impact-sort toggle.
 7. **explorer file edit mode.** Edit/save/discard, SSE tree refresh, keyboard nav,
@@ -74,11 +80,17 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 11. **status-bar** terminal toggle (Ctrl+`), presence, system status, sign-in badge.
 12. **modal-flamegraph / span timeline** Gantt; **modal-oversight** phase rendering+polling.
 13. **workspace group management UI** (create/rename/delete/switch, persistence).
-14. **git** branch create + open-folder; **images** pull SSE progress; **envconfig** model dropdown populate.
-15. **Infra:** api archived-task pagination, deep-link hash redirect (`#uuid`,
-    `#plan/path`), BroadcastChannel SSE tab-leader relay, heartbeat staleness.
+14. ~~**images** pull SSE progress; **envconfig** model dropdown populate.~~
+    ✅ DONE (2026-06-01). Pulls now subscribe to /api/images/pull/stream and
+    surface live phase + layer count. Model datalists populated from
+    lib/knownModels (claude/codex), respecting custom base URLs.
+    Remaining: **git** branch create + open-folder (already DONE per gap log).
+15. **Infra:** api archived-task pagination, BroadcastChannel SSE tab-leader
+    relay, heartbeat staleness. (Deep-link hash redirect ✅ done earlier.)
 16. **render** tag/impact badges + relative time (VERIFY in TaskCard), **bootstrap-choreography**
-    first-spec focus/toast, **sidebar-badge** board unread dot, **keyboard-shortcuts** dynamic binding.
+    first-spec focus/toast, **sidebar-badge** board unread dot (✅ done),
+    **keyboard-shortcuts** dynamic binding (✅ partial — "/" wired 2026-06-01;
+    card-level s/d/arrow nav still pending).
 
 ---
 
@@ -186,6 +198,24 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Progress log
 
+- 2026-06-01: **File-size refactor.** Per project convention (max 1000 LOC
+  per file): split header.css (1281), app.css (1543), spec-mode.css (1730)
+  into themed `.css` partials under matching subfolders, each <500 LOC;
+  PlanningChatPanel.vue (1739) → 874 by extracting `<style scoped>` to a
+  sidecar (`<style scoped src="…">`), `RenderedBubble` + parsers to
+  `lib/planningBubble.ts` (13 tests), and slash/mention autocomplete to a
+  composable. Every frontend file is now <1000 LOC.
+- 2026-06-01: **Composer parity round.** showPrompt added to dialog store
+  (gap #5). Sandbox override dropdown (PATCH after create), prompt template
+  insertion (cursor-aware datalist), blank-line `splitBatch` posting to
+  /api/tasks/batch, and Schedule toggle posting to /api/routines all wired.
+  Tracker gap #4 closed end-to-end.
+- 2026-06-01: **Settings polish.** Model datalists populated from
+  `lib/knownModels` (provider-scoped, respect custom base URLs);
+  SettingsTabSandbox now subscribes to /api/images/pull/stream and surfaces
+  live phase + layer count instead of polling. Tracker gap #14 closed.
+- 2026-06-01: **Keyboard.** Bare "/" focuses the task search input (matches
+  the help modal). Card-level s/d/arrow remain pending.
 - 2026-05-30: Built initial gap inventory (8 parallel explorers). Set up
   isolated harness (Vite :5173 + own :8090 + throwaway workspace + test data).
 - 2026-05-30: **CRITICAL FIX — Vue app didn't boot in dev at all** (blank page,
