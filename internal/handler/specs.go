@@ -17,6 +17,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/spec"
 )
@@ -68,15 +69,10 @@ func (h *Handler) GetSpecTree(w http.ResponseWriter, _ *http.Request) {
 // this path since the poller serialises the full TreeResponse and
 // compares the JSON — any field-level change drives a new event.
 func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+	stream := sse.NewWriter(w)
+	if stream == nil {
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
 
 	collectTree := h.collectSpecTree
 
@@ -85,15 +81,13 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, false
 		}
-		if _, err := fmt.Fprintf(w, "event: snapshot\ndata: %s\n\n", data); err != nil {
+		if err := stream.Event("snapshot", data); err != nil {
 			return nil, false
 		}
-		flusher.Flush()
 		return data, true
 	}
 
-	current := collectTree()
-	curData, ok := send(current)
+	curData, ok := send(collectTree())
 	if !ok {
 		return
 	}
@@ -109,21 +103,18 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-keepalive.C:
-			if _, err := fmt.Fprintf(w, "event: heartbeat\ndata: {}\n\n"); err != nil {
+			if err := stream.Heartbeat(); err != nil {
 				return
 			}
-			flusher.Flush()
 		case <-ticker.C:
-			next := collectTree()
-			nextData, err := json.Marshal(next)
+			nextData, err := json.Marshal(collectTree())
 			if err != nil {
 				continue
 			}
 			if string(nextData) != string(curData) {
-				if _, err := fmt.Fprintf(w, "event: snapshot\ndata: %s\n\n", nextData); err != nil {
+				if err := stream.Event("snapshot", nextData); err != nil {
 					return
 				}
-				flusher.Flush()
 				curData = nextData
 			}
 		}
