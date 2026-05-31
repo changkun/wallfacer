@@ -20,3 +20,4 @@ frontend/dist/
 *.png
 .playwright-mcp/
 frontend/test-results/
+release-evidence/
