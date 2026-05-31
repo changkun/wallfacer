@@ -8,13 +8,15 @@ import type { Task } from '../api/types';
 import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
+import SpanFlamegraph from './SpanFlamegraph.vue';
+import type { SpanResult } from '../lib/flamegraph';
 
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = useDialogStore();
 const toast = useToastStore();
 
-type MainTab = 'spec' | 'activity' | 'changes' | 'events';
+type MainTab = 'spec' | 'activity' | 'changes' | 'events' | 'timeline';
 const mainTab = ref<MainTab>('spec');
 
 // --- Changes (diff) tab ---
@@ -46,10 +48,40 @@ async function fetchDiff() {
   }
 }
 
+// --- Timeline (span flamegraph) tab ---
+
+const spans = ref<SpanResult[]>([]);
+const spansLoading = ref(false);
+const spansFetched = ref(false);
+const spansError = ref('');
+
+async function fetchSpans() {
+  if (!props.task) return;
+  spansLoading.value = true;
+  spansError.value = '';
+  try {
+    const data = await api<{ spans?: SpanResult[] }>('GET', `/api/tasks/${props.task.id}/spans`);
+    spans.value = data?.spans ?? [];
+    spansFetched.value = true;
+  } catch (e) {
+    spansError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    spansLoading.value = false;
+  }
+}
+
 watch(mainTab, (t) => {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
+  if (t === 'timeline' && !spansFetched.value) fetchSpans();
 });
+
+// Refetch spans when navigating to a different task while the timeline
+// tab stays selected (e.g. via deep-link or sidebar nav).
+watch(
+  () => props.task?.id,
+  () => { spansFetched.value = false; spans.value = []; if (mainTab.value === 'timeline') fetchSpans(); },
+);
 
 function lineClass(kind: string): string {
   return kind === 'ctx' ? '' : 'diff-' + kind;
@@ -289,6 +321,12 @@ const isArchived = computed(() => !!props.task.archived);
               :class="{ active: mainTab === 'events' }"
               @click="mainTab = 'events'"
             >Events</button>
+            <button
+              type="button"
+              class="main-tab"
+              :class="{ active: mainTab === 'timeline' }"
+              @click="mainTab = 'timeline'"
+            >Timeline</button>
           </div>
 
           <div id="modal-row">
@@ -457,6 +495,14 @@ const isArchived = computed(() => !!props.task.archived);
                       <span class="usage-value">{{ task.turns ?? 0 }}</span>
                     </div>
                   </div>
+                </div>
+
+                <!-- TIMELINE tab (span flamegraph) -->
+                <div data-main-tab-section="timeline">
+                  <h3 class="section-title">Timeline</h3>
+                  <div v-if="spansLoading" class="text-xs text-v-secondary">Loading spans…</div>
+                  <div v-else-if="spansError" class="text-xs" style="color: var(--err, #c0392b);">{{ spansError }}</div>
+                  <SpanFlamegraph v-else :spans="spans" />
                 </div>
               </div>
             </div>
