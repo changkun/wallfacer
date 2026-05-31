@@ -211,25 +211,6 @@ Every implementation task MUST complete all three steps before finishing:
 
 3. **Reflect on codebase health** — After implementing, review the files you touched and their immediate surroundings. If you spot a small, safe refactor (dead code, unclear naming, duplicated logic, missing error handling) directly related to your change, include it. Keep refactoring minimal and scoped.
 
-## Release (wallfacerd image)
-
-One command ships everything (build → push → deploy → smoke → GitHub release).
-
-```sh
-make release-patch    # v0.0.7 → v0.0.8
-make release-minor    # v0.0.7 → v0.1.0
-make release-major    # v0.0.7 → v1.0.0
-```
-
-Needs on PATH: `gh`, `podman` (or `docker`), `op`, `doctl`, `kubectl`.
-
-- Image: `ghcr.io/changkun/wallfacerd` (changkun namespace, not latere-ai). Tag strips leading `v` so `v0.0.7` → image tag `0.0.7`.
-- DO PAT in 1Password at `op://LatereAI/Digital Ocean Credentials/PAT`.
-- Deployment `wallfacerd`, namespace `latere`, prod URL `https://wf.latere.ai`.
-- Builds `linux/amd64` (cluster). Failure at any step rolls back the bump tag.
-- Pushing the tag during the deploy also triggers `release-binary.yml` (CLI binaries) and `release-desktop.yml` (Wails desktop with Apple notarization + Windows signtool) — these stay in GH Actions because the signing keys live there. Both attach their artifacts to the GitHub release that the deploy creates.
-- Internal targets exist if you need to step through (`make release`, `make deploy`, `make ghcr-login`, `make kubeconfig`, `make release-notes-publish` for the legacy hand-curated notes flow) — `release-patch` is the standard path.
-
 ## Commit and push strategy
 
 - Before committing, always run `make build` (or at minimum `make fmt && make lint`) and fix any issues they report. `make build` is the full gate.

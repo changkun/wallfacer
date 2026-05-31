@@ -1,27 +1,5 @@
 SHELL            := /bin/bash
 PODMAN           := $(shell command -v /opt/podman/bin/podman 2>/dev/null || command -v podman)
-
-# DOCKER is the container runtime for image build/push/login (wallfacerd image
-# release). PODMAN above remains the runtime for the sandbox-agents pull-images
-# logic that explicitly wants podman.
-DOCKER ?= $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null || echo docker)
-
-# Cluster nodes are linux/amd64. Build for that explicitly so Apple Silicon
-# laptops don't push arm64 images that pods refuse with "exec format error".
-PLATFORM ?= linux/amd64
-
-# wallfacerd image lives in the changkun namespace (not latere-ai) for legacy
-# reasons. The image tag strips the leading 'v' from VERSION so v0.0.7 → 0.0.7,
-# matching the historical deploy-wallfacerd.yml convention and the in-cluster
-# manifests that pin sha-style image tags.
-WD_IMAGE       := ghcr.io/changkun/wallfacerd
-WD_DEPLOYMENT  := wallfacerd
-WD_NAMESPACE   := latere
-CLUSTER        := latere-k8s
-OP_DO_PAT      := op://LatereAI/Digital Ocean Credentials/PAT
-
-WD_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo sha-$$(git rev-parse --short HEAD))
-WD_IMAGE_TAG := $(WD_VERSION:v%=%)
 # Resolve the latest versioned tag (e.g. v0.0.4) of latere-ai/images.
 # Tries the GitHub releases API first (one HTTP call); on failure — rate-limit,
 # offline, jq missing, field absent — falls back to `git ls-remote --tags` on
@@ -49,8 +27,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-host build-binary pull-images pull-images-force install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts frontend-build typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release-notes-publish \
-        release release-patch release-minor release-major deploy ghcr-login kubeconfig preflight-release preflight-deploy
+.PHONY: build build-host build-binary pull-images pull-images-force install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css ui-ts frontend-build typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Build the wallfacer binary and pull sandbox images (container-mode default).
 # For host mode (`wallfacer run --backend host`) use `make build-host` instead
@@ -320,19 +297,15 @@ ifndef RELEASE_VERSION
 endif
 	@./scripts/release-notes.sh "$(RELEASE_VERSION)"
 
-# Publish a GitHub release with hand-curated docs/releases/<version>.md notes.
-# This is the legacy CLI/desktop release flow; the wallfacerd image release
-# uses `make release` (the unified Tier A target below) and auto-generated
-# notes merged with smoke evidence.
-#
+# Create a GitHub release.
 # Expects docs/releases/<version>.md to exist (run make release-notes first).
 # Commits the notes, tags, pushes, and creates the GitHub release.
 # Usage:
-#   make release-notes RELEASE_VERSION=v0.0.6        # step 1: generate + review
-#   make release-notes-publish RELEASE_VERSION=v0.0.6 # step 2: publish
-release-notes-publish:
+#   make release-notes RELEASE_VERSION=v0.0.6   # step 1: generate + review
+#   make release RELEASE_VERSION=v0.0.6          # step 2: publish
+release:
 ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required. Usage: make release-notes-publish RELEASE_VERSION=v0.0.6)
+	$(error RELEASE_VERSION is required. Usage: make release RELEASE_VERSION=v0.0.6)
 endif
 	@test -f docs/releases/$(RELEASE_VERSION).md || (echo "Error: docs/releases/$(RELEASE_VERSION).md not found. Run 'make release-notes' first." >&2; exit 1)
 	git add docs/releases/$(RELEASE_VERSION).md
@@ -340,95 +313,3 @@ endif
 	git tag -a "$(RELEASE_VERSION)" -m "$(RELEASE_VERSION)"
 	git push origin main "$(RELEASE_VERSION)"
 	gh release create "$(RELEASE_VERSION)" --title "$(RELEASE_VERSION)" --notes-file docs/releases/$(RELEASE_VERSION).md
-
-# ── wallfacerd image release + deploy (Tier A) ────────────────────────────
-
-# Bump to the next semver from the latest v* tag, create an annotated tag at
-# HEAD, then run `make release` with it. Push the tag to origin yourself
-# (`git push origin <tag>`) when ready — or let make deploy do it.
-release-patch: BUMP := patch
-release-minor: BUMP := minor
-release-major: BUMP := major
-release-patch release-minor release-major: preflight-release
-release-patch release-minor release-major:
-	@latest=$$(git tag -l 'v*' --sort=-v:refname | head -1); \
-	if [ -z "$$latest" ]; then \
-		next="v0.1.0"; \
-	else \
-		ver=$${latest#v}; \
-		major=$${ver%%.*}; rest=$${ver#*.}; \
-		minor=$${rest%%.*}; patch=$${rest#*.}; patch=$${patch%%-*}; \
-		case "$(BUMP)" in \
-			major) next="v$$((major+1)).0.0" ;; \
-			minor) next="v$$major.$$((minor+1)).0" ;; \
-			patch) next="v$$major.$$minor.$$((patch+1))" ;; \
-		esac; \
-	fi; \
-	echo "bump: $${latest:-<none>} → $$next"; \
-	git tag -a "$$next" -m "release $$next"
-	@tag=$$(git tag -l 'v*' --sort=-v:refname | head -1); \
-	$(MAKE) release WD_VERSION="$$tag" && \
-	$(MAKE) deploy  WD_VERSION="$$tag" || { \
-		echo "release-patch: pipeline failed; rolling back tag $$tag" >&2; \
-		git tag -d "$$tag"; \
-		exit 1; \
-	}
-
-# Build wallfacerd image and push to ghcr.io/changkun/wallfacerd:<stripped-v>.
-# Dockerfile.wallfacerd builds the frontend + Go binary inside (with
-# BUILDPLATFORM pins so bun/go run native on the host).
-release: preflight-release ghcr-login
-	$(DOCKER) build --platform $(PLATFORM) -f Dockerfile.wallfacerd \
-		--build-arg VERSION=$(WD_VERSION) \
-		-t $(WD_IMAGE):$(WD_IMAGE_TAG) .
-	$(DOCKER) push $(WD_IMAGE):$(WD_IMAGE_TAG)
-
-# Apply manifests (service, ingress, deployment in order), roll the new image,
-# run smoke + publish evidence release, append to DEPLOY_LOG.md.
-deploy: preflight-deploy kubeconfig
-	@$(DOCKER) pull $(WD_IMAGE):$(WD_IMAGE_TAG) >/dev/null 2>&1 || { \
-		echo "deploy: $(WD_IMAGE):$(WD_IMAGE_TAG) not in ghcr.io" >&2; \
-		case "$(WD_VERSION)" in \
-			sha-*) \
-				latest=$$(git tag -l 'v*' --sort=-v:refname | head -1); \
-				echo "hint: HEAD is not on a v* tag (WD_VERSION fell back to $(WD_VERSION))." >&2; \
-				echo "      run 'make release-patch' to bump + push + tag HEAD, then 'make deploy'." >&2; \
-				echo "      or 'make deploy WD_VERSION=$${latest:-<no v* tags yet>}' to deploy the last tag." >&2; \
-				;; \
-			*) \
-				echo "hint: this version was never pushed; run 'make release WD_VERSION=$(WD_VERSION)' first." >&2; \
-				;; \
-		esac; \
-		exit 1; \
-	}
-	kubectl apply -f deploy/prod/service.yaml
-	kubectl apply -f deploy/prod/ingress.yaml
-	kubectl apply -f deploy/prod/deployment.yaml
-	kubectl -n $(WD_NAMESPACE) set image deployment/$(WD_DEPLOYMENT) $(WD_DEPLOYMENT)=$(WD_IMAGE):$(WD_IMAGE_TAG)
-	@set -e; \
-		out=$$(kubectl -n $(WD_NAMESPACE) rollout status deployment/$(WD_DEPLOYMENT) --timeout=180s); \
-		echo "$$out"; \
-		sha=$$(printf '%s' "$$out" | shasum -a 256 | cut -d' ' -f1 | cut -c1-12); \
-		printf '| %s | %s | %s |\n' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(WD_VERSION)" "$$sha" >> DEPLOY_LOG.md
-	VERSION=$(WD_VERSION) bash tools/release/publish.sh
-
-preflight-release:
-	@command -v $(DOCKER) >/dev/null 2>&1 \
-		|| { echo "missing: docker or podman (install OrbStack, Docker Desktop, colima, or podman)" >&2; exit 1; }
-	@command -v gh >/dev/null 2>&1 \
-		|| { echo "missing: gh (brew install gh)" >&2; exit 1; }
-
-preflight-deploy: preflight-release
-	@for cmd in kubectl op doctl; do \
-		command -v $$cmd >/dev/null 2>&1 \
-			|| { echo "missing: $$cmd (deploy needs kubectl + op + doctl)" >&2; exit 1; }; \
-	done
-
-ghcr-login:
-	@gh auth token | $(DOCKER) login ghcr.io -u $$USER --password-stdin
-
-kubeconfig:
-	@if [ "$$(kubectl config current-context 2>/dev/null)" != "$(CLUSTER)" ]; then \
-		DIGITALOCEAN_ACCESS_TOKEN=$$(op read "$(OP_DO_PAT)") \
-			doctl kubernetes cluster kubeconfig save $(CLUSTER) --expiry-seconds 3600; \
-	fi
