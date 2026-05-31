@@ -1,0 +1,265 @@
+/* --- Latere.ai sign-in (cloud mode, bottom of sidebar) ---
+ * Container inherits the `.sb-divider` spacing rhythm (8px top,
+ * 1px rule, 8px bottom) so the line above the badge is visually
+ * balanced with the rest of the footer navigation. */
+.sb-signin {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3) 6px;
+  border-top: 1px solid var(--rule);
+}
+.sb-signin:empty {
+  display: none;
+  margin-top: 0;
+  border-top: none;
+}
+.sb-signin__link {
+  display: block;
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: var(--fs-9);
+  padding: 4px 0;
+}
+.sb-signin__link:hover {
+  color: var(--ink-1);
+}
+.sb-signin__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.sb-signin__logout {
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: var(--fs-9);
+  flex-shrink: 0;
+}
+.sb-signin__logout:hover {
+  color: var(--ink-1);
+}
+
+/* Sign-in trigger button: two-line stack (display name on top,
+ * current scope as subtitle below) so the name gets the full
+ * width and doesn't truncate against an inline pill. Bare hover
+ * states from the shared token set; no hard border or accent ring. */
+.sb-signin__user {
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  width: 100%;
+  text-align: left;
+  position: relative;
+  border-radius: var(--r-sm);
+  transition: background-color 120ms ease;
+}
+.sb-signin__user:hover,
+.sb-signin__user[aria-expanded="true"] {
+  background: var(--bg-hover);
+}
+.sb-signin__user:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sb-signin__avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+/* Override the older 22px rule for fit with the new two-line stack. */
+.sb-signin__user img.sb-signin__avatar {
+  width: 26px;
+  height: 26px;
+}
+
+/* Text column: name on top, scope underneath. Column takes the
+ * remaining width so the name can grow freely and only truncates
+ * on genuinely long names. */
+.sb-signin__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  gap: 1px;
+}
+.sb-signin__name {
+  color: var(--ink);
+  font-size: var(--fs-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-signin__view-label {
+  color: var(--ink-3);
+  font-size: var(--fs-9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-signin__chevron {
+  color: var(--ink-3);
+  font-size: 9px;
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+.sb-signin__user[aria-expanded="true"] .sb-signin__chevron {
+  transform: rotate(180deg);
+}
+
+/* Popup menu: positioned `fixed` so it escapes the sidebar's
+ * overflow:hidden clipping — .app-sidebar truncates any absolutely-
+ * positioned child that extends beyond its ~208px width, and at
+ * ~48px in collapsed mode the menu would be clipped entirely.
+ * JS (_openSigninMenu in status-bar.js) sets `left` + `bottom` from
+ * the trigger's getBoundingClientRect() on open so the menu hugs
+ * the trigger in both layout modes. */
+.sb-signin__menu {
+  position: fixed;
+  min-width: 220px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  /* Sit above board / explorer / spec-mode layers (1000-1150) but
+   * below modal + command-palette (which should always trump). */
+  z-index: 1200;
+  animation: sb-signin-menu-in 120ms ease-out;
+}
+@keyframes sb-signin-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sb-signin__menu[hidden] {
+  display: none;
+}
+
+/* Optional section label rendered above a group — reserved for
+ * future grouping (e.g. "Workspaces" / "Account"). Added via
+ * renderer if/when the menu grows. */
+.sb-signin__menu-label {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.sb-signin__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  margin: 0;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  position: relative;
+  line-height: 1.25;
+}
+.sb-signin__menu-item:hover,
+.sb-signin__menu-item:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+/* Inline check marker is a leading bullet — reserves width on every
+ * item so the label text lines up whether an item is active or not.
+ * Accent only shows on the active row. */
+.sb-signin__menu-item::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  flex-shrink: 0;
+}
+.sb-signin__menu-item--active::before {
+  background: var(--accent);
+}
+.sb-signin__menu-item--active {
+  font-weight: 600;
+}
+
+.sb-signin__menu-sep {
+  height: 1px;
+  background: var(--rule);
+  margin: 4px 6px;
+}
+
+/* Collapsed sidebar: only the avatar is visible on the trigger;
+ * text, chevron, logout link all hide. Menu is NOT hidden —
+ * position:fixed lets it render next to the avatar at the edge
+ * of the sidebar without being clipped by overflow:hidden. */
+.app-sidebar.collapsed .sb-signin__text,
+.app-sidebar.collapsed .sb-signin__chevron,
+.app-sidebar.collapsed .sb-signin__logout,
+.app-sidebar.collapsed .sb-signin__link {
+  display: none;
+}
+.app-sidebar.collapsed .sb-signin {
+  text-align: center;
+}
+.app-sidebar.collapsed .sb-signin__user {
+  justify-content: center;
+  padding: 6px 0;
+  gap: 0;
+}
+
+/* Sidebar presence (running agents + signed-in user). */
+.sb-presence { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 4px; }
+.sb-presence-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.sb-presence-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); }
+.sb-presence-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex: 0 0 auto; }
+.sb-presence-item--agent .sb-presence-dot { background: var(--ok); animation: sb-presence-pulse 1.6s infinite; }
+.sb-presence-item--self .sb-presence-dot { background: var(--accent); }
+.sb-presence-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+@keyframes sb-presence-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Board "unread" dot on the sidebar nav. */
+.sb-unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
