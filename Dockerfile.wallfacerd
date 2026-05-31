@@ -1,4 +1,12 @@
-FROM oven/bun:1-alpine AS frontend
+# Wallfacer web server image. Built by `make release` locally; CI runs only
+# verify jobs (see .github/workflows/wallfacerd.yml).
+#
+# Both build stages pin --platform=$BUILDPLATFORM so they run native on the
+# host (avoids the bun x86_64-under-qemu SIGILL crash on Apple Silicon).
+# The frontend dist is arch-neutral; the Go binary is cross-compiled to
+# TARGETOS/TARGETARCH; the final amd64 image is correct for cluster nodes.
+
+FROM --platform=$BUILDPLATFORM oven/bun:1-alpine AS frontend
 WORKDIR /src
 COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
@@ -11,7 +19,8 @@ COPY docs/ /docs/
 COPY ui/ /ui/
 RUN bun run build
 
-FROM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -19,7 +28,9 @@ COPY . .
 RUN rm -rf internal/webserver/spa/dist
 COPY --from=frontend /src/dist internal/webserver/spa/dist/
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /wallfacer .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+    -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION}" \
+    -o /wallfacer .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
