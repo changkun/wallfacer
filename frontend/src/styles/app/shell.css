@@ -1,0 +1,91 @@
+/* ===== Page Shell (sticky footer) ===== */
+.page-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+.page-content { flex: 1; }
+
+/* ===== Base ===== */
+html { scroll-behavior: smooth; overflow-x: clip; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+}
+
+a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--accent-hover); }
+
+img, svg { display: block; }
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--text);
+    letter-spacing: -0.025em;
+}
+h1 { font-size: 2.5rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.15rem; }
+h1 em, h2 em {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-weight: 400;
+}
+
+/* ===== Layout ===== */
+.section {
+    padding: 48px 0;
+    position: relative;
+}
+.section + .section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(400px, 60%);
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}
+.section-container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 32px;
+}
+.section-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 12px;
+    text-align: center;
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
+}
+/* Marketing-page section headings — scope to product hero / docs landing
+   so they don't override the modal's left-aligned .section-title. */
+.product-section .section-title,
+.landing-section .section-title {
+    text-align: center;
+    margin-bottom: 32px;
+    font-size: 1.5rem;
+    letter-spacing: -0.03em;
+}
+.product-section .section-subtitle,
+.landing-section .section-subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
