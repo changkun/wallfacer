@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
 import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
@@ -11,6 +12,7 @@ import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSort
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
+const ui = useUiStore();
 const selectedTask = ref<Task | null>(null);
 
 const backlogSortMode = ref<BacklogSortMode>(loadBacklogSortMode());
@@ -47,9 +49,20 @@ async function archiveAllDone() {
 }
 
 onMounted(async () => {
-  if (!store.tasks.length) await store.fetchTasks();
+  if (!store.tasks.length) await store.fetchTasks({ includeArchived: ui.showArchived });
   if (!store.config) await store.fetchConfig();
 });
+
+// Toggling "Show archived" needs a server round-trip — the server only
+// returns archived rows when include_archived=true (see internal/handler/
+// tasks.go). Without this re-fetch the in-memory list stays archive-less
+// and the toggle does nothing.
+watch(
+  () => ui.showArchived,
+  async (enabled) => {
+    await store.fetchTasks({ includeArchived: enabled });
+  },
+);
 
 function selectTask(t: Task) {
   selectedTask.value = t;
