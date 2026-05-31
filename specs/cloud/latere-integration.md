@@ -68,6 +68,7 @@ seam is inert and local behavior is byte-identical to today.
 |------|----------------|---------------------|--------|------|
 | **Identity** | auth.latere.ai | `internal/auth` middleware + `pkg/jwtauth`/`oidc`; `store.Principal{Sub,OrgID}` | ✅ shipped (Phase 1+2) | [identity/authentication.md](../identity/authentication.md) |
 | **Runtime** | Cella | `sandbox.Backend` (already pluggable: Local, Host) | drafted | [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md) |
+| **Cella wire client** | Cella | shared Go client at `latere.ai/x/sandbox/client`, consumed by Wallfacer's `CellaBackend` and Topos's `cella.Provider` | drafted | [latere-integration/shared-cella-client.md](latere-integration/shared-cella-client.md) |
 | **File data plane** | FS | `internal/workspace` + `internal/runner` (worktree staging) | drafted; **blocked on FS Workspace API** | [tenant-filesystem.md](tenant-filesystem.md) |
 | **Per-task delegation** | auth (RFC 8693) | mint short-lived agent tokens so sandboxes call back | drafted | [identity/agent-token-exchange.md](../identity/agent-token-exchange.md) |
 | **Deploy** | terraform (DOKS) | thin deploy module + `pkg/otel` OTLP emit | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |

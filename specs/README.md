@@ -118,6 +118,7 @@ Integration track. Wallfacer is the autonomous-engineering control plane; in clo
 |------|--------|----------|
 | [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the integration seams (Identity ✅, Runtime→Cella, FS, deploy, Lux, MCP, metadata) and the consume-don't-absorb rules |
 | ↳ [latere-integration/cella-runtime.md](cloud/latere-integration/cella-runtime.md) | Drafted | `CellaBackend` implementing `sandbox.Backend` — a third runtime alongside Local (podman/docker) and Host, selected by `--backend cella`. Maps `ContainerSpec` onto Cella's `/v1/sandboxes` API; worktree transport via FS |
+| ↳ [latere-integration/shared-cella-client.md](cloud/latere-integration/shared-cella-client.md) | Drafted | Extract Cella's wire client into a standalone `latere.ai/x/sandbox/client` package shared by Wallfacer's `CellaBackend` and Topos's `cella.Provider`; abstractions stay split (harness-inside vs harness-outside) |
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Drafted | fs.latere.ai integration, repo provisioner, workspace cloud mapping. **Blocked on FS Workspace API (Phase 5)** |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Drafted | Thin deploy module into the existing DOKS `latere` namespace + `pkg/otel` OTLP emit |
 | [tenant-api.md](cloud/tenant-api.md) | Drafted | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
