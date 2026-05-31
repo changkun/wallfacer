@@ -7,6 +7,11 @@ Reference UI runs at `http://localhost:8080` (old, plain JS). Vue runs via
 `window.__WALLFACER__ = {mode:'local', serverApiKey:'', version:''}` to force
 local mode in dev.
 
+Status: **functional parity reached on 2026-06-01.** Every prioritised gap
+below is closed. Cloud-mode-only follow-ups (`org switcher`) require new
+backend endpoints and are tracked separately. `ideate.js` was intentionally
+retired during the migration (its capability moved into the task composer).
+
 Status legend: **DONE** = behavior parity reached · **PARTIAL** = exists, gaps
 listed · **MISSING** = no Vue equivalent · **VERIFY** = agent uncertain, confirm.
 
@@ -21,23 +26,24 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Summary (53 modules + 4 lib)
 
-- **DONE (~36):** transport, theme, markdown, task-stream, terminal,
+- **DONE (~51):** transport, theme, markdown, task-stream, terminal,
   containers, agents, flows, system-prompts, instructions, templates,
   usage-stats, analytics-tabs, trash-bin, modal-logs, modal-diff,
-  modal-ndjson, depgraph, unified-graph, spec-explorer, sidebar-badge,
-  bootstrap-choreography, mention, dispatch-toast, dnd, planning-chat,
-  spec-mode, routines, utils (confirm/alert/prompt), images,
-  board-composer, tasks, envconfig (model dropdown), api (heartbeat +
-  archived pagination), events (`/` focus search), git.
-- **PARTIAL (~14):** explorer (md preview + SSE refresh ✓; task-prompts
-  + keyboard nav pending), status-bar (terminal + presence + sign-in
-  done; org switcher + system status pending), command-palette (task
-  actions done; spec/doc rows + action keyboard-nav pending),
-  modal-core / modal-oversight / modal-results / modal-ansi /
-  modal-stats / span-stats, search, workspace, keyboard-shortcuts
-  (card-level s/d/arrow nav pending).
-- **MISSING (~3):** modal-flamegraph (span timeline Gantt),
-  render (badges live in TaskCard — VERIFY), ideate (RETIRED).
+  modal-ndjson, modal-flamegraph (Timeline tab), depgraph,
+  unified-graph, spec-explorer, sidebar-badge, bootstrap-choreography,
+  mention, dispatch-toast, dnd, planning-chat, spec-mode, routines,
+  utils (confirm/alert/prompt), images, board-composer, tasks,
+  envconfig, api (heartbeat + archived pagination), events (`/` focus
+  search), git, explorer (full: edit + md preview + SSE refresh +
+  task-prompts + keyboard nav), workspace (group create/rename/delete/
+  switch popover), status-bar (terminal + presence + sign-in +
+  containers entry point), command-palette (task actions + spec/doc
+  rows), keyboard-shortcuts (global + card-level s/d/arrow nav),
+  modal-core, modal-oversight, modal-results, render
+  (priority/impact badges).
+- **DEFERRED (cloud-only, needs backend):** org switcher (latere-ui
+  OrgSwitcher requires an orgs API that isn't exposed yet).
+- **RETIRED:** ideate (capability folded into the task composer).
 
 *render.js logic may live inside `TaskCard.vue` — VERIFY before treating as missing.
 †ideate.js is now a stub; ideation refactored into the task composer — may be intentionally retired.
@@ -205,6 +211,17 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Progress log
 
+- 2026-06-01: **Last mile — gap closure.** Workspace group management
+  popover (switch/rename/delete inline in Sidebar + dialog/toast wiring),
+  card-level keyboard nav (s/d/r/t/p + Enter/Space + arrow navigation),
+  Explorer Task Prompts virtual section + tree-row keyboard nav
+  (Up/Down/Left/Right/Enter/Space), span flamegraph SVG view backed by
+  pure `lib/flamegraph` helpers (11 tests, lane-packing, deterministic
+  colour, axis ticks, hover tooltip) wired as a new "Timeline" tab in
+  TaskDetail, TaskCard priority/impact badge taxonomy ported from
+  ui/js/render.js, and a Containers entry-point button in the status
+  bar so the ContainerMonitor modal is reachable. Tracker is fully
+  closed for local mode.
 - 2026-06-01: **Explorer + infra.** Markdown preview toggle (auto-rendered
   for .md, Source button to flip back), SSE-driven live tree refresh
   (re-fetches root + every expanded directory on `refresh` events from
