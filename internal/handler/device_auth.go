@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/oidc"
@@ -31,14 +32,14 @@ import (
 // One concurrent device flow at a time; an in-flight flow is overwritten
 // when /start is called again (the previous flow is cancelled).
 type DeviceAuth struct {
-	OIDC        *oidc.Client
-	Store       authkit.TokenStore
-	NewClient   func() *oidc.Client // optional override for tests
-	ClientID    string              // default: AUTH_CLIENT_ID or "wallfacer-local"
-	Scopes      []string            // default: ["openid", "email", "profile", "offline_access"]
+	OIDC      *oidc.Client
+	Store     authkit.TokenStore
+	NewClient func() *oidc.Client // optional override for tests
+	ClientID  string              // default: AUTH_CLIENT_ID or "wallfacer-local"
+	Scopes    []string            // default: ["openid", "email", "profile", "offline_access"]
 
-	mu      sync.Mutex
-	flow    *deviceFlowState
+	mu   sync.Mutex
+	flow *deviceFlowState
 }
 
 type deviceFlowState struct {
@@ -89,9 +90,9 @@ func (d *DeviceAuth) Mount(mux *http.ServeMux) {
 // /api/auth/device/* endpoints (they answer 503).
 func (h *Handler) SetDeviceAuth(d *DeviceAuth) { h.deviceAuth = d }
 
-// AuthDeviceStart, AuthDevicePoll, AuthDeviceCancel are exposed as
-// *Handler methods so the apicontract-driven route registry in
-// internal/cli/server.go can map them like any other endpoint.
+// AuthDeviceStart is exposed as a *Handler method so the apicontract-driven
+// route registry in internal/cli/server.go can map it like any other endpoint.
+// AuthDevicePoll and AuthDeviceCancel below mirror the same pattern.
 func (h *Handler) AuthDeviceStart(w http.ResponseWriter, r *http.Request) {
 	if h.deviceAuth == nil {
 		deviceUnavailable(w, r)
@@ -100,6 +101,7 @@ func (h *Handler) AuthDeviceStart(w http.ResponseWriter, r *http.Request) {
 	h.deviceAuth.start(w, r)
 }
 
+// AuthDevicePoll proxies to the device-code driver; see AuthDeviceStart.
 func (h *Handler) AuthDevicePoll(w http.ResponseWriter, r *http.Request) {
 	if h.deviceAuth == nil {
 		deviceUnavailable(w, r)
@@ -108,6 +110,7 @@ func (h *Handler) AuthDevicePoll(w http.ResponseWriter, r *http.Request) {
 	h.deviceAuth.poll(w, r)
 }
 
+// AuthDeviceCancel proxies to the device-code driver; see AuthDeviceStart.
 func (h *Handler) AuthDeviceCancel(w http.ResponseWriter, r *http.Request) {
 	if h.deviceAuth == nil {
 		deviceUnavailable(w, r)
@@ -133,12 +136,9 @@ type startResponse struct {
 }
 
 func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
-	var body startRequest
-	if r.ContentLength > 0 {
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+	body, ok := httpjson.DecodeOptionalBody[startRequest](w, r)
+	if !ok {
+		return
 	}
 
 	d.mu.Lock()
@@ -181,7 +181,7 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 		cancel:          cancel,
 		done:            make(chan struct{}),
 		startedAt:       time.Now(),
-		expiresAt:       time.Now().Add(time.Duration(da.Expiry.Sub(time.Now()).Seconds()) * time.Second),
+		expiresAt:       time.Now().Add(time.Duration(time.Until(da.Expiry).Seconds()) * time.Second),
 		verificationURI: verify,
 		userCode:        da.UserCode,
 	}
@@ -215,7 +215,7 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 	if expiresIn < 0 {
 		expiresIn = 0
 	}
-	writeJSON(w, http.StatusOK, startResponse{
+	httpjson.Write(w, http.StatusOK, startResponse{
 		VerificationURI:         da.VerificationURI,
 		VerificationURIComplete: verify,
 		UserCode:                da.UserCode,
@@ -234,7 +234,7 @@ func (d *DeviceAuth) poll(w http.ResponseWriter, _ *http.Request) {
 	d.mu.Unlock()
 
 	if flow == nil {
-		writeJSON(w, http.StatusOK, pollResponse{Status: "idle"})
+		httpjson.Write(w, http.StatusOK, pollResponse{Status: "idle"})
 		return
 	}
 	select {
@@ -255,12 +255,12 @@ func (d *DeviceAuth) poll(w http.ResponseWriter, _ *http.Request) {
 					status = "denied"
 				}
 			}
-			writeJSON(w, http.StatusOK, pollResponse{Status: status, Error: err.Error()})
+			httpjson.Write(w, http.StatusOK, pollResponse{Status: status, Error: err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, pollResponse{Status: "done"})
+		httpjson.Write(w, http.StatusOK, pollResponse{Status: "done"})
 	default:
-		writeJSON(w, http.StatusOK, pollResponse{Status: "pending"})
+		httpjson.Write(w, http.StatusOK, pollResponse{Status: "pending"})
 	}
 }
 
@@ -272,12 +272,6 @@ func (d *DeviceAuth) cancel(w http.ResponseWriter, _ *http.Request) {
 	}
 	d.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
 }
 
 // inferLocalClientID is a small env-with-fallback helper for the device-auth
