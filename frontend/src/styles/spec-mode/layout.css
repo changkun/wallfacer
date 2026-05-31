@@ -1,0 +1,467 @@
+/* ===== Spec Mode Layout ===== */
+
+/* Three-pane container: focused markdown view + resize handle + chat stream */
+.spec-mode-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/*
+ * Layout state machine (layout-state-machine spec).
+ *
+ * [data-layout="three-pane"] (default) — explorer + focused view + chat.
+ * [data-layout="chat-first"] — no specs and no Roadmap: chat takes the
+ *   full Plan-mode width. Explorer + focused view + resize handle animate
+ *   out to width:0 with a short deceleration curve; the reverse
+ *   transition uses a longer acceleration/exit curve for subtlety.
+ */
+.spec-focused-view,
+.spec-chat-stream {
+  transition:
+    width 260ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 260ms cubic-bezier(0.2, 0, 0, 1),
+    transform 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.spec-mode-container[data-layout="chat-first"] .spec-focused-view {
+  /* Override the default flex:1 so the collapsed focused-view doesn't
+     eat horizontal space and push the centered chat card off-axis. */
+  flex: 0 0 0;
+  width: 0;
+  opacity: 0;
+  transform: translateX(-12px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.spec-mode-container[data-layout="chat-first"] #spec-chat-resize {
+  display: none;
+}
+
+/* Chat-first mirrors the empty-Board composer's spatial language: a
+   centered card with padding around it, not a full-width slab. The
+   parent flex centers the card; the card itself has a max-width that
+   matches the empty-Board composer family so both modes' empty states
+   read as visually continuous. */
+.spec-mode-container[data-layout="chat-first"] {
+  justify-content: center;
+  align-items: stretch;
+  padding: 32px 16px;
+  transition-timing-function: cubic-bezier(0.3, 0, 0.8, 0.15);
+  transition-duration: 200ms;
+}
+
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream {
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card, var(--bg));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+/* Suppress the redundant "PLANNING CHAT" header row in chat-first —
+   the thread tab bar already labels the pane and the card framing
+   makes the explicit header look like visual noise. */
+.spec-mode-container[data-layout="chat-first"] .spec-chat-stream__header {
+  display: none;
+}
+
+/* The "/create" hint slot sits between the messages area and the
+   composer. Only renders when the chat has no messages (JS toggles
+   the .spec-chat-empty-hint--visible modifier). */
+.spec-chat-empty-hint {
+  display: none;
+  padding: 8px 14px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.spec-mode-container[data-layout="chat-first"] .spec-chat-empty-hint--visible {
+  display: block;
+}
+.spec-chat-empty-hint__cmd {
+  font-family: var(--font-mono, monospace);
+  color: var(--text);
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spec-focused-view,
+  .spec-chat-stream {
+    transition-duration: 0s;
+  }
+}
+
+/* The `spec-mode--chat-only` class is still toggled by
+ * _updateSpecPaneVisibility for backwards compat with external hooks
+ * and tests that assert on its presence, but all layout CSS is now
+ * driven by the [data-layout] attribute above. */
+
+/* Center pane: focused markdown view */
+.spec-focused-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Header adopts the mockup's two-row layout: a slim chrome bar (path,
+   tags, actions) and a display title rendered as huge italic serif. */
+.spec-focused-view__header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 28px 18px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.spec-focused-view__chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+}
+
+.spec-focused-view__path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__title {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: 52em;
+  word-break: break-word;
+}
+
+.spec-focused-view__status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  text-transform: lowercase;
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+}
+
+.spec-focused-view__kind {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  text-transform: lowercase;
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+/* Collapse tag/path chips entirely when there is no content — the
+   Roadmap index has no frontmatter, so the chrome should not render
+   empty pills as solid shapes. */
+.spec-focused-view__path:empty,
+.spec-focused-view__status:empty,
+.spec-focused-view__kind:empty,
+.spec-focused-view__effort:empty {
+  display: none;
+}
+
+.spec-kind--design {
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
+}
+
+.spec-kind--impl {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.spec-focused-view__effort {
+  font-size: 11px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__spacer {
+  flex: 1;
+}
+
+/* Pinned Roadmap (specs/README.md) in the focused view: hide every
+   spec-only affordance — status chip, kind/effort badges, metadata bar,
+   dispatch/breakdown/archive buttons, archived banner. The Roadmap is a
+   plain markdown document with no lifecycle. */
+/* Spec-only affordances: always have a transition so toggling the
+   Roadmap marker class (.spec-focused-view--index) slides them out
+   with a subtle translateY + opacity dissolve rather than snapping.
+   Honouring reduced motion collapses the transition to zero. */
+.spec-focused-view__path,
+.spec-focused-view__status,
+.spec-focused-view__kind,
+.spec-focused-view__effort,
+.spec-focused-view__meta,
+#spec-dispatch-btn,
+#spec-summarize-btn,
+#spec-archive-btn,
+#spec-unarchive-btn,
+#spec-archived-banner {
+  transition:
+    opacity 220ms cubic-bezier(0.2, 0, 0, 1),
+    transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+.spec-focused-view--index .spec-focused-view__path,
+.spec-focused-view--index .spec-focused-view__status,
+.spec-focused-view--index .spec-focused-view__kind,
+.spec-focused-view--index .spec-focused-view__effort,
+.spec-focused-view--index .spec-focused-view__meta,
+.spec-focused-view--index #spec-dispatch-btn,
+.spec-focused-view--index #spec-summarize-btn,
+.spec-focused-view--index #spec-archive-btn,
+.spec-focused-view--index #spec-unarchive-btn,
+.spec-focused-view--index #spec-archived-banner {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  /* Keep the elements out of the flow so the index view reads as a
+     pure markdown document without reserved button-sized gaps. */
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spec-focused-view__path,
+  .spec-focused-view__status,
+  .spec-focused-view__kind,
+  .spec-focused-view__effort,
+  .spec-focused-view__meta,
+  #spec-dispatch-btn,
+  #spec-summarize-btn,
+  #spec-archive-btn,
+  #spec-unarchive-btn,
+  #spec-archived-banner,
+  #spec-focused-body-inner {
+    transition-duration: 0s !important;
+  }
+}
+
+/* First-spec bootstrap toast — slides in from the top centre when a
+   chat-first workspace transitions to three-pane on the very first
+   /spec-new. Differentiated from the bottom-right dispatch toast to
+   avoid visual confusion during onboarding. */
+.bootstrap-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  opacity: 0;
+  z-index: 1150;
+  max-width: 520px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent, #6366f1);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  animation: bootstrap-toast-in 200ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+.bootstrap-toast--no-motion,
+.bootstrap-toast.bootstrap-toast--no-motion {
+  animation: none;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+@keyframes bootstrap-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bootstrap-toast {
+    animation: none;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Chat messages crossfade on thread switch — triggered by the
+   `.spec-chat-stream__messages--swapping` class added in
+   planning-chat.js::_switchToThread. */
+#spec-chat-messages {
+  transition: opacity 120ms linear;
+}
+.spec-chat-stream__messages--swapping {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  #spec-chat-messages {
+    transition: none;
+  }
+}
+
+.spec-focused-view__meta {
+  padding: 8px 28px 10px;
+  font-size: 11px;
+  color: var(--ink-4);
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.spec-focused-view__meta:empty {
+  display: none;
+}
+
+.spec-status--complete {
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
+}
+
+.spec-status--validated {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.spec-status--drafted {
+  background: var(--tint-amber);
+  color: var(--tint-amber-ink);
+}
+
+.spec-status--vague {
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+}
+
+.spec-status--stale {
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
+}
+
+.spec-status--archived {
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+  opacity: 0.7;
+}
+
+.spec-archived-banner {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-left: 4px solid #6c757d;
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem 16px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+/* Override loaded-later display:flex so the .hidden utility still hides the banner. */
+.spec-archived-banner.hidden {
+  display: none;
+}
+
+.spec-archived-banner__text {
+  flex: 1;
+}
+
+.spec-archive-toasts {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 360px;
+  pointer-events: none;
+}
+
+.spec-archive-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  animation: spec-archive-toast-in 0.18s ease-out;
+}
+
+.spec-archive-toast__text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spec-archive-toast__close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.spec-archive-toast__close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+@keyframes spec-archive-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

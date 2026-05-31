@@ -1,0 +1,202 @@
+/* ===== Spec Explorer Tree ===== */
+
+.spec-loading {
+  padding: 12px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Pinned Roadmap entry at the top of the spec explorer — stable visual
+   anchor for specs/README.md, regardless of track filter. */
+.spec-explorer-pinned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+.spec-explorer-pinned:hover {
+  background: var(--bg-hover);
+}
+.spec-explorer-pinned:focus {
+  outline: none;
+  background: var(--bg-hover);
+}
+.spec-explorer-pinned--focused {
+  border-left: 2px solid var(--accent);
+  background: var(--bg-hover);
+}
+
+.spec-track-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-top: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.spec-track-header:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.spec-track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spec-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spec-node:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.spec-node--focused {
+  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
+  color: var(--text);
+}
+.spec-node--focused .spec-node-icon {
+  color: var(--accent);
+}
+
+.spec-node--archived {
+  opacity: 0.6;
+  color: #6c757d;
+}
+
+.spec-show-archived {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.spec-show-archived.hidden {
+  display: none;
+}
+
+.spec-node-toggle {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  border-radius: 3px;
+}
+
+.spec-node-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.spec-node-toggle svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+.spec-node-toggle-placeholder {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.spec-node-icon {
+  flex-shrink: 0;
+}
+
+.spec-node-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.spec-node-progress {
+  color: var(--text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.spec-select-checkbox {
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.spec-select-checkbox:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.spec-dispatch-bar {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.spec-dispatch-selected-btn {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.spec-dispatch-selected-btn:hover {
+  background: var(--accent-hover, #1d4ed8);
+}
+
+.spec-dispatch-selected-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spec-status-filter {
+  font-size: 10px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  margin-left: auto;
+}
+

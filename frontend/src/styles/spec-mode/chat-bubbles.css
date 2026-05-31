@@ -1,0 +1,347 @@
+/* ===== Planning Chat Bubbles ===== */
+
+.planning-chat-bubble {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  max-width: 100%;
+  position: relative;
+  font-size: 13px;
+}
+
+.planning-chat-bubble__av {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--bg-sunk);
+  color: var(--text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.planning-chat-bubble--user .planning-chat-bubble__av {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+}
+
+.planning-chat-bubble--assistant .planning-chat-bubble__av {
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-card));
+  color: var(--accent);
+}
+
+.planning-chat-bubble__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.planning-chat-bubble__meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.planning-chat-bubble__time {
+  font-weight: 500;
+}
+
+.planning-chat-bubble__time:not(:empty)::before {
+  content: "·";
+  margin: 0 4px;
+}
+
+.planning-chat-bubble__content {
+  color: var(--text);
+  line-height: 1.55;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.planning-chat-bubble__content > :first-child {
+  margin-top: 0;
+}
+
+.planning-chat-bubble__content > :last-child {
+  margin-bottom: 0;
+}
+
+/* Scale down prose headings inside chat bubbles so they don't dominate.
+   Chat flow reads more naturally with sans headings — override the serif
+   italic from the canonical .prose-content. */
+.planning-chat-bubble--assistant .prose-content h1,
+.planning-chat-bubble--assistant .prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.planning-chat-bubble--assistant .prose-content h1 {
+  font-size: 15px;
+  margin: 8px 0 6px;
+}
+.planning-chat-bubble--assistant .prose-content h2 {
+  font-size: 14px;
+  margin: 8px 0 6px;
+}
+.planning-chat-bubble--assistant .prose-content h3 {
+  font-size: 12px;
+  margin: 6px 0 4px;
+}
+.planning-chat-bubble--assistant .prose-content h4 {
+  font-size: 13px;
+  margin: 6px 0 4px;
+}
+.planning-chat-bubble--assistant .prose-content p {
+  margin: 0 0 8px;
+}
+
+.planning-chat-bubble__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.planning-chat-bubble:hover .planning-chat-bubble__actions,
+.planning-chat-bubble:focus-within .planning-chat-bubble__actions {
+  opacity: 1;
+}
+
+.planning-chat-bubble__undo {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.planning-chat-bubble__undo:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.planning-chat-bubble__undo:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.planning-chat-bubble--reverted .planning-chat-bubble__content {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--text-muted);
+}
+
+.planning-chat-system {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 0;
+  font-style: italic;
+}
+
+.planning-chat-system--undo {
+  text-align: left;
+  font-style: normal;
+  background: var(--bg-card);
+  border-left: 2px solid var(--border);
+  padding: 6px 10px;
+  margin: 4px 0;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.planning-chat-system__files {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.planning-chat-system__files li {
+  list-style: disc;
+  margin: 0;
+  padding: 0;
+}
+
+.planning-chat-error {
+  background: var(--bg-card);
+  border: 1px solid var(--danger, #e53e3e);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--danger, #e53e3e);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.planning-chat-interrupted {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 2px 0 8px;
+}
+
+.planning-chat-activity {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.planning-chat-activity summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Timeline-style activity log — left accent border, no outer box. */
+.planning-chat-activity__log {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--border);
+}
+
+/* Flatten tool results inside chat activity — no indent, inline flow.
+   Override .prose-content pre styling so <pre class="cc-result-text">
+   renders the same way as in the task detail panel (no box). */
+.planning-chat-activity .cc-tool-result {
+  padding-left: 0;
+}
+
+.planning-chat-activity pre.cc-result-text {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.planning-chat-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.planning-chat-thinking {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.planning-chat-thinking__dots span {
+  animation: planning-chat-dot 1.4s infinite;
+  opacity: 0.2;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.planning-chat-thinking__dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.planning-chat-thinking__dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes planning-chat-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* Queue chips */
+.planning-chat-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.planning-chat-queue:empty {
+  display: none;
+}
+
+.planning-chat-queue__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  max-width: 200px;
+}
+
+.planning-chat-queue__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.planning-chat-queue__text:hover {
+  color: var(--accent);
+}
+
+.planning-chat-queue__remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}
+
+.planning-chat-queue__remove:hover {
+  color: var(--danger, #e53e3e);
+}
+
+.planning-chat-queue__edit {
+  font-size: 11px;
+  padding: 1px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+}
+
+.planning-chat-interrupt-btn {
+  background: var(--danger, #e53e3e) !important;
+}
+
+.planning-chat-interrupt-btn:hover {
+  opacity: 0.85;
+}
+
+/* Slash command autocomplete — reuses mention-dropdown styling */

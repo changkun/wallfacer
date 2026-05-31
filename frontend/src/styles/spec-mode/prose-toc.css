@@ -1,0 +1,355 @@
+/* Table of contents — absolutely positioned; JS exclusion keeps text clear */
+.spec-toc {
+  position: absolute;
+  top: 72px;
+  right: 12px;
+  width: 180px;
+  max-height: calc(100% - 88px);
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  z-index: 2;
+  opacity: 0.85;
+  pointer-events: auto;
+}
+
+.spec-toc:hover {
+  opacity: 1;
+}
+
+.spec-toc__title {
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.spec-toc__link {
+  display: block;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 1px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.spec-toc__link:hover {
+  color: var(--text);
+}
+
+.spec-toc__link--active {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.spec-toc__link--h1 {
+  padding-left: 0;
+}
+
+.spec-toc__link--h2 {
+  padding-left: 8px;
+}
+
+.spec-toc__link--h3 {
+  padding-left: 16px;
+}
+
+.spec-toc__link--h4 {
+  padding-left: 24px;
+}
+
+/* Secondary header actions — muted text links, no border, no fill.
+   Dispatch stands out as the dark primary call-to-action. */
+.spec-summarize-btn,
+.spec-chat-toggle-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.spec-summarize-btn:hover,
+.spec-chat-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+
+/* When the chat pane is folded, emphasise the toggle so the user
+   can easily find their way back to the chat. */
+.spec-chat-toggle-btn--folded {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.spec-chat-toggle-btn--folded:hover {
+  background: var(--accent-tint);
+  color: var(--accent-2);
+}
+
+.spec-dispatch-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--r-md);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+
+.spec-dispatch-btn:hover {
+  background: color-mix(in oklab, var(--ink) 85%, var(--accent) 15%);
+  border-color: color-mix(in oklab, var(--ink) 85%, var(--accent) 15%);
+  color: var(--bg);
+}
+
+.spec-focused-view__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.spec-focused-view__body-inner {
+  max-width: 52em;
+  padding: 20px 28px 80px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Mockup's drop cap: first letter of the first paragraph rendered as a
+   large italic serif in the clay accent colour. Only applied to the spec
+   body — docs and chat retain flat paragraph starts. */
+.spec-focused-view__body-inner.prose-content > p:first-of-type::first-letter {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 3em;
+  line-height: 0.9;
+  float: left;
+  padding: 4px 10px 0 0;
+  color: var(--accent);
+}
+
+.spec-focused-view__body-inner.prose-content > p:first-of-type {
+  font-size: 15px;
+  line-height: 1.72;
+}
+
+/* Section headings inside the spec body — sans for legibility. Serif
+   italic is reserved for the display title above so long-form reading
+   stays comfortable. */
+.spec-focused-view__body-inner.prose-content h2 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.005em;
+  margin: 28px 0 10px;
+}
+.spec-focused-view__body-inner.prose-content h3 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--ink);
+  text-transform: none;
+  margin: 22px 0 8px;
+}
+
+/* Reusable prose class — single source of truth for markdown rendering.
+   Paper-ink style: Instrument Serif italic headings, Inter body, clay accent.
+   Canonical tier is compact (modal / chat scale). The .docs-mode__content
+   scope in docs.css scales up to display sizes with inverted code blocks. */
+.prose-content {
+  color: var(--ink);
+  font-size: var(--fs-md);
+  line-height: 1.65;
+}
+
+/* Headings default to sans for legibility. Serif italic is only used on
+   display titles (the spec header title, docs h1 hero) — those are opted
+   in by scoped overrides, not by default. */
+.prose-content h1,
+.prose-content h2,
+.prose-content h3,
+.prose-content h4,
+.prose-content h5,
+.prose-content h6 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.prose-content h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 10px;
+}
+.prose-content h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  margin: 22px 0 8px;
+}
+.prose-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 18px 0 6px;
+}
+.prose-content h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 14px 0 4px;
+}
+.prose-content h5,
+.prose-content h6 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin: 12px 0 4px;
+}
+
+.prose-content p {
+  margin: 0 0 12px;
+}
+.prose-content p:first-child {
+  margin-top: 0;
+}
+.prose-content p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-content strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose-content em {
+  font-style: italic;
+}
+
+.prose-content ul,
+.prose-content ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.prose-content ul {
+  list-style-type: disc;
+}
+.prose-content ol {
+  list-style-type: decimal;
+}
+.prose-content ul ul {
+  list-style-type: circle;
+}
+.prose-content li {
+  margin: 2px 0;
+}
+.prose-content li > p {
+  margin: 2px 0;
+}
+
+.prose-content code {
+  background: var(--bg-input);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.prose-content pre {
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  margin: 0 0 14px;
+  color: var(--ink-2);
+}
+.prose-content pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  border-radius: 0;
+}
+
+.prose-content blockquote {
+  border-left: 2px solid var(--accent);
+  margin: 0 0 14px;
+  padding: 2px 0 2px 14px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 1em;
+  line-height: 1.55;
+}
+
+/* Emphasis (markdown *italic*) stays italic but uses the default sans —
+   the italic variant of Inter is easier to read than Instrument Serif
+   italic for inline emphasis. */
+.prose-content em {
+  font-family: var(--font-sans);
+  font-style: italic;
+}
+
+.prose-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 14px;
+  font-size: 12px;
+}
+.prose-content th,
+.prose-content td {
+  border: 1px solid var(--rule);
+  padding: 6px 12px;
+  text-align: left;
+}
+.prose-content th {
+  background: var(--bg-input);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prose-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.prose-content a:hover {
+  text-decoration: underline;
+}
+
+.prose-content img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.prose-content hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 20px 0;
+}
+
