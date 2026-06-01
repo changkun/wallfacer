@@ -5,9 +5,11 @@ import { api } from '../../api/client';
 import { usePlanningStore } from '../../stores/planning';
 import type { SpecNode } from '../../stores/planning';
 import { useTaskStore } from '../../stores/tasks';
+import { useUiStore } from '../../stores/ui';
 
 const planning = usePlanningStore();
 const taskStore = useTaskStore();
+const ui = useUiStore();
 const {
   tree, treeProgress, treeIndex, treeLoading,
   focusedSpecPath, focusedIsIndex, focusedTaskId,
@@ -298,6 +300,8 @@ async function dispatchSelected() {
   try {
     const resp = await api<DispatchResp>('POST', '/api/specs/dispatch', { paths, run: false });
     selectedPaths.value = new Set();
+    // Pulse the freshly-created cards when the board next renders them.
+    ui.markDispatched((resp.dispatched ?? []).map((d) => d.task_id).filter(Boolean));
     if (resp.errors && resp.errors.length > 0) {
       const lines = resp.errors.map(e => `${e.spec_path}: ${e.error}`).join('\n');
       const dispatched = resp.dispatched?.length ?? 0;

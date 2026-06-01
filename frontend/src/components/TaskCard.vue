@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
@@ -39,12 +40,25 @@ const routineIntervalChoices = computed(() => {
 const now = ref(Date.now());
 let tickerHandle: ReturnType<typeof setInterval> | null = null;
 
+// One-shot "just created" pulse for cards freshly dispatched from Plan mode.
+const uiStore = useUiStore();
+const justDispatched = ref(false);
+let pulseHandle: ReturnType<typeof setTimeout> | null = null;
+
 onMounted(() => {
   tickerHandle = setInterval(() => { now.value = Date.now(); }, 1000);
+  if (uiStore.dispatchedIds.has(props.task.id)) {
+    justDispatched.value = true;
+    pulseHandle = setTimeout(() => {
+      justDispatched.value = false;
+      uiStore.consumeDispatched(props.task.id);
+    }, 1500);
+  }
 });
 
 onBeforeUnmount(() => {
   if (tickerHandle !== null) clearInterval(tickerHandle);
+  if (pulseHandle !== null) clearTimeout(pulseHandle);
 });
 
 const routineCountdown = computed(() => {
@@ -131,6 +145,7 @@ function cardClasses(task: Task): Record<string, boolean> {
     'card-failed-waiting': task.status === 'failed',
     'card-cancelled-done': task.status === 'cancelled',
     'card-routine': task.kind === 'routine',
+    'card--just-created': justDispatched.value,
   };
 }
 
