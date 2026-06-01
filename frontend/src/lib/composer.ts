@@ -16,6 +16,19 @@ export function parseTags(input: string): string[] {
   return out;
 }
 
+// A flow accepts an empty prompt when it is the built-in "brainstorm" or any
+// flow whose spawn_kind is "idea-agent" — the agent builds its own prompt from
+// workspace signals. Mirrors the server rule on POST /api/tasks and
+// ui/js/tasks.js _flowAllowsEmptyPrompt.
+export function flowAllowsEmptyPrompt(
+  slug: string,
+  flows: ReadonlyArray<{ slug: string; spawn_kind?: string }>,
+): boolean {
+  if (slug === 'brainstorm') return true;
+  const f = flows.find((x) => x.slug === slug);
+  return !!(f && f.spawn_kind === 'idea-agent');
+}
+
 // Split a multi-paragraph prompt into separate task prompts. Paragraphs are
 // blank-line-separated; per-paragraph leading / trailing whitespace is
 // trimmed and empty paragraphs are dropped. Caller is expected to cap the
