@@ -5,7 +5,7 @@ This guide is for contributors who want to build Wallfacer from source, run test
 ## Prerequisites
 
 - **Go 1.25+** — [go.dev](https://go.dev/)
-- **Podman** or **Docker** — container runtime for sandbox images
+- **`claude` CLI** (and optionally `codex`) on your `PATH` — tasks exec it directly
 - **Node.js 22+** — for frontend tests and Tailwind CSS regeneration
 - **A Claude credential** — OAuth token (`claude setup-token`) or API key from [console.anthropic.com](https://console.anthropic.com/)
 
@@ -20,13 +20,7 @@ cd wallfacer
 go build -o wallfacer .
 ```
 
-Pull sandbox images (optional — auto-pulled from ghcr.io at runtime):
-
-```bash
-make pull-images    # Pull Claude and Codex sandbox images
-```
-
-`make build` builds the binary and pulls the unified sandbox image in one step. The sandbox image is maintained in a separate repository (`github.com/latere-ai/images`); for normal development the server pulls `ghcr.io/latere-ai/sandbox-agents:latest` automatically on first task run. The same image ships both the Claude Code and Codex CLIs; the entrypoint dispatches to the correct one based on `WALLFACER_AGENT` (`claude` or `codex`), which the runner sets per task.
+`make build` runs the full gate (fmt + lint + TypeScript build + binary). At runtime the server execs the `claude`/`codex` CLI directly; the binary selected per task is set via the `WALLFACER_AGENT` env var (`claude` or `codex`).
 
 ## Configure Credentials
 
@@ -56,17 +50,13 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 
 | Target | Description |
 |---|---|
-| `make build` | Full gate: fmt + lint (Go + JS) + build binary + pull both sandbox images |
-| `make build-host` | Host-mode build: full gate, no image pull (for `wallfacer run --backend host`) |
-| `make build-binary` | Build just the Go binary, skipping fmt/lint/pull (accepts optional `VERSION=`) |
+| `make build` | Full gate: fmt + lint (Go + JS) + TypeScript build + binary |
+| `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
 | `make build-desktop` | Build the native desktop app for the current platform (uses `go tool wails`) |
 | `make build-desktop-darwin` / `-windows` / `-linux` | Cross-platform desktop builds |
 | `make install-wails` | Install the Wails CLI tracked as a tool in go.mod |
-| `make pull-images` | Pull Claude and Codex sandbox images |
 | `make server` | Build and run the server natively |
 | `make server-dev` | Build and run the server with `-ui-dir ./ui` so UI edits reload without rebuilding |
-| `make shell` | Open a bash shell in a sandbox container |
-| `make clean` | Remove all sandbox images |
 | `make fmt` | Format Go and JS in place |
 | `make lint` | Lint only (golangci-lint + Biome); fastest way to catch style regressions |
 | `make test` | Lint + backend tests + frontend tests |
@@ -74,8 +64,7 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 | `make test-frontend` | Frontend Vitest runner |
 | `make ui-css` | Regenerate Tailwind CSS from UI sources |
 | `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
-| `make run PROMPT="…"` | Headless one-shot Claude execution |
-| `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`, `BACKEND=host`) |
+| `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
 | `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
 | `make release-notes` | Generate an LLM prompt for release notes (requires `RELEASE_VERSION=`) |
 | `make release` | Commit release notes, tag, push, create GitHub release (requires `RELEASE_VERSION=` and `RELEASE_NOTES=`) |
