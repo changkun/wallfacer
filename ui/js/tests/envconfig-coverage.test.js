@@ -713,8 +713,6 @@ describe("showEnvConfigEditor", () => {
         ["env-config-status", makeInput("")],
         ["env-claude-test-status", makeInput("")],
         ["env-codex-test-status", makeInput("")],
-        ["env-container-cpus", makeInput("")],
-        ["env-container-memory", makeInput("")],
       ],
       api,
       applySandboxByActivity: () => {},
@@ -1028,35 +1026,5 @@ describe("saveArchivedTasksPerPage clamping", () => {
 
     await ctx.saveArchivedTasksPerPage();
     expect(status.textContent).toBe("Error: fail");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildSaveEnvPayload — container resource fields
-// ---------------------------------------------------------------------------
-describe("buildSaveEnvPayload with container resources", () => {
-  it("includes container_cpus and container_memory", () => {
-    const ctx = makeContext({
-      elements: [
-        ["env-oauth-token", makeInput("")],
-        ["env-api-key", makeInput("")],
-        ["env-claude-base-url", makeInput("")],
-        ["env-openai-api-key", makeInput("")],
-        ["env-openai-base-url", makeInput("")],
-        ["env-default-model", makeInput("")],
-        ["env-title-model", makeInput("")],
-        ["env-codex-default-model", makeInput("")],
-        ["env-codex-title-model", makeInput("")],
-        ["env-default-sandbox", makeInput("")],
-        ["env-sandbox-fast", makeCheckbox(true)],
-        ["env-container-cpus", makeInput("2.0")],
-        ["env-container-memory", makeInput("4g")],
-      ],
-    });
-    loadScript(ctx, "envconfig.js");
-
-    const body = ctx.buildSaveEnvPayload();
-    expect(body.container_cpus).toBe("2.0");
-    expect(body.container_memory).toBe("4g");
   });
 });

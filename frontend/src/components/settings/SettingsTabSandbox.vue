@@ -162,8 +162,6 @@ const codexDefaultModel = ref('');
 const codexTitleModel = ref('');
 const defaultSandbox = ref('');
 const sandboxFast = ref(true);
-const containerCpus = ref('');
-const containerMemory = ref('');
 
 const claudeModels = computed(() => claudeModelsFor(claudeBaseUrl.value));
 const codexModels = computed(() => codexModelsFor(openaiBaseUrl.value));
@@ -214,8 +212,6 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   codexTitleModel.value = cfg?.codex_title_model || '';
   defaultSandbox.value = cfg?.default_sandbox || '';
   sandboxFast.value = cfg?.sandbox_fast !== false;
-  containerCpus.value = cfg?.container_cpus || '';
-  containerMemory.value = cfg?.container_memory || '';
   claudeTestStatus.value = '';
   claudeTestReauth.value = false;
   codexTestStatus.value = '';
@@ -244,8 +240,6 @@ function buildSavePayload(): EnvUpdatePayload {
   // clears any legacy WALLFACER_SANDBOX_* entries.
   body.sandbox_by_activity = {};
   body.sandbox_fast = sandboxFast.value;
-  body.container_cpus = containerCpus.value.trim();
-  body.container_memory = containerMemory.value.trim();
   return body;
 }
 
@@ -906,45 +900,6 @@ function capitalize(s: string): string {
               <input id="env-sandbox-fast" v-model="sandboxFast" type="checkbox" />
               <span>Enable <code style="font-family: monospace">/fast</code> for sandbox runs</span>
             </label>
-          </div>
-        </div>
-
-        <!-- Container Resource Limits -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Container Resource Limits</label>
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Container CPUs (WALLFACER_CONTAINER_CPUS)</label>
-              <input
-                id="env-container-cpus"
-                v-model="containerCpus"
-                type="text"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="e.g. 2.0 (leave empty for no limit)"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Max CPU cores for each container (<code style="font-family: monospace">--cpus</code>).
-                Clear to remove the limit.
-              </div>
-            </div>
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Container Memory (WALLFACER_CONTAINER_MEMORY)</label>
-              <input
-                id="env-container-memory"
-                v-model="containerMemory"
-                type="text"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="e.g. 4g (leave empty for no limit)"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Max memory for each container (<code style="font-family: monospace">--memory</code>).
-                Clear to remove the limit.
-              </div>
-            </div>
           </div>
         </div>
       </div>
