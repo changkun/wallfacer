@@ -10,7 +10,7 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 8 done, 1 in progress, 12 pending
+Local Product — 8 done, 1 in progress, 13 pending
   ✅ Desktop App                   ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
@@ -71,6 +71,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [refinement-into-plan.md](local/refinement-into-plan.md) | **Complete** | Retired the bespoke refine pipeline. Plan mode edits task prompts directly via a Task Prompts explorer section and a task-aware `update_task_prompt` tool. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. Auto-refine removed entirely (no replacement in this spec). |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [vue-frontend-migration.md](local/vue-frontend-migration.md) | Drafted | Converge both frontends (vanilla JS `ui/` + Vue+TS `frontend/`) into a single Vue 3 + TypeScript SPA. Runtime mode switching: local serves kanban directly, cloud adds landing/docs/pricing. Parallel build with cutover flag. Supersedes typescript-migration and typed-dom-hooks. |
+| [backend-redundancy-cleanup.md](local/backend-redundancy-cleanup.md) | Drafted | Post-migration sweep: collapse verb-specific endpoints into PATCH (planning threads, spec actions, oversight phase, task actions, auth orgs), retire deferred backend duplications from pass-1 cleanup, and fix the `TaskUsage` cache-token undercount in `/api/stats`. Blocked on vue-frontend-migration because the API-shape collapses touch both `ui/` and `frontend/`. |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 | [spatial-canvas.md](local/spatial-canvas.md) | Vague | Spatial infinite-canvas view — tasks, agents, and notes as free-form nodes on a 2D plane |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the planning-only slash command registry to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting). Task board and other UI surfaces can then trigger their own `/` commands via the shared autocomplete widget. |
