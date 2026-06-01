@@ -18,16 +18,16 @@ import (
 func newDeviceServer(t *testing.T, deviceBody, tokenBody string, tokenStatus int) (*oidc.Client, *httptest.Server) {
 	t.Helper()
 	mux := http.NewServeMux()
-	mux.HandleFunc("/device/code", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/device/code", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, deviceBody)
+		_, _ = fmt.Fprint(w, deviceBody)
 	})
-	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if tokenStatus != 0 {
 			w.WriteHeader(tokenStatus)
 		}
-		fmt.Fprint(w, tokenBody)
+		_, _ = fmt.Fprint(w, tokenBody)
 	})
 	srv := httptest.NewServer(mux)
 	c := oidc.New(oidc.Config{

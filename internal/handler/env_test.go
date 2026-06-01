@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -492,13 +492,13 @@ func TestTestSandbox_InvalidBaseURLRejected(t *testing.T) {
 // WALLFACER_AGENT inside the container, not via the image name.
 func TestSandboxImageForTest(t *testing.T) {
 	const image = "ghcr.io/latere-ai/sandbox-agents:v0.0.5"
-	for _, sb := range []sandbox.Type{sandbox.Claude, sandbox.Codex} {
+	for _, sb := range []harness.ID{harness.Claude, harness.Codex} {
 		got := sandboxImageForTest(sb, image)
 		if got != image {
 			t.Fatalf("sandboxImageForTest(%q, %q) = %q; want %q", sb, image, got, image)
 		}
 	}
-	if got := sandboxImageForTest(sandbox.Codex, "  spaced  "); got != "spaced" {
+	if got := sandboxImageForTest(harness.Codex, "  spaced  "); got != "spaced" {
 		t.Fatalf("expected whitespace-trimmed image, got %q", got)
 	}
 }

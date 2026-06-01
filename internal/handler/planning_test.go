@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -542,7 +542,7 @@ func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
 	if got.StopReason != "end_turn" {
 		t.Errorf("stop_reason: got %q, want end_turn", got.StopReason)
 	}
-	if got.Sandbox != sandbox.Claude {
+	if got.Sandbox != harness.Claude {
 		t.Errorf("sandbox: got %q, want claude", got.Sandbox)
 	}
 	if got.SubAgent != store.SandboxActivityPlanning {

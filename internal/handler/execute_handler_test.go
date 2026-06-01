@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -381,8 +382,8 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h := newTestHandler(t)
 	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*sandbox.HostBackend); ok {
-		hb.SetBinaryForTest(sandbox.Claude, "/usr/bin/false")
-		hb.SetBinaryForTest(sandbox.Codex, "/usr/bin/false")
+		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
+		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}
 	h.SetAutopilot(true)
 	h.SetAutotest(true)

@@ -14,8 +14,8 @@ import (
 // without constructing a real OIDC client (which would require a live auth
 // service for UserFromRequest to succeed).
 type fakeAuth struct {
-	user          *auth.User
-	url           string
+	user              *auth.User
+	url               string
 	loginCalls        int
 	callbackCalls     int
 	logoutCalls       int

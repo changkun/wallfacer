@@ -12,6 +12,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/oauth"
@@ -22,7 +23,6 @@ import (
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/routine"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -184,7 +184,7 @@ type Handler struct {
 	routineEngine *routine.Engine
 
 	sandboxTestMu     sync.RWMutex
-	sandboxTestPassed map[sandbox.Type]bool
+	sandboxTestPassed map[harness.ID]bool
 	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
 	// tryAutoPromote precisely when the soonest scheduled task becomes due.
 	scheduledPromoteMu    sync.Mutex
@@ -218,9 +218,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		startTime:            time.Now(),
 		ideationExploitRatio: constants.DefaultIdeationExploitRatio,
 		reg:                  reg,
-		sandboxTestPassed: map[sandbox.Type]bool{
-			sandbox.Claude: false,
-			sandbox.Codex:  false,
+		sandboxTestPassed: map[harness.ID]bool{
+			harness.Claude: false,
+			harness.Codex:  false,
 		},
 		breakers: map[string]*watcherBreaker{
 			"auto-promote": newWatcherBreaker(),
@@ -619,7 +619,7 @@ func (h *Handler) incAutopilotPhase2Miss(watcher string) {
 
 // setSandboxTestPassed records whether the given sandbox type has passed its
 // connectivity test. Protected by sandboxTestMu for concurrent access.
-func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
+func (h *Handler) setSandboxTestPassed(sb harness.ID, passed bool) {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.Lock()
 	h.sandboxTestPassed[s] = passed
@@ -628,7 +628,7 @@ func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
 
 // sandboxTestPassedState reports whether the given sandbox type has passed
 // its connectivity test.
-func (h *Handler) sandboxTestPassedState(sb sandbox.Type) bool {
+func (h *Handler) sandboxTestPassedState(sb harness.ID) bool {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.RLock()
 	defer h.sandboxTestMu.RUnlock()
@@ -643,7 +643,7 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	}
 	ok, _ := h.runner.HostCodexAuthStatus(time.Now())
 	if ok {
-		h.setSandboxTestPassed(sandbox.Codex, true)
+		h.setSandboxTestPassed(harness.Codex, true)
 	}
 }
 

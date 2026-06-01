@@ -6,24 +6,24 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
-// normalizeSandbox maps an arbitrary string to a canonical sandbox.Type,
+// normalizeSandbox maps an arbitrary string to a canonical harness.ID,
 // applying the same default logic as sandbox.Default (empty → Claude).
-func normalizeSandbox(s string) sandbox.Type {
-	return sandbox.Default(s)
+func normalizeSandbox(s string) harness.ID {
+	return harness.DefaultFrom(s)
 }
 
 // sandboxUsable reports whether the given sandbox type can accept tasks.
 // For Claude, it is always usable. For Codex, the check follows a priority
 // chain: host auth (~/.codex/auth.json) > OPENAI_API_KEY > prior test pass.
 // Returns (usable, reason) where reason explains why it is not usable.
-func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
+func (h *Handler) sandboxUsable(sb harness.ID) (bool, string) {
 	s := sb.OrDefault()
 	// Claude sandbox is always usable (uses local OAuth or API key from env).
-	if s != sandbox.Codex {
+	if s != harness.Codex {
 		return true, ""
 	}
 	// Check 1: host-level Codex auth cache (highest priority — no API key needed).
@@ -52,7 +52,7 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 		return false, reason
 	}
 	// Check 3: API key present but not yet validated — require a smoke test first.
-	if !h.sandboxTestPassedState(sandbox.Codex) {
+	if !h.sandboxTestPassedState(harness.Codex) {
 		return false, "Codex unavailable: run Settings -> API Configuration -> Test (Codex) first."
 	}
 	return true, ""
@@ -60,7 +60,7 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 
 // validateRequestedSandboxes checks that both the task-level sandbox and all
 // per-activity sandbox overrides are usable. Returns the first failure reason.
-func (h *Handler) validateRequestedSandboxes(taskSandbox sandbox.Type, byActivity map[store.SandboxActivity]sandbox.Type) error {
+func (h *Handler) validateRequestedSandboxes(taskSandbox harness.ID, byActivity map[store.SandboxActivity]harness.ID) error {
 	if ok, reason := h.sandboxUsable(taskSandbox); !ok {
 		return errors.New(reason)
 	}

@@ -11,10 +11,10 @@ import (
 
 	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 )
@@ -56,11 +56,11 @@ func ssrfHardenedTransport() *http.Transport {
 // availableSandboxes returns all sandbox types the UI should display,
 // combining the built-in Claude and Codex sandboxes with any user-configured
 // default or per-activity sandbox overrides.
-func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
-	sandboxSet := map[sandbox.Type]bool{}
-	var sandboxes []sandbox.Type
-	add := func(name sandbox.Type) {
-		name = sandbox.Normalize(strings.TrimSpace(string(name)))
+func availableSandboxes(cfg envconfig.Config) []harness.ID {
+	sandboxSet := map[harness.ID]bool{}
+	var sandboxes []harness.ID
+	add := func(name harness.ID) {
+		name = harness.NormalizeID(strings.TrimSpace(string(name)))
 		if name == "" || sandboxSet[name] {
 			return
 		}
@@ -69,8 +69,8 @@ func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
 	}
 	// Always expose both built-in sandboxes in the UI so users can select
 	// either provider even before model/env values are configured.
-	add(sandbox.Claude)
-	add(sandbox.Codex)
+	add(harness.Claude)
+	add(harness.Codex)
 
 	if cfg.DefaultSandbox != "" {
 		add(cfg.DefaultSandbox)
@@ -84,17 +84,17 @@ func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
 // defaultSandbox determines which sandbox type should be pre-selected for new
 // tasks. Priority: explicit DefaultSandbox > Claude (if DefaultModel set) >
 // Codex (if CodexDefaultModel set) > Claude as fallback.
-func defaultSandbox(cfg envconfig.Config) sandbox.Type {
+func defaultSandbox(cfg envconfig.Config) harness.ID {
 	if cfg.DefaultSandbox != "" {
 		return cfg.DefaultSandbox
 	}
 	if cfg.DefaultModel != "" {
-		return sandbox.Claude
+		return harness.Claude
 	}
 	if cfg.CodexDefaultModel != "" {
-		return sandbox.Codex
+		return harness.Codex
 	}
-	return sandbox.Claude
+	return harness.Claude
 }
 
 // buildConfigResponse assembles the full configuration payload returned by
@@ -210,9 +210,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"instructions_path":        instructionsPath,
 		"prompts_dir":              promptsDir,
 		"sandbox_activities":       store.SandboxActivities,
-		"sandboxes":                []sandbox.Type{sandbox.Claude, sandbox.Codex},
-		"default_sandbox":          sandbox.Claude,
-		"sandbox_usable":           map[sandbox.Type]bool{sandbox.Claude: true, sandbox.Codex: true},
+		"sandboxes":                []harness.ID{harness.Claude, harness.Codex},
+		"default_sandbox":          harness.Claude,
+		"sandbox_usable":           map[harness.ID]bool{harness.Claude: true, harness.Codex: true},
 		"sandbox_reasons":          map[string]string{},
 		"activity_sandboxes":       map[string]string{},
 		"autopilot":                h.AutopilotEnabled(),
@@ -246,9 +246,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	sandboxes := availableSandboxes(*cfg)
-	sandboxUsable := map[sandbox.Type]bool{
-		sandbox.Claude: true,
-		sandbox.Codex:  true,
+	sandboxUsable := map[harness.ID]bool{
+		harness.Claude: true,
+		harness.Codex:  true,
 	}
 	sandboxReasons := map[string]string{}
 

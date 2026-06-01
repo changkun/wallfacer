@@ -12,10 +12,10 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -96,59 +96,59 @@ func validateBaseURL(u string) error {
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
-	OAuthToken           string                                 `json:"oauth_token"` // masked
-	APIKey               string                                 `json:"api_key"`     // masked
-	BaseURL              string                                 `json:"base_url"`
-	OpenAIAPIKey         string                                 `json:"openai_api_key"` // masked
-	OpenAIBaseURL        string                                 `json:"openai_base_url"`
-	DefaultModel         string                                 `json:"default_model"`
-	TitleModel           string                                 `json:"title_model"`
-	CodexDefaultModel    string                                 `json:"codex_default_model"`
-	CodexTitleModel      string                                 `json:"codex_title_model"`
-	DefaultSandbox       sandbox.Type                           `json:"default_sandbox"`
-	SandboxByActivity    map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
-	MaxParallelTasks     int                                    `json:"max_parallel_tasks"`
-	MaxTestParallelTasks int                                    `json:"max_test_parallel_tasks"`
-	OversightInterval    int                                    `json:"oversight_interval"`
-	ArchivedTasksPerPage int                                    `json:"archived_tasks_per_page"`
-	AutoPushEnabled      bool                                   `json:"auto_push_enabled"`
-	AutoPushThreshold    int                                    `json:"auto_push_threshold"`
-	SandboxFast          bool                                   `json:"sandbox_fast"`
-	ContainerNetwork     string                                 `json:"container_network"`
-	ContainerCPUs        string                                 `json:"container_cpus"`
-	ContainerMemory      string                                 `json:"container_memory"`
+	OAuthToken           string                               `json:"oauth_token"` // masked
+	APIKey               string                               `json:"api_key"`     // masked
+	BaseURL              string                               `json:"base_url"`
+	OpenAIAPIKey         string                               `json:"openai_api_key"` // masked
+	OpenAIBaseURL        string                               `json:"openai_base_url"`
+	DefaultModel         string                               `json:"default_model"`
+	TitleModel           string                               `json:"title_model"`
+	CodexDefaultModel    string                               `json:"codex_default_model"`
+	CodexTitleModel      string                               `json:"codex_title_model"`
+	DefaultSandbox       harness.ID                           `json:"default_sandbox"`
+	SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
+	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
+	MaxTestParallelTasks int                                  `json:"max_test_parallel_tasks"`
+	OversightInterval    int                                  `json:"oversight_interval"`
+	ArchivedTasksPerPage int                                  `json:"archived_tasks_per_page"`
+	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
+	AutoPushThreshold    int                                  `json:"auto_push_threshold"`
+	SandboxFast          bool                                 `json:"sandbox_fast"`
+	ContainerNetwork     string                               `json:"container_network"`
+	ContainerCPUs        string                               `json:"container_cpus"`
+	ContainerMemory      string                               `json:"container_memory"`
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
 // smoke-check via POST /api/env/test.
 type sandboxTestResponse struct {
-	TaskID          string       `json:"task_id"`
-	Sandbox         sandbox.Type `json:"sandbox"`
-	Status          string       `json:"status"`
-	LastTestResult  string       `json:"last_test_result,omitempty"`
-	Result          string       `json:"result,omitempty"`
-	StopReason      string       `json:"stop_reason,omitempty"`
-	ReauthAvailable bool         `json:"reauth_available,omitempty"`
+	TaskID          string     `json:"task_id"`
+	Sandbox         harness.ID `json:"sandbox"`
+	Status          string     `json:"status"`
+	LastTestResult  string     `json:"last_test_result,omitempty"`
+	Result          string     `json:"result,omitempty"`
+	StopReason      string     `json:"stop_reason,omitempty"`
+	ReauthAvailable bool       `json:"reauth_available,omitempty"`
 }
 
 // sandboxTestRequest is the JSON body accepted by POST /api/env/test.
 // All credential fields use pointer semantics: nil means "use saved value".
 type sandboxTestRequest struct {
-	Sandbox           *sandbox.Type                          `json:"sandbox"`
-	Timeout           *int                                   `json:"timeout"`
-	Prompt            *string                                `json:"prompt"`
-	OAuthToken        *string                                `json:"oauth_token"`
-	APIKey            *string                                `json:"api_key"`
-	BaseURL           *string                                `json:"base_url"`
-	OpenAIAPIKey      *string                                `json:"openai_api_key"`
-	OpenAIBaseURL     *string                                `json:"openai_base_url"`
-	DefaultModel      *string                                `json:"default_model"`
-	TitleModel        *string                                `json:"title_model"`
-	CodexDefaultModel *string                                `json:"codex_default_model"`
-	CodexTitleModel   *string                                `json:"codex_title_model"`
-	DefaultSandbox    *sandbox.Type                          `json:"default_sandbox"`
-	SandboxByActivity map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
-	SandboxFast       *bool                                  `json:"sandbox_fast"`
+	Sandbox           *harness.ID                          `json:"sandbox"`
+	Timeout           *int                                 `json:"timeout"`
+	Prompt            *string                              `json:"prompt"`
+	OAuthToken        *string                              `json:"oauth_token"`
+	APIKey            *string                              `json:"api_key"`
+	BaseURL           *string                              `json:"base_url"`
+	OpenAIAPIKey      *string                              `json:"openai_api_key"`
+	OpenAIBaseURL     *string                              `json:"openai_base_url"`
+	DefaultModel      *string                              `json:"default_model"`
+	TitleModel        *string                              `json:"title_model"`
+	CodexDefaultModel *string                              `json:"codex_default_model"`
+	CodexTitleModel   *string                              `json:"codex_title_model"`
+	DefaultSandbox    *harness.ID                          `json:"default_sandbox"`
+	SandboxByActivity map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
+	SandboxFast       *bool                                `json:"sandbox_fast"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -209,7 +209,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sb := sandbox.Claude
+	sb := harness.Claude
 	if req.Sandbox != nil {
 		if !req.Sandbox.IsValid() {
 			http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
@@ -396,7 +396,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 // sandboxImageForTest returns the container image name to use for a sandbox
 // connectivity test. The unified sandbox-agents image serves both Claude and
 // Codex; the agent CLI is selected at runtime via WALLFACER_AGENT.
-func sandboxImageForTest(_ sandbox.Type, baseImage string) string {
+func sandboxImageForTest(_ harness.ID, baseImage string) string {
 	return strings.TrimSpace(baseImage)
 }
 
@@ -411,28 +411,28 @@ func sandboxImageForTest(_ sandbox.Type, baseImage string) string {
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		OAuthToken           *string                                `json:"oauth_token"`
-		APIKey               *string                                `json:"api_key"`
-		BaseURL              *string                                `json:"base_url"`
-		OpenAIAPIKey         *string                                `json:"openai_api_key"`
-		OpenAIBaseURL        *string                                `json:"openai_base_url"`
-		DefaultModel         *string                                `json:"default_model"`
-		TitleModel           *string                                `json:"title_model"`
-		CodexDefaultModel    *string                                `json:"codex_default_model"`
-		CodexTitleModel      *string                                `json:"codex_title_model"`
-		DefaultSandbox       *sandbox.Type                          `json:"default_sandbox"`
-		SandboxByActivity    map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
-		MaxParallelTasks     *int                                   `json:"max_parallel_tasks"`
-		MaxTestParallelTasks *int                                   `json:"max_test_parallel_tasks"`
-		OversightInterval    *int                                   `json:"oversight_interval"`
-		ArchivedTasksPerPage *int                                   `json:"archived_tasks_per_page"`
-		AutoPushEnabled      *bool                                  `json:"auto_push_enabled"`
-		AutoPushThreshold    *int                                   `json:"auto_push_threshold"`
-		SandboxFast          *bool                                  `json:"sandbox_fast"`
-		ContainerNetwork     *string                                `json:"container_network"`
-		ContainerCPUs        *string                                `json:"container_cpus"`
-		ContainerMemory      *string                                `json:"container_memory"`
-		TerminalEnabled      *bool                                  `json:"terminal_enabled"`
+		OAuthToken           *string                              `json:"oauth_token"`
+		APIKey               *string                              `json:"api_key"`
+		BaseURL              *string                              `json:"base_url"`
+		OpenAIAPIKey         *string                              `json:"openai_api_key"`
+		OpenAIBaseURL        *string                              `json:"openai_base_url"`
+		DefaultModel         *string                              `json:"default_model"`
+		TitleModel           *string                              `json:"title_model"`
+		CodexDefaultModel    *string                              `json:"codex_default_model"`
+		CodexTitleModel      *string                              `json:"codex_title_model"`
+		DefaultSandbox       *harness.ID                          `json:"default_sandbox"`
+		SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
+		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
+		MaxTestParallelTasks *int                                 `json:"max_test_parallel_tasks"`
+		OversightInterval    *int                                 `json:"oversight_interval"`
+		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
+		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
+		AutoPushThreshold    *int                                 `json:"auto_push_threshold"`
+		SandboxFast          *bool                                `json:"sandbox_fast"`
+		ContainerNetwork     *string                              `json:"container_network"`
+		ContainerCPUs        *string                              `json:"container_cpus"`
+		ContainerMemory      *string                              `json:"container_memory"`
+		TerminalEnabled      *bool                                `json:"terminal_enabled"`
 	}](w, r)
 	if !ok {
 		return
@@ -580,7 +580,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Any env update may affect sandbox connectivity/model settings; require
 	// a fresh sandbox test before allowing API-key codex tasks again.
 	// If valid host codex auth is present, keep codex usable.
-	h.setSandboxTestPassed(sandbox.Codex, false)
+	h.setSandboxTestPassed(harness.Codex, false)
 	h.refreshCodexBootstrapAuthState()
 	if err := envconfig.UpdateSandboxSettings(
 		h.envFile,
@@ -639,15 +639,15 @@ func isAuthError(result, lastTestResult string) bool {
 
 // isOAuthAvailable returns true if the sandbox type supports OAuth sign-in
 // and no custom base URL is configured (custom endpoints won't use standard OAuth).
-func isOAuthAvailable(sb sandbox.Type, envFile string) bool {
+func isOAuthAvailable(sb harness.ID, envFile string) bool {
 	cfg, err := envconfig.Parse(envFile)
 	if err != nil {
 		return false
 	}
 	switch sb {
-	case sandbox.Claude:
+	case harness.Claude:
 		return cfg.BaseURL == ""
-	case sandbox.Codex:
+	case harness.Codex:
 		return cfg.OpenAIBaseURL == ""
 	default:
 		return false
