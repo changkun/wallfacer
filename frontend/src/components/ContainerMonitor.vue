@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 
 interface ContainerItem {
@@ -16,10 +17,17 @@ interface ContainerItem {
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
+const router = useRouter();
 const containers = ref<ContainerItem[]>([]);
 const loading = ref(false);
 const error = ref('');
 const lastUpdated = ref('');
+
+function openTask(taskId: string | undefined) {
+  if (!taskId) return;
+  void router.push({ path: '/', hash: `#${taskId}` });
+  close();
+}
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -191,10 +199,12 @@ const hasContent = computed(() => !loading.value && !error.value && containers.v
                       {{ shortId(c.id) }}
                     </td>
                     <td :style="{ padding: '8px 10px', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
-                      <span v-if="c.task_title" :style="{ color: 'var(--text-primary)' }">{{ c.task_title }}</span>
-                      <span v-else-if="c.task_id" :style="{ fontFamily: 'monospace', color: 'var(--text-muted)' }">
-                        {{ shortTaskId(c.task_id) }}
-                      </span>
+                      <button
+                        v-if="c.task_id"
+                        type="button"
+                        class="cm-task-link"
+                        @click="openTask(c.task_id)"
+                      >{{ c.task_title || shortTaskId(c.task_id) }}</button>
                       <span v-else :style="{ color: 'var(--text-muted)' }">&mdash;</span>
                     </td>
                     <td
@@ -252,4 +262,18 @@ const hasContent = computed(() => !loading.value && !error.value && containers.v
 .cm-row:hover {
   background: var(--bg-hover, transparent);
 }
+.cm-task-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.cm-task-link:hover { text-decoration: underline; }
 </style>
