@@ -15,7 +15,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] render — dependency badges on cards (blocked / deps-met / dep-cancelled with blocking names)
 - [x] render — cost progress bar (green/yellow/red, spent vs max_cost_usd) on in_progress/waiting cards
 - [x] render — failure-category friendly labels (Timeout/Budget/Crash/…) on failed cards
-- [ ] status-bar — agent presence list (active agents + signed-in user, status dots)
+- [x] status-bar — agent presence list (verified: Sidebar derivePresence + sb-presence list)
 - [~] status-bar — sign-in badge + org switcher (CLOUD-ONLY; needs /api/auth/orgs; deferred)
 - [x] modal-core — retry history section (past attempts: status/time/cost/turns, expandable)
 - [x] modal-core — usage breakdown table (per-agent token/cost: impl/test/refinement/oversight)
@@ -80,7 +80,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] explorer — Tab→indent in textarea edit
 - [x] terminal — container picker uses /api/debug/health (DONE earlier; per-state icons still minor)
 - [ ] tasks — brainstorm flow empty-prompt allowance + placeholder
-- [ ] tasks — routine creation interval/repeat controls detail
+- [x] tasks — routine interval/repeat controls (verified: TaskCard routine footer select+toggle+run-now)
 - [x] command-palette — doc search title-prefix bonus scoring
 - [ ] command-palette — remote/local result distinction + server snippet field
 - [x] mention — file ranking path-substring boost
