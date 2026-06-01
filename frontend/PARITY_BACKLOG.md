@@ -69,7 +69,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] tasks — dependency picker chips w/ remove buttons (vs plain select multiple)
 - [ ] modal-diff — highlight.js syntax coloring in diffs
 - [x] modal-results — collapse older turns in <details>
-- [ ] modal-logs — impl-vs-test phase log separation
+- [x] modal-logs — impl-vs-test phase separation (Results split at test_run_start_turn)
 - [x] git — 409 conflict shows blocking_tasks list, not generic alert
 - [x] command-palette — context actions: tab-switch jumps (changes/results/timeline) + fixed task-open from query
 - [x] command-palette — recent-tasks fallback when palette opens empty (verified: sections "Recent" on empty query)
