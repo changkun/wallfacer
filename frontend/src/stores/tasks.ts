@@ -62,6 +62,15 @@ export const useTaskStore = defineStore('tasks', () => {
     tasks.value = tasks.value.filter(t => t.id !== id);
   }
 
+  /** Apply a partial update to a single task in-place. Used by the board
+   *  drag-and-drop handlers so the move shows up before the server SSE
+   *  delta arrives — when the delta lands, the full Task replaces the
+   *  optimistic shape via updateTask(). Safe no-op if the id is unknown. */
+  function patchTaskLocal(id: string, patch: Partial<Task>) {
+    const idx = tasks.value.findIndex(t => t.id === id);
+    if (idx >= 0) tasks.value[idx] = { ...tasks.value[idx], ...patch };
+  }
+
   /** Fetch tasks for the active workspace. When `includeArchived` is true the
    *  endpoint also returns the most recent page of archived tasks; the page
    *  size is sourced from the server's `archived_tasks_per_page` env value
@@ -152,7 +161,7 @@ export const useTaskStore = defineStore('tasks', () => {
   return {
     tasks, config, loading, filterQuery,
     backlog, inProgress, waiting, done,
-    setTasks, updateTask, removeTask,
+    setTasks, updateTask, removeTask, patchTaskLocal,
     fetchTasks, fetchConfig,
     createTask, batchCreateTasks, patchTask, cancelTask, deleteTask,
   };
