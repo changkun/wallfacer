@@ -12,9 +12,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 
 ## Missing (no frontend equivalent)
 - [ ] modal-core — "Blocked by" dependencies panel (list + status badges + clickable links + "Waiting on X of Y")
-- [ ] render — dependency badges on cards (blocked / deps-met / dep-cancelled with blocking names)
-- [ ] render — cost progress bar (green/yellow/red, spent vs max_cost_usd) on in_progress/waiting cards
-- [ ] render — failure-category friendly labels (Timeout/Budget/Crash/…) on failed cards
+- [x] render — dependency badges on cards (blocked / deps-met / dep-cancelled with blocking names)
+- [x] render — cost progress bar (green/yellow/red, spent vs max_cost_usd) on in_progress/waiting cards
+- [x] render — failure-category friendly labels (Timeout/Budget/Crash/…) on failed cards
 - [ ] status-bar — agent presence list (active agents + signed-in user, status dots)
 - [~] status-bar — sign-in badge + org switcher (CLOUD-ONLY; needs /api/auth/orgs; deferred)
 - [ ] modal-core — retry history section (past attempts: status/time/cost/turns, expandable)
@@ -37,7 +37,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] workspace — browser folder create (/api/workspaces/mkdir) + rename (/api/workspaces/rename)
 - [x] workspace — per-group max-parallel override (done earlier in SettingsTabWorkspace)
 - [ ] render — hide system routines (kind=routine + system:* tag) from board
-- [ ] render — scheduled badge with relative time on backlog cards
+- [x] render — scheduled badge with relative time on backlog cards
 - [ ] render — forked-task ancestry badge (parent id, click to open)
 - [ ] render — brainstorm category tag badges (BRAINSTORM_CATEGORIES from /api/config)
 - [ ] board-composer — empty-board composer dismiss-for-session persistence
