@@ -100,7 +100,6 @@ Categories:
 - **Spec Tree** — `/api/specs/*` (tree, stream, dispatch, undispatch, archive, unarchive)
 - **Planning Sandbox** — `/api/planning*` (sandbox lifecycle, threads, messages, SSE stream, interrupt, undo, slash commands)
 - **Usage & Statistics** — `/api/usage`, `/api/stats`, `/api/files`
-- **Sandbox Images** — `/api/images*` (cache check, pull, delete, SSE pull progress)
 - **File Explorer** — `/api/explorer/*` (tree, stream, file read/write)
 - **Terminal** — `/api/terminal/ws` WebSocket (multi-session host shell tabs; not in apicontract; `?token=` auth)
 - **OAuth Authentication** — `/api/auth/{provider}/*` for `claude` and `codex`

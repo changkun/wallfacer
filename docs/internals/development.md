@@ -85,25 +85,6 @@ In this mode the server re-parses `index.html` and `partials/*.html` on every re
 
 Do not use this flag in production: it disables template caching and browser caching, and points the server at a mutable directory.
 
-## Sandbox Images
-
-```bash
-podman images sandbox-agents   # or: docker images sandbox-agents
-```
-
-The sandbox image is maintained in a separate repository ([github.com/latere-ai/images](https://github.com/latere-ai/images)). It is an Ubuntu 24.04 image bundling Go 1.25, Node.js 22, Python 3, and both agent CLIs (Claude Code and Codex). The entrypoint dispatches to the requested CLI based on `WALLFACER_AGENT`. The multi-arch image (amd64 + arm64) is published to `ghcr.io/latere-ai/sandbox-agents` on version tags via GitHub Actions.
-
-To build sandbox images locally (e.g. for customization or offline use):
-
-```bash
-git clone https://github.com/latere-ai/images.git
-cd images
-make                   # Build the unified sandbox-agents image
-make RUNTIME=docker    # Use Docker instead of Podman
-```
-
-Local builds are tagged as `sandbox-agents:latest`.
-
 ## Release Workflow
 
 Releases are triggered by pushing a version tag (`v*`). Two GitHub Actions workflows run in parallel in this repository:
@@ -113,13 +94,7 @@ Releases are triggered by pushing a version tag (`v*`). Two GitHub Actions workf
 | `release-binary.yml` | `wallfacer-{linux,darwin,windows}-{amd64,arm64}` binaries on the GitHub Release |
 | `release-desktop.yml` | Signed desktop apps (`Wallfacer-Desktop-*`) on the GitHub Release |
 
-The unified sandbox image (`ghcr.io/latere-ai/sandbox-agents`) is built and published from [`github.com/latere-ai/images`](https://github.com/latere-ai/images) on its own release cadence.
-
-**Version embedding.** Release binaries are built with `-ldflags "-X changkun.de/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output. It does **not** determine the sandbox image tag.
-
-**Sandbox image tag embedding.** The sandbox image is maintained in a separate repository (`github.com/latere-ai/images`) that releases independently of wallfacer. Its latest tag is resolved from that repo at build time and passed via `-ldflags "-X changkun.de/x/wallfacer/internal/cli.SandboxTag=vA.B.C"`. The `Makefile` resolves `SANDBOX_TAG` for local builds; the release workflows (`release-binary.yml`, `release-desktop.yml`) resolve it before the build step. If neither is set, the binary queries the GitHub API for the latest `latere-ai/images` release at runtime and falls back to `:latest` when the lookup fails.
-
-**Image tagging.** Each `latere-ai/images` release produces three image tags on GHCR: `v<version>` (e.g. `v0.0.6`), `v<major>.<minor>` (e.g. `v0.0`), and `latest`.
+**Version embedding.** Release binaries are built with `-ldflags "-X changkun.de/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output.
 
 **Creating a release:**
 
