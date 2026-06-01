@@ -374,17 +374,6 @@ func (b *mockBackend) List(_ context.Context) ([]sandbox.ContainerInfo, error) {
 	return nil, nil
 }
 
-type mockWorkerBackend struct {
-	mockBackend
-	stopCalled bool
-}
-
-func (b *mockWorkerBackend) StopTaskWorker(_ string) { b.stopCalled = true }
-func (b *mockWorkerBackend) ShutdownWorkers()        {}
-func (b *mockWorkerBackend) WorkerStats() sandbox.WorkerStatsInfo {
-	return sandbox.WorkerStatsInfo{}
-}
-
 // --- StartLiveLog / CloseLiveLog / LogReader ---
 
 func TestPlannerStartLiveLog(t *testing.T) {
@@ -450,7 +439,7 @@ func TestPlannerInterrupt_Busy(t *testing.T) {
 	}
 }
 
-// --- Stop with handle and WorkerManager ---
+// --- Stop with handle ---
 
 func TestPlannerStop_WithHandle(t *testing.T) {
 	p := New(Config{Command: "podman"})
@@ -462,17 +451,6 @@ func TestPlannerStop_WithHandle(t *testing.T) {
 	}
 	if p.IsRunning() {
 		t.Error("should not be running after Stop")
-	}
-}
-
-func TestPlannerStop_WithWorkerManager(t *testing.T) {
-	wb := &mockWorkerBackend{}
-	p := New(Config{Command: "podman"})
-	p.backend = wb
-	_ = p.Start(context.Background())
-	p.Stop()
-	if !wb.stopCalled {
-		t.Error("expected StopTaskWorker to be called")
 	}
 }
 

@@ -96,19 +96,9 @@ type Handle interface {
 	Name() string
 }
 
-// WorkerManager is an optional interface that backends can implement to
-// support per-task worker containers. The runner uses this to clean up
-// workers when tasks complete, are cancelled, or during sync operations.
-type WorkerManager interface {
-	// StopTaskWorker stops and removes the worker for the given task ID.
-	StopTaskWorker(taskID string)
-	// ShutdownWorkers stops all active task workers.
-	ShutdownWorkers()
-	// WorkerStats returns aggregate worker lifecycle statistics.
-	WorkerStats() WorkerStatsInfo
-}
-
-// WorkerStatsInfo holds aggregate worker lifecycle statistics.
+// WorkerStatsInfo is the legacy worker-stats response shape, retained as
+// the JSON contract for the runtime endpoint. Always zero under the host
+// backend.
 type WorkerStatsInfo struct {
 	Enabled       bool                       `json:"enabled"`
 	ActiveWorkers int                        `json:"active_workers"`
