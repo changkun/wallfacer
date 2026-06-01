@@ -27,7 +27,3 @@ func (r *Runner) buildContainerArgsForSandbox(
 ) []string {
 	return r.buildContainerSpecForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sb).Build()
 }
-
-func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb sandbox.Type) []string {
-	return r.buildIdeationContainerSpec(containerName, prompt, sb).Build()
-}

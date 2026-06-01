@@ -370,18 +370,6 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 	return r.buildIdeationPrompt(existingTasks, "", r.collectIdeationContext(r.shutdownCtx))
 }
 
-// buildIdeationContainerSpec builds a ContainerSpec for the ideation
-// agent. After the agent-abstraction migration this is a thin shim
-// around buildInspectorSpec + buildAgentCmd, preserved so the
-// container-builder table-driven tests in container_builder_test.go
-// keep their fixture surface intact.
-func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb sandbox.Type) sandbox.ContainerSpec {
-	model := r.modelFromEnvForSandbox(sb)
-	spec := r.buildInspectorSpec(containerName, model, sb, mountReadOnly)
-	spec.Cmd = buildAgentCmd(prompt, model)
-	return spec
-}
-
 // runIdeationTask executes the brainstorm agent for an idea-agent task card.
 // It runs RunIdeation, creates backlog tasks from the results, and transitions
 // the idea-agent task to done. On failure it returns an error so Run() can
