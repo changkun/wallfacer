@@ -17,13 +17,17 @@ import { renderMarkdown as renderResultMarkdown } from '../lib/markdown';
 import { ansiToHtml } from '../lib/ansi';
 import { useFocusTrap } from '../composables/useFocusTrap';
 
-// Modal focus trap — Tab cycles inside the dialog only, focus restores
-// to the element that triggered the open on close.
-const modalRoot = ref<HTMLElement | null>(null);
-useFocusTrap(modalRoot, () => !!props.task);
-
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
+
+// Modal focus trap — Tab cycles inside the dialog only, focus restores
+// to the element that triggered the open on close. Must be declared
+// AFTER defineProps so the `() => !!props.task` getter doesn't access
+// `props` during its initial synchronous watch (TDZ on `props` —
+// useFocusTrap's `watch(immediate: true)` evaluates the predicate
+// before the surrounding setup function finishes declaring locals).
+const modalRoot = ref<HTMLElement | null>(null);
+useFocusTrap(modalRoot, () => !!props.task);
 const dialog = useDialogStore();
 const toast = useToastStore();
 

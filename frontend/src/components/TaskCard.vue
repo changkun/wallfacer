@@ -308,7 +308,10 @@ function focusSibling(direction: 'next' | 'prev' | 'left' | 'right') {
   // For vertical nav we walk siblings in the same column; for horizontal
   // we walk by position across columns. Use a flat DOM query and find
   // ourselves in it — simple, side-effect-free.
-  const all = Array.from(document.querySelectorAll<HTMLElement>('.task-card[tabindex="0"]'));
+  // Match the actual card class — `card` is the root (see cardClasses()),
+  // not `task-card`. A wrong selector here silently breaks card-to-card
+  // keyboard nav (the focusSibling never finds any peers).
+  const all = Array.from(document.querySelectorAll<HTMLElement>('.card[tabindex="0"]'));
   const idx = all.indexOf(root);
   if (idx < 0 || all.length === 0) return;
   let nextIdx = idx;
