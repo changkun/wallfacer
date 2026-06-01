@@ -72,7 +72,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] modal-logs — impl-vs-test phase log separation
 - [ ] git — 409 conflict shows blocking_tasks list, not generic alert
 - [ ] command-palette — context actions: tab-switch jumps (testing/changes/flamegraph/timeline)
-- [ ] command-palette — recent-tasks fallback when palette opens empty
+- [x] command-palette — recent-tasks fallback when palette opens empty (verified: sections "Recent" on empty query)
 - [x] search — multi-tag AND + text combination (DONE: lib/taskFilter)
 - [ ] modal-ndjson — thinking blocks inline-expandable (>5 lines "+N lines")
 - [x] explorer — unsaved-changes dirty-confirm on close
@@ -84,7 +84,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] command-palette — doc search title-prefix bonus scoring
 - [ ] command-palette — remote/local result distinction + server snippet field
 - [x] mention — file ranking path-substring boost
-- [ ] status-bar — terminal panel height persisted
+- [x] status-bar — terminal panel height persisted
 - [x] explorer — Task Prompts relative updated_at timestamp
 - [x] explorer — md rendered/raw toggle (DONE earlier)
 - [ ] envconfig — OAuth button visibility reactive to base-URL
