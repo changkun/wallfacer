@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/slugutil"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -163,24 +165,7 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 // characters of lowercase letters, digits, and hyphens; neither
 // leading nor trailing hyphen. Matches the validation enforced by
 // the /api/agents POST handler.
-func IsValidSlug(s string) bool {
-	if len(s) < 2 || len(s) > 40 {
-		return false
-	}
-	for i, c := range s {
-		switch {
-		case c >= 'a' && c <= 'z':
-		case c >= '0' && c <= '9':
-		case c == '-':
-			if i == 0 || i == len(s)-1 {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return true
-}
+func IsValidSlug(s string) bool { return slugutil.IsValid(s) }
 
 // IsBuiltin reports whether slug names a built-in agent. Used by
 // PUT/DELETE handlers to reject mutations targeting shipped roles.
