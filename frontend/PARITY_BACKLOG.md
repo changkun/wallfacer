@@ -46,7 +46,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] planning-chat — queue item double-click edit mode
 - [x] planning-chat — send-mode toggle button (already present PlanningChatPanel.vue:45-61)
 - [ ] spec-mode — sidebar collapse/expand persisted on boot
-- [ ] search — `<mark>` highlight markup in results
+- [x] search — `<mark>` highlight markup in results
 - [ ] search — mode-aware filter routing (spec/depgraph/board)
 - [x] docs — prev/next ordered-doc nav links
 - [x] docs — floating table-of-contents sidebar

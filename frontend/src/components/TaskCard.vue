@@ -5,6 +5,7 @@ import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
+import { highlightMatch } from '../lib/highlight';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
@@ -280,6 +281,9 @@ const cardActions = computed(() =>
 const router = useRouter();
 const taskStore = useTaskStore();
 
+// Highlight the active board filter inside the card title (legacy parity).
+const titleHtml = computed(() => highlightMatch(props.task.title || '', taskStore.filterQuery));
+
 // Dependency-state badge for backlog cards (blocked / ready / cancelled),
 // resolved against the live task list. Mirrors render.js renderDependencyBadge.
 const depBadge = computed(() => {
@@ -485,7 +489,7 @@ function onCardKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Row 2: title -->
-    <div v-if="props.task.title" class="card-title" :title="props.task.title">{{ props.task.title }}</div>
+    <div v-if="props.task.title" class="card-title" :title="props.task.title" v-html="titleHtml"></div>
 
     <!-- Row 3: tags (priority:*/impact:* get dedicated badges).
          Click a tag to filter the board to that tag. -->
