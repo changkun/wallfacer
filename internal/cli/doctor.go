@@ -36,7 +36,6 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Printf("Data directory:    %s\n", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
 	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
-	fmt.Printf("Sandbox backend:   host (exec claude / codex directly; no container)\n")
 	fmt.Println()
 
 	// --- Config directory ---

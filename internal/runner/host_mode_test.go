@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/store"
@@ -39,75 +38,26 @@ func newStoreForTest(t *testing.T) *store.Store {
 	return s
 }
 
-// TestRunner_HostMode_Default verifies that the default backend selection
-// leaves host mode off.
-func TestRunner_HostMode_Default(t *testing.T) {
-	s := newStoreForTest(t)
-	r := NewRunner(s, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "test:latest",
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	if r.HostMode() {
-		t.Error("default backend should not enable host mode")
-	}
-}
-
-// TestRunner_HostMode_Host verifies that SandboxBackend="host" builds a
-// HostBackend, flips hostMode on, and does not panic when both binaries
-// resolve.
-func TestRunner_HostMode_Host(t *testing.T) {
+// TestRunner_HostMode_AlwaysOn verifies that NewRunner builds a HostBackend
+// and flips hostMode on.
+func TestRunner_HostMode_AlwaysOn(t *testing.T) {
 	bin := buildFakeAgentForTest(t)
 
 	s := newStoreForTest(t)
 	r := NewRunner(s, RunnerConfig{
 		Command:          "echo",
 		SandboxImage:     "test:latest",
-		SandboxBackend:   "host",
 		HostClaudeBinary: bin,
 		HostCodexBinary:  bin,
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
 	if !r.HostMode() {
-		t.Error("HostMode() = false; want true for backend=host")
+		t.Error("HostMode() = false; want true")
 	}
 	if r.SandboxBackend() == nil {
-		t.Error("SandboxBackend() returned nil for host mode")
+		t.Error("SandboxBackend() returned nil")
 	}
-}
-
-// TestRunner_HostMode_UnknownBackend verifies that an unknown backend value
-// falls back to local and leaves host mode off (with a warning log — not
-// asserted here).
-func TestRunner_HostMode_UnknownBackend(t *testing.T) {
-	s := newStoreForTest(t)
-	r := NewRunner(s, RunnerConfig{
-		Command:        "echo",
-		SandboxImage:   "test:latest",
-		SandboxBackend: "k8s",
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	if r.HostMode() {
-		t.Error("unknown backend should not enable host mode")
-	}
-}
-
-// TestRunner_HostMode_LocalIsExplicit verifies "local" resolves the same as
-// the empty default — no host mode.
-func TestRunner_HostMode_LocalIsExplicit(t *testing.T) {
-	s := newStoreForTest(t)
-	r := NewRunner(s, RunnerConfig{
-		Command:        "echo",
-		SandboxImage:   "test:latest",
-		SandboxBackend: "local",
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	if r.HostMode() {
-		t.Error("local backend should not enable host mode")
-	}
-	// Double-check the string wasn't coerced elsewhere.
-	_ = strings.ToLower("local")
 }
 
 // TestSandboxForTaskActivity_HostMode_PassesCodexThrough verifies that host
