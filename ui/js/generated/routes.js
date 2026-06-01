@@ -29,13 +29,6 @@ var Routes = {
     },
   },
 
-  containers: {
-    // GET /api/containers
-    list: function () {
-      return "/api/containers";
-    },
-  },
-
   files: {
     // GET /api/files
     list: function () {

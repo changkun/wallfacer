@@ -72,15 +72,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks", "debug"},
 	},
 
-	// --- Container monitoring ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/containers", Name: "GetContainers",
-		JSName:      "list",
-		Description: "List running sandbox containers.",
-		Tags:        []string{"containers"},
-	},
-
 	// --- File listing ---
 
 	{

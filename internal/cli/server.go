@@ -924,9 +924,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"BoardManifest":     h.BoardManifest,
 		"TaskBoardManifest": withID(h.TaskBoardManifest),
 
-		// Container monitoring.
-		"GetContainers": h.GetContainers,
-
 		// File listing.
 		"GetFiles": h.GetFiles,
 
