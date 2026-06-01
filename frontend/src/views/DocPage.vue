@@ -4,6 +4,7 @@ import { useHead } from '@unhead/vue';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
 import { useT } from '../i18n';
 import { useMermaid } from '../composables/useMermaid';
+import { useToc } from '../composables/useToc';
 import { renderMarkdown, stripFirstHeading } from '../lib/markdown';
 import { docIndex } from '../data/docs';
 
@@ -12,6 +13,14 @@ const t = useT();
 
 const entry = computed(() => docIndex.find(e => e.slug === props.slug));
 const sidebarCollapsed = ref(false);
+
+// Ordered prev/next within the doc list (docIndex is the canonical order).
+const docPos = computed(() => docIndex.findIndex(e => e.slug === props.slug));
+const prevDoc = computed(() => (docPos.value > 0 ? docIndex[docPos.value - 1] : null));
+const nextDoc = computed(() => (docPos.value >= 0 && docPos.value < docIndex.length - 1 ? docIndex[docPos.value + 1] : null));
+
+// Floating table of contents from the rendered article's h2 headings.
+const { entries: tocEntries, activeId } = useToc('.docs-article');
 
 const docFiles = import.meta.glob('../../../docs/guide/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
@@ -68,7 +77,30 @@ useHead(computed(() => ({
           </aside>
           <main class="docs-main">
             <article class="docs-article prose" v-html="articleHtml"></article>
+            <!-- Prev/next ordered-doc navigation. -->
+            <nav v-if="prevDoc || nextDoc" class="docs-prevnext">
+              <router-link v-if="prevDoc" :to="`/docs/${prevDoc.slug}`" class="docs-prevnext__link docs-prevnext__prev">
+                <span class="docs-prevnext__dir">← Previous</span>
+                <span class="docs-prevnext__title">{{ prevDoc.title }}</span>
+              </router-link>
+              <span v-else />
+              <router-link v-if="nextDoc" :to="`/docs/${nextDoc.slug}`" class="docs-prevnext__link docs-prevnext__next">
+                <span class="docs-prevnext__dir">Next →</span>
+                <span class="docs-prevnext__title">{{ nextDoc.title }}</span>
+              </router-link>
+            </nav>
           </main>
+          <!-- Floating table of contents for the current doc. -->
+          <aside v-if="tocEntries.length" class="docs-toc">
+            <div class="docs-toc__label">On this page</div>
+            <a
+              v-for="e in tocEntries"
+              :key="e.id"
+              :href="`#${e.id}`"
+              class="docs-toc__link"
+              :class="{ active: e.id === activeId }"
+            >{{ e.text }}</a>
+          </aside>
         </div>
       </template>
       <template v-else>

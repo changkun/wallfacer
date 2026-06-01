@@ -48,9 +48,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] spec-mode — sidebar collapse/expand persisted on boot
 - [ ] search — `<mark>` highlight markup in results
 - [ ] search — mode-aware filter routing (spec/depgraph/board)
-- [ ] docs — prev/next ordered-doc nav links
-- [ ] docs — floating table-of-contents sidebar
-- [ ] docs — markdown link enhancement (linkHandler:'docs')
+- [x] docs — prev/next ordered-doc nav links
+- [x] docs — floating table-of-contents sidebar
+- [x] docs — markdown link enhancement (linkHandler:'docs')
 - [ ] containers — task status badge in monitor cell
 - [~] terminal — Wails desktop PTY discovery (/api/desktop-port) (desktop-only; defer)
 - [ ] flows — parallel-step grouping viz ("‖" chips)
