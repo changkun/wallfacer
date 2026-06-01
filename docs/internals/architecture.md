@@ -429,7 +429,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `event_helpers.go` | Shared helpers for inserting task events | — (internal) |
 | `auth.go` | OAuth authentication flow (start, poll status, cancel) | `POST /api/auth/{provider}/start`, `GET /api/auth/{provider}/status`, `POST /api/auth/{provider}/cancel` |
 | `explorer.go` | File explorer: directory listing, file read/write, binary detection | `GET /api/explorer/tree`, `GET /api/explorer/file`, `PUT /api/explorer/file`, `GET /api/explorer/stream` |
-| `images.go` | Sandbox image management: status check, pull, delete | `GET /api/images`, `POST /api/images/pull`, `DELETE /api/images`, `GET /api/images/pull/stream` |
 | `planning.go` | Planning chat agent: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/planning/messages`, `GET /api/planning/messages/stream`, `POST /api/planning/messages/interrupt`, `GET /api/planning/commands` |
 | `planning_directive.go` | `/spec-new` directive scanner: line-oriented, fence-aware parser that extracts scaffold requests from assistant output and calls `spec.Scaffold` | — (internal; called from planning chat commit path) |
 | `planning_git.go` | Staging/committing planning rounds on the workspace branch with `Plan-Thread` and `Plan-Round` trailers so undo can target the caller's thread | — (internal) |

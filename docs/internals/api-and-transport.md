@@ -136,11 +136,6 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `POST /api/planning/threads/{id}/archive` | Archive a thread (hide from tab bar; files retained). 409 if the thread is in-flight. |
 | `POST /api/planning/threads/{id}/unarchive` | Restore an archived thread. |
 | `POST /api/planning/threads/{id}/activate` | Record the UI's active thread. Rejects archived/unknown IDs. |
-| **Sandbox images** | |
-| `GET /api/images` | Check which sandbox images are cached locally |
-| `POST /api/images/pull` | Start async pull for a sandbox image |
-| `DELETE /api/images` | Remove a cached sandbox image |
-| `GET /api/images/pull/stream` | SSE: pull progress |
 
 ### Triggering Task Execution
 
