@@ -479,17 +479,23 @@ const isArchived = computed(() => !!props.task.archived);
 
         <div id="modal-body">
           <!-- Main tabs -->
-          <div id="main-tabs" class="main-tabs" role="tablist">
+          <div id="main-tabs" class="main-tabs" role="tablist" aria-label="Task detail sections">
             <button
               type="button"
               class="main-tab"
               :class="{ active: mainTab === 'spec' }"
+              role="tab"
+              :aria-selected="mainTab === 'spec'"
+              aria-controls="modal-row"
               @click="mainTab = 'spec'"
             >Spec</button>
             <button
               type="button"
               class="main-tab"
               :class="{ active: mainTab === 'activity' }"
+              role="tab"
+              :aria-selected="mainTab === 'activity'"
+              aria-controls="modal-row"
               @click="mainTab = 'activity'"
             >
               Activity
@@ -499,29 +505,41 @@ const isArchived = computed(() => !!props.task.archived);
               type="button"
               class="main-tab"
               :class="{ active: mainTab === 'changes' }"
+              role="tab"
+              :aria-selected="mainTab === 'changes'"
+              aria-controls="modal-row"
               @click="mainTab = 'changes'"
             >Changes</button>
             <button
               type="button"
               class="main-tab"
               :class="{ active: mainTab === 'results' }"
+              role="tab"
+              :aria-selected="mainTab === 'results'"
+              aria-controls="modal-row"
               @click="mainTab = 'results'"
             >Results</button>
             <button
               type="button"
               class="main-tab"
               :class="{ active: mainTab === 'events' }"
+              role="tab"
+              :aria-selected="mainTab === 'events'"
+              aria-controls="modal-row"
               @click="mainTab = 'events'"
             >Events</button>
             <button
               type="button"
               class="main-tab"
               :class="{ active: mainTab === 'timeline' }"
+              role="tab"
+              :aria-selected="mainTab === 'timeline'"
+              aria-controls="modal-row"
               @click="mainTab = 'timeline'"
             >Timeline</button>
           </div>
 
-          <div id="modal-row">
+          <div id="modal-row" role="tabpanel" :aria-labelledby="`main-tab-${mainTab}`">
             <!-- Main pane -->
             <div id="modal-main-pane">
               <div id="modal-main-content">
