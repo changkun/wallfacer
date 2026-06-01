@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
 import { useUiStore } from '../stores/ui';
-import { api } from '../api/client';
 import { getStored, setStored } from '../lib/storage';
 import { clampPanelHeight, PANEL_MIN_HEIGHT, PANEL_HEIGHT_KEY } from '../lib/panelHeight';
 
@@ -25,8 +24,6 @@ const sessions = ref<Record<string, { label: string; buffer: Uint8Array[] }>>({}
 const activeId = ref<string | null>(null);
 const sessionsOrder = ref<string[]>([]);
 const tabCounter = ref(0);
-const containerPickerOpen = ref(false);
-const containerList = ref<{ id: string; name: string; state: string; task_title?: string }[]>([]);
 const SESSION_BUFFER_LIMIT = 100_000;
 
 let term: import('@xterm/xterm').Terminal | null = null;
@@ -305,40 +302,6 @@ function closeSession(id: string) {
   }
 }
 
-async function toggleContainerPicker() {
-  if (containerPickerOpen.value) { containerPickerOpen.value = false; return; }
-  try {
-    // /api/containers was removed (host backend has no containers); the
-    // running-container list now lives in /api/debug/health.
-    const res = await api<{ running_containers?: { items?: { task_id?: string; name?: string; state?: string }[] } }>('GET', '/api/debug/health');
-    const items = res?.running_containers?.items ?? [];
-    containerList.value = items.map((c) => ({
-      id: '',
-      name: c.name ?? '',
-      state: c.state ?? 'running',
-      task_title: undefined,
-    }));
-  } catch {
-    containerList.value = [];
-  }
-  containerPickerOpen.value = true;
-}
-
-function attachToContainer(name: string) {
-  containerPickerOpen.value = false;
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'create_session', container: name }));
-  }
-  deferFocus();
-}
-
-function onPickerOutsideClick(e: MouseEvent) {
-  const t = e.target as HTMLElement;
-  if (!t.closest('.terminal-container-picker') && !t.closest('.terminal-container-btn-trigger')) {
-    containerPickerOpen.value = false;
-  }
-}
-
 watch(() => ui.showTerminal, async (open) => {
   if (!open) return;
   await nextTick();
@@ -357,11 +320,6 @@ watch(() => ui.showTerminal, async (open) => {
   }, 60);
 });
 
-watch(containerPickerOpen, (open) => {
-  if (open) document.addEventListener('mousedown', onPickerOutsideClick);
-  else document.removeEventListener('mousedown', onPickerOutsideClick);
-});
-
 onMounted(async () => {
   if (ui.showTerminal) {
     await nextTick();
@@ -375,7 +333,6 @@ onUnmounted(() => {
   if (reconnectTimer) clearTimeout(reconnectTimer);
   ws?.close();
   term?.dispose();
-  document.removeEventListener('mousedown', onPickerOutsideClick);
 });
 
 function onHandleDown(e: MouseEvent) {
@@ -447,39 +404,7 @@ function onHandleDown(e: MouseEvent) {
         @mousedown.prevent
         @click="newSession"
       >+</button>
-      <button
-        type="button"
-        class="terminal-tab-add terminal-container-btn-trigger"
-        title="Attach to container"
-        aria-label="Attach to running container"
-        tabindex="-1"
-        @mousedown.prevent
-        @click="toggleContainerPicker"
-      >▢</button>
     </div>
     <div ref="termContainer" id="terminal-canvas" />
-
-    <div
-      v-if="containerPickerOpen"
-      class="terminal-container-picker"
-    >
-      <div
-        v-if="containerList.filter(c => c.state === 'running').length === 0"
-        class="terminal-container-picker__empty"
-      >No running containers</div>
-      <button
-        v-for="c in containerList.filter(x => x.state === 'running')"
-        :key="c.id || c.name"
-        type="button"
-        class="terminal-container-picker__item"
-        :data-container-name="c.name"
-        @mousedown.prevent
-        @click="attachToContainer(c.name)"
-      >{{ c.task_title || c.name }}<span v-if="c.id" class="terminal-container-picker__id"> @ {{ c.id.slice(0, 8) }}</span></button>
-    </div>
   </div>
 </template>
-
-<style scoped>
-.terminal-container-picker__id { color: var(--text-muted); font-size: 11px; }
-</style>
