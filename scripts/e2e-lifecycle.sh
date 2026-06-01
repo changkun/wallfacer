@@ -1,21 +1,16 @@
 #!/bin/bash
 #
-# End-to-end integration test for task lifecycle with real sandbox containers
-# or host-exec'd claude/codex (BACKEND=host).
+# End-to-end integration test for task lifecycle with host-exec'd claude/codex.
 #
 # Requires:
 #   - A running wallfacer server (default: http://localhost:8080)
 #   - Valid credentials configured in the server (.env)
-#   - Container mode: container runtime (podman/docker) available.
-#   - Host mode:      claude (and optionally codex) on $PATH, and the server
-#                     must have been started with `wallfacer run --backend host`.
+#   - claude (and optionally codex) on $PATH
 #
 # Usage:
-#   sh scripts/e2e-lifecycle.sh                              # test both sandboxes, container backend
+#   sh scripts/e2e-lifecycle.sh                              # test both sandboxes
 #   sh scripts/e2e-lifecycle.sh claude                       # test claude only
 #   sh scripts/e2e-lifecycle.sh codex                        # test codex only
-#   BACKEND=host sh scripts/e2e-lifecycle.sh                 # host backend, both sandboxes
-#   BACKEND=host sh scripts/e2e-lifecycle.sh claude          # host backend, claude only
 #   WALLFACER_URL=http://localhost:9090 sh scripts/e2e-lifecycle.sh
 #
 set -euo pipefail
@@ -27,7 +22,6 @@ BASE_URL="${WALLFACER_URL:-http://localhost:8080}"
 API_KEY="${WALLFACER_SERVER_API_KEY:-}"
 TIMEOUT="${WALLFACER_TEST_TIMEOUT:-120}"  # seconds to wait for task completion
 SANDBOXES="${1:-claude codex}"
-BACKEND="${BACKEND:-container}"  # "container" (default) | "host"
 FAILURES=0
 
 pass() { printf "  \033[32mPASS\033[0m %s\n" "$1"; }
@@ -77,31 +71,25 @@ if ! api GET "/api/debug/health" >/dev/null 2>&1; then
 fi
 pass "server reachable at $BASE_URL"
 
-# Host-mode preflight: the server must have been started with --backend host
-# for the host-mode assertions below to be meaningful. /api/config exposes
-# a host_mode boolean reflecting the runner's HostMode() state.
-if [ "$BACKEND" = "host" ]; then
-    if ! command -v claude >/dev/null 2>&1; then
-        echo "ERROR: BACKEND=host requires 'claude' on \$PATH (or WALLFACER_HOST_CLAUDE_BINARY set on the server)"
-        exit 1
-    fi
-    for sb in $SANDBOXES; do
-        if [ "$sb" = "codex" ] && ! command -v codex >/dev/null 2>&1; then
-            echo "ERROR: BACKEND=host with codex tests requires 'codex' on \$PATH"
-            exit 1
-        fi
-    done
-    server_host_mode=$(api GET "/api/config" | jq -r '.host_mode // false')
-    if [ "$server_host_mode" != "true" ]; then
-        echo "ERROR: server is not running in host mode (host_mode=$server_host_mode)"
-        echo "Restart the server with: wallfacer run --backend host"
-        exit 1
-    fi
-    pass "server running with --backend host"
-elif [ "$BACKEND" != "container" ] && [ "$BACKEND" != "local" ]; then
-    echo "ERROR: unknown BACKEND=$BACKEND (want \"container\" or \"host\")"
+# Preflight: tasks exec the agent CLIs directly, so they must be on $PATH (or
+# pointed at via WALLFACER_HOST_CLAUDE_BINARY / WALLFACER_HOST_CODEX_BINARY on
+# the server). /api/config exposes host_mode, reflecting the runner's state.
+if ! command -v claude >/dev/null 2>&1; then
+    echo "ERROR: 'claude' must be on \$PATH (or WALLFACER_HOST_CLAUDE_BINARY set on the server)"
     exit 1
 fi
+for sb in $SANDBOXES; do
+    if [ "$sb" = "codex" ] && ! command -v codex >/dev/null 2>&1; then
+        echo "ERROR: codex tests require 'codex' on \$PATH"
+        exit 1
+    fi
+done
+server_host_mode=$(api GET "/api/config" | jq -r '.host_mode // false')
+if [ "$server_host_mode" != "true" ]; then
+    echo "ERROR: server is not running in host mode (host_mode=$server_host_mode)"
+    exit 1
+fi
+pass "server running in host mode"
 
 # Run the lifecycle test for a given sandbox type.
 #
@@ -209,36 +197,16 @@ test_sandbox() {
         fail "task not archived (archived=$archived)"
     fi
 
-    # 8. Wait briefly for worker cleanup, then verify no container/process
-    # lingers for the archived task. The dedicated /api/containers route was
-    # removed (host backend has no containers to list); the surviving source
-    # of truth for running sandbox processes is /api/debug/health →
-    # running_containers.items.
+    # 8. Wait briefly for process cleanup, then verify no agent process lingers
+    # for the archived task. The source of truth for running sandbox processes
+    # is /api/debug/health → running_containers.items.
     sleep 3
     local task_containers
     task_containers=$(api GET "/api/debug/health" | jq --arg id "$task_id" '[.running_containers.items[]? | select(.task_id == $id)] | length')
     if [ "$task_containers" = "0" ] || [ "$task_containers" = "null" ] || [ -z "$task_containers" ]; then
-        if [ "$BACKEND" = "host" ]; then
-            pass "no host-mode processes for archived task"
-        else
-            pass "no containers for archived task"
-        fi
+        pass "no processes for archived task"
     else
         fail "$task_containers process(es) still tracked for archived task"
-    fi
-
-    # 9. Check active workers via runtime debug endpoint. Worker stats are
-    # a container-mode optimization and are always zero in host mode; skip
-    # the assertion there rather than reporting a misleading "note".
-    if [ "$BACKEND" != "host" ]; then
-        local worker_count
-        worker_count=$(api GET "/api/debug/runtime" | jq '.worker_stats.active_workers // 0')
-        if [ "$worker_count" = "0" ]; then
-            pass "no active workers remaining"
-        else
-            # Workers from other tasks may exist; just log it.
-            step "note: $worker_count active worker(s) (may be from other tasks)"
-        fi
     fi
 }
 
