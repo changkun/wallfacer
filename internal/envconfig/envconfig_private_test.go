@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -97,10 +97,10 @@ func TestUpdateSandboxSettings(t *testing.T) {
 		t.Fatalf("write env file: %v", err)
 	}
 
-	defaultSandbox := sandbox.Codex
-	if err := UpdateSandboxSettings(path, &defaultSandbox, map[store.SandboxActivity]sandbox.Type{
-		store.SandboxActivityImplementation: sandbox.Codex,
-		store.SandboxActivityIdeaAgent:      sandbox.Claude,
+	defaultSandbox := harness.Codex
+	if err := UpdateSandboxSettings(path, &defaultSandbox, map[store.SandboxActivity]harness.ID{
+		store.SandboxActivityImplementation: harness.Codex,
+		store.SandboxActivityIdeaAgent:      harness.Claude,
 		store.SandboxActivityCommitMessage:  "",
 	}); err != nil {
 		t.Fatalf("UpdateSandboxSettings: %v", err)

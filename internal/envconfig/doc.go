@@ -10,7 +10,7 @@
 // # Connected packages
 //
 // Depends on [changkun.de/x/wallfacer/internal/pkg/atomicfile] for atomic writes
-// and [changkun.de/x/wallfacer/internal/sandbox] for sandbox type parsing.
+// and [changkun.de/x/wallfacer/internal/harness] for agent-type parsing.
 // Consumed by [workspace] (env file path management), [runner] (container settings),
 // [handler] (serve/update env configuration), and [cli] (build container commands).
 // When adding a new .env variable, add the field to [Config], update [Parse],
