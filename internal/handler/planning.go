@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/spec"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -783,7 +783,7 @@ func (h *Handler) persistPlanningRoundUsage(raw []byte) {
 		CacheCreationTokens:  usage.CacheCreationInputTokens,
 		CostUSD:              usage.CostUSD,
 		StopReason:           usage.StopReason,
-		Sandbox:              sandbox.Claude,
+		Sandbox:              harness.Claude,
 		SubAgent:             store.SandboxActivityPlanning,
 	}
 	if err := store.AppendPlanningUsage(h.configDir, groupKey, rec); err != nil {

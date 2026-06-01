@@ -17,6 +17,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/runner"
@@ -2542,8 +2543,8 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	// test machine's real claude runs and the assertion races against the
 	// real commit pipeline.
 	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*sandbox.HostBackend); ok {
-		hb.SetBinaryForTest(sandbox.Claude, "/usr/bin/false")
-		hb.SetBinaryForTest(sandbox.Codex, "/usr/bin/false")
+		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
+		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}
 	h.SetAutopilot(true)
 	h.SetAutotest(true)

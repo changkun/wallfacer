@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/statemachine"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -174,20 +174,20 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 // callers can migrate.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		Prompt             string                                 `json:"prompt"`
-		Timeout            int                                    `json:"timeout"`
-		MountWorktrees     bool                                   `json:"mount_worktrees"`
-		Sandbox            *sandbox.Type                          `json:"sandbox,omitempty"`
-		SandboxByActivity  map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
-		Kind               store.TaskKind                         `json:"kind"`
-		Flow               string                                 `json:"flow"`
-		Tags               []string                               `json:"tags"`
-		MaxCostUSD         float64                                `json:"max_cost_usd"`
-		MaxInputTokens     int                                    `json:"max_input_tokens"`
-		Model              string                                 `json:"model"`
-		ScheduledAt        *time.Time                             `json:"scheduled_at,omitempty"`
-		CustomPassPatterns []string                               `json:"custom_pass_patterns,omitempty"`
-		CustomFailPatterns []string                               `json:"custom_fail_patterns,omitempty"`
+		Prompt             string                               `json:"prompt"`
+		Timeout            int                                  `json:"timeout"`
+		MountWorktrees     bool                                 `json:"mount_worktrees"`
+		Sandbox            *harness.ID                          `json:"sandbox,omitempty"`
+		SandboxByActivity  map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
+		Kind               store.TaskKind                       `json:"kind"`
+		Flow               string                               `json:"flow"`
+		Tags               []string                             `json:"tags"`
+		MaxCostUSD         float64                              `json:"max_cost_usd"`
+		MaxInputTokens     int                                  `json:"max_input_tokens"`
+		Model              string                               `json:"model"`
+		ScheduledAt        *time.Time                           `json:"scheduled_at,omitempty"`
+		CustomPassPatterns []string                             `json:"custom_pass_patterns,omitempty"`
+		CustomFailPatterns []string                             `json:"custom_fail_patterns,omitempty"`
 	}](w, r)
 	if !ok {
 		return
@@ -262,17 +262,17 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 // reject callers that still pass the deprecated fields rather than
 // silently dropping them.
 type batchTaskInput struct {
-	Ref               string                                  `json:"ref"`
-	Prompt            string                                  `json:"prompt"`
-	Timeout           int                                     `json:"timeout"`
-	Tags              []string                                `json:"tags"`
-	Sandbox           *sandbox.Type                           `json:"sandbox,omitempty"`
-	SandboxByActivity *map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
-	Flow              string                                  `json:"flow"`
-	Kind              store.TaskKind                          `json:"kind"`
-	MountWorktrees    bool                                    `json:"mount_worktrees"`
-	DependsOnRefs     []string                                `json:"depends_on_refs"`
-	SpecSourcePath    string                                  `json:"spec_source_path"`
+	Ref               string                                `json:"ref"`
+	Prompt            string                                `json:"prompt"`
+	Timeout           int                                   `json:"timeout"`
+	Tags              []string                              `json:"tags"`
+	Sandbox           *harness.ID                           `json:"sandbox,omitempty"`
+	SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
+	Flow              string                                `json:"flow"`
+	Kind              store.TaskKind                        `json:"kind"`
+	MountWorktrees    bool                                  `json:"mount_worktrees"`
+	DependsOnRefs     []string                              `json:"depends_on_refs"`
+	SpecSourcePath    string                                `json:"spec_source_path"`
 }
 
 type batchCreateRequest struct {
@@ -603,18 +603,18 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 // UpdateTask handles PATCH requests: status transitions, position, prompt, etc.
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	req, ok := httpjson.DecodeBody[struct {
-		Status            *store.TaskStatus                       `json:"status"`
-		Position          *int                                    `json:"position"`
-		Prompt            *string                                 `json:"prompt"`
-		Timeout           *int                                    `json:"timeout"`
-		FreshStart        *bool                                   `json:"fresh_start"`
-		MountWorktrees    *bool                                   `json:"mount_worktrees"`
-		Sandbox           *sandbox.Type                           `json:"sandbox"`
-		SandboxByActivity *map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
-		DependsOn         *[]string                               `json:"depends_on"`
-		Tags              *[]string                               `json:"tags"`
-		MaxCostUSD        *float64                                `json:"max_cost_usd"`
-		MaxInputTokens    *int                                    `json:"max_input_tokens"`
+		Status            *store.TaskStatus                     `json:"status"`
+		Position          *int                                  `json:"position"`
+		Prompt            *string                               `json:"prompt"`
+		Timeout           *int                                  `json:"timeout"`
+		FreshStart        *bool                                 `json:"fresh_start"`
+		MountWorktrees    *bool                                 `json:"mount_worktrees"`
+		Sandbox           *harness.ID                           `json:"sandbox"`
+		SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
+		DependsOn         *[]string                             `json:"depends_on"`
+		Tags              *[]string                             `json:"tags"`
+		MaxCostUSD        *float64                              `json:"max_cost_usd"`
+		MaxInputTokens    *int                                  `json:"max_input_tokens"`
 		// Model sets the per-task model override; empty string clears it.
 		Model *string `json:"model"`
 		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)

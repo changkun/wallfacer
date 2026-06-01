@@ -275,4 +275,3 @@ func (h *Handler) TriggerRoutine(w http.ResponseWriter, r *http.Request) {
 	logger.Handler.Info("routine: trigger requested", "routine", id)
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"queued": true})
 }
-
