@@ -35,9 +35,16 @@ import './styles/app.css';
 
 export const createApp = ViteSSG(App, { routes }, ({ app, isClient }) => {
   app.use(createPinia());
-  // Browser RUM: client-side only (this setup also runs in Node during SSG)
-  // and production-only (no telemetry proxy in dev).
-  if (isClient && import.meta.env.PROD) {
+  // Browser RUM: only enable in cloud mode — that's the only deployment
+  // where the backend exposes /v1/telemetry/* (TelemetryProxy). Local-mode
+  // binaries (and dev) have no proxy, so initialising here would spam the
+  // console with 405s from every OTLP batch.
+  if (
+    isClient &&
+    import.meta.env.PROD &&
+    typeof window !== 'undefined' &&
+    window.__WALLFACER__?.mode === 'cloud'
+  ) {
     initTelemetry('wallfacer-spa');
   }
 });
