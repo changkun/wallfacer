@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
@@ -60,57 +59,23 @@ func (h *Handler) GetTestOversight(w http.ResponseWriter, r *http.Request, id uu
 // Only tasks in a terminal state (done, waiting, failed, cancelled) with at least
 // one turn are eligible, since there must be agent activity to summarize.
 func (h *Handler) GenerateMissingOversight(w http.ResponseWriter, r *http.Request) {
-	limit := 10
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			limit = n
-		}
-	}
-
-	tasks, err := h.store.ListTasks(r.Context(), true)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Terminal statuses that have completed agent activity worth summarizing.
 	terminal := map[store.TaskStatus]bool{
 		store.TaskStatusDone:      true,
 		store.TaskStatusWaiting:   true,
 		store.TaskStatusFailed:    true,
 		store.TaskStatusCancelled: true,
 	}
-
-	var eligible []store.Task
-	for _, t := range tasks {
-		if !terminal[t.Status] || t.Turns == 0 {
-			continue
-		}
-		o, err := h.store.GetOversight(t.ID)
-		if err != nil {
-			continue
-		}
-		// Skip tasks that already have a ready or in-progress summary.
-		if o.Status == store.OversightStatusReady || o.Status == store.OversightStatusGenerating {
-			continue
-		}
-		eligible = append(eligible, t)
-	}
-
-	total := len(eligible)
-	if limit > 0 && len(eligible) > limit {
-		eligible = eligible[:limit]
-	}
-
-	taskIDs := make([]string, len(eligible))
-	for i, t := range eligible {
-		taskIDs[i] = t.ID.String()
-		go h.runner.GenerateOversight(t.ID)
-	}
-
-	httpjson.Write(w, http.StatusOK, map[string]any{
-		"queued":                  len(eligible),
-		"total_without_oversight": total,
-		"task_ids":                taskIDs,
-	})
+	h.runBackfillBatch(w, r, "total_without_oversight",
+		func(t store.Task) bool {
+			if !terminal[t.Status] || t.Turns == 0 {
+				return false
+			}
+			o, err := h.store.GetOversight(t.ID)
+			if err != nil {
+				return false
+			}
+			return o.Status != store.OversightStatusReady && o.Status != store.OversightStatusGenerating
+		},
+		func(t store.Task) { go h.runner.GenerateOversight(t.ID) },
+	)
 }
