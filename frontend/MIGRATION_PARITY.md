@@ -177,7 +177,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | Module | Status | Vue equivalent | Missing behaviors |
 |---|---|---|---|
 | terminal.js | DONE | TerminalPanel.vue | xterm, WS PTY, multi-session, container exec |
-| containers.js | DONE | ContainerMonitor.vue | poll, states, task link |
+| containers.js | RETIRED | — | container monitor removed; host execution has no containers and the `/api/containers` route is gone |
 | explorer.js | PARTIAL+ | ExplorerPage.vue | **edit mode added** (Edit/Save/Cancel → PUT /api/explorer/file). Pending: SSE tree refresh, keyboard nav, md preview toggle, task-prompts, resize |
 | git.js | DONE | StatusBar.vue, BranchDropdown.vue | branches/checkout/push/sync/rebase + create-branch + **open-folder** all present. (conflict-resolution messaging is a minor follow-up) |
 | workspace.js | PARTIAL | WorkspacePicker.vue | group create/rename/delete/switch UI, persistence, active-group badge |

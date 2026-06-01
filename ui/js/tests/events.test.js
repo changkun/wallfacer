@@ -66,7 +66,6 @@ function makeContext(overrides = {}) {
     closeAlert: vi.fn(),
     closeStatsModal: vi.fn(),
     closeUsageStats: vi.fn(),
-    closeContainerMonitor: vi.fn(),
     closeInstructionsEditor: vi.fn(),
     closeSettings: vi.fn(),
     closeKeyboardShortcuts: vi.fn(),
