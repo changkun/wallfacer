@@ -2,78 +2,19 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
-	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // Version is set at build time via -ldflags (e.g. -X cli.Version=1.2.3).
 // When empty (dev build), the doctor subcommand displays "dev" as the
-// version string. Version tracks wallfacer's own release and is
-// intentionally independent of the sandbox image tag.
+// version string.
 var Version = ""
-
-// SandboxTag is the sandbox image tag embedded at build time via -ldflags
-// (e.g. -X cli.SandboxTag=v0.0.4). It is resolved from the latest release of
-// github.com/latere-ai/images at build time and MUST NOT be derived from
-// wallfacer's own Version — the two repositories release independently.
-var SandboxTag = ""
-
-// sandboxImageBase is the registry path for the published sandbox image.
-// The single sandbox-agents image ships both Claude Code and Codex CLIs;
-// the entrypoint selects between them at runtime via WALLFACER_AGENT.
-const sandboxImageBase = "ghcr.io/latere-ai/sandbox-agents"
-
-// defaultSandboxImage returns the tagged sandbox image reference.
-// Builds that embed SandboxTag via ldflags use that tag directly.
-// Otherwise the binary queries the GitHub API for the latest release of
-// latere-ai/images and uses that tag. Falls back to :latest only if the
-// query fails.
-func defaultSandboxImage() string {
-	if SandboxTag != "" {
-		return sandboxImageBase + ":" + SandboxTag
-	}
-	if tag := resolveLatestImageTag(); tag != "" {
-		logger.Main.Info("resolved latest sandbox image tag", "tag", tag)
-		return sandboxImageBase + ":" + tag
-	}
-	return sandboxImageBase + ":latest"
-}
-
-// resolveLatestImageTag queries the GitHub API for the latest release tag
-// of the latere-ai/images repository. Returns the tag name (e.g. "v0.0.3")
-// or empty string on failure.
-func resolveLatestImageTag() string {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("https://api.github.com/repos/latere-ai/images/releases/latest")
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return ""
-	}
-	var release struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return ""
-	}
-	return release.TagName
-}
-
-// fallbackSandboxImage is the locally-built image name used when the
-// remote registry image cannot be pulled (e.g. no network, auth failure).
-// This intentionally uses :latest as a last-resort local fallback.
-const fallbackSandboxImage = "sandbox-agents:latest"
 
 // ConfigDir returns the default wallfacer configuration directory.
 func ConfigDir() string {
@@ -98,13 +39,6 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "  status       print running board state to terminal\n")
 	fmt.Fprintf(os.Stderr, "  spec         spec document tools (validate, ...)\n")
 	fmt.Fprintf(os.Stderr, "  doctor       check prerequisites and configuration\n")
-	fmt.Fprintf(os.Stderr, "  exec         open a shell in a running task container\n")
-	fmt.Fprintf(os.Stderr, "\nThe exec subcommand attaches to a task container by its task UUID prefix:\n")
-	fmt.Fprintf(os.Stderr, "  wallfacer exec <task-id-prefix> [-- command...]\n")
-	fmt.Fprintf(os.Stderr, "  wallfacer exec --sandbox <claude|codex> [-- command...]\n")
-	fmt.Fprintf(os.Stderr, "  <task-id-prefix>  first 8+ hex characters of the task UUID\n")
-	fmt.Fprintf(os.Stderr, "                    (the UUID prefix shown on task board UI task cards)\n")
-	fmt.Fprintf(os.Stderr, "  command defaults to bash; use '-- sh' if bash is not available.\n")
 	fmt.Fprintf(os.Stderr, "\nRun 'wallfacer <command> -help' for more information on a command.\n")
 }
 
@@ -129,7 +63,7 @@ func initConfigDir(configDir, envFile string) {
 			"# Optional: model for auto-generating task titles (falls back to default model).\n" +
 			"# CLAUDE_TITLE_MODEL=\n\n" +
 			"# =============================================================================\n" +
-			"# OpenAI Codex sandbox (uses the unified sandbox-agents image; WALLFACER_AGENT=codex selects this CLI at runtime)\n" +
+			"# OpenAI Codex (set OPENAI_API_KEY to enable Codex-typed tasks).\n" +
 			"# =============================================================================\n\n" +
 			"# Authentication: set your OpenAI API key.\n" +
 			"# OPENAI_API_KEY=sk-...\n\n" +
@@ -155,45 +89,6 @@ func envOrDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
-}
-
-// detectContainerRuntime returns the path to the container runtime binary.
-// It prefers /opt/podman/bin/podman, then falls back to "podman" and "docker"
-// on $PATH. Returns the hardcoded default if nothing is found.
-func detectContainerRuntime() string {
-	if override := strings.TrimSpace(os.Getenv("CONTAINER_CMD")); override != "" {
-		return override
-	}
-
-	// Unix: preferred explicit podman installation.
-	if runtime.GOOS != "windows" {
-		if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
-			return "/opt/podman/bin/podman"
-		}
-	}
-	// Windows: check common install locations.
-	if runtime.GOOS == "windows" {
-		for _, candidate := range []string{
-			filepath.Join(os.Getenv("ProgramFiles"), "RedHat", "Podman", "podman.exe"),
-		} {
-			if _, err := os.Stat(candidate); err == nil {
-				return candidate
-			}
-		}
-	}
-	// Cross-platform: podman on $PATH.
-	if p, err := exec.LookPath("podman"); err == nil {
-		return p
-	}
-	// Cross-platform: docker on $PATH.
-	if p, err := exec.LookPath("docker"); err == nil {
-		return p
-	}
-	// Nothing found; return a platform-appropriate default.
-	if runtime.GOOS == "windows" {
-		return "podman.exe"
-	}
-	return "/opt/podman/bin/podman"
 }
 
 // isWSL reports whether the process is running inside Windows Subsystem for Linux.
