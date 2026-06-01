@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useHead } from '@unhead/vue';
 import { useRouter } from 'vue-router';
 import Sidebar from '../components/Sidebar.vue';
@@ -19,6 +19,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { useKeyboard } from '../composables/useKeyboard';
 import { getStored, setStored } from '../lib/storage';
+import { shouldRefetchOnVisible } from '../lib/visibility';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
@@ -40,6 +41,16 @@ onMounted(async () => {
     ui.showWorkspaces = true;
   }
 });
+
+// On tab refocus, refetch the task list so any SSE events missed while the
+// tab was hidden are picked up immediately (legacy ui/js/api.js fallback).
+function onVisibilityChange() {
+  if (shouldRefetchOnVisible(document.visibilityState, !!store.config?.workspaces?.length)) {
+    void store.fetchTasks({ includeArchived: ui.showArchived });
+  }
+}
+onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange));
+onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange));
 
 // Browser-tab title reflects the active workspace + the count of running
 // tasks. "Wallfacer" alone when nothing's running; "Wallfacer — repo (3)"

@@ -89,7 +89,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] explorer — md rendered/raw toggle (DONE earlier)
 - [ ] envconfig — OAuth button visibility reactive to base-URL
 - [ ] instructions — preloadedContent for re-init-from-template
-- [ ] events — visibilitychange→fetchTasks on tab refocus
+- [x] events — visibilitychange→fetchTasks on tab refocus
 - [ ] task-stream — waitForTaskDelta SSE-resolve optimization
 - [ ] workspace — group popover active/switching state (partial in Sidebar)
 - [ ] spec-mode — focused-view crossfade epoch-guard against click-spam
