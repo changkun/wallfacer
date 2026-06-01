@@ -3,9 +3,12 @@ import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import type { SystemPromptTemplate } from '../api/types';
+import { useEscapeToClose } from '../composables/useEscapeToClose';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
+
+useEscapeToClose(() => props.modelValue, () => close());
 
 type EditTab = 'edit' | 'preview';
 
