@@ -12,7 +12,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import DependencyPicker from './DependencyPicker.vue';
-import type { SpanResult } from '../lib/flamegraph';
+import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
 // Re-imported as a local binding so the template can call renderMarkdown()
 // directly inside the Results tab.
@@ -183,6 +183,7 @@ function copyResult(entry: ResultEntry) {
 // --- Timeline (span flamegraph) tab ---
 
 const spans = ref<SpanResult[]>([]);
+const turnUsages = ref<TurnUsageRecord[]>([]);
 const spansLoading = ref(false);
 const spansFetched = ref(false);
 const spansError = ref('');
@@ -194,6 +195,11 @@ async function fetchSpans() {
   try {
     const data = await api<{ spans?: SpanResult[] }>('GET', `/api/tasks/${props.task.id}/spans`);
     spans.value = data?.spans ?? [];
+    // Turn-usage powers the cumulative cost chart overlay (best-effort).
+    try {
+      const usage = await api<TurnUsageRecord[]>('GET', `/api/tasks/${props.task.id}/turn-usage`);
+      turnUsages.value = Array.isArray(usage) ? usage : [];
+    } catch { turnUsages.value = []; }
     spansFetched.value = true;
   } catch (e) {
     spansError.value = e instanceof Error ? e.message : String(e);
@@ -290,7 +296,7 @@ onMounted(() => { if (mainTab.value !== 'spec') fetchForTab(mainTab.value); });
 watch(
   () => props.task?.id,
   () => {
-    spansFetched.value = false; spans.value = [];
+    spansFetched.value = false; spans.value = []; turnUsages.value = [];
     resultsFetched.value = false; implResults.value = []; testResults.value = [];
     eventsFetched.value = false; events.value = [];
     if (mainTab.value === 'timeline') fetchSpans();
@@ -1084,7 +1090,7 @@ const isArchived = computed(() => !!props.task.archived);
                   <h3 class="section-title">Timeline</h3>
                   <div v-if="spansLoading" class="text-xs text-v-secondary">Loading spans…</div>
                   <div v-else-if="spansError" class="text-xs" style="color: var(--err, #c0392b);">{{ spansError }}</div>
-                  <SpanFlamegraph v-else :spans="spans" />
+                  <SpanFlamegraph v-else :spans="spans" :turn-usages="turnUsages" />
                 </div>
               </div>
             </div>

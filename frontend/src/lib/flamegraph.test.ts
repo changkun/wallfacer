@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { assignLanes, formatMs, humanSpanLabel, layoutSpans, labelHue, type SpanResult } from './flamegraph';
+import { assignLanes, formatMs, humanSpanLabel, layoutSpans, labelHue, cumulativeCostPoints, type SpanResult } from './flamegraph';
+
+describe('cumulativeCostPoints', () => {
+  const id = (ms: number) => ms; // identity toPercent for testing
+  it('accumulates positive costs in timestamp order', () => {
+    const { points, maxCost } = cumulativeCostPoints([
+      { timestamp: '2026-01-01T00:00:02Z', cost_usd: 0.2, sub_agent: 'test' },
+      { timestamp: '2026-01-01T00:00:01Z', cost_usd: 0.1, sub_agent: 'impl' },
+    ], id);
+    expect(points[0]).toEqual({ xPct: 0, cost: 0, activity: '' });
+    expect(points.map((p) => p.cost)).toEqual([0, 0.1, expect.closeTo(0.3, 5)]);
+    expect(maxCost).toBeCloseTo(0.3, 5);
+  });
+  it('skips zero-cost and unparseable-timestamp records', () => {
+    const { points } = cumulativeCostPoints([
+      { timestamp: '2026-01-01T00:00:01Z', cost_usd: 0 },
+      { timestamp: 'nope', cost_usd: 0.5 },
+      { cost_usd: 0.5 },
+    ], id);
+    expect(points).toHaveLength(1); // only the seed point
+  });
+});
 
 describe('assignLanes', () => {
   it('packs non-overlapping spans onto lane 0', () => {
