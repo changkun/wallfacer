@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { useFocusTrap } from '../composables/useFocusTrap';
 
 interface BrowseEntry {
   name: string;
@@ -19,6 +20,8 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const store = useTaskStore();
 
+const cardRef = ref<HTMLElement | null>(null);
+useFocusTrap(cardRef, computed(() => props.modelValue));
 const workspaces = ref<string[]>([]);
 const browsePath = ref('/');
 const pathInput = ref('/');
@@ -167,7 +170,7 @@ function breadcrumbSegments() {
     class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
     @click="onBackdrop"
   >
-    <div class="modal-card ws-picker" role="dialog" aria-label="Workspace Picker">
+    <div ref="cardRef" class="modal-card ws-picker" role="dialog" aria-modal="true" aria-label="Workspace Picker">
       <div class="ws-picker__header">
         <div style="flex: 1; min-width: 0">
           <h3 class="ws-picker__title">Select Workspaces</h3>

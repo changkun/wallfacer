@@ -15,6 +15,12 @@ import { detectResultType } from '../lib/resultType';
 // directly inside the Results tab.
 import { renderMarkdown as renderResultMarkdown } from '../lib/markdown';
 import { ansiToHtml } from '../lib/ansi';
+import { useFocusTrap } from '../composables/useFocusTrap';
+
+// Modal focus trap — Tab cycles inside the dialog only, focus restores
+// to the element that triggered the open on close.
+const modalRoot = ref<HTMLElement | null>(null);
+useFocusTrap(modalRoot, () => !!props.task);
 
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
@@ -457,7 +463,7 @@ const isArchived = computed(() => !!props.task.archived);
     class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
     @click="onBackdrop"
   >
-    <div id="modal" class="modal-card modal-wide" :data-main-tab="mainTab">
+    <div id="modal" ref="modalRoot" class="modal-card modal-wide" role="dialog" aria-modal="true" :data-main-tab="mainTab">
       <div class="p-6">
         <!-- Header row: badge / id / time / close -->
         <div class="flex items-start justify-between mb-4">
