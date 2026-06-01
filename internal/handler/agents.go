@@ -7,6 +7,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/slugutil"
 )
 
 // AgentResponse is the wire shape for an agent descriptor surfaced on
@@ -131,7 +132,7 @@ func (req agentWriteRequest) toRole() agents.Role {
 }
 
 func validateAgentWrite(req agentWriteRequest) error {
-	if !agents.IsValidSlug(req.Slug) {
+	if !slugutil.IsValid(req.Slug) {
 		return fmt.Errorf("slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", req.Slug)
 	}
 	if req.Title == "" {

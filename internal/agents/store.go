@@ -45,7 +45,7 @@ func LoadUserAgents(dir string) ([]Role, error) {
 		if a.Slug == "" {
 			return nil, fmt.Errorf("parse %s: slug is required", f.Path)
 		}
-		if !IsValidSlug(a.Slug) {
+		if !slugutil.IsValid(a.Slug) {
 			return nil, fmt.Errorf("parse %s: slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", f.Path, a.Slug)
 		}
 		if a.Title == "" {
@@ -71,7 +71,7 @@ func LoadUserAgents(dir string) ([]Role, error) {
 // must have already validated the slug does not collide with a
 // built-in.
 func WriteUserAgent(dir string, role Role) error {
-	if !IsValidSlug(role.Slug) {
+	if !slugutil.IsValid(role.Slug) {
 		return fmt.Errorf("invalid slug %q", role.Slug)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -101,7 +101,7 @@ func WriteUserAgent(dir string, role Role) error {
 // DeleteUserAgent removes dir/<slug>.yaml. Returns nil when the
 // file is already absent so callers can treat delete as idempotent.
 func DeleteUserAgent(dir, slug string) error {
-	if !IsValidSlug(slug) {
+	if !slugutil.IsValid(slug) {
 		return fmt.Errorf("invalid slug %q", slug)
 	}
 	path := filepath.Join(dir, slug+".yaml")
@@ -137,12 +137,6 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 	}
 	return NewRegistry(all...), nil
 }
-
-// IsValidSlug reports whether s is a valid agent slug: 2–40
-// characters of lowercase letters, digits, and hyphens; neither
-// leading nor trailing hyphen. Matches the validation enforced by
-// the /api/agents POST handler.
-func IsValidSlug(s string) bool { return slugutil.IsValid(s) }
 
 // IsBuiltin reports whether slug names a built-in agent. Used by
 // PUT/DELETE handlers to reject mutations targeting shipped roles.

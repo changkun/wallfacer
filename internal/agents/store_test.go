@@ -139,25 +139,6 @@ func TestWriteAndDeleteUserAgent_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestIsValidSlug(t *testing.T) {
-	cases := map[string]bool{
-		"impl":            true,
-		"impl-codex":      true,
-		"ag01":            true,
-		"a":               false, // too short
-		"-leading":        false,
-		"trailing-":       false,
-		"Upper":           false,
-		"with_underscore": false,
-		"this-is-way-too-long-to-fit-in-forty-characters": false,
-	}
-	for s, want := range cases {
-		if got := IsValidSlug(s); got != want {
-			t.Errorf("IsValidSlug(%q) = %v, want %v", s, got, want)
-		}
-	}
-}
-
 func TestIsBuiltin(t *testing.T) {
 	if !IsBuiltin("impl") {
 		t.Error("impl should be built-in")

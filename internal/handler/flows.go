@@ -9,6 +9,7 @@ import (
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/slugutil"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -151,7 +152,7 @@ func (req flowWriteRequest) toFlow() flow.Flow {
 }
 
 func (h *Handler) validateFlowWrite(req flowWriteRequest) error {
-	if !flow.IsValidSlug(req.Slug) {
+	if !slugutil.IsValid(req.Slug) {
 		return fmt.Errorf("slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", req.Slug)
 	}
 	if req.Name == "" {
