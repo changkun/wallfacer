@@ -35,9 +35,7 @@ func RunDesktop(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) er
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
 	addr := fs.String("addr", envOrDefault("ADDR", ":0"), "listen address (default: random port)")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
-	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", detectContainerRuntime()), "container runtime command (podman or docker)")
-	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
-	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
+	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file with credentials and runtime settings")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer desktop [flags]\n\n")
@@ -48,13 +46,11 @@ func RunDesktop(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) er
 	_ = fs.Parse(args)
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    *logFormat,
-		Addr:         *addr,
-		DataDir:      *dataDir,
-		ContainerCmd: *containerCmd,
-		SandboxImage: *sandboxImage,
-		EnvFile:      *envFile,
-		SkipCSRF:     true,
+		LogFormat: *logFormat,
+		Addr:      *addr,
+		DataDir:   *dataDir,
+		EnvFile:   *envFile,
+		SkipCSRF:  true,
 	}, uiFS, vueDist, docsFS)
 
 	go func() {
