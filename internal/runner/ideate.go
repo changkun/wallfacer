@@ -259,7 +259,7 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("empty output from ideation container")
 	}
 
-	output, parseErr := parseOutput(raw)
+	output, parseErr := r.parseAgentStream(sb, raw)
 	if parseErr != nil {
 		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("parse ideation output: %w", parseErr)
 	}
@@ -630,7 +630,13 @@ func (r *Runner) CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) e
 		rawStderr = data
 	}
 
-	output, parseErr := parseOutput(strings.TrimSpace(string(rawStdout)))
+	// Re-parse via the same harness that produced the stored output so the
+	// read path stays harness-owned.
+	sb := harness.Claude
+	if task, err := r.taskStore(taskID).GetTask(ctx, taskID); err == nil && task != nil {
+		sb = r.sandboxForTaskActivity(task, activityIdeaAgent)
+	}
+	output, parseErr := r.parseAgentStream(sb, strings.TrimSpace(string(rawStdout)))
 	if parseErr != nil {
 		return fmt.Errorf("parse output: %w", parseErr)
 	}
