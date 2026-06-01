@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import { useEnvConfig } from '../../composables/useEnvConfig';
 import { claudeModelsFor, codexModelsFor } from '../../lib/knownModels';
+import { useDialogStore } from '../../stores/dialog';
 import type {
   EnvConfig,
   EnvUpdatePayload,
@@ -13,6 +14,7 @@ import type {
 } from '../../api/types';
 
 const taskStore = useTaskStore();
+const dialog = useDialogStore();
 const { env, fetchEnv, updateEnv } = useEnvConfig();
 
 // --- Host-mode banner ---
@@ -132,9 +134,14 @@ async function pullImage(sandbox: string): Promise<void> {
 }
 
 async function deleteImage(sandbox: string): Promise<void> {
-  if (!window.confirm(`Remove the ${sandbox} sandbox image? You can re-pull it later.`)) {
-    return;
-  }
+  const ok = await dialog.confirm({
+    title: 'Remove sandbox image',
+    message: `Remove the ${sandbox} sandbox image? You can re-pull it later from this same panel.`,
+    confirmLabel: 'Remove',
+    cancelLabel: 'Keep',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api('DELETE', '/api/images', { sandbox });
     await loadImages();

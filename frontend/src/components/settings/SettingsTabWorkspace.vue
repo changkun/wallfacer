@@ -45,6 +45,36 @@ async function useGroup(group: WorkspaceGroup) {
     switchingKey.value = null;
   }
 }
+
+// Per-group parallel overrides: writes the whole workspace_groups array
+// back to /api/config with the edited group's max_parallel /
+// max_test_parallel replaced. 0 / empty input clears the override so the
+// global default takes over again.
+const savingGroup = ref<string | null>(null);
+async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null, maxTestParallel: number | null) {
+  if (savingGroup.value) return;
+  savingGroup.value = group.key;
+  status.value = '';
+  try {
+    const next = workspaceGroups.value.map((g) => {
+      if (g.key !== group.key) return { name: g.name, workspaces: g.workspaces, max_parallel: g.max_parallel, max_test_parallel: g.max_test_parallel };
+      return {
+        name: g.name,
+        workspaces: g.workspaces,
+        max_parallel: maxParallel && maxParallel > 0 ? maxParallel : undefined,
+        max_test_parallel: maxTestParallel && maxTestParallel > 0 ? maxTestParallel : undefined,
+      };
+    });
+    await api('PUT', '/api/config', { workspace_groups: next });
+    await store.fetchConfig();
+    status.value = 'Saved.';
+    setTimeout(() => { if (status.value === 'Saved.') status.value = ''; }, 2000);
+  } catch (e) {
+    status.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
+  } finally {
+    savingGroup.value = null;
+  }
+}
 </script>
 
 <template>
@@ -123,6 +153,31 @@ async function useGroup(group: WorkspaceGroup) {
               style="font-family: monospace; font-size: 11px; color: var(--text-muted); word-break: break-all;"
             >{{ path }}</div>
           </div>
+          <!-- Per-group parallel overrides. 0/empty = use global default. -->
+          <div class="group-limits">
+            <label>
+              <span>Max parallel</span>
+              <input
+                type="number"
+                min="0"
+                :value="group.max_parallel ?? ''"
+                placeholder="default"
+                :disabled="savingGroup === group.key"
+                @change="saveGroupLimits(group, ($event.target as HTMLInputElement).valueAsNumber || null, group.max_test_parallel ?? null)"
+              />
+            </label>
+            <label>
+              <span>Max test parallel</span>
+              <input
+                type="number"
+                min="0"
+                :value="group.max_test_parallel ?? ''"
+                placeholder="default"
+                :disabled="savingGroup === group.key"
+                @change="saveGroupLimits(group, group.max_parallel ?? null, ($event.target as HTMLInputElement).valueAsNumber || null)"
+              />
+            </label>
+          </div>
         </div>
       </div>
       <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">
@@ -131,3 +186,29 @@ async function useGroup(group: WorkspaceGroup) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.group-limits {
+  display: flex;
+  gap: 12px;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.group-limits label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.group-limits input {
+  width: 80px;
+  padding: 3px 6px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text);
+}
+</style>
