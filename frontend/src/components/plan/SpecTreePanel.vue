@@ -328,7 +328,14 @@ onMounted(() => {
   void loadTaskPrompts();
 });
 
-watch(() => taskStore.tasks.length, () => { void loadTaskPrompts(); });
+// Keep the Task Prompts list fresh against the SSE-synced task store: reload
+// whenever a task is added/removed OR changes status/title (a backlog task
+// starting moves it out of the list). Watching only .length missed those
+// transitions. Mirrors the legacy spec-explorer SSE subscription.
+const taskPromptsSignal = computed(() =>
+  taskStore.tasks.map((t) => `${t.id}:${t.status}:${t.title ? 1 : 0}`).join(','),
+);
+watch(taskPromptsSignal, () => { void loadTaskPrompts(); });
 
 onUnmounted(() => {
   selectedPaths.value = new Set();
