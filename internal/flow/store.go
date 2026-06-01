@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"changkun.de/x/wallfacer/internal/pkg/slugutil"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -183,24 +184,7 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 // IsValidSlug enforces the same slug format flows and agents share:
 // 2–40 chars, lowercase letters / digits / hyphens, no leading or
 // trailing hyphen.
-func IsValidSlug(s string) bool {
-	if len(s) < 2 || len(s) > 40 {
-		return false
-	}
-	for i, c := range s {
-		switch {
-		case c >= 'a' && c <= 'z':
-		case c >= '0' && c <= '9':
-		case c == '-':
-			if i == 0 || i == len(s)-1 {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return true
-}
+func IsValidSlug(s string) bool { return slugutil.IsValid(s) }
 
 // IsBuiltin reports whether slug names a built-in flow.
 func IsBuiltin(slug string) bool {
