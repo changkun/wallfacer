@@ -611,81 +611,11 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 
 // TestBuildContainerArgsWorktreeOverride verifies that worktreeOverrides
 // replaces the workspace host path in the volume mount.
-func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	ws := t.TempDir()
-	wt := t.TempDir()
-
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
-		SandboxImage: "test:latest",
-		Workspaces:   []string{ws},
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
-	basename := filepath.Base(ws)
-	zOpt := mountOpts("z")
-	expectedMount := "type=bind,src=" + hostPath(wt, "podman") + ",dst=/workspace/" + basename
-	if zOpt != "" {
-		expectedMount += "," + zOpt
-	}
-	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("expected worktree override mount %q; got: %v", expectedMount, args)
-	}
-	// Original workspace path must NOT appear as the host path.
-	unexpectedMount := "type=bind,src=" + hostPath(ws, "podman") + ",dst=/workspace/" + basename
-	if zOpt != "" {
-		unexpectedMount += "," + zOpt
-	}
-	if containsConsecutive(args, "--mount", unexpectedMount) {
-		t.Fatalf("original workspace path should be replaced by worktree, but found %q", unexpectedMount)
-	}
-}
 
 // TestBuildContainerArgsWorktreeGitDirMount verifies that when a workspace has
 // a worktree override and the original workspace is a git repo, the main repo's
 // .git directory is mounted at its host path so the worktree's .git file
 // reference resolves correctly inside the container.
-func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	// Create a real git repo so .git directory exists.
-	repo := setupTestRepo(t)
-	wt := t.TempDir()
-
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
-		SandboxImage: "test:latest",
-		Workspaces:   []string{repo},
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{repo: wt}, "", nil, "")
-
-	// The main repo's .git should be mounted. The source path is translated
-	// for the container runtime, but the destination is the raw host path
-	// (so git worktree references resolve inside the container on Unix hosts).
-	gitDir := filepath.Join(repo, ".git")
-	expectedGitMount := "type=bind,src=" + hostPath(gitDir, "podman") + ",dst=" + gitDir
-	if z := mountOpts("z"); z != "" {
-		expectedGitMount += "," + z
-	}
-	if !containsConsecutive(args, "--mount", expectedGitMount) {
-		t.Fatalf("expected .git dir mount %q; got: %v", expectedGitMount, args)
-	}
-}
 
 // TestBuildContainerArgsNoGitDirMountWithoutWorktree verifies that when no
 // worktree override is used, no extra .git directory mount is added.

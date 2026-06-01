@@ -205,34 +205,3 @@ func TestBuildContainerSpec_HostMode_CmdContainsPromptAndResume(t *testing.T) {
 	}
 }
 
-func TestBuildContainerSpec_LocalMode_StillGetsContainerPaths(t *testing.T) {
-	t.Skip("container-mode no longer exists; dead after specs/shared/host-default")
-	// Regression guard: the default container path must still produce
-	// /workspace/* paths (host-mode branch must not leak into container mode).
-	workspace := t.TempDir()
-	r := newRunnerForArgTest(t, RunnerConfig{
-		Command:      "podman",
-		SandboxImage: "test:latest",
-		Workspaces:   []string{workspace},
-		WorktreesDir: t.TempDir(),
-	})
-
-	spec := r.buildContainerSpecForSandbox(
-		"wallfacer-local", "task-1", "do work", "",
-		nil, "", nil, "", sandbox.Claude,
-	)
-
-	found := false
-	for _, v := range spec.Volumes {
-		if strings.HasPrefix(v.Container, "/workspace/") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("local mode should produce /workspace/* volume mounts; got %+v", spec.Volumes)
-	}
-	if spec.WorkDir == "" || !strings.HasPrefix(spec.WorkDir, "/workspace") {
-		t.Errorf("local-mode WorkDir should be a container path; got %q", spec.WorkDir)
-	}
-}
