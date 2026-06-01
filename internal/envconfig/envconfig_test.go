@@ -561,7 +561,6 @@ func TestUpdateSandboxFast(t *testing.T) {
 	}
 }
 
-
 // TestUpdateAutoPush verifies that auto-push settings can be written and read back.
 func TestUpdateAutoPush(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
