@@ -180,6 +180,17 @@ function copyResult(entry: ResultEntry) {
   toast.push('Copied to clipboard', { kind: 'success', timeout: 2000 });
 }
 
+// Spec/Result markdown helper actions (toggle rendered/raw + copy), mirroring
+// ui/js/markdown.js toggleModalSection / copyModalText.
+const specShowRaw = ref(false);
+const resultShowRaw = ref(false);
+function copyText(text: string) {
+  void navigator.clipboard.writeText(text);
+  toast.push('Copied to clipboard', { kind: 'success', timeout: 2000 });
+}
+const specPromptHtml = computed(() => renderResultMarkdown(props.task.prompt || ''));
+const specResultHtml = computed(() => renderResultMarkdown(props.task.result || ''));
+
 // --- Timeline (span flamegraph) tab ---
 
 const spans = ref<SpanResult[]>([]);
@@ -774,12 +785,28 @@ const isArchived = computed(() => !!props.task.archived);
               <div id="modal-main-content">
                 <!-- SPEC tab -->
                 <div data-main-tab-section="spec">
-                  <h3 class="section-title">Spec</h3>
-                  <pre class="code-block mb-4">{{ task.prompt }}</pre>
+                  <div class="md-section-head">
+                    <h3 class="section-title">Spec</h3>
+                    <span class="md-section-actions">
+                      <button type="button" class="btn-icon" @click="copyText(task.prompt)">Copy</button>
+                      <button type="button" class="btn-icon" @click="specShowRaw = !specShowRaw">{{ specShowRaw ? 'Rendered' : 'Raw' }}</button>
+                    </span>
+                  </div>
+                  <pre v-if="specShowRaw" class="code-block mb-4">{{ task.prompt }}</pre>
+                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                  <div v-else class="prose-content mb-4" v-html="specPromptHtml"></div>
 
                   <template v-if="task.result">
-                    <h3 class="section-title">Result</h3>
-                    <pre class="code-block mb-4">{{ task.result }}</pre>
+                    <div class="md-section-head">
+                      <h3 class="section-title">Result</h3>
+                      <span class="md-section-actions">
+                        <button type="button" class="btn-icon" @click="copyText(task.result || '')">Copy</button>
+                        <button type="button" class="btn-icon" @click="resultShowRaw = !resultShowRaw">{{ resultShowRaw ? 'Rendered' : 'Raw' }}</button>
+                      </span>
+                    </div>
+                    <pre v-if="resultShowRaw" class="code-block mb-4">{{ task.result }}</pre>
+                    <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                    <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
                   </template>
 
                   <div v-if="isWaiting" class="mb-4">
@@ -1540,6 +1567,15 @@ const isArchived = computed(() => !!props.task.archived);
   border-radius: 6px;
   padding: 6px 8px;
 }
+
+/* Spec/Result markdown section header with toggle + copy actions. */
+.md-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.md-section-actions { display: inline-flex; gap: 6px; }
 
 /* Execution-environment provenance list in the right aside. */
 .env-provenance {
