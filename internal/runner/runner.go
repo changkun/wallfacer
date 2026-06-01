@@ -390,11 +390,18 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 	})
 }
 
+// taskBackground launches fn on the backgroundWg with a "<label>:<short-id>"
+// goroutine name. Shared by every task-keyed background launcher except
+// RunBackground (which also tracks workspace counts and shutdown-guards).
+func (r *Runner) taskBackground(label string, taskID uuid.UUID, fn func()) {
+	r.backgroundWg.Go(label+":"+taskID.String()[:8], fn)
+}
+
 // SyncWorktreesBackground launches SyncWorktrees in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 // The optional onDone callbacks are called after SyncWorktrees returns.
 func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus, onDone ...func()) {
-	r.backgroundWg.Go("sync:"+taskID.String()[:8], func() {
+	r.taskBackground("sync", taskID, func() {
 		r.SyncWorktrees(taskID, sessionID, prevStatus)
 		for _, fn := range onDone {
 			fn()
@@ -405,17 +412,13 @@ func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, pre
 // GenerateOversightBackground launches GenerateOversight in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
-	r.backgroundWg.Go("oversight:"+taskID.String()[:8], func() {
-		r.GenerateOversight(taskID)
-	})
+	r.taskBackground("oversight", taskID, func() { r.GenerateOversight(taskID) })
 }
 
 // GenerateTitleBackground launches GenerateTitle in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
-	r.backgroundWg.Go("title:"+taskID.String()[:8], func() {
-		r.GenerateTitle(taskID, prompt)
-	})
+	r.taskBackground("title", taskID, func() { r.GenerateTitle(taskID, prompt) })
 }
 
 // NewRunner constructs a Runner from the given store and config. The returned
