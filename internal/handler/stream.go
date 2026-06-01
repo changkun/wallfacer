@@ -11,7 +11,6 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/logpipe"
 	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
@@ -290,42 +289,6 @@ func (h *Handler) writeStoredTurns(w http.ResponseWriter, id uuid.UUID) {
 		}
 		_, _ = w.Write(content)
 		_, _ = fmt.Fprintln(w)
-	}
-}
-
-// streamLines writes lines from a logpipe to the HTTP response with periodic
-// keepalive newlines. It blocks until the pipe is exhausted or the request
-// context is cancelled.
-func streamLines(w http.ResponseWriter, r *http.Request, flusher http.Flusher, p *logpipe.Pipe) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
-	defer keepalive.Stop()
-	defer p.Close()
-
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case line, ok := <-p.Lines():
-			if !ok {
-				return
-			}
-			if _, err := w.Write([]byte(line + "\n")); err != nil {
-				return
-			}
-			flusher.Flush()
-		case <-keepalive.C:
-			if _, err := w.Write([]byte("\n")); err != nil {
-				return
-			}
-			flusher.Flush()
-		}
 	}
 }
 
