@@ -101,40 +101,39 @@ The following Claude / Codex specifics are scattered today:
 | Hidden Codex behavior in `codex-agent.sh` (already gone after host-default) | Re-read the script before deletion to capture any flag we still need (e.g., `--config model_reasoning_effort="low"` when `WALLFACER_SANDBOX_FAST != "false"`). |
 | Persistence-layer rename causes task replay regressions | Keep the `sandbox` field name in `store.Task` for one release; document as a follow-up rename. |
 
-## Outcome (partial)
+## Outcome
 
 Shipped:
 
-- `harness.Claude` and `harness.Codex` own argv assembly (`BuildArgv`),
-  auth env (`AuthEnv`), and capabilities. `HostBackend.launchClaude` /
-  `launchCodex` call `harness.Lookup(...).BuildArgv(req)` via a
-  `requestFromClaudeSpec` shim.
+- **Write path.** `harness.Claude` and `harness.Codex` own argv assembly
+  (`BuildArgv`), auth env (`AuthEnv`), and capabilities.
+  `HostBackend.launchClaude` / `launchCodex` call
+  `harness.Lookup(...).BuildArgv(req)` via a `requestFromClaudeSpec` shim.
+- **Read path.** The runner derives `agentOutput` from per-line
+  `harness.ParseEvent` via `parseAgentStream` + the `parseHarnessOutput`
+  accumulator. All four production parse sites (heavyweight/inspector
+  `runAgent`, commit-message, ephemeral ideation, idea-backlog re-parse) go
+  through it; `parseOutput` survives only as the fallback for an
+  unregistered harness. claude keys its terminal on line shape (typeless /
+  `type:"result"`); codex maps `turn.completed` and the normalized result
+  envelope. `Subtype` and top-level `total_cost_usd` are carried through so
+  token-limit and cost-budget accounting are unchanged.
+- **No cross-harness synthesis.** `host_codex.go` recovers codex's final
+  message from `--output-last-message` and emits it as a codex-native
+  `turn.completed` event (not a Claude-shaped result line), parsed by
+  `harness.Codex.ParseEvent`.
 - The agent-type enum is unified: `harness.ID` is the only type;
   `sandbox.Type` (and its `Parse`/`Normalize`/`Default`/`All`/`IsValid`/
   `OrDefault`) is deleted. `store`, `envconfig`, `handler`, `planner`,
-  `runner`, and `sandbox` all reference `harness.ID`. `harness.All()` /
-  `harness.DefaultFrom` / `harness.NormalizeID` / `harness.ParseID` replace
-  the old sandbox helpers.
+  `runner`, and `sandbox` all reference `harness.ID`.
 - `WALLFACER_SANDBOX_FAST` is threaded through `harness.Request.FastMode`
   (resolved by the host backend from the per-task env), fixing a regression
   where the harness read it from the server process env (always empty).
 - Dead `SupportsAppendSystemPrompt` probe and `extractPromptAndModelFromClaudeArgv`
   removed.
 
-Deferred (still the read-path gap, NOT yet done):
+Remaining (cosmetic, separate phase):
 
-- **`ParseEvent` is not on the production read path.** The runner still uses
-  `internal/runner/parse.go` (`parseOutput`, whole-buffer with stop_reason
-  fallback), and `host_codex.go` still synthesizes a Claude-compatible final
-  result line so that parser works for codex. `harness.{Claude,Codex}.ParseEvent`
-  exist and are unit-tested but unused by the runner.
-- **Why deferred:** codex's final assistant message is written to the
-  `--output-last-message` file, not emitted on the NDJSON stream, so the
-  synthesis can't be removed without first giving the runner another way to
-  recover that text. Wiring `ParseEvent` also means replacing parseOutput's
-  whole-buffer fallback semantics with per-line accumulation. This is a
-  focused, test-gated refactor of the core execution path and is tracked as
-  the remaining step rather than rushed.
 - `internal/sandbox` is now purely the launch/executor layer but retains the
   `sandbox` name and container-era `ContainerSpec` fields; renaming to
-  `internal/executor` and slimming the spec is a separate cosmetic phase.
+  `internal/executor` and slimming the spec is deferred.
