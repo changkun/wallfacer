@@ -209,16 +209,16 @@ test_sandbox() {
         fail "task not archived (archived=$archived)"
     fi
 
-    # 8. Wait briefly for worker cleanup, then verify.
+    # 8. Wait briefly for worker cleanup, then verify no container/process
+    # lingers for the archived task. The dedicated /api/containers route was
+    # removed (host backend has no containers to list); the surviving source
+    # of truth for running sandbox processes is /api/debug/health →
+    # running_containers.items.
     sleep 3
-    local containers
-    containers=$(api GET "/api/containers")
     local task_containers
-    task_containers=$(echo "$containers" | jq --arg id "$task_id" '[.[] | select(.task_id == $id)] | length')
-    if [ "$task_containers" = "0" ] || [ "$task_containers" = "null" ]; then
+    task_containers=$(api GET "/api/debug/health" | jq --arg id "$task_id" '[.running_containers.items[]? | select(.task_id == $id)] | length')
+    if [ "$task_containers" = "0" ] || [ "$task_containers" = "null" ] || [ -z "$task_containers" ]; then
         if [ "$BACKEND" = "host" ]; then
-            # Host mode reports PID-tracked processes under /api/containers too
-            # (Image="host"); assert none lingered for this task.
             pass "no host-mode processes for archived task"
         else
             pass "no containers for archived task"
