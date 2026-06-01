@@ -196,20 +196,12 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 // agent should be one of the SandboxActivity constants.
 func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent SandboxActivity, delta TaskUsage) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.Usage.InputTokens += delta.InputTokens
-		t.Usage.OutputTokens += delta.OutputTokens
-		t.Usage.CacheReadInputTokens += delta.CacheReadInputTokens
-		t.Usage.CacheCreationTokens += delta.CacheCreationTokens
-		t.Usage.CostUSD += delta.CostUSD
+		t.Usage.Add(delta)
 		if t.UsageBreakdown == nil {
 			t.UsageBreakdown = make(map[SandboxActivity]TaskUsage)
 		}
 		prev := t.UsageBreakdown[agent]
-		prev.InputTokens += delta.InputTokens
-		prev.OutputTokens += delta.OutputTokens
-		prev.CacheReadInputTokens += delta.CacheReadInputTokens
-		prev.CacheCreationTokens += delta.CacheCreationTokens
-		prev.CostUSD += delta.CostUSD
+		prev.Add(delta)
 		t.UsageBreakdown[agent] = prev
 		return nil
 	})

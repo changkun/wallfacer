@@ -23,6 +23,18 @@ type TaskUsage struct {
 	CostUSD              float64 `json:"cost_usd"`
 }
 
+// Add accumulates every field of other into u. Centralised so callers
+// can't accidentally drop one of the cache-token fields when summing
+// usage across tasks (a bug the per-bucket aggregations in
+// /api/stats used to have).
+func (u *TaskUsage) Add(other TaskUsage) {
+	u.InputTokens += other.InputTokens
+	u.OutputTokens += other.OutputTokens
+	u.CacheReadInputTokens += other.CacheReadInputTokens
+	u.CacheCreationTokens += other.CacheCreationTokens
+	u.CostUSD += other.CostUSD
+}
+
 // ExecutionEnvironment captures the runtime environment used for a task execution.
 // It is recorded once at the start of Run() and stored alongside the task for
 // reproducibility auditing and debugging when results differ between runs.

@@ -59,6 +59,17 @@ type UsageStat struct {
 	Count               int     `json:"count"`
 }
 
+// addUsage accumulates every field of u into s, including the two cache
+// token columns. Centralised so per-bucket aggregations can't silently
+// drop fields the way the inline += loops used to.
+func (s *UsageStat) addUsage(u store.TaskUsage) {
+	s.CostUSD += u.CostUSD
+	s.InputTokens += u.InputTokens
+	s.OutputTokens += u.OutputTokens
+	s.CacheReadTokens += u.CacheReadInputTokens
+	s.CacheCreationTokens += u.CacheCreationTokens
+}
+
 // TaskCostEntry holds abbreviated task information for the top-cost list.
 type TaskCostEntry struct {
 	ID      string           `json:"id"`
@@ -115,17 +126,13 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 
 		// ByStatus bucket.
 		s := resp.ByStatus[t.Status]
-		s.CostUSD += u.CostUSD
-		s.InputTokens += u.InputTokens
-		s.OutputTokens += u.OutputTokens
+		s.addUsage(u)
 		resp.ByStatus[t.Status] = s
 
 		// ByActivity buckets from per-task breakdown.
 		for activity, au := range breakdown {
 			a := resp.ByActivity[activity]
-			a.CostUSD += au.CostUSD
-			a.InputTokens += au.InputTokens
-			a.OutputTokens += au.OutputTokens
+			a.addUsage(au)
 			resp.ByActivity[activity] = a
 		}
 
@@ -133,11 +140,7 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		// Tasks that never ran (empty WorktreePaths) are excluded.
 		for repoPath := range t.WorktreePaths {
 			ws := resp.ByWorkspace[repoPath]
-			ws.CostUSD += u.CostUSD
-			ws.InputTokens += u.InputTokens
-			ws.OutputTokens += u.OutputTokens
-			ws.CacheReadTokens += t.Usage.CacheReadInputTokens
-			ws.CacheCreationTokens += t.Usage.CacheCreationTokens
+			ws.addUsage(u)
 			ws.Count++
 			resp.ByWorkspace[repoPath] = ws
 		}
@@ -153,9 +156,7 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		}
 		if effectiveCat != "" {
 			fc := resp.ByFailureCategory[effectiveCat]
-			fc.CostUSD += u.CostUSD
-			fc.InputTokens += u.InputTokens
-			fc.OutputTokens += u.OutputTokens
+			fc.addUsage(u)
 			fc.Count++
 			resp.ByFailureCategory[effectiveCat] = fc
 		}
