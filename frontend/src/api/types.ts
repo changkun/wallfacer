@@ -56,6 +56,20 @@ export interface Task {
   max_input_tokens?: number;
   test_run_start_turn?: number;
   scheduled_at?: string | null;
+  prompt_history?: string[];
+  retry_history?: RetryRecord[];
+  parent_task_id?: string | null;
+}
+
+export interface RetryRecord {
+  retired_at: string;
+  prompt: string;
+  status: string;
+  result?: string;
+  session_id?: string;
+  turns: number;
+  cost_usd: number;
+  failure_category?: string;
 }
 
 export interface WorkspaceGroup {
