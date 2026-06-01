@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
+import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { toRef } from 'vue';
 
@@ -279,6 +280,64 @@ const cardActions = computed(() =>
 const router = useRouter();
 const taskStore = useTaskStore();
 
+// Dependency-state badge for backlog cards (blocked / ready / cancelled),
+// resolved against the live task list. Mirrors render.js renderDependencyBadge.
+const depBadge = computed(() => {
+  const byId = new Map(taskStore.tasks.map((t) => [t.id, t]));
+  return dependencyBadge(props.task, byId);
+});
+const depBadgeClass = computed(() => {
+  switch (depBadge.value?.kind) {
+    case 'blocked': return 'badge-blocked';
+    case 'ready': return 'badge-deps-met';
+    case 'cancelled': return 'badge-dep-cancelled';
+    default: return '';
+  }
+});
+const depBadgeText = computed(() => {
+  const b = depBadge.value;
+  if (!b) return '';
+  if (b.kind === 'ready') return 'ready';
+  if (b.kind === 'cancelled') return 'dependency cancelled';
+  return `${b.count} dep${b.count !== 1 ? 's' : ''}`;
+});
+const depBadgeTitle = computed(() => {
+  const b = depBadge.value;
+  if (!b) return '';
+  if (b.kind === 'blocked') return `Blocked by: ${b.blocking}`;
+  if (b.kind === 'cancelled') return 'A dependency was cancelled or removed; this task may be unblocked after the next sync';
+  return 'All dependencies satisfied; ready for promotion';
+});
+
+// Friendly failure-category label (Timeout/Budget/…) for failed cards.
+const failureBadge = computed(() => failureLabel(props.task.failure_category));
+
+// Cost budget progress bar on running/waiting cards.
+const costBar = computed(() => {
+  const t = props.task;
+  const max = t.max_cost_usd ?? 0;
+  if (!(max > 0) || !(t.status === 'in_progress' || t.status === 'waiting')) return null;
+  const spent = t.usage?.cost_usd ?? 0;
+  const pct = Math.min(100, (spent / max) * 100);
+  const color = pct >= 90 ? 'var(--red,#ef4444)' : pct >= 70 ? 'var(--yellow,#f59e0b)' : 'var(--green,#22c55e)';
+  return { pct, color, title: `Cost: $${spent.toFixed(4)} of $${max.toFixed(2)} budget` };
+});
+
+// Scheduled badge with relative time on backlog cards (one-shot scheduled_at).
+const scheduledLabel = computed(() => {
+  const t = props.task;
+  if (t.status !== 'backlog' || !t.scheduled_at) return '';
+  const at = new Date(t.scheduled_at).getTime();
+  if (Number.isNaN(at)) return '';
+  const diff = at - now.value;
+  if (diff <= 0) return 'scheduled';
+  const m = Math.round(diff / 60000);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `in ${h}h`;
+  return `in ${Math.round(h / 24)}d`;
+});
+
 // Clicking a tag chip filters the board to that exact tag using the
 // `#tag` search prefix matchesFilter understands. stopPropagation keeps
 // the row click from also opening the task detail.
@@ -394,11 +453,21 @@ function onCardKeydown(e: KeyboardEvent) {
         <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
         <span v-if="showSpinner(props.task)" class="spinner"></span>
         <span
-          v-if="props.task.failure_category"
+          v-if="failureBadge"
           class="badge badge-failure-category"
           :title="'Failure reason: ' + props.task.failure_category"
           style="font-family:monospace;font-size:9px;"
-        >{{ props.task.failure_category }}</span>
+        >{{ failureBadge }}</span>
+        <span
+          v-if="depBadge"
+          :class="['badge', depBadgeClass]"
+          :title="depBadgeTitle"
+        >{{ depBadgeText }}</span>
+        <span
+          v-if="scheduledLabel"
+          class="badge badge-scheduled"
+          title="Scheduled start"
+        >{{ scheduledLabel }}</span>
         <span
           v-if="testBadge"
           :class="['badge', testBadge.cls]"
@@ -474,6 +543,16 @@ function onCardKeydown(e: KeyboardEvent) {
     >
       <span>⚠ {{ behind.total.value }} commit{{ behind.total.value === 1 ? '' : 's' }} behind</span>
       <button type="button" class="diff-sync-btn" @click="syncFromCard">Sync</button>
+    </div>
+
+    <!-- Cost budget progress bar (running/waiting with a max_cost_usd). -->
+    <div
+      v-if="costBar"
+      class="card-cost-bar"
+      :title="costBar.title"
+      style="margin-top:4px;height:3px;border-radius:2px;background:var(--border);overflow:hidden;"
+    >
+      <div :style="{ height:'100%', width: costBar.pct + '%', background: costBar.color, transition:'width 0.3s' }" />
     </div>
 
     <!-- Row 7: meta footer (turns, cost, session id) -->
