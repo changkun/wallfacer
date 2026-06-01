@@ -51,7 +51,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] docs — prev/next ordered-doc nav links
 - [x] docs — floating table-of-contents sidebar
 - [x] docs — markdown link enhancement (linkHandler:'docs')
-- [ ] containers — task status badge in monitor cell
+- [x] containers — task status badge in monitor cell
 - [~] terminal — Wails desktop PTY discovery (/api/desktop-port) (desktop-only; defer)
 - [ ] flows — parallel-step grouping viz ("‖" chips)
 - [ ] flows — step input_from relationship shown
