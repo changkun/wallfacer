@@ -114,30 +114,22 @@ When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInst
 
 `prompts.ReinitInstructions()` regenerates the file from scratch using `BuildInstructionsContent()`, overwriting any user edits. This is triggered by **Settings > AGENTS.md > Re-init** in the UI, which calls `POST /api/instructions/reinit`. The re-init picks up any new `AGENTS.md` / `CLAUDE.md` files that may have appeared in the workspaces since the last generation.
 
-### Mount Path
+### Instructions Delivery
 
-The instructions file is mounted read-only into every task container. The mount filename depends on the sandbox type:
-- **Claude sandbox**: `CLAUDE.md` (legacy filename that Claude Code auto-discovers)
-- **Codex sandbox**: `AGENTS.md`
-
-The mount **location** depends on the number of workspaces:
-- **Single workspace**: Mounted inside the repo directory (e.g. `/workspace/<repo>/CLAUDE.md`) so the agent stays anchored to the repo root.
-- **Multiple workspaces**: Mounted at `/workspace/CLAUDE.md` (the common root) so it is accessible from any repo.
-
-This is handled by `appendInstructionsMount()` in `container.go`, which selects the filename via `instructionsFilenameForSandbox()` and the mount directory based on the basenames slice.
+The workspace instructions file is delivered to the agent process via `--append-system-prompt` when the CLI supports it, falling back to prepending it to the `-p` prompt. The runner passes its path to the host backend as `WALLFACER_INSTRUCTIONS_PATH` (see `internal/runner/container.go` and `internal/executor/host.go`). Each task also runs with its git worktree as the working directory, so the agent picks up any per-repo `AGENTS.md` / `CLAUDE.md` natively.
 
 ## Sandbox Type System
 
-### Claude vs Codex sandbox types
+### Claude vs Codex
 
-The `internal/sandbox` package defines two sandbox types as `Type` constants:
+The `internal/harness` package defines harness identities as `ID` constants:
 
-- **`Claude`** (`"claude"`) — Runs Claude Code in a `sandbox-agents` container with `WALLFACER_AGENT=claude`. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **`Codex`** (`"codex"`) — Runs OpenAI Codex CLI in the same `sandbox-agents` container with `WALLFACER_AGENT=codex`. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **`Claude`** (`"claude"`) — Execs the Claude Code CLI with `WALLFACER_AGENT=claude`. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **`Codex`** (`"codex"`) — Execs the OpenAI Codex CLI with `WALLFACER_AGENT=codex`. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 
-Both sandbox types use the same unified container image — only the `WALLFACER_AGENT` env var differs at runtime.
+The `WALLFACER_AGENT` env var selects which CLI the host backend execs.
 
-`sandbox.Default(value)` returns the parsed type or falls back to `Claude` for unknown values.
+`harness.DefaultFrom(value)` returns the parsed identity or falls back to `Claude` for unknown values.
 
 ### Activity routing
 
@@ -197,7 +189,7 @@ The `Config` struct covers all known keys. Key categories:
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
-| **Sandbox backend** | `SandboxBackend` (populated by `--backend` flag; `""`/`"local"` = container, `"host"` = host exec), `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`) |
+| **Host backend** | `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`) — optional explicit CLI paths; empty resolves via `$PATH` |
 | **Container** | `TaskWorkers` (`WALLFACER_TASK_WORKERS`, default `true`), `DependencyCaches` (`WALLFACER_DEPENDENCY_CACHES`, default `false`) |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `PlanningWindowDays` (`WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
@@ -221,7 +213,7 @@ This design means that `PUT /api/env` can safely omit token fields — they are 
 
 ### Propagation to Running Components
 
-The env file is re-read on every container launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new containers without a server restart. Running containers are unaffected — they received their environment at launch time via `--env-file`.
+The env file is re-read on every agent process launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new tasks without a server restart. Already-running tasks are unaffected — they received their environment when the process was spawned.
 
 The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location — e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque podman `--env-file … no such file` exit 125. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. Host mode is independently resilient — `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
 
