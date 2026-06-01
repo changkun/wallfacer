@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { api } from '../api/client';
 import { useUiStore } from './ui';
 import { matchesTaskFilter } from '../lib/taskFilter';
+import { isSystemRoutineCard } from '../lib/boardVisibility';
 import type { Task, ServerConfig } from '../api/types';
 
 export const useTaskStore = defineStore('tasks', () => {
@@ -13,6 +14,9 @@ export const useTaskStore = defineStore('tasks', () => {
   const ui = useUiStore();
 
   function matchesFilter(t: Task): boolean {
+    // System routine schedule cards live behind Automation settings, never on
+    // the board (mirrors ui/js/render.js grouping).
+    if (isSystemRoutineCard(t)) return false;
     // Multi-token AND search with #tag filters — see lib/taskFilter (ported
     // from ui/js/search.js's matchesFilter). The `@`-prefixed server search
     // is handled separately by SearchBar handing off to the command palette.
