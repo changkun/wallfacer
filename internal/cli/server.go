@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -25,7 +24,6 @@ import (
 	"changkun.de/x/wallfacer/internal/handler"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
@@ -1325,66 +1323,6 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 			logger.Handler.Debug(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur.Round(time.Millisecond))
 		}
 	})
-}
-
-// ensureImage checks whether the sandbox image is present locally and pulls
-// it from the registry if it is not. For sandbox-agents images, a locally-
-// built sandbox-agents:latest (e.g. from a sibling latere-ai/images checkout)
-// is preferred over a network pull — mirroring the Makefile's pull-images
-// behavior so `wallfacer run` and `make build` stay in sync. If the pull
-// fails, the same local fallback is used as a last resort.
-// Returns the image reference that should actually be used.
-func ensureImage(containerCmd, image string) string {
-	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()
-	if err == nil && out != "" {
-		return image // already present
-	}
-	if fb, ok := localSandboxFallback(containerCmd, image); ok {
-		logger.Main.Info("using local fallback sandbox image instead of pulling", "image", fb)
-		return fb
-	}
-	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
-	cmd := exec.Command(containerCmd, "pull", image)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		logger.Main.Warn("failed to pull sandbox image", "image", image, "error", err)
-		if fb, ok := localSandboxFallback(containerCmd, image); ok {
-			logger.Main.Info("using local fallback sandbox image after pull failure", "image", fb)
-			return fb
-		}
-		logger.Main.Warn("no sandbox image available; tasks may fail")
-	}
-	return image
-}
-
-// localSandboxFallback returns sandbox-agents:latest if the requested image
-// belongs to the sandbox-agents family and a local copy of the fallback is
-// available. The scoping check prevents unrelated custom images from being
-// silently substituted with the sandbox-agents fallback.
-func localSandboxFallback(containerCmd, image string) (string, bool) {
-	if image == fallbackSandboxImage || !isSandboxAgentsImage(image) {
-		return "", false
-	}
-	out, err := cmdexec.New(containerCmd, "images", "-q", fallbackSandboxImage).Output()
-	if err != nil || out == "" {
-		return "", false
-	}
-	return fallbackSandboxImage, true
-}
-
-// isSandboxAgentsImage reports whether image refers to the sandbox-agents
-// repository, regardless of registry prefix (e.g. matches both
-// "ghcr.io/latere-ai/sandbox-agents:v0.0.6" and "sandbox-agents:latest").
-func isSandboxAgentsImage(image string) bool {
-	name := image
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		name = name[i+1:]
-	}
-	if i := strings.Index(name, ":"); i >= 0 {
-		name = name[:i]
-	}
-	return name == "sandbox-agents"
 }
 
 // requiresStore returns true for route names that need an active workspace

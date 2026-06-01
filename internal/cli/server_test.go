@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -141,7 +140,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		{http.MethodGet, "/api/debug/health", http.StatusOK},
 		{http.MethodGet, "/api/debug/spans", http.StatusOK},
 		{http.MethodGet, "/api/debug/runtime", http.StatusOK},
-		{http.MethodGet, "/api/containers", http.StatusOK},
 		{http.MethodGet, "/api/files", http.StatusOK},
 		{http.MethodGet, "/api/tasks", http.StatusOK},
 		{http.MethodGet, "/api/tasks/stream", http.StatusOK},
@@ -169,128 +167,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 				t.Fatalf("status for %s %s: got %d, want %d (body=%s)", tc.method, tc.path, rr.Code, tc.want, strings.TrimSpace(rr.Body.String()))
 			}
 		})
-	}
-}
-
-// TestEnsureImage_ReturnsExistingOrPulledImage verifies that ensureImage
-// returns the requested image when it is already present locally.
-func TestEnsureImage_ReturnsExistingOrPulledImage(t *testing.T) {
-	tmp := t.TempDir()
-	runtimeScript := filepath.Join(tmp, "runtime.sh")
-	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
-		"if [ \"$1\" = \"images\" ]; then\n"+
-		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"sandbox-agents:latest\" ]; then\n"+
-		"    echo found\n"+
-		"  fi\n"+
-		"  exit 0\n"+
-		"elif [ \"$1\" = \"pull\" ]; then\n"+
-		"  exit 0\n"+
-		"fi\n"), 0o755); err != nil {
-		t.Fatalf("write runtime script: %v", err)
-	}
-
-	got := ensureImage(runtimeScript, "sandbox-agents:latest")
-	if got != "sandbox-agents:latest" {
-		t.Fatalf("expected requested image, got %q", got)
-	}
-}
-
-// TestEnsureImage_UsesFallbackWhenPullFails verifies that ensureImage falls
-// back to sandbox-agents:latest when the requested image is a sandbox-agents
-// tag that is not cached and the pull fails.
-func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	tmp := t.TempDir()
-	runtimeScript := filepath.Join(tmp, "runtime.sh")
-	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
-		"if [ \"$1\" = \"images\" ]; then\n"+
-		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"sandbox-agents:latest\" ]; then\n"+
-		"    echo found\n"+
-		"  fi\n"+
-		"  exit 0\n"+
-		"elif [ \"$1\" = \"pull\" ]; then\n"+
-		"  exit 1\n"+
-		"fi\n"), 0o755); err != nil {
-		t.Fatalf("write runtime script: %v", err)
-	}
-
-	// Pre-pull fast-path skips the pull entirely for sandbox-agents images
-	// with a local fallback. To exercise the post-pull fallback branch we
-	// simulate the fast-path being unavailable by requesting a missing
-	// sandbox-agents tag while the fallback exists: ensureImage uses the
-	// fast-path before trying to pull, so the assertion still reflects that
-	// the fallback is returned, just earlier than before.
-	got := ensureImage(runtimeScript, "ghcr.io/latere-ai/sandbox-agents:v9.9.9")
-	if got != "sandbox-agents:latest" {
-		t.Fatalf("expected fallback image, got %q", got)
-	}
-}
-
-// TestEnsureImage_PrefersLocalSandboxAgentsOverPull verifies that when the
-// requested image is a sandbox-agents tag that is not present locally but
-// sandbox-agents:latest is available, ensureImage uses the local fallback
-// without performing a network pull. This mirrors the Makefile's
-// pull-images target so `wallfacer run` stays in sync with `make build`
-// for developers working from a sibling latere-ai/images checkout.
-func TestEnsureImage_PrefersLocalSandboxAgentsOverPull(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	tmp := t.TempDir()
-	pullMarker := filepath.Join(tmp, "pull.called")
-	runtimeScript := filepath.Join(tmp, "runtime.sh")
-	script := "#!/bin/sh\n" +
-		"if [ \"$1\" = \"images\" ]; then\n" +
-		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"sandbox-agents:latest\" ]; then\n" +
-		"    echo found\n" +
-		"  fi\n" +
-		"  exit 0\n" +
-		"elif [ \"$1\" = \"pull\" ]; then\n" +
-		"  touch \"" + pullMarker + "\"\n" +
-		"  exit 0\n" +
-		"fi\n"
-	if err := os.WriteFile(runtimeScript, []byte(script), 0o755); err != nil {
-		t.Fatalf("write runtime script: %v", err)
-	}
-
-	got := ensureImage(runtimeScript, "ghcr.io/latere-ai/sandbox-agents:v0.0.6")
-	if got != "sandbox-agents:latest" {
-		t.Fatalf("expected local fallback, got %q", got)
-	}
-	if _, err := os.Stat(pullMarker); err == nil {
-		t.Fatalf("expected no network pull, but pull was invoked")
-	}
-}
-
-// TestEnsureImage_DoesNotFallbackForUnrelatedImage verifies that a custom
-// non-sandbox-agents image missing locally still triggers a pull rather than
-// being silently substituted with sandbox-agents:latest. The fallback is
-// scoped to the sandbox-agents repository to avoid surprising users who
-// configured SANDBOX_IMAGE to something custom.
-func TestEnsureImage_DoesNotFallbackForUnrelatedImage(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	tmp := t.TempDir()
-	runtimeScript := filepath.Join(tmp, "runtime.sh")
-	script := "#!/bin/sh\n" +
-		"if [ \"$1\" = \"images\" ]; then\n" +
-		"  if [ \"$2\" = \"-q\" ] && [ \"$3\" = \"sandbox-agents:latest\" ]; then\n" +
-		"    echo found\n" +
-		"  fi\n" +
-		"  exit 0\n" +
-		"elif [ \"$1\" = \"pull\" ]; then\n" +
-		"  exit 0\n" +
-		"fi\n"
-	if err := os.WriteFile(runtimeScript, []byte(script), 0o755); err != nil {
-		t.Fatalf("write runtime script: %v", err)
-	}
-
-	got := ensureImage(runtimeScript, "myregistry/custom-agent:v1")
-	if got != "myregistry/custom-agent:v1" {
-		t.Fatalf("expected requested image after successful pull, got %q", got)
 	}
 }
 
@@ -716,55 +592,6 @@ func TestNormalizeBrowserVisibleHostPort(t *testing.T) {
 	}
 }
 
-// TestEnsureImage_NeitherPullNorFallback verifies that when pull fails and no
-// local fallback exists, the original image name is returned.
-func TestEnsureImage_NeitherPullNorFallback(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	tmp := t.TempDir()
-	runtimeScript := filepath.Join(tmp, "runtime.sh")
-	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
-		"if [ \"$1\" = \"images\" ]; then\n"+
-		"  exit 0\n"+ // always returns empty (no image found)
-		"fi\n"+
-		"if [ \"$1\" = \"pull\" ]; then\n"+
-		"  exit 1\n"+ // pull fails
-		"fi\n"), 0o755); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
-
-	got := ensureImage(runtimeScript, "custom-image:v1")
-	if got != "custom-image:v1" {
-		t.Fatalf("expected original image returned, got %q", got)
-	}
-}
-
-// TestEnsureImage_SameAsFallback verifies that when the requested image equals
-// the fallback image and pull fails, it still returns the image without trying
-// the fallback.
-func TestEnsureImage_SameAsFallback(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	tmp := t.TempDir()
-	runtimeScript := filepath.Join(tmp, "runtime.sh")
-	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+
-		"if [ \"$1\" = \"images\" ]; then\n"+
-		"  exit 0\n"+
-		"fi\n"+
-		"if [ \"$1\" = \"pull\" ]; then\n"+
-		"  exit 1\n"+
-		"fi\n"), 0o755); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
-
-	got := ensureImage(runtimeScript, "sandbox-agents:latest")
-	if got != "sandbox-agents:latest" {
-		t.Fatalf("expected original image, got %q", got)
-	}
-}
-
 // TestRequiresStore verifies the routing classification for store-requiring
 // and store-independent routes.
 func TestRequiresStore(t *testing.T) {
@@ -780,7 +607,7 @@ func TestRequiresStore(t *testing.T) {
 	}
 
 	storeRequired := []string{
-		"ListTasks", "CreateTask", "Health", "GetContainers",
+		"ListTasks", "CreateTask", "Health",
 	}
 	for _, name := range storeRequired {
 		if !requiresStore(name) {
