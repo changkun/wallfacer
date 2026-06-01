@@ -17,12 +17,27 @@ export interface SpecFrontmatter {
 export interface ParsedSpec {
   frontmatter: SpecFrontmatter;
   body: string;
+  /** Non-null when the document looks like it tried to declare YAML
+   *  frontmatter (starts with `---`) but the closing fence couldn't be
+   *  matched — surfacing the warning helps users spot a typo / missing
+   *  newline / stray `-` that would otherwise silently drop their
+   *  metadata. */
+  warning?: string;
 }
 
 export function parseSpecFrontmatter(text: string): ParsedSpec {
   if (!text) return { frontmatter: {}, body: '' };
   const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) return { frontmatter: {}, body: text };
+  if (!match) {
+    const looksLikeFrontmatter = /^---\s*\n/.test(text);
+    return {
+      frontmatter: {},
+      body: text,
+      warning: looksLikeFrontmatter
+        ? 'Frontmatter looks malformed: a leading `---` is present but the closing `---` line could not be matched.'
+        : undefined,
+    };
+  }
 
   const fm: SpecFrontmatter = {};
   for (const line of match[1].split('\n')) {

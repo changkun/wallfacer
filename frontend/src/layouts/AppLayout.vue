@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
+import { useHead } from '@unhead/vue';
 import { useRouter } from 'vue-router';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
@@ -34,6 +35,24 @@ onMounted(async () => {
     ui.showWorkspaces = true;
   }
 });
+
+// Browser-tab title reflects the active workspace + the count of running
+// tasks. "Wallfacer" alone when nothing's running; "Wallfacer — repo (3)"
+// when three tasks are in progress. Mirrors legacy ui/js/git.js title
+// updates.
+useHead(computed(() => {
+  const ws = store.config?.workspaces ?? [];
+  const wsLabel = ws.length === 0
+    ? ''
+    : ws.length === 1
+      ? ws[0].replace(/\/+$/, '').split('/').pop() || ws[0]
+      : `${ws.length} workspaces`;
+  const running = store.inProgress.length;
+  const parts: string[] = ['Wallfacer'];
+  if (wsLabel) parts.push(wsLabel);
+  const title = parts.join(' — ') + (running > 0 ? ` (${running})` : '');
+  return { title };
+}));
 
 const { connected } = useSse({
   url: '/api/tasks/stream',
