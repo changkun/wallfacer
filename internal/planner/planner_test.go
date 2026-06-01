@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -29,17 +28,11 @@ func TestPlannerNew(t *testing.T) {
 	if p.command != cfg.Command {
 		t.Errorf("command = %q, want %q", p.command, cfg.Command)
 	}
-	if p.image != cfg.Image {
-		t.Errorf("image = %q, want %q", p.image, cfg.Image)
-	}
 	if len(p.workspaces) != 1 || p.workspaces[0] != "/home/user/repo" {
 		t.Errorf("workspaces = %v, want [/home/user/repo]", p.workspaces)
 	}
 	if p.fingerprint != cfg.Fingerprint {
 		t.Errorf("fingerprint = %q, want %q", p.fingerprint, cfg.Fingerprint)
-	}
-	if p.network != cfg.Network {
-		t.Errorf("network = %q, want %q", p.network, cfg.Network)
 	}
 }
 
@@ -141,12 +134,6 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 	if strings.HasPrefix(spec.WorkDir, "/workspace") {
 		t.Errorf("host mode WorkDir must not be a container path, got %q", spec.WorkDir)
 	}
-	if spec.Entrypoint != "" {
-		t.Errorf("host mode spec must not carry a container entrypoint, got %q", spec.Entrypoint)
-	}
-	if len(spec.Volumes) != 0 {
-		t.Errorf("host mode spec must not carry volumes, got %d", len(spec.Volumes))
-	}
 }
 
 func TestBuildContainerSpec(t *testing.T) {
@@ -181,30 +168,20 @@ func TestBuildContainerSpec(t *testing.T) {
 	if spec.Name != "wallfacer-plan-test" {
 		t.Errorf("Name = %q, want %q", spec.Name, "wallfacer-plan-test")
 	}
-	// The host backend and the container entrypoint script both branch
-	// on WALLFACER_AGENT. Without it, host-backend planner execs error
-	// out with "WALLFACER_AGENT is missing or unknown". Regression test
-	// for a bug where planner spec didn't thread the agent through.
+	// The host backend dispatches to the right CLI based on WALLFACER_AGENT.
+	// Without it, host-backend planner execs error out with "WALLFACER_AGENT
+	// is missing or unknown". Regression test for a bug where the planner spec
+	// didn't thread the agent through.
 	if got := spec.Env["WALLFACER_AGENT"]; got != string(harness.Claude) {
 		t.Errorf("spec.Env[WALLFACER_AGENT] = %q, want %q", got, harness.Claude)
-	}
-	if spec.Image != "sandbox-agents:latest" {
-		t.Errorf("Image = %q, want %q", spec.Image, "sandbox-agents:latest")
 	}
 	if spec.EnvFile != "/tmp/test.env" {
 		t.Errorf("EnvFile = %q, want %q", spec.EnvFile, "/tmp/test.env")
 	}
-	if spec.Network != "bridge" {
-		t.Errorf("Network = %q, want %q", spec.Network, "bridge")
-	}
-	if spec.CPUs != "1.0" {
-		t.Errorf("CPUs = %q, want %q", spec.CPUs, "1.0")
-	}
-	if spec.Memory != "2g" {
-		t.Errorf("Memory = %q, want %q", spec.Memory, "2g")
-	}
-	if spec.Entrypoint != "/usr/local/bin/entrypoint.sh" {
-		t.Errorf("Entrypoint = %q, want %q", spec.Entrypoint, "/usr/local/bin/entrypoint.sh")
+	// The instructions file is surfaced to the host process via an env var,
+	// not a container mount.
+	if got := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; got != instrFile {
+		t.Errorf("spec.Env[WALLFACER_INSTRUCTIONS_PATH] = %q, want %q", got, instrFile)
 	}
 
 	// Check labels for backend worker routing.
@@ -215,124 +192,9 @@ func TestBuildContainerSpec(t *testing.T) {
 		t.Errorf("task.activity label = %q, want %q", spec.Labels["wallfacer.task.activity"], "planning")
 	}
 
-	// Check volumes.
-	wantRO := mountOpts("z", "ro")
-	wantRW := mountOpts("z")
-
-	var hasNamedConfig, hasWorkspaceRO, hasSpecsRW, hasInstructions bool
-	for _, v := range spec.Volumes {
-		switch {
-		case v.Named && v.Host == "claude-config":
-			hasNamedConfig = true
-		case v.Container == "/workspace/"+filepath.Base(tmpDir) && v.Options == wantRO:
-			hasWorkspaceRO = true
-		case v.Container == "/workspace/"+filepath.Base(tmpDir)+"/specs" && v.Options == wantRW:
-			hasSpecsRW = true
-		case v.Host == instrFile && v.Options == wantRO:
-			hasInstructions = true
-		}
-	}
-
-	if !hasNamedConfig {
-		t.Error("missing claude-config named volume")
-	}
-	if !hasWorkspaceRO {
-		t.Error("missing read-only workspace mount")
-	}
-	if !hasSpecsRW {
-		t.Error("missing read-write specs mount")
-	}
-	if !hasInstructions {
-		t.Error("missing instructions mount")
-	}
-
-	// Working directory for single workspace.
-	wantWorkDir := "/workspace/" + filepath.Base(tmpDir)
-	if spec.WorkDir != wantWorkDir {
-		t.Errorf("WorkDir = %q, want %q", spec.WorkDir, wantWorkDir)
-	}
-}
-
-func TestBuildContainerSpecMultiWorkspace(t *testing.T) {
-	tmpDir1 := t.TempDir()
-	tmpDir2 := t.TempDir()
-
-	// Create specs/ in both workspaces.
-	for _, d := range []string{tmpDir1, tmpDir2} {
-		if err := os.Mkdir(filepath.Join(d, "specs"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	p := New(Config{
-		Command:     "podman",
-		Image:       "sandbox-agents:latest",
-		Workspaces:  []string{tmpDir1, tmpDir2},
-		Fingerprint: "multi",
-	})
-
-	spec := p.buildContainerSpec("wallfacer-plan-multi", harness.Claude)
-
-	// Multi-workspace: working directory should be /workspace.
-	if spec.WorkDir != "/workspace" {
-		t.Errorf("WorkDir = %q, want %q", spec.WorkDir, "/workspace")
-	}
-
-	// Should have RO mount and RW specs mount for each workspace.
-	roCount := 0
-	rwSpecsCount := 0
-	wantRO := mountOpts("z", "ro")
-	wantRW := mountOpts("z")
-	for _, v := range spec.Volumes {
-		if v.Named {
-			continue
-		}
-		if v.Options == wantRO && !isInstructionsMount(v) {
-			roCount++
-		}
-		if v.Options == wantRW {
-			rwSpecsCount++
-		}
-	}
-
-	if roCount != 2 {
-		t.Errorf("read-only workspace mounts = %d, want 2", roCount)
-	}
-	if rwSpecsCount != 2 {
-		t.Errorf("read-write specs mounts = %d, want 2", rwSpecsCount)
-	}
-}
-
-func TestBuildContainerSpecNoSpecsDir(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	p := New(Config{
-		Command:     "podman",
-		Image:       "sandbox-agents:latest",
-		Workspaces:  []string{tmpDir},
-		Fingerprint: "nospecs",
-	})
-
-	spec := p.buildContainerSpec("wallfacer-plan-nospecs", harness.Claude)
-
-	wantRW := mountOpts("z")
-	for _, v := range spec.Volumes {
-		if v.Options == wantRW && !v.Named {
-			t.Error("should not have a read-write specs mount when specs/ dir doesn't exist")
-		}
-	}
-}
-
-func TestMountOpts(t *testing.T) {
-	got := mountOpts("z", "ro")
-	if runtime.GOOS == "linux" {
-		if got != "z,ro" {
-			t.Errorf("mountOpts on linux = %q, want %q", got, "z,ro")
-		}
-	} else {
-		if got != "ro" {
-			t.Errorf("mountOpts on non-linux = %q, want %q", got, "ro")
-		}
+	// Working directory is the host workspace path, not a container path.
+	if spec.WorkDir != tmpDir {
+		t.Errorf("WorkDir = %q, want host path %q", spec.WorkDir, tmpDir)
 	}
 }
 
@@ -343,10 +205,6 @@ func TestTruncFingerprint(t *testing.T) {
 	if got := truncFingerprint("short"); got != "short" {
 		t.Errorf("truncFingerprint short = %q, want %q", got, "short")
 	}
-}
-
-func isInstructionsMount(v executor.VolumeMount) bool {
-	return filepath.Base(v.Container) == "CLAUDE.md" || filepath.Base(v.Container) == "AGENTS.md"
 }
 
 // --- Mock types for testing ---
@@ -481,62 +339,6 @@ func TestPlannerExec_BackendError(t *testing.T) {
 	_, err := p.Exec(context.Background(), []string{"echo"})
 	if err == nil {
 		t.Error("expected error from backend")
-	}
-}
-
-// --- appendInstructionsMount Codex case ---
-
-func TestAppendInstructionsMount_Codex(t *testing.T) {
-	instrFile := filepath.Join(t.TempDir(), "AGENTS.md")
-	if err := os.WriteFile(instrFile, []byte("# agents"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	p := New(Config{
-		Command:          "podman",
-		Image:            "sandbox-agents:latest",
-		Workspaces:       []string{"/workspace/repo"},
-		InstructionsPath: instrFile,
-	})
-
-	volumes := p.appendInstructionsMount(nil, harness.Codex, []string{"repo"})
-	if len(volumes) != 1 {
-		t.Fatalf("expected 1 volume, got %d", len(volumes))
-	}
-	if !strings.Contains(volumes[0].Container, "AGENTS.md") {
-		t.Errorf("expected AGENTS.md mount, got %q", volumes[0].Container)
-	}
-}
-
-func TestAppendInstructionsMount_MultiWorkspace(t *testing.T) {
-	instrFile := filepath.Join(t.TempDir(), "CLAUDE.md")
-	if err := os.WriteFile(instrFile, []byte("# instr"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	p := New(Config{
-		Command:          "podman",
-		InstructionsPath: instrFile,
-	})
-
-	volumes := p.appendInstructionsMount(nil, harness.Claude, []string{"repo1", "repo2"})
-	if len(volumes) != 1 {
-		t.Fatalf("expected 1 volume, got %d", len(volumes))
-	}
-	if volumes[0].Container != "/workspace/CLAUDE.md" {
-		t.Errorf("expected /workspace/CLAUDE.md, got %q", volumes[0].Container)
-	}
-}
-
-func TestAppendInstructionsMount_MissingFile(t *testing.T) {
-	p := New(Config{
-		Command:          "podman",
-		InstructionsPath: "/nonexistent/path/CLAUDE.md",
-	})
-
-	volumes := p.appendInstructionsMount(nil, harness.Claude, []string{"repo"})
-	if len(volumes) != 0 {
-		t.Errorf("expected no volumes for missing instructions file, got %d", len(volumes))
 	}
 }
 

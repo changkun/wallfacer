@@ -151,32 +151,6 @@ func containsConsecutive(slice []string, needle1, needle2 string) bool {
 // and the file exists, buildContainerArgs includes a read-only volume mount
 // that places it at /workspace/CLAUDE.md inside the container.
 
-// TestContainerArgsNoInstructionsPath verifies that when InstructionsPath is
-// empty no CLAUDE.md mount is added to the container args.
-func TestContainerArgsNoInstructionsPath(t *testing.T) {
-	runner := newTestRunnerWithInstructions(t, "")
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-	for _, a := range args {
-		if strings.Contains(a, "CLAUDE.md") {
-			t.Fatalf("expected no CLAUDE.md mount when InstructionsPath is empty; got arg: %q", a)
-		}
-	}
-}
-
-// TestContainerArgsMissingInstructionsFile verifies that when instructionsPath
-// is set but the file does not exist, no CLAUDE.md mount is added (the runner
-// silently skips a missing file rather than failing the container launch).
-func TestContainerArgsMissingInstructionsFile(t *testing.T) {
-	missingPath := filepath.Join(t.TempDir(), "nonexistent.md")
-	runner := newTestRunnerWithInstructions(t, missingPath)
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-	for _, a := range args {
-		if strings.Contains(a, "CLAUDE.md") {
-			t.Fatalf("expected no CLAUDE.md mount for missing file; got arg: %q", a)
-		}
-	}
-}
-
 // TestContainerArgsCLAUDEMDMountIsReadOnly verifies the mount is marked :ro
 // so the container cannot accidentally modify the shared instructions file.
 
@@ -191,36 +165,6 @@ func TestContainerArgsMissingInstructionsFile(t *testing.T) {
 
 // TestContainerArgsCodexMountsAGENTSMD verifies that codex sandbox mounts
 // workspace instructions at /workspace/AGENTS.md.
-
-func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
-		InstructionsPath: instructionsFile,
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
-	found := false
-	for _, a := range args {
-		if a == "sandbox-agents:latest" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("codex sandbox should use codex image; got args: %v", args)
-	}
-}
 
 func TestHostCodexAuthStatus_Valid(t *testing.T) {
 	codexAuthDir := t.TempDir()
@@ -270,18 +214,6 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 
 // TestBuildContainerArgs_BoardMount verifies that a non-empty boardDir adds
 // a read-only mount at /workspace/.tasks.
-
-// TestBuildContainerArgs_NoBoardMount verifies that an empty boardDir does
-// not add a .tasks mount.
-func TestBuildContainerArgs_NoBoardMount(t *testing.T) {
-	runner := newTestRunnerWithInstructions(t, "")
-	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
-	for _, a := range args {
-		if strings.Contains(a, ".tasks") {
-			t.Fatalf("should not have .tasks mount when boardDir is empty; found %q", a)
-		}
-	}
-}
 
 // TestBuildContainerArgs_SiblingMounts verifies that sibling worktree mounts
 // are added as read-only volumes under /workspace/.tasks/worktrees/.

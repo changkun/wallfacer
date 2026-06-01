@@ -20,31 +20,6 @@ func newHostModeRunner(t *testing.T, cfg RunnerConfig) *Runner {
 	return r
 }
 
-func TestBuildContainerSpec_HostMode_NoMounts(t *testing.T) {
-	workDir := t.TempDir()
-	r := newHostModeRunner(t, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "test:latest",
-		Workspaces:   []string{workDir},
-		WorktreesDir: t.TempDir(),
-	})
-
-	spec := r.buildContainerSpecForSandbox(
-		"wallfacer-host", "task-1", "do work", "",
-		nil, "", nil, "", harness.Claude,
-	)
-
-	if len(spec.Volumes) != 0 {
-		t.Errorf("expected no volumes in host mode, got %d: %+v", len(spec.Volumes), spec.Volumes)
-	}
-	// Check no /workspace/* container paths slipped through anywhere.
-	for _, v := range spec.Volumes {
-		if strings.HasPrefix(v.Container, "/workspace") {
-			t.Errorf("host mode leaked container path: %q", v.Container)
-		}
-	}
-}
-
 func TestBuildContainerSpec_HostMode_WorkDirIsHostPath(t *testing.T) {
 	workspace := t.TempDir()
 	worktree := t.TempDir()
@@ -159,25 +134,6 @@ func TestBuildContainerSpec_HostMode_NoSiblingsSkipsManifest(t *testing.T) {
 	// No manifest file should be written either.
 	if _, err := os.Stat(filepath.Join(boardDir, "sibling_worktrees.json")); err == nil {
 		t.Error("manifest file should not be written when no siblings exist")
-	}
-}
-
-func TestBuildContainerSpec_HostMode_EntrypointCleared(t *testing.T) {
-	workspace := t.TempDir()
-	r := newHostModeRunner(t, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "test:latest",
-		Workspaces:   []string{workspace},
-		WorktreesDir: t.TempDir(),
-	})
-
-	spec := r.buildContainerSpecForSandbox(
-		"wallfacer-host", "task-1", "do work", "",
-		nil, "", nil, "", harness.Claude,
-	)
-
-	if spec.Entrypoint != "" {
-		t.Errorf("host-mode Entrypoint = %q; want empty (no dispatcher in host mode)", spec.Entrypoint)
 	}
 }
 
