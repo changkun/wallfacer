@@ -111,20 +111,46 @@ interface OversightPhase {
 }
 const oversightStatus = ref('');
 const oversightPhases = ref<OversightPhase[]>([]);
-let oversightLoaded = false;
+const oversightError = ref('');
+let oversightTimer: ReturnType<typeof setTimeout> | null = null;
+let oversightTaskId = '';
+
+function stopOversightPolling() {
+  if (oversightTimer) { clearTimeout(oversightTimer); oversightTimer = null; }
+}
 
 async function fetchOversight() {
-  if (oversightLoaded) return;
-  oversightLoaded = true;
+  // Reset state if the user switched to a different task while keeping the
+  // Activity tab open.
+  if (oversightTaskId !== props.task.id) {
+    stopOversightPolling();
+    oversightTaskId = props.task.id;
+    oversightStatus.value = '';
+    oversightPhases.value = [];
+    oversightError.value = '';
+  }
   try {
-    const data = await api<{ status?: string; phases?: OversightPhase[] }>(
+    const data = await api<{ status?: string; phases?: OversightPhase[]; error?: string }>(
       'GET',
       `/api/tasks/${props.task.id}/oversight`,
     );
     oversightStatus.value = data?.status ?? '';
     oversightPhases.value = data?.phases ?? [];
+    oversightError.value = data?.error ?? '';
+    // The server emits status === 'generating' (or no status yet) while the
+    // summary is being produced. Re-poll every 3 s until it transitions —
+    // mirrors ui/js/modal-oversight.js line 73. Stop on ready / failed /
+    // error or when the tab unmounts.
+    if (data?.status === 'generating' || data?.status === 'pending') {
+      oversightTimer = setTimeout(() => {
+        if (mainTab.value === 'activity' && oversightTaskId === props.task.id) {
+          void fetchOversight();
+        }
+      }, 3000);
+    }
   } catch {
     oversightStatus.value = 'error';
+    oversightError.value = '';
   }
 }
 
@@ -254,7 +280,10 @@ onMounted(() => {
     mainTab.value = 'activity';
   }
 });
-onUnmounted(() => document.removeEventListener('keydown', onKeydown));
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown);
+  stopOversightPolling();
+});
 
 const status = computed(() => props.task.status);
 const isBacklog = computed(() => status.value === 'backlog');
@@ -400,7 +429,9 @@ const isArchived = computed(() => !!props.task.archived);
                           </div>
                         </div>
                       </div>
+                      <div v-else-if="oversightStatus === 'pending'" class="text-xs text-v-muted">Oversight summary not yet generated.</div>
                       <div v-else-if="oversightStatus === 'generating'" class="text-xs text-v-muted">Generating oversight summary…</div>
+                      <div v-else-if="oversightStatus === 'failed'" class="text-xs" style="color: var(--err, #c0392b);">Oversight generation failed{{ oversightError ? `: ${oversightError}` : '' }}</div>
 
                       <!-- Pretty activity rows (thinking / tool calls / results / text). -->
                       <div v-if="activity.length" class="ta-activity-log">
