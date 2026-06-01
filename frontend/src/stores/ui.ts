@@ -14,7 +14,6 @@ export const useUiStore = defineStore('ui', () => {
   const showSettings = ref(false);
   const showWorkspaces = ref(false);
   const showPalette = ref(false);
-  const showContainers = ref(false);
   const showInstructions = ref(false);
   const showSystemPrompts = ref(false);
   const showTemplates = ref(false);
@@ -53,8 +52,6 @@ export const useUiStore = defineStore('ui', () => {
   function openPalette() { showPalette.value = true; }
   function openPaletteWith(seed: string) { paletteSeed.value = seed; showPalette.value = true; }
   function closePalette() { showPalette.value = false; }
-  function openContainers() { showContainers.value = true; }
-  function closeContainers() { showContainers.value = false; }
   function openInstructions() { showSettings.value = false; showInstructions.value = true; }
   function closeInstructions() { showInstructions.value = false; }
   function openSystemPrompts() { showSettings.value = false; showSystemPrompts.value = true; }
@@ -68,7 +65,7 @@ export const useUiStore = defineStore('ui', () => {
   function closeShortcuts() { showShortcuts.value = false; }
 
   return {
-    showSettings, showWorkspaces, showPalette, showContainers,
+    showSettings, showWorkspaces, showPalette,
     showInstructions, showSystemPrompts, showTemplates, showTerminal,
     showShortcuts, showArchived, setShowArchived,
     dispatchedIds, markDispatched, consumeDispatched,
@@ -76,7 +73,7 @@ export const useUiStore = defineStore('ui', () => {
     openSettings, closeSettings,
     openWorkspaces, closeWorkspaces,
     openPalette, openPaletteWith, closePalette,
-    openContainers, closeContainers,
+
     openInstructions, closeInstructions,
     openSystemPrompts, closeSystemPrompts,
     openTemplates, closeTemplates,
