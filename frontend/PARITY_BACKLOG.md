@@ -32,8 +32,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] command-palette — "Sync with default" action for waiting/failed
 - [ ] templates — searchable anchored template picker (live filter, body preview, Esc/outside-click)
 - [ ] tasks — dependency picker search dropdown (auto-focus, filter, outside-click close)
-- [ ] tasks — tag input: Backspace removes last tag on empty; comma commits
-- [ ] tasks — flow-select updates composer placeholder/data-task-flow
+- [x] tasks — tag input: Backspace removes last tag on empty; comma commits
+- [x] tasks — flow-select updates composer placeholder/data-task-flow
 - [ ] workspace — browser folder create (/api/workspaces/mkdir) + rename (/api/workspaces/rename)
 - [x] workspace — per-group max-parallel override (done earlier in SettingsTabWorkspace)
 - [ ] render — hide system routines (kind=routine + system:* tag) from board

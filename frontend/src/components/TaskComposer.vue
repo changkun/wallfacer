@@ -2,7 +2,7 @@
 import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
-import { parseTags, splitBatch } from '../lib/composer';
+import { splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
@@ -32,8 +32,33 @@ const flows = ref<FlowOption[]>([]);
 const flow = ref('implement');
 const templates = ref<PromptTemplate[]>([]);
 const templatePick = ref('');
-const tagsInput = ref('');
+// Tag chips: committed tags + a pending draft. comma/Enter commit the draft;
+// Backspace on an empty draft removes the last chip. Mirrors legacy tasks.js.
+const tags = ref<string[]>([]);
+const tagDraft = ref('');
+function commitTag() {
+  const raw = tagDraft.value.trim().replace(/,$/, '').trim();
+  tagDraft.value = '';
+  if (raw && !tags.value.includes(raw)) tags.value.push(raw);
+}
+function onTagKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commitTag(); return; }
+  if (e.key === 'Backspace' && tagDraft.value === '' && tags.value.length) {
+    e.preventDefault();
+    tags.value.pop();
+  }
+}
+function removeTag(i: number) { tags.value.splice(i, 1); }
+// A trailing comma typed/pasted into the draft auto-commits.
+watch(tagDraft, (v) => { if (v.includes(',')) { tagDraft.value = v.replace(/,/g, ''); commitTag(); } });
+
 const timeoutMin = ref<number | null>(null);
+
+// Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
+const promptPlaceholder = computed(() => {
+  const f = flow.value || 'implement';
+  return `Describe the task… (flow: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
+});
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
 const model = ref('');
@@ -117,7 +142,7 @@ async function expand() {
 function collapse() {
   expanded.value = false;
   prompt.value = '';
-  tagsInput.value = '';
+  tags.value = []; tagDraft.value = '';
   timeoutMin.value = null;
   showMore.value = false;
   model.value = '';
@@ -138,7 +163,7 @@ async function submitRoutine(text: string): Promise<void> {
     interval_minutes: minutes,
     spawn_flow: flow.value || 'implement',
     timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
-    tags: parseTags(tagsInput.value),
+    tags: tags.value.slice(),
   });
 }
 
@@ -154,7 +179,7 @@ async function submit() {
     }
     const sharedOpts = {
       flow: flow.value || undefined,
-      tags: parseTags(tagsInput.value),
+      tags: tags.value.slice(),
       timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
       model: model.value.trim() || undefined,
       maxCostUsd: maxCostUsd.value ?? undefined,
@@ -190,7 +215,7 @@ async function submit() {
     }
 
     prompt.value = '';
-    tagsInput.value = '';
+    tags.value = []; tagDraft.value = '';
     timeoutMin.value = null;
     model.value = '';
     maxCostUsd.value = null;
@@ -244,7 +269,7 @@ function onInput(e: Event) {
         ref="textareaRef"
         v-model="prompt"
         class="composer__prompt"
-        :placeholder="`Describe the task… (Markdown supported, @ to mention files, ${modKey}↵ to save)`"
+        :placeholder="promptPlaceholder"
         rows="4"
         @keydown="onKeydown"
         @input="onInput"
@@ -271,13 +296,21 @@ function onInput(e: Event) {
       </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Tags</span>
-        <input
-          v-model="tagsInput"
-          class="composer__input"
-          type="text"
-          placeholder="comma,separated"
-          aria-label="Tags"
-        />
+        <div class="composer__tags">
+          <span v-for="(tag, i) in tags" :key="tag" class="composer__tag-chip">
+            {{ tag }}
+            <button type="button" class="composer__tag-x" title="Remove tag" @click="removeTag(i)">×</button>
+          </span>
+          <input
+            v-model="tagDraft"
+            class="composer__tag-input"
+            type="text"
+            :placeholder="tags.length ? '' : 'tag, tag…'"
+            aria-label="Add tag"
+            @keydown="onTagKeydown"
+            @blur="commitTag"
+          />
+        </div>
       </label>
       <label class="composer__opt">
         <span class="composer__opt-label">Timeout</span>
@@ -456,6 +489,29 @@ function onInput(e: Event) {
   outline: none;
 }
 .composer__input--num { width: 72px; }
+.composer__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  min-height: 28px;
+}
+.composer__tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 1px 4px 1px 6px;
+  font-size: 11px;
+}
+.composer__tag-x { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 13px; line-height: 1; padding: 0 2px; }
+.composer__tag-x:hover { color: var(--text); }
+.composer__tag-input { flex: 1; min-width: 60px; background: none; border: none; outline: none; color: var(--text); font-size: 12px; }
 .composer__select:focus,
 .composer__input:focus { border-color: var(--accent); }
 .composer__more {
