@@ -83,7 +83,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] tasks — routine creation interval/repeat controls detail
 - [ ] command-palette — doc search title-prefix bonus scoring
 - [ ] command-palette — remote/local result distinction + server snippet field
-- [ ] mention — file ranking path-substring boost
+- [x] mention — file ranking path-substring boost
 - [ ] status-bar — terminal panel height persisted
 - [x] explorer — Task Prompts relative updated_at timestamp
 - [x] explorer — md rendered/raw toggle (DONE earlier)
