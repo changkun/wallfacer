@@ -37,6 +37,22 @@ describe('parseActivity', () => {
     expect(rows[1].summary).toBe('Done — created the file.');
   });
 
+  it('collapses long thinking blocks behind a "+N lines" expander', () => {
+    const thinking = Array.from({ length: 9 }, (_, i) => `line ${i + 1}`).join('\n');
+    const raw = ndjson({ type: 'assistant', message: { content: [{ type: 'thinking', thinking }] } });
+    const row = parseActivity(raw)[0];
+    expect(row.kind).toBe('thinking');
+    expect(row.detailLabel).toBe('+4 lines'); // 9 lines - 5 preview
+    expect(row.detail).toBe(thinking);
+  });
+
+  it('short thinking blocks have no expander', () => {
+    const raw = ndjson({ type: 'assistant', message: { content: [{ type: 'thinking', thinking: 'a\nb' }] } });
+    const row = parseActivity(raw)[0];
+    expect(row.detailLabel).toBeUndefined();
+    expect(row.detail).toBeUndefined();
+  });
+
   it('skips empty assistant text blocks', () => {
     const raw = ndjson({ type: 'assistant', message: { content: [{ type: 'text', text: '   ' }] } });
     expect(parseActivity(raw)).toEqual([]);

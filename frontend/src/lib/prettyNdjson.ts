@@ -12,9 +12,15 @@ export interface ActivityRow {
   summary?: string;
   /** Optional full body, only set when summary alone is truncated. */
   detail?: string;
+  /** Expander label, e.g. "+12 lines" for long thinking blocks. */
+  detailLabel?: string;
   /** True for entries that should default to expanded (errors). */
   defaultOpen?: boolean;
 }
+
+// Thinking blocks preview the first few lines; the rest collapses behind a
+// "+N lines" expander (mirrors ui/js/modal-ndjson.js).
+const THINKING_PREVIEW_LINES = 5;
 
 interface ContentBlock {
   type?: string;
@@ -93,11 +99,14 @@ export function parseActivity(raw: string): ActivityRow[] {
           });
         } else if (block.type === 'thinking') {
           const text = block.thinking ?? '';
+          const lineCount = text.split('\n').length;
+          const manyLines = lineCount > THINKING_PREVIEW_LINES;
           out.push({
             kind: 'thinking',
             label: 'thinking',
             summary: truncate(text),
-            detail: text.length > MAX_SUMMARY ? text : undefined,
+            detail: manyLines || text.length > MAX_SUMMARY ? text : undefined,
+            detailLabel: manyLines ? `+${lineCount - THINKING_PREVIEW_LINES} lines` : undefined,
           });
         } else if (block.type === 'text') {
           const text = block.text ?? '';

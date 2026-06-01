@@ -804,7 +804,7 @@ const isArchived = computed(() => !!props.task.archived);
                             <span class="ta-activity-label">{{ row.label }}</span>
                             <span v-if="row.summary" class="ta-activity-summary">{{ row.summary }}</span>
                             <details v-if="row.detail" class="ta-activity-detail" :open="row.defaultOpen">
-                              <summary>details</summary>
+                              <summary>{{ row.detailLabel || 'details' }}</summary>
                               <pre>{{ row.detail }}</pre>
                             </details>
                           </div>
