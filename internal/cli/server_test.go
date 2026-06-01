@@ -30,10 +30,10 @@ func TestInitServer(t *testing.T) {
 	}
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
@@ -624,10 +624,10 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 	}
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
@@ -669,10 +669,10 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 	}
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
@@ -700,10 +700,10 @@ func TestInitServer_PortFallback(t *testing.T) {
 
 	// Now try to init server on the same port.
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         fmt.Sprintf(":%d", occupiedPort),
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      fmt.Sprintf(":%d", occupiedPort),
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
@@ -727,10 +727,10 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 	t.Setenv("WALLFACER_TOMBSTONE_RETENTION_DAYS", "30")
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 
@@ -749,10 +749,10 @@ func TestShutdown_WithPlannerRunning(t *testing.T) {
 	}
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 
 	// Planner is initialized but not running, so Shutdown should handle it.
@@ -769,10 +769,10 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 	}
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
 	}, testFS(t), testFS(t), testFS(t))
 
 	// Start serving so that Shutdown has something to shut down.
@@ -791,11 +791,11 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 	}
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    "text",
-		Addr:         ":0",
-		DataDir:      filepath.Join(configDir, "data"),
-		EnvFile:      envFile,
-		SkipCSRF:     true,
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
+		SkipCSRF:  true,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
 

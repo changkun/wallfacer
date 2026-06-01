@@ -86,7 +86,10 @@ describe("spec-explorer first-spec choreography gating", () => {
     expect(h.triggerSpy).not.toHaveBeenCalled();
     h.emit(WITH_SPECS); // user creates their first spec
     expect(h.triggerSpy).toHaveBeenCalledTimes(1);
-    expect(h.triggerSpy).toHaveBeenCalledWith("specs/local/foo.md", "/workspace/repo");
+    expect(h.triggerSpy).toHaveBeenCalledWith(
+      "specs/local/foo.md",
+      "/workspace/repo",
+    );
   });
 
   it("does not re-fire once the transition has happened", () => {

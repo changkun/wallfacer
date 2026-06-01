@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
 func TestContainerSpecBasicRoundTrip(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "mycontainer", Image: "myimage:latest"}
+	spec := executor.ContainerSpec{Name: "mycontainer", Image: "myimage:latest"}
 	got := spec.Build()
 	want := []string{"run", "--rm", "--network=host", "--name", "mycontainer", "myimage:latest"}
 	if !reflect.DeepEqual(got, want) {
@@ -24,7 +24,7 @@ func TestContainerSpecBasicRoundTrip(t *testing.T) {
 
 // TestContainerSpecNetworkNone asserts that Network="none" produces --network=none.
 func TestContainerSpecNetworkNone(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "c", Image: "img", Network: "none"}
+	spec := executor.ContainerSpec{Name: "c", Image: "img", Network: "none"}
 	got := spec.Build()
 	if !containsConsecutiveSingle(got, "--network=none") {
 		t.Errorf("expected --network=none in args; got %v", got)
@@ -38,7 +38,7 @@ func TestContainerSpecNetworkNone(t *testing.T) {
 
 // TestContainerSpecNetworkEmptyFallback asserts that an empty Network falls back to --network=host.
 func TestContainerSpecNetworkEmptyFallback(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "c", Image: "img", Network: ""}
+	spec := executor.ContainerSpec{Name: "c", Image: "img", Network: ""}
 	got := spec.Build()
 	if !containsConsecutiveSingle(got, "--network=host") {
 		t.Errorf("expected --network=host fallback when Network is empty; got %v", got)
@@ -57,7 +57,7 @@ func containsConsecutiveSingle(args []string, s string) bool {
 
 func TestContainerSpecEmptyEnvProducesNoFlags(t *testing.T) {
 	for _, env := range []map[string]string{nil, {}} {
-		spec := sandbox.ContainerSpec{Name: "n", Image: "img", Env: env}
+		spec := executor.ContainerSpec{Name: "n", Image: "img", Env: env}
 		args := spec.Build()
 		for _, a := range args {
 			if a == "-e" {
@@ -69,7 +69,7 @@ func TestContainerSpecEmptyEnvProducesNoFlags(t *testing.T) {
 }
 
 func TestContainerSpecEmptyVolumesProducesNoFlags(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "n", Image: "img", Volumes: nil}
+	spec := executor.ContainerSpec{Name: "n", Image: "img", Volumes: nil}
 	args := spec.Build()
 	for _, a := range args {
 		if a == "-v" || a == "--mount" {
@@ -80,7 +80,7 @@ func TestContainerSpecEmptyVolumesProducesNoFlags(t *testing.T) {
 }
 
 func TestContainerSpecLabels(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:   "n",
 		Image:  "img",
 		Labels: map[string]string{"b": "2", "a": "1"},
@@ -95,7 +95,7 @@ func TestContainerSpecLabels(t *testing.T) {
 }
 
 func TestContainerSpecEnvFile(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "n", Image: "img", EnvFile: "/path/to/.env"}
+	spec := executor.ContainerSpec{Name: "n", Image: "img", EnvFile: "/path/to/.env"}
 	args := spec.Build()
 	if !containsConsecutive(args, "--env-file", "/path/to/.env") {
 		t.Errorf("expected --env-file /path/to/.env; got %v", args)
@@ -103,7 +103,7 @@ func TestContainerSpecEnvFile(t *testing.T) {
 }
 
 func TestContainerSpecEnv(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
 		Env:   map[string]string{"FOO": "bar", "BAZ": "qux"},
@@ -118,10 +118,10 @@ func TestContainerSpecEnv(t *testing.T) {
 }
 
 func TestContainerSpecVolumeWithOptions(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
-		Volumes: []sandbox.VolumeMount{
+		Volumes: []executor.VolumeMount{
 			{Host: "/host/path", Container: "/container/path", Options: "z,ro"},
 		},
 	}
@@ -132,10 +132,10 @@ func TestContainerSpecVolumeWithOptions(t *testing.T) {
 }
 
 func TestContainerSpecVolumeWithoutOptions(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
-		Volumes: []sandbox.VolumeMount{
+		Volumes: []executor.VolumeMount{
 			{Host: "/host/path", Container: "/container/path"},
 		},
 	}
@@ -146,10 +146,10 @@ func TestContainerSpecVolumeWithoutOptions(t *testing.T) {
 }
 
 func TestContainerSpecVolumeWithColonInPath(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
-		Volumes: []sandbox.VolumeMount{
+		Volumes: []executor.VolumeMount{
 			{Host: "/path/with:colon", Container: "/workspace/myrepo", Options: "z"},
 		},
 	}
@@ -161,10 +161,10 @@ func TestContainerSpecVolumeWithColonInPath(t *testing.T) {
 }
 
 func TestContainerSpecVolumeWithUnicodePath(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
-		Volumes: []sandbox.VolumeMount{
+		Volumes: []executor.VolumeMount{
 			{Host: "/home/user/我的项目", Container: "/workspace/我的项目", Options: "z"},
 		},
 	}
@@ -175,7 +175,7 @@ func TestContainerSpecVolumeWithUnicodePath(t *testing.T) {
 }
 
 func TestContainerSpecWorkDir(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "n", Image: "img", WorkDir: "/workspace/myrepo"}
+	spec := executor.ContainerSpec{Name: "n", Image: "img", WorkDir: "/workspace/myrepo"}
 	args := spec.Build()
 	if !containsConsecutive(args, "-w", "/workspace/myrepo") {
 		t.Errorf("expected -w /workspace/myrepo; got %v", args)
@@ -196,7 +196,7 @@ func TestContainerSpecWorkDir(t *testing.T) {
 }
 
 func TestContainerSpecEmptyWorkDirOmitted(t *testing.T) {
-	spec := sandbox.ContainerSpec{Name: "n", Image: "img", WorkDir: ""}
+	spec := executor.ContainerSpec{Name: "n", Image: "img", WorkDir: ""}
 	args := spec.Build()
 	for _, a := range args {
 		if a == "-w" {
@@ -207,7 +207,7 @@ func TestContainerSpecEmptyWorkDirOmitted(t *testing.T) {
 }
 
 func TestContainerSpecExtraFlags(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:       "n",
 		Image:      "img",
 		WorkDir:    "/work",
@@ -236,7 +236,7 @@ func TestContainerSpecExtraFlags(t *testing.T) {
 }
 
 func TestContainerSpecCmd(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
 		Cmd:   []string{"-p", "do something", "--verbose"},
@@ -260,7 +260,7 @@ func TestContainerSpecCmd(t *testing.T) {
 }
 
 func TestContainerSpecLabelOrder(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:   "n",
 		Image:  "img",
 		Labels: map[string]string{"b": "2", "a": "1"},
@@ -285,7 +285,7 @@ func TestContainerSpecLabelOrder(t *testing.T) {
 }
 
 func TestContainerSpecEnvOrder(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Name:  "n",
 		Image: "img",
 		Env:   map[string]string{"Z_KEY": "z", "A_KEY": "a"},
@@ -310,7 +310,7 @@ func TestContainerSpecEnvOrder(t *testing.T) {
 
 func TestContainerSpecEmptyNameAllowed(t *testing.T) {
 	// Zero-value struct must not panic.
-	spec := sandbox.ContainerSpec{}
+	spec := executor.ContainerSpec{}
 	got := spec.Build()
 	// Should at minimum contain the fixed prefix tokens.
 	if len(got) < 4 {
@@ -319,7 +319,7 @@ func TestContainerSpecEmptyNameAllowed(t *testing.T) {
 }
 
 func TestContainerSpecFullArgs(t *testing.T) {
-	spec := sandbox.ContainerSpec{
+	spec := executor.ContainerSpec{
 		Runtime: "/opt/podman/bin/podman",
 		Name:    "wallfacer-task-abc12345",
 		Image:   "sandbox-agents:latest",
@@ -329,7 +329,7 @@ func TestContainerSpecFullArgs(t *testing.T) {
 		},
 		EnvFile: "/home/user/.wallfacer/.env",
 		Env:     map[string]string{"CLAUDE_CODE_MODEL": "claude-opus-4-6"},
-		Volumes: []sandbox.VolumeMount{
+		Volumes: []executor.VolumeMount{
 			{Host: "claude-config", Container: "/home/agent/.claude", Named: true},
 			{Host: "/repos/myproject", Container: "/workspace/myproject", Options: "z"},
 			{Host: "/instructions/CLAUDE.md", Container: "/workspace/CLAUDE.md", Options: "z,ro"},

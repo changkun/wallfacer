@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -381,7 +381,7 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 
 func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h := newTestHandler(t)
-	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*sandbox.HostBackend); ok {
+	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*executor.HostBackend); ok {
 		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}

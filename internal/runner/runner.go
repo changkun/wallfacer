@@ -14,6 +14,7 @@ import (
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
@@ -26,7 +27,6 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/yamlwatch"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -34,7 +34,7 @@ import (
 
 // ListContainers returns structured info for each wallfacer container known
 // to the sandbox backend. Supports both Podman and Docker JSON output formats.
-func (r *Runner) ListContainers() ([]sandbox.ContainerInfo, error) {
+func (r *Runner) ListContainers() ([]executor.ContainerInfo, error) {
 	return r.backend.List(context.Background())
 }
 
@@ -165,7 +165,7 @@ type Runner struct {
 	liveLogs               syncmap.Map[uuid.UUID, *liveLog] // live log buffers for in-progress turns
 	oversightMu            keyedmu.Map[string]              // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker          // circuit breaker for container launch operations
-	backend                sandbox.Backend                  // pluggable sandbox backend (local podman/docker, host, future: k8s)
+	backend                executor.Backend                 // pluggable sandbox backend (local podman/docker, host, future: k8s)
 	hostMode               bool                             // true when backend is a HostBackend (no container, no /workspace/* paths)
 	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
@@ -497,7 +497,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	cbThreshold := envutil.IntMin("WALLFACER_CONTAINER_CB_THRESHOLD", constants.DefaultCBThreshold, 1)
 	cbOpenSec := envutil.IntMin("WALLFACER_CONTAINER_CB_OPEN_SECONDS", 30, 1)
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
-	hb, err := sandbox.NewHostBackend(sandbox.HostBackendConfig{
+	hb, err := executor.NewHostBackend(executor.HostBackendConfig{
 		ClaudeBinary: cfg.HostClaudeBinary,
 		CodexBinary:  cfg.HostCodexBinary,
 	})
@@ -783,7 +783,7 @@ func (r *Runner) SandboxImage() string {
 }
 
 // SandboxBackend returns the sandbox backend used for container operations.
-func (r *Runner) SandboxBackend() sandbox.Backend {
+func (r *Runner) SandboxBackend() executor.Backend {
 	return r.backend
 }
 
@@ -916,8 +916,8 @@ func (r *Runner) KillContainer(taskID uuid.UUID) {
 
 // WorkerStats returns zero values. Retained on the interface for downstream
 // callers; the host backend does not manage worker containers.
-func (r *Runner) WorkerStats() sandbox.WorkerStatsInfo {
-	return sandbox.WorkerStatsInfo{}
+func (r *Runner) WorkerStats() executor.WorkerStatsInfo {
+	return executor.WorkerStatsInfo{}
 }
 
 // StopTaskWorker is a no-op under the host backend.

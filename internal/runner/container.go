@@ -11,10 +11,10 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -87,7 +87,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 	sb harness.ID,
-) sandbox.ContainerSpec {
+) executor.ContainerSpec {
 	// Resolve model once: override takes priority, then env default.
 	model := modelOverride
 	if model == "" {
@@ -127,7 +127,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 			}
 			basename := sanitizeBasename(ws)
 			basenames = append(basenames, basename)
-			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+			spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 				Host:      hostPath,
 				Container: "/workspace/" + basename,
 				Options:   mountOpts("z"),
@@ -157,12 +157,12 @@ func (r *Runner) buildContainerSpecForSandbox(
 						altGitDir := "/wallfacer-git/" + basename
 						if pf := containerGitPointerFile(wt, gitDir, altGitDir); pf != "" {
 							spec.Volumes = append(spec.Volumes,
-								sandbox.VolumeMount{Host: gitDir, Container: altGitDir, Options: mountOpts("z")},
-								sandbox.VolumeMount{Host: pf, Container: wtContainerPath + "/.git", Options: mountOpts("z")},
+								executor.VolumeMount{Host: gitDir, Container: altGitDir, Options: mountOpts("z")},
+								executor.VolumeMount{Host: pf, Container: wtContainerPath + "/.git", Options: mountOpts("z")},
 							)
 						}
 					} else {
-						spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+						spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 							Host:      gitDir,
 							Container: gitDir,
 							Options:   mountOpts("z"),
@@ -170,7 +170,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 						// Also mount at the symlink-resolved path if it differs
 						// (e.g. macOS /var -> /private/var).
 						if resolved, err := filepath.EvalSymlinks(gitDir); err == nil && resolved != gitDir {
-							spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+							spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 								Host:      gitDir,
 								Container: resolved,
 								Options:   mountOpts("z"),
@@ -191,7 +191,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 
 	// Board context: mount board.json read-only at /workspace/.tasks/.
 	if boardDir != "" {
-		spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+		spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 			Host:      boardDir,
 			Container: "/workspace/.tasks",
 			Options:   mountOpts("z", "ro"),
@@ -216,7 +216,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 			wtPath := repos[repoPath]
 			basename := sanitizeBasename(repoPath)
 			containerPath := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
-			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+			spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 				Host:      wtPath,
 				Container: containerPath,
 				Options:   mountOpts("z", "ro"),
@@ -255,13 +255,13 @@ func (r *Runner) buildContainerSpecForSandbox(
 // The returned spec has Entrypoint cleared (the host binary is the CLI
 // itself — no dispatcher entrypoint to invoke).
 func (r *Runner) buildHostSpec(
-	spec sandbox.ContainerSpec,
+	spec executor.ContainerSpec,
 	prompt, model, sessionID string,
 	_ harness.ID,
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
-) sandbox.ContainerSpec {
+) executor.ContainerSpec {
 	// The agents-image entrypoint is meaningless on the host — we invoke
 	// the CLI binary directly.
 	spec.Entrypoint = ""
@@ -348,7 +348,7 @@ func instructionsFilenameForSandbox(sb harness.ID) string {
 // stays anchored to the repo root. For multiple workspaces the file is
 // mounted at /workspace/ so it is accessible from the common root.
 // It is a no-op when instructionsPath is empty or does not exist on the host.
-func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb harness.ID, basenames []string) []sandbox.VolumeMount {
+func (r *Runner) appendInstructionsMount(volumes []executor.VolumeMount, sb harness.ID, basenames []string) []executor.VolumeMount {
 	instrPath := r.currentInstructionsPath()
 	if instrPath == "" {
 		return volumes
@@ -361,7 +361,7 @@ func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb harne
 	if len(basenames) == 1 {
 		containerPath = "/workspace/" + basenames[0] + "/" + filename
 	}
-	return append(volumes, sandbox.VolumeMount{
+	return append(volumes, executor.VolumeMount{
 		Host:      instrPath,
 		Container: containerPath,
 		Options:   mountOpts("z", "ro"),
@@ -399,12 +399,12 @@ func buildAgentCmd(prompt, model string) []string {
 // startup, so the directory itself must remain writable inside the
 // container. Mounting the whole dir read-only would break the CLI;
 // mounting it read-write would let the container clobber host state.
-func (r *Runner) appendCodexAuthMount(volumes []sandbox.VolumeMount, sb harness.ID) []sandbox.VolumeMount {
+func (r *Runner) appendCodexAuthMount(volumes []executor.VolumeMount, sb harness.ID) []executor.VolumeMount {
 	if sb != harness.Codex {
 		return volumes
 	}
 	if hostDir := r.hostCodexAuthPath(); hostDir != "" {
-		volumes = append(volumes, sandbox.VolumeMount{
+		volumes = append(volumes, executor.VolumeMount{
 			Host:      filepath.Join(hostDir, "auth.json"),
 			Container: "/home/agent/.codex/auth.json",
 			Options:   mountOpts("z", "ro"),
@@ -467,8 +467,8 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.ID) sandbox.ContainerSpec {
-	spec := sandbox.ContainerSpec{
+func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.ID) executor.ContainerSpec {
+	spec := executor.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
 		Image:   strings.TrimSpace(r.sandboxImage),
@@ -480,7 +480,7 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.
 	if model != "" {
 		spec.Env["CLAUDE_CODE_MODEL"] = model
 	}
-	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+	spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 		Host:      "claude-config",
 		Container: "/home/agent/.claude",
 		Named:     true,
@@ -547,7 +547,7 @@ var dependencyCacheVolumes = []struct {
 // appendDependencyCacheVolumes adds named volumes for dependency caches when
 // WALLFACER_DEPENDENCY_CACHES is enabled. Volume names include the workspace
 // key so different workspace groups don't share caches.
-func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []sandbox.VolumeMount {
+func (r *Runner) appendDependencyCacheVolumes(volumes []executor.VolumeMount) []executor.VolumeMount {
 	if r.envFile == "" {
 		return volumes
 	}
@@ -560,7 +560,7 @@ func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []s
 		wsKey = "default"
 	}
 	for _, cache := range dependencyCacheVolumes {
-		volumes = append(volumes, sandbox.VolumeMount{
+		volumes = append(volumes, executor.VolumeMount{
 			Host:      "wallfacer-cache-" + cache.suffix + "-" + wsKey,
 			Container: cache.container,
 			Named:     true,

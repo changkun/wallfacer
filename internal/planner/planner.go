@@ -1,7 +1,7 @@
 // Package planner manages the planning sandbox container lifecycle.
 // The planning sandbox is a long-lived workspace-scoped container that
 // lets the chat agent read the full workspace and write to specs/.
-// It delegates to a [sandbox.Backend] for container operations so that
+// It delegates to a [executor.Backend] for container operations so that
 // any backend (local, K8s) can serve the planning container.
 package planner
 
@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"sync"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
-	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 // planningTaskID is a fixed synthetic task ID used as the worker key for
@@ -24,23 +24,23 @@ const planningTaskID = "planning-sandbox"
 
 // Config holds the configuration for a Planner.
 type Config struct {
-	Backend          sandbox.Backend // container backend (local, K8s, etc.)
-	Command          string          // container runtime binary path (for ContainerSpec.Runtime)
-	Image            string          // sandbox container image name
-	Workspaces       []string        // workspace directory paths
-	EnvFile          string          // path to .env file for container
-	Fingerprint      string          // workspace fingerprint for keying the container
-	InstructionsPath string          // path to AGENTS.md / CLAUDE.md instructions file
-	Network          string          // container network (empty defaults to "host")
-	CPUs             string          // container CPU limit (e.g. "2.0")
-	Memory           string          // container memory limit (e.g. "4g")
-	ConfigDir        string          // base config directory (~/.wallfacer/) for conversation persistence
+	Backend          executor.Backend // container backend (local, K8s, etc.)
+	Command          string           // container runtime binary path (for ContainerSpec.Runtime)
+	Image            string           // sandbox container image name
+	Workspaces       []string         // workspace directory paths
+	EnvFile          string           // path to .env file for container
+	Fingerprint      string           // workspace fingerprint for keying the container
+	InstructionsPath string           // path to AGENTS.md / CLAUDE.md instructions file
+	Network          string           // container network (empty defaults to "host")
+	CPUs             string           // container CPU limit (e.g. "2.0")
+	Memory           string           // container memory limit (e.g. "4g")
+	ConfigDir        string           // base config directory (~/.wallfacer/) for conversation persistence
 }
 
 // Planner manages a singleton long-lived planning container for a workspace.
 type Planner struct {
 	mu               sync.Mutex
-	backend          sandbox.Backend
+	backend          executor.Backend
 	command          string
 	image            string
 	workspaces       []string
@@ -51,12 +51,12 @@ type Planner struct {
 	cpus             string
 	memory           string
 
-	handle       sandbox.Handle // non-nil when a planning invocation is active
-	active       bool           // true after Start, false after Stop
-	busy         bool           // true while a chat exec is in flight
-	busyThreadID string         // thread ID of the in-flight exec (empty when !busy)
-	liveLog      *livelog.Log   // live output buffer for the current exec (nil when idle)
-	threads      *ThreadManager // multi-thread chat persistence (nil if configDir empty)
+	handle       executor.Handle // non-nil when a planning invocation is active
+	active       bool            // true after Start, false after Stop
+	busy         bool            // true while a chat exec is in flight
+	busyThreadID string          // thread ID of the in-flight exec (empty when !busy)
+	liveLog      *livelog.Log    // live output buffer for the current exec (nil when idle)
+	threads      *ThreadManager  // multi-thread chat persistence (nil if configDir empty)
 
 	configDir string // root config directory; kept so UpdateWorkspaces can open a new ThreadManager
 }
@@ -153,7 +153,7 @@ func (p *Planner) IsRunning() bool {
 // Exec launches a command inside the planning container via the sandbox
 // backend. The backend's worker container mechanism (when available)
 // reuses the same container across calls using the stable planningTaskID.
-func (p *Planner) Exec(ctx context.Context, cmd []string) (sandbox.Handle, error) {
+func (p *Planner) Exec(ctx context.Context, cmd []string) (executor.Handle, error) {
 	p.mu.Lock()
 	if !p.active {
 		p.mu.Unlock()

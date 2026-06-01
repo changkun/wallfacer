@@ -1,4 +1,4 @@
-package sandbox
+package executor
 
 import (
 	"encoding/json"

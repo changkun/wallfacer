@@ -159,7 +159,6 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 	return NewRegistry(all...), nil
 }
 
-
 // IsBuiltin reports whether slug names a built-in flow.
 func IsBuiltin(slug string) bool {
 	for i := range builtins {

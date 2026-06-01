@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
 // ContainerLister can enumerate currently running containers.
 type ContainerLister interface {
-	ListContainers() ([]sandbox.ContainerInfo, error)
+	ListContainers() ([]executor.ContainerInfo, error)
 }
 
 // missingRecoveryWorktrees returns the repo paths whose worktree directories

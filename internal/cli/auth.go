@@ -23,7 +23,7 @@ import (
 // The token is stored at <UserConfigDir>/latere/token.json, the same
 // location latere-cli uses, so a single login carries over between both
 // tools and (eventually) wallfacer's local-mode desktop UI.
-func RunAuth(configDir string, args []string) {
+func RunAuth(_ string, args []string) {
 	if len(args) == 0 {
 		printAuthUsage()
 		os.Exit(2)

@@ -19,7 +19,7 @@ func buildFakeAgentForTest(t *testing.T) string {
 	bin := filepath.Join(t.TempDir(), "fakeagent")
 	// Run the build from the sandbox package so the relative `testdata/...`
 	// path resolves.
-	cmd := exec.Command("go", "build", "-o", bin, "../sandbox/testdata/fakeagent/main.go")
+	cmd := exec.Command("go", "build", "-o", bin, "../executor/testdata/fakeagent/main.go")
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build fakeagent: %v\n%s", err, out)

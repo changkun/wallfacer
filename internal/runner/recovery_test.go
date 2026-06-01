@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
 // mockLister is a test double for ContainerLister.
 type mockLister struct {
-	containers []sandbox.ContainerInfo
+	containers []executor.ContainerInfo
 	err        error
 }
 
-func (m *mockLister) ListContainers() ([]sandbox.ContainerInfo, error) {
+func (m *mockLister) ListContainers() ([]executor.ContainerInfo, error) {
 	return m.containers, m.err
 }
 
@@ -112,9 +112,9 @@ func TestRecoverOrphanedTasks(t *testing.T) {
 			}
 
 			// 3. Build the mock lister.
-			var containers []sandbox.ContainerInfo
+			var containers []executor.ContainerInfo
 			if tc.useTaskIDAsContainer {
-				containers = []sandbox.ContainerInfo{
+				containers = []executor.ContainerInfo{
 					{TaskID: task.ID.String(), State: "running"},
 				}
 			}
@@ -315,7 +315,7 @@ func gitCmdWithEnv(dir string, extraEnv []string, args ...string) *exec.Cmd {
 
 // listerResponse holds one canned response for sequenceLister.
 type listerResponse struct {
-	containers []sandbox.ContainerInfo
+	containers []executor.ContainerInfo
 	err        error
 }
 
@@ -328,7 +328,7 @@ type sequenceLister struct {
 	pos int
 }
 
-func (s *sequenceLister) ListContainers() ([]sandbox.ContainerInfo, error) {
+func (s *sequenceLister) ListContainers() ([]executor.ContainerInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	idx := s.pos
@@ -373,7 +373,7 @@ func TestMonitorContainerUntilStoppedWithConfig_ContextCancel(t *testing.T) {
 	s, task := setupInProgressTask(t)
 
 	// Lister always reports the container as running.
-	lister := &mockLister{containers: []sandbox.ContainerInfo{
+	lister := &mockLister{containers: []executor.ContainerInfo{
 		{TaskID: task.ID.String(), State: "running"},
 	}}
 
@@ -419,7 +419,7 @@ func TestMonitorContainerUntilStoppedWithConfig_Timeout(t *testing.T) {
 	s, task := setupInProgressTask(t)
 
 	// Lister always reports the container as running — it will never stop.
-	lister := &mockLister{containers: []sandbox.ContainerInfo{
+	lister := &mockLister{containers: []executor.ContainerInfo{
 		{TaskID: task.ID.String(), State: "running"},
 	}}
 
@@ -549,7 +549,7 @@ func TestMonitorContainerUntilStoppedWithConfig_IntermittentErrors(t *testing.T)
 
 	// Response sequence: two errors, one "still running", then stopped.
 	runningEntry := listerResponse{
-		containers: []sandbox.ContainerInfo{{TaskID: task.ID.String(), State: "running"}},
+		containers: []executor.ContainerInfo{{TaskID: task.ID.String(), State: "running"}},
 	}
 	stoppedEntry := listerResponse{} // empty containers list → not running
 

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -28,12 +28,12 @@ type Interface interface {
 	PruneUnknownWorktrees()
 
 	// Container management.
-	ListContainers() ([]sandbox.ContainerInfo, error)
+	ListContainers() ([]executor.ContainerInfo, error)
 	ContainerName(taskID uuid.UUID) string
 	TaskLogReader(taskID uuid.UUID) *LiveLogReader
 	KillContainer(taskID uuid.UUID)
 	StopTaskWorker(taskID uuid.UUID)
-	WorkerStats() sandbox.WorkerStatsInfo
+	WorkerStats() executor.WorkerStatsInfo
 
 	// Container circuit breaker.
 	ContainerCircuitAllow() bool
@@ -74,7 +74,7 @@ type Interface interface {
 	// Configuration accessors.
 	Command() string
 	SandboxImage() string
-	SandboxBackend() sandbox.Backend
+	SandboxBackend() executor.Backend
 	HostMode() bool
 	WorktreesDir() string
 	TmpDir() string

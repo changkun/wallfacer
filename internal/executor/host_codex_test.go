@@ -1,6 +1,6 @@
 //go:build !windows
 
-package sandbox
+package executor
 
 import (
 	"bufio"
