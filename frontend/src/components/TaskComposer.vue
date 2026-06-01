@@ -2,13 +2,13 @@
 import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
-import { splitBatch } from '../lib/composer';
+import { splitBatch, flowAllowsEmptyPrompt } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
-interface FlowOption { slug: string; name: string }
+interface FlowOption { slug: string; name: string; spawn_kind?: string }
 
 const props = defineProps<{ autoExpand?: boolean }>();
 const store = useTaskStore();
@@ -56,8 +56,12 @@ watch(tagDraft, (v) => { if (v.includes(',')) { tagDraft.value = v.replace(/,/g,
 const timeoutMin = ref<number | null>(null);
 
 // Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
+const allowsEmptyPrompt = computed(() => flowAllowsEmptyPrompt(flow.value, flows.value));
 const promptPlaceholder = computed(() => {
   const f = flow.value || 'implement';
+  if (allowsEmptyPrompt.value) {
+    return `Optional: focus the ${f} (leave blank to let the agent pick from workspace signals)`;
+  }
   return `Describe the task… (flow: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
 });
 // Optional overrides (behind a "More" toggle).
@@ -188,7 +192,9 @@ async function submitRoutine(text: string): Promise<void> {
 
 async function submit() {
   const text = prompt.value.trim();
-  if (!text || submitting.value) return;
+  // Brainstorm / idea-agent flows accept an empty prompt (the agent builds its
+  // own from workspace signals); every other flow requires one.
+  if ((!text && !allowsEmptyPrompt.value) || submitting.value) return;
   submitting.value = true;
   try {
     if (scheduled.value) {

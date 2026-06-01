@@ -79,7 +79,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] explorer — 30+ extension/special-file semantic icon map (vs emoji)
 - [x] explorer — Tab→indent in textarea edit
 - [x] terminal — container picker uses /api/debug/health (DONE earlier; per-state icons still minor)
-- [ ] tasks — brainstorm flow empty-prompt allowance + placeholder
+- [x] tasks — brainstorm flow empty-prompt allowance + placeholder
 - [x] tasks — routine interval/repeat controls (verified: TaskCard routine footer select+toggle+run-now)
 - [x] command-palette — doc search title-prefix bonus scoring
 - [ ] command-palette — remote/local result distinction + server snippet field
