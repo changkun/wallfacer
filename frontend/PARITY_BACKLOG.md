@@ -28,7 +28,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] modal-stats — Top Tasks rows clickable to open task
 - [x] modal-logs — 8MB truncation banner + "Download full log" link
 - [ ] modal-core — task environment aside provenance (container digest, instructions hash, API endpoint, ts)
-- [ ] command-palette — spec rows (fuzzy match on spec title/path, Plan section)
+- [x] command-palette — spec rows (fuzzy match on spec title/path, Plan section)
 - [x] command-palette — "Sync with default" action for waiting/failed
 - [ ] templates — searchable anchored template picker (live filter, body preview, Esc/outside-click)
 - [x] tasks — dependency picker search dropdown (auto-focus, filter, outside-click close)
