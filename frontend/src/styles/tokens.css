@@ -143,14 +143,14 @@
   --fw-bold: 700;
   --tracking-label: 0.06em;
 
-  /* Terminal surface — always dark, does not swap with theme. */
-  --terminal-bg: #1b1916;
-  --terminal-fg: #f4f1ea;
-  --terminal-rule: #2a2720;
-  --terminal-ink-muted: rgba(244, 241, 234, 0.55);
-  --terminal-ink-dim: rgba(244, 241, 234, 0.45);
-  --terminal-tab-hover: #24221d;
-  --terminal-tab-active: #2a2823;
+  /* Terminal surface — follows the active theme (light values here). */
+  --terminal-bg: #faf8f3;
+  --terminal-fg: #2a2720;
+  --terminal-rule: #d9d3c5;
+  --terminal-ink-muted: rgba(27, 25, 22, 0.55);
+  --terminal-ink-dim: rgba(27, 25, 22, 0.45);
+  --terminal-tab-hover: #ece8de;
+  --terminal-tab-active: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -223,6 +223,15 @@
   --border-strong: var(--rule-2);
   --border-emphasis: var(--rule-2);
   --grid-color: rgba(255, 255, 255, 0.025);
+
+  /* Terminal surface — dark values for the dark theme. */
+  --terminal-bg: #1b1916;
+  --terminal-fg: #f4f1ea;
+  --terminal-rule: #2a2720;
+  --terminal-ink-muted: rgba(244, 241, 234, 0.55);
+  --terminal-ink-dim: rgba(244, 241, 234, 0.45);
+  --terminal-tab-hover: #24221d;
+  --terminal-tab-active: #2a2823;
 }
 
 .serif {

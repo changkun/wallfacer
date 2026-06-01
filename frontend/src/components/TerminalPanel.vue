@@ -38,12 +38,19 @@ let initialized = false;
 let reconnectDelay = 1000;
 let reconnectTimer: number | null = null;
 
-// VSCode-style dark ANSI palette (matches legacy ui/js/terminal.js).
+// VSCode-style ANSI palettes (dark matches legacy ui/js/terminal.js; light is
+// the VSCode light+ palette so colours stay legible on a light surface).
 const darkAnsi = {
   black: '#3c3c3c', red: '#f14c4c', green: '#23d18b', yellow: '#f5f543',
   blue: '#3b8eea', magenta: '#d670d6', cyan: '#29b8db', white: '#cccccc',
   brightBlack: '#666666', brightRed: '#f14c4c', brightGreen: '#23d18b', brightYellow: '#f5f543',
   brightBlue: '#3b8eea', brightMagenta: '#d670d6', brightCyan: '#29b8db', brightWhite: '#e5e5e5',
+};
+const lightAnsi = {
+  black: '#000000', red: '#cd3131', green: '#00a000', yellow: '#949800',
+  blue: '#0451a5', magenta: '#bc05bc', cyan: '#0598bc', white: '#555555',
+  brightBlack: '#7a766e', brightRed: '#cd3131', brightGreen: '#14ce14', brightYellow: '#b5ba00',
+  brightBlue: '#0451a5', brightMagenta: '#bc05bc', brightCyan: '#0598bc', brightWhite: '#2a2720',
 };
 
 function getCssVar(name: string): string {
@@ -51,13 +58,18 @@ function getCssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+function isDarkTheme(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark';
+}
+
 function buildTermTheme() {
+  const dark = isDarkTheme();
   return {
-    background: getCssVar('--terminal-bg') || '#1b1916',
-    foreground: getCssVar('--terminal-fg') || '#f4f1ea',
+    background: getCssVar('--terminal-bg') || (dark ? '#1b1916' : '#faf8f3'),
+    foreground: getCssVar('--terminal-fg') || (dark ? '#f4f1ea' : '#2a2720'),
     cursor: getCssVar('--accent') || '#c45a33',
-    selectionBackground: 'rgba(244, 241, 234, 0.18)',
-    ...darkAnsi,
+    selectionBackground: dark ? 'rgba(244, 241, 234, 0.18)' : 'rgba(27, 25, 22, 0.16)',
+    ...(dark ? darkAnsi : lightAnsi),
   };
 }
 
