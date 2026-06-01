@@ -23,7 +23,7 @@ flowchart TB
     threadsDir["~/.wallfacer/planning/&lt;fp&gt;/threads/&lt;id&gt;/"]
   end
   subgraph Sandbox
-    Box["Planning container<br/>(long-lived worker)"]
+    Box["Planning agent<br/>(host process per turn)"]
   end
 
   UI -->|HTTP / SSE| SpecsH
@@ -179,7 +179,7 @@ Key lifecycle methods:
 | `IsBusy / SetBusy / BusyThreadID`           | Single-turn-at-a-time constraint across all threads.                                   |
 | `StartLiveLog / CloseLiveLog / LogReader`   | Tee raw stdout into a `livelog.Log`; SSE consumers subscribe via per-thread readers.  |
 | `Interrupt()`                               | Kill the handle, close the live log, but keep the session ID so the next message `--resume`s. |
-| `UpdateWorkspaces(paths, fingerprint)`      | Stop the current container and re-open a `ThreadManager` rooted at the new fingerprint. |
+| `UpdateWorkspaces(paths, fingerprint)`      | Stop the current process and re-open a `ThreadManager` rooted at the new fingerprint. |
 
 ### Conversation Store
 
