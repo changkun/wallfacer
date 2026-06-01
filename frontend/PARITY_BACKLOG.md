@@ -30,7 +30,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] modal-core — task environment aside provenance (container digest, instructions hash, API endpoint, ts)
 - [x] command-palette — spec rows (fuzzy match on spec title/path, Plan section)
 - [x] command-palette — "Sync with default" action for waiting/failed
-- [ ] templates — searchable anchored template picker (live filter, body preview, Esc/outside-click)
+- [x] templates — searchable anchored template picker (live filter, body preview, Esc/outside-click)
 - [x] tasks — dependency picker search dropdown (auto-focus, filter, outside-click close)
 - [x] tasks — tag input: Backspace removes last tag on empty; comma commits
 - [x] tasks — flow-select updates composer placeholder/data-task-flow
