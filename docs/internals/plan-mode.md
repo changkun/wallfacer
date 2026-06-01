@@ -167,7 +167,7 @@ The write path uses `os.OpenFile(..., O_CREATE|O_EXCL|O_WRONLY, 0o644)` by defau
 
 ### Planner
 
-`internal/planner/planner.go` manages a singleton long-lived planning container per workspace group. The container is keyed by the workspace **fingerprint** (sha256 of the sorted workspace paths, truncated to 12 chars in the container name as `wallfacer-plan-<fp>`). The planner uses a fixed synthetic task ID, `planningTaskID = "planning-sandbox"`, so the `LocalBackend`'s worker-container logic (which keys on the `wallfacer.task.id` label) reuses the same container across every `Exec` call.
+`internal/planner/planner.go` manages a singleton planner per workspace group, keyed by the workspace **fingerprint** (sha256 of the sorted workspace paths, truncated to 12 chars in the spec name as `wallfacer-plan-<fp>`). Each chat message execs a fresh agent process via the host backend (`Exec`); continuity across messages comes from persisted thread history and session resume, not a reused process. A fixed synthetic task ID, `planningTaskID = "planning-sandbox"`, tags these execs via the `wallfacer.task.id` label.
 
 Key lifecycle methods:
 
