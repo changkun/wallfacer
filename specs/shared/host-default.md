@@ -1,6 +1,6 @@
 ---
 title: Host as the Only Local Backend
-status: drafted
+status: archived
 depends_on:
   - specs/shared/host-exec-mode.md
 affects:
@@ -27,7 +27,7 @@ affects:
   - ui/js/images.js
 effort: large
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-02
 author: changkun
 dispatched_task_id: null
 ---

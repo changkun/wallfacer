@@ -1,13 +1,13 @@
 ---
 title: Migrate Claude and Codex onto the Harness interface
-status: drafted
+status: complete
 depends_on:
   - specs/shared/harness-abstraction/interface.md
 affects:
   - internal/harness/claude.go
   - internal/harness/codex.go
-  - internal/sandbox/host.go
-  - internal/sandbox/host_codex.go
+  - internal/executor/host.go
+  - internal/executor/host_codex.go
   - internal/runner/agent.go
   - internal/runner/container.go
   - internal/runner/execute.go
@@ -16,7 +16,7 @@ affects:
   - internal/handler/env.go
 effort: large
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-02
 author: changkun
 dispatched_task_id: null
 ---
