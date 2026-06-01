@@ -336,7 +336,16 @@ async function resumeTask() {
   await api('POST', `/api/tasks/${props.task.id}/resume`);
 }
 async function testTask() {
-  await api('POST', `/api/tasks/${props.task.id}/test`);
+  // Optional acceptance criteria — when set, the test agent focuses on
+  // the exact checks the user described. Empty / cancelled = generic run.
+  const criteria = await dialog.prompt({
+    title: 'Test verification',
+    message: 'Acceptance criteria (optional). Leave blank for a generic verification run.',
+    placeholder: 'e.g. all unit tests pass; CHANGELOG updated',
+  });
+  if (criteria === null) return;
+  const body = criteria.trim() ? { criteria: criteria.trim() } : undefined;
+  await api('POST', `/api/tasks/${props.task.id}/test`, body);
 }
 async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
