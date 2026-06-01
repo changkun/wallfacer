@@ -24,9 +24,8 @@ const planningTaskID = "planning-sandbox"
 
 // Config holds the configuration for a Planner.
 type Config struct {
-	Backend          executor.Backend // container backend (local, K8s, etc.)
+	Backend          executor.Backend // execution backend (host; cloud later)
 	Command          string           // container runtime binary path (retained for backend config)
-	Image            string           // sandbox container image name
 	Workspaces       []string         // workspace directory paths
 	EnvFile          string           // path to .env file for container
 	Fingerprint      string           // workspace fingerprint for keying the container

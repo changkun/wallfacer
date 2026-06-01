@@ -89,7 +89,6 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "echo", // dummy — not used for host-side operations
-		SandboxImage:     "test:latest",
 		EnvFile:          "",
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
@@ -125,7 +124,6 @@ func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runne
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
 		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instructionsPath,
 	})
 	t.Cleanup(func() { r.Shutdown() })

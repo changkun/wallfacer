@@ -73,7 +73,6 @@ type Interface interface {
 
 	// Configuration accessors.
 	Command() string
-	SandboxImage() string
 	SandboxBackend() executor.Backend
 	HostMode() bool
 	WorktreesDir() string

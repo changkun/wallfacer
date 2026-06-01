@@ -25,7 +25,6 @@ func TestBuildContainerSpec_HostMode_WorkDirIsHostPath(t *testing.T) {
 	worktree := t.TempDir()
 	r := newHostModeRunner(t, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})
@@ -53,7 +52,6 @@ func TestBuildContainerSpec_HostMode_InstructionsEnv(t *testing.T) {
 	}
 	r := newHostModeRunner(t, RunnerConfig{
 		Command:          "echo",
-		SandboxImage:     "test:latest",
 		Workspaces:       []string{workspace},
 		WorktreesDir:     t.TempDir(),
 		InstructionsPath: instr,
@@ -77,7 +75,6 @@ func TestBuildContainerSpec_HostMode_BoardAndSiblingsViaEnv(t *testing.T) {
 	}
 	r := newHostModeRunner(t, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})
@@ -118,7 +115,6 @@ func TestBuildContainerSpec_HostMode_NoSiblingsSkipsManifest(t *testing.T) {
 	boardDir := t.TempDir()
 	r := newHostModeRunner(t, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})
@@ -141,7 +137,6 @@ func TestBuildContainerSpec_HostMode_CmdContainsPromptAndResume(t *testing.T) {
 	workspace := t.TempDir()
 	r := newHostModeRunner(t, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})

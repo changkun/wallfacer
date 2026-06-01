@@ -29,7 +29,6 @@ type MockRunner struct {
 	// Configuration fields — set these before calling NewHandler.
 	EnvFilePath string
 	Cmd         string
-	Image       string
 	WtDir       string
 	CodexPath   string
 	Host        bool // HostMode() return value
@@ -181,9 +180,6 @@ func (m *MockRunner) ShutdownCtx() context.Context { return context.Background()
 
 // Command returns the configured command.
 func (m *MockRunner) Command() string { return m.Cmd }
-
-// SandboxImage returns the configured sandbox image.
-func (m *MockRunner) SandboxImage() string { return m.Image }
 
 // SandboxBackend returns nil (mock does not provide a real backend).
 func (m *MockRunner) SandboxBackend() executor.Backend { return nil }

@@ -16,7 +16,6 @@ import (
 func TestPlannerNew(t *testing.T) {
 	cfg := Config{
 		Command:     "/usr/bin/podman",
-		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{"/home/user/repo"},
 		EnvFile:     "/home/user/.env",
 		Fingerprint: "abc123def456",
@@ -120,7 +119,6 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 	p := New(Config{
 		Backend:    hb,
 		Command:    "/usr/bin/podman",
-		Image:      "sandbox-agents:latest",
 		Workspaces: []string{tmpDir},
 	})
 	spec := p.buildContainerSpec("wallfacer-plan-test", harness.Claude)
@@ -149,7 +147,6 @@ func TestBuildContainerSpec(t *testing.T) {
 
 	p := New(Config{
 		Command:          "/usr/bin/podman",
-		Image:            "sandbox-agents:latest",
 		Workspaces:       []string{tmpDir},
 		EnvFile:          "/tmp/test.env",
 		Fingerprint:      "abc123",
@@ -359,7 +356,6 @@ func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
 func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
-		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{"", "  "},
 		Fingerprint: "fp",
 	})
@@ -374,7 +370,6 @@ func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 func TestBuildContainerSpec_NoEnvFile(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
-		Image:       "sandbox-agents:latest",
 		Workspaces:  []string{t.TempDir()},
 		Fingerprint: "fp",
 	})

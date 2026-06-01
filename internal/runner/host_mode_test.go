@@ -46,7 +46,6 @@ func TestRunner_HostMode_AlwaysOn(t *testing.T) {
 	s := newStoreForTest(t)
 	r := NewRunner(s, RunnerConfig{
 		Command:          "echo",
-		SandboxImage:     "test:latest",
 		HostClaudeBinary: bin,
 		HostCodexBinary:  bin,
 	})

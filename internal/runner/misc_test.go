@@ -976,15 +976,6 @@ func TestRunnerWorktreesDir(t *testing.T) {
 	}
 }
 
-// TestRunnerSandboxImage verifies that SandboxImage() returns the configured image.
-func TestRunnerSandboxImage(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// setupTestRunner uses "test:latest".
-	if r.SandboxImage() != "test:latest" {
-		t.Errorf("SandboxImage() = %q, want 'test:latest'", r.SandboxImage())
-	}
-}
-
 // TestRunnerInstructionsPath verifies InstructionsPath() when workspaceManager is nil.
 func TestRunnerInstructionsPath(t *testing.T) {
 	instructionsFile := filepath.Join(t.TempDir(), "CLAUDE.md")

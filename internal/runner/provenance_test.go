@@ -18,9 +18,8 @@ func TestCaptureExecutionEnvironment_ModelFromEnvconfig(t *testing.T) {
 	}
 
 	r := NewRunner(nil, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "sandbox-agents:latest",
-		EnvFile:      envFile,
+		Command: "echo",
+		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
@@ -46,7 +45,6 @@ func TestCaptureExecutionEnvironment_InstructionsHash(t *testing.T) {
 
 	r := NewRunner(nil, RunnerConfig{
 		Command:          "echo",
-		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: instrFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -65,7 +63,6 @@ func TestCaptureExecutionEnvironment_InstructionsHash(t *testing.T) {
 func TestCaptureExecutionEnvironment_MissingInstructions(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{
 		Command:          "echo",
-		SandboxImage:     "sandbox-agents:latest",
 		InstructionsPath: "/nonexistent/path/CLAUDE.md",
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -78,47 +75,11 @@ func TestCaptureExecutionEnvironment_MissingInstructions(t *testing.T) {
 	}
 }
 
-// TestCaptureExecutionEnvironment_ContainerDigestEmpty verifies that
-// ContainerDigest is empty (not an error) when the image inspect command fails.
-func TestCaptureExecutionEnvironment_ContainerDigestEmpty(t *testing.T) {
-	// Using a command that will fail for an image that doesn't exist.
-	r := NewRunner(nil, RunnerConfig{
-		Command:      "false", // always exits non-zero
-		SandboxImage: "sandbox-agents:latest",
-	})
-	t.Cleanup(func() { r.Shutdown() })
-
-	task := store.Task{}
-	env := r.captureExecutionEnvironment(task)
-
-	if env.ContainerDigest != "" {
-		t.Errorf("ContainerDigest = %q, want empty string on inspect failure", env.ContainerDigest)
-	}
-}
-
-// TestCaptureExecutionEnvironment_ContainerImage verifies that ContainerImage
-// is set to the resolved sandbox image name.
-func TestCaptureExecutionEnvironment_ContainerImage(t *testing.T) {
-	r := NewRunner(nil, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "sandbox-agents:latest",
-	})
-	t.Cleanup(func() { r.Shutdown() })
-
-	task := store.Task{}
-	env := r.captureExecutionEnvironment(task)
-
-	if env.ContainerImage != "sandbox-agents:latest" {
-		t.Errorf("ContainerImage = %q, want %q", env.ContainerImage, "sandbox-agents:latest")
-	}
-}
-
 // TestCaptureExecutionEnvironment_Sandbox verifies that the Sandbox field is
 // resolved via sandboxForTaskActivity (defaulting to "claude").
 func TestCaptureExecutionEnvironment_Sandbox(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "sandbox-agents:latest",
+		Command: "echo",
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
@@ -144,9 +105,8 @@ func TestCaptureExecutionEnvironment_TaskModelOverride(t *testing.T) {
 	}
 
 	r := NewRunner(nil, RunnerConfig{
-		Command:      "echo",
-		SandboxImage: "sandbox-agents:latest",
-		EnvFile:      envFile,
+		Command: "echo",
+		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
 

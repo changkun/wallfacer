@@ -115,7 +115,6 @@ func TestMockRunner_ContainerName_Default(t *testing.T) {
 func TestMockRunner_NoOpMethods(t *testing.T) {
 	m := &MockRunner{
 		Cmd:         "echo",
-		Image:       "test:latest",
 		WtDir:       "/tmp/wt",
 		EnvFilePath: "/tmp/env",
 		CodexPath:   "/tmp/codex",
@@ -202,9 +201,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 
 	if got := m.Command(); got != m.Cmd {
 		t.Errorf("Command = %q, want %q", got, m.Cmd)
-	}
-	if got := m.SandboxImage(); got != m.Image {
-		t.Errorf("SandboxImage = %q, want %q", got, m.Image)
 	}
 	if got := m.WorktreesDir(); got != m.WtDir {
 		t.Errorf("WorktreesDir = %q, want %q", got, m.WtDir)

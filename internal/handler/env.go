@@ -275,7 +275,6 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	probeRunner := runner.NewRunner(h.store, runner.RunnerConfig{
 		Command:          h.runner.Command(),
-		SandboxImage:     sandboxImageForTest(sb, h.runner.SandboxImage()),
 		EnvFile:          tempEnvFile,
 		Workspaces:       h.currentWorkspaces(),
 		WorktreesDir:     h.runner.WorktreesDir(),
@@ -385,13 +384,6 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	}
 
 	return tempFile.Name(), nil
-}
-
-// sandboxImageForTest returns the container image name to use for a sandbox
-// connectivity test. The unified sandbox-agents image serves both Claude and
-// Codex; the agent CLI is selected at runtime via WALLFACER_AGENT.
-func sandboxImageForTest(_ harness.ID, baseImage string) string {
-	return strings.TrimSpace(baseImage)
 }
 
 // UpdateEnvConfig writes changes to the env file.

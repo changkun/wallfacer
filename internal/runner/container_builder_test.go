@@ -105,7 +105,6 @@ func TestResolveEnvFileFallback(t *testing.T) {
 			}
 			r := newRunnerForArgTest(t, RunnerConfig{
 				Command:        "podman",
-				SandboxImage:   "sandbox-agents:latest",
 				EnvFile:        tc.envFile,
 				DefaultEnvFile: tc.defaultEnv,
 			})
@@ -128,7 +127,7 @@ func TestResolveEnvFileFallback(t *testing.T) {
 // differ only in the WALLFACER_AGENT env var that the entrypoint reads
 // to dispatch to the right CLI.
 func TestBuildBaseContainerSpecClaudeVsCodexAgentEnv(t *testing.T) {
-	r := newRunnerForArgTest(t, RunnerConfig{Command: "podman", SandboxImage: "sandbox-agents:latest"})
+	r := newRunnerForArgTest(t, RunnerConfig{Command: "podman"})
 
 	claudeSpec := r.buildBaseContainerSpec("c-test", "", "claude")
 	codexSpec := r.buildBaseContainerSpec("c-test", "", "codex")
