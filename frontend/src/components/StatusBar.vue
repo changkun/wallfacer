@@ -2,7 +2,9 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
-import { api } from '../api/client';
+import { useToastStore } from '../stores/toast';
+import { api, ApiError } from '../api/client';
+import { formatGitConflict } from '../lib/gitConflict';
 import BranchDropdown from './BranchDropdown.vue';
 
 const props = defineProps<{ connected: boolean }>();
@@ -22,6 +24,7 @@ interface GitWorkspace {
 
 const store = useTaskStore();
 const ui = useUiStore();
+const toast = useToastStore();
 const workspaces = ref<GitWorkspace[]>([]);
 const busy = ref<Record<string, string>>({}); // ws.path -> 'push' | 'sync' | 'rebase'
 
@@ -90,8 +93,14 @@ async function runAction(ws: GitWorkspace, kind: 'push' | 'sync' | 'rebase') {
         : '/api/git/rebase-on-main';
     await api('POST', route, { workspace: ws.path });
     await refreshGitStatus();
-  } catch {
-    /* error surfaced via stale state; status SSE will re-emit */
+  } catch (e) {
+    // A 409 means the mutation is blocked by in-flight tasks; surface the
+    // blocking list rather than swallowing it (mirrors ui/js/git.js).
+    if (e instanceof ApiError && e.status === 409) {
+      const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+      toast.push(formatGitConflict(e.body, label), { kind: 'error' });
+    }
+    /* other errors surface via stale state; status SSE will re-emit */
   } finally {
     delete busy.value[ws.path];
   }
