@@ -3,6 +3,7 @@ import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { api } from '../api/client';
 import { useTaskActivity } from '../composables/useTaskActivity';
 import { parseDiffFiles, type DiffFile } from '../lib/diff';
+import { highlightDiffFile, type HighlightedDiffLine } from '../lib/diffHighlight';
 import type { ActivityRow } from '../lib/prettyNdjson';
 import type { Task } from '../api/types';
 import { useMentions } from '../composables/useMentions';
@@ -89,6 +90,11 @@ const mainTab = ref<MainTab>(
 
 // --- Changes (diff) tab ---
 const diffFiles = ref<DiffFile[]>([]);
+// Per-file highlight.js token HTML (null when the language is unknown — the
+// template then falls back to plain text). Indexed parallel to diffFiles.
+const diffHighlights = computed<(HighlightedDiffLine[] | null)[]>(
+  () => diffFiles.value.map((f) => highlightDiffFile(f)),
+);
 const diffLoading = ref(false);
 const diffError = ref('');
 const diffFetched = ref(false);
@@ -965,7 +971,9 @@ const isArchived = computed(() => !!props.task.archived);
                             <span v-if="f.dels" class="diff-del">&minus;{{ f.dels }}</span>
                           </span>
                         </summary>
-                        <pre class="diff-block diff-block-modal"><template v-for="(ln, li) in f.lines" :key="li"><span class="diff-line" :class="lineClass(ln.kind)">{{ ln.text }}</span>
+                        <pre v-if="diffHighlights[fi]" class="diff-block diff-block-modal"><template v-for="(ln, li) in diffHighlights[fi]!" :key="li"><span class="diff-line" :class="lineClass(ln.kind)"><template v-if="ln.kind === 'header' || ln.kind === 'hunk'">{{ f.lines[li].text }}</template><template v-else>{{ ln.prefix }}<span v-html="ln.html"></span></template></span>
+</template></pre>
+                        <pre v-else class="diff-block diff-block-modal"><template v-for="(ln, li) in f.lines" :key="li"><span class="diff-line" :class="lineClass(ln.kind)">{{ ln.text }}</span>
 </template></pre>
                       </details>
                     </template>
