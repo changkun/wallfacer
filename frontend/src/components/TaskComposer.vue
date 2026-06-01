@@ -4,6 +4,7 @@ import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import { parseTags, splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
+import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
 interface FlowOption { slug: string; name: string }
@@ -15,13 +16,10 @@ const store = useTaskStore();
 // real UX regression vs the legacy UI, which used wallfacer-new-task-draft.
 // Same key so users mid-migration don't lose work.
 const DRAFT_KEY = 'wallfacer-new-task-draft';
-const prompt = ref<string>(
-  typeof localStorage !== 'undefined' ? localStorage.getItem(DRAFT_KEY) ?? '' : '',
-);
+const prompt = ref<string>(getStored(DRAFT_KEY) ?? '');
 watch(prompt, (v) => {
-  if (typeof localStorage === 'undefined') return;
-  if (v.trim()) localStorage.setItem(DRAFT_KEY, v);
-  else localStorage.removeItem(DRAFT_KEY);
+  if (v.trim()) setStored(DRAFT_KEY, v);
+  else removeStored(DRAFT_KEY);
 });
 const mentions = useMentions({ setValue: (v) => { prompt.value = v; }, priorityPrefix: 'spec/' });
 const submitting = ref(false);
