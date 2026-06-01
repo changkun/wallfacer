@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -864,38 +863,20 @@ func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
 	}
 }
 
-// TestStreamLogs_InProgress_ContainerExitsCleanly exercises the live streaming
-// path in StreamLogs end-to-end. The MockRunner returns a non-empty container
-// name and uses a wrapper script as the command, which prints a couple of log
-// lines and exits. The handler's select loop reads the lines and then
-// terminates naturally when the lines channel is closed.
-func TestStreamLogs_InProgress_ContainerExitsCleanly(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	// Write a tiny shell script that prints two log lines and exits.
-	scriptPath := filepath.Join(t.TempDir(), "fake-logs.sh")
-	script := "#!/bin/sh\nprintf 'log line 1\\nlog line 2\\n'\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	// Wrapper script: ignores all arguments (logs -f --tail 100 <name>) and
-	// just runs the inner script.
-	wrapperPath := filepath.Join(t.TempDir(), "fake-podman.sh")
-	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
-	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
-		t.Fatal(err)
-	}
-
+// TestStreamLogs_InProgress_NoLiveReader_ServesStoredLogs verifies that an
+// in-progress task with no live log reader serves stored turn output rather
+// than shelling out to a container runtime. Host execution has no container
+// log to stream, so the runner's Cmd (a nonexistent binary here) must never be
+// exec'd — a 200 with the stored output proves the container fallback is gone.
+func TestStreamLogs_InProgress_NoLiveReader_ServesStoredLogs(t *testing.T) {
 	mock := &runner.MockRunner{
-		Cmd:             wrapperPath,
-		ContainerNameFn: func(_ uuid.UUID) string { return "fake-container" },
+		Cmd:             "/nonexistent-binary-that-must-not-run",
+		ContainerNameFn: func(_ uuid.UUID) string { return "ignored-name" },
 	}
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "live stream test", Timeout: 15})
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "stored logs while in progress", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -903,101 +884,24 @@ func TestStreamLogs_InProgress_ContainerExitsCleanly(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Write a stored turn file; the MockRunner has no live log reader.
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
+	if err := os.MkdirAll(outputsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result":"stored ok"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 	h.StreamLogs(w, req, task.ID)
 
-	body := w.Body.String()
-	if !strings.Contains(body, "log line 1") {
-		t.Errorf("expected 'log line 1' in response, got: %s", body)
-	}
-	if !strings.Contains(body, "log line 2") {
-		t.Errorf("expected 'log line 2' in response, got: %s", body)
-	}
 	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
+		t.Fatalf("expected 200 (stored logs), got %d: %s", w.Code, w.Body.String())
 	}
-}
-
-// TestStreamLogs_InProgress_CommandStartFails exercises the cmd.Start error
-// path in StreamLogs. When the container command binary does not exist,
-// cmd.Start returns an error and StreamLogs responds with 500.
-func TestStreamLogs_InProgress_CommandStartFails(t *testing.T) {
-	mock := &runner.MockRunner{
-		// Use a non-existent binary so cmd.Start() fails.
-		Cmd:             "/nonexistent-binary-that-cannot-be-found",
-		ContainerNameFn: func(_ uuid.UUID) string { return "some-container" },
-	}
-	h, s := newTestHandlerWithMockRunner(t, mock)
-
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "start-fail test", Timeout: 15})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
-	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
-	h.StreamLogs(w, req, task.ID)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500 when command fails to start, got %d", w.Code)
-	}
-}
-
-// TestStreamLogs_InProgress_ContextCancellation verifies that StreamLogs
-// exits cleanly when the request context is cancelled while logs are streaming.
-func TestStreamLogs_InProgress_ContextCancellation(t *testing.T) {
-	// A script that blocks indefinitely.
-	scriptPath := filepath.Join(t.TempDir(), "blocking.sh")
-	script := "#!/bin/sh\nwhile true; do sleep 1; done\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	wrapperPath := filepath.Join(t.TempDir(), "fake-podman-block.sh")
-	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
-	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	mock := &runner.MockRunner{
-		Cmd:             wrapperPath,
-		ContainerNameFn: func(_ uuid.UUID) string { return "blocking-container" },
-	}
-	h, s := newTestHandlerWithMockRunner(t, mock)
-
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancellation test", Timeout: 15})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-
-	reqCtx, cancel := context.WithCancel(context.Background())
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil).WithContext(reqCtx)
-	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		h.StreamLogs(w, req, task.ID)
-	}()
-
-	// Give the handler time to start the subprocess, then cancel.
-	time.Sleep(50 * time.Millisecond)
-	cancel()
-
-	select {
-	case <-done:
-		// Handler exited cleanly after context cancellation.
-	case <-time.After(5 * time.Second):
-		t.Error("StreamLogs did not exit after context cancellation")
+	if !strings.Contains(w.Body.String(), "stored ok") {
+		t.Errorf("expected stored turn output in response, got: %s", w.Body.String())
 	}
 }
 
