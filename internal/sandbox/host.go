@@ -85,8 +85,8 @@ type HostBackend struct {
 	codexBinary  string
 
 	probeMu       sync.Mutex
-	probedOnce    map[Type]bool
-	probedSupport map[Type]bool
+	probedOnce    map[harness.ID]bool
+	probedSupport map[harness.ID]bool
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
@@ -95,13 +95,13 @@ type HostBackend struct {
 // SetBinaryForTest overrides the resolved binary path for the given agent
 // type. Used by tests that need to swap in a fake-cmd script after the
 // backend is constructed.
-func (b *HostBackend) SetBinaryForTest(t Type, path string) {
+func (b *HostBackend) SetBinaryForTest(t harness.ID, path string) {
 	b.binaryMu.Lock()
 	defer b.binaryMu.Unlock()
 	switch t {
-	case Claude:
+	case harness.Claude:
 		b.claudeBinary = path
-	case Codex:
+	case harness.Codex:
 		b.codexBinary = path
 	}
 }
@@ -123,8 +123,8 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	return &HostBackend{
 		claudeBinary:  claude,
 		codexBinary:   codex,
-		probedOnce:    make(map[Type]bool),
-		probedSupport: make(map[Type]bool),
+		probedOnce:    make(map[harness.ID]bool),
+		probedSupport: make(map[harness.ID]bool),
 		procs:         make(map[string]*hostHandle),
 	}, nil
 }
@@ -149,16 +149,16 @@ func resolveBinary(explicit, name string) (string, error) {
 // binaryFor returns the resolved binary path for the given agent type.
 // Returns an error when the type is unknown or when the binary for a known
 // type was not resolvable at construction time.
-func (b *HostBackend) binaryFor(t Type) (string, error) {
+func (b *HostBackend) binaryFor(t harness.ID) (string, error) {
 	b.binaryMu.RLock()
 	defer b.binaryMu.RUnlock()
 	switch t {
-	case Claude:
+	case harness.Claude:
 		if b.claudeBinary == "" {
 			return "", fmt.Errorf("claude binary not resolved")
 		}
 		return b.claudeBinary, nil
-	case Codex:
+	case harness.Codex:
 		if b.codexBinary == "" {
 			return "", fmt.Errorf("codex binary not resolved")
 		}
@@ -171,7 +171,7 @@ func (b *HostBackend) binaryFor(t Type) (string, error) {
 // SupportsAppendSystemPrompt reports whether the agent CLI for the given
 // type accepts --append-system-prompt. Result is cached; the probe runs at
 // most once per agent type per backend lifetime, on first query.
-func (b *HostBackend) SupportsAppendSystemPrompt(t Type) bool {
+func (b *HostBackend) SupportsAppendSystemPrompt(t harness.ID) bool {
 	b.probeMu.Lock()
 	if b.probedOnce[t] {
 		result := b.probedSupport[t]
@@ -192,7 +192,7 @@ func (b *HostBackend) SupportsAppendSystemPrompt(t Type) bool {
 // probeAppendSystemPrompt runs `<bin> --help` and looks for the flag name in
 // the combined output. A failed probe (timeout, missing binary, non-zero
 // exit) is treated as "not supported" so callers fall back cleanly.
-func (b *HostBackend) probeAppendSystemPrompt(t Type) bool {
+func (b *HostBackend) probeAppendSystemPrompt(t harness.ID) bool {
 	bin, err := b.binaryFor(t)
 	if err != nil {
 		return false
@@ -209,7 +209,7 @@ func (b *HostBackend) probeAppendSystemPrompt(t Type) bool {
 // handles CLI-specific argv + output wrangling.
 func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, error) {
 	agentStr := spec.Env["WALLFACER_AGENT"]
-	agent, ok := Parse(agentStr)
+	agent, ok := harness.ParseID(agentStr)
 	if !ok {
 		return nil, fmt.Errorf("host backend: spec.Env[WALLFACER_AGENT] is missing or unknown (got %q)", agentStr)
 	}
@@ -221,9 +221,9 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 	}
 
 	switch agent {
-	case Claude:
+	case harness.Claude:
 		return b.launchClaude(ctx, spec)
-	case Codex:
+	case harness.Codex:
 		return b.launchCodex(ctx, spec)
 	default:
 		return nil, fmt.Errorf("host backend: unsupported agent %q", agent)
@@ -236,7 +236,7 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 // stay a thin translation layer until upstream code passes Request
 // directly.
 func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Handle, error) {
-	bin, err := b.binaryFor(Claude)
+	bin, err := b.binaryFor(harness.Claude)
 	if err != nil {
 		return nil, err
 	}
