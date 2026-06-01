@@ -6,15 +6,12 @@ import { api } from '../api/client';
 import TaskDetail from '../components/TaskDetail.vue';
 import type { Task } from '../api/types';
 
-// MapPage hosts the legacy depgraph + unified-graph renderers verbatim from
-// ui/js/. We render the same DOM that ui/partials/depgraph-mode.html
-// provides, install a handful of `window` shims the legacy modules expect,
-// then call window.renderDependencyGraph() reactively.
-//
-// The legacy modules are imported via Vite's `fs.allow: ['..']` so the old
-// UI and the new UI share a single source of truth. When ui/ is removed in
-// Phase 5 of the migration spec, `git mv` the two files into
-// frontend/src/lib/depgraph/ and update the imports below.
+// MapPage hosts the depgraph + unified-graph renderers, vendored verbatim
+// into frontend/src/vendor/depgraph/. We render the same DOM the legacy
+// ui/partials/depgraph-mode.html provided, install a handful of `window`
+// shims the renderers expect, then call window.renderDependencyGraph()
+// reactively. The vendored copies are self-contained (no ui/ imports), so
+// frontend/ no longer depends on ui/ for the Map view.
 
 interface SpecMeta { status: string; dispatched_task_id: string | null }
 interface SpecNode { path: string; spec: SpecMeta; children: string[]; is_leaf: boolean; depth: number }
@@ -103,8 +100,8 @@ onMounted(async () => {
   await loadSpecTree();
 
   // Dynamic side-effect import; the IIFEs attach to window at execution.
-  await import('../../../ui/js/unified-graph.js');
-  await import('../../../ui/js/depgraph.js');
+  await import('../vendor/depgraph/unified-graph.js');
+  await import('../vendor/depgraph/depgraph.js');
 
   ready.value = true;
   await nextTick();

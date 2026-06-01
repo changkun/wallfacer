@@ -44,8 +44,8 @@ interface Window {
   _resetMapCentering?: () => void;
 }
 
-// Legacy IIFE modules vendored from ui/js/ (depgraph, unified-graph) have
-// no exports; Vite imports them for side effects so they attach renderer
-// functions to `window` (typed above).
-declare module '*/ui/js/depgraph.js';
-declare module '*/ui/js/unified-graph.js';
+// IIFE renderers vendored into frontend/src/vendor/depgraph/ (depgraph,
+// unified-graph) have no exports; Vite imports them for side effects so
+// they attach renderer functions to `window` (typed above).
+declare module '*/vendor/depgraph/depgraph.js';
+declare module '*/vendor/depgraph/unified-graph.js';
