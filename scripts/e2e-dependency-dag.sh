@@ -233,8 +233,10 @@ else
     fail "expected 8 archived, got $archived_count"
 fi
 
-# Check no containers remain for these tasks.
-container_count=$(api GET "/api/containers" | jq 'length')
+# Check no containers remain for these tasks. /api/containers was removed
+# (host backend has no containers to list); read the running-container list
+# from /api/debug/health → running_containers.count instead.
+container_count=$(api GET "/api/debug/health" | jq '.running_containers.count // 0')
 if [ "$container_count" = "0" ] || [ "$container_count" = "null" ]; then
     pass "no containers remaining"
 else
