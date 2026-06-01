@@ -90,6 +90,19 @@ func TestJSON_EncodesAndWrites(t *testing.T) {
 	}
 }
 
+func TestMessage_Format(t *testing.T) {
+	rec := httptest.NewRecorder()
+	s := NewWriter(rec)
+	if err := s.Message([]byte(`{"hello":"world"}`)); err != nil {
+		t.Fatalf("Message: %v", err)
+	}
+	got := rec.Body.String()
+	want := "data: {\"hello\":\"world\"}\n\n"
+	if got != want {
+		t.Errorf("frame = %q, want %q", got, want)
+	}
+}
+
 func TestHeartbeat_Format(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s := NewWriter(rec)

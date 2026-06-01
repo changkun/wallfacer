@@ -16,6 +16,7 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -140,15 +141,10 @@ func (h *Handler) GitStatus(w http.ResponseWriter, _ *http.Request) {
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
 func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+	stream := sse.NewWriter(w)
+	if stream == nil {
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
 
 	collect := func() []gitutil.WorkspaceGitStatus {
 		return collectWorkspaceStatuses(h.currentWorkspaces())
@@ -159,10 +155,11 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return false
 		}
-		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		// Default (unnamed) "message" event — the frontend listens on
+		// EventSource.onmessage for git status updates.
+		if err := stream.Message(data); err != nil {
 			return false
 		}
-		flusher.Flush()
 		return true
 	}
 

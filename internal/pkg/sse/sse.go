@@ -71,6 +71,18 @@ func (s *Writer) JSON(name string, v any) error {
 	return s.Event(name, data)
 }
 
+// Message writes a frame without an event field. SSE clients dispatch
+// these as the default "message" event (EventSource.onmessage). Used
+// by streams that never name their events, e.g. a single-purpose
+// status feed.
+func (s *Writer) Message(data []byte) error {
+	if _, err := fmt.Fprintf(s.w, "data: %s\n\n", data); err != nil {
+		return err
+	}
+	s.flusher.Flush()
+	return nil
+}
+
 // Heartbeat writes a "heartbeat" event with empty data. Sent as a real
 // event (not an SSE comment) so the browser EventSource dispatches it
 // to JavaScript — the frontend uses heartbeat arrivals to detect stale
