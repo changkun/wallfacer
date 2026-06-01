@@ -47,8 +47,6 @@ func main() {
 	switch subcmd {
 	case "doctor", "env":
 		cli.RunDoctor(configDir, args)
-	case "exec":
-		cli.RunExec(configDir, args)
 	case "run":
 		cli.RunServer(configDir, args, uiFiles, vueDist, docsFiles)
 	case "desktop":
