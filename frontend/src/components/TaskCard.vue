@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
 import { highlightMatch } from '../lib/highlight';
+import { classifyTag, type RenderedTag } from '../lib/tagBadge';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
@@ -170,10 +171,6 @@ function tagStyle(tag: string): string {
   return `background:var(--tag-bg-${n});color:var(--tag-text-${n});`;
 }
 
-function isSpawnedByTag(tag: string): boolean {
-  return tag.toLowerCase().startsWith('spawned-by:');
-}
-
 // Behind-upstream chip: fetched lazily via the shared composable, only
 // for statuses where falling behind matters. Routine cards opt out.
 const showsBehind = computed(() =>
@@ -208,23 +205,13 @@ const testBadge = computed<{ label: string; cls: string; title: string } | null>
   }
 });
 
-interface RenderedTag { rawTag: string; label: string; cls: string; styled: boolean }
-
-// Mirrors ui/js/render.js's tag taxonomy: priority:* and impact:* tags
-// get dedicated badge classes; spawned-by:* keeps its own class; everything
-// else falls back to the hue-coloured generic chip.
+// Brainstorm categories are backend-authoritative (config ideation_categories);
+// tags matching them render as category badges. See lib/tagBadge.
+const brainstormCategories = computed(
+  () => new Set(taskStore.config?.ideation_categories ?? []),
+);
 function renderedTag(rawTag: string): RenderedTag {
-  const lower = rawTag.toLowerCase();
-  if (lower.startsWith('priority:')) {
-    return { rawTag, label: rawTag.slice('priority:'.length).trim() || 'priority', cls: 'badge badge-priority', styled: false };
-  }
-  if (lower.startsWith('impact:')) {
-    return { rawTag, label: `impact ${rawTag.slice('impact:'.length).trim()}`, cls: 'badge badge-impact', styled: false };
-  }
-  if (isSpawnedByTag(rawTag)) {
-    return { rawTag, label: rawTag, cls: 'tag-chip badge-routine-spawn', styled: false };
-  }
-  return { rawTag, label: rawTag, cls: 'tag-chip', styled: true };
+  return classifyTag(rawTag, brainstormCategories.value);
 }
 
 function showSpinner(task: Task): boolean {
