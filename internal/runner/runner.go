@@ -23,6 +23,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"changkun.de/x/wallfacer/internal/pkg/syncmap"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
+	"changkun.de/x/wallfacer/internal/pkg/yamlwatch"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -476,14 +477,14 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	// disk (outside the HTTP API) take effect without a restart.
 	// Reload failures are logged but don't fault startup; the
 	// registry simply keeps its previous state.
-	if _, err := agents.Watch(r.shutdownCtx, agentsDir, func() {
+	if _, err := yamlwatch.Watch(r.shutdownCtx, "agents", agentsDir, func() {
 		if err := r.ReloadAgents(); err != nil {
 			logger.Runner.Warn("agents watcher: reload failed", "error", err)
 		}
 	}); err != nil {
 		logger.Runner.Warn("agents watcher: setup failed", "dir", agentsDir, "error", err)
 	}
-	if _, err := flow.Watch(r.shutdownCtx, flowsDir, func() {
+	if _, err := yamlwatch.Watch(r.shutdownCtx, "flow", flowsDir, func() {
 		if err := r.ReloadFlows(); err != nil {
 			logger.Runner.Warn("flows watcher: reload failed", "error", err)
 		}
