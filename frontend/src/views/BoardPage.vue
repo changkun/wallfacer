@@ -299,12 +299,6 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-name">In Progress</span>
         <span class="col-count">{{ store.inProgress.length }}</span>
         <span class="max-parallel-tag" title="Max parallel tasks for this workspace group">max {{ maxParallel }}</span>
-        <span class="col-icon-btn" aria-hidden="true" title="Sandbox Monitor">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="4 17 10 11 4 5" />
-            <line x1="12" y1="19" x2="20" y2="19" />
-          </svg>
-        </span>
       </div>
       <div class="column col-bg">
         <draggable :list="store.inProgress" :group="{ name: 'board', pull: false, put: true }" item-key="id" class="col-list" :animation="150" :sort="false" @change="onInProgressAdd">

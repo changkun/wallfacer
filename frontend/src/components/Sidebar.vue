@@ -103,7 +103,7 @@ async function saveGroups(next: WorkspaceGroup[], verb: string) {
 }
 
 const props = defineProps<{ collapsed: boolean }>();
-const emit = defineEmits<{ toggle: []; workspaces: []; containers: []; palette: [] }>();
+const emit = defineEmits<{ toggle: []; workspaces: []; palette: [] }>();
 
 const cloudMode = computed(() => store.config?.cloud_mode === true);
 

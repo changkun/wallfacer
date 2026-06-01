@@ -6,7 +6,6 @@ import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
 import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
-import ContainerMonitor from '../components/ContainerMonitor.vue';
 import InstructionsEditor from '../components/InstructionsEditor.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
 import TemplatesManager from '../components/TemplatesManager.vue';
@@ -122,7 +121,6 @@ useKeyboard({
       @toggle="sidebarCollapsed = !sidebarCollapsed"
       @palette="ui.showPalette = true"
       @workspaces="ui.showWorkspaces = true"
-      @containers="ui.showContainers = true"
     />
     <div class="app-main">
       <div
@@ -140,7 +138,6 @@ useKeyboard({
     </div>
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
-    <ContainerMonitor v-model="ui.showContainers" />
     <InstructionsEditor v-model="ui.showInstructions" />
     <SystemPromptsManager v-model="ui.showSystemPrompts" />
     <TemplatesManager v-model="ui.showTemplates" />
