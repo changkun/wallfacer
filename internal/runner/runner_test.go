@@ -142,13 +142,6 @@ func containsConsecutive(slice []string, needle1, needle2 string) bool {
 	return false
 }
 
-// hostPath translates a host filesystem path through the same path conversion
-// that ContainerSpec.Build applies. On non-Windows systems this is a no-op.
-// runtimeBin should match the runner's Command field (e.g. "podman").
-func hostPath(path, runtimeBin string) string {
-	return sandbox.TranslateHostPath(path, runtimeBin)
-}
-
 // ---------------------------------------------------------------------------
 // Runner.buildContainerArgs — CLAUDE.md mount
 // ---------------------------------------------------------------------------
@@ -197,7 +190,6 @@ func TestContainerArgsMissingInstructionsFile(t *testing.T) {
 
 // TestContainerArgsCodexMountsAGENTSMD verifies that codex sandbox mounts
 // workspace instructions at /workspace/AGENTS.md.
-
 
 func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
