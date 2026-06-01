@@ -40,7 +40,7 @@ import (
 // also drops --resume (see codex-agent.sh), so this matches existing
 // container behaviour.
 func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Handle, error) {
-	bin, err := b.binaryFor(Codex)
+	bin, err := b.binaryFor(harness.Codex)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,7 @@
 // Package sandbox defines the harness type enum and the launch abstraction
 // the runner drives.
 //
-//   - [Type] (Claude, Codex) names the agent runtime a task uses.
+//   - Agent types live in [harness] (harness.Claude, harness.Codex).
 //   - [Backend] / [Handle] abstract process launch and supervision.
 //
 // [HostBackend] is the only implementation: it execs the host-installed

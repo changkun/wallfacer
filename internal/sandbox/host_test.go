@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/harness"
 )
 
 // buildFakeAgent compiles testdata/fakeagent into a temp binary named `name`
@@ -76,7 +78,7 @@ func TestHostBackend_SupportsAppendSystemPrompt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("new: %v", err)
 		}
-		if !b.SupportsAppendSystemPrompt(Claude) {
+		if !b.SupportsAppendSystemPrompt(harness.Claude) {
 			t.Error("expected --append-system-prompt to be detected")
 		}
 	})
@@ -89,7 +91,7 @@ func TestHostBackend_SupportsAppendSystemPrompt(t *testing.T) {
 		// Poison the probe via env: the fakeagent omits the flag from --help when
 		// FAKEAGENT_NO_APPEND=1 is set in the probe's environment.
 		t.Setenv("FAKEAGENT_NO_APPEND", "1")
-		if b.SupportsAppendSystemPrompt(Codex) {
+		if b.SupportsAppendSystemPrompt(harness.Codex) {
 			t.Error("expected probe to report no support when fakeagent hides the flag")
 		}
 	})
@@ -349,8 +351,8 @@ func TestHostBackend_AppendSystemPrompt_Fallback(t *testing.T) {
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
 
 	b.probeMu.Lock()
-	b.probedOnce[Claude] = true
-	b.probedSupport[Claude] = false
+	b.probedOnce[harness.Claude] = true
+	b.probedSupport[harness.Claude] = false
 	b.probeMu.Unlock()
 
 	instr := filepath.Join(t.TempDir(), "AGENTS.md")
