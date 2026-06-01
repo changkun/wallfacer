@@ -448,6 +448,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: text;
+}
+.pcp-queue-edit {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-input, #fff);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink, inherit);
 }
 
 .pcp-queue-remove {

@@ -346,6 +346,27 @@ function removeFromQueue(id: number) {
   if (t.queue.length === 0) t.enqueuedAt = 0;
 }
 
+// Inline-edit a queued message (double-click the chip). Enter/blur saves a
+// non-empty value; Escape cancels. Mirrors ui/js/planning-chat.js _editQueueItem.
+const editingQueueId = ref<number | null>(null);
+const editQueueDraft = ref('');
+function startQueueEdit(q: { id: number; text: string }) {
+  editingQueueId.value = q.id;
+  editQueueDraft.value = q.text;
+  void nextTick(() => queueWrapEl.value?.querySelector<HTMLInputElement>('.pcp-queue-edit')?.focus());
+}
+function commitQueueEdit(id: number) {
+  if (editingQueueId.value !== id) return;
+  const t = activeThreadId.value ? threads.value[activeThreadId.value] : null;
+  const item = t?.queue.find(q => q.id === id);
+  const next = editQueueDraft.value.trim();
+  if (item && next) item.text = next;
+  editingQueueId.value = null;
+}
+function cancelQueueEdit() {
+  editingQueueId.value = null;
+}
+
 function drainNextQueued() {
   if (streaming.value) return;
   let bestId: string | null = null;
@@ -779,7 +800,20 @@ onUnmounted(() => {
 
     <div ref="queueWrapEl" class="pcp-queue">
       <div v-for="q in currentQueue" :key="q.id" class="pcp-queue-chip">
-        <span class="pcp-queue-text">{{ q.text }}</span>
+        <input
+          v-if="editingQueueId === q.id"
+          v-model="editQueueDraft"
+          class="pcp-queue-edit"
+          @keydown.enter.prevent="commitQueueEdit(q.id)"
+          @keydown.esc.prevent="cancelQueueEdit"
+          @blur="commitQueueEdit(q.id)"
+        />
+        <span
+          v-else
+          class="pcp-queue-text"
+          title="Double-click to edit"
+          @dblclick="startQueueEdit(q)"
+        >{{ q.text }}</span>
         <button
           type="button"
           class="pcp-queue-remove"

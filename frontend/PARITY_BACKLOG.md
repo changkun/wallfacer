@@ -43,7 +43,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] board-composer — empty-board composer dismiss-for-session persistence
 - [x] board-composer — composer "@" action button (insert @ + fire mention)
 - [x] sidebar-badge — board unread dot
-- [ ] planning-chat — queue item double-click edit mode
+- [x] planning-chat — queue item double-click edit mode
 - [x] planning-chat — send-mode toggle button (already present PlanningChatPanel.vue:45-61)
 - [x] spec-mode — sidebar collapse/expand persisted on boot (verified: AppLayout wallfacer-sidebar-collapsed)
 - [x] search — `<mark>` highlight markup in results
