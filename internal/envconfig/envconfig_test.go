@@ -128,20 +128,6 @@ func TestParseHostBinaryOverrides_Empty(t *testing.T) {
 	}
 }
 
-// TestParse_IgnoresSandboxBackendEnv verifies that WALLFACER_SANDBOX_BACKEND is
-// no longer read from the env file — backend selection moved to the
-// --backend CLI flag. Parse must leave the field zero.
-func TestParse_IgnoresSandboxBackendEnv(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND=host\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.SandboxBackend != "" {
-		t.Errorf("SandboxBackend should not be populated from env file; got %q", cfg.SandboxBackend)
-	}
-}
-
 // TestParseServerAPIKey verifies parsing of the WALLFACER_SERVER_API_KEY field.
 func TestParseServerAPIKey(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SERVER_API_KEY=secret-key\n")

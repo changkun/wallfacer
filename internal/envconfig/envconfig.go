@@ -46,13 +46,8 @@ type Config struct {
 	IdeaAgentSandbox      sandbox.Type // WALLFACER_SANDBOX_IDEA_AGENT
 	SandboxFast           bool         // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
-	// SandboxBackend is populated by the `wallfacer run --backend` flag (not
-	// read from the .env file). "" and "local" mean the container backend;
-	// "host" selects the host-process backend. Kept on Config as plumbing so
-	// the runner's New() reads it from one place regardless of source.
-	SandboxBackend   string
-	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY — explicit path to host claude CLI (optional)
-	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY  — explicit path to host codex CLI  (optional)
+	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
+	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
