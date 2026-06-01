@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -209,29 +208,14 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Prefer the in-process live log reader (works for both worker and
-	// ephemeral containers) over shelling out to `docker logs`.
+	// Prefer the in-process live log reader for the running turn; otherwise
+	// serve the saved turn outputs from disk. (Host processes stream through
+	// the live reader; there is no container log to shell out to.)
 	if lr := h.runner.TaskLogReader(id); lr != nil {
 		h.streamLiveLog(w, r, flusher, id, lr)
 		return
 	}
-
-	// Fallback: resolve the container name and shell out to `docker logs -f`.
-	// Do not pipe cmd.Stderr into the response: errors from the log command
-	// itself (e.g. "no such container" when the container was already removed
-	// or not yet started) would be forwarded verbatim to the client.
-	containerName := h.runner.ContainerName(id)
-	if containerName == "" {
-		h.serveStoredLogs(w, r, id)
-		return
-	}
-	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
-	p, err := logpipe.Start(cmd)
-	if err != nil {
-		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
-		return
-	}
-	streamLines(w, r, flusher, p)
+	h.serveStoredLogs(w, r, id)
 }
 
 // streamLiveLog streams output from the in-process live log buffer for the
