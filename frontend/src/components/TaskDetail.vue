@@ -960,47 +960,51 @@ const isArchived = computed(() => !!props.task.archived);
                   <template v-else>
                     <template v-if="implResults.length">
                       <h3 class="section-title">Implementation</h3>
-                      <div
-                        v-for="entry in implResults"
+                      <!-- Newest turn expanded; older turns collapse into
+                           <details> (mirrors ui/js/modal-results.js). -->
+                      <details
+                        v-for="(entry, idx) in implResults"
                         :key="`impl-${entry.turn}`"
                         class="result-entry"
+                        :open="idx === 0"
                       >
-                        <div class="result-entry__header">
+                        <summary class="result-entry-summary">
                           <div class="result-entry-labels">
                             <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
                             <span v-if="implResults.length > 1" class="result-turn-label">Turn {{ entry.turn }}</span>
                           </div>
-                          <div class="flex items-center gap-1.5">
-                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                          </div>
+                        </summary>
+                        <div class="result-entry-actions flex items-center gap-1.5">
+                          <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                          <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
                         </div>
                         <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
                         <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
                         <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                      </div>
+                      </details>
                     </template>
                     <template v-if="testResults.length">
                       <h3 class="section-title" style="margin-top: 16px;">Testing</h3>
-                      <div
-                        v-for="entry in testResults"
+                      <details
+                        v-for="(entry, idx) in testResults"
                         :key="`test-${entry.turn}`"
                         class="result-entry"
+                        :open="idx === 0"
                       >
-                        <div class="result-entry__header">
+                        <summary class="result-entry-summary">
                           <div class="result-entry-labels">
                             <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
                             <span class="result-turn-label">Turn {{ entry.turn }}</span>
                           </div>
-                          <div class="flex items-center gap-1.5">
-                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                          </div>
+                        </summary>
+                        <div class="result-entry-actions flex items-center gap-1.5">
+                          <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                          <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
                         </div>
                         <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
                         <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
                         <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                      </div>
+                      </details>
                     </template>
                   </template>
                 </div>
