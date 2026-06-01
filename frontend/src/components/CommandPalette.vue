@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { usePlanningStore, type SpecNode } from '../stores/planning';
 import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
 import { commandPaletteActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 const router = useRouter();
 const route = useRoute();
 const taskStore = useTaskStore();
+const planning = usePlanningStore();
 const ui = useUiStore();
 
 const query = ref('');
@@ -148,6 +150,7 @@ type FlatRow =
   | { kind: 'task'; task: Task }
   | { kind: 'action'; task: Task; action: ReturnType<typeof taskActions>[number] }
   | { kind: 'jump'; task: Task; tab: string; label: string }
+  | { kind: 'spec'; node: SpecNode }
   | { kind: 'doc'; slug: string };
 
 // Tab-switch jumps: open a task's detail modal directly on a given tab
@@ -172,6 +175,25 @@ const docMatches = computed(() => {
   return rankDocs(docIndex, q, 6);
 });
 
+// Spec rows for the Plan section: fuzzy match on spec title and path
+// (mirrors ui/js/command-palette.js's spec rows).
+const specMatches = computed<SpecNode[]>(() => {
+  const q = query.value.trim();
+  if (!q) return [];
+  const scored: { node: SpecNode; score: number }[] = [];
+  for (const n of planning.tree) {
+    const title = n.spec?.title || n.path;
+    const rt = fuzzyMatch(title, q);
+    const rp = fuzzyMatch(n.path, q);
+    const best = Math.max(rt.matched ? rt.score : -1, rp.matched ? rp.score : -1);
+    if (best > -1) scored.push({ node: n, score: best });
+  }
+  scored.sort((a, b) =>
+    b.score - a.score || (a.node.spec?.title || a.node.path).localeCompare(b.node.spec?.title || b.node.path),
+  );
+  return scored.slice(0, 6).map((s) => s.node);
+});
+
 const flatRows = computed<FlatRow[]>(() => {
   const out: FlatRow[] = [];
   for (const s of sections.value) {
@@ -181,6 +203,7 @@ const flatRows = computed<FlatRow[]>(() => {
       for (const j of tabJumps(t)) out.push({ kind: 'jump', task: t, tab: j.tab, label: j.label });
     }
   }
+  for (const n of specMatches.value) out.push({ kind: 'spec', node: n });
   for (const d of docMatches.value) out.push({ kind: 'doc', slug: d.slug });
   return out;
 });
@@ -193,6 +216,9 @@ function actionRowIndex(task: Task, actionId: CardAction): number {
 }
 function jumpRowIndex(task: Task, tab: string): number {
   return flatRows.value.findIndex((r) => r.kind === 'jump' && r.task.id === task.id && r.tab === tab);
+}
+function specRowIndex(path: string): number {
+  return flatRows.value.findIndex((r) => r.kind === 'spec' && r.node.path === path);
 }
 function docRowIndex(slug: string): number {
   return flatRows.value.findIndex((r) => r.kind === 'doc' && r.slug === slug);
@@ -220,6 +246,8 @@ watch(
       ui.paletteSeed = '';
       remoteResults.value = [];
       activeIndex.value = 0;
+      // Load the spec tree once so the Plan section can match (best-effort).
+      if (!planning.tree.length) void planning.fetchTree();
       nextTick(() => inputRef.value?.focus());
     } else {
       // Clear pending server search when closing.
@@ -286,6 +314,11 @@ function pickJump(task: Task, tab: string) {
   close();
 }
 
+function pickSpec(path: string) {
+  router.push({ path: '/plan', query: { spec: path } });
+  close();
+}
+
 function pickDoc(slug: string) {
   router.push({ path: `/docs/${slug}` });
   close();
@@ -332,6 +365,7 @@ function onKeydown(e: KeyboardEvent) {
       if (row.kind === 'task') pick(row.task);
       else if (row.kind === 'action') void runTaskAction(row.action.id, row.task);
       else if (row.kind === 'jump') pickJump(row.task, row.tab);
+      else if (row.kind === 'spec') pickSpec(row.node.path);
       else if (row.kind === 'doc') pickDoc(row.slug);
       break;
     }
@@ -465,6 +499,26 @@ onUnmounted(() => {
               </div>
             </section>
           </template>
+          <section v-if="specMatches.length" class="command-palette-section">
+            <div class="command-palette-section-title">Plan</div>
+            <div
+              v-for="n in specMatches"
+              :key="n.path"
+              role="button"
+              tabindex="0"
+              class="command-palette-row command-palette-row-task"
+              :class="{ active: specRowIndex(n.path) === activeIndex }"
+              @click="pickSpec(n.path)"
+              @keydown.enter="pickSpec(n.path)"
+              @mouseenter="activeIndex = specRowIndex(n.path)"
+            >
+              <div class="command-palette-row-title">📋 {{ n.spec?.title || n.path }}</div>
+              <div class="command-palette-row-meta">
+                <span class="command-palette-task-id">{{ n.path }}</span>
+                <span v-if="n.spec?.status" class="badge">{{ n.spec.status }}</span>
+              </div>
+            </div>
+          </section>
           <section v-if="docMatches.length" class="command-palette-section">
             <div class="command-palette-section-title">Docs</div>
             <div
@@ -481,7 +535,7 @@ onUnmounted(() => {
               <div class="command-palette-row-title">📖 {{ d.title }}</div>
             </div>
           </section>
-          <div v-if="!sections.length && !docMatches.length" class="command-palette-empty">
+          <div v-if="!sections.length && !specMatches.length && !docMatches.length" class="command-palette-empty">
             {{ query.trim() ? 'No matches' : 'No tasks yet' }}
           </div>
         </div>
