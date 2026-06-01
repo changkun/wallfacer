@@ -30,13 +30,13 @@ individually rather than treating this umbrella as a single unit.
 
 ## Backend-only (run anytime)
 
-| Spec | Effort | What |
+| Spec | Status | What |
 |---|---|---|
-| [taskusage-cache-fix.md](backend-redundancy-cleanup/taskusage-cache-fix.md) | Small | Fix the `CacheReadInputTokens` / `CacheCreationTokens` undercount in `/api/stats` bucket aggregations. Extract `(*TaskUsage).Add` so the handler, store, and stats layers stop inlining five-field `+=` loops with different field subsets. |
-| [handler-helpers-dedup.md](backend-redundancy-cleanup/handler-helpers-dedup.md) | Small | Four micro-cleanups bundled: unify the two `bearerToken` helpers; replace `hasScope`/`hasAud` with `slices.Contains`; promote `parsePathID` to `httpjson.PathUUID` and migrate inline UUID parses; route `orgs.SwitchOrg` through `httpjson.DecodeBody`. |
-| [background-task-launcher.md](backend-redundancy-cleanup/background-task-launcher.md) | Small | Collapse `SyncWorktreesBackground`, `GenerateOversightBackground`, and `GenerateTitleBackground` into a single `r.taskBackground(label, taskID, fn)` helper. `RunBackground` stays separate (has workspace-counting logic). |
-| [cache-wrappers-inline.md](backend-redundancy-cleanup/cache-wrappers-inline.md) | Small | Inline `diffcache.go` and `commitsbehind_cache.go` thin wrappers over `internal/pkg/cache.TTLCache` (or narrow their surface) so the typed-API value is consolidated. ~130 LOC reduction. |
-| [agents-flow-generic-registry.md](backend-redundancy-cleanup/agents-flow-generic-registry.md) | Large | Extract `internal/pkg/registry.Registry[T]` to replace the byte-similar `agents.Registry` and `flow.Registry`. Then extract `internal/pkg/crud.RegisterCRUD[T, Req]` to collapse the mirror-image CRUD handlers in `agents.go` and `flows.go`. |
+| [taskusage-cache-fix.md](backend-redundancy-cleanup/taskusage-cache-fix.md) | **Done** | Fixed the `CacheReadInputTokens` / `CacheCreationTokens` undercount in `/api/stats` bucket aggregations. Extracted `(*TaskUsage).Add` so the handler, store, and stats layers stop inlining five-field `+=` loops with different field subsets. |
+| [handler-helpers-dedup.md](backend-redundancy-cleanup/handler-helpers-dedup.md) | **Done** | Four micro-cleanups bundled: unified the two `bearerToken` helpers; replaced `hasScope`/`hasAud` with `slices.Contains`; promoted `parsePathID` to `httpjson.PathUUID` and migrated inline UUID parses; routed `orgs.SwitchOrg` through `httpjson.DecodeBody`. |
+| [background-task-launcher.md](backend-redundancy-cleanup/background-task-launcher.md) | **Done** | Collapsed `SyncWorktreesBackground`, `GenerateOversightBackground`, and `GenerateTitleBackground` into a single `r.taskBackground(label, taskID, fn)` helper. `RunBackground` stays separate (has workspace-counting logic). |
+| [cache-wrappers-inline.md](backend-redundancy-cleanup/cache-wrappers-inline.md) | Archived | Decided against. The diffcache `set` immutable-branch and commitsbehind `cachedCommitsBehind` read-through are real policy; inlining would push them to every caller for negative LOC and worse readability. Eleven tests would need rewriting. See Outcome in the child spec. |
+| [agents-flow-generic-registry.md](backend-redundancy-cleanup/agents-flow-generic-registry.md) | Archived | Decided against. The asymmetry (flow clones on Get; agents doesn't) and the three `Resolve*` methods only on flow.Registry mean a shared `Registry[T]` needs a clone hook + wrapper types + Resolve* forwarding, totalling more LOC than the duplication it removed. The smaller `ResolveForTask` / `ResolveRoutineFlow` consolidation landed as a focused micro-refactor in `flow/registry.go`. |
 
 ## API-surface (block on vue-frontend-migration)
 

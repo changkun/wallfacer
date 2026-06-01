@@ -84,6 +84,29 @@ func (r *Registry) ResolveLegacyKind(kind store.TaskKind) (Flow, bool) {
 	}
 }
 
+// resolveByExplicitOrLegacy is the shared body of ResolveForTask and
+// ResolveRoutineFlow: prefer the explicit slug field; fall back to the
+// legacy-kind mapping; default to "implement". explicitFlow and
+// legacyKind are extractor functions because the two callers read
+// different store.Task fields (FlowID vs RoutineSpawnFlow, Kind vs
+// RoutineSpawnKind).
+func (r *Registry) resolveByExplicitOrLegacy(
+	t *store.Task,
+	explicitFlow func(*store.Task) string,
+	legacyKind func(*store.Task) store.TaskKind,
+) string {
+	if t == nil {
+		return "implement"
+	}
+	if s := explicitFlow(t); s != "" {
+		return s
+	}
+	if f, ok := r.ResolveLegacyKind(legacyKind(t)); ok {
+		return f.Slug
+	}
+	return "implement"
+}
+
 // ResolveForTask returns the slug of the flow a task should run
 // against. Precedence: the task's explicit FlowID wins; otherwise
 // fall back to ResolveLegacyKind so pre-migration records dispatch
@@ -91,16 +114,10 @@ func (r *Registry) ResolveLegacyKind(kind store.TaskKind) (Flow, bool) {
 // lives on the flow Registry (rather than as a *Task method) because
 // the store package cannot import flow without creating a cycle.
 func (r *Registry) ResolveForTask(t *store.Task) string {
-	if t == nil {
-		return "implement"
-	}
-	if t.FlowID != "" {
-		return t.FlowID
-	}
-	if f, ok := r.ResolveLegacyKind(t.Kind); ok {
-		return f.Slug
-	}
-	return "implement"
+	return r.resolveByExplicitOrLegacy(t,
+		func(t *store.Task) string { return t.FlowID },
+		func(t *store.Task) store.TaskKind { return t.Kind },
+	)
 }
 
 // ResolveRoutineFlow returns the slug of the flow a routine should
@@ -109,16 +126,10 @@ func (r *Registry) ResolveForTask(t *store.Task) string {
 // resolver; otherwise "implement". Shares the same cycle-breaking
 // rationale as ResolveForTask.
 func (r *Registry) ResolveRoutineFlow(t *store.Task) string {
-	if t == nil {
-		return "implement"
-	}
-	if t.RoutineSpawnFlow != "" {
-		return t.RoutineSpawnFlow
-	}
-	if f, ok := r.ResolveLegacyKind(t.RoutineSpawnKind); ok {
-		return f.Slug
-	}
-	return "implement"
+	return r.resolveByExplicitOrLegacy(t,
+		func(t *store.Task) string { return t.RoutineSpawnFlow },
+		func(t *store.Task) store.TaskKind { return t.RoutineSpawnKind },
+	)
 }
 
 // cloneFlow produces a defensive deep copy of a Flow. Used by Get and
