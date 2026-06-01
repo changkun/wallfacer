@@ -411,12 +411,17 @@ onUnmounted(() => {
       <template v-else>
         <div v-if="loading && !specText" class="sf-loading">Loading…</div>
         <div
-          v-else-if="renderedBody"
+          v-else-if="parsed.warning"
+          class="sf-frontmatter-warning"
+          role="alert"
+        >⚠ {{ parsed.warning }}</div>
+        <div
+          v-if="renderedBody"
           ref="bodyRef"
           class="sf-content prose-content"
           v-html="renderedBody"
         />
-        <div v-else class="sf-loading">Select a spec from the tree.</div>
+        <div v-else-if="!loading && !parsed.warning" class="sf-loading">Select a spec from the tree.</div>
       </template>
       <FloatingToc :body-el="bodyRef" :content-key="(renderedBody || renderedTaskPrompt)" />
     </div>
@@ -568,6 +573,15 @@ onUnmounted(() => {
   text-align: center;
   padding: 40px 0;
   font-size: 13px;
+}
+.sf-frontmatter-warning {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--warn, #c87b1c) 18%, var(--bg-card));
+  border: 1px solid color-mix(in oklab, var(--warn, #c87b1c) 35%, var(--border));
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink);
 }
 
 .sf-content :deep(h1),

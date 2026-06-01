@@ -403,7 +403,7 @@ function onCardKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Row 2: title -->
-    <div v-if="props.task.title" class="card-title">{{ props.task.title }}</div>
+    <div v-if="props.task.title" class="card-title" :title="props.task.title">{{ props.task.title }}</div>
 
     <!-- Row 3: tags (priority:*/impact:* get dedicated badges) -->
     <div v-if="props.task.tags?.length" class="tag-chip-row">
