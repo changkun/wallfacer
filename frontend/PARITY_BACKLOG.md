@@ -34,7 +34,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] tasks — dependency picker search dropdown (auto-focus, filter, outside-click close)
 - [x] tasks — tag input: Backspace removes last tag on empty; comma commits
 - [x] tasks — flow-select updates composer placeholder/data-task-flow
-- [ ] workspace — browser folder create (/api/workspaces/mkdir) + rename (/api/workspaces/rename)
+- [x] workspace — browser folder create (/api/workspaces/mkdir) + rename (/api/workspaces/rename)
 - [x] workspace — per-group max-parallel override (done earlier in SettingsTabWorkspace)
 - [x] render — hide system routines (kind=routine + system:* tag) from board
 - [x] render — scheduled badge with relative time on backlog cards

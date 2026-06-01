@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { useDialogStore } from '../stores/dialog';
+import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
 
 interface BrowseEntry {
@@ -19,6 +21,34 @@ const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const store = useTaskStore();
+const dialog = useDialogStore();
+const toast = useToastStore();
+
+// Create a new folder under the current browse path, then refresh the listing.
+async function createFolder() {
+  const name = await dialog.prompt({ title: 'New folder', message: `Create a folder inside ${browsePath.value}:`, initial: '' });
+  if (!name) return;
+  try {
+    await api('POST', '/api/workspaces/mkdir', { path: browsePath.value, name: name.trim() });
+    await browse(browsePath.value);
+    toast.push(`Created ${name.trim()}`, { kind: 'success' });
+  } catch (e) {
+    toast.push(`Create failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
+}
+
+// Rename a browsed directory entry, then refresh the listing.
+async function renameEntry(entry: { path: string; name: string }) {
+  const name = await dialog.prompt({ title: 'Rename folder', message: `Rename "${entry.name}" to:`, initial: entry.name });
+  if (!name || name.trim() === entry.name) return;
+  try {
+    await api('POST', '/api/workspaces/rename', { path: entry.path, name: name.trim() });
+    await browse(browsePath.value);
+    toast.push(`Renamed to ${name.trim()}`, { kind: 'success' });
+  } catch (e) {
+    toast.push(`Rename failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
+}
 
 const cardRef = ref<HTMLElement | null>(null);
 useFocusTrap(cardRef, computed(() => props.modelValue));
@@ -231,6 +261,15 @@ function breadcrumbSegments() {
             >
               + Add current folder
             </button>
+            <button
+              type="button"
+              class="btn-ghost ws-picker__new-folder-btn"
+              :disabled="browsePath === '/'"
+              title="Create a new folder here"
+              @click="createFolder"
+            >
+              + New folder
+            </button>
           </div>
 
           <div class="ws-picker__status">
@@ -272,6 +311,12 @@ function breadcrumbSegments() {
                   <span style="overflow: hidden; text-overflow: ellipsis">{{ entry.name }}</span>
                   <span v-if="entry.is_git_repo" class="ws-entry__badge">git</span>
                 </button>
+                <button
+                  type="button"
+                  class="btn-ghost ws-entry__rename"
+                  title="Rename folder"
+                  @click="renameEntry(entry)"
+                >✎</button>
                 <button
                   v-if="!workspaces.includes(entry.path)"
                   type="button"
