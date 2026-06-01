@@ -2,9 +2,12 @@
 import { computed, ref, watch } from 'vue';
 import { api } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
+import { useEscapeToClose } from '../composables/useEscapeToClose';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
+
+useEscapeToClose(() => props.modelValue, () => close());
 
 type EditTab = 'edit' | 'preview';
 

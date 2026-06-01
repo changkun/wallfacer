@@ -3,12 +3,15 @@ import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import type { PromptTemplate } from '../api/types';
+import { useEscapeToClose } from '../composables/useEscapeToClose';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   changed: [];
 }>();
+
+useEscapeToClose(() => props.modelValue, () => close());
 
 const templates = ref<PromptTemplate[]>([]);
 const loading = ref(false);
