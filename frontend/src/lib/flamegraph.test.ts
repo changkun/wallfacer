@@ -63,12 +63,41 @@ describe('layoutSpans', () => {
       { phase: 'agent_turn', label: 'implementation_1', started_at: '2026-06-01T00:00:00.000Z', ended_at: '2026-06-01T00:00:10.000Z', duration_ms: 10_000 },
       { phase: 'commit', label: '', started_at: '2026-06-01T00:00:08.000Z', ended_at: '2026-06-01T00:00:14.000Z', duration_ms: 6000 },
     ];
-    const { blocks, t0, t1 } = layoutSpans(spans);
+    const { blocks, t0, t1, laneCount } = layoutSpans(spans);
     expect(blocks).toHaveLength(2);
     expect(t1 - t0).toBe(14_000);
     expect(blocks[0].lane).toBe(0);
     expect(blocks[1].lane).toBe(1); // overlaps → new lane
+    expect(laneCount).toBe(2);
     expect(blocks[0].label).toBe('Impl. Turn 1');
     expect(blocks[1].label).toBe('Commit');
+  });
+
+  it('every block carries a visual extent (leftPct/widthPct)', () => {
+    const spans: SpanResult[] = [
+      { phase: 'commit', label: '', started_at: '2026-06-01T00:00:00.000Z', ended_at: '2026-06-01T00:00:05.000Z', duration_ms: 5000 },
+    ];
+    const { blocks } = layoutSpans(spans);
+    expect(blocks[0].leftPct).toBeGreaterThanOrEqual(0);
+    expect(blocks[0].widthPct).toBeGreaterThanOrEqual(0.4);
+  });
+
+  it('compresses a long idle gap so flanking activity is not squished', () => {
+    // 5s of work, a 1h idle gap, then 5s more. Without compression the two
+    // active blocks would each occupy <0.3% of the width. The time map should
+    // mark the gap compressed and pull the active blocks well apart.
+    const spans: SpanResult[] = [
+      { phase: 'agent_turn', label: 'implementation_1', started_at: '2026-06-01T00:00:00.000Z', ended_at: '2026-06-01T00:00:05.000Z', duration_ms: 5000 },
+      { phase: 'agent_turn', label: 'implementation_2', started_at: '2026-06-01T01:00:05.000Z', ended_at: '2026-06-01T01:00:10.000Z', duration_ms: 5000 },
+    ];
+    const lay = layoutSpans(spans);
+    expect(lay.timeMap.compressed).toBe(true);
+    // First block starts at 0%, second block's start is pushed far right but
+    // not pinned at 100% (the gap is compressed, not removed).
+    expect(lay.blocks[0].leftPct).toBeCloseTo(0, 1);
+    expect(lay.blocks[1].leftPct).toBeGreaterThan(40);
+    expect(lay.blocks[1].leftPct).toBeLessThan(100);
+    // The first 5s block keeps a meaningful width instead of collapsing.
+    expect(lay.blocks[0].widthPct).toBeGreaterThan(5);
   });
 });
