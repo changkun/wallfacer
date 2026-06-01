@@ -192,6 +192,11 @@ async function submit() {
   // own from workspace signals); every other flow requires one.
   if ((!text && !allowsEmptyPrompt.value) || submitting.value) return;
   submitting.value = true;
+  // Drop the persisted draft up front: when the empty-state composer creates
+  // the first task, the board re-renders and mounts the in-backlog composer,
+  // which would otherwise read this draft and reopen prefilled. Restored on
+  // failure so a network error doesn't lose the user's text.
+  removeStored(DRAFT_KEY);
   try {
     if (scheduled.value) {
       await submitRoutine(text);
@@ -247,6 +252,8 @@ async function submit() {
     expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
+    // Re-persist the draft so a failed create doesn't lose the user's text.
+    if (text) setStored(DRAFT_KEY, prompt.value || text);
   } finally {
     submitting.value = false;
   }
