@@ -44,7 +44,6 @@ func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	resolved := resolveTestCmd(cmd)
 	r := NewRunner(s, RunnerConfig{
 		Command:          cmd,
-		SandboxImage:     "test:latest",
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
 		HostCodexBinary:  resolved,
@@ -180,7 +179,6 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	resolved := resolveTestCmd(cmd)
 	runner := NewRunner(s, RunnerConfig{
 		Command:          cmd,
-		SandboxImage:     "test:latest",
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
@@ -233,7 +231,6 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 	resolved := resolveTestCmd(cmd)
 	runner := NewRunner(s, RunnerConfig{
 		Command:          cmd,
-		SandboxImage:     "test:latest",
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
@@ -324,7 +321,6 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 	}
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -397,7 +393,6 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	resolved := resolveTestCmd(cmd)
 	runner := NewRunner(s, RunnerConfig{
 		Command:          cmd,
-		SandboxImage:     "test:latest",
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
@@ -529,7 +524,6 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 	}
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo", // dummy — not used for git operations
-		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -595,7 +589,6 @@ func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -645,7 +638,6 @@ func TestHostStageAndCommitCleansUpNonEmptyInstructionsFiles(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -705,7 +697,6 @@ func TestHostStageAndCommitPreservesTrackedInstructionsFiles(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo",
-		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})

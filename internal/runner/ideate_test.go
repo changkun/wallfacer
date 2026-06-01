@@ -1171,7 +1171,6 @@ func TestIdeationViaPlanner(t *testing.T) {
 	p := planner.New(planner.Config{
 		Backend:     r.backend,
 		Command:     r.command,
-		Image:       r.sandboxImage,
 		Workspaces:  r.workspaces,
 		Fingerprint: "test-fp",
 	})
@@ -1219,7 +1218,6 @@ func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
 	p := planner.New(planner.Config{
 		Backend:     r.backend,
 		Command:     r.command,
-		Image:       r.sandboxImage,
 		Workspaces:  r.workspaces,
 		Fingerprint: "test-fp",
 	})

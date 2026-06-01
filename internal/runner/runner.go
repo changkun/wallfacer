@@ -74,9 +74,8 @@ func (r *Runner) TaskLogReader(taskID uuid.UUID) *LiveLogReader {
 //
 //nolint:revive // name stutters but renaming would be too invasive
 type RunnerConfig struct {
-	Command      string
-	SandboxImage string
-	EnvFile      string
+	Command string
+	EnvFile string
 	// DefaultEnvFile is the canonical config env file (typically
 	// <configDir>/.env). It is used as a fallback when EnvFile is set to an
 	// override path that has gone missing at container-launch time — e.g. a
@@ -141,7 +140,6 @@ type Runner struct {
 	wsKey                  string   // workspace key of the currently viewed group (guarded by storeMu)
 	taskWSKey              sync.Map // uuid.UUID → string: maps task IDs to their workspace group key
 	command                string
-	sandboxImage           string
 	envFile                string
 	defaultEnvFile         string // fallback env file when envFile goes missing (see RunnerConfig.DefaultEnvFile)
 	workspaces             []string
@@ -422,7 +420,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	r := &Runner{
 		store:            s,
 		command:          cfg.Command,
-		sandboxImage:     cfg.SandboxImage,
 		envFile:          cfg.EnvFile,
 		defaultEnvFile:   cfg.DefaultEnvFile,
 		workspaces:       cfg.Workspaces,
@@ -723,11 +720,6 @@ func (r *Runner) InstructionsPath() string {
 // Prompts returns the prompt template Manager used by this runner.
 func (r *Runner) Prompts() *prompts.Manager {
 	return r.promptsMgr
-}
-
-// SandboxImage returns the container image used for task execution.
-func (r *Runner) SandboxImage() string {
-	return r.sandboxImage
 }
 
 // SandboxBackend returns the sandbox backend used for container operations.

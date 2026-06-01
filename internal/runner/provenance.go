@@ -4,11 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -36,20 +34,6 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 
 	// Sandbox: record the configured sandbox for this task.
 	env.Sandbox = r.sandboxForTaskActivity(&task, activityImplementation)
-
-	// Container image: the unified sandbox-agents image is used regardless
-	// of the per-task agent type; the agent is selected at runtime via
-	// WALLFACER_AGENT inside the container.
-	env.ContainerImage = strings.TrimSpace(r.sandboxImage)
-
-	// Container digest: query the runtime for the image's content digest.
-	// Failures are non-fatal; digest is left empty when unavailable.
-	if env.ContainerImage != "" && r.command != "" {
-		out, err := cmdexec.New(r.command, "inspect", "--format", "{{.Digest}}", env.ContainerImage).Output()
-		if err == nil {
-			env.ContainerDigest = out
-		}
-	}
 
 	// Instructions hash: SHA-256 of the workspace CLAUDE.md file content.
 	instrPath := r.currentInstructionsPath()

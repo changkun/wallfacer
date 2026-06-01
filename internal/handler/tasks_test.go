@@ -3737,7 +3737,6 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          cmd,
-		SandboxImage:     "test:latest",
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: cmd,

@@ -48,7 +48,6 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 	resolved := resolveTestCmd(cmd)
 	r := NewRunner(s, RunnerConfig{
 		Command:          cmd,
-		SandboxImage:     "test:latest",
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
