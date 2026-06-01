@@ -262,6 +262,16 @@
   gap: 12px;
   flex-shrink: 0;
 }
+.depgraph-mode__search {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  color: var(--text);
+  min-width: 160px;
+}
+.depgraph-mode__search:focus { outline: none; border-color: var(--accent); }
 
 .depgraph-mode__title {
   font-size: 15px;
