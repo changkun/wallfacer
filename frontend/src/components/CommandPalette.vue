@@ -7,6 +7,7 @@ import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import { docIndex } from '../data/docs';
+import { rankDocs } from '../lib/docSearch';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
@@ -149,9 +150,10 @@ type FlatRow =
 // `<script setup>` compiler keeps the top-level order, so a forward
 // reference produces a TDZ ReferenceError on first eval.
 const docMatches = computed(() => {
-  const q = query.value.trim().toLowerCase();
+  const q = query.value.trim();
   if (!q) return [];
-  return docIndex.filter((d) => d.title.toLowerCase().includes(q) || d.slug.includes(q)).slice(0, 6);
+  // Title-prefix > title-substring > slug, alphabetical tie-break (see lib/docSearch).
+  return rankDocs(docIndex, q, 6);
 });
 
 const flatRows = computed<FlatRow[]>(() => {
