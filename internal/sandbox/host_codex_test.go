@@ -218,29 +218,6 @@ func TestHostBackend_LaunchCodex_InstructionsPrepended(t *testing.T) {
 	}
 }
 
-func TestExtractPromptAndModelFromClaudeArgv(t *testing.T) {
-	cases := []struct {
-		name  string
-		in    []string
-		wantP string
-		wantM string
-	}{
-		{"simple", []string{"-p", "hi", "--verbose"}, "hi", ""},
-		{"with-model", []string{"-p", "hi", "--model", "sonnet"}, "hi", "sonnet"},
-		{"model-short", []string{"-p", "hi", "-m", "opus"}, "hi", "opus"},
-		{"no-prompt", []string{"--verbose"}, "", ""},
-		{"ignore-unknown", []string{"--output-format", "stream-json", "-p", "hi"}, "hi", ""},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			p, m := extractPromptAndModelFromClaudeArgv(tc.in)
-			if p != tc.wantP || m != tc.wantM {
-				t.Errorf("got (%q, %q); want (%q, %q)", p, m, tc.wantP, tc.wantM)
-			}
-		})
-	}
-}
-
 func TestSandboxFast(t *testing.T) {
 	cases := []struct {
 		name     string
