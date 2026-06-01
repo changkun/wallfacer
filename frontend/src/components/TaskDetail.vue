@@ -148,13 +148,13 @@ async function fetchResults() {
     const outputs = events
       .filter((e) => e.event_type === 'output' && typeof e.data?.result === 'string' && e.data.result.length > 0)
       .map((e) => e.data!.result as string);
-    // The legacy UI split outputs at task.test_run_start_turn into
-    // implementation vs test runs; that field is no longer maintained by
-    // the backend so we surface every turn as an implementation entry.
-    // (When the field is reintroduced, slice the array here.)
-    const impl = outputs;
-    const tests: string[] = [];
-    const split = 0;
+    // Split outputs into implementation vs test runs at task.test_run_start_turn
+    // (1-based; turns >= it belong to the test agent). The backend serves the
+    // same boundary for phase=impl|test log streams. Mirrors modal-results.js.
+    const startTurn = props.task.test_run_start_turn ?? 0;
+    const splitIdx = startTurn > 0 ? Math.min(startTurn - 1, outputs.length) : outputs.length;
+    const impl = outputs.slice(0, splitIdx);
+    const tests = outputs.slice(splitIdx);
     implResults.value = impl.map((text, i) => ({
       turn: i + 1,
       text,
@@ -162,7 +162,7 @@ async function fetchResults() {
       showRaw: false,
     })).reverse();
     testResults.value = tests.map((text, i) => ({
-      turn: i + 1 + (split > 0 ? split : impl.length),
+      turn: splitIdx + i + 1,
       text,
       type: detectResultType(text),
       showRaw: false,
