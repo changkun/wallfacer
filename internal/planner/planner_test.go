@@ -20,9 +20,6 @@ func TestPlannerNew(t *testing.T) {
 		Workspaces:  []string{"/home/user/repo"},
 		EnvFile:     "/home/user/.env",
 		Fingerprint: "abc123def456",
-		Network:     "host",
-		CPUs:        "2.0",
-		Memory:      "4g",
 	}
 	p := New(cfg)
 	if p.command != cfg.Command {
@@ -157,9 +154,6 @@ func TestBuildContainerSpec(t *testing.T) {
 		EnvFile:          "/tmp/test.env",
 		Fingerprint:      "abc123",
 		InstructionsPath: instrFile,
-		Network:          "bridge",
-		CPUs:             "1.0",
-		Memory:           "2g",
 	})
 
 	spec := p.buildContainerSpec("wallfacer-plan-test", harness.Claude)

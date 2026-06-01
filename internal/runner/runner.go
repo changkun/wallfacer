@@ -90,9 +90,6 @@ type RunnerConfig struct {
 	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
 	HostClaudeBinary string           // optional override for the `claude` binary path
 	HostCodexBinary  string           // optional override for the `codex` binary path
-	ContainerNetwork string           // --network value for task containers (empty = read from env file, fallback "host")
-	ContainerCPUs    string           // --cpus value for task containers (empty = read from env file, no limit)
-	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
 	TmpDir           string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager *workspace.Manager
@@ -153,9 +150,6 @@ type Runner struct {
 	instructionsPath       string
 	workspaceManager       *workspace.Manager
 	codexAuthPath          string
-	containerNetwork       string                           // --network override; empty = read from env file
-	containerCPUs          string                           // --cpus override; empty = read from env file
-	containerMemory        string                           // --memory override; empty = read from env file
 	promptsMgr             *prompts.Manager                 // prompt template manager
 	worktreeMu             sync.Mutex                       // serializes all worktree filesystem operations on worktreesDir
 	repoMu                 keyedmu.Map[string]              // per-repo mutex for serializing rebase+merge
@@ -436,9 +430,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		tmpDir:           cfg.TmpDir,
 		instructionsPath: cfg.InstructionsPath,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
-		containerNetwork: cfg.ContainerNetwork,
-		containerCPUs:    cfg.ContainerCPUs,
-		containerMemory:  cfg.ContainerMemory,
 		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
 		taskContainers:   &containerRegistry{},

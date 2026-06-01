@@ -188,9 +188,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		CodexAuthPath:    codexAuthPath,
 		HostClaudeBinary: envCfg.HostClaudeBinary,
 		HostCodexBinary:  envCfg.HostCodexBinary,
-		ContainerNetwork: envCfg.ContainerNetwork,
-		ContainerCPUs:    envCfg.ContainerCPUs,
-		ContainerMemory:  envCfg.ContainerMemory,
 		Prompts:          prompts.NewManager(promptsDir),
 		WorkspaceManager: wsMgr,
 		Reg:              reg,
@@ -277,9 +274,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		EnvFile:          cfg.EnvFile,
 		Fingerprint:      snapshot.Key,
 		InstructionsPath: snapshot.InstructionsPath,
-		Network:          envCfg.ContainerNetwork,
-		CPUs:             envCfg.ContainerCPUs,
-		Memory:           envCfg.ContainerMemory,
 		ConfigDir:        configDir,
 	})
 	h.SetPlanner(p)
