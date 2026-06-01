@@ -151,7 +151,6 @@ type Handler struct {
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache
 	fileIndex          *fileIndex
-	pulls              *pullTracker
 	spanCache          spanStatsCache
 
 	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
@@ -216,7 +215,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		diffCache:            newDiffCache(),
 		commitsBehindCache:   newCommitsBehindCache(constants.CommitsBehindCacheTTL),
 		fileIndex:            newFileIndex(),
-		pulls:                newPullTracker(),
 		startTime:            time.Now(),
 		ideationExploitRatio: constants.DefaultIdeationExploitRatio,
 		reg:                  reg,

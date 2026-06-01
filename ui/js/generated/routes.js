@@ -36,25 +36,6 @@ var Routes = {
     },
   },
 
-  images: {
-    // GET /api/images
-    status: function () {
-      return "/api/images";
-    },
-    // POST /api/images/pull
-    pull: function () {
-      return "/api/images/pull";
-    },
-    // DELETE /api/images
-    remove: function () {
-      return "/api/images";
-    },
-    // GET /api/images/pull/stream
-    pullStream: function () {
-      return "/api/images/pull/stream";
-    },
-  },
-
   files: {
     // GET /api/files
     list: function () {
@@ -441,6 +422,18 @@ var Routes = {
     // POST /api/auth/switch-org
     authSwitchOrg: function () {
       return "/api/auth/switch-org";
+    },
+    // POST /api/auth/device/start
+    authDeviceStart: function () {
+      return "/api/auth/device/start";
+    },
+    // GET /api/auth/device/poll
+    authDevicePoll: function () {
+      return "/api/auth/device/poll";
+    },
+    // POST /api/auth/device/cancel
+    authDeviceCancel: function () {
+      return "/api/auth/device/cancel";
     },
   },
 
