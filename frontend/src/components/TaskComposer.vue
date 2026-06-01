@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, computed } from 'vue';
+import { nextTick, ref, computed, onMounted } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import { parseTags, splitBatch } from '../lib/composer';
@@ -8,6 +8,7 @@ import type { PromptTemplate } from '../api/types';
 
 interface FlowOption { slug: string; name: string }
 
+const props = defineProps<{ autoExpand?: boolean }>();
 const store = useTaskStore();
 const prompt = ref('');
 const mentions = useMentions({ setValue: (v) => { prompt.value = v; }, priorityPrefix: 'spec/' });
@@ -86,6 +87,10 @@ function insertTemplate() {
     prompt.value = prompt.value ? prompt.value + '\n' + tmpl.body : tmpl.body;
   }
 }
+
+// When `autoExpand` is passed (typically by the BoardPage empty state),
+// open the composer on mount so the user sees the prompt textarea first.
+onMounted(() => { if (props.autoExpand) void expand(); });
 
 async function expand() {
   expanded.value = true;

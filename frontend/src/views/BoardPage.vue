@@ -44,6 +44,14 @@ const doneStats = computed(() => {
 
 const maxParallel = computed(() => store.config?.max_parallel ?? 5);
 
+// Empty-state composer: when the whole board is empty (no tasks across
+// every column, archived or not), show a centred prompt + auto-expanded
+// composer instead of the four columns. Mirrors ui/js/board-composer.js's
+// #board-empty-composer slot.
+const isEmptyBoard = computed(() =>
+  store.tasks.length === 0 && !store.loading,
+);
+
 async function archiveAllDone() {
   await api('POST', '/api/tasks/archive-done');
 }
@@ -128,7 +136,18 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
     </div>
   </header>
 
-  <main class="board-grid" id="board">
+  <main v-if="isEmptyBoard" class="board-empty">
+    <div class="board-empty__inner">
+      <h1 class="board-empty__title">What do you want to work on?</h1>
+      <p class="board-empty__hint">
+        Describe a task to kick things off. The board fills in as soon as
+        you save the first one.
+      </p>
+      <TaskComposer auto-expand class="board-empty__composer" />
+    </div>
+  </main>
+
+  <main v-else class="board-grid" id="board">
     <div class="col col-backlog">
       <div class="col-hd">
         <span class="col-dot" aria-hidden="true" />
@@ -210,3 +229,38 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
 
   <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
 </template>
+
+<style scoped>
+.board-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+}
+.board-empty__inner {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  text-align: center;
+}
+.board-empty__title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--fs-3xl, 28px);
+  color: var(--ink);
+  margin: 0;
+}
+.board-empty__hint {
+  margin: 0 0 4px;
+  color: var(--ink-3);
+  font-size: var(--fs-md);
+}
+.board-empty__composer {
+  text-align: left;
+}
+</style>
