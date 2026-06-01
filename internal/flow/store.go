@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/slugutil"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -130,13 +131,8 @@ func WriteUserFlow(dir string, f Flow) error {
 		return fmt.Errorf("marshal: %w", err)
 	}
 	path := filepath.Join(dir, f.Slug+".yaml")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, body, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", tmp, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("rename %s: %w", tmp, err)
+	if err := atomicfile.Write(path, body, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }
