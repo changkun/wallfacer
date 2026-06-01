@@ -211,6 +211,44 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Progress log
 
+- 2026-06-01: **Round-3 polish.** Document `<title>` reflects active
+  workspace + running task count (mirrors legacy ui/js/git.js).
+  TaskCard adds a `:title` attribute on the title row so truncated
+  titles stay reachable on hover. specFrontmatter detects a leading
+  `---` with no closing fence and exposes a `warning` field;
+  SpecFocusedView surfaces the warning inline so users notice typos
+  instead of silently dropping metadata. 5 new unit tests.
+- 2026-06-01: **Round-2 regression sweep — 12 items closed.**
+  1. Vue SPA is now the default; legacy UI behind WALLFACER_LEGACY_UI
+     (older WALLFACER_VUE_UI=false honoured for back-compat). 11
+     sub-tests cover the truth table.
+  2. Raise Budget action on TaskDetail (dialog.prompt × 2 → PATCH
+     max_cost_usd + max_input_tokens). Visible when failure_category
+     is budget_exceeded or stop_reason mentions budget.
+  3. Backlog editing in the detail aside — inline form for timeout /
+     model / tags / max_cost_usd / max_input_tokens with diff-only
+     PATCH so writes stay minimal.
+  4. Automation toggles UI (autopilot/autotest/autosubmit/autosync/
+     autopush) in SettingsTabExecution, each driving PUT /api/config.
+  5. Empty-workspace bootstrap: AppLayout auto-opens the picker on
+     first load when workspaces is empty; BoardPage shows an explicit
+     "Pick a workspace to begin" pane if the picker is dismissed.
+  6. Test action prompts for optional acceptance criteria, posts
+     {criteria} when set.
+  7. Cancel pending state — "Shutting down…" label + disabled
+     button held 1.5 s after the POST.
+  8. Modal focus trap + restoration (useFocusTrap composable) wired
+     into ConfirmDialog, WorkspacePicker, TaskDetail. aria-modal
+     added where it was missing.
+  9. Disconnect banner above the main slot when SSE stays down >1 s.
+  10. ContainerMonitor task cells become buttons that hash-route to
+      the task detail (matches legacy task link).
+  11. Tab ARIA roles on the main detail tabs (role=tab/tablist/
+      tabpanel + aria-selected/aria-controls).
+  12. Optimistic dnd: backlog reorder writes positions locally
+      before SSE delta arrives; backlog → in-progress flips status
+      locally and rolls back on failed PATCH.
+  13. Toast queue cap at 5 (oldest evicted on overflow, 4 tests).
 - 2026-06-01: **Post-audit regression fixes.** A parallel audit of the
   two frontends surfaced 8 real regressions that the headline tracker
   had missed; all closed in this push:
