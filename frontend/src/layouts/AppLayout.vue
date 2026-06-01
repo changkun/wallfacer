@@ -26,6 +26,13 @@ const sidebarCollapsed = ref(false);
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
+  // First-run guard: when the server has no active workspace yet, open
+  // the picker automatically so the user can wire one up before tasks
+  // fail with "no workspace selected" errors downstream. Mirrors the
+  // legacy ui/js/workspace.js workspacePickerRequired path.
+  if (!(store.config?.workspaces?.length)) {
+    ui.showWorkspaces = true;
+  }
 });
 
 const { connected } = useSse({

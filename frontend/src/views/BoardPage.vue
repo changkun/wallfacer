@@ -48,9 +48,11 @@ const maxParallel = computed(() => store.config?.max_parallel ?? 5);
 // every column, archived or not), show a centred prompt + auto-expanded
 // composer instead of the four columns. Mirrors ui/js/board-composer.js's
 // #board-empty-composer slot.
+const hasWorkspace = computed(() => (store.config?.workspaces?.length ?? 0) > 0);
 const isEmptyBoard = computed(() =>
-  store.tasks.length === 0 && !store.loading,
+  hasWorkspace.value && store.tasks.length === 0 && !store.loading,
 );
+const needsWorkspace = computed(() => store.config != null && !hasWorkspace.value);
 
 async function archiveAllDone() {
   await api('POST', '/api/tasks/archive-done');
@@ -136,7 +138,22 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
     </div>
   </header>
 
-  <main v-if="isEmptyBoard" class="board-empty">
+  <main v-if="needsWorkspace" class="board-empty">
+    <div class="board-empty__inner">
+      <h1 class="board-empty__title">Pick a workspace to begin</h1>
+      <p class="board-empty__hint">
+        Wallfacer scopes every task to a workspace directory. Choose
+        one (or more) before creating tasks.
+      </p>
+      <button
+        type="button"
+        class="composer__btn composer__btn--primary"
+        @click="ui.showWorkspaces = true"
+      >Open workspace picker</button>
+    </div>
+  </main>
+
+  <main v-else-if="isEmptyBoard" class="board-empty">
     <div class="board-empty__inner">
       <h1 class="board-empty__title">What do you want to work on?</h1>
       <p class="board-empty__hint">
