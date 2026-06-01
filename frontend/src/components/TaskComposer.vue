@@ -4,6 +4,7 @@ import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import { splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
+import DependencyPicker from './DependencyPicker.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
@@ -352,12 +353,10 @@ function onInput(e: Event) {
         <span class="composer__opt-label">Max tokens</span>
         <input v-model.number="maxInputTokens" class="composer__input composer__input--num" type="number" min="0" step="1000" placeholder="input" aria-label="Max input tokens" />
       </label>
-      <label v-if="depCandidates.length" class="composer__opt composer__opt--grow">
+      <div v-if="depCandidates.length" class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Depends on</span>
-        <select v-model="dependsOn" class="composer__select" multiple size="3" aria-label="Dependencies">
-          <option v-for="d in depCandidates" :key="d.id" :value="d.id">{{ d.label }}</option>
-        </select>
-      </label>
+        <DependencyPicker v-model="dependsOn" />
+      </div>
       <label class="composer__opt">
         <span class="composer__opt-label">Sandbox</span>
         <select v-model="sandbox" class="composer__select" aria-label="Sandbox override">

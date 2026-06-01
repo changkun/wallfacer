@@ -31,7 +31,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] command-palette — spec rows (fuzzy match on spec title/path, Plan section)
 - [ ] command-palette — "Sync with default" action for waiting/failed
 - [ ] templates — searchable anchored template picker (live filter, body preview, Esc/outside-click)
-- [ ] tasks — dependency picker search dropdown (auto-focus, filter, outside-click close)
+- [x] tasks — dependency picker search dropdown (auto-focus, filter, outside-click close)
 - [x] tasks — tag input: Backspace removes last tag on empty; comma commits
 - [x] tasks — flow-select updates composer placeholder/data-task-flow
 - [ ] workspace — browser folder create (/api/workspaces/mkdir) + rename (/api/workspaces/rename)
@@ -66,7 +66,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] events — keyboard shortcuts e/c/d/b (explorer/chat/dispatch/breakdown)
 
 ## Weaker (present but degraded)
-- [ ] tasks — dependency picker chips w/ remove buttons (vs plain select multiple)
+- [x] tasks — dependency picker chips w/ remove buttons (vs plain select multiple)
 - [ ] modal-diff — highlight.js syntax coloring in diffs
 - [x] modal-results — collapse older turns in <details>
 - [ ] modal-logs — impl-vs-test phase log separation
