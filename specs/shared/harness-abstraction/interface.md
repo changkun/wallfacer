@@ -1,6 +1,6 @@
 ---
 title: Harness interface and package skeleton
-status: drafted
+status: complete
 depends_on:
   - specs/shared/host-default.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - internal/sandbox/sandbox.go
 effort: small
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-02
 author: changkun
 dispatched_task_id: null
 ---
