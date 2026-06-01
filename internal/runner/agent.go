@@ -496,6 +496,20 @@ func (r *Runner) buildInspectorSpec(
 	}
 
 	workspaces := r.currentWorkspaces()
+	if r.HostMode() {
+		// Host backend ignores volumes; cwd is the first workspace.
+		spec.Entrypoint = ""
+		spec.Volumes = nil
+		for _, ws := range workspaces {
+			ws = strings.TrimSpace(ws)
+			if ws != "" {
+				spec.WorkDir = ws
+				break
+			}
+		}
+		return spec
+	}
+
 	var basenames []string
 	for _, ws := range workspaces {
 		ws = strings.TrimSpace(ws)
