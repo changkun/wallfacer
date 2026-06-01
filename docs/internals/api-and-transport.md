@@ -1,6 +1,6 @@
 # API & Transport
 
-This document covers the HTTP API surface, request processing pipeline, real-time event delivery (SSE), container runtime integration, metrics, and supporting infrastructure for the Wallfacer server.
+This document covers the HTTP API surface, request processing pipeline, real-time event delivery (SSE), host execution, metrics, and supporting infrastructure for the Wallfacer server.
 
 ## HTTP API
 
@@ -222,7 +222,7 @@ sequenceDiagram
 
 The same pattern applies to `GET /api/git/stream`, except the source is a time-based ticker (polling `git status` every few seconds) rather than a store write signal.
 
-Live container logs use a different mechanism: `GET /api/tasks/{id}/logs` opens a process pipe to `<runtime> logs -f <name>` and streams its stdout line-by-line as SSE events.
+Live task logs use a different mechanism: `GET /api/tasks/{id}/logs` streams the running agent process's live-log reader (`runner.TaskLogReader`) line-by-line as SSE events.
 
 ### Task Stream (`GET /api/tasks/stream`)
 
@@ -336,51 +336,20 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 - **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
 - **Frontend** (`ui/js/terminal.js`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
 
-## Container Runtime
+## Host Execution
 
-### Auto-Detection Order
+Each task runs as a host process: the runner builds a launch spec and the host backend (`internal/executor`) execs the selected agent CLI (`claude` or `codex`, chosen by `WALLFACER_AGENT`) directly, with the task's git worktree as the working directory.
 
-`detectContainerRuntime()` in `main.go` probes for a container runtime in this order:
+### Process Tracking
 
-1. `CONTAINER_CMD` environment variable — if set, used verbatim (highest priority).
-2. `/opt/podman/bin/podman` — checks for the file with `os.Stat`.
-3. `podman` on `$PATH` — found via `exec.LookPath`.
-4. `docker` on `$PATH` — found via `exec.LookPath`.
-5. Falls back to `/opt/podman/bin/podman` as a hardcoded default (so the error message is clear when nothing is found).
-
-The `-container` CLI flag can also override the detected runtime.
-
-### Podman vs Docker Format Differences
-
-The server handles format differences transparently in `parseContainerList()` (`internal/runner/runner.go`):
-
-| Aspect | Podman | Docker |
-|---|---|---|
-| `ps --format json` output | JSON array (`[{...}, ...]`) | NDJSON (one `{...}` per line) |
-| `Names` field | `[]string` | `string` |
-| `Created` field | `int64` (unix timestamp) | `string` (formatted datetime) |
-
-The `containerJSON` struct uses `json.RawMessage` for `Names` and `any` for `Created`, then tries both formats in sequence.
-
-### Image Pull Logic
-
-`ensureImage()` in `server.go` runs at startup:
-
-1. **Check local**: `<runtime> images -q <image>` — if output is non-empty, the image exists locally and is used as-is.
-2. **Pull from registry**: `<runtime> pull <image>` — streams stdout/stderr to the terminal. The default image is `ghcr.io/latere-ai/sandbox-agents:latest`.
-3. **Fallback to local**: If the pull fails and the requested image differs from `sandbox-agents:latest`, check whether `sandbox-agents:latest` exists locally. If so, use it instead.
-4. **No image**: If neither the remote nor local fallback is available, the server starts anyway but warns that tasks may fail.
-
-### Container Labels
-
-Every task container is labeled with metadata for monitoring and correlation:
+Each launch spec is tagged with task metadata:
 
 ```
---label wallfacer.task.id=<uuid>
---label wallfacer.task.prompt=<first 80 chars>
+wallfacer.task.id=<uuid>
+wallfacer.task.prompt=<first 80 chars>
 ```
 
-These labels are set in `buildContainerArgsForSandbox()` (`internal/runner/container.go`). The `ListContainers()` method reads these labels to correlate containers to tasks without relying on container name parsing — this is the primary lookup path, with name-based UUID extraction as a legacy fallback.
+These labels are set by the runner (`internal/runner/container.go`, `agent.go`). The host backend records them per running process and surfaces them via `ContainerInfo.TaskID` on `List()`; `ListContainers()` uses this to correlate running processes to tasks.
 
 ## Metrics Reference
 
