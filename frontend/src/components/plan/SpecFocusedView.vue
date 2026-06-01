@@ -343,6 +343,11 @@ onMounted(() => {
 onUnmounted(() => {
   bodyRef.value?.removeEventListener('click', onBodyClick);
 });
+
+// Exposed for the PlanPage keyboard shortcuts (d = dispatch, b = break down).
+function dispatchFocused() { if (showDispatch.value) void onDispatch(); }
+function breakdownFocused() { if (showBreakdown.value) onBreakdown(); }
+defineExpose({ dispatchFocused, breakdownFocused });
 </script>
 
 <template>

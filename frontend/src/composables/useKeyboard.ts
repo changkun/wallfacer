@@ -7,6 +7,8 @@ export interface KeyboardActions {
   onSettings?: () => void;
   onTerminal?: () => void;
   onShortcuts?: () => void;
+  onExplorer?: () => void;
+  onToggleMode?: () => void;
 }
 
 export function useKeyboard(actions: KeyboardActions) {
@@ -52,6 +54,18 @@ export function useKeyboard(actions: KeyboardActions) {
     if (e.key === 'n') {
       e.preventDefault();
       actions.onNewTask?.();
+      return;
+    }
+
+    // e = open the file explorer; p = toggle board ↔ plan (legacy ui shortcuts).
+    if (e.key === 'e') {
+      e.preventDefault();
+      actions.onExplorer?.();
+      return;
+    }
+    if (e.key === 'p') {
+      e.preventDefault();
+      actions.onToggleMode?.();
     }
   }
 
