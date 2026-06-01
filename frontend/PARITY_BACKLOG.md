@@ -60,7 +60,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] markdown — modal/card markdown helper actions (toggle section, copy)
 - [x] state — pendingCancel "cancelling" indicator (done earlier in TaskDetail)
 - [x] state — active-group badge tracking (live for active group, config active_groups for background)
-- [ ] task-stream — waitForTaskTitle resilience (poll until non-empty)
+- [~] task-stream — waitForTaskTitle (N/A: SPA renders title reactively via SSE store + stale-restart/visibilitychange refetch; no imperative poll-wait needed)
 - [x] dispatch-toast — dispatched-task pulse highlight on board
 - [ ] utils — mobile column nav (IntersectionObserver pill)
 - [ ] events — keyboard shortcuts e/c/d/b (explorer/chat/dispatch/breakdown)
@@ -90,7 +90,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] envconfig — OAuth button visibility reactive to base-URL (verified: showClaudeOauthBtn/showCodexOauthBtn)
 - [~] instructions — preloadedContent for re-init (DEAD: only test fixtures pass preloadedContent; sole production caller passes none. Real open+reinit flow is implemented.)
 - [x] events — visibilitychange→fetchTasks on tab refocus
-- [ ] task-stream — waitForTaskDelta SSE-resolve optimization
+- [~] task-stream — waitForTaskDelta (N/A: reactive SSE store replaces the imperative delta-wait; createTask updates reactively)
 - [x] workspace — group popover active/switching state
 - [ ] spec-mode — focused-view crossfade epoch-guard against click-spam
 - [ ] spec-explorer — Task Prompts SSE subscription to stay fresh
