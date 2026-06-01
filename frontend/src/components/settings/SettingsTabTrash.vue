@@ -2,11 +2,13 @@
 import { ref, onMounted } from 'vue';
 import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
+import { useToastStore } from '../../stores/toast';
 import type { Task } from '../../api/types';
 
 const TRASH_BIN_RETENTION_DAYS = 7;
 
 const store = useTaskStore();
+const toast = useToastStore();
 
 const deletedTasks = ref<Task[]>([]);
 const trashLoading = ref(false);
@@ -36,6 +38,7 @@ async function restoreTask(id: string) {
     await api('POST', `/api/tasks/${id}/restore`);
     deletedTasks.value = deletedTasks.value.filter((t) => t.id !== id);
     await store.fetchTasks();
+    toast.push('Task restored to the board', { kind: 'success' });
   } catch (e) {
     console.error('restore task:', e);
     trashError.value = e instanceof Error ? e.message : 'Failed to restore';
