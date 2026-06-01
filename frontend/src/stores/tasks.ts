@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { api } from '../api/client';
 import { useUiStore } from './ui';
+import { matchesTaskFilter } from '../lib/taskFilter';
 import type { Task, ServerConfig } from '../api/types';
 
 export const useTaskStore = defineStore('tasks', () => {
@@ -12,19 +13,10 @@ export const useTaskStore = defineStore('tasks', () => {
   const ui = useUiStore();
 
   function matchesFilter(t: Task): boolean {
-    const q = filterQuery.value;
-    if (!q) return true;
-    // `#tag` searches only tags (case-insensitive equality after the #).
-    // Otherwise the query matches title / prompt / id-prefix / any tag.
-    if (q.startsWith('#') && q.length > 1) {
-      const wanted = q.slice(1);
-      return !!t.tags?.some((tag) => tag.toLowerCase() === wanted);
-    }
-    return (t.title || '').toLowerCase().includes(q)
-      || t.prompt.toLowerCase().includes(q)
-      || t.id.startsWith(q)
-      || t.tags?.some(tag => tag.toLowerCase().includes(q))
-      || false;
+    // Multi-token AND search with #tag filters — see lib/taskFilter (ported
+    // from ui/js/search.js's matchesFilter). The `@`-prefixed server search
+    // is handled separately by SearchBar handing off to the command palette.
+    return matchesTaskFilter(t, filterQuery.value);
   }
 
   const backlog = computed(() =>
