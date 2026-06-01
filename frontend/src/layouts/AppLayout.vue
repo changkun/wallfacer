@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
@@ -49,6 +49,25 @@ const { connected } = useSse({
   onStaleRestart: () => { void store.fetchTasks({ includeArchived: ui.showArchived }); },
 });
 
+// Show an obvious banner the moment the SSE stream goes down so the
+// user can't mistake stale data for live data. Hold a 1 s grace
+// period before showing — fleeting tab focus changes shouldn't flash
+// the banner — and hide immediately on reconnect.
+const showDisconnectBanner = ref(false);
+let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+watch(connected, (now) => {
+  if (now) {
+    if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; }
+    showDisconnectBanner.value = false;
+    return;
+  }
+  if (disconnectTimer) return;
+  disconnectTimer = setTimeout(() => {
+    showDisconnectBanner.value = true;
+    disconnectTimer = null;
+  }, 1000);
+});
+
 useKeyboard({
   onSearch: () => { ui.showPalette = true; },
   onFocusSearch: () => document.querySelector<HTMLInputElement>('.task-search-input')?.focus(),
@@ -69,6 +88,15 @@ useKeyboard({
       @containers="ui.showContainers = true"
     />
     <div class="app-main">
+      <div
+        v-if="showDisconnectBanner"
+        class="app-disconnected-banner"
+        role="status"
+        aria-live="polite"
+      >
+        <span aria-hidden="true">⚠</span>
+        Live updates paused — server unreachable. Reconnecting…
+      </div>
       <slot :connected="connected" />
       <TerminalPanel />
       <StatusBar :connected="connected" @shortcuts="ui.openShortcuts()" />
@@ -99,5 +127,15 @@ useKeyboard({
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+}
+.app-disconnected-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: color-mix(in oklab, var(--warn, #c87b1c) 18%, var(--bg-card));
+  color: var(--ink);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
 }
 </style>
