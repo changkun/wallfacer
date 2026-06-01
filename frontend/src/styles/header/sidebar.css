@@ -224,6 +224,20 @@ html.wails-desktop .app-sidebar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sb-ws-popover__counts {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.sb-ws-popover__counts .badge {
+  font-size: 9px;
+  padding: 1px 5px;
+}
+.sb-ws-popover__switching {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
 .sb-ws-popover__divider {
   height: 1px;
   background: var(--rule);

@@ -111,6 +111,7 @@ export interface ServerConfig {
   terminal_enabled: boolean;
   cloud_mode: boolean;
   ideation_categories?: string[];
+  active_groups?: { key: string; in_progress: number; waiting: number }[];
 }
 
 export interface EnvConfig {

@@ -28,9 +28,21 @@ const toast = useToastStore();
 // emit('workspaces') for the case where the user wants to compose a
 // brand-new group from scratch.
 const wsPopoverOpen = ref(false);
+const switchingKey = ref('');
 const workspaceGroups = computed<WorkspaceGroup[]>(
   () => store.config?.workspace_groups ?? [],
 );
+
+// Per-group running/waiting badge. The active group reads the live task list
+// for instant updates; background groups use the server's active_groups info
+// (refreshed via /api/config). Mirrors ui/js/workspace.js activeGroupBadgeHtml.
+function groupBadge(g: WorkspaceGroup): { inProgress: number; waiting: number } {
+  if (isActiveGroup(g)) {
+    return { inProgress: store.inProgress.length, waiting: store.waiting.length };
+  }
+  const info = (store.config?.active_groups ?? []).find((a) => a.key === g.key);
+  return { inProgress: info?.in_progress ?? 0, waiting: info?.waiting ?? 0 };
+}
 function activeKey(): string {
   return JSON.stringify(store.config?.workspaces ?? []);
 }
@@ -38,15 +50,21 @@ function isActiveGroup(g: WorkspaceGroup): boolean {
   return JSON.stringify(g.workspaces) === activeKey();
 }
 async function switchToGroup(g: WorkspaceGroup) {
-  wsPopoverOpen.value = false;
-  if (isActiveGroup(g)) return;
+  if (isActiveGroup(g) || switchingKey.value) return;
+  switchingKey.value = g.key ?? JSON.stringify(g.workspaces);
   try {
     await api('PUT', '/api/workspaces', { workspaces: g.workspaces });
-    await store.fetchConfig();
+    await Promise.all([store.fetchConfig(), store.fetchTasks({ includeArchived: ui.showArchived })]);
     toast.push(`Switched to ${g.name || 'workspace'}`, { kind: 'success' });
+    wsPopoverOpen.value = false;
   } catch (e) {
     toast.push(`Switch failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  } finally {
+    switchingKey.value = '';
   }
+}
+function isSwitching(g: WorkspaceGroup): boolean {
+  return switchingKey.value === (g.key ?? JSON.stringify(g.workspaces));
 }
 async function renameGroup(g: WorkspaceGroup) {
   const name = await dialog.prompt({
@@ -230,6 +248,11 @@ watch(wsPopoverOpen, (open) => {
         >
           <span class="sb-ws-popover__check">{{ isActiveGroup(g) ? '✓' : '' }}</span>
           <span class="sb-ws-popover__label">{{ g.name || g.workspaces[0] || 'Workspace' }}</span>
+          <span v-if="isSwitching(g)" class="sb-ws-popover__switching">switching…</span>
+          <span v-else class="sb-ws-popover__counts">
+            <span v-if="groupBadge(g).inProgress > 0" class="badge badge-in_progress" :title="`${groupBadge(g).inProgress} running`">{{ groupBadge(g).inProgress }}</span>
+            <span v-if="groupBadge(g).waiting > 0" class="badge badge-waiting" :title="`${groupBadge(g).waiting} waiting`">{{ groupBadge(g).waiting }}</span>
+          </span>
           <span class="sb-ws-popover__row-actions">
             <button
               type="button"
