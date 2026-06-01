@@ -245,22 +245,27 @@ func (h *Handler) RenamePlanningThread(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
-// ArchivePlanningThread hides a thread from the tab bar. The thread
-// currently serving an in-flight exec cannot be archived (409).
-func (h *Handler) ArchivePlanningThread(w http.ResponseWriter, r *http.Request) {
+// mutatePlanningThread is the shared scaffold for the three single-
+// verb planning-thread mutations (archive, unarchive, activate). Each
+// dedicated handler delegates here with its own ThreadManager call;
+// the require-configured, busy-check (archive only), apply, refresh
+// meta, and response shape stay identical across the trio.
+func (h *Handler) mutatePlanningThread(
+	w http.ResponseWriter, r *http.Request,
+	busyConflict string,
+	apply func(*planner.ThreadManager, string) error,
+) {
 	tm := h.threadsManager()
 	if tm == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
 		return
 	}
 	id := r.PathValue("id")
-	if h.planner != nil && h.planner.BusyThreadID() == id {
-		httpjson.Write(w, http.StatusConflict, map[string]any{
-			"error": "thread is busy; interrupt or wait before archiving",
-		})
+	if busyConflict != "" && h.planner != nil && h.planner.BusyThreadID() == id {
+		httpjson.Write(w, http.StatusConflict, map[string]any{"error": busyConflict})
 		return
 	}
-	if err := tm.Archive(id); err != nil {
+	if err := apply(tm, id); err != nil {
 		writeThreadErr(w, err)
 		return
 	}
@@ -271,46 +276,23 @@ func (h *Handler) ArchivePlanningThread(w http.ResponseWriter, r *http.Request) 
 	}
 	mode, taskID := threadMode(tm, id)
 	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
+}
+
+// ArchivePlanningThread hides a thread from the tab bar. The thread
+// currently serving an in-flight exec cannot be archived (409).
+func (h *Handler) ArchivePlanningThread(w http.ResponseWriter, r *http.Request) {
+	h.mutatePlanningThread(w, r,
+		"thread is busy; interrupt or wait before archiving",
+		(*planner.ThreadManager).Archive,
+	)
 }
 
 // UnarchivePlanningThread restores a thread to the visible tab set.
 func (h *Handler) UnarchivePlanningThread(w http.ResponseWriter, r *http.Request) {
-	tm := h.threadsManager()
-	if tm == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
-		return
-	}
-	id := r.PathValue("id")
-	if err := tm.Unarchive(id); err != nil {
-		writeThreadErr(w, err)
-		return
-	}
-	meta, err := tm.Meta(id)
-	if err != nil {
-		writeThreadErr(w, err)
-		return
-	}
-	mode, taskID := threadMode(tm, id)
-	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
+	h.mutatePlanningThread(w, r, "", (*planner.ThreadManager).Unarchive)
 }
 
 // ActivatePlanningThread records a new active thread for the UI.
 func (h *Handler) ActivatePlanningThread(w http.ResponseWriter, r *http.Request) {
-	tm := h.threadsManager()
-	if tm == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
-		return
-	}
-	id := r.PathValue("id")
-	if err := tm.SetActiveID(id); err != nil {
-		writeThreadErr(w, err)
-		return
-	}
-	meta, err := tm.Meta(id)
-	if err != nil {
-		writeThreadErr(w, err)
-		return
-	}
-	mode, taskID := threadMode(tm, id)
-	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
+	h.mutatePlanningThread(w, r, "", (*planner.ThreadManager).SetActiveID)
 }
