@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -37,14 +37,14 @@ type Config struct {
 	CodexDefaultModel string // CODEX_DEFAULT_MODEL
 	CodexTitleModel   string // CODEX_TITLE_MODEL
 
-	DefaultSandbox        sandbox.Type // WALLFACER_DEFAULT_SANDBOX
-	ImplementationSandbox sandbox.Type // WALLFACER_SANDBOX_IMPLEMENTATION
-	TestingSandbox        sandbox.Type // WALLFACER_SANDBOX_TESTING
-	TitleSandbox          sandbox.Type // WALLFACER_SANDBOX_TITLE
-	OversightSandbox      sandbox.Type // WALLFACER_SANDBOX_OVERSIGHT
-	CommitMessageSandbox  sandbox.Type // WALLFACER_SANDBOX_COMMIT_MESSAGE
-	IdeaAgentSandbox      sandbox.Type // WALLFACER_SANDBOX_IDEA_AGENT
-	SandboxFast           bool         // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
+	DefaultSandbox        harness.ID // WALLFACER_DEFAULT_SANDBOX
+	ImplementationSandbox harness.ID // WALLFACER_SANDBOX_IMPLEMENTATION
+	TestingSandbox        harness.ID // WALLFACER_SANDBOX_TESTING
+	TitleSandbox          harness.ID // WALLFACER_SANDBOX_TITLE
+	OversightSandbox      harness.ID // WALLFACER_SANDBOX_OVERSIGHT
+	CommitMessageSandbox  harness.ID // WALLFACER_SANDBOX_COMMIT_MESSAGE
+	IdeaAgentSandbox      harness.ID // WALLFACER_SANDBOX_IDEA_AGENT
+	SandboxFast           bool       // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
 	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
 	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
@@ -184,19 +184,19 @@ func Parse(path string) (Config, error) {
 		case "CODEX_TITLE_MODEL":
 			cfg.CodexTitleModel = v
 		case "WALLFACER_DEFAULT_SANDBOX":
-			cfg.DefaultSandbox = sandbox.Normalize(v)
+			cfg.DefaultSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_IMPLEMENTATION":
-			cfg.ImplementationSandbox = sandbox.Normalize(v)
+			cfg.ImplementationSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_TESTING":
-			cfg.TestingSandbox = sandbox.Normalize(v)
+			cfg.TestingSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_TITLE":
-			cfg.TitleSandbox = sandbox.Normalize(v)
+			cfg.TitleSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_OVERSIGHT":
-			cfg.OversightSandbox = sandbox.Normalize(v)
+			cfg.OversightSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_COMMIT_MESSAGE":
-			cfg.CommitMessageSandbox = sandbox.Normalize(v)
+			cfg.CommitMessageSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_IDEA_AGENT":
-			cfg.IdeaAgentSandbox = sandbox.Normalize(v)
+			cfg.IdeaAgentSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_FAST":
 			cfg.SandboxFast = v != "false"
 		case "WALLFACER_HOST_CLAUDE_BINARY":
@@ -322,8 +322,8 @@ func FormatWorkspaces(workspaces []string) string {
 }
 
 // SandboxByActivity returns the per-activity sandbox type overrides derived from config.
-func (c Config) SandboxByActivity() map[store.SandboxActivity]sandbox.Type {
-	out := map[store.SandboxActivity]sandbox.Type{}
+func (c Config) SandboxByActivity() map[store.SandboxActivity]harness.ID {
+	out := map[store.SandboxActivity]harness.ID{}
 	if c.ImplementationSandbox != "" {
 		out[store.SandboxActivityImplementation] = c.ImplementationSandbox
 	}
@@ -487,7 +487,7 @@ func UpdateWorkspaces(path string, workspaces []string) error {
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
 // sandboxByActivity supports keys: implementation, testing, title,
 // oversight, commit_message, idea_agent.
-func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByActivity map[store.SandboxActivity]sandbox.Type) error {
+func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByActivity map[store.SandboxActivity]harness.ID) error {
 	var impl, test, title, oversight, commit, idea *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
@@ -502,33 +502,33 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		title, oversight, commit, idea = &emptyTitle, &emptyOversight, &emptyCommit, &emptyIdea
 
 		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(harness.NormalizeID(string(v)))
 			impl = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityTesting]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(harness.NormalizeID(string(v)))
 			test = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityTitle]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(harness.NormalizeID(string(v)))
 			title = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityOversight]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(harness.NormalizeID(string(v)))
 			oversight = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityCommitMessage]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(harness.NormalizeID(string(v)))
 			commit = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityIdeaAgent]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(harness.NormalizeID(string(v)))
 			idea = &s
 		}
 	}
 
 	if defaultSandbox != nil {
-		s := string(sandbox.Normalize(string(*defaultSandbox)))
+		s := string(harness.NormalizeID(string(*defaultSandbox)))
 		defaultSandboxValue = &s
 	}
 
