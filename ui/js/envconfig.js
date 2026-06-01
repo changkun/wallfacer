@@ -201,12 +201,6 @@ function buildSaveEnvPayload() {
   // server clears any legacy env entries on save.
   const sandboxByActivity = {};
   const sandboxFastEl = document.getElementById("env-sandbox-fast");
-  const containerCPUs = document.getElementById("env-container-cpus")
-    ? document.getElementById("env-container-cpus").value.trim()
-    : "";
-  const containerMemory = document.getElementById("env-container-memory")
-    ? document.getElementById("env-container-memory").value.trim()
-    : "";
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
   if (apiKeyRaw) body.api_key = apiKeyRaw;
@@ -220,8 +214,6 @@ function buildSaveEnvPayload() {
   body.default_sandbox = defaultSandbox;
   body.sandbox_by_activity = sandboxByActivity;
   body.sandbox_fast = sandboxFastEl ? !!sandboxFastEl.checked : true;
-  body.container_cpus = containerCPUs; // empty = clear
-  body.container_memory = containerMemory; // empty = clear
   return body;
 }
 
@@ -366,12 +358,6 @@ async function loadEnvConfig() {
   safeSetValue("env-sandbox-fast", (el) => {
     el.checked = true;
   });
-  safeSetValue("env-container-cpus", (el) => {
-    el.value = "";
-  });
-  safeSetValue("env-container-memory", (el) => {
-    el.value = "";
-  });
   safeSetValue("env-config-status", (el) => {
     el.textContent = "";
   });
@@ -441,12 +427,6 @@ async function loadEnvConfig() {
   // Per-activity sandbox dropdowns retired — any legacy values on
   // cfg.sandbox_by_activity are ignored. Workspace-wide harness
   // routing lives on the agent definition now.
-  safeSetValue("env-container-cpus", (el) => {
-    el.value = cfg.container_cpus || "";
-  });
-  safeSetValue("env-container-memory", (el) => {
-    el.value = cfg.container_memory || "";
-  });
   safeSetValue("env-config-status", (el) => {
     if (el.textContent === "Failed to load configuration.") return;
     el.textContent = "";

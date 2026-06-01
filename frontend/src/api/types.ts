@@ -119,9 +119,6 @@ export interface EnvConfig {
   auto_push_enabled: boolean;
   auto_push_threshold: number;
   sandbox_fast: boolean;
-  container_network: string;
-  container_cpus: string;
-  container_memory: string;
 }
 
 export interface EnvUpdatePayload {
@@ -143,8 +140,6 @@ export interface EnvUpdatePayload {
   auto_push_enabled?: boolean;
   auto_push_threshold?: number;
   sandbox_fast?: boolean;
-  container_cpus?: string;
-  container_memory?: string;
 }
 
 export interface SystemPromptTemplate {
