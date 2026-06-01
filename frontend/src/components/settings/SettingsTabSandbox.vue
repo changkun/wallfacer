@@ -4,17 +4,13 @@ import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import { useEnvConfig } from '../../composables/useEnvConfig';
 import { claudeModelsFor, codexModelsFor } from '../../lib/knownModels';
-import { useDialogStore } from '../../stores/dialog';
 import type {
   EnvConfig,
   EnvUpdatePayload,
-  SandboxImagesResponse,
-  SandboxImageInfo,
   SandboxTestResponse,
 } from '../../api/types';
 
 const taskStore = useTaskStore();
-const dialog = useDialogStore();
 const { env, fetchEnv, updateEnv } = useEnvConfig();
 
 // --- Host-mode banner ---
@@ -22,133 +18,6 @@ const hostMode = computed(() => taskStore.config?.host_mode === true);
 
 // --- Sandbox list ---
 const sandboxes = computed<string[]>(() => taskStore.config?.sandboxes ?? []);
-
-// --- Image status ---
-const images = ref<SandboxImageInfo[]>([]);
-const imagesLoading = ref(false);
-const imagesError = ref('');
-const pulling = ref<Record<string, boolean>>({});
-
-interface PullProgress {
-  phase: string;
-  layersDone: number;
-  line: string;
-}
-const pullProgress = ref<Record<string, PullProgress>>({});
-const pullStreams = new Map<string, EventSource>();
-
-function progressLabel(sandbox: string): string {
-  const p = pullProgress.value[sandbox];
-  if (!p) return '';
-  const phase = p.phase || 'pulling';
-  if (p.layersDone > 0) return `${phase} (${p.layersDone} layer${p.layersDone === 1 ? '' : 's'})`;
-  return phase;
-}
-
-async function loadImages(): Promise<void> {
-  imagesLoading.value = true;
-  imagesError.value = '';
-  try {
-    const data = await api<SandboxImagesResponse>('GET', '/api/images');
-    images.value = Array.isArray(data.images) ? data.images : [];
-  } catch (e) {
-    imagesError.value = e instanceof Error ? e.message : String(e);
-  } finally {
-    imagesLoading.value = false;
-  }
-}
-
-function streamUrlFor(pullId: string): string {
-  const base = `/api/images/pull/stream?pull_id=${encodeURIComponent(pullId)}`;
-  const key = window.__WALLFACER__?.serverApiKey;
-  return key ? `${base}&token=${encodeURIComponent(key)}` : base;
-}
-
-function clearPullState(sandbox: string) {
-  const next = { ...pulling.value };
-  delete next[sandbox];
-  pulling.value = next;
-  const prog = { ...pullProgress.value };
-  delete prog[sandbox];
-  pullProgress.value = prog;
-  pullStreams.get(sandbox)?.close();
-  pullStreams.delete(sandbox);
-}
-
-async function pullImage(sandbox: string): Promise<void> {
-  pulling.value = { ...pulling.value, [sandbox]: true };
-  pullProgress.value = { ...pullProgress.value, [sandbox]: { phase: 'starting', layersDone: 0, line: '' } };
-  try {
-    const resp = await api<{ pull_id: string }>('POST', '/api/images/pull', { sandbox });
-    const pullId = resp?.pull_id;
-    if (!pullId || typeof EventSource === 'undefined') {
-      // No pull_id or no SSE support — fall back to one delayed reload.
-      window.setTimeout(async () => {
-        await loadImages();
-        clearPullState(sandbox);
-      }, 4000);
-      return;
-    }
-    const es = new EventSource(streamUrlFor(pullId));
-    pullStreams.set(sandbox, es);
-    es.addEventListener('progress', (ev) => {
-      try {
-        const data = JSON.parse((ev as MessageEvent).data);
-        pullProgress.value = {
-          ...pullProgress.value,
-          [sandbox]: {
-            phase: data.phase ?? '',
-            layersDone: data.layers_done ?? 0,
-            line: data.line ?? '',
-          },
-        };
-      } catch {
-        // skip malformed progress event
-      }
-    });
-    es.addEventListener('done', async () => {
-      await loadImages();
-      clearPullState(sandbox);
-    });
-    es.addEventListener('error', async (ev) => {
-      // The server-sent 'error' event arrives via addEventListener with a
-      // MessageEvent.data payload; raw transport errors come through the
-      // same event but without data. Surface the message if present, then
-      // close out the pull.
-      const raw = (ev as MessageEvent).data;
-      if (typeof raw === 'string' && raw) {
-        try {
-          const obj = JSON.parse(raw);
-          if (obj?.error) imagesError.value = String(obj.error);
-        } catch {
-          imagesError.value = raw;
-        }
-      }
-      await loadImages();
-      clearPullState(sandbox);
-    });
-  } catch (e) {
-    imagesError.value = e instanceof Error ? e.message : String(e);
-    clearPullState(sandbox);
-  }
-}
-
-async function deleteImage(sandbox: string): Promise<void> {
-  const ok = await dialog.confirm({
-    title: 'Remove sandbox image',
-    message: `Remove the ${sandbox} sandbox image? You can re-pull it later from this same panel.`,
-    confirmLabel: 'Remove',
-    cancelLabel: 'Keep',
-    danger: true,
-  });
-  if (!ok) return;
-  try {
-    await api('DELETE', '/api/images', { sandbox });
-    await loadImages();
-  } catch (e) {
-    imagesError.value = e instanceof Error ? e.message : String(e);
-  }
-}
 
 // --- Form state (local refs bound to inputs) ---
 const oauthToken = ref('');
@@ -459,7 +328,7 @@ async function cancelOauthFlow(provider: 'claude' | 'codex'): Promise<void> {
 
 // --- Mount ---
 onMounted(async () => {
-  await Promise.all([fetchEnv(), loadImages()]);
+  await fetchEnv();
   applyEnvToForm(env.value);
 });
 
@@ -471,8 +340,6 @@ onUnmounted(() => {
       oauthPollers[provider] = undefined;
     }
   }
-  for (const es of pullStreams.values()) es.close();
-  pullStreams.clear();
 });
 
 function capitalize(s: string): string {
@@ -506,74 +373,6 @@ function capitalize(s: string): string {
           Wallfacer cannot prevent an agent from writing outside the worktree.
           Recommended only on trusted machines.
         </p>
-      </div>
-    </div>
-
-    <!-- Container Images -->
-    <div class="settings-card" style="margin-bottom: 12px">
-      <div class="settings-card-head">
-        <h4>Container Images</h4>
-        <p>
-          Sandbox images are pulled automatically on first use. You can also pull
-          or re-pull them here.
-        </p>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 8px">
-        <div v-if="imagesLoading" style="font-size: 12px; color: var(--text-muted);">Loading...</div>
-        <div v-else-if="imagesError" style="font-size: 12px; color: var(--text-error, red);">
-          Failed to load image status.
-        </div>
-        <template v-else>
-          <div
-            v-for="img in images"
-            :key="img.sandbox"
-            style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;"
-          >
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-weight: 600; text-transform: capitalize;">{{ img.sandbox }}</div>
-              <div
-                style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
-                :title="img.image"
-              >
-                {{ img.image }}
-              </div>
-              <div v-if="img.size" style="font-size: 11px; color: var(--text-muted);">
-                Size: {{ img.size }}
-              </div>
-            </div>
-            <span
-              v-if="pulling[img.sandbox]"
-              :title="pullProgress[img.sandbox]?.line || ''"
-              style="display: inline-block; padding: 1px 6px; border-radius: 4px; background: #fef9c3; color: #854d0e; font-size: 11px; font-weight: 600;"
-            >{{ progressLabel(img.sandbox) || 'Pulling…' }}</span>
-            <span
-              v-else-if="img.cached"
-              style="display: inline-block; padding: 1px 6px; border-radius: 4px; background: #dcfce7; color: #166534; font-size: 11px; font-weight: 600;"
-            >Cached</span>
-            <span
-              v-else
-              style="display: inline-block; padding: 1px 6px; border-radius: 4px; background: #fef2f2; color: #991b1b; font-size: 11px; font-weight: 600;"
-            >Missing</span>
-            <button
-              type="button"
-              class="btn-icon"
-              style="font-size: 12px; padding: 4px 10px; white-space: nowrap;"
-              :disabled="pulling[img.sandbox]"
-              @click="pullImage(img.sandbox)"
-            >
-              {{ pulling[img.sandbox] ? 'Pulling…' : (img.cached ? 'Re-pull' : 'Pull') }}
-            </button>
-            <button
-              v-if="img.cached && !pulling[img.sandbox]"
-              type="button"
-              class="btn-icon"
-              style="font-size: 12px; padding: 4px 10px; white-space: nowrap; color: var(--text-error, #dc2626);"
-              @click="deleteImage(img.sandbox)"
-            >
-              Delete
-            </button>
-          </div>
-        </template>
       </div>
     </div>
 

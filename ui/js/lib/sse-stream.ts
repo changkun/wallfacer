@@ -7,8 +7,7 @@
 //   - Single stop() that disables further auto-reconnect
 //
 // Used by explorer.js, spec-explorer.js, and git.js (leader path).
-// api.js (tasks stream) and images.js (pull progress) keep bespoke logic
-// because they carry resume IDs and per-pull lifetimes.
+// api.js (tasks stream) keeps bespoke logic because it carries resume IDs.
 
 declare function withAuthToken(url: string): string;
 
