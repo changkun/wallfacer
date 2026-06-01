@@ -57,7 +57,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] flows — step input_from relationship shown (verified: chip title tooltip)
 - [x] envconfig — first-launch "no credentials" alert banner
 - [x] trash-bin — restore-success toast
-- [ ] markdown — modal/card markdown helper actions (toggle section, copy)
+- [x] markdown — modal markdown helper actions (Spec/Result rendered/raw toggle + copy)
 - [x] state — pendingCancel "cancelling" indicator (done earlier in TaskDetail)
 - [x] state — active-group badge tracking (live for active group, config active_groups for background)
 - [~] task-stream — waitForTaskTitle (N/A: SPA renders title reactively via SSE store + stale-restart/visibilitychange refetch; no imperative poll-wait needed)
