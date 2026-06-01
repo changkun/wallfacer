@@ -18,7 +18,7 @@
         "@unhead/vue": "^2.0.0",
         "@xterm/addon-fit": "^0.11.0",
         "@xterm/xterm": "^6.0.0",
-        "latere-ui": "github:latere-ai/latere-ui#v1.2.3",
+        "latere-ui": "github:latere-ai/latere-ui#v1.8.1",
         "markdown-it": "^14.1.0",
         "markdown-it-anchor": "^9.2.0",
         "mermaid": "^11.14.0",
@@ -573,7 +573,7 @@
 
     "langium": ["langium@4.2.3", "", { "dependencies": { "@chevrotain/regexp-to-ast": "~12.0.0", "chevrotain": "~12.0.0", "chevrotain-allstar": "~0.4.3", "vscode-languageserver": "~9.0.1", "vscode-languageserver-textdocument": "~1.0.11", "vscode-uri": "~3.1.0" } }, "sha512-sOPIi4hISFnY7twwV97ca1TsxpBtXq0URu/LL1AvxwccPG/RIBBlKS7a/f/EL6w8lTNaS0EFs/F+IdSOaqYpng=="],
 
-    "latere-ui": ["latere-ui@github:latere-ai/latere-ui#b376f65", { "peerDependencies": { "vue": "^3.5.0" } }, "latere-ai-latere-ui-b376f65", "sha512-D1CP91kh0OTvQ1x4a+H2KGjFw3a5FTTBUUVLUX3uo7cCcLf1OPmC3gfGBdhuEotGZO1YxLnSKvqA5vxdV9aODg=="],
+    "latere-ui": ["latere-ui@github:latere-ai/latere-ui#3956d99", { "peerDependencies": { "pinia": "^2.2.0 || ^3.0.0", "vue": "^3.5.0" } }, "latere-ai-latere-ui-3956d99", "sha512-zpEut0wIn8axJahgVF+7W/FbiGGWQOmHqKvAaz3pdtFBGQ5w+tvBtB4WrC2UO2hblgztZixj9VJXggNywv4xyQ=="],
 
     "layout-base": ["layout-base@1.0.2", "", {}, "sha512-8h2oVEZNktL4BH2JCOI90iD1yXwL6iNW7KcCKT2QZgQJR2vbqDsldCTPRU9NifTCqHZci57XvQQ15YTu+sTYPg=="],
 
