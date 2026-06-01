@@ -77,6 +77,65 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 	}
 }
 
+// TestNewManagerSkipsStaleSavedGroupAtStartup verifies that a saved group
+// whose directory was since deleted (e.g. a /tmp throwaway workspace) does
+// not fatal server startup: the manager skips the stale most-recent group
+// and restores the next group whose paths still validate.
+func TestNewManagerSkipsStaleSavedGroupAtStartup(t *testing.T) {
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	stale := filepath.Join(t.TempDir(), "deleted-workspace") // never created
+	valid := t.TempDir()
+	// Most-recent group first (stale), valid group second.
+	if err := SaveGroups(configDir, []Group{
+		{Workspaces: []string{stale}},
+		{Workspaces: []string{valid}},
+	}); err != nil {
+		t.Fatalf("save workspace groups: %v", err)
+	}
+
+	m, err := NewManager(configDir, dataDir, envFile, nil)
+	if err != nil {
+		t.Fatalf("NewManager should tolerate a stale saved group, got: %v", err)
+	}
+	snap := m.Snapshot()
+	if len(snap.Workspaces) != 1 || snap.Workspaces[0] != valid {
+		t.Fatalf("expected restore to skip stale group and load %q, got %v", valid, snap.Workspaces)
+	}
+}
+
+// TestNewManagerAllSavedGroupsStaleStartsEmpty verifies that when every saved
+// group is invalid, startup falls back to no workspace (picker opens) instead
+// of failing.
+func TestNewManagerAllSavedGroupsStaleStartsEmpty(t *testing.T) {
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	if err := SaveGroups(configDir, []Group{
+		{Workspaces: []string{filepath.Join(t.TempDir(), "gone-a")}},
+		{Workspaces: []string{filepath.Join(t.TempDir(), "gone-b")}},
+	}); err != nil {
+		t.Fatalf("save workspace groups: %v", err)
+	}
+
+	m, err := NewManager(configDir, dataDir, envFile, nil)
+	if err != nil {
+		t.Fatalf("NewManager should not fatal when all saved groups are stale, got: %v", err)
+	}
+	if snap := m.Snapshot(); len(snap.Workspaces) != 0 {
+		t.Fatalf("expected empty startup when all groups stale, got %v", snap.Workspaces)
+	}
+}
+
 // TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup verifies that
 // passing an explicit empty slice (non-nil) suppresses session restore,
 // distinguishing "no workspaces requested" from "use last session".
