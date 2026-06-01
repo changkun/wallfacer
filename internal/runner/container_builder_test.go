@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -163,7 +164,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
-			spec := r.buildBaseContainerSpec("c-test", tc.model, sandbox.Normalize(tc.sandbox))
+			spec := r.buildBaseContainerSpec("c-test", tc.model, harness.NormalizeID(tc.sandbox))
 			args := spec.Build()
 
 			for _, p := range tc.wantPairs {
@@ -471,7 +472,6 @@ func TestBuildContainerSpecGitConflict(t *testing.T) {
 // buildIdeationContainerArgs — table-driven parity tests
 // ---------------------------------------------------------------------------
 
-
 // TestBuildIdeationContainerArgsSingleWorkspaceReadOnly verifies that the
 // single workspace mount uses ":z,ro" (read-only) and the workdir points into
 // that workspace.
@@ -713,7 +713,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
 			initial := []sandbox.VolumeMount{{Host: "claude-config", Container: "/home/agent/.claude", Named: true}}
-			result := r.appendInstructionsMount(initial, sandbox.Normalize(tc.sandbox), tc.basenames)
+			result := r.appendInstructionsMount(initial, harness.NormalizeID(tc.sandbox), tc.basenames)
 
 			if tc.wantNone {
 				if len(result) != len(initial) {
@@ -750,7 +750,7 @@ func TestAppendInstructionsMountReadOnly(t *testing.T) {
 				SandboxImage:     "img",
 				InstructionsPath: p,
 			})
-			result := r.appendInstructionsMount(nil, sandbox.Normalize(sb), nil)
+			result := r.appendInstructionsMount(nil, harness.NormalizeID(sb), nil)
 			if len(result) != 1 {
 				t.Fatalf("expected 1 mount; got %d", len(result))
 			}

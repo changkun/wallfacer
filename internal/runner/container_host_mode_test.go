@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 )
 
 // newHostModeRunner creates a Runner with hostMode forced on for testing
@@ -31,7 +31,7 @@ func TestBuildContainerSpec_HostMode_NoMounts(t *testing.T) {
 
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "do work", "",
-		nil, "", nil, "", sandbox.Claude,
+		nil, "", nil, "", harness.Claude,
 	)
 
 	if len(spec.Volumes) != 0 {
@@ -59,7 +59,7 @@ func TestBuildContainerSpec_HostMode_WorkDirIsHostPath(t *testing.T) {
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "do work", "",
 		map[string]string{workspace: worktree},
-		"", nil, "", sandbox.Claude,
+		"", nil, "", harness.Claude,
 	)
 
 	if spec.WorkDir != worktree {
@@ -86,7 +86,7 @@ func TestBuildContainerSpec_HostMode_InstructionsEnv(t *testing.T) {
 
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "do work", "",
-		nil, "", nil, "", sandbox.Claude,
+		nil, "", nil, "", harness.Claude,
 	)
 
 	if spec.Env["WALLFACER_INSTRUCTIONS_PATH"] != instr {
@@ -114,7 +114,7 @@ func TestBuildContainerSpec_HostMode_BoardAndSiblingsViaEnv(t *testing.T) {
 
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "do work", "",
-		nil, boardDir, siblings, "", sandbox.Claude,
+		nil, boardDir, siblings, "", harness.Claude,
 	)
 
 	if got := spec.Env["WALLFACER_BOARD_JSON"]; got != filepath.Join(boardDir, "board.json") {
@@ -150,7 +150,7 @@ func TestBuildContainerSpec_HostMode_NoSiblingsSkipsManifest(t *testing.T) {
 
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "do work", "",
-		nil, boardDir, nil, "", sandbox.Claude,
+		nil, boardDir, nil, "", harness.Claude,
 	)
 
 	if _, ok := spec.Env["WALLFACER_SIBLING_WORKTREES_JSON"]; ok {
@@ -173,7 +173,7 @@ func TestBuildContainerSpec_HostMode_EntrypointCleared(t *testing.T) {
 
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "do work", "",
-		nil, "", nil, "", sandbox.Claude,
+		nil, "", nil, "", harness.Claude,
 	)
 
 	if spec.Entrypoint != "" {
@@ -192,7 +192,7 @@ func TestBuildContainerSpec_HostMode_CmdContainsPromptAndResume(t *testing.T) {
 
 	spec := r.buildContainerSpecForSandbox(
 		"wallfacer-host", "task-1", "the task", "sess-42",
-		nil, "", nil, "", sandbox.Claude,
+		nil, "", nil, "", harness.Claude,
 	)
 
 	// Expect -p <prompt> and --resume <sessionID> in Cmd.
@@ -204,4 +204,3 @@ func TestBuildContainerSpec_HostMode_CmdContainsPromptAndResume(t *testing.T) {
 		t.Errorf("Cmd missing --resume: %v", spec.Cmd)
 	}
 }
-

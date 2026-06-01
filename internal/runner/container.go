@@ -11,6 +11,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -45,15 +46,15 @@ type agentUsage struct {
 // agentOutput is the top-level result object emitted by an agent
 // container. ActualSandbox is populated by the runner, not parsed.
 type agentOutput struct {
-	Result        string       `json:"result"`
-	SessionID     string       `json:"session_id"`
-	ThreadID      string       `json:"thread_id,omitempty"`
-	StopReason    string       `json:"stop_reason"`
-	Subtype       string       `json:"subtype"`
-	IsError       bool         `json:"is_error"`
-	TotalCostUSD  float64      `json:"total_cost_usd"`
-	Usage         agentUsage   `json:"usage"`
-	ActualSandbox sandbox.Type `json:"-"`
+	Result        string     `json:"result"`
+	SessionID     string     `json:"session_id"`
+	ThreadID      string     `json:"thread_id,omitempty"`
+	StopReason    string     `json:"stop_reason"`
+	Subtype       string     `json:"subtype"`
+	IsError       bool       `json:"is_error"`
+	TotalCostUSD  float64    `json:"total_cost_usd"`
+	Usage         agentUsage `json:"usage"`
+	ActualSandbox harness.ID `json:"-"`
 }
 
 // Package-level aliases for SandboxActivity constants to reduce verbosity
@@ -85,7 +86,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
-	sb sandbox.Type,
+	sb harness.ID,
 ) sandbox.ContainerSpec {
 	// Resolve model once: override takes priority, then env default.
 	model := modelOverride
@@ -256,7 +257,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 func (r *Runner) buildHostSpec(
 	spec sandbox.ContainerSpec,
 	prompt, model, sessionID string,
-	_ sandbox.Type,
+	_ harness.ID,
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
@@ -333,8 +334,8 @@ func writeSiblingManifest(boardDir string, siblingMounts map[string]map[string]s
 
 // instructionsFilenameForSandbox returns the container-side filename for
 // workspace-level instructions. Claude expects CLAUDE.md; Codex expects AGENTS.md.
-func instructionsFilenameForSandbox(sb sandbox.Type) string {
-	if sb == sandbox.Codex {
+func instructionsFilenameForSandbox(sb harness.ID) string {
+	if sb == harness.Codex {
 		return prompts.CodexInstructionsFilename
 	}
 	return prompts.ClaudeInstructionsFilename
@@ -347,7 +348,7 @@ func instructionsFilenameForSandbox(sb sandbox.Type) string {
 // stays anchored to the repo root. For multiple workspaces the file is
 // mounted at /workspace/ so it is accessible from the common root.
 // It is a no-op when instructionsPath is empty or does not exist on the host.
-func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandbox.Type, basenames []string) []sandbox.VolumeMount {
+func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb harness.ID, basenames []string) []sandbox.VolumeMount {
 	instrPath := r.currentInstructionsPath()
 	if instrPath == "" {
 		return volumes
@@ -398,8 +399,8 @@ func buildAgentCmd(prompt, model string) []string {
 // startup, so the directory itself must remain writable inside the
 // container. Mounting the whole dir read-only would break the CLI;
 // mounting it read-write would let the container clobber host state.
-func (r *Runner) appendCodexAuthMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
-	if sb != sandbox.Codex {
+func (r *Runner) appendCodexAuthMount(volumes []sandbox.VolumeMount, sb harness.ID) []sandbox.VolumeMount {
+	if sb != harness.Codex {
 		return volumes
 	}
 	if hostDir := r.hostCodexAuthPath(); hostDir != "" {
@@ -466,7 +467,7 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.Type) sandbox.ContainerSpec {
+func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.ID) sandbox.ContainerSpec {
 	spec := sandbox.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
@@ -570,16 +571,16 @@ func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []s
 
 // sandboxForTask returns the resolved sandbox type for the task's implementation activity.
 // Shorthand for sandboxForTaskActivity(task, activityImplementation).
-func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
+func (r *Runner) sandboxForTask(task *store.Task) harness.ID {
 	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
 // Resolution priority: per-task per-activity override → per-task sandbox → env-file
 // per-activity setting → env-file default sandbox → Claude (hardcoded fallback).
-func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
+func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) harness.ID {
 	if task == nil {
-		return sandbox.Claude
+		return harness.Claude
 	}
 	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
 	if task.SandboxByActivity != nil {
@@ -593,13 +594,13 @@ func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.Sandbox
 	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
 		return sb
 	}
-	return sandbox.Claude
+	return harness.Claude
 }
 
 // sandboxFromEnvForActivity reads the env-file sandbox routing for a specific activity.
 // Falls back to cfg.DefaultSandbox when no activity-specific override is set.
 // Returns "" when the env file is absent or unparseable.
-func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandbox.Type {
+func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) harness.ID {
 	if r.envFile == "" {
 		return ""
 	}
@@ -640,12 +641,12 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandb
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file.
 // Returns an empty string when the file is absent or the key is unset.
 func (r *Runner) modelFromEnv() string {
-	return r.modelFromEnvForSandbox(sandbox.Claude)
+	return r.modelFromEnvForSandbox(harness.Claude)
 }
 
 // modelFromEnvForSandbox reads the default model for the given sandbox.
 // Supports "claude" and "codex" values.
-func (r *Runner) modelFromEnvForSandbox(sb sandbox.Type) string {
+func (r *Runner) modelFromEnvForSandbox(sb harness.ID) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -654,7 +655,7 @@ func (r *Runner) modelFromEnvForSandbox(sb sandbox.Type) string {
 		return ""
 	}
 	switch sb {
-	case sandbox.Codex:
+	case harness.Codex:
 		return cfg.CodexDefaultModel
 	default:
 		return cfg.DefaultModel
@@ -664,12 +665,12 @@ func (r *Runner) modelFromEnvForSandbox(sb sandbox.Type) string {
 // titleModelFromEnv reads CLAUDE_TITLE_MODEL from the env file,
 // falling back to CLAUDE_DEFAULT_MODEL if the title model is not set.
 func (r *Runner) titleModelFromEnv() string {
-	return r.titleModelFromEnvForSandbox(sandbox.Claude)
+	return r.titleModelFromEnvForSandbox(harness.Claude)
 }
 
 // titleModelFromEnvForSandbox returns the sandbox-specific title model.
 // Supports "claude" and "codex" values.
-func (r *Runner) titleModelFromEnvForSandbox(sb sandbox.Type) string {
+func (r *Runner) titleModelFromEnvForSandbox(sb harness.ID) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -678,7 +679,7 @@ func (r *Runner) titleModelFromEnvForSandbox(sb sandbox.Type) string {
 		return ""
 	}
 	switch sb {
-	case sandbox.Codex:
+	case harness.Codex:
 		if cfg.CodexTitleModel != "" {
 			return cfg.CodexTitleModel
 		}
@@ -785,7 +786,7 @@ func (r *Runner) runContainer(
 		// sandboxForTaskActivity resolution, so the fallback is a
 		// separate runAgent call that hard-forces Codex by pinning
 		// the model override.
-		if task != nil && r.sandboxForTaskActivity(task, activity) == sandbox.Claude &&
+		if task != nil && r.sandboxForTaskActivity(task, activity) == harness.Claude &&
 			isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
@@ -793,11 +794,11 @@ func (r *Runner) runContainer(
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
 			return r.runContainerOnSandbox(ctx, role, task, containerName, prompt, sessionID,
-				modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, sandbox.Codex)
+				modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, harness.Codex)
 		}
 		return nil, rawStdout, rawStderr, err
 	}
-	if task != nil && r.sandboxForTaskActivity(task, activity) == sandbox.Claude &&
+	if task != nil && r.sandboxForTaskActivity(task, activity) == harness.Claude &&
 		output != nil && output.IsError && isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
@@ -805,7 +806,7 @@ func (r *Runner) runContainer(
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
 		return r.runContainerOnSandbox(ctx, role, task, containerName, prompt, sessionID,
-			modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, sandbox.Codex)
+			modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, harness.Codex)
 	}
 
 	return output, rawStdout, rawStderr, nil
@@ -824,7 +825,7 @@ func (r *Runner) runContainerOnSandbox(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	ll *liveLog,
-	sb sandbox.Type,
+	sb harness.ID,
 ) (*agentOutput, []byte, []byte, error) {
 	// Override the per-activity sandbox resolution by temporarily
 	// assigning Sandbox on a shallow task copy so sandboxForTaskActivity

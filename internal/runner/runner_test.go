@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
@@ -107,8 +108,8 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	// them to the fake script so commit-message generation does not shell
 	// out to the real CLI.
 	if hb, ok := runner.backend.(*sandbox.HostBackend); ok {
-		hb.SetBinaryForTest(sandbox.Claude, cmd)
-		hb.SetBinaryForTest(sandbox.Codex, cmd)
+		hb.SetBinaryForTest(harness.Claude, cmd)
+		hb.SetBinaryForTest(harness.Codex, cmd)
 	}
 }
 

@@ -14,10 +14,10 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -420,7 +420,7 @@ func localFallbackCommitMessage(prompt, diffStat string) string {
 func (r *Runner) runCommitContainer(
 	ctx context.Context,
 	containerName, commitPrompt string,
-	sb sandbox.Type,
+	sb harness.ID,
 	labels map[string]string,
 ) (*agentOutput, error) {
 	model := r.modelFromEnvForSandbox(sb)
@@ -469,12 +469,12 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 	commitPrompt := r.promptsMgr.CommitMessage(data)
 	labels := map[string]string{"wallfacer.task.activity": "commit_message_planning"}
 
-	initial := sandbox.Claude
+	initial := harness.Claude
 	output, err := r.runCommitContainer(ctx, containerName, commitPrompt, initial, labels)
 	if err != nil {
 		if isLikelyTokenLimitError(err.Error()) {
 			logger.Runner.Warn("plan commit message: claude token limit hit; retrying with codex")
-			output, err = r.runCommitContainer(ctx, containerName, commitPrompt, sandbox.Codex, labels)
+			output, err = r.runCommitContainer(ctx, containerName, commitPrompt, harness.Codex, labels)
 		}
 		if err != nil {
 			return "", err
@@ -482,7 +482,7 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 	}
 	if output != nil && output.IsError && isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("plan commit message: claude reported token limit in output; retrying with codex")
-		output, err = r.runCommitContainer(ctx, containerName, commitPrompt, sandbox.Codex, labels)
+		output, err = r.runCommitContainer(ctx, containerName, commitPrompt, harness.Codex, labels)
 		if err != nil {
 			return "", err
 		}

@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 // parseTitleResult extracts the trimmed title string from an
@@ -39,7 +39,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		EmitSpanEvents: true,
 		TrackUsage:     true,
 		Turn:           1,
-		ModelResolver:  func(sb sandbox.Type) string { return r.titleModelFromEnvForSandbox(sb) },
+		ModelResolver:  func(sb harness.ID) string { return r.titleModelFromEnvForSandbox(sb) },
 	})
 	if err != nil {
 		logger.Runner.Warn("title generation failed", "task", taskID, "error", err)

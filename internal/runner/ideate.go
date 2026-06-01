@@ -13,6 +13,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/prompts"
@@ -204,7 +205,7 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 		}
 	}
 
-	sb := sandbox.Claude
+	sb := harness.Claude
 	if taskID != uuid.Nil {
 		if task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
 			sb = r.sandboxForTaskActivity(task, activityIdeaAgent)

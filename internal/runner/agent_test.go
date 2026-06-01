@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -120,7 +121,7 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	if res.Output.SessionID != "s-1" {
 		t.Errorf("SessionID = %q, want s-1", res.Output.SessionID)
 	}
-	if res.Output.ActualSandbox != sandbox.Claude {
+	if res.Output.ActualSandbox != harness.Claude {
 		t.Errorf("ActualSandbox = %q, want claude", res.Output.ActualSandbox)
 	}
 
@@ -170,7 +171,7 @@ func TestRunAgent_HarnessPinOverridesTaskSandbox(t *testing.T) {
 	// Task pins itself to Claude; the agent role pins itself to Codex.
 	// The role pin must win.
 	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
-		Prompt: "harness pin", Timeout: 10, Sandbox: sandbox.Claude,
+		Prompt: "harness pin", Timeout: 10, Sandbox: harness.Claude,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -182,7 +183,7 @@ func TestRunAgent_HarnessPinOverridesTaskSandbox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runAgent: %v", err)
 	}
-	if res.SandboxUsed != sandbox.Codex {
+	if res.SandboxUsed != harness.Codex {
 		t.Errorf("SandboxUsed = %q, want codex (role.Harness pin)", res.SandboxUsed)
 	}
 }
@@ -260,7 +261,7 @@ func TestRunAgent_HarnessPinEmptyInherits(t *testing.T) {
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
 
 	task, _ := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
-		Prompt: "inherit", Timeout: 10, Sandbox: sandbox.Codex,
+		Prompt: "inherit", Timeout: 10, Sandbox: harness.Codex,
 	})
 	role := makeTestRole(t, "t-harness-empty", mountNone)
 	// role.Harness left empty → inherit from the task's Sandbox.
@@ -268,7 +269,7 @@ func TestRunAgent_HarnessPinEmptyInherits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runAgent: %v", err)
 	}
-	if res.SandboxUsed != sandbox.Codex {
+	if res.SandboxUsed != harness.Codex {
 		t.Errorf("SandboxUsed = %q, want codex (task sandbox)", res.SandboxUsed)
 	}
 }

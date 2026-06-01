@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -82,7 +83,7 @@ type runAgentOpts struct {
 	// used when ModelOverride is empty. Title and oversight use this
 	// to route to the small-model env var without mutating the role
 	// descriptor.
-	ModelResolver func(sandbox.Type) string
+	ModelResolver func(harness.ID) string
 	// WorktreeOverrides maps workspace host paths to the task's
 	// worktree paths. mountReadWrite roles mount the worktrees in
 	// place of the raw workspaces so commits land on the task's
@@ -128,7 +129,7 @@ type agentResult struct {
 	Parsed      any
 	RawStdout   []byte
 	RawStderr   []byte
-	SandboxUsed sandbox.Type
+	SandboxUsed harness.ID
 }
 
 // runAgent is the single launch primitive shared by every sub-agent
@@ -185,8 +186,8 @@ func (r *Runner) runAgent(
 	//   4. Env-file per-activity setting.
 	//   5. Env-file default sandbox.
 	//   6. Claude (hardcoded fallback).
-	primary := sandbox.Claude
-	if pin := sandbox.Type(strings.ToLower(strings.TrimSpace(role.Harness))); pin.IsValid() {
+	primary := harness.Claude
+	if pin := harness.ID(strings.ToLower(strings.TrimSpace(role.Harness))); pin.IsValid() {
 		primary = pin
 	} else if task != nil {
 		primary = r.sandboxForTaskActivity(task, binding.Activity)
@@ -238,7 +239,7 @@ func (r *Runner) runAgent(
 	// timeline shows a clean bar per container run — including retries.
 	// Callers can suppress this via opts when they own their own
 	// span accounting (the heavyweight turn loop will).
-	launchOnce := func(sb sandbox.Type) (*agentResult, error) {
+	launchOnce := func(sb harness.ID) (*agentResult, error) {
 		if opts.EmitSpanEvents && task != nil {
 			_ = r.taskStore(task.ID).InsertEvent(r.shutdownCtx, task.ID, store.EventTypeSpanStart,
 				store.SpanData{Phase: "container_run", Label: string(activity)})
@@ -252,13 +253,13 @@ func (r *Runner) runAgent(
 
 	result, err := launchOnce(primary)
 	// Retry on token-limit-at-launch for Claude→Codex.
-	if err != nil && primary == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
+	if err != nil && primary == harness.Claude && isLikelyTokenLimitError(err.Error()) {
 		logger.Runner.Warn("runAgent: claude token limit on launch; retrying with codex",
 			"role", role.Slug, "container", containerName)
 		if task != nil {
 			r.recordFallbackEvent(task.ID, activity)
 		}
-		result, err = launchOnce(sandbox.Codex)
+		result, err = launchOnce(harness.Codex)
 	}
 	if err != nil {
 		return nil, err
@@ -267,14 +268,14 @@ func (r *Runner) runAgent(
 	// Retry on token-limit-in-output for Claude→Codex. Agents sometimes
 	// exit cleanly but signal a token-limit inside their result field
 	// (e.g. --continue backoff), which the parser surfaces as IsError.
-	if primary == sandbox.Claude && result.Output != nil && result.Output.IsError &&
+	if primary == harness.Claude && result.Output != nil && result.Output.IsError &&
 		isLikelyTokenLimitError(result.Output.Result, result.Output.Subtype) {
 		logger.Runner.Warn("runAgent: claude reported token limit in output; retrying with codex",
 			"role", role.Slug, "container", containerName)
 		if task != nil {
 			r.recordFallbackEvent(task.ID, activity)
 		}
-		result, err = launchOnce(sandbox.Codex)
+		result, err = launchOnce(harness.Codex)
 		if err != nil {
 			return nil, err
 		}
@@ -312,7 +313,7 @@ func (r *Runner) launchOne(
 	role AgentRole,
 	binding agentBinding,
 	containerName, prompt string,
-	sb sandbox.Type,
+	sb harness.ID,
 	labels map[string]string,
 	task *store.Task,
 	opts runAgentOpts,
@@ -487,7 +488,7 @@ func (r *Runner) launchOne(
 // cheap to spin up ephemerally.
 func (r *Runner) buildInspectorSpec(
 	containerName, model string,
-	sb sandbox.Type,
+	sb harness.ID,
 	mode mountMode,
 ) sandbox.ContainerSpec {
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
