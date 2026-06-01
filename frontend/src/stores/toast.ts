@@ -23,6 +23,12 @@ export interface ToastOptions {
   timeout?: number;
 }
 
+// Visible toast cap. Once the stack would exceed this, the oldest is
+// dismissed so a burst of errors can't bury the screen. The legacy UI
+// only allowed one toast at a time; five gives the user enough room to
+// read a previous one while a new one slides in without piling up.
+const MAX_VISIBLE_TOASTS = 5;
+
 export const useToastStore = defineStore('toast', () => {
   const toasts = ref<Toast[]>([]);
   let seq = 0;
@@ -37,6 +43,12 @@ export const useToastStore = defineStore('toast', () => {
   function push(message: string, opts: ToastOptions = {}): number {
     const id = ++seq;
     toasts.value.push({ id, message, kind: opts.kind ?? 'info', action: opts.action });
+    // Drop oldest if we've exceeded the visible cap. Always evict the
+    // single overflow so the cap holds even when many pushes race.
+    while (toasts.value.length > MAX_VISIBLE_TOASTS) {
+      const evicted = toasts.value[0];
+      dismiss(evicted.id);
+    }
     const timeout = opts.timeout ?? 6000;
     if (timeout > 0) {
       timers.set(id, setTimeout(() => dismiss(id), timeout));

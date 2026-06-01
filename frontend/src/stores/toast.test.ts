@@ -38,4 +38,12 @@ describe('toast store', () => {
     expect(run).toHaveBeenCalledOnce();
     expect(t.toasts).toHaveLength(0);
   });
+
+  it('caps the visible stack — pushing past the cap drops the oldest', () => {
+    const t = useToastStore();
+    for (let i = 0; i < 7; i++) t.push(`#${i}`, { timeout: 0 });
+    // Cap is 5; the two oldest got evicted, the latest five remain.
+    expect(t.toasts).toHaveLength(5);
+    expect(t.toasts.map((x) => x.message)).toEqual(['#2', '#3', '#4', '#5', '#6']);
+  });
 });
