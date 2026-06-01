@@ -13,7 +13,6 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -700,48 +699,6 @@ func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
 			}
 		}
 	}()
-}
-
-// resolvedContainerNetwork returns the --network value to use for task containers.
-// Priority: explicit RunnerConfig value > WALLFACER_CONTAINER_NETWORK from env file > "host".
-func (r *Runner) resolvedContainerNetwork() string {
-	if r.containerNetwork != "" {
-		return r.containerNetwork
-	}
-	if r.envFile != "" {
-		if cfg, err := envconfig.Parse(r.envFile); err == nil && cfg.ContainerNetwork != "" {
-			return cfg.ContainerNetwork
-		}
-	}
-	return "host"
-}
-
-// resolvedContainerCPUs returns the --cpus value to use for task containers.
-// Priority: explicit RunnerConfig value > WALLFACER_CONTAINER_CPUS from env file > "" (no limit).
-func (r *Runner) resolvedContainerCPUs() string {
-	if r.containerCPUs != "" {
-		return r.containerCPUs
-	}
-	if r.envFile != "" {
-		if cfg, err := envconfig.Parse(r.envFile); err == nil {
-			return cfg.ContainerCPUs
-		}
-	}
-	return ""
-}
-
-// resolvedContainerMemory returns the --memory value to use for task containers.
-// Priority: explicit RunnerConfig value > WALLFACER_CONTAINER_MEMORY from env file > "" (no limit).
-func (r *Runner) resolvedContainerMemory() string {
-	if r.containerMemory != "" {
-		return r.containerMemory
-	}
-	if r.envFile != "" {
-		if cfg, err := envconfig.Parse(r.envFile); err == nil {
-			return cfg.ContainerMemory
-		}
-	}
-	return ""
 }
 
 // Command returns the container runtime binary path (podman/docker).

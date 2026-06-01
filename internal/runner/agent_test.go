@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/store"
@@ -134,10 +133,10 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	}
 }
 
-// TestRunAgent_MountReadOnly_AddsWorkspaceMounts verifies the inspector
-// mount profile picks up every configured workspace as a read-only
-// volume.
-func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
+// TestRunAgent_MountReadOnly_SetsWorkspaceCWD verifies the inspector
+// mount profile runs the agent in the configured workspace directory
+// (host mode has no mounts; the workspace is the process cwd).
+func TestRunAgent_MountReadOnly_SetsWorkspaceCWD(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	ws := t.TempDir()
 	r.workspaces = []string{ws}
@@ -152,10 +151,8 @@ func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("expected 1 Launch call, got %d", len(calls))
 	}
-	joined := strings.Join(calls[0].Args, " ")
-	wantPath := executor.TranslateHostPath(ws, "")
-	if !strings.Contains(joined, wantPath) {
-		t.Errorf("expected workspace path %q in launch args, got %q", wantPath, joined)
+	if calls[0].WorkDir != ws {
+		t.Errorf("expected WorkDir %q, got %q", ws, calls[0].WorkDir)
 	}
 }
 

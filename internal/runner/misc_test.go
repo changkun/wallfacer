@@ -573,42 +573,6 @@ func TestRunContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 // buildContainerArgs extras (paths not covered by runner_test.go)
 // ---------------------------------------------------------------------------
 
-// TestBuildContainerArgsWithSessionID verifies that a non-empty sessionID
-// adds --resume <sessionID> to the container args.
-func TestBuildContainerArgsWithSessionID(t *testing.T) {
-	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "", "prompt", "sess-abc", nil, "", nil, "")
-	if !containsConsecutive(args, "--resume", "sess-abc") {
-		t.Fatalf("expected --resume sess-abc in args; got: %v", args)
-	}
-}
-
-// TestBuildContainerArgsWithEnvFile verifies that a non-empty envFile adds
-// --env-file to the container args.
-func TestBuildContainerArgsWithEnvFile(t *testing.T) {
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, []byte("KEY=val\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
-		SandboxImage: "test:latest",
-		EnvFile:      envFile,
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
-	if !containsConsecutive(args, "--env-file", envFile) {
-		t.Fatalf("expected --env-file %s in args; got: %v", envFile, args)
-	}
-}
-
 // TestBuildContainerArgsWorktreeOverride verifies that worktreeOverrides
 // replaces the workspace host path in the volume mount.
 
@@ -616,49 +580,6 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 // a worktree override and the original workspace is a git repo, the main repo's
 // .git directory is mounted at its host path so the worktree's .git file
 // reference resolves correctly inside the container.
-
-// TestBuildContainerArgsNoGitDirMountWithoutWorktree verifies that when no
-// worktree override is used, no extra .git directory mount is added.
-func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
-	repo := setupTestRepo(t)
-
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
-		SandboxImage: "test:latest",
-		Workspaces:   []string{repo},
-	})
-	t.Cleanup(func() { r.Shutdown() })
-	// No worktree override — direct mount of workspace.
-	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
-
-	gitDir := filepath.Join(repo, ".git")
-	gitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir
-	if z := mountOpts("z"); z != "" {
-		gitMount += "," + z
-	}
-	if containsConsecutive(args, "--mount", gitMount) {
-		t.Fatalf("should NOT mount .git dir separately when no worktree override; found %q", gitMount)
-	}
-}
-
-// TestBuildContainerArgsNoSessionID verifies that omitting sessionID means
-// --resume is NOT added to the args.
-func TestBuildContainerArgsNoSessionID(t *testing.T) {
-	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
-	for i, a := range args {
-		if a == "--resume" {
-			t.Fatalf("--resume should not appear when sessionID is empty (found at index %d)", i)
-		}
-	}
-}
 
 // ---------------------------------------------------------------------------
 // GenerateTitle

@@ -25,7 +25,7 @@ const planningTaskID = "planning-sandbox"
 // Config holds the configuration for a Planner.
 type Config struct {
 	Backend          executor.Backend // container backend (local, K8s, etc.)
-	Command          string           // container runtime binary path (for ContainerSpec.Runtime)
+	Command          string           // container runtime binary path (retained for backend config)
 	Image            string           // sandbox container image name
 	Workspaces       []string         // workspace directory paths
 	EnvFile          string           // path to .env file for container
@@ -42,14 +42,10 @@ type Planner struct {
 	mu               sync.Mutex
 	backend          executor.Backend
 	command          string
-	image            string
 	workspaces       []string
 	envFile          string
 	fingerprint      string
 	instructionsPath string
-	network          string
-	cpus             string
-	memory           string
 
 	handle       executor.Handle // non-nil when a planning invocation is active
 	active       bool            // true after Start, false after Stop
@@ -69,14 +65,10 @@ func New(cfg Config) *Planner {
 	p := &Planner{
 		backend:          cfg.Backend,
 		command:          cfg.Command,
-		image:            cfg.Image,
 		workspaces:       cfg.Workspaces,
 		envFile:          cfg.EnvFile,
 		fingerprint:      cfg.Fingerprint,
 		instructionsPath: cfg.InstructionsPath,
-		network:          cfg.Network,
-		cpus:             cfg.CPUs,
-		memory:           cfg.Memory,
 		configDir:        cfg.ConfigDir,
 	}
 	if cfg.ConfigDir != "" && cfg.Fingerprint != "" {

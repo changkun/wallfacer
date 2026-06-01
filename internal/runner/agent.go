@@ -498,42 +498,16 @@ func (r *Runner) buildInspectorSpec(
 		return spec
 	}
 
-	workspaces := r.currentWorkspaces()
-	if r.HostMode() {
-		// Host backend ignores volumes; cwd is the first workspace.
-		spec.Entrypoint = ""
-		spec.Volumes = nil
-		for _, ws := range workspaces {
-			ws = strings.TrimSpace(ws)
-			if ws != "" {
-				spec.WorkDir = ws
-				break
-			}
-		}
-		return spec
-	}
-
-	var basenames []string
-	for _, ws := range workspaces {
+	// Host backend runs in a real workspace directory; cwd is the first
+	// configured workspace. Instructions reach the agent via the
+	// WALLFACER_INSTRUCTIONS_PATH env the heavyweight path also uses.
+	for _, ws := range r.currentWorkspaces() {
 		ws = strings.TrimSpace(ws)
-		if ws == "" {
-			continue
+		if ws != "" {
+			spec.WorkDir = ws
+			break
 		}
-		basename := sanitizeBasename(ws)
-		basenames = append(basenames, basename)
-		spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-			Host:      ws,
-			Container: "/workspace/" + basename,
-			Options:   mountOpts("z", "ro"),
-		})
 	}
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
-
-	workdir := "/workspace"
-	if len(basenames) == 1 {
-		workdir = "/workspace/" + basenames[0]
-	}
-	spec.WorkDir = workdir
 	return spec
 }
 

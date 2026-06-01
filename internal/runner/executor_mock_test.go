@@ -21,9 +21,11 @@ type ContainerResponse struct {
 }
 
 // ContainerCall records a single Launch invocation for later assertion.
+// Args is the agent argv (spec.Cmd); WorkDir is the resolved host cwd.
 type ContainerCall struct {
-	Name string
-	Args []string
+	Name    string
+	Args    []string
+	WorkDir string
 }
 
 // MockSandboxBackend implements SandboxBackend for tests. It pops pre-configured
@@ -41,7 +43,7 @@ func (m *MockSandboxBackend) Launch(_ context.Context, spec executor.ContainerSp
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.calls = append(m.calls, ContainerCall{Name: spec.Name, Args: spec.Build()})
+	m.calls = append(m.calls, ContainerCall{Name: spec.Name, Args: spec.Cmd, WorkDir: spec.WorkDir})
 
 	if len(m.responses) == 0 {
 		return nil, fmt.Errorf("mock: no more responses queued")

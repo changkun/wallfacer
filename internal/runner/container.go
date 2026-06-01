@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
-	"slices"
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/agents"
@@ -14,25 +12,9 @@ import (
 	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
-
-// mountOpts returns volume mount options appropriate for the host OS.
-// The "z" SELinux relabeling option is only included on Linux.
-func mountOpts(opts ...string) string {
-	if runtime.GOOS != "linux" {
-		filtered := make([]string, 0, len(opts))
-		for _, o := range opts {
-			if o != "z" {
-				filtered = append(filtered, o)
-			}
-		}
-		return strings.Join(filtered, ",")
-	}
-	return strings.Join(opts, ",")
-}
 
 // agentUsage mirrors the token-usage JSON object emitted by the
 // agent container.
@@ -96,8 +78,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
-	// Label the container with task metadata so the monitor can correlate
-	// containers to tasks by label rather than by parsing the container name.
+	// Label the task so the monitor can correlate the host process to a task.
 	if taskID != "" {
 		spec.Labels = map[string]string{
 			"wallfacer.task.id":     taskID,
@@ -105,155 +86,19 @@ func (r *Runner) buildContainerSpecForSandbox(
 		}
 	}
 
-	// Host mode takes a separate path: no mounts, host paths verbatim,
-	// context surfaced via env vars instead of /workspace/.tasks/ mounts.
-	if r.HostMode() {
-		return r.buildHostSpec(spec, prompt, model, sessionID, sb, worktreeOverrides, boardDir, siblingMounts)
-	}
-
-	// Mount workspaces, substituting per-task worktree paths where available.
-	// Read under storeMu to avoid racing with applyWorkspaceSnapshot.
-	workspaces := r.currentWorkspaces()
-	var basenames []string
-	if len(workspaces) > 0 {
-		for _, ws := range workspaces {
-			ws = strings.TrimSpace(ws)
-			if ws == "" {
-				continue
-			}
-			hostPath := ws
-			if wt, ok := worktreeOverrides[ws]; ok {
-				hostPath = wt
-			}
-			basename := sanitizeBasename(ws)
-			basenames = append(basenames, basename)
-			spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-				Host:      hostPath,
-				Container: "/workspace/" + basename,
-				Options:   mountOpts("z"),
-			})
-
-			// Git worktrees have a .git file (not directory) that references
-			// the main repo's .git/worktrees/<name>/ using an absolute host
-			// path. Mount the main repo's .git directory at the same host
-			// path inside the container so git operations work correctly.
-			// On macOS, /var is a symlink to /private/var, so git may store
-			// the resolved path in the worktree's .git file. Mount at both
-			// the original and resolved paths to handle this.
-			if wt, isWorktree := worktreeOverrides[ws]; isWorktree {
-				gitDir := filepath.Join(ws, ".git")
-				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
-					wtContainerPath := "/workspace/" + basename
-					// Detect conflict: the .git directory's container path falls
-					// under the worktree's own container mount path. This happens
-					// when the workspace already lives under /workspace/ on the host
-					// (e.g. repos bind-mounted at /workspace/ in a container-in-
-					// container setup). Mounting a directory onto the .git FILE from
-					// the worktree bind-mount would fail with "Not a directory".
-					// Fix: mount ws/.git at an alternate container path and replace
-					// the worktree's .git FILE via a file-over-file bind-mount so
-					// git inside the container resolves the gitdir correctly.
-					if strings.HasPrefix(gitDir, wtContainerPath+"/") {
-						altGitDir := "/wallfacer-git/" + basename
-						if pf := containerGitPointerFile(wt, gitDir, altGitDir); pf != "" {
-							spec.Volumes = append(spec.Volumes,
-								executor.VolumeMount{Host: gitDir, Container: altGitDir, Options: mountOpts("z")},
-								executor.VolumeMount{Host: pf, Container: wtContainerPath + "/.git", Options: mountOpts("z")},
-							)
-						}
-					} else {
-						spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-							Host:      gitDir,
-							Container: gitDir,
-							Options:   mountOpts("z"),
-						})
-						// Also mount at the symlink-resolved path if it differs
-						// (e.g. macOS /var -> /private/var).
-						if resolved, err := filepath.EvalSymlinks(gitDir); err == nil && resolved != gitDir {
-							spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-								Host:      gitDir,
-								Container: resolved,
-								Options:   mountOpts("z"),
-							})
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Mount workspace-level instructions file based on sandbox convention:
-	// - Claude sandbox expects CLAUDE.md
-	// - Codex sandbox expects AGENTS.md
-	// For single workspace, mount inside the repo directory so that the
-	// agent stays anchored to the repo root rather than /workspace/.
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
-
-	// Board context: mount board.json read-only at /workspace/.tasks/.
-	if boardDir != "" {
-		spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-			Host:      boardDir,
-			Container: "/workspace/.tasks",
-			Options:   mountOpts("z", "ro"),
-		})
-	}
-
-	// Sibling worktrees: mount each eligible sibling's worktrees read-only.
-	// Sort by shortID then by repoPath for deterministic output.
-	shortIDs := make([]string, 0, len(siblingMounts))
-	for shortID := range siblingMounts {
-		shortIDs = append(shortIDs, shortID)
-	}
-	slices.Sort(shortIDs)
-	for _, shortID := range shortIDs {
-		repos := siblingMounts[shortID]
-		repoPaths := make([]string, 0, len(repos))
-		for repoPath := range repos {
-			repoPaths = append(repoPaths, repoPath)
-		}
-		slices.Sort(repoPaths)
-		for _, repoPath := range repoPaths {
-			wtPath := repos[repoPath]
-			basename := sanitizeBasename(repoPath)
-			containerPath := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
-			spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-				Host:      wtPath,
-				Container: containerPath,
-				Options:   mountOpts("z", "ro"),
-			})
-		}
-	}
-
-	// When there is exactly one workspace, set CWD directly into it so
-	// Claude operates in the repo directory by default. For multiple
-	// workspaces keep CWD at /workspace so all repos are accessible.
-	spec.WorkDir = workdirForBasenames(basenames)
-
-	// Build the agent command: prompt, verbosity flags, optional model, optional resume.
-	spec.Cmd = buildAgentCmd(prompt, model)
-	if sessionID != "" {
-		spec.Cmd = append(spec.Cmd, "--resume", sessionID)
-	}
-
-	spec.Network = r.resolvedContainerNetwork()
-	return spec
+	return r.buildHostSpec(spec, prompt, model, sessionID, sb, worktreeOverrides, boardDir, siblingMounts)
 }
 
-// buildHostSpec fills in the fields of a base ContainerSpec for host-mode
-// execution. It deliberately does NOT append to spec.Volumes — host mode has
-// no mounts. Instead, the composed workspace instructions, the board
-// manifest, and the sibling-worktree table are surfaced to the agent via
-// WALLFACER_* environment variables the HostBackend and agents can consult.
+// buildHostSpec fills in the fields of a base launch spec for host-mode
+// execution. The composed workspace instructions, the board manifest, and
+// the sibling-worktree table are surfaced to the agent via WALLFACER_*
+// environment variables the HostBackend and agents can consult.
 //
 // CWD:
 //   - Single workspace: CWD is the host path of that workspace (worktree
 //     override applied when available).
 //   - Multi-workspace: pick the first; the agent can reach the others via
-//     the manifest file referenced by WALLFACER_SIBLING_WORKTREES_JSON. No
-//     pseudo-root like /workspace exists on the host.
-//
-// The returned spec has Entrypoint cleared (the host binary is the CLI
-// itself — no dispatcher entrypoint to invoke).
+//     the manifest file referenced by WALLFACER_SIBLING_WORKTREES_JSON.
 func (r *Runner) buildHostSpec(
 	spec executor.ContainerSpec,
 	prompt, model, sessionID string,
@@ -262,14 +107,6 @@ func (r *Runner) buildHostSpec(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 ) executor.ContainerSpec {
-	// The agents-image entrypoint is meaningless on the host — we invoke
-	// the CLI binary directly.
-	spec.Entrypoint = ""
-	// Drop any base-spec mounts that describe container-only artifacts.
-	// HostBackend ignores spec.Volumes anyway, but dropping them here keeps
-	// tests that snapshot the spec readable.
-	spec.Volumes = nil
-
 	// Resolve CWD from the workspace list, preferring the worktree override.
 	workspaces := r.currentWorkspaces()
 	workDir := ""
@@ -332,52 +169,6 @@ func writeSiblingManifest(boardDir string, siblingMounts map[string]map[string]s
 	return path, nil
 }
 
-// instructionsFilenameForSandbox returns the container-side filename for
-// workspace-level instructions. Claude expects CLAUDE.md; Codex expects AGENTS.md.
-func instructionsFilenameForSandbox(sb harness.ID) string {
-	if sb == harness.Codex {
-		return prompts.CodexInstructionsFilename
-	}
-	return prompts.ClaudeInstructionsFilename
-}
-
-// appendInstructionsMount adds the workspace-level instructions file as a
-// read-only bind mount (CLAUDE.md for claude, AGENTS.md for codex).
-// When there is exactly one workspace, the file is mounted inside that
-// workspace directory (e.g. /workspace/<repo>/CLAUDE.md) so the agent
-// stays anchored to the repo root. For multiple workspaces the file is
-// mounted at /workspace/ so it is accessible from the common root.
-// It is a no-op when instructionsPath is empty or does not exist on the host.
-func (r *Runner) appendInstructionsMount(volumes []executor.VolumeMount, sb harness.ID, basenames []string) []executor.VolumeMount {
-	instrPath := r.currentInstructionsPath()
-	if instrPath == "" {
-		return volumes
-	}
-	if _, err := os.Stat(instrPath); err != nil {
-		return volumes
-	}
-	filename := instructionsFilenameForSandbox(sb)
-	containerPath := "/workspace/" + filename
-	if len(basenames) == 1 {
-		containerPath = "/workspace/" + basenames[0] + "/" + filename
-	}
-	return append(volumes, executor.VolumeMount{
-		Host:      instrPath,
-		Container: containerPath,
-		Options:   mountOpts("z", "ro"),
-	})
-}
-
-// workdirForBasenames returns the container working directory for the given set
-// of workspace basenames. A single workspace sets CWD into that workspace;
-// multiple workspaces keep CWD at /workspace so all repos are accessible.
-func workdirForBasenames(basenames []string) string {
-	if len(basenames) == 1 {
-		return "/workspace/" + basenames[0]
-	}
-	return "/workspace"
-}
-
 // buildAgentCmd returns the standard agent Cmd slice for the given prompt and
 // optional model. All sub-agent invocations follow this pattern:
 //
@@ -389,35 +180,6 @@ func buildAgentCmd(prompt, model string) []string {
 	}
 	return cmd
 }
-
-// appendCodexAuthMount adds the host Codex auth.json file as a read-only
-// bind mount when the sandbox is Codex and the file exists. No-op for
-// other sandboxes.
-//
-// Only the file is mounted (not the entire ~/.codex directory): codex
-// 0.120+ writes config.toml and session state into $HOME/.codex at
-// startup, so the directory itself must remain writable inside the
-// container. Mounting the whole dir read-only would break the CLI;
-// mounting it read-write would let the container clobber host state.
-func (r *Runner) appendCodexAuthMount(volumes []executor.VolumeMount, sb harness.ID) []executor.VolumeMount {
-	if sb != harness.Codex {
-		return volumes
-	}
-	if hostDir := r.hostCodexAuthPath(); hostDir != "" {
-		volumes = append(volumes, executor.VolumeMount{
-			Host:      filepath.Join(hostDir, "auth.json"),
-			Container: "/home/agent/.codex/auth.json",
-			Options:   mountOpts("z", "ro"),
-		})
-	}
-	return volumes
-}
-
-// sandboxEntrypoint is the in-image dispatcher script. The sandbox-agents
-// image installs a single entrypoint that reads WALLFACER_AGENT to decide
-// whether to launch claude-agent.sh or codex-agent.sh; both classic and
-// worker exec invocations point at the same path.
-const sandboxEntrypoint = "/usr/local/bin/entrypoint.sh"
 
 // buildBaseContainerSpec creates a ContainerSpec pre-populated with the
 // configuration shared across all sub-agent invocations:
@@ -468,11 +230,7 @@ func fileExists(path string) bool {
 }
 
 func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.ID) executor.ContainerSpec {
-	spec := executor.ContainerSpec{
-		Runtime: r.command,
-		Name:    containerName,
-		Image:   strings.TrimSpace(r.sandboxImage),
-	}
+	spec := executor.ContainerSpec{Name: containerName}
 	if envFile := r.resolveEnvFile(); envFile != "" {
 		spec.EnvFile = envFile
 	}
@@ -480,93 +238,7 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.
 	if model != "" {
 		spec.Env["CLAUDE_CODE_MODEL"] = model
 	}
-	spec.Volumes = append(spec.Volumes, executor.VolumeMount{
-		Host:      "claude-config",
-		Container: "/home/agent/.claude",
-		Named:     true,
-	})
-	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
-	spec.Volumes = r.appendDependencyCacheVolumes(spec.Volumes)
-	spec.Entrypoint = sandboxEntrypoint
-	spec.Network = r.resolvedContainerNetwork()
-	spec.CPUs = r.resolvedContainerCPUs()
-	spec.Memory = r.resolvedContainerMemory()
 	return spec
-}
-
-// containerGitPointerFile writes a patched git-pointer file next to the
-// worktree at <wt>.container-git. The file redirects the gitdir reference
-// from the original absolute host path to altGitDir, which is the container-
-// internal mount point for the main .git directory. It is used when the
-// normal .git container path would conflict with the worktree bind-mount
-// (both fall under /workspace/<basename>). The file is cleaned up together
-// with the task worktree directory. Returns "" on any error.
-func containerGitPointerFile(wt, gitDir, altGitDir string) string {
-	data, err := os.ReadFile(filepath.Join(wt, ".git"))
-	if err != nil {
-		return ""
-	}
-	trimmed := strings.TrimSpace(string(data))
-	const pfx = "gitdir: "
-	if !strings.HasPrefix(trimmed, pfx) {
-		return ""
-	}
-	origGitdir := strings.TrimSpace(trimmed[len(pfx):])
-	// origGitdir is an absolute container path like
-	// /workspace/foo/.git/worktrees/<name>. We extract the sub-path relative
-	// to gitDir (e.g. "worktrees/<name>") and repoint it under altGitDir so
-	// git inside the container finds the gitdir. Both gitDir and altGitDir
-	// are Linux container paths, so operate on them with forward slashes
-	// even when the host is Windows (avoid filepath which uses backslashes).
-	prefix := strings.TrimRight(gitDir, "/") + "/"
-	if !strings.HasPrefix(origGitdir, prefix) {
-		return ""
-	}
-	rel := origGitdir[len(prefix):]
-	newContent := "gitdir: " + strings.TrimRight(altGitDir, "/") + "/" + rel + "\n"
-	dst := wt + ".container-git"
-	if err := os.WriteFile(dst, []byte(newContent), 0o600); err != nil {
-		return ""
-	}
-	return dst
-}
-
-// dependencyCacheVolumes are the common dependency cache directories
-// mounted as named volumes so warm caches persist across container lifetimes.
-// Paths target the unified sandbox-agents image's `agent` user home.
-var dependencyCacheVolumes = []struct {
-	suffix    string // volume name suffix (e.g. "npm")
-	container string // container path
-}{
-	{"npm", "/home/agent/.npm"},
-	{"pip", "/home/agent/.cache/pip"},
-	{"cargo", "/home/agent/.cargo/registry"},
-	{"go-build", "/home/agent/.cache/go-build"},
-}
-
-// appendDependencyCacheVolumes adds named volumes for dependency caches when
-// WALLFACER_DEPENDENCY_CACHES is enabled. Volume names include the workspace
-// key so different workspace groups don't share caches.
-func (r *Runner) appendDependencyCacheVolumes(volumes []executor.VolumeMount) []executor.VolumeMount {
-	if r.envFile == "" {
-		return volumes
-	}
-	cfg, err := envconfig.Parse(r.envFile)
-	if err != nil || !cfg.DependencyCaches {
-		return volumes
-	}
-	wsKey := r.currentWSKey()
-	if wsKey == "" {
-		wsKey = "default"
-	}
-	for _, cache := range dependencyCacheVolumes {
-		volumes = append(volumes, executor.VolumeMount{
-			Host:      "wallfacer-cache-" + cache.suffix + "-" + wsKey,
-			Container: cache.container,
-			Named:     true,
-		})
-	}
-	return volumes
 }
 
 // sandboxForTask returns the resolved sandbox type for the task's implementation activity.
