@@ -62,7 +62,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] state — active-group badge tracking (live for active group, config active_groups for background)
 - [~] task-stream — waitForTaskTitle (N/A: SPA renders title reactively via SSE store + stale-restart/visibilitychange refetch; no imperative poll-wait needed)
 - [x] dispatch-toast — dispatched-task pulse highlight on board
-- [ ] utils — mobile column nav (IntersectionObserver pill)
+- [x] utils — mobile column nav (IntersectionObserver pill)
 - [x] events — keyboard shortcuts e (explorer), p (mode), c (chat), d (dispatch), b (breakdown)
 
 ## Weaker (present but degraded)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
@@ -97,11 +97,50 @@ async function archiveAllDone() {
   await api('POST', '/api/tasks/archive-done');
 }
 
+// ── Mobile column navigation ──────────────────────────────────────
+// On narrow screens the board is a horizontal snap-scroll; this pill bar jumps
+// between columns and tracks the visible one via IntersectionObserver. Mirrors
+// ui/js/utils.js initMobileColNav.
+const MOBILE_COLS = ['Backlog', 'In Progress', 'Waiting', 'Done'];
+const activeCol = ref(0);
+let colObserver: IntersectionObserver | null = null;
+
+function boardColumns(): HTMLElement[] {
+  const board = document.getElementById('board');
+  return board ? Array.from(board.querySelectorAll<HTMLElement>('.col')) : [];
+}
+function scrollToColumn(i: number) {
+  boardColumns()[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+}
+function setupColObserver() {
+  colObserver?.disconnect();
+  const board = document.getElementById('board');
+  const cols = boardColumns();
+  if (!board || cols.length === 0) return;
+  colObserver = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const idx = cols.indexOf(e.target as HTMLElement);
+        if (idx >= 0) activeCol.value = idx;
+      }
+    },
+    { root: board, threshold: 0.5 },
+  );
+  cols.forEach((c) => colObserver!.observe(c));
+}
+
 onMounted(async () => {
   if (!store.tasks.length) await store.fetchTasks({ includeArchived: ui.showArchived });
   if (!store.config) await store.fetchConfig();
   syncSelectedFromQuery();
+  await nextTick();
+  setupColObserver();
 });
+onUnmounted(() => colObserver?.disconnect());
+// Re-attach the observer when the board grid (re)appears, e.g. after the empty
+// state clears once the first task lands.
+watch(() => isEmptyBoard.value || needsWorkspace.value, () => { void nextTick(setupColObserver); });
 
 // Open/replace the detail modal whenever ?task= changes (command palette,
 // deep links) or once the task list arrives.
@@ -300,6 +339,18 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       </div>
     </div>
   </main>
+
+  <!-- Mobile-only column nav: jump between the snap-scrolled columns. -->
+  <nav v-if="!isEmptyBoard && !needsWorkspace" class="board-mobile-nav" aria-label="Board columns">
+    <button
+      v-for="(label, i) in MOBILE_COLS"
+      :key="label"
+      type="button"
+      class="board-mobile-nav__btn"
+      :class="{ active: activeCol === i }"
+      @click="scrollToColumn(i)"
+    >{{ label }}</button>
+  </nav>
 
   <TaskDetail v-if="selectedTask" :task="selectedTask" :initial-tab="initialTab" @close="closeDetail" />
 </template>
