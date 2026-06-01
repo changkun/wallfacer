@@ -303,6 +303,11 @@ const elapsedDisplay = computed(() => relativeTime(props.task.updated_at));
 async function startTask() {
   await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'in_progress' });
 }
+// `cancelling` tracks the in-flight POST so the button shows
+// "Shutting down…" and stays disabled until the request returns or
+// the task transitions out of cancelling state. Mirrors the legacy
+// pendingCancelTaskIds Set.
+const cancelling = ref(false);
 async function cancelTask() {
   const ok = await dialog.confirm({
     title: 'Cancel task',
@@ -312,7 +317,14 @@ async function cancelTask() {
     danger: true,
   });
   if (!ok) return;
-  await api('POST', `/api/tasks/${props.task.id}/cancel`);
+  cancelling.value = true;
+  try {
+    await api('POST', `/api/tasks/${props.task.id}/cancel`);
+  } finally {
+    // Hold the visual a moment so the user sees the shutdown phase even
+    // if the API replies instantly — the actual container kill is async.
+    setTimeout(() => { cancelling.value = false; }, 1500);
+  }
 }
 async function retryTask() {
   await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'backlog' });
@@ -855,11 +867,16 @@ const isArchived = computed(() => !!props.task.archived);
                 </div>
 
                 <div v-if="isInProgress || isWaiting">
-                  <button type="button" class="aside-action aside-action--warn" @click="cancelTask">
-                    <span class="aside-action__icon" aria-hidden="true">&#9209;</span>
+                  <button
+                    type="button"
+                    class="aside-action aside-action--warn"
+                    :disabled="cancelling"
+                    @click="cancelTask"
+                  >
+                    <span class="aside-action__icon" aria-hidden="true">{{ cancelling ? '…' : '⏹' }}</span>
                     <span class="aside-action__body">
-                      <span class="aside-action__label">Cancel</span>
-                      <span class="aside-action__hint">discard changes</span>
+                      <span class="aside-action__label">{{ cancelling ? 'Shutting down…' : 'Cancel' }}</span>
+                      <span class="aside-action__hint">{{ cancelling ? 'stopping container' : 'discard changes' }}</span>
                     </span>
                   </button>
                 </div>
