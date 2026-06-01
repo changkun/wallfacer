@@ -10,13 +10,17 @@ import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import type { SpanResult } from '../lib/flamegraph';
+import { detectResultType } from '../lib/resultType';
+// Re-imported as a local binding so the template can call renderMarkdown()
+// directly inside the Results tab.
+import { renderMarkdown as renderResultMarkdown } from '../lib/markdown';
 
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = useDialogStore();
 const toast = useToastStore();
 
-type MainTab = 'spec' | 'activity' | 'changes' | 'events' | 'timeline';
+type MainTab = 'spec' | 'activity' | 'changes' | 'results' | 'events' | 'timeline';
 const mainTab = ref<MainTab>('spec');
 
 // --- Changes (diff) tab ---
@@ -48,6 +52,70 @@ async function fetchDiff() {
   }
 }
 
+// --- Results (multi-turn) tab ---
+//
+// One entry per "output" event with a non-empty result text. Implementation
+// turns vs test turns are separated using task.test_run_start_turn: turns
+// before that index are implementation, turns >= are test. Newest-first
+// to match ui/js/modal-results.js (line 603).
+
+interface ResultEntry {
+  turn: number;      // 1-based chronological turn number
+  text: string;
+  type: 'plan' | 'result';
+  showRaw: boolean;
+}
+const implResults = ref<ResultEntry[]>([]);
+const testResults = ref<ResultEntry[]>([]);
+const resultsLoading = ref(false);
+const resultsError = ref('');
+const resultsFetched = ref(false);
+
+async function fetchResults() {
+  if (!props.task) return;
+  resultsLoading.value = true;
+  resultsError.value = '';
+  try {
+    const data = await api<{ events?: { event_type: string; data?: { result?: string } }[] } | { event_type: string; data?: { result?: string } }[]>(
+      'GET',
+      `/api/tasks/${props.task.id}/events?type=output`,
+    );
+    const events = Array.isArray(data) ? data : (data?.events ?? []);
+    const outputs = events
+      .filter((e) => e.event_type === 'output' && typeof e.data?.result === 'string' && e.data.result.length > 0)
+      .map((e) => e.data!.result as string);
+    // The legacy UI split outputs at task.test_run_start_turn into
+    // implementation vs test runs; that field is no longer maintained by
+    // the backend so we surface every turn as an implementation entry.
+    // (When the field is reintroduced, slice the array here.)
+    const impl = outputs;
+    const tests: string[] = [];
+    const split = 0;
+    implResults.value = impl.map((text, i) => ({
+      turn: i + 1,
+      text,
+      type: detectResultType(text),
+      showRaw: false,
+    })).reverse();
+    testResults.value = tests.map((text, i) => ({
+      turn: i + 1 + (split > 0 ? split : impl.length),
+      text,
+      type: detectResultType(text),
+      showRaw: false,
+    })).reverse();
+    resultsFetched.value = true;
+  } catch (e) {
+    resultsError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    resultsLoading.value = false;
+  }
+}
+
+function copyResult(entry: ResultEntry) {
+  void navigator.clipboard.writeText(entry.text);
+  toast.push('Copied to clipboard', { kind: 'success', timeout: 2000 });
+}
+
 // --- Timeline (span flamegraph) tab ---
 
 const spans = ref<SpanResult[]>([]);
@@ -73,6 +141,7 @@ async function fetchSpans() {
 watch(mainTab, (t) => {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
+  if (t === 'results' && !resultsFetched.value) fetchResults();
   if (t === 'timeline' && !spansFetched.value) fetchSpans();
 });
 
@@ -80,7 +149,12 @@ watch(mainTab, (t) => {
 // tab stays selected (e.g. via deep-link or sidebar nav).
 watch(
   () => props.task?.id,
-  () => { spansFetched.value = false; spans.value = []; if (mainTab.value === 'timeline') fetchSpans(); },
+  () => {
+    spansFetched.value = false; spans.value = [];
+    resultsFetched.value = false; implResults.value = []; testResults.value = [];
+    if (mainTab.value === 'timeline') fetchSpans();
+    if (mainTab.value === 'results') fetchResults();
+  },
 );
 
 function lineClass(kind: string): string {
@@ -347,6 +421,12 @@ const isArchived = computed(() => !!props.task.archived);
             <button
               type="button"
               class="main-tab"
+              :class="{ active: mainTab === 'results' }"
+              @click="mainTab = 'results'"
+            >Results</button>
+            <button
+              type="button"
+              class="main-tab"
               :class="{ active: mainTab === 'events' }"
               @click="mainTab = 'events'"
             >Events</button>
@@ -526,6 +606,59 @@ const isArchived = computed(() => !!props.task.archived);
                       <span class="usage-value">{{ task.turns ?? 0 }}</span>
                     </div>
                   </div>
+                </div>
+
+                <!-- RESULTS tab (multi-turn) -->
+                <div data-main-tab-section="results">
+                  <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading results…</div>
+                  <div v-else-if="resultsError" class="text-xs" style="color: var(--err, #c0392b);">{{ resultsError }}</div>
+                  <div v-else-if="!implResults.length && !testResults.length" class="text-xs text-v-muted">No turn results yet.</div>
+                  <template v-else>
+                    <template v-if="implResults.length">
+                      <h3 class="section-title">Implementation</h3>
+                      <div
+                        v-for="entry in implResults"
+                        :key="`impl-${entry.turn}`"
+                        class="result-entry"
+                      >
+                        <div class="result-entry__header">
+                          <div class="result-entry-labels">
+                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
+                            <span v-if="implResults.length > 1" class="result-turn-label">Turn {{ entry.turn }}</span>
+                          </div>
+                          <div class="flex items-center gap-1.5">
+                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
+                          </div>
+                        </div>
+                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
+                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
+                      </div>
+                    </template>
+                    <template v-if="testResults.length">
+                      <h3 class="section-title" style="margin-top: 16px;">Testing</h3>
+                      <div
+                        v-for="entry in testResults"
+                        :key="`test-${entry.turn}`"
+                        class="result-entry"
+                      >
+                        <div class="result-entry__header">
+                          <div class="result-entry-labels">
+                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
+                            <span class="result-turn-label">Turn {{ entry.turn }}</span>
+                          </div>
+                          <div class="flex items-center gap-1.5">
+                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
+                          </div>
+                        </div>
+                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
+                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
+                      </div>
+                    </template>
+                  </template>
                 </div>
 
                 <!-- TIMELINE tab (span flamegraph) -->
