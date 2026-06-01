@@ -169,6 +169,23 @@ function isSpawnedByTag(tag: string): boolean {
   return tag.toLowerCase().startsWith('spawned-by:');
 }
 
+// Test-verification badge for the card's Row 1. Mirrors ui/js/render.js:
+// pass → ✓ verified; fail → ✗ verify failed; unknown → no verdict; an
+// untested waiting task → unverified. Other statuses get nothing.
+const testBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
+  const t = props.task;
+  switch (t.last_test_result) {
+    case 'pass': return { label: '✓ verified', cls: 'badge-test-pass', title: 'Verification passed' };
+    case 'fail': return { label: '✗ verify failed', cls: 'badge-test-fail', title: 'Verification failed' };
+    case 'unknown': return { label: 'no verdict', cls: 'badge-test-none', title: 'Tested — no clear verdict detected' };
+    default:
+      if (t.status === 'waiting') {
+        return { label: 'unverified', cls: 'badge-test-none', title: 'Not yet verified' };
+      }
+      return null;
+  }
+});
+
 interface RenderedTag { rawTag: string; label: string; cls: string; styled: boolean }
 
 // Mirrors ui/js/render.js's tag taxonomy: priority:* and impact:* tags
@@ -350,6 +367,11 @@ function onCardKeydown(e: KeyboardEvent) {
           :title="'Failure reason: ' + props.task.failure_category"
           style="font-family:monospace;font-size:9px;"
         >{{ props.task.failure_category }}</span>
+        <span
+          v-if="testBadge"
+          :class="['badge', testBadge.cls]"
+          :title="testBadge.title"
+        >{{ testBadge.label }}</span>
       </div>
       <div class="flex items-center gap-1.5 card-meta-right">
         <span
