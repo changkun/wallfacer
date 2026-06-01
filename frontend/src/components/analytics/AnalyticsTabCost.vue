@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, useTemplateRef, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { api } from '../../api/client';
+
+const router = useRouter();
+// Open a task from a Top Tasks row — deep-link via the hash route handler,
+// matching legacy modal-stats' closeStatsModal→openModal hop.
+function openTask(id: string) {
+  if (id) void router.push({ path: '/', hash: `#${id}` });
+}
 
 interface Bucket {
   count?: number;
@@ -412,9 +420,15 @@ watch(planningWindowDays, () => fetchAndRender());
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="t in (data.top_tasks || [])" :key="t.id">
+                <tr
+                  v-for="t in (data.top_tasks || [])"
+                  :key="t.id"
+                  class="top-task-row"
+                  style="cursor: pointer;"
+                  @click="openTask(t.id)"
+                >
                   <td style="padding: 6px 10px; max-width: 360px;">
-                    <span style="display: block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.title }}</span>
+                    <span style="display: block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent);">{{ t.title }}</span>
                   </td>
                   <td style="padding: 6px 10px; color: var(--text-muted); white-space: nowrap;">{{ t.status }}</td>
                   <td style="padding: 6px 10px; text-align: right; font-weight: 500; white-space: nowrap;">{{ fmtCost(t.cost_usd) }}</td>

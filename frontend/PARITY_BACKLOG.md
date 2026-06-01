@@ -25,7 +25,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] modal-logs — test-phase log streaming + test oversight (/oversight/test), parallel Testing tab
 - [x] depgraph/unified-graph — Map view integrated (vendored; MapPage works)
 - [ ] modal-flamegraph — span timeline detail table + cumulative cost chart (/turn-usage) + oversight phase bands
-- [ ] modal-stats — Top Tasks rows clickable to open task
+- [x] modal-stats — Top Tasks rows clickable to open task
 - [ ] modal-logs — 8MB truncation banner + "Download full log" link
 - [ ] modal-core — task environment aside provenance (container digest, instructions hash, API endpoint, ts)
 - [ ] command-palette — spec rows (fuzzy match on spec title/path, Plan section)
