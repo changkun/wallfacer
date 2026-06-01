@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
@@ -165,7 +166,7 @@ func (p *Planner) Exec(ctx context.Context, cmd []string) (sandbox.Handle, error
 	p.mu.Unlock()
 
 	containerName := "wallfacer-plan-" + truncFingerprint(p.fingerprint)
-	spec := p.buildContainerSpec(containerName, sandbox.Claude)
+	spec := p.buildContainerSpec(containerName, harness.Claude)
 	spec.Cmd = cmd
 
 	h, err := p.backend.Launch(ctx, spec)

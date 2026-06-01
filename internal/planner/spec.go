@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/sanitize"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
@@ -14,7 +15,7 @@ import (
 // Workspaces are mounted read-only; each workspace's specs/ subdirectory
 // is mounted read-write on top (container runtimes apply later mounts
 // over earlier ones, so specs/ is writable while the rest is read-only).
-func (p *Planner) buildContainerSpec(containerName string, sb sandbox.Type) sandbox.ContainerSpec {
+func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) sandbox.ContainerSpec {
 	spec := sandbox.ContainerSpec{
 		Runtime: p.command,
 		Name:    containerName,
@@ -126,7 +127,7 @@ func (p *Planner) hostWorkDir() string {
 
 // appendInstructionsMount adds the workspace AGENTS.md / CLAUDE.md file
 // as a read-only mount, following the same pattern as the runner.
-func (p *Planner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandbox.Type, basenames []string) []sandbox.VolumeMount {
+func (p *Planner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb harness.ID, basenames []string) []sandbox.VolumeMount {
 	if p.instructionsPath == "" {
 		return volumes
 	}
@@ -134,7 +135,7 @@ func (p *Planner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sand
 		return volumes
 	}
 	filename := "CLAUDE.md"
-	if sb == sandbox.Codex {
+	if sb == harness.Codex {
 		filename = "AGENTS.md"
 	}
 	containerPath := "/workspace/" + filename
