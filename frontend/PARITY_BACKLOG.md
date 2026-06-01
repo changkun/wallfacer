@@ -82,7 +82,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] tasks — brainstorm flow empty-prompt allowance + placeholder
 - [x] tasks — routine interval/repeat controls (verified: TaskCard routine footer select+toggle+run-now)
 - [x] command-palette — doc search title-prefix bonus scoring
-- [ ] command-palette — remote/local result distinction + server snippet field
+- [x] command-palette — remote/local result distinction + server snippet field (also fixed bare-array parse)
 - [x] mention — file ranking path-substring boost
 - [x] status-bar — terminal panel height persisted
 - [x] explorer — Task Prompts relative updated_at timestamp

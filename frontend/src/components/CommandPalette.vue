@@ -23,7 +23,10 @@ const ui = useUiStore();
 const query = ref('');
 const activeIndex = ref(0);
 const inputRef = ref<HTMLInputElement | null>(null);
-const remoteResults = ref<Task[]>([]);
+// Server search rows embed the full Task plus a matched_field + HTML snippet
+// (store.TaskSearchResult). The endpoint returns a bare array, not {tasks}.
+type SearchTask = Task & { matched_field?: string; snippet?: string };
+const remoteResults = ref<SearchTask[]>([]);
 
 let serverSeq = 0;
 let serverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -113,7 +116,7 @@ const recentTasks = computed<Task[]>(() => {
 
 interface Section {
   title: string;
-  tasks: Task[];
+  tasks: SearchTask[];
 }
 
 const sections = computed<Section[]>(() => {
@@ -249,12 +252,13 @@ watch(query, (q) => {
   const seq = ++serverSeq;
   serverTimer = setTimeout(async () => {
     try {
-      const res = await api<{ tasks: Task[] }>(
+      const res = await api<SearchTask[] | { tasks: SearchTask[] }>(
         'GET',
         `/api/tasks/search?q=${encodeURIComponent(trimmed)}`,
       );
       if (seq !== serverSeq) return;
-      remoteResults.value = Array.isArray(res?.tasks) ? res.tasks : [];
+      // The endpoint returns a bare array; tolerate a {tasks} wrapper too.
+      remoteResults.value = Array.isArray(res) ? res : (res?.tasks ?? []);
     } catch {
       if (seq !== serverSeq) return;
       remoteResults.value = [];
@@ -415,6 +419,11 @@ onUnmounted(() => {
                 <div class="command-palette-row-meta">
                   <span class="command-palette-task-id">{{ shortId(task) }}</span>
                   <span
+                    v-if="task.matched_field"
+                    class="badge command-palette-match-field"
+                    :title="`Matched in ${task.matched_field}`"
+                  >{{ task.matched_field }}</span>
+                  <span
                     v-if="task.status"
                     class="badge"
                     :class="`badge-${task.status}`"
@@ -445,8 +454,12 @@ onUnmounted(() => {
                     >{{ j.label }}</button>
                   </span>
                 </div>
+                <!-- Server search rows carry a pre-escaped HTML snippet with
+                     <mark> highlights; local rows fall back to a prompt preview. -->
+                <!-- eslint-disable-next-line vue/no-v-html — snippet is server-escaped -->
+                <div v-if="task.snippet" class="command-palette-task-snippet" v-html="task.snippet" />
                 <div
-                  v-if="!task.title && task.prompt"
+                  v-else-if="!task.title && task.prompt"
                   class="command-palette-task-snippet"
                 >{{ task.prompt.slice(0, 180) }}</div>
               </div>
