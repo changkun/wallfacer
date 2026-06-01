@@ -6,6 +6,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useDialogStore } from '../stores/dialog';
 import { renderMarkdown } from '../lib/markdown';
 import { mapEntries, type RawExplorerEntry, type TreeEntry } from '../lib/explorerTree';
+import { fileIcon, type FileIcon } from '../lib/fileIcon';
 
 interface TaskPromptEntry {
   task_id: string;
@@ -44,6 +45,11 @@ function openTaskPrompt(entry: TaskPromptEntry) {
 
 const children = ref<Map<string, TreeEntry[]>>(new Map());
 const expanded = ref<Set<string>>(new Set());
+
+// Semantic file-type icon (colour + SVG paths) for a tree entry. See lib/fileIcon.
+function iconFor(entry: TreeEntry): FileIcon {
+  return fileIcon(entry.name, entry.is_dir, expanded.value.has(entry.path));
+}
 const selectedPath = ref<string | null>(null);
 const fileContent = ref<string | null>(null);
 const fileLoading = ref(false);
@@ -399,7 +405,19 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
             <span class="explorer-node__toggle">
               <template v-if="entry.is_dir">{{ expanded.has(entry.path) ? '▼' : '▶' }}</template>
             </span>
-            <span class="explorer-node__icon">{{ entry.is_dir ? '▣' : '·' }}</span>
+            <span class="explorer-node__icon" aria-hidden="true">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                :stroke="iconFor(entry).color"
+                v-html="iconFor(entry).paths"
+              ></svg>
+            </span>
             <span class="explorer-node__name">{{ entry.name }}</span>
           </div>
         </template>
