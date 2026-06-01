@@ -190,14 +190,24 @@ useSse({
 
 // ── Keyboard shortcut: C toggles chat ─────────────────────────────
 
+const focusedViewRef = ref<{ dispatchFocused: () => void; breakdownFocused: () => void } | null>(null);
+
 function onKeydown(ev: KeyboardEvent) {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   // Ignore when typing into a form field.
   const t = ev.target as HTMLElement;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  // c = toggle chat, d = dispatch focused spec, b = break it down (spec mode).
   if (ev.key === 'c' || ev.key === 'C') {
     if (layout.value === 'chat-first') return;
     ev.preventDefault();
     toggleChat();
+  } else if (ev.key === 'd' || ev.key === 'D') {
+    ev.preventDefault();
+    focusedViewRef.value?.dispatchFocused();
+  } else if (ev.key === 'b' || ev.key === 'B') {
+    ev.preventDefault();
+    focusedViewRef.value?.breakdownFocused();
   }
 }
 
@@ -210,6 +220,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
     <SpecTreePanel v-if="layout === 'three-pane'" />
     <SpecFocusedView
       v-if="layout === 'three-pane'"
+      ref="focusedViewRef"
       :chat-visible="effectiveChatOpen"
       @toggle-chat="toggleChat"
       @focus-sibling="focusSibling"

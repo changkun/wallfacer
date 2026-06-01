@@ -110,6 +110,8 @@ useKeyboard({
   onSettings: () => { void router.push('/settings'); },
   onTerminal: () => { ui.toggleTerminal(); },
   onShortcuts: () => { ui.openShortcuts(); },
+  onExplorer: () => { void router.push('/explorer'); },
+  onToggleMode: () => { void router.push(router.currentRoute.value.path.startsWith('/plan') ? '/' : '/plan'); },
 });
 </script>
 

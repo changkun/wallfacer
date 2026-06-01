@@ -63,7 +63,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [~] task-stream — waitForTaskTitle (N/A: SPA renders title reactively via SSE store + stale-restart/visibilitychange refetch; no imperative poll-wait needed)
 - [x] dispatch-toast — dispatched-task pulse highlight on board
 - [ ] utils — mobile column nav (IntersectionObserver pill)
-- [ ] events — keyboard shortcuts e/c/d/b (explorer/chat/dispatch/breakdown)
+- [x] events — keyboard shortcuts e (explorer), p (mode), c (chat), d (dispatch), b (breakdown)
 
 ## Weaker (present but degraded)
 - [x] tasks — dependency picker chips w/ remove buttons (vs plain select multiple)
