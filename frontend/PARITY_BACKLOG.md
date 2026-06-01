@@ -24,7 +24,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] tasks — modal-based backlog editing (prompt/timeout/sandbox/deps/tags/budgets/scheduled_at/model; save-based not debounced)
 - [ ] modal-logs — test-phase log streaming + test oversight (/oversight/test), parallel Testing tab
 - [x] depgraph/unified-graph — Map view integrated (vendored; MapPage works)
-- [ ] modal-flamegraph — span timeline detail table + cumulative cost chart (/turn-usage) + oversight phase bands
+- [x] modal-flamegraph — span detail table + cumulative cost chart (oversight phase bands deferred; minor overlay)
 - [x] modal-stats — Top Tasks rows clickable to open task
 - [x] modal-logs — 8MB truncation banner + "Download full log" link
 - [x] modal-core — task environment aside provenance (container digest, instructions hash, API endpoint, ts)

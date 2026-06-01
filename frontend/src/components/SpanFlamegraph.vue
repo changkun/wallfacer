@@ -4,9 +4,30 @@
 // presentation + hover tooltip. Lanes are laid out top-down; horizontal
 // axis is the task's wall-clock time normalised into 100% of the SVG width.
 import { computed, ref } from 'vue';
-import { formatMs, layoutSpans, type SpanResult } from '../lib/flamegraph';
+import { formatMs, layoutSpans, labelHue, cumulativeCostPoints, type SpanResult, type TurnUsageRecord } from '../lib/flamegraph';
 
-const props = defineProps<{ spans: SpanResult[] }>();
+const props = defineProps<{ spans: SpanResult[]; turnUsages?: TurnUsageRecord[] }>();
+
+// Cumulative-cost overlay positioned along the (idle-compressed) timeline.
+const costChart = computed(() => {
+  const recs = props.turnUsages ?? [];
+  if (!recs.length) return null;
+  const { points, maxCost } = cumulativeCostPoints(recs, layout.value.timeMap.toPercent);
+  if (points.length < 2 || maxCost <= 0) return null;
+  const chartH = 48, padding = 4, innerH = chartH - padding * 2;
+  const yFor = (cost: number) => padding + innerH * (1 - cost / maxCost);
+  return {
+    chartH,
+    total: `$${maxCost.toFixed(4)}`,
+    polyPoints: points.map((p) => `${p.xPct.toFixed(3)},${yFor(p.cost).toFixed(1)}`).join(' '),
+    dots: points.slice(1).map((p) => ({
+      left: p.xPct,
+      top: yFor(p.cost),
+      color: `hsl(${labelHue(p.activity)}, 55%, 55%)`,
+      title: `${p.activity || 'cost'}: $${p.cost.toFixed(4)}`,
+    })),
+  };
+});
 const LANE_H = 22;
 const LANE_GAP = 3;
 const PAD_TOP = 24; // axis row
@@ -148,6 +169,25 @@ const detailRows = computed(() => {
       <div class="flamegraph__tip-range">{{ hovered.range }}</div>
     </div>
 
+    <div
+      v-if="costChart"
+      class="flamegraph__cost"
+      :style="{ height: costChart.chartH + 'px' }"
+      :title="`Cumulative cost across activities. Total: ${costChart.total}`"
+    >
+      <svg :viewBox="`0 0 100 ${costChart.chartH}`" preserveAspectRatio="none" width="100%" :height="costChart.chartH">
+        <polyline :points="costChart.polyPoints" class="flamegraph__cost-line" />
+      </svg>
+      <span
+        v-for="(d, i) in costChart.dots"
+        :key="'dot' + i"
+        class="flamegraph__cost-dot"
+        :style="{ left: d.left + '%', top: d.top + 'px', background: d.color }"
+        :title="d.title"
+      />
+      <span class="flamegraph__cost-total">{{ costChart.total }}</span>
+    </div>
+
     <table v-if="detailRows.length" class="flamegraph__table">
       <thead>
         <tr>
@@ -216,6 +256,34 @@ const detailRows = computed(() => {
 }
 .flamegraph__tip-label { font-weight: 600; color: var(--text); }
 .flamegraph__tip-range { color: var(--text-muted); font-family: var(--font-mono); }
+
+.flamegraph__cost {
+  position: relative;
+  width: 100%;
+  margin-top: 8px;
+}
+.flamegraph__cost-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.flamegraph__cost-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.flamegraph__cost-total {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
 
 .flamegraph__table {
   width: 100%;

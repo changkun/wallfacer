@@ -131,3 +131,42 @@ export function layoutSpans(spans: SpanResult[]): FlamegraphLayout {
   });
   return { blocks, t0, t1, timeMap, laneCount };
 }
+
+// Per-turn usage record (subset of store.TurnUsageRecord) used by the
+// cumulative cost chart overlay.
+export interface TurnUsageRecord {
+  timestamp?: string;
+  cost_usd?: number;
+  sub_agent?: string;
+}
+
+export interface CostPoint {
+  xPct: number;
+  cost: number;
+  activity: string;
+}
+
+// Build cumulative-cost points for the flamegraph cost chart, positioned along
+// the (idle-compressed) timeline via toPercent. Records with no positive cost
+// or unparseable timestamp are skipped. Mirrors modal-flamegraph.js buildCostChart.
+export function cumulativeCostPoints(
+  records: readonly TurnUsageRecord[],
+  toPercent: (ms: number) => number,
+): { points: CostPoint[]; maxCost: number } {
+  const sorted = [...records].sort((a, b) => {
+    const ta = a.timestamp ? Date.parse(a.timestamp) : 0;
+    const tb = b.timestamp ? Date.parse(b.timestamp) : 0;
+    return ta - tb;
+  });
+  let cum = 0;
+  const points: CostPoint[] = [{ xPct: 0, cost: 0, activity: '' }];
+  for (const u of sorted) {
+    const cost = u.cost_usd || 0;
+    if (cost <= 0) continue;
+    const ts = u.timestamp ? Date.parse(u.timestamp) : NaN;
+    if (!Number.isFinite(ts)) continue;
+    cum += cost;
+    points.push({ xPct: toPercent(ts), cost: cum, activity: u.sub_agent || '' });
+  }
+  return { points, maxCost: points[points.length - 1].cost };
+}
