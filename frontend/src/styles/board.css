@@ -1,3 +1,34 @@
+/* Mobile column-nav pill bar — hidden on desktop, shown on narrow screens. */
+.board-mobile-nav { display: none; }
+@media (max-width: 768px) {
+  .board-mobile-nav {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    padding: 8px 12px;
+    border-top: 1px solid var(--rule);
+    background: var(--bg);
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+  }
+  .board-mobile-nav__btn {
+    flex: 1;
+    font-size: 11px;
+    padding: 6px 4px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .board-mobile-nav__btn.active {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+}
+
 /* --- Cards --- */
 /* One-shot pulse for cards freshly dispatched from Plan mode
    (mirrors ui/js/dispatch-toast.js). */
