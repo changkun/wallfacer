@@ -5,7 +5,7 @@ import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
-import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
+import { commandPaletteActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import { docIndex } from '../data/docs';
 import { rankDocs } from '../lib/docSearch';
 
@@ -265,7 +265,7 @@ function pickDoc(slug: string) {
 }
 
 function taskActions(task: Task) {
-  return cardActionsFor(task).map((id) => CARD_ACTION_DEFS[id]);
+  return commandPaletteActionsFor(task).map((id) => CARD_ACTION_DEFS[id]);
 }
 
 async function runTaskAction(action: CardAction, task: Task) {
@@ -276,6 +276,7 @@ async function runTaskAction(action: CardAction, task: Task) {
     case 'done': await api('POST', `/api/tasks/${id}/done`); break;
     case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
     case 'test': await api('POST', `/api/tasks/${id}/test`); break;
+    case 'sync': await api('POST', '/api/git/sync', { task_id: id }); break;
   }
   close();
 }
