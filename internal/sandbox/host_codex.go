@@ -141,23 +141,6 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 // `--model <value>` in the runner's Cmd slice. Returns ("", "") when -p
 // is missing. Other flags (--verbose, --output-format, --resume) are
 // ignored — codex has no equivalents in exec mode.
-func extractPromptAndModelFromClaudeArgv(cmd []string) (prompt, model string) {
-	for i := 0; i < len(cmd); i++ {
-		switch cmd[i] {
-		case "-p":
-			if i+1 < len(cmd) {
-				prompt = cmd[i+1]
-				i++
-			}
-		case "--model", "-m":
-			if i+1 < len(cmd) {
-				model = cmd[i+1]
-				i++
-			}
-		}
-	}
-	return prompt, model
-}
 
 // sandboxFast reports whether WALLFACER_SANDBOX_FAST is effectively true.
 // Defaults to true when unset — matching the container-side default.

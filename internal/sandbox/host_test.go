@@ -13,8 +13,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"changkun.de/x/wallfacer/internal/harness"
 )
 
 // buildFakeAgent compiles testdata/fakeagent into a temp binary named `name`
@@ -69,32 +67,6 @@ func TestNewHostBackend_UsesLookupWhenEmpty(t *testing.T) {
 	if _, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func TestHostBackend_SupportsAppendSystemPrompt(t *testing.T) {
-	t.Run("supported", func(t *testing.T) {
-		bin := buildFakeAgent(t, "fakeagent")
-		b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-		if err != nil {
-			t.Fatalf("new: %v", err)
-		}
-		if !b.SupportsAppendSystemPrompt(harness.Claude) {
-			t.Error("expected --append-system-prompt to be detected")
-		}
-	})
-	t.Run("not-supported", func(t *testing.T) {
-		bin := buildFakeAgent(t, "fakeagent")
-		b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-		if err != nil {
-			t.Fatalf("new: %v", err)
-		}
-		// Poison the probe via env: the fakeagent omits the flag from --help when
-		// FAKEAGENT_NO_APPEND=1 is set in the probe's environment.
-		t.Setenv("FAKEAGENT_NO_APPEND", "1")
-		if b.SupportsAppendSystemPrompt(harness.Codex) {
-			t.Error("expected probe to report no support when fakeagent hides the flag")
-		}
-	})
 }
 
 // launchAndDrain runs Launch with a minimal spec and returns the parsed NDJSON
@@ -310,80 +282,6 @@ func TestHostBackend_Launch_MissingAgentEnv(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "WALLFACER_AGENT") {
 		t.Errorf("expected WALLFACER_AGENT error; got: %v", err)
-	}
-}
-
-func TestHostBackend_AppendSystemPrompt_Supported(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-
-	instr := filepath.Join(t.TempDir(), "AGENTS.md")
-	if err := os.WriteFile(instr, []byte("workspace instructions here"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name: "wallfacer-test-append-ok",
-		Env: map[string]string{
-			"WALLFACER_AGENT":             "claude",
-			"WALLFACER_INSTRUCTIONS_PATH": instr,
-			// Disable fast mode so --append-system-prompt only carries the
-			// instructions path (not the /fast shortcut the launcher also
-			// appends when fast mode is active).
-			"WALLFACER_SANDBOX_FAST": "false",
-		},
-		Cmd:     []string{"-p", "run"},
-		WorkDir: t.TempDir(),
-	}
-	got := launchAndDrain(t, b, spec)
-	if got["append"] != instr {
-		t.Errorf("fakeagent saw append = %q; want %q (flag should be forwarded)", got["append"], instr)
-	}
-	// In supported mode the prompt itself must not be prepended.
-	if got["prompt"] != "run" {
-		t.Errorf("prompt should be unmodified when flag is supported; got %q", got["prompt"])
-	}
-}
-
-func TestHostBackend_AppendSystemPrompt_Fallback(t *testing.T) {
-	t.Skip("harness.Claude always passes --append-system-prompt; ancient-claude prepend fallback dropped")
-	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-
-	b.probeMu.Lock()
-	b.probedOnce[harness.Claude] = true
-	b.probedSupport[harness.Claude] = false
-	b.probeMu.Unlock()
-
-	instr := filepath.Join(t.TempDir(), "AGENTS.md")
-	if err := os.WriteFile(instr, []byte("PREAMBLE"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name: "wallfacer-test-append-fallback",
-		Env: map[string]string{
-			"WALLFACER_AGENT":             "claude",
-			"WALLFACER_INSTRUCTIONS_PATH": instr,
-			// Disable fast mode so the --append-system-prompt flag is NOT
-			// added by the launcher itself; this isolates the fallback
-			// behaviour we're asserting.
-			"WALLFACER_SANDBOX_FAST": "false",
-		},
-		Cmd:     []string{"-p", "the-task"},
-		WorkDir: t.TempDir(),
-	}
-	got := launchAndDrain(t, b, spec)
-
-	prompt, _ := got["prompt"].(string)
-	if !strings.HasPrefix(prompt, "PREAMBLE") {
-		t.Errorf("prompt should start with preamble; got %q", prompt)
-	}
-	if !strings.HasSuffix(prompt, "the-task") {
-		t.Errorf("prompt should end with original task; got %q", prompt)
-	}
-	if got["append"] != "" {
-		t.Errorf("append flag should not be passed in fallback mode; got %q", got["append"])
 	}
 }
 

@@ -84,10 +84,6 @@ type HostBackend struct {
 	claudeBinary string
 	codexBinary  string
 
-	probeMu       sync.Mutex
-	probedOnce    map[harness.ID]bool
-	probedSupport map[harness.ID]bool
-
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
 }
@@ -121,11 +117,9 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	// codex anyway until host-mode codex support lands.
 	codex, _ := resolveBinary(cfg.CodexBinary, "codex")
 	return &HostBackend{
-		claudeBinary:  claude,
-		codexBinary:   codex,
-		probedOnce:    make(map[harness.ID]bool),
-		probedSupport: make(map[harness.ID]bool),
-		procs:         make(map[string]*hostHandle),
+		claudeBinary: claude,
+		codexBinary:  codex,
+		procs:        make(map[string]*hostHandle),
 	}, nil
 }
 
@@ -166,41 +160,6 @@ func (b *HostBackend) binaryFor(t harness.ID) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown sandbox type %q", t)
 	}
-}
-
-// SupportsAppendSystemPrompt reports whether the agent CLI for the given
-// type accepts --append-system-prompt. Result is cached; the probe runs at
-// most once per agent type per backend lifetime, on first query.
-func (b *HostBackend) SupportsAppendSystemPrompt(t harness.ID) bool {
-	b.probeMu.Lock()
-	if b.probedOnce[t] {
-		result := b.probedSupport[t]
-		b.probeMu.Unlock()
-		return result
-	}
-	b.probeMu.Unlock()
-
-	supported := b.probeAppendSystemPrompt(t)
-
-	b.probeMu.Lock()
-	b.probedOnce[t] = true
-	b.probedSupport[t] = supported
-	b.probeMu.Unlock()
-	return supported
-}
-
-// probeAppendSystemPrompt runs `<bin> --help` and looks for the flag name in
-// the combined output. A failed probe (timeout, missing binary, non-zero
-// exit) is treated as "not supported" so callers fall back cleanly.
-func (b *HostBackend) probeAppendSystemPrompt(t harness.ID) bool {
-	bin, err := b.binaryFor(t)
-	if err != nil {
-		return false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	out, _ := exec.CommandContext(ctx, bin, "--help").CombinedOutput()
-	return strings.Contains(string(out), "--append-system-prompt")
 }
 
 // Launch execs the selected agent binary and returns a Handle the runner

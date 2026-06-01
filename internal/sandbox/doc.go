@@ -1,4 +1,4 @@
-// Package sandbox defines the harness type enum and the launch abstraction
+// Package sandbox defines the host process launch abstraction
 // the runner drives.
 //
 //   - Agent types live in [harness] (harness.Claude, harness.Codex).
