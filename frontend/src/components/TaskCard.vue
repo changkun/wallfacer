@@ -5,6 +5,8 @@ import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
+import { useBehindCounts } from '../composables/useBehindCounts';
+import { toRef } from 'vue';
 
 const props = defineProps<{ task: Task; rank?: number }>();
 
@@ -167,6 +169,23 @@ function tagStyle(tag: string): string {
 
 function isSpawnedByTag(tag: string): boolean {
   return tag.toLowerCase().startsWith('spawned-by:');
+}
+
+// Behind-upstream chip: fetched lazily via the shared composable, only
+// for statuses where falling behind matters. Routine cards opt out.
+const showsBehind = computed(() =>
+  !isRoutine.value && (props.task.status === 'waiting' || props.task.status === 'failed'),
+);
+const behind = useBehindCounts(
+  computed(() => (showsBehind.value ? props.task.id : '')),
+  toRef(props.task, 'updated_at'),
+);
+
+async function syncFromCard(e: Event) {
+  e.stopPropagation();
+  try {
+    await api('POST', '/api/git/sync', { task_id: props.task.id });
+  } catch { /* handled by SSE state refresh */ }
 }
 
 // Test-verification badge for the card's Row 1. Mirrors ui/js/render.js:
@@ -428,6 +447,18 @@ function onCardKeydown(e: KeyboardEvent) {
       style="max-height:3.2em;"
       v-html="resultHtml"
     ></div>
+
+    <!-- Behind-upstream banner (waiting/failed only). Mirrors the legacy
+         applyDiffToCard() warning; clicking Sync fires POST /api/git/sync
+         for this task without opening the card. -->
+    <div
+      v-if="showsBehind && behind.total.value > 0"
+      class="diff-behind-warning"
+      @click.stop
+    >
+      <span>⚠ {{ behind.total.value }} commit{{ behind.total.value === 1 ? '' : 's' }} behind</span>
+      <button type="button" class="diff-sync-btn" @click="syncFromCard">Sync</button>
+    </div>
 
     <!-- Row 7: meta footer (turns, cost, session id) -->
     <div
