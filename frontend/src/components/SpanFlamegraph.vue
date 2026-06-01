@@ -67,6 +67,22 @@ function showTip(ev: MouseEvent, b: typeof layout.value.blocks[number]) {
   };
 }
 function hideTip() { hovered.value = null; }
+
+// Detail table: every span sorted by duration descending, with its start
+// offset, duration, and share of total span time (mirrors modal-flamegraph.js).
+const detailRows = computed(() => {
+  const lay = layout.value;
+  const total = lay.blocks.reduce((sum, b) => sum + b.durationMs, 0);
+  return [...lay.blocks]
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .map((b) => ({
+      label: b.label,
+      color: b.color,
+      start: formatMs(b.startMs - lay.t0),
+      duration: formatMs(b.durationMs),
+      pct: total > 0 ? ((b.durationMs / total) * 100).toFixed(1) : '0.0',
+    }));
+});
 </script>
 
 <template>
@@ -131,6 +147,28 @@ function hideTip() { hovered.value = null; }
       <div class="flamegraph__tip-label">{{ hovered.label }}</div>
       <div class="flamegraph__tip-range">{{ hovered.range }}</div>
     </div>
+
+    <table v-if="detailRows.length" class="flamegraph__table">
+      <thead>
+        <tr>
+          <th class="flamegraph__th-left">Span</th>
+          <th class="flamegraph__th-right">Start</th>
+          <th class="flamegraph__th-right">Duration</th>
+          <th class="flamegraph__th-right">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(r, i) in detailRows" :key="i">
+          <td>
+            <span class="flamegraph__swatch" :style="{ background: r.color }" />
+            {{ r.label }}
+          </td>
+          <td class="flamegraph__td-right">{{ r.start }}</td>
+          <td class="flamegraph__td-right">{{ r.duration }}</td>
+          <td class="flamegraph__td-right flamegraph__td-muted">{{ r.pct }}%</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -178,4 +216,33 @@ function hideTip() { hovered.value = null; }
 }
 .flamegraph__tip-label { font-weight: 600; color: var(--text); }
 .flamegraph__tip-range { color: var(--text-muted); font-family: var(--font-mono); }
+
+.flamegraph__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 12px;
+}
+.flamegraph__table th {
+  padding: 3px 6px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.flamegraph__th-left { text-align: left; }
+.flamegraph__th-right { text-align: right; }
+.flamegraph__table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.flamegraph__td-right { text-align: right; font-family: var(--font-mono); }
+.flamegraph__td-muted { color: var(--text-muted); }
+.flamegraph__swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
 </style>
