@@ -5,7 +5,14 @@ import { useUiStore } from '../stores/ui';
 
 const store = useTaskStore();
 const ui = useUiStore();
-const query = ref('');
+const query = ref(store.filterQuery);
+
+// Reverse sync: when something else (e.g. a tag chip click) writes to
+// store.filterQuery, mirror the value into the visible input so the
+// user can see and edit the active filter.
+watch(() => store.filterQuery, (q) => {
+  if (q !== query.value.trim().toLowerCase()) query.value = q;
+});
 const inputRef = ref<HTMLInputElement | null>(null);
 
 watch(query, (q) => {

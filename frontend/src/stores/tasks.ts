@@ -14,6 +14,12 @@ export const useTaskStore = defineStore('tasks', () => {
   function matchesFilter(t: Task): boolean {
     const q = filterQuery.value;
     if (!q) return true;
+    // `#tag` searches only tags (case-insensitive equality after the #).
+    // Otherwise the query matches title / prompt / id-prefix / any tag.
+    if (q.startsWith('#') && q.length > 1) {
+      const wanted = q.slice(1);
+      return !!t.tags?.some((tag) => tag.toLowerCase() === wanted);
+    }
     return (t.title || '').toLowerCase().includes(q)
       || t.prompt.toLowerCase().includes(q)
       || t.id.startsWith(q)
