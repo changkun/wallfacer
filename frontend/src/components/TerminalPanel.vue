@@ -178,7 +178,7 @@ function connect() {
       }
       return;
     }
-    let msg: { type: string; sessions?: { id: string; active?: boolean; container?: string }[]; session?: string };
+    let msg: { type: string; sessions?: { id: string; active?: boolean }[]; session?: string };
     try { msg = JSON.parse(event.data); } catch { return; }
     switch (msg.type) {
       case 'sessions': handleSessionsList(msg.sessions ?? []); break;
@@ -220,7 +220,7 @@ function clearTermScreen() {
   term.write('\x1b[2J\x1b[H');
 }
 
-function handleSessionsList(list: { id: string; active?: boolean; container?: string }[]) {
+function handleSessionsList(list: { id: string; active?: boolean }[]) {
   const ids: Record<string, true> = {};
   for (const s of list) ids[s.id] = true;
   // Drop sessions no longer on the server.
@@ -233,14 +233,8 @@ function handleSessionsList(list: { id: string; active?: boolean; container?: st
   // Add new sessions.
   for (const s of list) {
     if (!sessions.value[s.id]) {
-      let label: string;
-      if (s.container) {
-        label = s.container.length > 24 ? s.container.slice(0, 24) + '…' : s.container;
-      } else {
-        tabCounter.value += 1;
-        label = `Shell ${tabCounter.value}`;
-      }
-      sessions.value[s.id] = { label, buffer: [] };
+      tabCounter.value += 1;
+      sessions.value[s.id] = { label: `Shell ${tabCounter.value}`, buffer: [] };
       sessionsOrder.value.push(s.id);
     }
     if (s.active && activeId.value !== s.id) {
