@@ -437,9 +437,16 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		uiFS = prefixFS{inner: os.DirFS(absUI), prefix: "ui"}
 	}
 
-	vueUI := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_VUE_UI"))
+	// UI selection: Vue is the default; the legacy vanilla-JS UI in ui/ is
+	// available as an escape hatch via WALLFACER_LEGACY_UI=1. The older
+	// WALLFACER_VUE_UI flag is honoured for backwards compatibility — see
+	// envconfig.UseLegacyUI for the precise truth table.
+	legacyUI := envconfig.UseLegacyUI(
+		envconfig.Lookup(envFileKV, "WALLFACER_LEGACY_UI"),
+		envconfig.Lookup(envFileKV, "WALLFACER_VUE_UI"),
+	)
 	var vueDistFS fs.FS
-	if vueUI {
+	if !legacyUI {
 		vueDistFS = vueDist
 	}
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS, vueDistFS, cloudMode)
@@ -513,13 +520,13 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 	_ = fs.Parse(args)
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:      *logFormat,
-		Addr:           *addr,
-		DataDir:        *dataDir,
-		ContainerCmd:   *containerCmd,
-		SandboxImage:   *sandboxImage,
-		EnvFile:        *envFile,
-		UIDir:          *uiDir,
+		LogFormat:    *logFormat,
+		Addr:         *addr,
+		DataDir:      *dataDir,
+		ContainerCmd: *containerCmd,
+		SandboxImage: *sandboxImage,
+		EnvFile:      *envFile,
+		UIDir:        *uiDir,
 	}, uiFS, vueDist, docsFS)
 	defer sc.Stop()
 
@@ -624,7 +631,7 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 		}
 		http.NotFound(w, r)
 	})
-	logger.Main.Info("vue-ui: serving Vue SPA (WALLFACER_VUE_UI=true)", "mode", mode)
+	logger.Main.Info("ui: serving Vue SPA (default; set WALLFACER_LEGACY_UI=1 to switch back)", "mode", mode)
 }
 
 const (

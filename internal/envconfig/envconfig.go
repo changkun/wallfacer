@@ -271,6 +271,26 @@ func ParseBoolFlag(v string) bool {
 	return false
 }
 
+// UseLegacyUI decides whether the server should serve the vanilla-JS UI
+// in ui/ instead of the Vue SPA in frontend/dist/. Vue is the default.
+// Inputs (read as-is from the environment / .env file):
+//
+//   - WALLFACER_LEGACY_UI: when truthy ("true" / "1" / "yes"), serve legacy.
+//   - WALLFACER_VUE_UI:    back-compat — when *explicitly* set to a falsy
+//     value ("false" / "0" / "no"), serve legacy. An unset value is treated
+//     as "no preference" and falls through to the default (Vue).
+//
+// Both flags missing or both truthy → Vue.
+func UseLegacyUI(legacyRaw, vueRaw string) bool {
+	if ParseBoolFlag(legacyRaw) {
+		return true
+	}
+	if strings.TrimSpace(vueRaw) != "" && !ParseBoolFlag(vueRaw) {
+		return true
+	}
+	return false
+}
+
 // ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted
 // string (':' on Unix, ';' on Windows), trimming empty entries.
 func ParseWorkspaces(raw string) []string {

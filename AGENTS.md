@@ -173,6 +173,7 @@ Commonly-tuned variables (full list in `docs/guide/configuration.md`):
 - `WALLFACER_WORKSPACES` — workspace paths (OS path-list separated)
 - `WALLFACER_SERVER_API_KEY` — bearer token for server API authentication
 - `WALLFACER_CLOUD` — gate for cloud-only UI surfaces; shell env only (defaults `false`)
+- `WALLFACER_LEGACY_UI` — when truthy, fall back to the vanilla-JS UI in `ui/` instead of the default Vue SPA in `frontend/dist/`. Older `WALLFACER_VUE_UI=false` is honoured for back-compat.
 - `AUTH_JWKS_URL` / `AUTH_ISSUER` — JWT validation in cloud mode (auto-derived from `AUTH_URL` when unset)
 
 **Cloud vs local partition.** `WALLFACER_CLOUD` is the single gate between local-only functionality and cloud surfaces. Cloud adds identity, not feature gates — task execution is identical in both modes. Full details in [`docs/cloud/README.md`](docs/cloud/README.md). Long-range design in [`specs/shared/authentication.md`](specs/shared/authentication.md).
