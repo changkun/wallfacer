@@ -178,6 +178,30 @@ const logContainer = ref<HTMLElement | null>(null);
 const streamTaskId = computed(() => props.task.id || null);
 const { raw: rawOutput, activity, streaming } = useTaskActivity(streamTaskId);
 
+// Activity search + truncation. Mirrors ui/js/modal-logs.js (line 142
+// search filter + line 117 MAX_LOG_LINES cap). Filter is case-insensitive
+// across label/summary/detail. Cap protects the DOM from runaway agents.
+const activitySearch = ref('');
+const ACTIVITY_MAX_ROWS = 5000;
+const visibleActivity = computed(() => {
+  const q = activitySearch.value.trim().toLowerCase();
+  const filtered = q
+    ? activity.value.filter((row) => {
+        const hay = `${row.label} ${row.summary ?? ''} ${row.detail ?? ''}`.toLowerCase();
+        return hay.includes(q);
+      })
+    : activity.value;
+  if (filtered.length > ACTIVITY_MAX_ROWS) {
+    return filtered.slice(filtered.length - ACTIVITY_MAX_ROWS);
+  }
+  return filtered;
+});
+const activityTruncated = computed(() => {
+  const q = activitySearch.value.trim().toLowerCase();
+  const len = q ? visibleActivity.value.length : activity.value.length;
+  return activity.value.length > ACTIVITY_MAX_ROWS && len === ACTIVITY_MAX_ROWS;
+});
+
 interface OversightPhase {
   title: string;
   summary: string;
@@ -515,20 +539,41 @@ const isArchived = computed(() => !!props.task.archived);
                       <div v-else-if="oversightStatus === 'failed'" class="text-xs" style="color: var(--err, #c0392b);">Oversight generation failed{{ oversightError ? `: ${oversightError}` : '' }}</div>
 
                       <!-- Pretty activity rows (thinking / tool calls / results / text). -->
-                      <div v-if="activity.length" class="ta-activity-log">
+                      <div v-if="activity.length">
+                        <div class="ta-activity-search">
+                          <input
+                            v-model="activitySearch"
+                            type="search"
+                            class="ta-activity-search__input"
+                            placeholder="Filter activity…"
+                            aria-label="Filter activity rows"
+                          />
+                          <span v-if="activitySearch" class="ta-activity-search__count">
+                            {{ visibleActivity.length }} / {{ activity.length }}
+                          </span>
+                        </div>
                         <div
-                          v-for="(row, i) in activity"
-                          :key="i"
-                          class="ta-activity-row"
-                          :class="'ta-activity-row--' + row.kind"
+                          v-if="activityTruncated"
+                          class="ta-activity-truncated"
+                          :title="`Showing the last ${ACTIVITY_MAX_ROWS} rows; load the full log via /api/tasks/{id}/logs for the complete trace.`"
                         >
-                          <span class="ta-activity-icon" aria-hidden="true">{{ activityIcon(row.kind) }}</span>
-                          <span class="ta-activity-label">{{ row.label }}</span>
-                          <span v-if="row.summary" class="ta-activity-summary">{{ row.summary }}</span>
-                          <details v-if="row.detail" class="ta-activity-detail" :open="row.defaultOpen">
-                            <summary>details</summary>
-                            <pre>{{ row.detail }}</pre>
-                          </details>
+                          Showing last {{ ACTIVITY_MAX_ROWS.toLocaleString() }} rows.
+                        </div>
+                        <div class="ta-activity-log">
+                          <div
+                            v-for="(row, i) in visibleActivity"
+                            :key="i"
+                            class="ta-activity-row"
+                            :class="'ta-activity-row--' + row.kind"
+                          >
+                            <span class="ta-activity-icon" aria-hidden="true">{{ activityIcon(row.kind) }}</span>
+                            <span class="ta-activity-label">{{ row.label }}</span>
+                            <span v-if="row.summary" class="ta-activity-summary">{{ row.summary }}</span>
+                            <details v-if="row.detail" class="ta-activity-detail" :open="row.defaultOpen">
+                              <summary>details</summary>
+                              <pre>{{ row.detail }}</pre>
+                            </details>
+                          </div>
                         </div>
                       </div>
 
@@ -976,6 +1021,34 @@ const isArchived = computed(() => !!props.task.archived);
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-muted);
+}
+
+/* Activity tab search bar + truncation notice. */
+.ta-activity-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 6px;
+}
+.ta-activity-search__input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.ta-activity-search__count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.ta-activity-truncated {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 4px;
 }
 
 /* Pretty agent-activity rows (mirrors the planning chat's pcp-activity). */
