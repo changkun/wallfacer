@@ -59,7 +59,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] trash-bin — restore-success toast
 - [ ] markdown — modal/card markdown helper actions (toggle section, copy)
 - [x] state — pendingCancel "cancelling" indicator (done earlier in TaskDetail)
-- [ ] state — active-group badge tracking from SSE
+- [x] state — active-group badge tracking (live for active group, config active_groups for background)
 - [ ] task-stream — waitForTaskTitle resilience (poll until non-empty)
 - [x] dispatch-toast — dispatched-task pulse highlight on board
 - [ ] utils — mobile column nav (IntersectionObserver pill)
@@ -91,7 +91,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [~] instructions — preloadedContent for re-init (DEAD: only test fixtures pass preloadedContent; sole production caller passes none. Real open+reinit flow is implemented.)
 - [x] events — visibilitychange→fetchTasks on tab refocus
 - [ ] task-stream — waitForTaskDelta SSE-resolve optimization
-- [ ] workspace — group popover active/switching state (partial in Sidebar)
+- [x] workspace — group popover active/switching state
 - [ ] spec-mode — focused-view crossfade epoch-guard against click-spam
 - [ ] spec-explorer — Task Prompts SSE subscription to stay fresh
 
