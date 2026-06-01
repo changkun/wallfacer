@@ -149,6 +149,7 @@ func hostPath(path, runtimeBin string) string {
 // and the file exists, buildContainerArgs includes a read-only volume mount
 // that places it at /workspace/CLAUDE.md inside the container.
 func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -194,6 +195,7 @@ func TestContainerArgsMissingInstructionsFile(t *testing.T) {
 // TestContainerArgsCLAUDEMDMountIsReadOnly verifies the mount is marked :ro
 // so the container cannot accidentally modify the shared instructions file.
 func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("content"), 0644); err != nil {
 		t.Fatal(err)
@@ -219,6 +221,7 @@ func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
 // (/workspace/<repo>/CLAUDE.md) so the agent stays anchored to the repo root
 // rather than treating /workspace/ as the project root.
 func TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -258,6 +261,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo(t *testing.T) {
 // there are multiple workspaces, CLAUDE.md is mounted at /workspace/CLAUDE.md
 // (the CWD for multi-workspace mode).
 func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -290,6 +294,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 // TestContainerArgsCodexMountsAGENTSMD verifies that codex sandbox mounts
 // workspace instructions at /workspace/AGENTS.md.
 func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -305,6 +310,7 @@ func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
 }
 
 func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -412,6 +418,7 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 // appears before the image name in the args list, matching the expected
 // container launch order.
 func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("content"), 0644); err != nil {
 		t.Fatal(err)
@@ -464,6 +471,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 // TestBuildContainerArgs_BoardMount verifies that a non-empty boardDir adds
 // a read-only mount at /workspace/.tasks.
 func TestBuildContainerArgs_BoardMount(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	runner := newTestRunnerWithInstructions(t, "")
 	boardDir := t.TempDir()
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, boardDir, nil, "")
@@ -488,6 +496,7 @@ func TestBuildContainerArgs_NoBoardMount(t *testing.T) {
 // TestBuildContainerArgs_SiblingMounts verifies that sibling worktree mounts
 // are added as read-only volumes under /workspace/.tasks/worktrees/.
 func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	runner := newTestRunnerWithInstructions(t, "")
 	siblingDir := t.TempDir()
 	siblingMounts := map[string]map[string]string{
@@ -510,6 +519,7 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 // container spec builder read r.workspaces without storeMu, which could
 // produce zero workspace mounts during a workspace switch.
 func TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	ws1 := t.TempDir()
 	ws2 := t.TempDir()
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")

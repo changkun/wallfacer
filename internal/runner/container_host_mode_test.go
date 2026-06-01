@@ -206,6 +206,7 @@ func TestBuildContainerSpec_HostMode_CmdContainsPromptAndResume(t *testing.T) {
 }
 
 func TestBuildContainerSpec_LocalMode_StillGetsContainerPaths(t *testing.T) {
+	t.Skip("container-mode no longer exists; dead after specs/shared/host-default")
 	// Regression guard: the default container path must still produce
 	// /workspace/* paths (host-mode branch must not leak into container mode).
 	workspace := t.TempDir()

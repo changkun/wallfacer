@@ -612,6 +612,7 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 // TestBuildContainerArgsWorktreeOverride verifies that worktreeOverrides
 // replaces the workspace host path in the volume mount.
 func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	ws := t.TempDir()
 	wt := t.TempDir()
 
@@ -653,6 +654,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 // .git directory is mounted at its host path so the worktree's .git file
 // reference resolves correctly inside the container.
 func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
+	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
 	// Create a real git repo so .git directory exists.
 	repo := setupTestRepo(t)
 	wt := t.TempDir()

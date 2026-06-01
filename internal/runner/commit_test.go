@@ -14,6 +14,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// resolveTestCmd maps a non-absolute cmd (e.g. "echo") to its $PATH location
+// so HostBackend's binary resolver accepts it. Absolute paths pass through.
+func resolveTestCmd(cmd string) string {
+	if filepath.IsAbs(cmd) {
+		return cmd
+	}
+	if p, err := exec.LookPath(cmd); err == nil {
+		return p
+	}
+	return cmd
+}
+
 // runnerWithCmd creates a minimal Runner backed by a fresh store using the
 // given container command string. No workspaces are configured, which is fine
 // for commit message generation tests that don't touch git worktrees.
@@ -29,10 +41,13 @@ func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
 		t.Fatal(err)
 	}
+	resolved := resolveTestCmd(cmd)
 	r := NewRunner(s, RunnerConfig{
-		Command:      cmd,
-		SandboxImage: "test:latest",
-		WorktreesDir: worktreesDir,
+		Command:          cmd,
+		SandboxImage:     "test:latest",
+		WorktreesDir:     worktreesDir,
+		HostClaudeBinary: resolved,
+		HostCodexBinary:  resolved,
 	})
 	t.Cleanup(func() { r.Shutdown() })
 	return r
