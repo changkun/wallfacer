@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -27,7 +28,31 @@ function dismissComposer() {
 
 const store = useTaskStore();
 const ui = useUiStore();
+const route = useRoute();
+const router = useRouter();
 const selectedTask = ref<Task | null>(null);
+// Optional tab to open the detail modal on, carried via ?tab= (command-palette
+// tab-switch jumps). Read once when the task opens.
+const initialTab = computed(() => (typeof route.query.tab === 'string' ? route.query.tab : ''));
+
+// Open the detail modal for ?task=<id> so the command palette (and deep links)
+// can surface a task. Resolves the id against the loaded task list.
+function syncSelectedFromQuery() {
+  const id = typeof route.query.task === 'string' ? route.query.task : '';
+  if (!id) { selectedTask.value = null; return; }
+  if (selectedTask.value?.id === id) return;
+  const t = store.tasks.find((x) => x.id === id);
+  if (t) selectedTask.value = t;
+}
+
+function closeDetail() {
+  selectedTask.value = null;
+  if (route.query.task || route.query.tab) {
+    const q = { ...route.query };
+    delete q.task; delete q.tab;
+    void router.replace({ path: '/', query: q });
+  }
+}
 
 const backlogSortMode = ref<BacklogSortMode>(loadBacklogSortMode());
 const displayedBacklog = computed(() => sortBacklog(store.backlog, backlogSortMode.value));
@@ -75,7 +100,13 @@ async function archiveAllDone() {
 onMounted(async () => {
   if (!store.tasks.length) await store.fetchTasks({ includeArchived: ui.showArchived });
   if (!store.config) await store.fetchConfig();
+  syncSelectedFromQuery();
 });
+
+// Open/replace the detail modal whenever ?task= changes (command palette,
+// deep links) or once the task list arrives.
+watch(() => route.query.task, syncSelectedFromQuery);
+watch(() => store.tasks.length, syncSelectedFromQuery);
 
 // Toggling "Show archived" needs a server round-trip — the server only
 // returns archived rows when include_archived=true (see internal/handler/
@@ -270,7 +301,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
     </div>
   </main>
 
-  <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
+  <TaskDetail v-if="selectedTask" :task="selectedTask" :initial-tab="initialTab" @close="closeDetail" />
 </template>
 
 <style scoped>

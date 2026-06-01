@@ -19,7 +19,7 @@ import { renderMarkdown as renderResultMarkdown } from '../lib/markdown';
 import { ansiToHtml } from '../lib/ansi';
 import { useFocusTrap } from '../composables/useFocusTrap';
 
-const props = defineProps<{ task: Task }>();
+const props = defineProps<{ task: Task; initialTab?: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 const taskStore = useTaskStore();
@@ -58,7 +58,11 @@ const dialog = useDialogStore();
 const toast = useToastStore();
 
 type MainTab = 'spec' | 'activity' | 'changes' | 'results' | 'events' | 'timeline';
-const mainTab = ref<MainTab>('spec');
+const MAIN_TABS: readonly MainTab[] = ['spec', 'activity', 'changes', 'results', 'events', 'timeline'];
+// Honour an initial tab (command-palette tab-switch jumps / deep links).
+const mainTab = ref<MainTab>(
+  MAIN_TABS.includes(props.initialTab as MainTab) ? (props.initialTab as MainTab) : 'spec',
+);
 
 // --- Changes (diff) tab ---
 const diffFiles = ref<DiffFile[]>([]);
@@ -246,13 +250,17 @@ const usageBreakdown = computed(() => {
 const retryHistory = computed(() => props.task.retry_history ?? []);
 const promptHistory = computed(() => props.task.prompt_history ?? []);
 
-watch(mainTab, (t) => {
+function fetchForTab(t: MainTab) {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
   if (t === 'results' && !resultsFetched.value) fetchResults();
   if (t === 'timeline' && !spansFetched.value) fetchSpans();
   if (t === 'events' && !eventsFetched.value) fetchEvents();
-});
+}
+watch(mainTab, fetchForTab);
+// When opened directly on a data tab (command-palette jump / deep link), the
+// change watcher above never fires, so kick off that tab's fetch on mount.
+onMounted(() => { if (mainTab.value !== 'spec') fetchForTab(mainTab.value); });
 
 // Refetch per-tab data when navigating to a different task while a data
 // tab stays selected (e.g. via deep-link or sidebar nav).
