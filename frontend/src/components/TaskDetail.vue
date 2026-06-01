@@ -14,6 +14,7 @@ import { detectResultType } from '../lib/resultType';
 // Re-imported as a local binding so the template can call renderMarkdown()
 // directly inside the Results tab.
 import { renderMarkdown as renderResultMarkdown } from '../lib/markdown';
+import { ansiToHtml } from '../lib/ansi';
 
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
@@ -531,9 +532,14 @@ const isArchived = computed(() => !!props.task.archived);
                         </div>
                       </div>
 
-                      <!-- Fallback: raw output when nothing parsed into activity. -->
+                      <!-- Fallback: raw output when nothing parsed into activity.
+                           Carriage returns are collapsed and ANSI escapes are
+                           coloured via lib/ansi so spinners + warning lines
+                           render the way they do in a terminal. -->
                       <div v-else class="activity-oversight-box" id="modal-logs-section">
-                        <pre ref="logContainer" class="logs-block"><span v-if="!rawOutput" class="cc-result-empty">{{ streaming ? 'Connecting…' : 'No output' }}</span>{{ rawOutput }}</pre>
+                        <pre v-if="!rawOutput" ref="logContainer" class="logs-block"><span class="cc-result-empty">{{ streaming ? 'Connecting…' : 'No output' }}</span></pre>
+                        <!-- eslint-disable-next-line vue/no-v-html — ansiToHtml escapes its input -->
+                        <pre v-else ref="logContainer" class="logs-block" v-html="ansiToHtml(rawOutput)"></pre>
                       </div>
                     </div>
                   </section>
