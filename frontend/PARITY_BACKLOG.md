@@ -22,7 +22,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] modal-core — prompt history section (#1/#2 prior iterations)
 - [x] modal-core — backlog spec Edit/Preview tabs (textarea vs rendered markdown)
 - [x] tasks — modal-based backlog editing (prompt/timeout/sandbox/deps/tags/budgets/scheduled_at/model; save-based not debounced)
-- [ ] modal-logs — test-phase log streaming + test oversight (/oversight/test), parallel Testing tab
+- [x] modal-logs — test-phase oversight (/oversight/test) + Results impl/test split; live test logs stream in Activity during a test run
 - [x] depgraph/unified-graph — Map view integrated (vendored; MapPage works)
 - [x] modal-flamegraph — span detail table + cumulative cost chart (oversight phase bands deferred; minor overlay)
 - [x] modal-stats — Top Tasks rows clickable to open task
