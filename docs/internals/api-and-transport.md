@@ -382,20 +382,6 @@ Every task container is labeled with metadata for monitoring and correlation:
 
 These labels are set in `buildContainerArgsForSandbox()` (`internal/runner/container.go`). The `ListContainers()` method reads these labels to correlate containers to tasks without relying on container name parsing — this is the primary lookup path, with name-based UUID extraction as a legacy fallback.
 
-### Resource Limits
-
-Container resource limits follow a three-tier resolution order (in `resolvedContainerCPUs()`, `resolvedContainerMemory()`, `resolvedContainerNetwork()`):
-
-1. Explicit `RunnerConfig` value passed at construction time.
-2. Value from `~/.wallfacer/.env` (re-read on each container launch).
-3. Default: no CPU/memory limit; `host` network.
-
-```
-[--cpus 2.0]       # from WALLFACER_CONTAINER_CPUS
-[--memory 4g]      # from WALLFACER_CONTAINER_MEMORY
-[--network mynet]   # from WALLFACER_CONTAINER_NETWORK, default "host"
-```
-
 ## Metrics Reference
 
 All metrics are served at `GET /metrics` in Prometheus text exposition format via `metrics.Registry.WritePrometheus()`.

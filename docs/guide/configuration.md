@@ -174,13 +174,6 @@ Route specific agent activities to different sandbox types (`claude` or `codex`)
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Override for commit message generation |
 | `WALLFACER_SANDBOX_IDEA_AGENT` | Override for ideation agent |
 
-### Container Resource Limits
-
-Limit the CPU and memory available to each task container via `WALLFACER_CONTAINER_CPUS` and `WALLFACER_CONTAINER_MEMORY`. These correspond to the `--cpus` and `--memory` flags of `podman run` / `docker run`. Leave empty for no limit.
-
-- Container CPUs (`WALLFACER_CONTAINER_CPUS`) -- e.g. `2.0`; leave empty for no limit
-- Container Memory (`WALLFACER_CONTAINER_MEMORY`) -- e.g. `4g`; leave empty for no limit
-
 ### Fast Mode
 
 When `WALLFACER_SANDBOX_FAST` is `true` (the default), Wallfacer passes fast-mode hints to the sandbox agent. Set to `false` to disable.
@@ -240,9 +233,6 @@ Wallfacer runs tasks through one of two backends, selected at server start via t
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_CONTAINER_NETWORK` | -- | Container network name |
-| `WALLFACER_CONTAINER_CPUS` | (no limit) | CPU limit per container, e.g. `"2.0"` |
-| `WALLFACER_CONTAINER_MEMORY` | (no limit) | Memory limit per container, e.g. `"4g"` |
 | `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive container runtime failures before the circuit breaker opens |
 | `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
 | `WALLFACER_TASK_WORKERS` | `true` | Enable per-task worker containers for container reuse. Each task gets a long-lived container that is reused across agent invocations (implementation turns, title, oversight, commit message). Set to `false` to always use ephemeral containers. |
