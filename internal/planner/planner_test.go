@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 func TestPlannerNew(t *testing.T) {
@@ -122,7 +122,7 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	hb, err := sandbox.NewHostBackend(sandbox.HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	hb, err := executor.NewHostBackend(executor.HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
 	if err != nil {
 		t.Fatalf("NewHostBackend: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestTruncFingerprint(t *testing.T) {
 	}
 }
 
-func isInstructionsMount(v sandbox.VolumeMount) bool {
+func isInstructionsMount(v executor.VolumeMount) bool {
 	return filepath.Base(v.Container) == "CLAUDE.md" || filepath.Base(v.Container) == "AGENTS.md"
 }
 
@@ -353,25 +353,25 @@ func isInstructionsMount(v sandbox.VolumeMount) bool {
 
 type mockHandle struct{}
 
-func (h *mockHandle) State() sandbox.BackendState { return sandbox.StateRunning }
-func (h *mockHandle) Stdout() io.ReadCloser       { return io.NopCloser(strings.NewReader("")) }
-func (h *mockHandle) Stderr() io.ReadCloser       { return io.NopCloser(strings.NewReader("")) }
-func (h *mockHandle) Wait() (int, error)          { return 0, nil }
-func (h *mockHandle) Kill() error                 { return nil }
-func (h *mockHandle) Name() string                { return "mock" }
+func (h *mockHandle) State() executor.BackendState { return executor.StateRunning }
+func (h *mockHandle) Stdout() io.ReadCloser        { return io.NopCloser(strings.NewReader("")) }
+func (h *mockHandle) Stderr() io.ReadCloser        { return io.NopCloser(strings.NewReader("")) }
+func (h *mockHandle) Wait() (int, error)           { return 0, nil }
+func (h *mockHandle) Kill() error                  { return nil }
+func (h *mockHandle) Name() string                 { return "mock" }
 
 type mockBackend struct {
 	launchErr error
 }
 
-func (b *mockBackend) Launch(_ context.Context, _ sandbox.ContainerSpec) (sandbox.Handle, error) {
+func (b *mockBackend) Launch(_ context.Context, _ executor.ContainerSpec) (executor.Handle, error) {
 	if b.launchErr != nil {
 		return nil, b.launchErr
 	}
 	return &mockHandle{}, nil
 }
 
-func (b *mockBackend) List(_ context.Context) ([]sandbox.ContainerInfo, error) {
+func (b *mockBackend) List(_ context.Context) ([]executor.ContainerInfo, error) {
 	return nil, nil
 }
 

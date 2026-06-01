@@ -14,9 +14,9 @@ type nonFlushingRecorder struct {
 	rec *httptest.ResponseRecorder
 }
 
-func (n *nonFlushingRecorder) Header() http.Header        { return n.rec.Header() }
+func (n *nonFlushingRecorder) Header() http.Header         { return n.rec.Header() }
 func (n *nonFlushingRecorder) Write(b []byte) (int, error) { return n.rec.Write(b) }
-func (n *nonFlushingRecorder) WriteHeader(code int)       { n.rec.WriteHeader(code) }
+func (n *nonFlushingRecorder) WriteHeader(code int)        { n.rec.WriteHeader(code) }
 
 func TestNewWriter_SetsHeaders(t *testing.T) {
 	rec := httptest.NewRecorder()

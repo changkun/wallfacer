@@ -179,7 +179,7 @@ func checkHostBackend(vals map[string]string) int {
 	return issues
 }
 
-// resolveHostBinary mirrors sandbox.NewHostBackend's resolver, but returns a
+// resolveHostBinary mirrors executor.NewHostBackend's resolver, but returns a
 // descriptive error instead of crashing. Used by doctor for readiness
 // reporting so the user sees the same hint they'd get from `wallfacer run`
 // failing at startup.

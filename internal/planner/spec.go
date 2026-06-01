@@ -6,17 +6,17 @@ import (
 	"runtime"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/sanitize"
-	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 // buildContainerSpec creates a ContainerSpec for the planning sandbox.
 // Workspaces are mounted read-only; each workspace's specs/ subdirectory
 // is mounted read-write on top (container runtimes apply later mounts
 // over earlier ones, so specs/ is writable while the rest is read-only).
-func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) sandbox.ContainerSpec {
-	spec := sandbox.ContainerSpec{
+func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) executor.ContainerSpec {
+	spec := executor.ContainerSpec{
 		Runtime: p.command,
 		Name:    containerName,
 		Image:   p.image,
@@ -37,7 +37,7 @@ func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) sandbo
 	}
 
 	// claude-config named volume for agent configuration persistence.
-	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+	spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 		Host:      "claude-config",
 		Container: "/home/agent/.claude",
 		Named:     true,
@@ -53,7 +53,7 @@ func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) sandbo
 		basenames = append(basenames, basename)
 
 		// Mount the workspace read-only.
-		spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+		spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 			Host:      ws,
 			Container: "/workspace/" + basename,
 			Options:   mountOpts("z", "ro"),
@@ -62,7 +62,7 @@ func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) sandbo
 		// Mount specs/ read-write on top of the read-only workspace.
 		specsDir := filepath.Join(ws, "specs")
 		if info, err := os.Stat(specsDir); err == nil && info.IsDir() {
-			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+			spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 				Host:      specsDir,
 				Container: "/workspace/" + basename + "/specs",
 				Options:   mountOpts("z"),
@@ -105,10 +105,10 @@ func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) sandbo
 
 // isHostBackend reports whether the configured sandbox backend runs the
 // agent CLI as a host process (no container mounts). Checked via a
-// type-assertion against *sandbox.HostBackend to avoid leaking backend
+// type-assertion against *executor.HostBackend to avoid leaking backend
 // knowledge into the rest of the planner.
 func (p *Planner) isHostBackend() bool {
-	_, ok := p.backend.(*sandbox.HostBackend)
+	_, ok := p.backend.(*executor.HostBackend)
 	return ok
 }
 
@@ -127,7 +127,7 @@ func (p *Planner) hostWorkDir() string {
 
 // appendInstructionsMount adds the workspace AGENTS.md / CLAUDE.md file
 // as a read-only mount, following the same pattern as the runner.
-func (p *Planner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb harness.ID, basenames []string) []sandbox.VolumeMount {
+func (p *Planner) appendInstructionsMount(volumes []executor.VolumeMount, sb harness.ID, basenames []string) []executor.VolumeMount {
 	if p.instructionsPath == "" {
 		return volumes
 	}
@@ -142,7 +142,7 @@ func (p *Planner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb harn
 	if len(basenames) == 1 {
 		containerPath = "/workspace/" + basenames[0] + "/" + filename
 	}
-	return append(volumes, sandbox.VolumeMount{
+	return append(volumes, executor.VolumeMount{
 		Host:      p.instructionsPath,
 		Container: containerPath,
 		Options:   mountOpts("z", "ro"),

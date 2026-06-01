@@ -13,11 +13,11 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -309,7 +309,7 @@ func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, pro
 		}
 	}
 
-	onLaunch := func(name string, handle sandbox.Handle) {
+	onLaunch := func(name string, handle executor.Handle) {
 		if taskID != uuid.Nil {
 			r.taskContainers.Set(taskID, name)
 			r.taskContainers.SetHandle(taskID, handle, nil)

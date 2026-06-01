@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -153,7 +153,7 @@ func TestRunAgent_MountReadOnly_AddsWorkspaceMounts(t *testing.T) {
 		t.Fatalf("expected 1 Launch call, got %d", len(calls))
 	}
 	joined := strings.Join(calls[0].Args, " ")
-	wantPath := sandbox.TranslateHostPath(ws, "")
+	wantPath := executor.TranslateHostPath(ws, "")
 	if !strings.Contains(joined, wantPath) {
 		t.Errorf("expected workspace path %q in launch args, got %q", wantPath, joined)
 	}

@@ -16,12 +16,12 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -2542,7 +2542,7 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	// runner falls back to the canned "wallfacer:" message. Without this the
 	// test machine's real claude runs and the assertion races against the
 	// real commit pipeline.
-	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*sandbox.HostBackend); ok {
+	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*executor.HostBackend); ok {
 		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}

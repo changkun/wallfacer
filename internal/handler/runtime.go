@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -25,7 +25,7 @@ type runtimeStatusResponse struct {
 	TaskStates       map[store.TaskStatus]int `json:"task_states"`
 	ActiveContainers int                      `json:"active_containers"`
 	ContainerCircuit containerCircuitStatus   `json:"container_circuit"`
-	WorkerStats      sandbox.WorkerStatsInfo  `json:"worker_stats"`
+	WorkerStats      executor.WorkerStatsInfo `json:"worker_stats"`
 	Timestamp        time.Time                `json:"timestamp"`
 }
 

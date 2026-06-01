@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/flow"
 	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -99,7 +99,7 @@ func (m *MockRunner) CleanupWorktrees(taskID uuid.UUID, _ map[string]string, _ s
 func (m *MockRunner) PruneUnknownWorktrees() {}
 
 // ListContainers returns an empty list.
-func (m *MockRunner) ListContainers() ([]sandbox.ContainerInfo, error) { return nil, nil }
+func (m *MockRunner) ListContainers() ([]executor.ContainerInfo, error) { return nil, nil }
 
 // ContainerName returns the container name for a task, using ContainerNameFn if set.
 func (m *MockRunner) ContainerName(taskID uuid.UUID) string {
@@ -123,7 +123,7 @@ func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 func (m *MockRunner) StopTaskWorker(_ uuid.UUID) {}
 
 // WorkerStats returns empty stats in the mock.
-func (m *MockRunner) WorkerStats() sandbox.WorkerStatsInfo { return sandbox.WorkerStatsInfo{} }
+func (m *MockRunner) WorkerStats() executor.WorkerStatsInfo { return executor.WorkerStatsInfo{} }
 
 // ContainerCircuitAllow always returns true in the mock.
 func (m *MockRunner) ContainerCircuitAllow() bool { return true }
@@ -186,7 +186,7 @@ func (m *MockRunner) Command() string { return m.Cmd }
 func (m *MockRunner) SandboxImage() string { return m.Image }
 
 // SandboxBackend returns nil (mock does not provide a real backend).
-func (m *MockRunner) SandboxBackend() sandbox.Backend { return nil }
+func (m *MockRunner) SandboxBackend() executor.Backend { return nil }
 
 // HostMode reports the mock's configured hostMode (defaults to false).
 func (m *MockRunner) HostMode() bool { return m.Host }

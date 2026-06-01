@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -107,7 +107,7 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	// Host backend resolved Claude/Codex binaries at construction; swap
 	// them to the fake script so commit-message generation does not shell
 	// out to the real CLI.
-	if hb, ok := runner.backend.(*sandbox.HostBackend); ok {
+	if hb, ok := runner.backend.(*executor.HostBackend); ok {
 		hb.SetBinaryForTest(harness.Claude, cmd)
 		hb.SetBinaryForTest(harness.Codex, cmd)
 	}

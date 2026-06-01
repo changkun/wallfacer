@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 
 	"changkun.de/x/wallfacer/internal/agents"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -69,7 +69,7 @@ type runAgentOpts struct {
 	// (e.g. refineContainers) so log streams and kill commands can
 	// attach to the in-flight container. Called for every launch
 	// attempt, including the codex fallback.
-	OnLaunch func(containerName string, handle sandbox.Handle)
+	OnLaunch func(containerName string, handle executor.Handle)
 
 	// SessionID, when non-empty, is threaded into buildAgentCmd as
 	// --resume <id>. Used by the multi-turn heavyweight roles so the
@@ -340,7 +340,7 @@ func (r *Runner) launchOne(
 		}
 	}
 
-	var spec sandbox.ContainerSpec
+	var spec executor.ContainerSpec
 	switch binding.MountMode {
 	case mountReadWrite:
 		// Heavyweight spec builder already handles worktree mounts,
@@ -492,7 +492,7 @@ func (r *Runner) buildInspectorSpec(
 	containerName, model string,
 	sb harness.ID,
 	mode mountMode,
-) sandbox.ContainerSpec {
+) executor.ContainerSpec {
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 	if mode != mountReadOnly {
 		return spec
@@ -521,7 +521,7 @@ func (r *Runner) buildInspectorSpec(
 		}
 		basename := sanitizeBasename(ws)
 		basenames = append(basenames, basename)
-		spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
+		spec.Volumes = append(spec.Volumes, executor.VolumeMount{
 			Host:      ws,
 			Container: "/workspace/" + basename,
 			Options:   mountOpts("z", "ro"),
