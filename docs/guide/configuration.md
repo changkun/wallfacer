@@ -387,13 +387,10 @@ wallfacer run [flags] [workspace...]
 |---|---|---|---|
 | `-addr` | `ADDR` | `:8080` | Listen address |
 | `-data` | `DATA_DIR` | `~/.wallfacer/data` | Task data directory |
-| `-container` | `CONTAINER_CMD` | auto-detected | Container runtime command (`podman` or `docker`) |
-| `-image` | `SANDBOX_IMAGE` | `ghcr.io/latere-ai/sandbox-agents:latest` | Sandbox image name (same image serves both Claude and Codex; `WALLFACER_AGENT` selects the CLI) |
-| `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
+| `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file with credentials and runtime settings |
 | `-no-browser` | -- | `false` | Skip auto-opening the browser |
+| `-ui-dir` | `UI_DIR` | -- | Serve the UI from this on-disk directory (dev mode) |
 | `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |
-
-Container runtime auto-detection order: `/opt/podman/bin/podman`, then `podman` on `$PATH`, then `docker` on `$PATH`.
 
 #### wallfacer status
 
@@ -420,7 +417,7 @@ wallfacer status -addr :9090      # Connect to a different server
 
 #### wallfacer doctor
 
-Check prerequisites and configuration. Displays config paths, then verifies credentials, container runtime (including responsiveness), sandbox images, and Git.
+Check prerequisites and configuration. Displays config paths, then verifies credentials, the `claude` / `codex` binaries on `$PATH`, and Git.
 
 ```
 wallfacer doctor
@@ -428,27 +425,6 @@ wallfacer doctor
 
 Output uses `[ok]` for passing checks, `[!]` for issues that need fixing, and `[ ]` for optional items that are not configured. Credential values are masked.
 
-#### wallfacer exec
-
-Attach an interactive shell to a running task container, or open a shell in a new sandbox container.
-
-```
-wallfacer exec <task-id-prefix> [-- command...]
-wallfacer exec --sandbox <claude|codex> [-- command...]
-```
-
-- `<task-id-prefix>` -- the first 8 or more hex characters of the task UUID (shown on task cards)
-- `--sandbox` -- open a fresh sandbox container with the current directory mounted, without attaching to an existing task
-- `command` -- command to run inside the container (default: `bash`; falls back to `sh` if bash is unavailable)
-
-**Examples:**
-
-```bash
-wallfacer exec a1b2c3d4              # Attach to running task container
-wallfacer exec a1b2c3d4 -- sh       # Use sh instead of bash
-wallfacer exec --sandbox claude      # Open shell in a new Claude sandbox
-wallfacer exec --sandbox codex       # Open shell in a new Codex sandbox
-```
 
 ### Security
 

@@ -162,7 +162,7 @@ sequenceDiagram
     participant S as Store
     participant SSE as SSE Subscribers
     participant R as Runner
-    participant C as Container
+    participant C as Agent CLI
     participant G as Git
 
     B->>H: POST /api/tasks {prompt}
@@ -182,7 +182,7 @@ sequenceDiagram
 
     loop Turn loop
         R->>R: generateBoardContextAndMounts()
-        R->>C: buildContainerArgsForSandbox() + executor.RunArgs()
+        R->>C: buildContainerSpecForSandbox() + backend.Launch()
         C-->>R: NDJSON stdout (agentOutput)
         R->>S: SaveTurnOutput() + AccumulateSubAgentUsage()
         R->>R: parse stop_reason
@@ -223,7 +223,7 @@ The browser sends `PATCH /api/tasks/{id}` with `{status: "in_progress"}`. `Handl
 
 ### 3. Turn loop
 
-The turn loop in `Run` increments the turn counter, refreshes the board context via `generateBoardContextAndMounts` (`internal/runner/board.go`), and calls `runContainer` (`internal/runner/container.go`). That function builds the container spec via `buildContainerArgsForSandbox`, resolves the sandbox type per activity, checks the circuit breaker, and invokes `executor.RunArgs` which runs `podman/docker run` via `os/exec`. The NDJSON stdout is parsed into an `agentOutput` struct. The runner saves raw output via `Store.SaveTurnOutput`, accumulates token usage via `Store.AccumulateSubAgentUsage` and `Store.AppendTurnUsage`, then inspects `output.StopReason` to decide the next step.
+The turn loop in `Run` increments the turn counter, refreshes the board context via `generateBoardContextAndMounts` (`internal/runner/board.go`), and calls `runContainer` (`internal/runner/container.go`). That function builds the launch spec via `buildContainerSpecForSandbox`, resolves the sandbox type per activity, checks the circuit breaker, and invokes `backend.Launch`, which execs the agent CLI directly via `os/exec`. The NDJSON stdout is parsed into an `agentOutput` struct. The runner saves raw output via `Store.SaveTurnOutput`, accumulates token usage via `Store.AccumulateSubAgentUsage` and `Store.AppendTurnUsage`, then inspects `output.StopReason` to decide the next step.
 
 ### 4. Waiting state
 
@@ -303,7 +303,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change the turn loop | `internal/runner/execute.go` (`Run()`) |
 | Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `internal/gitutil/ops.go` |
 | Add a new automation watcher | `internal/handler/tasks_autopilot.go` (follow `SubscribeWake` pattern) |
-| Change container arguments | `internal/runner/container.go` (`buildContainerArgsForSandbox()`) |
+| Change the agent launch spec | `internal/runner/container.go` (`buildContainerSpecForSandbox()`) |
 | Add a new env config variable | `internal/envconfig/envconfig.go` |
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
 | Debug a failing rebase | `internal/gitutil/ops.go` + `internal/gitutil/stash.go` |

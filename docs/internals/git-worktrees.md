@@ -68,19 +68,15 @@ claude-config (named volume)           ->  /home/agent/.claude
 
 The `.env` file is passed via `--env-file`, not as a bind mount.
 
-The agent operates on `/workspace/<repo>` -- the isolated worktree branch -- so all edits land on `task/<uuid8>` and never touch `main`.
+The agent operates on the worktree directory -- the isolated worktree branch -- so all edits land on `task/<uuid8>` and never touch `main`.
 
-### Git Directory Bind-Mount
+### Git Directory
 
-Git worktrees use a `.git` file (not a directory) that references the main repo's `.git/worktrees/<name>/` via an absolute host path. To make git operations work inside the container, `buildContainerArgsForSandbox()` (`internal/runner/container.go`) bind-mounts the main repo's `.git` directory at the same absolute host path inside the container:
-
-```
-~/projects/myapp/.git  ->  ~/projects/myapp/.git:z   (read-write)
-```
+Git worktrees use a `.git` file (not a directory) that references the main repo's `.git/worktrees/<name>/` via an absolute host path. Because each task runs as a host process, that path resolves natively -- no bind-mount or path translation is needed for git operations to work inside the worktree.
 
 ### Working Directory
 
-When there is exactly one workspace, the container's working directory is set to `/workspace/<basename>` so the agent starts directly in the repo. For multiple workspaces, CWD is `/workspace` so all repos are accessible. See `workdirForBasenames()` in `container.go`.
+Each task process runs with its git worktree as the working directory, so the agent starts directly in the repo. The host backend rejects any non-host (`/workspace/...`) working directory to fail fast on path-translation bugs.
 
 ## Commit Pipeline
 

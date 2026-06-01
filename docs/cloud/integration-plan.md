@@ -33,9 +33,9 @@ git/worktree workflow, autonomy controls, local-first UX.
   `Group.CreatedBy/OrgID`, and `TasksForPrincipal` org-scoped filtering. The
   authentication spec is **archived/complete**.
 - **The integration seams are already interfaces**, selected by config:
-  - `sandbox.Backend` (`internal/sandbox/backend.go:74`) — `LocalBackend`
-    (podman/docker) and `HostBackend` coexist; `--backend` selects. Optional
-    `WorkerManager` for per-task worker lifecycle.
+  - `executor.Backend` (`internal/executor/backend.go`) — `HostBackend` is the
+    only implementation today; the interface is the seam a cloud backend (e.g.
+    a Cella/K8s backend) would implement.
   - `store.StorageBackend` (`internal/store/backend.go:9`) — tasks/events/blobs;
     `FilesystemBackend` is the only impl, but the seam is clean.
   - `handler.AuthProvider` (`internal/handler/login.go:13`) — swappable; nil ⇒
