@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 )
 
@@ -46,59 +47,51 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 
 	env := b.buildChildEnv(spec)
 
-	prompt, model := extractPromptAndModelFromClaudeArgv(spec.Cmd)
-	if prompt == "" {
+	req := requestFromClaudeSpec(spec)
+	if req.Prompt == "" {
 		return nil, fmt.Errorf("host backend: codex launch requires a -p <prompt> argument in spec.Cmd")
 	}
-	if model == "" {
+	if req.Model == "" {
 		// Fall back to CODEX_DEFAULT_MODEL from env if set (matches
 		// codex-agent.sh behaviour).
 		for _, kv := range env {
 			if strings.HasPrefix(kv, "CODEX_DEFAULT_MODEL=") {
-				model = strings.TrimPrefix(kv, "CODEX_DEFAULT_MODEL=")
+				req.Model = strings.TrimPrefix(kv, "CODEX_DEFAULT_MODEL=")
 				break
 			}
 		}
 	}
 
-	// Apply the optional instructions preamble the same way the claude
-	// path does: prepend to the prompt. Codex's exec CLI does not accept
-	// --append-system-prompt today, so feature-probing is pointless — we
-	// just prepend when an instructions file is present.
+	// Codex has no --append-system-prompt equivalent; the harness
+	// prepends SystemPrompt into the prompt body. Hand it the
+	// instructions file content rather than the path so the harness's
+	// prepend produces the same wire bytes as the legacy code path.
 	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
 		if data, rErr := os.ReadFile(instrPath); rErr == nil && len(data) > 0 {
-			prompt = string(data) + "\n\n---\n\n" + prompt
+			req.SystemPrompt = string(data)
 		} else if rErr != nil {
 			logger.Runner.Warn("host backend: read instructions file", "path", instrPath, "error", rErr)
 		}
 	}
 
-	// Per-launch temp dir holds the --output-last-message file. Using a
-	// fresh dir per call avoids races that the container script had with
-	// its fixed /tmp/codex-* paths.
+	codexH, _ := harness.Lookup(harness.Codex)
+	argv, _, argvErr := codexH.BuildArgv(req)
+	if argvErr != nil {
+		return nil, fmt.Errorf("host backend: codex argv: %w", argvErr)
+	}
+
+	// Per-launch temp dir holds the --output-last-message file. The
+	// runner's downstream parser still expects a Claude-style final
+	// result line; teeCodexAndAppendResult synthesizes it from this
+	// file plus the in-stream events.
 	tmpDir, err := os.MkdirTemp("", "wallfacer-codex-")
 	if err != nil {
 		return nil, fmt.Errorf("host backend: codex tmp dir: %w", err)
 	}
 	lastMsgFile := filepath.Join(tmpDir, "last-message.txt")
-
-	// Assemble codex argv.
-	argv := []string{
-		"exec",
-		"--full-auto",
-		"--sandbox", "workspace-write",
-		"--skip-git-repo-check",
-		"--json",
-		"--output-last-message", lastMsgFile,
-		"--color", "never",
-	}
-	if sandboxFast(spec.Env, env) {
-		argv = append(argv, "--config", `model_reasoning_effort="low"`)
-	}
-	if model != "" {
-		argv = append(argv, "--model", model)
-	}
-	argv = append(argv, prompt)
+	// argv ends with the prompt; insert --output-last-message before it.
+	prompt := argv[len(argv)-1]
+	argv = append(argv[:len(argv)-1:len(argv)-1], "--output-last-message", lastMsgFile, prompt)
 
 	cmd := exec.CommandContext(ctx, bin, argv...)
 	cmd.Env = env
