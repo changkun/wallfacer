@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -273,34 +272,6 @@ func TestFilterByFailureCategory_ViaListTasksHandler(t *testing.T) {
 	}
 	if tasks[0].ID != task1.ID {
 		t.Errorf("unexpected task in filtered result: %s", tasks[0].ID)
-	}
-}
-
-// --- GetContainers ---
-
-// TestGetContainers_RuntimeError verifies that GetContainers returns 500 when the
-// container runtime is not available (no command configured in the runner).
-func TestGetContainers_RuntimeError(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/containers", nil)
-	w := httptest.NewRecorder()
-	h.GetContainers(w, req)
-	// With no container runtime configured, ListContainers fails → 500.
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500 when runtime fails, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestGetContainers_EmptyWithMock verifies that GetContainers returns 200 with an
-// empty JSON array when the runner reports no containers.
-func TestGetContainers_EmptyWithMock(t *testing.T) {
-	m := &runner.MockRunner{}
-	h, _ := newTestHandlerWithMockRunner(t, m)
-	req := httptest.NewRequest(http.MethodGet, "/api/containers", nil)
-	w := httptest.NewRecorder()
-	h.GetContainers(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

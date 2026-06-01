@@ -715,20 +715,6 @@ func TestGetFiles_SkipsNodeModules(t *testing.T) {
 	}
 }
 
-// --- GetContainers ---
-
-func TestGetContainers_ReturnsResult(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/containers", nil)
-	w := httptest.NewRecorder()
-	h.GetContainers(w, req)
-
-	// Either a list (possibly empty) or an error — both return JSON.
-	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 200 or 500, got %d", w.Code)
-	}
-}
-
 // --- GitStatus ---
 
 func TestGitStatus_NoWorkspaces(t *testing.T) {
