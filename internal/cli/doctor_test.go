@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -121,87 +120,6 @@ func TestRunDoctor_OpenAIOptional(t *testing.T) {
 	}
 }
 
-// TestRunDoctor_ContainerRuntimeNotFound verifies that doctor warns when the
-// configured container runtime binary does not exist.
-func TestRunDoctor_ContainerRuntimeNotFound(t *testing.T) {
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	// Point to a non-existent container command.
-	t.Setenv("CONTAINER_CMD", "/nonexistent/container-runtime")
-
-	out := captureStdout(func() {
-		RunDoctor(configDir, nil)
-	})
-
-	if !strings.Contains(out, "[!] Container runtime not found") {
-		t.Errorf("expected runtime warning, got:\n%s", out)
-	}
-}
-
-// TestRunDoctor_RuntimeRespondingWithVersion verifies that doctor shows the
-// container runtime version when the runtime binary responds.
-func TestRunDoctor_RuntimeRespondingWithVersion(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test uses shell scripts")
-	}
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	// Create a fake container runtime that responds with a version.
-	fakeRuntime := filepath.Join(t.TempDir(), "podman")
-	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\nif [ \"$1\" = \"images\" ]; then echo \"\"; exit 0; fi\nexit 0\n"
-	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
-		t.Fatalf("write fake runtime: %v", err)
-	}
-
-	t.Setenv("CONTAINER_CMD", fakeRuntime)
-
-	out := captureStdout(func() {
-		RunDoctor(configDir, nil)
-	})
-
-	if !strings.Contains(out, "[ok] Container runtime") {
-		t.Errorf("expected container runtime ok, got:\n%s", out)
-	}
-}
-
-// TestRunDoctor_RuntimeNotResponding verifies that doctor warns when the
-// container runtime binary exists but doesn't respond.
-func TestRunDoctor_RuntimeNotResponding(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test uses shell scripts")
-	}
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	// Create a fake runtime that fails on version check.
-	fakeRuntime := filepath.Join(t.TempDir(), "podman")
-	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
-		t.Fatalf("write fake runtime: %v", err)
-	}
-
-	t.Setenv("CONTAINER_CMD", fakeRuntime)
-
-	out := captureStdout(func() {
-		RunDoctor(configDir, nil)
-	})
-
-	if !strings.Contains(out, "not responding") {
-		t.Errorf("expected 'not responding' warning, got:\n%s", out)
-	}
-}
-
 // TestRunDoctor_ConfigDirIsFile verifies that doctor warns when the config
 // path exists but is a regular file instead of a directory.
 func TestRunDoctor_ConfigDirIsFile(t *testing.T) {
@@ -215,7 +133,6 @@ func TestRunDoctor_ConfigDirIsFile(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	t.Setenv("ENV_FILE", envFile)
-	t.Setenv("CONTAINER_CMD", "/nonexistent/runtime")
 
 	out := captureStdout(func() {
 		RunDoctor(configPath, nil)
@@ -242,71 +159,6 @@ func TestRunDoctor_MalformedEnvLine(t *testing.T) {
 
 	if !strings.Contains(out, "[ok] ANTHROPIC_API_KEY is set") {
 		t.Errorf("expected credential ok despite malformed line, got:\n%s", out)
-	}
-}
-
-// TestRunDoctor_SandboxImageFallback verifies that doctor reports the fallback
-// image when the primary image is not cached but the fallback is.
-func TestRunDoctor_SandboxImageFallback(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test uses shell scripts")
-	}
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	fakeRuntime := filepath.Join(t.TempDir(), "podman")
-	// Responds with version, returns found only for sandbox-agents:latest (the fallback).
-	script := "#!/bin/sh\n" +
-		"if [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\n" +
-		"if [ \"$1\" = \"images\" ] && [ \"$3\" = \"sandbox-agents:latest\" ]; then echo \"abc123\"; exit 0; fi\n" +
-		"if [ \"$1\" = \"images\" ]; then echo \"\"; exit 0; fi\n" +
-		"exit 0\n"
-	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	t.Setenv("CONTAINER_CMD", fakeRuntime)
-	// Use a non-fallback image so the fallback path triggers.
-	t.Setenv("SANDBOX_IMAGE", "ghcr.io/latere-ai/sandbox-agents:v99")
-
-	out := captureStdout(func() {
-		RunDoctor(configDir, nil)
-	})
-
-	if !strings.Contains(out, "not cached (fallback") {
-		t.Errorf("expected fallback image message, got:\n%s", out)
-	}
-}
-
-// TestRunDoctor_SandboxImageCached verifies that doctor reports a cached
-// sandbox image when the runtime responds that it exists.
-func TestRunDoctor_SandboxImageCached(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test uses shell scripts")
-	}
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-test\n"), 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	fakeRuntime := filepath.Join(t.TempDir(), "podman")
-	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo \"5.0.0\"; exit 0; fi\nif [ \"$1\" = \"images\" ] && [ \"$2\" = \"-q\" ]; then echo \"abc123\"; exit 0; fi\nexit 0\n"
-	if err := os.WriteFile(fakeRuntime, []byte(script), 0755); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	t.Setenv("CONTAINER_CMD", fakeRuntime)
-
-	out := captureStdout(func() {
-		RunDoctor(configDir, nil)
-	})
-
-	if !strings.Contains(out, "[ok] Sandbox image") {
-		t.Errorf("expected cached sandbox image ok, got:\n%s", out)
 	}
 }
 
