@@ -3,16 +3,22 @@ package harness
 import "testing"
 
 func TestNormalizeID(t *testing.T) {
-	cases := map[string]ID{
-		"claude":    Claude,
-		"  Claude ": Claude,
-		"CODEX":     Codex,
-		"weird":     ID("weird"),
-		"":          ID(""),
+	// Slice rather than a map so the intentional whitespace input
+	// ("  Claude ", which exercises trimming) isn't a map key — gocritic
+	// flags suspicious-whitespace keys.
+	cases := []struct {
+		in   string
+		want ID
+	}{
+		{"claude", Claude},
+		{"  Claude ", Claude},
+		{"CODEX", Codex},
+		{"weird", ID("weird")},
+		{"", ID("")},
 	}
-	for in, want := range cases {
-		if got := NormalizeID(in); got != want {
-			t.Errorf("NormalizeID(%q) = %q, want %q", in, got, want)
+	for _, c := range cases {
+		if got := NormalizeID(c.in); got != c.want {
+			t.Errorf("NormalizeID(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }
