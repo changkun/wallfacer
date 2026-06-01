@@ -186,4 +186,9 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.command-palette-action-btn:hover { background: var(--bg-hover); }
+.command-palette-action-btn:hover,
+.command-palette-action-btn.active {
+  background: var(--bg-hover);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
