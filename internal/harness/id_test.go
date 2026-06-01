@@ -24,9 +24,9 @@ func TestParseID(t *testing.T) {
 	if id, ok := ParseID(" CODEX "); !ok || id != Codex {
 		t.Errorf("ParseID(CODEX) = %q,%v", id, ok)
 	}
-	// Unregistered harness ID: normalized but not ok.
-	if id, ok := ParseID("cursor"); ok || id != Cursor {
-		t.Errorf("ParseID(cursor) = %q,%v; want cursor,false (not registered)", id, ok)
+	// Unregistered harness ID: zero value, not ok.
+	if id, ok := ParseID("cursor"); ok || id != "" {
+		t.Errorf("ParseID(cursor) = %q,%v; want \"\",false (not registered)", id, ok)
 	}
 }
 
