@@ -198,7 +198,7 @@ The `Config` struct covers all known keys. Key categories:
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
 | **Sandbox backend** | `SandboxBackend` (populated by `--backend` flag; `""`/`"local"` = container, `"host"` = host exec), `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`) |
-| **Container** | `ContainerNetwork`, `ContainerCPUs`, `ContainerMemory`, `TaskWorkers` (`WALLFACER_TASK_WORKERS`, default `true`), `DependencyCaches` (`WALLFACER_DEPENDENCY_CACHES`, default `false`) |
+| **Container** | `TaskWorkers` (`WALLFACER_TASK_WORKERS`, default `true`), `DependencyCaches` (`WALLFACER_DEPENDENCY_CACHES`, default `false`) |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `PlanningWindowDays` (`WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 | **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
@@ -221,7 +221,7 @@ This design means that `PUT /api/env` can safely omit token fields — they are 
 
 ### Propagation to Running Components
 
-The env file is re-read on every container launch (`r.modelFromEnvForSandbox`, `r.resolvedContainerNetwork`, etc.), so changes made via the UI take effect immediately for new containers without a server restart. Running containers are unaffected — they received their environment at launch time via `--env-file`.
+The env file is re-read on every container launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new containers without a server restart. Running containers are unaffected — they received their environment at launch time via `--env-file`.
 
 The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location — e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque podman `--env-file … no such file` exit 125. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. Host mode is independently resilient — `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
 
