@@ -35,6 +35,12 @@ describe('filterMentionFiles', () => {
     const r = filterMentionFiles(files, '', 'specs/');
     expect(r[0]).toBe('specs/plan.md');
   });
+  it('priorityPrefix matches the prefix anywhere, not just at path start', () => {
+    // Real paths carry a workspace-basename prefix (e.g. "repo/specs/...").
+    const data = ['repo/src/app.js', 'repo/specs/plan.md'];
+    const r = filterMentionFiles(data, '', 'specs/');
+    expect(r[0]).toBe('repo/specs/plan.md');
+  });
   it('respects the limit', () => {
     expect(filterMentionFiles(files, '', '', 2)).toHaveLength(2);
   });

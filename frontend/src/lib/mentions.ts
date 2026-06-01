@@ -21,8 +21,11 @@ export function mentionQueryAt(text: string, caretPos: number): MentionQuery | n
 }
 
 // Filter+rank files for a query. Files whose basename starts with the query
-// rank first, then path substring matches; a priorityPrefix (e.g. "spec/")
-// floats matching files to the top. Case-insensitive. Capped at `limit`.
+// rank first, then path substring matches; a priorityPrefix (e.g. "specs/")
+// floats matching files to the top. The prefix matches anywhere in the path
+// (not just at the start), because file paths carry a workspace-basename
+// prefix like "repo/specs/foo.md" (mirrors ui/js/mention.js). Case-insensitive,
+// capped at `limit`.
 export function filterMentionFiles(
   files: string[],
   query: string,
@@ -40,7 +43,10 @@ export function filterMentionFiles(
     else if (base.includes(q)) score = 2;
     else if (lower.includes(q)) score = 1;
     else continue;
-    if (priorityPrefix && lower.startsWith(priorityPrefix.toLowerCase())) score += 4;
+    if (priorityPrefix) {
+      const pp = priorityPrefix.toLowerCase();
+      if (lower.startsWith(pp) || lower.includes('/' + pp)) score += 4;
+    }
     scored.push({ f, score });
   }
   scored.sort((a, b) => (b.score - a.score) || a.f.localeCompare(b.f));
