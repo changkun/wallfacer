@@ -82,6 +82,10 @@ html.wails-desktop .app-sidebar {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* A <button> shrink-to-fits by default; span the sidebar (minus the 10px
+     side insets from the margin) like the nav items below. */
+  width: calc(100% - 20px);
+  box-sizing: border-box;
   margin: 0 10px 6px;
   padding: 6px 8px;
   border: 1px solid var(--rule);
