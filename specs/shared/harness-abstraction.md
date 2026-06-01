@@ -101,20 +101,37 @@ Each harness is one Go file: `internal/harness/claude.go`, `codex.go`, `cursor.g
 
 ### Layer 2 — Executor (existing, narrowed)
 
-The current `sandbox.Backend` interface stays as the **executor** abstraction — "where does the process run" — but its scope narrows to launch + supervise. Implementations: `HostExecutor` (local, from [host-default.md](host-default.md)), `RemoteExecutor` (Topos, separate spec). The K8s/Cella path keeps its own backend on the cloud side.
+The current `sandbox.Backend` interface stays as the **executor** abstraction — "where does the task runs" — but its scope narrows. Three executor categories:
 
-The runner becomes:
+| Category | Examples | Composes a `Harness`? |
+|---|---|---|
+| **Harness-running, local** | `HostExecutor` (from [host-default.md](host-default.md)) | yes |
+| **Harness-running, remote** | `TopozExecutor` ([cloud/latere-integration/topos-remote-executor.md](../cloud/latere-integration/topos-remote-executor.md)) | yes — Topos runs the wallfacer-selected harness server-side |
+| **Self-contained, remote** | `ClaudeManagedAgentsExecutor` ([cloud/claude-managed-agents.md](../cloud/claude-managed-agents.md)), `AntigravityExecutor` ([cloud/antigravity.md](../cloud/antigravity.md)) | no — the harness is baked into the platform, model and tools may be selectable but the agent loop is not |
+
+The K8s/Cella path keeps its own backend on the cloud side.
+
+The runner's flow has two shapes depending on executor category:
 
 ```go
+// Harness-running executors (host, Topos):
 argv, stdin, _ := harness.BuildArgv(req)
 handle, _ := executor.Launch(ctx, argv, env, cwd, stdin)
 for line := range handle.Stdout() {
     evt, _ := harness.ParseEvent(line)
     // emit to event sourcing, accumulate usage, etc.
 }
+
+// Self-contained executors (Managed Agents, Antigravity):
+handle, _ := executor.Dispatch(ctx, req)   // takes harness.Request directly
+for evt := range handle.Events() {         // executor parses native API events into canonical Event
+    // same downstream consumers
+}
 ```
 
-`runAgent` (the role primitive) is unaffected — it still owns role descriptors. It just calls `harness.BuildArgv` and `harness.ParseEvent` instead of branching on `sandbox.Type`.
+The `Executor` interface must be high-level enough to host both — likely `RunTask(ctx, req) (EventStream, error)` where harness-running implementations internally call `harness.BuildArgv` + `harness.ParseEvent`, and self-contained implementations call their remote API directly. The runner stays uniform; the dispatch choice is internal to each executor.
+
+`runAgent` (the role primitive) is unaffected — it still owns role descriptors. For harness-running executors it goes through `harness.BuildArgv` / `harness.ParseEvent`; for self-contained executors it passes `harness.Request` straight through.
 
 ## Decisions
 
@@ -123,7 +140,7 @@ for line := range handle.Stdout() {
 3. **`Capabilities` is read at runtime**, not compile-time, so callers can degrade gracefully (skip `MaxCostUSD` on harnesses that don't honor it, prepend `SystemPrompt` into the user prompt on harnesses without `--append-system-prompt`).
 4. **No Tier-C support in v1.** Aider and Crush lack a structured event stream; supporting them needs a stdout-scraping adapter and a "lossy harness" UX. Deferred.
 5. **Goose deferred too** — Tier B, but its NDJSON schema is least documented externally. Add once a user asks.
-6. **Topos is not a harness.** It's a remote *executor* (Latere's `/v1/agents` control plane). Separate spec: [`cloud/latere-integration/topos-remote-executor.md`](../cloud/latere-integration/topos-remote-executor.md).
+6. **Topos is not a harness, neither are Claude Managed Agents or Antigravity.** They're all *executors*. Topos proxies a wallfacer-selected harness; Managed Agents and Antigravity are self-contained (fixed harness, with selectable model in the Managed Agents case). Separate specs: [`cloud/latere-integration/topos-remote-executor.md`](../cloud/latere-integration/topos-remote-executor.md), [`cloud/claude-managed-agents.md`](../cloud/claude-managed-agents.md), [`cloud/antigravity.md`](../cloud/antigravity.md).
 
 ## Out of Scope
 
