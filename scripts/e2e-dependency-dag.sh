@@ -233,14 +233,13 @@ else
     fail "expected 8 archived, got $archived_count"
 fi
 
-# Check no containers remain for these tasks. /api/containers was removed
-# (host backend has no containers to list); read the running-container list
-# from /api/debug/health → running_containers.count instead.
+# Check no agent processes remain for these tasks. Read the tracked-process
+# count from /api/debug/health → running_containers.count.
 container_count=$(api GET "/api/debug/health" | jq '.running_containers.count // 0')
 if [ "$container_count" = "0" ] || [ "$container_count" = "null" ]; then
-    pass "no containers remaining"
+    pass "no processes remaining"
 else
-    step "$container_count container(s) still present (may be from other work)"
+    step "$container_count process(es) still present (may be from other work)"
 fi
 
 # --- Summary ---
