@@ -4,19 +4,13 @@ import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { renderMarkdown } from '../lib/markdown';
+import { mapEntries, type RawExplorerEntry, type TreeEntry } from '../lib/explorerTree';
 
 interface TaskPromptEntry {
   task_id: string;
   title: string;
   status: string;
   updated_at: string;
-}
-
-interface TreeEntry {
-  name: string;
-  path: string;
-  is_dir: boolean;
-  size: number;
 }
 
 const store = useTaskStore();
@@ -66,17 +60,17 @@ function workspace(): string {
 async function fetchChildren(dirPath: string) {
   const ws = workspace();
   if (!ws) return;
+  // The backend requires a non-empty `path`; the root level lists the
+  // workspace directory itself. The map stays keyed by `dirPath` ('' for
+  // root) so visibleEntries()'s walk('') and toggleDir(absolutePath) both
+  // resolve consistently.
+  const reqPath = dirPath || ws;
   try {
-    let url = `/api/explorer/tree?workspace=${encodeURIComponent(ws)}`;
-    if (dirPath) {
-      url += `&path=${encodeURIComponent(dirPath)}`;
-    }
-    const res = await api<{ entries: TreeEntry[] }>('GET', url);
-    const sorted = (res.entries ?? []).slice().sort((a, b) => {
-      if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    children.value.set(dirPath, sorted);
+    const url = `/api/explorer/tree?workspace=${encodeURIComponent(ws)}&path=${encodeURIComponent(reqPath)}`;
+    // The endpoint returns a bare JSON array of entries, not {entries:[…]}.
+    const res = await api<RawExplorerEntry[]>('GET', url);
+    children.value.set(dirPath, mapEntries(reqPath, Array.isArray(res) ? res : []));
+    if (!dirPath) errorMsg.value = '';
   } catch (e) {
     console.error('explorer tree:', e);
     if (!dirPath) errorMsg.value = 'Failed to load file tree.';
