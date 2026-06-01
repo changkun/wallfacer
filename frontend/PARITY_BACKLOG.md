@@ -61,7 +61,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] state — pendingCancel "cancelling" indicator (done earlier in TaskDetail)
 - [ ] state — active-group badge tracking from SSE
 - [ ] task-stream — waitForTaskTitle resilience (poll until non-empty)
-- [ ] dispatch-toast — dispatched-task pulse highlight on board
+- [x] dispatch-toast — dispatched-task pulse highlight on board
 - [ ] utils — mobile column nav (IntersectionObserver pill)
 - [ ] events — keyboard shortcuts e/c/d/b (explorer/chat/dispatch/breakdown)
 

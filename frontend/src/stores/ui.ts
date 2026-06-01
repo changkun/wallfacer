@@ -22,6 +22,23 @@ export const useUiStore = defineStore('ui', () => {
   const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
+  // Task ids freshly dispatched from Plan mode; a TaskCard consumes its own id
+  // on mount to play a one-shot "just created" pulse, even after navigating to
+  // the board (mirrors ui/js/dispatch-toast.js highlight).
+  const dispatchedIds = ref<Set<string>>(new Set());
+  function markDispatched(ids: string[]) {
+    if (!ids.length) return;
+    const next = new Set(dispatchedIds.value);
+    for (const id of ids) next.add(id);
+    dispatchedIds.value = next;
+  }
+  function consumeDispatched(id: string) {
+    if (!dispatchedIds.value.has(id)) return;
+    const next = new Set(dispatchedIds.value);
+    next.delete(id);
+    dispatchedIds.value = next;
+  }
+
   function setShowArchived(v: boolean) {
     showArchived.value = v;
     try { if (typeof localStorage !== 'undefined') localStorage.setItem(SHOW_ARCHIVED_KEY, String(v)); }
@@ -54,6 +71,7 @@ export const useUiStore = defineStore('ui', () => {
     showSettings, showWorkspaces, showPalette, showContainers,
     showInstructions, showSystemPrompts, showTemplates, showTerminal,
     showShortcuts, showArchived, setShowArchived,
+    dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
     openSettings, closeSettings,
     openWorkspaces, closeWorkspaces,

@@ -1,4 +1,17 @@
 /* --- Cards --- */
+/* One-shot pulse for cards freshly dispatched from Plan mode
+   (mirrors ui/js/dispatch-toast.js). */
+.card--just-created {
+  animation: card-just-created 1.2s ease-out;
+}
+@keyframes card-just-created {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.55); }
+  30% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card--just-created { animation: none; }
+}
 .card {
   cursor: grab;
   background: var(--bg-card);
