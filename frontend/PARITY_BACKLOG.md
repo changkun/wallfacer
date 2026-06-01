@@ -38,7 +38,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] workspace — per-group max-parallel override (done earlier in SettingsTabWorkspace)
 - [x] render — hide system routines (kind=routine + system:* tag) from board
 - [x] render — scheduled badge with relative time on backlog cards
-- [ ] render — forked-task ancestry badge (parent id, click to open)
+- [~] render — forked-task ancestry badge (DEAD: backend emits no forked_from field; legacy badge never rendered. No fork feature exists.)
 - [x] render — brainstorm category tag badges (BRAINSTORM_CATEGORIES from /api/config)
 - [ ] board-composer — empty-board composer dismiss-for-session persistence
 - [ ] board-composer — composer "@" action button (insert @ + fire mention)
