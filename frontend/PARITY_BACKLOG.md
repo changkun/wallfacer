@@ -8,7 +8,7 @@ one scoped commit.
 Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 
 ## Broken (wrong behavior shipping today)
-- [ ] modal-logs — "Events" tab renders only usage/timeline token stats, never the actual event stream (state_change/output/feedback/error/system) with conflict/rebase detail. Mislabeled. (ui/js/modal-core.js:1223-1429 → TaskDetail.vue:749-789)
+- [x] modal-logs — "Events" tab renders only usage/timeline token stats, never the actual event stream (state_change/output/feedback/error/system) with conflict/rebase detail. Mislabeled. (ui/js/modal-core.js:1223-1429 → TaskDetail.vue:749-789)
 
 ## Missing (no frontend equivalent)
 - [ ] modal-core — "Blocked by" dependencies panel (list + status badges + clickable links + "Waiting on X of Y")
