@@ -19,8 +19,8 @@ import type { Task } from '../api/types';
 // SVG layout pipeline (no getBBox / partial getComputedStyle). The bridge
 // shims under test are installed by MapPage itself before these imports
 // run, so making the imports no-ops doesn't reduce coverage of the wiring.
-vi.mock('../../../ui/js/unified-graph.js', () => ({}));
-vi.mock('../../../ui/js/depgraph.js', () => ({}));
+vi.mock('../vendor/depgraph/unified-graph.js', () => ({}));
+vi.mock('../vendor/depgraph/depgraph.js', () => ({}));
 
 function makeTask(id: string, overrides: Partial<Task> = {}): Task {
   return {
