@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -298,7 +298,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]harness.ID, maxCostUSD *float64, maxInputTokens *int) error {
 	var loweredPrompt string
 	if prompt != nil {
 		loweredPrompt = strings.ToLower(*prompt)
@@ -368,7 +368,7 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 
 // UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
 // Passing an empty map clears the override map.
-func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[SandboxActivity]sandbox.Type) error {
+func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[SandboxActivity]harness.ID) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
 		return nil
@@ -376,9 +376,9 @@ func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, san
 }
 
 // UpdateTaskSandbox stores the task sandbox selection (e.g. "claude" or "codex").
-func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb sandbox.Type) error {
+func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb harness.ID) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.Sandbox = sandbox.Normalize(string(sb))
+		t.Sandbox = harness.NormalizeID(string(sb))
 		return nil
 	})
 }

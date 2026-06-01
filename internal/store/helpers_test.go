@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 )
 
 // bg returns a background context for use in tests.
@@ -71,8 +71,8 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.SessionID = &sessionID
 	task.Result = &result
 	task.StopReason = &stopReason
-	task.SandboxByActivity = map[SandboxActivity]sandbox.Type{
-		SandboxActivityImplementation: sandbox.Claude,
+	task.SandboxByActivity = map[SandboxActivity]harness.ID{
+		SandboxActivityImplementation: harness.Claude,
 	}
 	task.UsageBreakdown = map[SandboxActivity]TaskUsage{
 		SandboxActivityImplementation: {

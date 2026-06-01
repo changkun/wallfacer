@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 	"github.com/google/uuid"
 )
 
@@ -885,24 +885,24 @@ func TestSandboxByActivityEqual_BothEmpty(t *testing.T) {
 }
 
 func TestSandboxByActivityEqual_DifferentLengths(t *testing.T) {
-	a := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude}
-	b := map[SandboxActivity]sandbox.Type{}
+	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
+	b := map[SandboxActivity]harness.ID{}
 	if sandboxByActivityEqual(a, b) {
 		t.Error("expected not equal for different lengths")
 	}
 }
 
 func TestSandboxByActivityEqual_DifferentValues(t *testing.T) {
-	a := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude}
-	b := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Codex}
+	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
+	b := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Codex}
 	if sandboxByActivityEqual(a, b) {
 		t.Error("expected not equal for different values")
 	}
 }
 
 func TestSandboxByActivityEqual_SameValues(t *testing.T) {
-	a := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude}
-	b := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude}
+	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
+	b := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
 	if !sandboxByActivityEqual(a, b) {
 		t.Error("expected equal for same values")
 	}
@@ -1019,8 +1019,8 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 		MountWorktrees:     true,
 		Kind:               TaskKindIdeaAgent,
 		Tags:               []string{"tag1", "tag2"},
-		Sandbox:            sandbox.Claude,
-		SandboxByActivity:  map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude},
+		Sandbox:            harness.Claude,
+		SandboxByActivity:  map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
 		MaxCostUSD:         10.0,
 		MaxInputTokens:     50000,
 		ScheduledAt:        &scheduled,
@@ -1449,12 +1449,12 @@ func TestUpdateTaskBacklog_SandboxByActivity(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "sandbox", Timeout: 5})
 
-	sba := map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: sandbox.Claude}
+	sba := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
 	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &sba, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
-	if got.SandboxByActivity[SandboxActivityImplementation] != sandbox.Claude {
+	if got.SandboxByActivity[SandboxActivityImplementation] != harness.Claude {
 		t.Error("expected SandboxByActivity to be set")
 	}
 }
@@ -2233,13 +2233,13 @@ func TestBuildAndSaveSummary_WithOversightCoverage(t *testing.T) {
 }
 
 func TestNormalizeSandboxByActivity_InvalidTypeCoverage(t *testing.T) {
-	if r := normalizeSandboxByActivity(map[SandboxActivity]sandbox.Type{SandboxActivityImplementation: "bad"}); r != nil {
+	if r := normalizeSandboxByActivity(map[SandboxActivity]harness.ID{SandboxActivityImplementation: "bad"}); r != nil {
 		t.Errorf("expected nil, got %v", r)
 	}
 }
 
 func TestNormalizeSandboxByActivity_InvalidActivityCoverage(t *testing.T) {
-	if r := normalizeSandboxByActivity(map[SandboxActivity]sandbox.Type{"bad": sandbox.Claude}); r != nil {
+	if r := normalizeSandboxByActivity(map[SandboxActivity]harness.ID{"bad": harness.Claude}); r != nil {
 		t.Errorf("expected nil, got %v", r)
 	}
 }
