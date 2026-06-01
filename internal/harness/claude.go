@@ -49,6 +49,7 @@ func (claudeHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 type claudeResultLine struct {
 	Result       string       `json:"result"`
 	SessionID    string       `json:"session_id"`
+	ThreadID     string       `json:"thread_id"`
 	StopReason   string       `json:"stop_reason"`
 	Subtype      string       `json:"subtype"`
 	IsError      bool         `json:"is_error"`
@@ -76,42 +77,59 @@ type claudeStreamLine struct {
 func (claudeHarness) ParseEvent(raw []byte) (Event, error) {
 	evt := Event{Raw: append([]byte(nil), raw...)}
 
-	// Terminal result line: discriminated by presence of a top-level
-	// `result` field with no `type`.
-	var res claudeResultLine
-	if err := json.Unmarshal(raw, &res); err == nil && res.SessionID != "" && res.Result != "" {
-		evt.Kind = KindResult
-		evt.SessionID = res.SessionID
-		evt.StopReason = res.StopReason
-		evt.Text = res.Result
-		if res.Usage != nil {
-			evt.Usage = &Usage{
-				InputTokens:         res.Usage.InputTokens,
-				OutputTokens:        res.Usage.OutputTokens,
-				CacheCreationTokens: res.Usage.CacheCreationInputTokens,
-				CacheReadTokens:     res.Usage.CacheReadInputTokens,
-				CostUSD:             res.TotalCostUSD,
-			}
-		}
-		if res.IsError {
-			evt.Kind = KindError
-		}
+	var line claudeStreamLine
+	if err := json.Unmarshal(raw, &line); err != nil {
 		return evt, nil
 	}
 
-	// Intermediate stream-json line.
-	var line claudeStreamLine
-	if err := json.Unmarshal(raw, &line); err == nil {
-		switch line.Type {
-		case "system":
-			if line.Subtype == "init" {
-				evt.Kind = KindSystemInit
-			}
-		case "assistant":
-			evt.Kind = KindAssistantText
-		case "user":
-			evt.Kind = KindUserResult
+	switch line.Type {
+	case "system":
+		evt.Kind = KindSystemInit
+		return evt, nil
+	case "assistant":
+		evt.Kind = KindAssistantText
+		return evt, nil
+	case "user":
+		evt.Kind = KindUserResult
+		return evt, nil
+	}
+
+	// Terminal result line: claude emits it either typeless or with
+	// type:"result". Key on the line shape, not on a non-empty result —
+	// the waiting / test-run states carry an empty result with an empty
+	// stop_reason and must still be recognised as the terminal event.
+	var res claudeResultLine
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return evt, nil
+	}
+	if line.Type != "result" && res.SessionID == "" && res.StopReason == "" &&
+		res.Result == "" && !res.IsError && res.Usage == nil {
+		// A typeless line with none of the result fields is not a claude
+		// result envelope (e.g. a stray object); leave it KindUnknown.
+		return evt, nil
+	}
+	evt.Kind = KindResult
+	evt.SessionID = res.SessionID
+	if evt.SessionID == "" {
+		evt.SessionID = res.ThreadID
+	}
+	evt.StopReason = res.StopReason
+	evt.Subtype = res.Subtype
+	evt.Text = res.Result
+	// total_cost_usd is a top-level field independent of the token usage
+	// object; surface it even when usage is absent so cost-budget
+	// accounting still sees it.
+	if res.Usage != nil || res.TotalCostUSD != 0 {
+		evt.Usage = &Usage{CostUSD: res.TotalCostUSD}
+		if res.Usage != nil {
+			evt.Usage.InputTokens = res.Usage.InputTokens
+			evt.Usage.OutputTokens = res.Usage.OutputTokens
+			evt.Usage.CacheCreationTokens = res.Usage.CacheCreationInputTokens
+			evt.Usage.CacheReadTokens = res.Usage.CacheReadInputTokens
 		}
+	}
+	if res.IsError {
+		evt.Kind = KindError
 	}
 	return evt, nil
 }

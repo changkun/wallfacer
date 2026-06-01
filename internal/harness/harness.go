@@ -68,7 +68,8 @@ type Request struct {
 type Event struct {
 	Kind       EventKind
 	SessionID  string
-	Text       string          // populated for KindAssistantText
+	Text       string          // populated for KindAssistantText / KindResult
+	Subtype    string          // harness-specific result subtype (e.g. error_max_tokens)
 	Tool       *ToolCall       // populated for KindToolCall{Start,End}
 	Usage      *Usage          // populated on KindResult when EmitsUsage
 	StopReason string          // populated on KindResult

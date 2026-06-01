@@ -52,26 +52,40 @@ func (codexHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	return argv, nil, nil
 }
 
+type codexUsageLine struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	CachedInputTokens        int `json:"cached_input_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+}
+
 // codexEventLine captures the fields harness.Codex sniffs from codex's
 // native JSON event stream. Unknown fields are ignored.
+//
+// It also carries the top-level claude-shaped result fields (Result,
+// IsError, Subtype) so the parser can recognise the normalized result
+// envelope the host launcher emits (codex's final assistant message lives
+// in --output-last-message, not in the event stream) without a separate
+// claude-shaped decode pass.
 type codexEventLine struct {
-	Type         string   `json:"type"`
-	SessionID    string   `json:"session_id,omitempty"`
-	StopReason   string   `json:"stop_reason,omitempty"`
-	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
-	Usage        *struct {
-		InputTokens              int `json:"input_tokens"`
-		OutputTokens             int `json:"output_tokens"`
-		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-		CachedInputTokens        int `json:"cached_input_tokens"`
-		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	} `json:"usage,omitempty"`
+	Type         string          `json:"type"`
+	SessionID    string          `json:"session_id,omitempty"`
+	ThreadID     string          `json:"thread_id,omitempty"`
+	StopReason   string          `json:"stop_reason,omitempty"`
+	TotalCostUSD *float64        `json:"total_cost_usd,omitempty"`
+	Usage        *codexUsageLine `json:"usage,omitempty"`
+	Result       string          `json:"result,omitempty"`
+	IsError      bool            `json:"is_error,omitempty"`
+	Subtype      string          `json:"subtype,omitempty"`
 }
 
 // ParseEvent maps one NDJSON line of codex output to a canonical Event.
 // Codex emits dot-namespaced event types (thread.*, turn.*, item.*); this
-// adapter recognises the high-leverage ones and falls through to
-// KindUnknown for the rest.
+// adapter recognises the high-leverage ones, plus the normalized result
+// envelope the host launcher appends (a typeless line carrying the final
+// message text from --output-last-message). Unrecognised lines fall
+// through to KindUnknown.
 func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 	evt := Event{Raw: append([]byte(nil), raw...)}
 
@@ -82,6 +96,31 @@ func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 
 	if line.SessionID != "" {
 		evt.SessionID = line.SessionID
+	} else if line.ThreadID != "" {
+		evt.SessionID = line.ThreadID
+	}
+
+	usageFrom := func() *Usage {
+		// total_cost_usd is independent of the token usage object; surface
+		// a Usage carrying cost even when token counts are absent.
+		if line.Usage == nil && line.TotalCostUSD == nil {
+			return nil
+		}
+		u := &Usage{}
+		if line.Usage != nil {
+			cacheRead := line.Usage.CacheReadInputTokens
+			if cacheRead == 0 {
+				cacheRead = line.Usage.CachedInputTokens
+			}
+			u.InputTokens = line.Usage.InputTokens
+			u.OutputTokens = line.Usage.OutputTokens
+			u.CacheCreationTokens = line.Usage.CacheCreationInputTokens
+			u.CacheReadTokens = cacheRead
+		}
+		if line.TotalCostUSD != nil {
+			u.CostUSD = *line.TotalCostUSD
+		}
+		return u
 	}
 
 	switch {
@@ -93,20 +132,11 @@ func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 		if evt.StopReason == "" {
 			evt.StopReason = "end_turn"
 		}
-		if line.Usage != nil {
-			cacheRead := line.Usage.CacheReadInputTokens
-			if cacheRead == 0 {
-				cacheRead = line.Usage.CachedInputTokens
-			}
-			evt.Usage = &Usage{
-				InputTokens:         line.Usage.InputTokens,
-				OutputTokens:        line.Usage.OutputTokens,
-				CacheCreationTokens: line.Usage.CacheCreationInputTokens,
-				CacheReadTokens:     cacheRead,
-			}
-			if line.TotalCostUSD != nil {
-				evt.Usage.CostUSD = *line.TotalCostUSD
-			}
+		evt.Text = line.Result
+		evt.Subtype = line.Subtype
+		evt.Usage = usageFrom()
+		if line.IsError {
+			evt.Kind = KindError
 		}
 	case strings.HasPrefix(line.Type, "item."):
 		// Items cover assistant messages, tool calls, file changes, etc.
@@ -116,6 +146,20 @@ func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 		evt.Kind = KindAssistantText
 	case line.Type == "turn.failed" || line.Type == "error":
 		evt.Kind = KindError
+	case line.Type == "result" || (line.Type == "" &&
+		(line.Result != "" || line.StopReason != "" || line.SessionID != "" || line.IsError)):
+		// Normalized result envelope (claude-shaped, typeless or
+		// type:"result") appended by the host launcher with the final
+		// message recovered from --output-last-message. Recognised so the
+		// codex harness owns parsing of its own normalized output.
+		evt.Kind = KindResult
+		evt.StopReason = line.StopReason
+		evt.Text = line.Result
+		evt.Subtype = line.Subtype
+		evt.Usage = usageFrom()
+		if line.IsError {
+			evt.Kind = KindError
+		}
 	}
 	return evt, nil
 }

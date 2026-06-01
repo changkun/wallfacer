@@ -448,8 +448,10 @@ func (r *Runner) launchOne(
 	// Parse first so a non-zero exit with a valid final NDJSON payload
 	// still counts as success — several existing tests cover this
 	// tolerant behaviour for title + oversight, and the legacy code
-	// paths all implemented it.
-	output, err := parseOutput(raw)
+	// paths all implemented it. Parsing is harness-owned: each harness
+	// maps its own event stream to canonical events, and
+	// parseHarnessOutput collapses them into the result fields below.
+	output, err := r.parseAgentStream(sb, raw)
 	if err != nil {
 		if exitCode != 0 {
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s stdout=%s",
