@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, ref, watch, computed } from 'vue';
 import { useDialogStore } from '../stores/dialog';
+import { useFocusTrap } from '../composables/useFocusTrap';
 const dialog = useDialogStore();
 const promptInput = ref<HTMLInputElement | null>(null);
 const promptText = ref('');
+const cardRef = ref<HTMLElement | null>(null);
+useFocusTrap(cardRef, computed(() => !!dialog.active));
 
 watch(() => dialog.active, async (a) => {
   if (a?.prompt) {
@@ -36,7 +39,7 @@ function onKeydown(e: KeyboardEvent) {
       @click.self="dialog.dismiss()"
       @keydown="onKeydown"
     >
-      <div class="confirm-card" role="dialog" aria-modal="true">
+      <div ref="cardRef" class="confirm-card" role="dialog" aria-modal="true">
         <h3 v-if="dialog.active.title" class="confirm-title">{{ dialog.active.title }}</h3>
         <p class="confirm-message">{{ dialog.active.message }}</p>
         <input
