@@ -152,6 +152,17 @@ func TestAggregateStats(t *testing.T) {
 		t.Errorf("ByStatus[cancelled].CostUSD = %v, want 0.005", cancelledStat.CostUSD)
 	}
 
+	// Regression: ByStatus[done] should include cache token totals from
+	// both task 1 (CacheReadInputTokens=200) and task 3
+	// (CacheCreationTokens=100). Previously these were inlined as
+	// per-bucket += loops that dropped the cache fields entirely.
+	if doneStat.CacheReadTokens != 200 {
+		t.Errorf("ByStatus[done].CacheReadTokens = %d, want 200 (regression — used to drop cache fields)", doneStat.CacheReadTokens)
+	}
+	if doneStat.CacheCreationTokens != 100 {
+		t.Errorf("ByStatus[done].CacheCreationTokens = %d, want 100 (regression — used to drop cache fields)", doneStat.CacheCreationTokens)
+	}
+
 	// --- ByActivity ---
 	// implementation total: 0.08 + 0.04 + 0.15 + 0.005 = 0.275
 	implStat, ok := resp.ByActivity["implementation"]

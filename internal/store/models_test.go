@@ -232,3 +232,36 @@ func TestTaskKindPlanning(t *testing.T) {
 		t.Errorf("round-tripped Kind = %q, want %q", decoded.Kind, TaskKindPlanning)
 	}
 }
+
+func TestTaskUsage_Add(t *testing.T) {
+	dst := TaskUsage{
+		InputTokens:          10,
+		OutputTokens:         20,
+		CacheReadInputTokens: 5,
+		CacheCreationTokens:  3,
+		CostUSD:              0.10,
+	}
+	src := TaskUsage{
+		InputTokens:          1,
+		OutputTokens:         2,
+		CacheReadInputTokens: 4,
+		CacheCreationTokens:  6,
+		CostUSD:              0.05,
+	}
+	dst.Add(src)
+	if dst.InputTokens != 11 || dst.OutputTokens != 22 ||
+		dst.CacheReadInputTokens != 9 || dst.CacheCreationTokens != 9 {
+		t.Errorf("after Add token totals wrong: %+v", dst)
+	}
+	if diff := dst.CostUSD - 0.15; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("CostUSD = %v, want 0.15 (±1e-9)", dst.CostUSD)
+	}
+}
+
+func TestTaskUsage_Add_ZeroOther(t *testing.T) {
+	dst := TaskUsage{InputTokens: 100, CostUSD: 1.0}
+	dst.Add(TaskUsage{})
+	if dst.InputTokens != 100 || dst.CostUSD != 1.0 {
+		t.Errorf("Add(zero) mutated dst: %+v", dst)
+	}
+}

@@ -20,17 +20,8 @@ type usageResponse struct {
 	PeriodDays int                                       `json:"period_days"`
 }
 
-// addUsage accumulates all token and cost fields from src into dst.
-func addUsage(dst *store.TaskUsage, src store.TaskUsage) {
-	dst.InputTokens += src.InputTokens
-	dst.OutputTokens += src.OutputTokens
-	dst.CacheReadInputTokens += src.CacheReadInputTokens
-	dst.CacheCreationTokens += src.CacheCreationTokens
-	dst.CostUSD += src.CostUSD
-}
-
 // planningRecordAsUsage projects a TurnUsageRecord into the TaskUsage shape
-// so it can flow through the same addUsage helper as task-side data.
+// so it can flow through the same TaskUsage.Add path as task-side data.
 func planningRecordAsUsage(rec store.TurnUsageRecord) store.TaskUsage {
 	return store.TaskUsage{
 		InputTokens:          rec.InputTokens,
@@ -65,9 +56,9 @@ func mergePlanningUsage(resp *usageResponse, configDir string, cutoff time.Time)
 		for _, rec := range recs {
 			u := planningRecordAsUsage(rec)
 			a := resp.BySubAgent[store.SandboxActivityPlanning]
-			addUsage(&a, u)
+			a.Add(u)
 			resp.BySubAgent[store.SandboxActivityPlanning] = a
-			addUsage(&resp.Total, u)
+			resp.Total.Add(u)
 		}
 	}
 }
@@ -106,15 +97,15 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.TaskCount++
 
-		addUsage(&resp.Total, t.Usage)
+		resp.Total.Add(t.Usage)
 
 		s := resp.ByStatus[t.Status]
-		addUsage(&s, t.Usage)
+		s.Add(t.Usage)
 		resp.ByStatus[t.Status] = s
 
 		for agent, u := range t.UsageBreakdown {
 			a := resp.BySubAgent[agent]
-			addUsage(&a, u)
+			a.Add(u)
 			resp.BySubAgent[agent] = a
 		}
 	}
