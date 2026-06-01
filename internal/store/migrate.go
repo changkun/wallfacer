@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 	"github.com/google/uuid"
 )
 
@@ -68,7 +68,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	}
 
 	// (3) Normalize Sandbox and SandboxByActivity.
-	if normalSandbox := sandbox.Normalize(string(task.Sandbox)); normalSandbox != task.Sandbox {
+	if normalSandbox := harness.NormalizeID(string(task.Sandbox)); normalSandbox != task.Sandbox {
 		task.Sandbox = normalSandbox
 		changed = true
 	}
@@ -139,7 +139,7 @@ func stringSliceEqual(a, b []string) bool {
 
 // sandboxByActivityEqual reports whether two sandbox-by-activity maps contain
 // exactly the same keys and values.
-func sandboxByActivityEqual(a, b map[SandboxActivity]sandbox.Type) bool {
+func sandboxByActivityEqual(a, b map[SandboxActivity]harness.ID) bool {
 	if len(a) != len(b) {
 		return false
 	}

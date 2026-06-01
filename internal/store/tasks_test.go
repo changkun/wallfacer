@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/statemachine"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -659,9 +659,9 @@ func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
-	updates := map[SandboxActivity]sandbox.Type{
-		"implementation": sandbox.Type("CLAUDE"),
-		"Testing":        sandbox.Type("Codex "),
+	updates := map[SandboxActivity]harness.ID{
+		"implementation": harness.ID("CLAUDE"),
+		"Testing":        harness.ID("Codex "),
 		"invalid":        "x",
 		"oversight":      "",
 	}
@@ -684,7 +684,7 @@ func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 		t.Fatalf("expected invalid activity key to be ignored, got %#v", got.SandboxByActivity)
 	}
 
-	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, map[SandboxActivity]sandbox.Type{}); err != nil {
+	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, map[SandboxActivity]harness.ID{}); err != nil {
 		t.Fatalf("UpdateTaskSandboxByActivity empty: %v", err)
 	}
 	got, _ = s.GetTask(bg(), task.ID)

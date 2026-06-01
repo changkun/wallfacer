@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/statemachine"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -39,13 +39,13 @@ func (u *TaskUsage) Add(other TaskUsage) {
 // It is recorded once at the start of Run() and stored alongside the task for
 // reproducibility auditing and debugging when results differ between runs.
 type ExecutionEnvironment struct {
-	ContainerImage   string       `json:"container_image"`   // e.g. "wallfacer-sandbox"
-	ContainerDigest  string       `json:"container_digest"`  // sha256 of image, empty if unavailable
-	ModelName        string       `json:"model_name"`        // e.g. "claude-opus-4-6"
-	APIBaseURL       string       `json:"api_base_url"`      // empty string = default Anthropic endpoint
-	InstructionsHash string       `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
-	Sandbox          sandbox.Type `json:"sandbox"`           // configured sandbox: "claude", "codex", etc.
-	RecordedAt       time.Time    `json:"recorded_at"`
+	ContainerImage   string     `json:"container_image"`   // e.g. "wallfacer-sandbox"
+	ContainerDigest  string     `json:"container_digest"`  // sha256 of image, empty if unavailable
+	ModelName        string     `json:"model_name"`        // e.g. "claude-opus-4-6"
+	APIBaseURL       string     `json:"api_base_url"`      // empty string = default Anthropic endpoint
+	InstructionsHash string     `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
+	Sandbox          harness.ID `json:"sandbox"`           // configured sandbox: "claude", "codex", etc.
+	RecordedAt       time.Time  `json:"recorded_at"`
 }
 
 // TurnUsageRecord captures token consumption and stop reason for a single agent turn.
@@ -58,7 +58,7 @@ type TurnUsageRecord struct {
 	CacheCreationTokens  int             `json:"cache_creation_tokens"`
 	CostUSD              float64         `json:"cost_usd"`
 	StopReason           string          `json:"stop_reason,omitempty"`
-	Sandbox              sandbox.Type    `json:"sandbox,omitempty"`
+	Sandbox              harness.ID      `json:"sandbox,omitempty"`
 	SubAgent             SandboxActivity `json:"sub_agent,omitempty"`
 }
 
@@ -260,27 +260,27 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion     int                              `json:"schema_version"`
-	ID                uuid.UUID                        `json:"id"`
-	Title             string                           `json:"title,omitempty"`
-	Prompt            string                           `json:"prompt"`
-	PromptHistory     []string                         `json:"prompt_history,omitempty"`
-	RetryHistory      []RetryRecord                    `json:"retry_history,omitempty"`
-	RefineSessions    []RefinementSession              `json:"refine_sessions,omitempty"`
-	CurrentRefinement *RefinementJob                   `json:"current_refinement,omitempty"`
-	Status            TaskStatus                       `json:"status"`
-	Archived          bool                             `json:"archived,omitempty"`
-	SessionID         *string                          `json:"session_id"`
-	FreshStart        bool                             `json:"fresh_start,omitempty"`
-	Result            *string                          `json:"result"`
-	StopReason        *string                          `json:"stop_reason"`
-	Turns             int                              `json:"turns"`
-	Timeout           int                              `json:"timeout"`
-	MaxCostUSD        float64                          `json:"max_cost_usd,omitempty"`     // 0 = unlimited
-	MaxInputTokens    int                              `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
-	Usage             TaskUsage                        `json:"usage"`
-	Sandbox           sandbox.Type                     `json:"sandbox,omitempty"`
-	SandboxByActivity map[SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
+	SchemaVersion     int                            `json:"schema_version"`
+	ID                uuid.UUID                      `json:"id"`
+	Title             string                         `json:"title,omitempty"`
+	Prompt            string                         `json:"prompt"`
+	PromptHistory     []string                       `json:"prompt_history,omitempty"`
+	RetryHistory      []RetryRecord                  `json:"retry_history,omitempty"`
+	RefineSessions    []RefinementSession            `json:"refine_sessions,omitempty"`
+	CurrentRefinement *RefinementJob                 `json:"current_refinement,omitempty"`
+	Status            TaskStatus                     `json:"status"`
+	Archived          bool                           `json:"archived,omitempty"`
+	SessionID         *string                        `json:"session_id"`
+	FreshStart        bool                           `json:"fresh_start,omitempty"`
+	Result            *string                        `json:"result"`
+	StopReason        *string                        `json:"stop_reason"`
+	Turns             int                            `json:"turns"`
+	Timeout           int                            `json:"timeout"`
+	MaxCostUSD        float64                        `json:"max_cost_usd,omitempty"`     // 0 = unlimited
+	MaxInputTokens    int                            `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
+	Usage             TaskUsage                      `json:"usage"`
+	Sandbox           harness.ID                     `json:"sandbox,omitempty"`
+	SandboxByActivity map[SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	// UsageBreakdown tracks token/cost per sub-agent activity.
 	UsageBreakdown map[SandboxActivity]TaskUsage `json:"usage_breakdown,omitempty"`
 	// Environment records the runtime environment captured at the start of execution.

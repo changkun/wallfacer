@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 	"github.com/google/uuid"
 )
 
@@ -148,8 +148,8 @@ func TestMigrateTaskJSON_SandboxNormalized(t *testing.T) {
 	if !changed {
 		t.Error("expected changed=true when sandbox needed normalization")
 	}
-	if task.Sandbox != sandbox.Claude {
-		t.Errorf("Sandbox = %q, want %q", task.Sandbox, sandbox.Claude)
+	if task.Sandbox != harness.Claude {
+		t.Errorf("Sandbox = %q, want %q", task.Sandbox, harness.Claude)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestMigrateTaskJSON_NoChangesWhenAlreadyCurrent(t *testing.T) {
 		"timeout":        60,
 		"created_at":     now,
 		"updated_at":     now,
-		"sandbox":        string(sandbox.Claude),
+		"sandbox":        string(harness.Claude),
 		"schema_version": constants.CurrentTaskSchemaVersion,
 		"auto_retry_budget": map[string]int{
 			string(FailureCategoryContainerCrash): 2,

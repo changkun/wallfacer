@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -39,8 +39,8 @@ type TaskCreateOptions struct {
 	// ("implement" for normal tasks, "brainstorm" for idea-agent).
 	FlowID             string
 	Tags               []string
-	Sandbox            sandbox.Type
-	SandboxByActivity  map[SandboxActivity]sandbox.Type
+	Sandbox            harness.ID
+	SandboxByActivity  map[SandboxActivity]harness.ID
 	MaxCostUSD         float64
 	MaxInputTokens     int
 	ScheduledAt        *time.Time
@@ -115,7 +115,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 
 	// Sandbox.
 	if opts.Sandbox != "" {
-		task.Sandbox = sandbox.Normalize(string(opts.Sandbox))
+		task.Sandbox = harness.NormalizeID(string(opts.Sandbox))
 	}
 
 	// SandboxByActivity: normalise (validates keys, strips invalid entries).
@@ -236,7 +236,7 @@ func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, moun
 // It lowercases and trims activity keys, validates them against the allowed set,
 // parses sandbox type values, and drops invalid entries. Returns nil for an
 // empty result so omitempty keeps JSON clean.
-func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[SandboxActivity]sandbox.Type {
+func normalizeSandboxByActivity(input map[SandboxActivity]harness.ID) map[SandboxActivity]harness.ID {
 	if len(input) == 0 {
 		return nil
 	}
@@ -244,13 +244,13 @@ func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[Sand
 	for _, key := range SandboxActivities {
 		allowed[key] = struct{}{}
 	}
-	out := make(map[SandboxActivity]sandbox.Type)
+	out := make(map[SandboxActivity]harness.ID)
 	for k, v := range input {
 		key := SandboxActivity(strings.ToLower(strings.TrimSpace(string(k))))
 		if _, ok := allowed[key]; !ok {
 			continue
 		}
-		val, ok := sandbox.Parse(string(v))
+		val, ok := harness.ParseID(string(v))
 		if !ok {
 			continue
 		}
