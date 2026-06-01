@@ -375,6 +375,9 @@ interface OversightPhase {
 const oversightStatus = ref('');
 const oversightPhases = ref<OversightPhase[]>([]);
 const oversightError = ref('');
+// Test-phase oversight (the test agent's run), shown as a parallel "Testing"
+// section. Sourced from /oversight/test. Mirrors the legacy parallel Testing tab.
+const testOversightPhases = ref<OversightPhase[]>([]);
 let oversightTimer: ReturnType<typeof setTimeout> | null = null;
 let oversightTaskId = '';
 
@@ -391,7 +394,13 @@ async function fetchOversight() {
     oversightStatus.value = '';
     oversightPhases.value = [];
     oversightError.value = '';
+    testOversightPhases.value = [];
   }
+  // Test-phase oversight (best-effort; only present once a test agent has run).
+  try {
+    const t = await api<{ phases?: OversightPhase[] }>('GET', `/api/tasks/${props.task.id}/oversight/test`);
+    testOversightPhases.value = t?.phases ?? [];
+  } catch { testOversightPhases.value = []; }
   try {
     const data = await api<{ status?: string; phases?: OversightPhase[]; error?: string }>(
       'GET',
@@ -859,6 +868,16 @@ const isArchived = computed(() => !!props.task.archived);
                       <div v-if="oversightPhases.length" class="ta-oversight">
                         <div class="ta-oversight__label">Oversight summary</div>
                         <div v-for="(ph, pi) in oversightPhases" :key="pi" class="ta-oversight__phase">
+                          <div class="ta-oversight__title">{{ ph.title }}</div>
+                          <div class="ta-oversight__summary">{{ ph.summary }}</div>
+                          <div v-if="ph.tools_used?.length" class="ta-oversight__tools">
+                            <span v-for="t in ph.tools_used" :key="t" class="ta-oversight__tool">{{ t }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-if="testOversightPhases.length" class="ta-oversight" style="margin-top: 10px;">
+                        <div class="ta-oversight__label">Testing oversight</div>
+                        <div v-for="(ph, pi) in testOversightPhases" :key="'test' + pi" class="ta-oversight__phase">
                           <div class="ta-oversight__title">{{ ph.title }}</div>
                           <div class="ta-oversight__summary">{{ ph.summary }}</div>
                           <div v-if="ph.tools_used?.length" class="ta-oversight__tools">
