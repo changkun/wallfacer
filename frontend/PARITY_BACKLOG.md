@@ -76,7 +76,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] search — multi-tag AND + text combination (DONE: lib/taskFilter)
 - [ ] modal-ndjson — thinking blocks inline-expandable (>5 lines "+N lines")
 - [x] explorer — unsaved-changes dirty-confirm on close
-- [ ] explorer — 30+ extension/special-file semantic icon map (vs emoji)
+- [x] explorer — 30+ extension/special-file semantic icon map (vs emoji)
 - [x] explorer — Tab→indent in textarea edit
 - [x] terminal — container picker uses /api/debug/health (DONE earlier; per-state icons still minor)
 - [ ] tasks — brainstorm flow empty-prompt allowance + placeholder
