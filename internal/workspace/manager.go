@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/store"
@@ -106,7 +107,21 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 	if err != nil || len(groups) == 0 {
 		return nil
 	}
-	return cloneStrings(groups[0].Workspaces)
+	// Restore the most-recent group whose paths still validate. A saved
+	// group can reference a directory that was since deleted or moved (a
+	// /tmp throwaway workspace, an unmounted volume, a renamed repo); such
+	// a stale group must not fatal server startup. Skip invalid groups with
+	// a warning and fall through to the next; if none are valid, start with
+	// no workspace so the picker opens instead of crashing.
+	for _, g := range groups {
+		if _, verr := validate(g.Workspaces); verr != nil {
+			logger.Main.Warn("skipping invalid saved workspace group at startup",
+				"workspaces", g.Workspaces, "error", verr)
+			continue
+		}
+		return cloneStrings(g.Workspaces)
+	}
+	return nil
 }
 
 // NewStatic creates a Manager with a fixed workspace set that cannot be switched.
