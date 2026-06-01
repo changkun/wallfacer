@@ -6,7 +6,6 @@ import (
 )
 
 func TestClaude_BuildArgv_Basic(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "false")
 	h := claudeHarness{}
 	argv, stdin, err := h.BuildArgv(Request{Prompt: "do the thing"})
 	if err != nil {
@@ -28,23 +27,21 @@ func TestClaude_BuildArgv_Basic(t *testing.T) {
 		}
 	}
 	if strings.Contains(joined, "/fast") {
-		t.Errorf("argv contains /fast despite WALLFACER_SANDBOX_FAST=false: %v", argv)
+		t.Errorf("argv contains /fast despite FastMode=false: %v", argv)
 	}
 }
 
-func TestClaude_BuildArgv_FastDefault(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "")
+func TestClaude_BuildArgv_FastMode(t *testing.T) {
 	h := claudeHarness{}
-	argv, _, _ := h.BuildArgv(Request{Prompt: "hi"})
+	argv, _, _ := h.BuildArgv(Request{Prompt: "hi", FastMode: true})
 
 	joined := strings.Join(argv, " ")
 	if !strings.Contains(joined, "--append-system-prompt /fast") {
-		t.Errorf("fast mode should be enabled by default: %v", argv)
+		t.Errorf("FastMode should add /fast: %v", argv)
 	}
 }
 
 func TestClaude_BuildArgv_ModelResumeSystemPrompt(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "false")
 	h := claudeHarness{}
 	argv, _, _ := h.BuildArgv(Request{
 		Prompt:       "task",

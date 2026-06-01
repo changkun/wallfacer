@@ -6,7 +6,6 @@ import (
 )
 
 func TestCodex_BuildArgv_Basic(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "false")
 	h := codexHarness{}
 	argv, stdin, err := h.BuildArgv(Request{Prompt: "do it"})
 	if err != nil {
@@ -38,17 +37,23 @@ func TestCodex_BuildArgv_Basic(t *testing.T) {
 	}
 }
 
-func TestCodex_BuildArgv_FastDefault(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "")
-	argv, _, _ := codexHarness{}.BuildArgv(Request{Prompt: "x"})
+func TestCodex_BuildArgv_FastMode(t *testing.T) {
+	argv, _, _ := codexHarness{}.BuildArgv(Request{Prompt: "x", FastMode: true})
 	joined := strings.Join(argv, " ")
 	if !strings.Contains(joined, `model_reasoning_effort="low"`) {
-		t.Errorf("fast mode should set reasoning_effort=low by default: %v", argv)
+		t.Errorf("FastMode should set reasoning_effort=low: %v", argv)
+	}
+}
+
+func TestCodex_BuildArgv_NoFastMode(t *testing.T) {
+	argv, _, _ := codexHarness{}.BuildArgv(Request{Prompt: "x"})
+	joined := strings.Join(argv, " ")
+	if strings.Contains(joined, "model_reasoning_effort") {
+		t.Errorf("FastMode off should not set reasoning_effort: %v", argv)
 	}
 }
 
 func TestCodex_BuildArgv_ModelAndSystemPrompt(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "false")
 	argv, _, _ := codexHarness{}.BuildArgv(Request{
 		Prompt:       "task",
 		Model:        "gpt-5",
@@ -69,7 +74,6 @@ func TestCodex_BuildArgv_ModelAndSystemPrompt(t *testing.T) {
 }
 
 func TestCodex_BuildArgv_IgnoresSessionID(t *testing.T) {
-	t.Setenv("WALLFACER_SANDBOX_FAST", "false")
 	argv, _, _ := codexHarness{}.BuildArgv(Request{
 		Prompt:    "x",
 		SessionID: "ignored",

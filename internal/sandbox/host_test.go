@@ -147,6 +147,60 @@ func TestHostBackend_Launch_Argv(t *testing.T) {
 	}
 }
 
+// TestHostBackend_Launch_FastModeFromEnvFile is a seam regression test for the
+// bug where the harness read WALLFACER_SANDBOX_FAST from the server's process
+// env (always empty) instead of the per-task env file. With the env file
+// setting it to "false", claude must NOT receive the /fast system prompt.
+func TestHostBackend_Launch_FastModeFromEnvFile(t *testing.T) {
+	bin := buildFakeAgent(t, "fakeagent")
+	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte("WALLFACER_SANDBOX_FAST=false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// No instructions path, so /fast would be the only --append-system-prompt
+	// value if fast mode leaked through. fakeagent echoes the last
+	// --append-system-prompt value as "append".
+	spec := ContainerSpec{
+		Name:    "wallfacer-test-fastoff",
+		Env:     map[string]string{"WALLFACER_AGENT": "claude"},
+		EnvFile: envFile,
+		Cmd:     []string{"-p", "hi"},
+		WorkDir: t.TempDir(),
+	}
+	got := launchAndDrain(t, b, spec)
+	if got["append"] != "" {
+		t.Errorf("WALLFACER_SANDBOX_FAST=false in env file should suppress /fast; got append=%q", got["append"])
+	}
+}
+
+// TestHostBackend_Launch_FastModeDefaultOn confirms the default (no env file
+// override) still enables /fast — the positive control for the regression
+// test above.
+func TestHostBackend_Launch_FastModeDefaultOn(t *testing.T) {
+	bin := buildFakeAgent(t, "fakeagent")
+	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+
+	spec := ContainerSpec{
+		Name:    "wallfacer-test-faston",
+		Env:     map[string]string{"WALLFACER_AGENT": "claude"},
+		Cmd:     []string{"-p", "hi"},
+		WorkDir: t.TempDir(),
+	}
+	got := launchAndDrain(t, b, spec)
+	if got["append"] != "/fast" {
+		t.Errorf("fast mode should default on; got append=%q", got["append"])
+	}
+}
+
 func TestHostBackend_Launch_ResumeFlag(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})

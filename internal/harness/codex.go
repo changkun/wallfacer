@@ -37,7 +37,7 @@ func (codexHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 		"--json",
 		"--color", "never",
 	}
-	if sandboxFastEnabled() {
+	if req.FastMode {
 		argv = append(argv, "--config", `model_reasoning_effort="low"`)
 	}
 	if req.Model != "" {
