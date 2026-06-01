@@ -92,7 +92,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] events — visibilitychange→fetchTasks on tab refocus
 - [~] task-stream — waitForTaskDelta (N/A: reactive SSE store replaces the imperative delta-wait; createTask updates reactively)
 - [x] workspace — group popover active/switching state
-- [ ] spec-mode — focused-view crossfade epoch-guard against click-spam
+- [x] spec-mode — focused-view crossfade (Transition out-in; intrinsic click-spam guard)
 - [ ] spec-explorer — Task Prompts SSE subscription to stay fresh
 
 ## Counts at audit time: 1 broken · 53 missing · 29 weaker

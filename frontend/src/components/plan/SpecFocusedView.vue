@@ -346,7 +346,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="spec-focused">
+  <!-- Crossfade the whole view when the focused entry changes (spec ↔ index ↔
+       spec). Vue's out-in transition cancels an in-flight fade when a newer
+       focus lands, which is the click-spam epoch-guard from spec-mode.js. -->
+  <Transition name="sf-crossfade" mode="out-in">
+  <main class="spec-focused" :key="(focusedIsIndex ? 'index' : focusedSpecPath) || 'empty'">
     <header class="sf-header">
       <div class="sf-chrome">
         <span class="sf-path">{{ displayPath }}</span>
@@ -459,9 +463,20 @@ onUnmounted(() => {
       </div>
     </div>
   </main>
+  </Transition>
 </template>
 
 <style scoped>
+/* Focused-view crossfade (mirrors spec-mode.js _scheduleFocusedCrossfade). */
+.sf-crossfade-leave-active { transition: opacity 140ms cubic-bezier(0.3, 0, 0.8, 0.15); }
+.sf-crossfade-enter-active { transition: opacity 180ms cubic-bezier(0.2, 0, 0, 1); }
+.sf-crossfade-enter-from,
+.sf-crossfade-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .sf-crossfade-leave-active,
+  .sf-crossfade-enter-active { transition: none; }
+}
+
 .spec-focused {
   flex: 1;
   display: flex;
