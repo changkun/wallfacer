@@ -97,6 +97,7 @@ export interface ServerConfig {
   host_mode: boolean;
   terminal_enabled: boolean;
   cloud_mode: boolean;
+  ideation_categories?: string[];
 }
 
 export interface EnvConfig {

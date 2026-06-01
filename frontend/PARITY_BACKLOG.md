@@ -39,7 +39,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] render — hide system routines (kind=routine + system:* tag) from board
 - [x] render — scheduled badge with relative time on backlog cards
 - [ ] render — forked-task ancestry badge (parent id, click to open)
-- [ ] render — brainstorm category tag badges (BRAINSTORM_CATEGORIES from /api/config)
+- [x] render — brainstorm category tag badges (BRAINSTORM_CATEGORIES from /api/config)
 - [ ] board-composer — empty-board composer dismiss-for-session persistence
 - [ ] board-composer — composer "@" action button (insert @ + fire mention)
 - [x] sidebar-badge — board unread dot
