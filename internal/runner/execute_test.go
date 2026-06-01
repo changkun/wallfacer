@@ -45,11 +45,14 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
 		t.Fatal(err)
 	}
+	resolved := resolveTestCmd(cmd)
 	r := NewRunner(s, RunnerConfig{
-		Command:      cmd,
-		SandboxImage: "test:latest",
-		Workspaces:   workspaces,
-		WorktreesDir: worktreesDir,
+		Command:          cmd,
+		SandboxImage:     "test:latest",
+		Workspaces:       workspaces,
+		WorktreesDir:     worktreesDir,
+		HostClaudeBinary: resolved,
+		HostCodexBinary:  resolved,
 	})
 	t.Cleanup(func() { r.Shutdown() })
 	return s, r
