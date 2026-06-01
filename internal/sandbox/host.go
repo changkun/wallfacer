@@ -19,10 +19,13 @@ import (
 
 // requestFromClaudeSpec translates a runner-built ContainerSpec (whose Cmd
 // holds the legacy `-p ... --verbose --output-format stream-json [--model
-// m] [--resume sid]` shape) into the canonical harness.Request. This
-// shim exists so harness.Claude owns the wire knowledge; once upstream
-// callers pass Request directly to Launch, the function disappears.
-func requestFromClaudeSpec(spec ContainerSpec) harness.Request {
+// m] [--resume sid]` shape) into the canonical harness.Request. childEnv
+// is the resolved process environment (env file merged with spec.Env) so
+// FastMode can be read from WALLFACER_SANDBOX_FAST, which lives there
+// rather than in the server's own process env. This shim exists so the
+// harness owns the wire knowledge; once upstream callers pass Request
+// directly to Launch, the function disappears.
+func requestFromClaudeSpec(spec ContainerSpec, childEnv []string) harness.Request {
 	var req harness.Request
 	cmd := spec.Cmd
 	for i := 0; i < len(cmd); i++ {
@@ -47,6 +50,7 @@ func requestFromClaudeSpec(spec ContainerSpec) harness.Request {
 	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
 		req.SystemPrompt = instrPath
 	}
+	req.FastMode = sandboxFast(spec.Env, childEnv)
 	return req
 }
 
@@ -238,7 +242,7 @@ func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Han
 	}
 
 	env := b.buildChildEnv(spec)
-	req := requestFromClaudeSpec(spec)
+	req := requestFromClaudeSpec(spec, env)
 	claudeH, _ := harness.Lookup(harness.Claude)
 	argv, _, argvErr := claudeH.BuildArgv(req)
 	if argvErr != nil {

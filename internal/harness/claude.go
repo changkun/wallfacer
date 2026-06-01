@@ -3,7 +3,6 @@ package harness
 import (
 	"encoding/json"
 	"io"
-	"os"
 )
 
 func init() {
@@ -26,11 +25,10 @@ func (claudeHarness) ID() ID { return Claude }
 // The `--dangerously-skip-permissions` flag is required when claude runs in a
 // piped non-TTY context: without it claude waits for interactive permission
 // prompts and buffers all stream-json output until the task ends. `/fast`
-// activates Claude Code's fast mode when WALLFACER_SANDBOX_FAST is "true"
-// (the default) and is suppressed when explicitly disabled.
+// activates Claude Code's fast mode when req.FastMode is set.
 func (claudeHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	argv := []string{"--dangerously-skip-permissions"}
-	if sandboxFastEnabled() {
+	if req.FastMode {
 		argv = append(argv, "--append-system-prompt", "/fast")
 	}
 	argv = append(argv, "-p", req.Prompt, "--verbose", "--output-format", "stream-json")
@@ -44,13 +42,6 @@ func (claudeHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 		argv = append(argv, "--append-system-prompt", req.SystemPrompt)
 	}
 	return argv, nil, nil
-}
-
-// sandboxFastEnabled reports whether Claude's `/fast` mode should be enabled.
-// Defaults to true; only an explicit "false" disables it.
-func sandboxFastEnabled() bool {
-	v := os.Getenv("WALLFACER_SANDBOX_FAST")
-	return v != "false"
 }
 
 // claudeResultLine is the subset of claude's terminal stream-json object

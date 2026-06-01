@@ -56,6 +56,12 @@ type Request struct {
 	MCPServers   []MCPServer
 	MaxTurns     int     // 0 ⇒ no cap
 	MaxCostUSD   float64 // 0 ⇒ no cap
+	// FastMode requests the harness's low-latency profile (Claude: the
+	// `/fast` system prompt; Codex: model_reasoning_effort=low). The
+	// caller resolves this from WALLFACER_SANDBOX_FAST; the harness cannot
+	// read that itself because it lives in the per-task env, not the
+	// server's process environment.
+	FastMode bool
 }
 
 // Event is one canonical update from a harness's output stream.

@@ -47,7 +47,7 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 
 	env := b.buildChildEnv(spec)
 
-	req := requestFromClaudeSpec(spec)
+	req := requestFromClaudeSpec(spec, env)
 	if req.Prompt == "" {
 		return nil, fmt.Errorf("host backend: codex launch requires a -p <prompt> argument in spec.Cmd")
 	}

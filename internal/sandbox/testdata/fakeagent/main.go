@@ -121,7 +121,7 @@ var _ = strings.TrimSpace
 // events (an item + a turn.completed with usage and session_id).
 func runFakeCodex() {
 	args := os.Args[2:] // strip the leading "exec" subcommand
-	var lastMsgFile, model, prompt string
+	var lastMsgFile, model, prompt, config string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -132,7 +132,7 @@ func runFakeCodex() {
 			model = args[i+1]
 			i++
 		case a == "--config" && i+1 < len(args):
-			// skip config value
+			config = args[i+1]
 			i++
 		case a == "--full-auto" || a == "--skip-git-repo-check" || a == "--json":
 			// no arg
@@ -159,8 +159,9 @@ func runFakeCodex() {
 	// but forwarded to the caller).
 	enc := json.NewEncoder(os.Stdout)
 	_ = enc.Encode(map[string]any{
-		"type":  "item.completed",
-		"model": model,
+		"type":   "item.completed",
+		"model":  model,
+		"config": config,
 	})
 	// Emit the turn.completed event with usage and session_id.
 	_ = enc.Encode(map[string]any{
