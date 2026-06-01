@@ -357,6 +357,49 @@ async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
 }
 
+// Backlog editing — surfaces a few common knobs (timeout, model, budgets,
+// tags) as an inline editor that PATCHes the task. Lets the user adjust
+// settings after creation without having to retype the prompt. Mirrors
+// the legacy modal-core editable settings (timeout/tags/deps/budget).
+const editingBacklog = ref(false);
+const editTimeout = ref<number | null>(null);
+const editModel = ref('');
+const editTags = ref('');
+const editMaxCost = ref<number | null>(null);
+const editMaxTokens = ref<number | null>(null);
+const editSaving = ref(false);
+
+function openBacklogEdit() {
+  const t = props.task;
+  editTimeout.value = t.timeout > 0 ? Math.round(t.timeout / 60) : null;
+  editModel.value = t.model ?? '';
+  editTags.value = (t.tags ?? []).join(', ');
+  editMaxCost.value = t.max_cost_usd && t.max_cost_usd > 0 ? t.max_cost_usd : null;
+  editMaxTokens.value = t.max_input_tokens && t.max_input_tokens > 0 ? t.max_input_tokens : null;
+  editingBacklog.value = true;
+}
+
+async function saveBacklogEdit() {
+  editSaving.value = true;
+  try {
+    const patch: Record<string, unknown> = {};
+    if (editTimeout.value !== null && editTimeout.value > 0) patch.timeout = editTimeout.value * 60;
+    if (editModel.value.trim() !== (props.task.model ?? '').trim()) patch.model = editModel.value.trim();
+    const parsedTags = editTags.value.split(',').map((t) => t.trim()).filter(Boolean);
+    if (JSON.stringify(parsedTags) !== JSON.stringify(props.task.tags ?? [])) patch.tags = parsedTags;
+    if ((editMaxCost.value ?? 0) !== (props.task.max_cost_usd ?? 0)) patch.max_cost_usd = editMaxCost.value ?? 0;
+    if ((editMaxTokens.value ?? 0) !== (props.task.max_input_tokens ?? 0)) patch.max_input_tokens = editMaxTokens.value ?? 0;
+    if (Object.keys(patch).length === 0) { editingBacklog.value = false; return; }
+    await api('PATCH', `/api/tasks/${props.task.id}`, patch);
+    toast.push('Settings updated', { kind: 'success' });
+    editingBacklog.value = false;
+  } catch (e) {
+    toast.push(`Save failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  } finally {
+    editSaving.value = false;
+  }
+}
+
 // Raise the cost / token budget on a task that hit a guardrail. Two
 // sequential prompts mirror ui/js/tasks.js:912. PATCH the task with the
 // new caps; an empty / 0 entry means "unlimited".
@@ -817,6 +860,39 @@ const isArchived = computed(() => !!props.task.archived);
                       <span class="aside-action__hint">move to In Progress</span>
                     </span>
                   </button>
+                  <button v-if="!editingBacklog" type="button" class="aside-action" @click="openBacklogEdit">
+                    <span class="aside-action__icon" aria-hidden="true">&#9998;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Edit settings</span>
+                      <span class="aside-action__hint">timeout, tags, model, budget</span>
+                    </span>
+                  </button>
+                  <div v-if="editingBacklog" class="backlog-edit">
+                    <label class="backlog-edit__field">
+                      <span>Timeout (min)</span>
+                      <input v-model.number="editTimeout" type="number" min="1" placeholder="15" />
+                    </label>
+                    <label class="backlog-edit__field">
+                      <span>Model</span>
+                      <input v-model="editModel" type="text" placeholder="override model" />
+                    </label>
+                    <label class="backlog-edit__field">
+                      <span>Tags</span>
+                      <input v-model="editTags" type="text" placeholder="comma,separated" />
+                    </label>
+                    <label class="backlog-edit__field">
+                      <span>Max $</span>
+                      <input v-model.number="editMaxCost" type="number" min="0" step="0.5" placeholder="USD (0 = unlimited)" />
+                    </label>
+                    <label class="backlog-edit__field">
+                      <span>Max tokens</span>
+                      <input v-model.number="editMaxTokens" type="number" min="0" step="1000" placeholder="0 = unlimited" />
+                    </label>
+                    <div class="backlog-edit__actions">
+                      <button type="button" class="composer__btn composer__btn--ghost" :disabled="editSaving" @click="editingBacklog = false">Cancel</button>
+                      <button type="button" class="composer__btn composer__btn--primary" :disabled="editSaving" @click="saveBacklogEdit">{{ editSaving ? 'Saving…' : 'Save' }}</button>
+                    </div>
+                  </div>
                 </div>
 
                 <div v-if="isWaiting">
@@ -1146,6 +1222,38 @@ const isArchived = computed(() => !!props.task.archived);
   color: var(--text-muted);
   font-style: italic;
   margin-bottom: 4px;
+}
+
+/* Backlog edit form inside the right aside. */
+.backlog-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+.backlog-edit__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.backlog-edit__field input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+}
+.backlog-edit__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 /* Pretty agent-activity rows (mirrors the planning chat's pcp-activity). */
