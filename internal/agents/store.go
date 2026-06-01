@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/slugutil"
 
 	"gopkg.in/yaml.v3"
@@ -110,13 +111,8 @@ func WriteUserAgent(dir string, role Role) error {
 		return fmt.Errorf("marshal: %w", err)
 	}
 	path := filepath.Join(dir, role.Slug+".yaml")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, body, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", tmp, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("rename %s: %w", tmp, err)
+	if err := atomicfile.Write(path, body, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }
