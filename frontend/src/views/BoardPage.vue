@@ -11,6 +11,20 @@ import SearchBar from '../components/SearchBar.vue';
 import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
 
+// Empty-board composer dismissal, remembered for the tab session (survives SPA
+// route remounts but clears on tab close). Mirrors ui/js/board-composer.js's
+// _dismissedForSession flag.
+const COMPOSER_DISMISS_KEY = 'wallfacer-empty-composer-dismissed';
+function readComposerDismissed(): boolean {
+  try { return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(COMPOSER_DISMISS_KEY) === '1'; }
+  catch { return false; }
+}
+const composerDismissed = ref(readComposerDismissed());
+function dismissComposer() {
+  composerDismissed.value = true;
+  try { sessionStorage.setItem(COMPOSER_DISMISS_KEY, '1'); } catch { /* ignore */ }
+}
+
 const store = useTaskStore();
 const ui = useUiStore();
 const selectedTask = ref<Task | null>(null);
@@ -164,8 +178,9 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
     </div>
   </main>
 
-  <main v-else-if="isEmptyBoard" class="board-empty">
+  <main v-else-if="isEmptyBoard && !composerDismissed" class="board-empty">
     <div class="board-empty__inner">
+      <button type="button" class="board-empty__dismiss" title="Dismiss" aria-label="Dismiss composer" @click="dismissComposer">&times;</button>
       <h1 class="board-empty__title">What do you want to work on?</h1>
       <p class="board-empty__hint">
         Describe a task to kick things off. The board fills in as soon as
@@ -274,7 +289,23 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
   align-items: stretch;
   gap: 12px;
   text-align: center;
+  position: relative;
 }
+.board-empty__dismiss {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.board-empty__dismiss:hover { color: var(--ink); background: var(--bg-hover); }
 .board-empty__title {
   font-family: var(--font-serif);
   font-style: italic;

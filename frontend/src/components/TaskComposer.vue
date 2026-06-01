@@ -124,6 +124,24 @@ function insertTemplate() {
   }
 }
 
+// Inserts an "@" at the cursor (with a leading space if needed) and opens the
+// mention autocomplete, matching the legacy board-composer "@" action button.
+function insertAtMention() {
+  const el = textareaRef.value;
+  if (!el) return;
+  const pos = el.selectionStart ?? el.value.length;
+  const before = el.value.slice(0, pos);
+  const after = el.value.slice(pos);
+  const insert = before.length > 0 && !/\s$/.test(before) ? ' @' : '@';
+  prompt.value = before + insert + after;
+  nextTick(() => {
+    const newPos = pos + insert.length;
+    el.focus();
+    el.setSelectionRange(newPos, newPos);
+    void mentions.onInput(el);
+  });
+}
+
 // When `autoExpand` is passed (typically by the BoardPage empty state),
 // open the composer on mount so the user sees the prompt textarea first.
 onMounted(() => {
@@ -336,6 +354,13 @@ function onInput(e: Event) {
           <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
         </select>
       </label>
+      <button
+        type="button"
+        class="composer__more"
+        title="Mention a file (@)"
+        aria-label="Insert @ mention"
+        @click="insertAtMention"
+      >@</button>
       <button type="button" class="composer__more" @click="showMore = !showMore">
         {{ showMore ? '− Less' : '+ More' }}
       </button>
