@@ -36,7 +36,7 @@ flowchart TB
   Box -->|reads/writes| specsDir
 ```
 
-Plan Mode layers strictly on top of the task board. The planning container writes only to `specs/` in the mounted workspace; task dispatch is the hand-off point at which a validated spec becomes a first-class board task with its own worktree and container. Everything upstream of dispatch is the responsibility of this subsystem.
+Plan Mode layers strictly on top of the task board. The planning sandbox writes only to `specs/` in the active workspace; task dispatch is the hand-off point at which a validated spec becomes a first-class board task with its own worktree. Everything upstream of dispatch is the responsibility of this subsystem.
 
 ## Package: internal/spec
 
@@ -173,9 +173,9 @@ Key lifecycle methods:
 
 | Method                                      | Role                                                                                   |
 |---------------------------------------------|----------------------------------------------------------------------------------------|
-| `Start(ctx)`                                | Mark the planner active. The container is created lazily on first `Exec`.              |
-| `Stop()`                                    | Kill the current handle, tell `WorkerManager` to stop the worker, mark inactive.       |
-| `Exec(ctx, cmd)`                            | Launch `cmd` in the planning container, reusing the worker when available.            |
+| `Start(ctx)`                                | Mark the planner active. A process is launched on the next `Exec`.                     |
+| `Stop()`                                    | Kill the current process handle and mark the planner inactive.                         |
+| `Exec(ctx, cmd)`                            | Exec `cmd` as a fresh host process via the backend; returns its handle.                |
 | `IsBusy / SetBusy / BusyThreadID`           | Single-turn-at-a-time constraint across all threads.                                   |
 | `StartLiveLog / CloseLiveLog / LogReader`   | Tee raw stdout into a `livelog.Log`; SSE consumers subscribe via per-thread readers.  |
 | `Interrupt()`                               | Kill the handle, close the live log, but keep the session ID so the next message `--resume`s. |
