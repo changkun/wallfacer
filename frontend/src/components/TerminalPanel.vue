@@ -2,11 +2,24 @@
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
 import { useUiStore } from '../stores/ui';
 import { api } from '../api/client';
+import { getStored, setStored } from '../lib/storage';
+import { clampPanelHeight, PANEL_MIN_HEIGHT, PANEL_HEIGHT_KEY } from '../lib/panelHeight';
 
 const ui = useUiStore();
 
 const termContainer = ref<HTMLElement | null>(null);
-const panelHeight = ref(260);
+const panelHeight = ref(restorePanelHeight());
+
+// Restore the persisted terminal panel height, clamped to the current
+// viewport. Mirrors ui/js/status-bar.js's wallfacer-panel-height storage.
+function restorePanelHeight(): number {
+  const stored = Number(getStored(PANEL_HEIGHT_KEY));
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+  if (Number.isFinite(stored) && stored >= PANEL_MIN_HEIGHT) {
+    return clampPanelHeight(stored, vh);
+  }
+  return 260;
+}
 const dragging = ref(false);
 const sessions = ref<Record<string, { label: string; buffer: Uint8Array[] }>>({});
 const activeId = ref<string | null>(null);
@@ -360,12 +373,13 @@ function onHandleDown(e: MouseEvent) {
   const startH = panelHeight.value;
   function onMove(ev: MouseEvent) {
     const dy = startY - ev.clientY;
-    panelHeight.value = Math.min(Math.max(startH + dy, 120), Math.round(window.innerHeight * 0.8));
+    panelHeight.value = clampPanelHeight(startH + dy, window.innerHeight);
   }
   function onUp() {
     dragging.value = false;
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
+    setStored(PANEL_HEIGHT_KEY, String(panelHeight.value));
     try { fitAddon?.fit(); } catch { /* ignore */ }
   }
   document.addEventListener('mousemove', onMove);
