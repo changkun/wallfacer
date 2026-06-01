@@ -133,21 +133,28 @@ func withClaims(r *http.Request, c *Claims) *http.Request {
 	return r.WithContext(WithClaims(r.Context(), c))
 }
 
-// bearerToken extracts the token from the Authorization header. Returns
-// (token, true) only when the header matches the "Bearer " scheme with
-// a non-empty token; other schemes (Basic, etc.) and empty bearers
-// return ("", false).
-func bearerToken(r *http.Request) (string, bool) {
-	raw := r.Header.Get("Authorization")
+// BearerToken extracts a token from an Authorization header value.
+// Returns (token, true) only when the header matches the "Bearer "
+// scheme with a non-empty token; other schemes (Basic, etc.) and
+// empty bearers return ("", false). Exported so consumers outside
+// this package (e.g. handler.SandboxProxy) can reuse the canonical
+// extractor instead of re-implementing it.
+func BearerToken(header string) (string, bool) {
 	const prefix = "Bearer "
-	if !strings.HasPrefix(raw, prefix) {
+	if !strings.HasPrefix(header, prefix) {
 		return "", false
 	}
-	tok := strings.TrimSpace(raw[len(prefix):])
+	tok := strings.TrimSpace(header[len(prefix):])
 	if tok == "" {
 		return "", false
 	}
 	return tok, true
+}
+
+// bearerToken is the request-scoped wrapper used by the middleware
+// helpers in this file.
+func bearerToken(r *http.Request) (string, bool) {
+	return BearerToken(r.Header.Get("Authorization"))
 }
 
 func writeUnauthorized(w http.ResponseWriter, msg string) {

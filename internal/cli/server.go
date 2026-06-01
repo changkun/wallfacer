@@ -26,6 +26,7 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/runner"
@@ -884,11 +885,12 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 	// withID wraps a handler that needs a parsed task UUID from the {id} path
 	// segment, converting the UUID-accepting signature to http.HandlerFunc.
+	// Delegates parsing + error response to internal/pkg/httpjson.PathUUID so
+	// the parse contract matches every other {name}-keyed route.
 	withID := func(fn func(http.ResponseWriter, *http.Request, uuid.UUID)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			id, err := uuid.Parse(r.PathValue("id"))
-			if err != nil {
-				http.Error(w, "invalid task id", http.StatusBadRequest)
+			id, ok := httpjson.PathUUID(w, r, "id")
+			if !ok {
 				return
 			}
 			fn(w, r, id)

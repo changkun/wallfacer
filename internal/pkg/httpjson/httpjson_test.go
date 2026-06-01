@@ -294,3 +294,46 @@ func TestWrite_EncodingError(t *testing.T) {
 		t.Fatalf("expected application/json, got %s", ct)
 	}
 }
+
+func TestPathUUID_Valid(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api/x/00000000-0000-0000-0000-000000000001", nil)
+	r.SetPathValue("id", "00000000-0000-0000-0000-000000000001")
+	w := httptest.NewRecorder()
+
+	id, ok := PathUUID(w, r, "id")
+	if !ok {
+		t.Fatalf("expected ok=true, got %d body=%s", w.Code, w.Body.String())
+	}
+	if id.String() != "00000000-0000-0000-0000-000000000001" {
+		t.Errorf("id = %s, want all-zeros-1", id)
+	}
+}
+
+func TestPathUUID_Missing(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	if _, ok := PathUUID(w, r, "id"); ok {
+		t.Fatal("expected ok=false for missing path value")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "missing id") {
+		t.Errorf("body = %s, want 'missing id'", w.Body.String())
+	}
+}
+
+func TestPathUUID_Malformed(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api/x/notauuid", nil)
+	r.SetPathValue("id", "notauuid")
+	w := httptest.NewRecorder()
+	if _, ok := PathUUID(w, r, "id"); ok {
+		t.Fatal("expected ok=false for malformed uuid")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid id") {
+		t.Errorf("body = %s, want 'invalid id'", w.Body.String())
+	}
+}

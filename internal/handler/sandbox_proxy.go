@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -254,7 +255,7 @@ func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, sco
 	if p.Validator == nil {
 		return &auth.Claims{}, true
 	}
-	tok, ok := bearerToken(r.Header.Get("Authorization"))
+	tok, ok := auth.BearerToken(r.Header.Get("Authorization"))
 	if !ok {
 		http.Error(w, "missing bearer", http.StatusUnauthorized)
 		return nil, false
@@ -264,42 +265,15 @@ func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, sco
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return nil, false
 	}
-	if !hasAud(claims.Aud, "wallfacer-sandbox-proxy") {
+	if !slices.Contains(claims.Aud, "wallfacer-sandbox-proxy") {
 		http.Error(w, "aud mismatch", http.StatusForbidden)
 		return nil, false
 	}
-	if !hasScope(claims.Scopes, scope) {
+	if !slices.Contains(claims.Scopes, scope) {
 		http.Error(w, fmt.Sprintf("missing scope %s", scope), http.StatusForbidden)
 		return nil, false
 	}
 	return claims, true
-}
-
-func bearerToken(h string) (string, bool) {
-	const p = "Bearer "
-	if !strings.HasPrefix(h, p) {
-		return "", false
-	}
-	tok := strings.TrimSpace(h[len(p):])
-	return tok, tok != ""
-}
-
-func hasScope(scopes []string, want string) bool {
-	for _, s := range scopes {
-		if s == want {
-			return true
-		}
-	}
-	return false
-}
-
-func hasAud(aud []string, want string) bool {
-	for _, a := range aud {
-		if a == want {
-			return true
-		}
-	}
-	return false
 }
 
 func delegatorSub(c *auth.Claims) string {

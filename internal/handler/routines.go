@@ -175,7 +175,7 @@ func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 // omitted from the body are left unchanged so the UI can apply partial
 // updates (e.g. toggle enabled without re-sending the interval).
 func (h *Handler) UpdateRoutineSchedule(w http.ResponseWriter, r *http.Request) {
-	id, ok := parsePathID(w, r, "id")
+	id, ok := httpjson.PathUUID(w, r, "id")
 	if !ok {
 		return
 	}
@@ -239,7 +239,7 @@ func (h *Handler) UpdateRoutineSchedule(w http.ResponseWriter, r *http.Request) 
 // in here to actually spawn an instance. Returning 202 keeps the contract
 // stable across that transition.
 func (h *Handler) TriggerRoutine(w http.ResponseWriter, r *http.Request) {
-	id, ok := parsePathID(w, r, "id")
+	id, ok := httpjson.PathUUID(w, r, "id")
 	if !ok {
 		return
 	}
@@ -276,19 +276,3 @@ func (h *Handler) TriggerRoutine(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"queued": true})
 }
 
-// parsePathID reads a UUID from the named path variable and writes a
-// 400 response on parse failure. Used by the routine handlers for the
-// {id} segment in PATCH and POST routes.
-func parsePathID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
-	raw := r.PathValue(name)
-	if raw == "" {
-		http.Error(w, "missing "+name, http.StatusBadRequest)
-		return uuid.UUID{}, false
-	}
-	id, err := uuid.Parse(raw)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid %s: %v", name, err), http.StatusBadRequest)
-		return uuid.UUID{}, false
-	}
-	return id, true
-}

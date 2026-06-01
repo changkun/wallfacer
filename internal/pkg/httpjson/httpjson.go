@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 // DecodeBody decodes the JSON request body into a new T. It rejects unknown
@@ -70,4 +72,22 @@ func Write[T any](w http.ResponseWriter, status int, v T) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		slog.Error("write json", "error", err)
 	}
+}
+
+// PathUUID parses a UUID from the named path segment, writing a 400
+// response on failure. Returns (parsed, true) on success or
+// (uuid.Nil, false) on missing/malformed input. name is the path
+// parameter name (e.g. "id" for routes like "/api/tasks/{id}/...").
+func PathUUID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
+	raw := r.PathValue(name)
+	if raw == "" {
+		http.Error(w, "missing "+name, http.StatusBadRequest)
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		http.Error(w, "invalid "+name+": "+err.Error(), http.StatusBadRequest)
+		return uuid.Nil, false
+	}
+	return id, true
 }

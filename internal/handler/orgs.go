@@ -156,9 +156,8 @@ func (h *Handler) AuthSwitchOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req switchOrgRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpjson.Write(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+	req, ok := httpjson.DecodeBody[switchOrgRequest](w, r)
+	if !ok {
 		return
 	}
 	req.OrgID = strings.TrimSpace(req.OrgID)
