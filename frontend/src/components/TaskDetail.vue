@@ -193,6 +193,33 @@ const visibleEvents = computed(() =>
   events.value.filter((e) => e.event_type !== 'span_start' && e.event_type !== 'span_end'),
 );
 
+// Per-sub-agent usage breakdown (implementation/test/refinement/oversight/…).
+const USAGE_ACTIVITY_LABELS: Record<string, string> = {
+  implementation: 'Implementation',
+  test: 'Test',
+  refinement: 'Refinement',
+  oversight: 'Oversight',
+  'oversight-test': 'Oversight (test)',
+  title: 'Title',
+  commit_message: 'Commit msg',
+  ideation: 'Ideation',
+};
+const usageBreakdown = computed(() => {
+  const bd = props.task.usage_breakdown ?? {};
+  return Object.entries(bd)
+    .filter(([, u]) => u && (u.input_tokens || u.output_tokens || u.cost_usd))
+    .map(([activity, u]) => ({
+      label: USAGE_ACTIVITY_LABELS[activity] ?? activity,
+      input: u.input_tokens ?? 0,
+      output: u.output_tokens ?? 0,
+      cost: u.cost_usd ?? 0,
+    }));
+});
+
+// Retry history (past retired attempts) and prompt history (prior prompts).
+const retryHistory = computed(() => props.task.retry_history ?? []);
+const promptHistory = computed(() => props.task.prompt_history ?? []);
+
 watch(mainTab, (t) => {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
@@ -338,6 +365,11 @@ const costDisplay = computed(() => {
 });
 
 const tokenCount = (n: number) => (n || 0).toLocaleString();
+
+// Status → badge class, for retry-history rows (matches the board badges).
+function badgeClassFor(status: string): string {
+  return `badge-${status}`;
+}
 
 function timeStr(iso: string): string {
   if (!iso) return '—';
@@ -849,6 +881,49 @@ const isArchived = computed(() => !!props.task.archived);
                       <span class="usage-value">{{ task.turns ?? 0 }}</span>
                     </div>
                   </div>
+
+                  <!-- Per-sub-agent usage breakdown -->
+                  <template v-if="usageBreakdown.length">
+                    <h3 class="section-title" style="margin-top: 16px;">Usage by agent</h3>
+                    <table class="usage-breakdown">
+                      <thead>
+                        <tr><th>Agent</th><th>In</th><th>Out</th><th>Cost</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in usageBreakdown" :key="row.label">
+                          <td>{{ row.label }}</td>
+                          <td>{{ tokenCount(row.input) }}</td>
+                          <td>{{ tokenCount(row.output) }}</td>
+                          <td>{{ row.cost > 0 ? '$' + row.cost.toFixed(4) : '—' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </template>
+
+                  <!-- Retry history (past retired attempts) -->
+                  <template v-if="retryHistory.length">
+                    <h3 class="section-title" style="margin-top: 16px;">Retry history</h3>
+                    <div v-for="(r, i) in retryHistory" :key="i" class="retry-record">
+                      <div class="retry-record__head">
+                        <span class="badge" :class="badgeClassFor(r.status)">{{ r.status }}</span>
+                        <span v-if="r.failure_category" class="retry-record__cat">{{ r.failure_category }}</span>
+                        <span class="retry-record__meta">{{ r.turns }} turn{{ r.turns === 1 ? '' : 's' }} · ${{ r.cost_usd.toFixed(4) }} · {{ timeStr(r.retired_at) }}</span>
+                      </div>
+                      <details v-if="r.result" class="retry-record__detail">
+                        <summary>result</summary>
+                        <pre>{{ r.result }}</pre>
+                      </details>
+                    </div>
+                  </template>
+
+                  <!-- Prompt history (prior iterations) -->
+                  <template v-if="promptHistory.length">
+                    <h3 class="section-title" style="margin-top: 16px;">Prompt history</h3>
+                    <details v-for="(p, i) in promptHistory" :key="i" class="prompt-record">
+                      <summary>#{{ i + 1 }}</summary>
+                      <pre>{{ p }}</pre>
+                    </details>
+                  </template>
                 </div>
 
                 <!-- RESULTS tab (multi-turn) -->
@@ -1322,6 +1397,28 @@ const isArchived = computed(() => !!props.task.archived);
   gap: 6px;
   margin-top: 4px;
 }
+
+/* Usage-by-agent breakdown table. */
+.usage-breakdown { width: 100%; border-collapse: collapse; font-size: 11px; }
+.usage-breakdown th {
+  text-align: right; padding: 3px 8px; color: var(--text-muted);
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.usage-breakdown th:first-child, .usage-breakdown td:first-child { text-align: left; }
+.usage-breakdown td { padding: 3px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Retry + prompt history records in the Events tab. */
+.retry-record { border-top: 1px solid var(--border); padding: 6px 0; }
+.retry-record__head { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.retry-record__cat { color: var(--err, #c0392b); font-family: var(--font-mono); font-size: 10px; }
+.retry-record__meta { margin-left: auto; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.retry-record__detail pre, .prompt-record pre {
+  white-space: pre-wrap; font-size: 11px; margin: 4px 0 0; color: var(--text-secondary);
+  max-height: 220px; overflow: auto;
+}
+.prompt-record { border-top: 1px solid var(--border); padding: 6px 0; font-size: 11px; }
+.prompt-record summary, .retry-record__detail summary { cursor: pointer; color: var(--text-muted); }
 
 /* Event timeline rows in the Events tab. */
 .event-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }

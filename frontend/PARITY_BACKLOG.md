@@ -17,9 +17,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] render — failure-category friendly labels (Timeout/Budget/Crash/…) on failed cards
 - [ ] status-bar — agent presence list (active agents + signed-in user, status dots)
 - [~] status-bar — sign-in badge + org switcher (CLOUD-ONLY; needs /api/auth/orgs; deferred)
-- [ ] modal-core — retry history section (past attempts: status/time/cost/turns, expandable)
-- [ ] modal-core — usage breakdown table (per-agent token/cost: impl/test/refinement/oversight)
-- [ ] modal-core — prompt history section (#1/#2 prior iterations)
+- [x] modal-core — retry history section (past attempts: status/time/cost/turns, expandable)
+- [x] modal-core — usage breakdown table (per-agent token/cost: impl/test/refinement/oversight)
+- [x] modal-core — prompt history section (#1/#2 prior iterations)
 - [ ] modal-core — backlog spec Edit/Preview tabs (textarea vs rendered markdown)
 - [ ] tasks — modal-based backlog editing (debounced PATCH of prompt/timeout/sandbox/deps/tags/budgets/scheduled_at/model)
 - [ ] modal-logs — test-phase log streaming + test oversight (/oversight/test), parallel Testing tab
