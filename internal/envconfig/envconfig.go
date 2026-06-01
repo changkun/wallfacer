@@ -48,8 +48,6 @@ type Config struct {
 
 	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
 	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
-	TaskWorkers      bool   // WALLFACER_TASK_WORKERS ("true"/"false"), defaults to true when unset
-	DependencyCaches bool   // WALLFACER_DEPENDENCY_CACHES ("true"/"false"), defaults to false
 	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
@@ -94,8 +92,6 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_FAST",
 	"WALLFACER_HOST_CLAUDE_BINARY",
 	"WALLFACER_HOST_CODEX_BINARY",
-	"WALLFACER_TASK_WORKERS",
-	"WALLFACER_DEPENDENCY_CACHES",
 	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
 	"WALLFACER_CLOUD",
@@ -108,16 +104,15 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// SandboxFast, TaskWorkers, and TerminalEnabled default to true; only an
-	// explicit "false" value in the file disables them. This opt-out semantic
-	// means missing keys preserve the safer default (features enabled).
+	// SandboxFast and TerminalEnabled default to true; only an explicit
+	// "false" value in the file disables them. This opt-out semantic means
+	// missing keys preserve the safer default (features enabled).
 	//
 	// PlanningWindowDays defaults to 30 so the planning-cost period picker
 	// opens on a sensible "last month" view when the user hasn't configured
 	// anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
 		SandboxFast:        true,
-		TaskWorkers:        true,
 		TerminalEnabled:    true,
 		PlanningWindowDays: 30,
 	}
@@ -197,10 +192,6 @@ func Parse(path string) (Config, error) {
 			cfg.HostClaudeBinary = v
 		case "WALLFACER_HOST_CODEX_BINARY":
 			cfg.HostCodexBinary = v
-		case "WALLFACER_TASK_WORKERS":
-			cfg.TaskWorkers = v != "false"
-		case "WALLFACER_DEPENDENCY_CACHES":
-			cfg.DependencyCaches = v == "true"
 		case "WALLFACER_TERMINAL_ENABLED":
 			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":

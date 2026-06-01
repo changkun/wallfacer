@@ -224,14 +224,12 @@ Wallfacer runs each task as a host process, execing the `claude` (and optionally
 
 > **Tasks run with your user's permissions.** A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. The Settings → Sandbox tab shows this warning while active. See [Host mode](#host-mode) below.
 
-#### Container
+#### Circuit Breaker
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive container runtime failures before the circuit breaker opens |
+| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive agent-process launch failures before the circuit breaker opens |
 | `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
-| `WALLFACER_TASK_WORKERS` | `true` | Enable per-task worker containers for container reuse. Each task gets a long-lived container that is reused across agent invocations (implementation turns, title, oversight, commit message). Set to `false` to always use ephemeral containers. |
-| `WALLFACER_DEPENDENCY_CACHES` | `false` | Mount named volumes for dependency caches (`~/.npm`, `~/.cache/pip`, `~/.cargo/registry`, `~/.cache/go-build`) that persist across container restarts. Scoped per workspace group. |
 
 #### Host mode
 
