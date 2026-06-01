@@ -329,6 +329,43 @@ async function testTask() {
 async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
 }
+
+// Raise the cost / token budget on a task that hit a guardrail. Two
+// sequential prompts mirror ui/js/tasks.js:912. PATCH the task with the
+// new caps; an empty / 0 entry means "unlimited".
+async function raiseBudget() {
+  const cur = props.task;
+  const newCost = await dialog.prompt({
+    title: 'Raise cost limit',
+    message: `New cost limit in USD (0 = unlimited). Current: ${cur.max_cost_usd && cur.max_cost_usd > 0 ? '$' + cur.max_cost_usd.toFixed(2) : 'none'}.`,
+    initial: cur.max_cost_usd && cur.max_cost_usd > 0 ? String(cur.max_cost_usd) : '',
+    placeholder: '10',
+  });
+  if (newCost === null) return;
+  const newTokens = await dialog.prompt({
+    title: 'Raise token limit',
+    message: `New input-token limit (0 = unlimited). Current: ${cur.max_input_tokens && cur.max_input_tokens > 0 ? cur.max_input_tokens.toLocaleString() : 'none'}.`,
+    initial: cur.max_input_tokens && cur.max_input_tokens > 0 ? String(cur.max_input_tokens) : '',
+    placeholder: '100000',
+  });
+  if (newTokens === null) return;
+  try {
+    await api('PATCH', `/api/tasks/${cur.id}`, {
+      max_cost_usd: parseFloat(newCost) || 0,
+      max_input_tokens: parseInt(newTokens, 10) || 0,
+    });
+    toast.push('Budget updated', { kind: 'success' });
+  } catch (e) {
+    toast.push(`Failed to update budget: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
+}
+
+// Surface the Raise Budget button when the task was paused for budget
+// reasons. Two conditions cover both shapes the server emits.
+const budgetExceeded = computed(() =>
+  props.task.failure_category === 'budget_exceeded' ||
+  (props.task.stop_reason ?? '').toLowerCase().includes('budget'),
+);
 async function archiveTask() {
   const id = props.task.id;
   await api('POST', `/api/tasks/${id}/archive`);
@@ -763,6 +800,16 @@ const isArchived = computed(() => !!props.task.archived);
                     <span class="aside-action__body">
                       <span class="aside-action__label">Test</span>
                       <span class="aside-action__hint">run test verification</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="budgetExceeded && (isWaiting || isFailed)">
+                  <button type="button" class="aside-action" @click="raiseBudget">
+                    <span class="aside-action__icon" aria-hidden="true">&#36;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Raise budget</span>
+                      <span class="aside-action__hint">unblock and resume</span>
                     </span>
                   </button>
                 </div>

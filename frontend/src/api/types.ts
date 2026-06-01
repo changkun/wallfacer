@@ -51,6 +51,11 @@ export interface Task {
   routine_last_fired_at?: string | null;
   routine_spawn_kind?: string;
   routine_spawn_flow?: string;
+  // Budget guardrails — 0 / missing means unlimited.
+  max_cost_usd?: number;
+  max_input_tokens?: number;
+  test_run_start_turn?: number;
+  scheduled_at?: string | null;
 }
 
 export interface WorkspaceGroup {
