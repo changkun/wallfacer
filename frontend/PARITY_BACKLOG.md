@@ -53,8 +53,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] docs — markdown link enhancement (linkHandler:'docs')
 - [x] containers — task status badge in monitor cell
 - [~] terminal — Wails desktop PTY discovery (/api/desktop-port) (desktop-only; defer)
-- [ ] flows — parallel-step grouping viz ("‖" chips)
-- [ ] flows — step input_from relationship shown
+- [x] flows — parallel-step grouping viz ("‖" chips) (verified: chainGroups/groupParallel)
+- [x] flows — step input_from relationship shown (verified: chip title tooltip)
 - [x] envconfig — first-launch "no credentials" alert banner
 - [x] trash-bin — restore-success toast
 - [ ] markdown — modal/card markdown helper actions (toggle section, copy)
