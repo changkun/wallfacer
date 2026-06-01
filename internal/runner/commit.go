@@ -446,7 +446,7 @@ func (r *Runner) runCommitContainer(
 		return nil, fmt.Errorf("empty output")
 	}
 
-	output, err := parseOutput(raw)
+	output, err := r.parseAgentStream(sb, raw)
 	if err != nil {
 		return nil, fmt.Errorf("parse failure: raw=%s", truncate(raw, 200))
 	}
