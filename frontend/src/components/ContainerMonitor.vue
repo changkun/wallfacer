@@ -2,6 +2,7 @@
 import { ref, watch, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api/client';
+import { useTaskStore } from '../stores/tasks';
 
 interface ContainerItem {
   task_id?: string;
@@ -14,7 +15,15 @@ const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const router = useRouter();
+const taskStore = useTaskStore();
 const containers = ref<ContainerItem[]>([]);
+
+// The lifecycle status of the task a container is running, looked up from the
+// live task store. Rendered as a badge before the title (mirrors ui/js/containers.js).
+function taskStatus(taskId: string | undefined): string {
+  if (!taskId) return '';
+  return taskStore.tasks.find((t) => t.id === taskId)?.status ?? '';
+}
 const loading = ref(false);
 const error = ref('');
 const lastUpdated = ref('');
@@ -186,12 +195,18 @@ const hasContent = computed(() => !loading.value && !error.value && containers.v
                 <tbody>
                   <tr v-for="(c, i) in containers" :key="(c.name || '') + i" class="cm-row">
                     <td :style="{ padding: '8px 10px', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
-                      <button
-                        v-if="c.task_id"
-                        type="button"
-                        class="cm-task-link"
-                        @click="openTask(c.task_id)"
-                      >{{ c.task_title || shortTaskId(c.task_id) }}</button>
+                      <template v-if="c.task_id">
+                        <span
+                          v-if="taskStatus(c.task_id)"
+                          :class="`badge badge-${taskStatus(c.task_id)}`"
+                          :style="{ marginRight: '6px' }"
+                        >{{ taskStatus(c.task_id) }}</span>
+                        <button
+                          type="button"
+                          class="cm-task-link"
+                          @click="openTask(c.task_id)"
+                        >{{ c.task_title || shortTaskId(c.task_id) }}</button>
+                      </template>
                       <span v-else :style="{ color: 'var(--text-muted)' }">&mdash;</span>
                     </td>
                     <td
