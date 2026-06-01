@@ -89,9 +89,8 @@ type RunnerConfig struct {
 	WorktreesDir     string
 	InstructionsPath string
 	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
-	SandboxBackend   string           // "local" (default, podman/docker) or "host" (exec claude/codex directly)
-	HostClaudeBinary string           // optional override for the `claude` binary path (host backend only)
-	HostCodexBinary  string           // optional override for the `codex` binary path  (host backend only)
+	HostClaudeBinary string           // optional override for the `claude` binary path
+	HostCodexBinary  string           // optional override for the `codex` binary path
 	ContainerNetwork string           // --network value for task containers (empty = read from env file, fallback "host")
 	ContainerCPUs    string           // --cpus value for task containers (empty = read from env file, no limit)
 	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
@@ -499,36 +498,17 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	cbThreshold := envutil.IntMin("WALLFACER_CONTAINER_CB_THRESHOLD", constants.DefaultCBThreshold, 1)
 	cbOpenSec := envutil.IntMin("WALLFACER_CONTAINER_CB_OPEN_SECONDS", 30, 1)
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
-	localCfg := sandbox.LocalBackendConfig{
-		EnableTaskWorkers: true, // default; overridden by envconfig if available
-		Reg:               cfg.Reg,
+	hb, err := sandbox.NewHostBackend(sandbox.HostBackendConfig{
+		ClaudeBinary: cfg.HostClaudeBinary,
+		CodexBinary:  cfg.HostCodexBinary,
+	})
+	if err != nil {
+		// Startup-time failure: fail fast with an actionable message rather
+		// than limping along with a half-configured runner.
+		logger.Fatal("host sandbox backend", "error", err)
 	}
-	// Read WALLFACER_TASK_WORKERS from the env file if available.
-	if cfg.EnvFile != "" {
-		if parsed, err := envconfig.Parse(cfg.EnvFile); err == nil {
-			localCfg.EnableTaskWorkers = parsed.TaskWorkers
-		}
-	}
-	switch cfg.SandboxBackend {
-	case "", "local":
-		r.backend = sandbox.NewLocalBackend(r.command, localCfg)
-	case "host":
-		hb, err := sandbox.NewHostBackend(sandbox.HostBackendConfig{
-			ClaudeBinary: cfg.HostClaudeBinary,
-			CodexBinary:  cfg.HostCodexBinary,
-		})
-		if err != nil {
-			// Startup-time failure: fail fast with an actionable message rather
-			// than limping along with a half-configured runner.
-			logger.Fatal("host sandbox backend", "error", err)
-		}
-		r.backend = hb
-		r.hostMode = true
-		logger.Runner.Info("host sandbox backend active — tasks run directly on this machine with no container isolation")
-	default:
-		logger.Runner.Warn("unknown sandbox backend, falling back to local", "backend", cfg.SandboxBackend)
-		r.backend = sandbox.NewLocalBackend(r.command, localCfg)
-	}
+	r.backend = hb
+	r.hostMode = true
 	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {

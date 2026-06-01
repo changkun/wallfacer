@@ -84,11 +84,6 @@ type ServerConfig struct {
 	// instead of the embedded filesystem. Used during frontend development
 	// so edits under ui/ take effect on reload without rebuilding the binary.
 	UIDir string
-	// SandboxBackend selects the sandbox implementation. Valid values:
-	// "" / "local" (podman/docker container; default) and "host" (exec the
-	// host-installed claude/codex CLIs directly; no isolation). Populated
-	// from the `wallfacer run --backend` flag.
-	SandboxBackend string
 }
 
 // ServerComponents holds the initialized server components returned by initServer.
@@ -173,13 +168,9 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
 	}
 
-	// Skip image pull entirely when running in host mode: tasks run directly
-	// via the host claude/codex binary, so the sandbox container image is never
-	// used. Pulling it wastes bandwidth and time on every startup.
+	// Host backend execs the claude/codex binaries directly, so no
+	// container image is pulled or used.
 	resolvedImage := cfg.SandboxImage
-	if cfg.SandboxBackend != "host" {
-		resolvedImage = ensureImage(cfg.ContainerCmd, cfg.SandboxImage)
-	}
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
@@ -203,7 +194,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		TmpDir:           tmpDir,
 		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,
-		SandboxBackend:   cfg.SandboxBackend,
 		HostClaudeBinary: envCfg.HostClaudeBinary,
 		HostCodexBinary:  envCfg.HostCodexBinary,
 		ContainerNetwork: envCfg.ContainerNetwork,
@@ -530,7 +520,6 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 		SandboxImage:   *sandboxImage,
 		EnvFile:        *envFile,
 		UIDir:          *uiDir,
-		SandboxBackend: "host",
 	}, uiFS, vueDist, docsFS)
 	defer sc.Stop()
 

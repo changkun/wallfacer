@@ -39,9 +39,6 @@ func TestRunDoctor_BinariesPresent(t *testing.T) {
 		RunDoctor(configDir, nil)
 	})
 
-	if !strings.Contains(out, "Sandbox backend:   host") {
-		t.Errorf("missing host-mode banner:\n%s", out)
-	}
 	if !strings.Contains(out, "[ok] Claude binary: "+claudePath) {
 		t.Errorf("missing claude binary line:\n%s", out)
 	}
