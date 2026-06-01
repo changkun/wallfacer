@@ -24,12 +24,7 @@ function makeContext(extra = {}) {
     // Minimal document stub – getElementById returning null makes any IIFE
     // that checks for DOM elements bail out gracefully.
     document: {
-      getElementById: (id) => {
-        if (id === "container-monitor-modal") {
-          return { addEventListener: () => {} };
-        }
-        return null;
-      },
+      getElementById: () => null,
       querySelectorAll: () => ({ forEach: () => {} }),
       documentElement: { setAttribute: () => {} },
       readyState: "complete",
@@ -165,28 +160,6 @@ describe("getResolvedTheme", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 5 – containerStateColor (containers.js)
-// Verifies the status-dot colours shown in the container monitor modal.
-// ---------------------------------------------------------------------------
-describe("containerStateColor", () => {
-  let ctx;
-  beforeAll(() => {
-    // containers.js references escapeHtml inside renderContainers (not at
-    // load time), so a stub is enough to avoid ReferenceError if any path
-    // ever reaches it during test setup.
-    ctx = makeContext({ escapeHtml: (s) => String(s ?? "") });
-    loadScript("containers.js", ctx);
-  });
-
-  it("maps known container states to their designated hex colours", () => {
-    expect(ctx.containerStateColor("running")).toBe("#45b87a");
-    expect(ctx.containerStateColor("dead")).toBe("#d46868");
-    expect(ctx.containerStateColor("paused")).toBe("#d4a030");
-    expect(ctx.containerStateColor(null)).toBe("#9c9890"); // default / unknown
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Test 6 – updateMaxParallelTag (render.js)
 // Verifies that the "max N" badge in the In Progress column header reflects
 // the current maxParallelTasks global and responds to changes so that the UI
@@ -214,8 +187,6 @@ describe("updateMaxParallelTag", () => {
       document: {
         getElementById: (id) => {
           if (id === "max-parallel-tag") return tagEl;
-          if (id === "container-monitor-modal")
-            return { addEventListener: () => {} };
           return null;
         },
         querySelectorAll: () => ({ forEach: () => {} }),
@@ -368,8 +339,6 @@ describe("populateDependsOnPicker status ordering", () => {
       document: {
         getElementById(id) {
           if (id === "dep-picker") return wrapEl;
-          if (id === "container-monitor-modal")
-            return { addEventListener: () => {} };
           // tasks.js attaches event listeners to these at module load time
           if (id === "modal-edit-prompt") return { addEventListener: () => {} };
           if (id === "modal-edit-timeout")

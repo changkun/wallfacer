@@ -32,7 +32,6 @@ const LIB_DEPS = {
     "build/lib/modal-controller.js",
   ],
   "instructions.js": ["build/lib/modal.js", "build/lib/modal-controller.js"],
-  "containers.js": ["build/lib/modal.js", "build/lib/modal-controller.js"],
   "docs.js": [
     "build/lib/modal.js",
     "build/lib/modal-controller.js",

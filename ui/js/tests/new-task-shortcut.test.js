@@ -57,9 +57,6 @@ function setup() {
     "alert-modal": makeElement("alert-modal", "div", ["hidden"]),
     "stats-modal": makeElement("stats-modal", "div", ["hidden"]),
     "usage-stats-modal": makeElement("usage-stats-modal", "div", ["hidden"]),
-    "container-monitor-modal": makeElement("container-monitor-modal", "div", [
-      "hidden",
-    ]),
     "instructions-modal": makeElement("instructions-modal", "div", ["hidden"]),
     "settings-modal": makeElement("settings-modal", "div", ["hidden"]),
     "keyboard-shortcuts-modal": makeElement("keyboard-shortcuts-modal", "div", [
@@ -91,7 +88,6 @@ function setup() {
       "alert-modal",
       "stats-modal",
       "usage-stats-modal",
-      "container-monitor-modal",
       "instructions-modal",
       "settings-modal",
       "keyboard-shortcuts-modal",
