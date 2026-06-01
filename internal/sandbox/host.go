@@ -13,8 +13,42 @@ import (
 	"syscall"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
 )
+
+// requestFromClaudeSpec translates a runner-built ContainerSpec (whose Cmd
+// holds the legacy `-p ... --verbose --output-format stream-json [--model
+// m] [--resume sid]` shape) into the canonical harness.Request. This
+// shim exists so harness.Claude owns the wire knowledge; once upstream
+// callers pass Request directly to Launch, the function disappears.
+func requestFromClaudeSpec(spec ContainerSpec) harness.Request {
+	var req harness.Request
+	cmd := spec.Cmd
+	for i := 0; i < len(cmd); i++ {
+		switch cmd[i] {
+		case "-p":
+			if i+1 < len(cmd) {
+				req.Prompt = cmd[i+1]
+				i++
+			}
+		case "--model", "-m":
+			if i+1 < len(cmd) {
+				req.Model = cmd[i+1]
+				i++
+			}
+		case "--resume":
+			if i+1 < len(cmd) {
+				req.SessionID = cmd[i+1]
+				i++
+			}
+		}
+	}
+	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
+		req.SystemPrompt = instrPath
+	}
+	return req
+}
 
 // HostBackendConfig configures a HostBackend. Empty binary paths trigger a
 // $PATH lookup; tests use explicit paths to inject a fake agent.
@@ -175,13 +209,11 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 	}
 }
 
-// launchClaude execs the claude CLI with the runner's argv passed through
-// almost verbatim — claude accepts the declarative `-p ... --verbose
-// --output-format stream-json` invocation the runner already builds. The
-// only transformation is instructions delivery: if the runner set
-// WALLFACER_INSTRUCTIONS_PATH, we either add --append-system-prompt (when
-// claude --help advertises it) or prepend the instructions content to the
-// -p prompt value.
+// launchClaude execs the claude CLI. The argv is assembled by
+// harness.Claude from a Request extracted from spec; this keeps the
+// claude wire knowledge in one place and lets the runner's spec.Cmd
+// stay a thin translation layer until upstream code passes Request
+// directly.
 func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Handle, error) {
 	bin, err := b.binaryFor(Claude)
 	if err != nil {
@@ -189,29 +221,11 @@ func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Han
 	}
 
 	env := b.buildChildEnv(spec)
-
-	// Mirror the container's claude-agent.sh wrapper: without
-	// --dangerously-skip-permissions claude waits for interactive
-	// permission prompts in a piped non-TTY context, which buffers all
-	// stream-json output until the task ends. --append-system-prompt "/fast"
-	// activates the Claude Code fast mode when WALLFACER_SANDBOX_FAST is
-	// enabled (the default).
-	argv := []string{"--dangerously-skip-permissions"}
-	if sandboxFast(spec.Env, env) {
-		argv = append(argv, "--append-system-prompt", "/fast")
-	}
-	argv = append(argv, spec.Cmd...)
-	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
-		if b.SupportsAppendSystemPrompt(Claude) {
-			argv = append(argv, "--append-system-prompt", instrPath)
-		} else {
-			data, rErr := os.ReadFile(instrPath)
-			if rErr != nil {
-				logger.Runner.Warn("host backend: read instructions file", "path", instrPath, "error", rErr)
-			} else if len(data) > 0 {
-				argv = prependToPromptFlag(argv, string(data))
-			}
-		}
+	req := requestFromClaudeSpec(spec)
+	claudeH, _ := harness.Lookup(harness.Claude)
+	argv, _, argvErr := claudeH.BuildArgv(req)
+	if argvErr != nil {
+		return nil, fmt.Errorf("host backend: claude argv: %w", argvErr)
 	}
 
 	cmd := exec.CommandContext(ctx, bin, argv...)

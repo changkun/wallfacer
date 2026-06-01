@@ -290,10 +290,10 @@ func TestHostBackend_AppendSystemPrompt_Supported(t *testing.T) {
 }
 
 func TestHostBackend_AppendSystemPrompt_Fallback(t *testing.T) {
+	t.Skip("harness.Claude always passes --append-system-prompt; ancient-claude prepend fallback dropped")
 	bin := buildFakeAgent(t, "fakeagent")
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
 
-	// Force the probe to report "not supported" by pre-seeding the cache.
 	b.probeMu.Lock()
 	b.probedOnce[Claude] = true
 	b.probedSupport[Claude] = false
