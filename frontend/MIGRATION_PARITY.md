@@ -163,7 +163,7 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 | instructions.js | DONE | InstructionsEditor.vue | full parity |
 | templates.js | DONE | TemplatesManager.vue | full parity |
 | envconfig.js | PARTIAL | SettingsTabSandbox.vue, useEnvConfig.ts | model dropdown populate from base_url; first-launch button emphasis |
-| images.js | PARTIAL | SettingsTabSandbox.vue | SSE pull progress (currently polls); per-line/phase progress |
+| images.js | RETIRED | — | Container Images surface removed; host execution uses no sandbox image (no `/api/images*` routes) |
 
 ### Agents/flows/routines/ideate
 | Module | Status | Vue equivalent | Missing behaviors |
