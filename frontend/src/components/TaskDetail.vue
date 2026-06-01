@@ -8,6 +8,8 @@ import type { Task } from '../api/types';
 import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
+import { useTaskStore } from '../stores/tasks';
+import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import type { SpanResult } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
@@ -19,6 +21,30 @@ import { useFocusTrap } from '../composables/useFocusTrap';
 
 const props = defineProps<{ task: Task }>();
 const emit = defineEmits<{ close: [] }>();
+
+const taskStore = useTaskStore();
+const detailRouter = useRouter();
+
+// "Blocked by" dependency list — resolves depends_on against the live task
+// store, mirroring modal-core's dependency section. Each row is clickable
+// to open the blocking task; a "Waiting on X of Y" summary shows how many
+// are still unsatisfied (not done/cancelled).
+interface DepRow { id: string; label: string; status: string; satisfied: boolean }
+const blockedBy = computed<DepRow[]>(() => {
+  const ids = props.task.depends_on ?? [];
+  const byId = new Map(taskStore.tasks.map((t) => [t.id, t]));
+  return ids.map((id) => {
+    const dep = byId.get(id);
+    if (!dep) return { id, label: id.slice(0, 8) + '…', status: 'missing', satisfied: false };
+    const label = dep.title || (dep.prompt.length > 40 ? dep.prompt.slice(0, 40) + '…' : dep.prompt) || id.slice(0, 8);
+    const satisfied = dep.status === 'done' || dep.status === 'cancelled';
+    return { id, label, status: dep.status, satisfied };
+  });
+});
+const blockedByUnmet = computed(() => blockedBy.value.filter((d) => !d.satisfied).length);
+function openDep(id: string) {
+  detailRouter.push({ path: '/', query: { task: id } });
+}
 
 // Modal focus trap — Tab cycles inside the dialog only, focus restores
 // to the element that triggered the open on close. Must be declared
@@ -991,6 +1017,25 @@ const isArchived = computed(() => !!props.task.archived);
 
             <!-- Right aside -->
             <aside class="modal-aside">
+              <div v-if="blockedBy.length" class="mdl-section modal-aside__deps">
+                <div class="mdl-h">
+                  Blocked by
+                  <span v-if="blockedByUnmet > 0" class="deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
+                  <span v-else class="deps-summary deps-summary--ready">all satisfied</span>
+                </div>
+                <button
+                  v-for="d in blockedBy"
+                  :key="d.id"
+                  type="button"
+                  class="dep-row"
+                  :title="`Open ${d.label}`"
+                  @click="openDep(d.id)"
+                >
+                  <span class="badge" :class="badgeClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
+                  <span class="dep-row__label">{{ d.label }}</span>
+                </button>
+              </div>
+
               <div class="mdl-section modal-aside__actions">
                 <div class="mdl-h">Actions</div>
 
@@ -1397,6 +1442,32 @@ const isArchived = computed(() => !!props.task.archived);
   gap: 6px;
   margin-top: 4px;
 }
+
+/* "Blocked by" dependency list in the aside. */
+.modal-aside__deps .deps-summary {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.modal-aside__deps .deps-summary--ready { color: var(--green, #22c55e); }
+.dep-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 4px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+}
+.dep-row:hover { background: var(--bg-hover); }
+.dep-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 
 /* Usage-by-agent breakdown table. */
 .usage-breakdown { width: 100%; border-collapse: collapse; font-size: 11px; }
