@@ -81,7 +81,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] terminal — container picker uses /api/debug/health (DONE earlier; per-state icons still minor)
 - [ ] tasks — brainstorm flow empty-prompt allowance + placeholder
 - [ ] tasks — routine creation interval/repeat controls detail
-- [ ] command-palette — doc search title-prefix bonus scoring
+- [x] command-palette — doc search title-prefix bonus scoring
 - [ ] command-palette — remote/local result distinction + server snippet field
 - [x] mention — file ranking path-substring boost
 - [ ] status-bar — terminal panel height persisted
