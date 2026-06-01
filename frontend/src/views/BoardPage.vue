@@ -81,6 +81,9 @@ function selectTask(t: Task) {
 async function onBacklogChange(evt: { moved?: { element: Task } }) {
   if (evt.moved) {
     const ids = store.backlog.map(t => t.id);
+    // Optimistic: write the new positions into the local store before
+    // the SSE delta arrives so the order doesn't flicker back.
+    ids.forEach((id, i) => store.patchTaskLocal(id, { position: i }));
     for (let i = 0; i < ids.length; i++) {
       api('PATCH', `/api/tasks/${ids[i]}`, { position: i });
     }
@@ -89,7 +92,15 @@ async function onBacklogChange(evt: { moved?: { element: Task } }) {
 
 async function onInProgressAdd(evt: { added?: { element: Task } }) {
   if (evt.added) {
-    await api('PATCH', `/api/tasks/${evt.added.element.id}`, { status: 'in_progress' });
+    // Optimistic: flip the status locally so the card stays in
+    // In Progress while the PATCH is in flight. Server SSE will
+    // re-confirm; a failed PATCH rolls it back via the next fetch.
+    store.patchTaskLocal(evt.added.element.id, { status: 'in_progress' });
+    try {
+      await api('PATCH', `/api/tasks/${evt.added.element.id}`, { status: 'in_progress' });
+    } catch {
+      store.patchTaskLocal(evt.added.element.id, { status: 'backlog' });
+    }
   }
 }
 
