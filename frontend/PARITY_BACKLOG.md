@@ -42,7 +42,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] render — brainstorm category tag badges (BRAINSTORM_CATEGORIES from /api/config)
 - [ ] board-composer — empty-board composer dismiss-for-session persistence
 - [ ] board-composer — composer "@" action button (insert @ + fire mention)
-- [ ] sidebar-badge — board unread dot
+- [x] sidebar-badge — board unread dot
 - [ ] planning-chat — queue item double-click edit mode
 - [x] planning-chat — send-mode toggle button (already present PlanningChatPanel.vue:45-61)
 - [ ] spec-mode — sidebar collapse/expand persisted on boot
@@ -55,8 +55,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [~] terminal — Wails desktop PTY discovery (/api/desktop-port) (desktop-only; defer)
 - [ ] flows — parallel-step grouping viz ("‖" chips)
 - [ ] flows — step input_from relationship shown
-- [ ] envconfig — first-launch "no credentials" alert banner
-- [ ] trash-bin — restore-success toast
+- [x] envconfig — first-launch "no credentials" alert banner
+- [x] trash-bin — restore-success toast
 - [ ] markdown — modal/card markdown helper actions (toggle section, copy)
 - [x] state — pendingCancel "cancelling" indicator (done earlier in TaskDetail)
 - [ ] state — active-group badge tracking from SSE

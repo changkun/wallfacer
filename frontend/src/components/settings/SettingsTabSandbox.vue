@@ -194,6 +194,9 @@ const codexHasCreds = computed(() => {
   const k = env.value?.openai_api_key;
   return !!(k && k !== '(not set)');
 });
+// First-launch banner: no credentials for either provider. Mirrors the
+// legacy envconfig.js "No API credentials configured" alert.
+const noCredentials = computed(() => env.value != null && !claudeHasCreds.value && !codexHasCreds.value);
 
 // OAuth sign-in buttons hide when a custom base URL is set.
 const showClaudeOauthBtn = computed(() => !claudeBaseUrl.value);
@@ -485,6 +488,17 @@ function capitalize(s: string): string {
 
 <template>
   <div class="settings-tab-content active" data-settings-tab="sandbox">
+    <!-- First-launch: no credentials configured for either provider. -->
+    <div
+      v-if="noCredentials"
+      class="settings-card"
+      style="border-color: var(--warn, #c87b1c); background: color-mix(in oklab, var(--warn, #c87b1c) 12%, var(--bg-card));"
+    >
+      <strong>⚠ No API credentials configured.</strong>
+      Sign in below or enter a Claude OAuth token / Anthropic API key (or an
+      OpenAI key for Codex) to start running tasks.
+    </div>
+
     <!-- Host-mode banner -->
     <div
       v-if="hostMode"
