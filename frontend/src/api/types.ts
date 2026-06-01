@@ -59,6 +59,19 @@ export interface Task {
   prompt_history?: string[];
   retry_history?: RetryRecord[];
   parent_task_id?: string | null;
+  environment?: ExecutionEnvironment | null;
+}
+
+// Runtime environment captured at the start of a task run (reproducibility
+// provenance). Mirrors store.ExecutionEnvironment.
+export interface ExecutionEnvironment {
+  container_image?: string;
+  container_digest?: string;
+  model_name?: string;
+  api_base_url?: string;
+  instructions_hash?: string;
+  sandbox?: string;
+  recorded_at?: string;
 }
 
 export interface RetryRecord {

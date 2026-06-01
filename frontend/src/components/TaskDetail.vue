@@ -42,6 +42,28 @@ const blockedBy = computed<DepRow[]>(() => {
   });
 });
 const blockedByUnmet = computed(() => blockedBy.value.filter((d) => !d.satisfied).length);
+
+// Execution-environment provenance rows (container digest, instructions hash,
+// API endpoint, recorded time). Mirrors modal-core.js's environment section.
+const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() => {
+  const e = props.task.environment;
+  if (!e) return [];
+  const rows: { label: string; value: string; mono?: boolean }[] = [];
+  rows.push({ label: 'Sandbox', value: e.sandbox || '(default)' });
+  rows.push({ label: 'Model', value: e.model_name || '(unknown)' });
+  const digest = e.container_digest ? e.container_digest.slice(0, 12) : '';
+  rows.push({
+    label: 'Container',
+    value: e.container_image ? e.container_image + (digest ? ` @ ${digest}` : '') : '(unknown)',
+    mono: !!e.container_image,
+  });
+  if (e.instructions_hash) {
+    rows.push({ label: 'Instructions SHA-256', value: e.instructions_hash.slice(0, 12), mono: true });
+  }
+  rows.push({ label: 'API endpoint', value: e.api_base_url || '(default)' });
+  if (e.recorded_at) rows.push({ label: 'Recorded', value: relativeTime(e.recorded_at) });
+  return rows;
+});
 function openDep(id: string) {
   detailRouter.push({ path: '/', query: { task: id } });
 }
@@ -1059,6 +1081,16 @@ const isArchived = computed(() => !!props.task.archived);
                 </button>
               </div>
 
+              <div v-if="envRows.length" class="mdl-section modal-aside__env">
+                <div class="mdl-h">Environment</div>
+                <dl class="env-provenance">
+                  <template v-for="row in envRows" :key="row.label">
+                    <dt>{{ row.label }}</dt>
+                    <dd :class="{ 'env-provenance__mono': row.mono }">{{ row.value }}</dd>
+                  </template>
+                </dl>
+              </div>
+
               <div class="mdl-section modal-aside__actions">
                 <div class="mdl-h">Actions</div>
 
@@ -1447,6 +1479,18 @@ const isArchived = computed(() => !!props.task.archived);
   border-radius: 6px;
   padding: 6px 8px;
 }
+
+/* Execution-environment provenance list in the right aside. */
+.env-provenance {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0;
+  font-size: 11px;
+}
+.env-provenance dt { color: var(--text-muted); white-space: nowrap; }
+.env-provenance dd { margin: 0; color: var(--text-secondary); word-break: break-word; }
+.env-provenance__mono { font-family: var(--font-mono, monospace); font-size: 10px; }
 
 /* Backlog edit form inside the right aside. */
 .backlog-edit {
