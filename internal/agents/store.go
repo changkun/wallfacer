@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/slugutil"
+	"changkun.de/x/wallfacer/internal/pkg/yamldir"
 
 	"gopkg.in/yaml.v3"
 )
@@ -32,43 +32,24 @@ type diskAgent struct {
 // state); a malformed file is fatal because silent skip masks
 // typos.
 func LoadUserAgents(dir string) ([]Role, error) {
-	if dir == "" {
-		return nil, nil
-	}
-	entries, err := os.ReadDir(dir)
+	files, err := yamldir.ReadAll("agents", dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read agents dir %s: %w", dir, err)
+		return nil, err
 	}
 	var roles []Role
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		ext := strings.ToLower(filepath.Ext(name))
-		if ext != ".yaml" && ext != ".yml" {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
-		}
+	for _, f := range files {
 		var a diskAgent
-		if err := yaml.Unmarshal(body, &a); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
+		if err := yaml.Unmarshal(f.Body, &a); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", f.Path, err)
 		}
 		if a.Slug == "" {
-			return nil, fmt.Errorf("parse %s: slug is required", path)
+			return nil, fmt.Errorf("parse %s: slug is required", f.Path)
 		}
 		if !IsValidSlug(a.Slug) {
-			return nil, fmt.Errorf("parse %s: slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", path, a.Slug)
+			return nil, fmt.Errorf("parse %s: slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", f.Path, a.Slug)
 		}
 		if a.Title == "" {
-			return nil, fmt.Errorf("parse %s: title is required", path)
+			return nil, fmt.Errorf("parse %s: title is required", f.Path)
 		}
 		//nolint:staticcheck // S1016: the two types share fields by design but are distinct — diskAgent is the wire format, Role is the runtime descriptor; keep them explicitly decoupled so a future field split does not silently coerce.
 		roles = append(roles, Role{

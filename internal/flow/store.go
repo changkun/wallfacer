@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/slugutil"
+	"changkun.de/x/wallfacer/internal/pkg/yamldir"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -36,35 +36,17 @@ type diskStep struct {
 // directory is not an error (no user flows yet is valid);
 // malformed files are fatal so typos don't silently vanish.
 func LoadUserFlows(dir string) ([]Flow, error) {
-	if dir == "" {
-		return nil, nil
-	}
-	entries, err := os.ReadDir(dir)
+	files, err := yamldir.ReadAll("flows", dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read flows dir %s: %w", dir, err)
+		return nil, err
 	}
 	var flows []Flow
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		ext := strings.ToLower(filepath.Ext(name))
-		if ext != ".yaml" && ext != ".yml" {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
-		}
+	for _, file := range files {
 		var f diskFlow
-		if err := yaml.Unmarshal(body, &f); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
+		if err := yaml.Unmarshal(file.Body, &f); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", file.Path, err)
 		}
+		path := file.Path
 		if f.Slug == "" {
 			return nil, fmt.Errorf("parse %s: slug is required", path)
 		}
