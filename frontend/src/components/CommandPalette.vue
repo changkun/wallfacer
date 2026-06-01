@@ -145,6 +145,15 @@ type FlatRow =
   | { kind: 'action'; task: Task; action: ReturnType<typeof taskActions>[number] }
   | { kind: 'doc'; slug: string };
 
+// docMatches must be declared BEFORE flatRows references it — the
+// `<script setup>` compiler keeps the top-level order, so a forward
+// reference produces a TDZ ReferenceError on first eval.
+const docMatches = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  if (!q) return [];
+  return docIndex.filter((d) => d.title.toLowerCase().includes(q) || d.slug.includes(q)).slice(0, 6);
+});
+
 const flatRows = computed<FlatRow[]>(() => {
   const out: FlatRow[] = [];
   for (const s of sections.value) {
@@ -247,12 +256,6 @@ function pick(task: Task) {
   }
   close();
 }
-
-const docMatches = computed(() => {
-  const q = query.value.trim().toLowerCase();
-  if (!q) return [];
-  return docIndex.filter((d) => d.title.toLowerCase().includes(q) || d.slug.includes(q)).slice(0, 6);
-});
 
 function pickDoc(slug: string) {
   router.push({ path: `/docs/${slug}` });
