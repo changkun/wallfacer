@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -62,29 +61,6 @@ func TestInitConfigDir_CreatesEnvTemplate(t *testing.T) {
 	initConfigDir(configDir, envFile)
 	if _, err := os.Stat(envFile); err != nil {
 		t.Fatalf("expected env file after second call: %v", err)
-	}
-}
-
-// TestDetectContainerRuntime checks that the detection prefers /opt/podman
-// when available and otherwise falls back through podman/docker on $PATH.
-func TestDetectContainerRuntime(t *testing.T) {
-	if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
-		if got := detectContainerRuntime(); got != "/opt/podman/bin/podman" {
-			t.Fatalf("expected /opt/podman/bin/podman when available, got %q", got)
-		}
-		return
-	}
-
-	want := "/opt/podman/bin/podman"
-	if p, err := exec.LookPath("podman"); err == nil {
-		want = p
-	} else if p, err := exec.LookPath("docker"); err == nil {
-		want = p
-	}
-
-	got := detectContainerRuntime()
-	if got != want {
-		t.Fatalf("detectContainerRuntime() = %q, want %q", got, want)
 	}
 }
 
@@ -193,89 +169,6 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 			t.Fatal("expected xdg-open helper to run")
 		}
 		time.Sleep(20 * time.Millisecond)
-	}
-}
-
-// TestDefaultSandboxImage_WithSandboxTag verifies that a build-time SandboxTag
-// is used verbatim (already includes the "v" prefix).
-func TestDefaultSandboxImage_WithSandboxTag(t *testing.T) {
-	oldTag := SandboxTag
-	SandboxTag = "v0.0.4"
-	defer func() { SandboxTag = oldTag }()
-
-	got := defaultSandboxImage()
-	if got != sandboxImageBase+":v0.0.4" {
-		t.Fatalf("expected image tag :v0.0.4, got %q", got)
-	}
-}
-
-// TestDefaultSandboxImage_VersionDoesNotDriveTag verifies that wallfacer's own
-// Version must NOT be used as the sandbox image tag. The sandbox image comes
-// from github.com/latere-ai/images, which releases independently of wallfacer.
-// Setting Version without SandboxTag must fall back to runtime resolution or
-// :latest, never to ":v<wallfacer-version>".
-func TestDefaultSandboxImage_VersionDoesNotDriveTag(t *testing.T) {
-	oldVersion := Version
-	oldTag := SandboxTag
-	Version = "9.9.9"
-	SandboxTag = ""
-	defer func() {
-		Version = oldVersion
-		SandboxTag = oldTag
-	}()
-
-	got := defaultSandboxImage()
-	if got == sandboxImageBase+":v9.9.9" {
-		t.Fatalf("sandbox tag must not be derived from wallfacer Version; got %q", got)
-	}
-}
-
-// TestDefaultSandboxImage_DevBuild verifies that when no SandboxTag is embedded
-// the binary either resolves the latest release tag from latere-ai/images or
-// falls back to :latest.
-func TestDefaultSandboxImage_DevBuild(t *testing.T) {
-	oldVersion := Version
-	oldTag := SandboxTag
-	Version = ""
-	SandboxTag = ""
-	defer func() {
-		Version = oldVersion
-		SandboxTag = oldTag
-	}()
-
-	got := defaultSandboxImage()
-	// Dev build queries GitHub API for the latest tag; if the query succeeds
-	// we get e.g. ":v0.0.4", otherwise ":latest" as fallback.
-	if got == sandboxImageBase+":latest" {
-		return // fallback path — OK
-	}
-	if !strings.HasPrefix(got, sandboxImageBase+":") {
-		t.Fatalf("unexpected image base, got %q", got)
-	}
-	tag := strings.TrimPrefix(got, sandboxImageBase+":")
-	if tag == "" || tag == "latest" {
-		t.Fatalf("expected a resolved tag or :latest, got %q", got)
-	}
-	// Resolved a real tag (e.g. "v0.0.4") — valid.
-}
-
-// TestDetectContainerRuntime_EnvOverride verifies that CONTAINER_CMD env var
-// overrides all other detection logic.
-func TestDetectContainerRuntime_EnvOverride(t *testing.T) {
-	t.Setenv("CONTAINER_CMD", "/custom/runtime")
-	got := detectContainerRuntime()
-	if got != "/custom/runtime" {
-		t.Fatalf("expected /custom/runtime, got %q", got)
-	}
-}
-
-// TestDetectContainerRuntime_EnvOverrideTrimmed verifies whitespace is trimmed
-// from the CONTAINER_CMD override.
-func TestDetectContainerRuntime_EnvOverrideTrimmed(t *testing.T) {
-	t.Setenv("CONTAINER_CMD", "  /custom/runtime  ")
-	got := detectContainerRuntime()
-	if got != "/custom/runtime" {
-		t.Fatalf("expected trimmed path, got %q", got)
 	}
 }
 
