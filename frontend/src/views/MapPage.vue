@@ -72,7 +72,16 @@ function onShowArchivedChange(e: Event) {
 }
 
 function onResetClick() {
+  mapSearch.value = '';
   window.resetMapLayout?.();
+}
+
+// Map-mode search: filters graph nodes by label substring via the depgraph
+// lib's setMapSearch hook. This is the spec/depgraph leg of the legacy
+// mode-aware filter routing.
+const mapSearch = ref('');
+function onMapSearchInput() {
+  window.setMapSearch?.(mapSearch.value);
 }
 
 onMounted(async () => {
@@ -138,6 +147,14 @@ watch(specTree, () => rerender(), { deep: false });
           </p>
         </div>
         <div class="depgraph-mode__actions">
+          <input
+            v-model="mapSearch"
+            type="search"
+            class="depgraph-mode__search"
+            placeholder="Filter nodes…"
+            aria-label="Filter graph nodes"
+            @input="onMapSearchInput"
+          />
           <label class="depgraph-mode__option" title="Include archived specs and tasks">
             <input type="checkbox" id="depgraph-show-archived" @change="onShowArchivedChange" />
             Show archived

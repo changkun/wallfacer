@@ -47,7 +47,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] planning-chat — send-mode toggle button (already present PlanningChatPanel.vue:45-61)
 - [x] spec-mode — sidebar collapse/expand persisted on boot (verified: AppLayout wallfacer-sidebar-collapsed)
 - [x] search — `<mark>` highlight markup in results
-- [ ] search — mode-aware filter routing (spec/depgraph/board)
+- [x] search — mode-aware filter routing (board SearchBar, plan tree filter, map depgraph search)
 - [x] docs — prev/next ordered-doc nav links
 - [x] docs — floating table-of-contents sidebar
 - [x] docs — markdown link enhancement (linkHandler:'docs')
