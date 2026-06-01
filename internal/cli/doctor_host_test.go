@@ -20,10 +20,10 @@ func writeFakeCLI(t *testing.T, dir, name, version string) string {
 	return path
 }
 
-// TestRunDoctor_HostMode_BinariesPresent verifies the host-backend readiness
+// TestRunDoctor_BinariesPresent verifies the host-backend readiness
 // block: both binaries resolved, [ok] lines emitted, no image/runtime
 // output.
-func TestRunDoctor_HostMode_BinariesPresent(t *testing.T) {
+func TestRunDoctor_BinariesPresent(t *testing.T) {
 	configDir := t.TempDir()
 	claudePath := writeFakeCLI(t, t.TempDir(), "claude", "claude/1.2.3")
 	codexPath := writeFakeCLI(t, t.TempDir(), "codex", "codex-0.99")
@@ -36,7 +36,7 @@ func TestRunDoctor_HostMode_BinariesPresent(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir, []string{"--backend", "host"})
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "Sandbox backend:   host") {
@@ -61,7 +61,7 @@ func TestRunDoctor_HostMode_BinariesPresent(t *testing.T) {
 	}
 }
 
-func TestRunDoctor_HostMode_ClaudeMissing(t *testing.T) {
+func TestRunDoctor_ClaudeMissing(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	// Explicit bogus claude path; codex intentionally unset.
@@ -70,7 +70,7 @@ func TestRunDoctor_HostMode_ClaudeMissing(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		RunDoctor(configDir, []string{"--backend", "host"})
+		RunDoctor(configDir, nil)
 	})
 
 	if !strings.Contains(out, "[!]") || !strings.Contains(out, "claude") {
@@ -78,26 +78,5 @@ func TestRunDoctor_HostMode_ClaudeMissing(t *testing.T) {
 	}
 	if !strings.Contains(out, "issue(s) found") {
 		t.Errorf("expected issue summary:\n%s", out)
-	}
-}
-
-func TestRunDoctor_ContainerMode_UnchangedOutput(t *testing.T) {
-	// Regression guard: without --backend, doctor still prints the
-	// container-mode banners (Container command + Sandbox image).
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("ANTHROPIC_API_KEY=sk-ant-x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	out := captureStdout(func() {
-		RunDoctor(configDir, nil)
-	})
-
-	if !strings.Contains(out, "Container command:") {
-		t.Errorf("container mode should still print Container command line:\n%s", out)
-	}
-	if !strings.Contains(out, "Sandbox image:") {
-		t.Errorf("container mode should still print Sandbox image line:\n%s", out)
 	}
 }

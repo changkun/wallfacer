@@ -18,19 +18,9 @@ import (
 // It displays configuration paths, checks prerequisites, and reports
 // whether credentials, agent backends, and git are ready. Items marked
 // [!] need attention; [ ] are optional.
-//
-// The --backend flag selects which sandbox backend's readiness to probe:
-// "container" (default) checks the container runtime + cached image;
-// "host" checks the claude / codex CLIs on $PATH (and their versions).
 func RunDoctor(configDir string, args []string) {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-	backendFlag := fs.String("backend", "container", `sandbox backend to check: "container" (default) or "host"`)
 	_ = fs.Parse(args)
-	backend, err := resolveBackendFlag(*backendFlag)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "wallfacer doctor:", err)
-		os.Exit(2)
-	}
 
 	v := Version
 	if v == "" {
@@ -46,12 +36,7 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Printf("Data directory:    %s\n", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
 	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
-	if backend == "host" {
-		fmt.Printf("Sandbox backend:   host (exec claude / codex directly; no container)\n")
-	} else {
-		fmt.Printf("Container command: %s\n", envOrDefault("CONTAINER_CMD", detectContainerRuntime()))
-		fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()))
-	}
+	fmt.Printf("Sandbox backend:   host (exec claude / codex directly; no container)\n")
 	fmt.Println()
 
 	// --- Config directory ---
@@ -124,11 +109,7 @@ func RunDoctor(configDir string, args []string) {
 	printOptionalVar(vals, "CODEX_TITLE_MODEL", "falls back to CODEX_DEFAULT_MODEL")
 
 	fmt.Println()
-	if backend == "host" {
-		issues += checkHostBackend(vals)
-	} else {
-		issues += checkContainerBackend()
-	}
+	issues += checkHostBackend(vals)
 
 	// --- Git ---
 	fmt.Println()
@@ -158,57 +139,6 @@ func printOptionalVar(vals map[string]string, key, fallback string) {
 	} else {
 		fmt.Printf("[ ] %s not set (%s)\n", key, fallback)
 	}
-}
-
-// imageExists reports whether a container image is available locally.
-func imageExists(containerCmd, image string) bool {
-	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()
-	return err == nil && out != ""
-}
-
-// checkContainerBackend probes the container runtime, reports its version,
-// and checks whether the sandbox image is already cached. Returns the
-// number of problems found (0 when all green).
-func checkContainerBackend() int {
-	issues := 0
-	containerCmd := envOrDefault("CONTAINER_CMD", detectContainerRuntime())
-	runtimePath, lookErr := exec.LookPath(containerCmd)
-	if lookErr != nil {
-		fmt.Printf("[!] Container runtime not found: %s\n", containerCmd)
-		fmt.Printf("    Install Podman (https://podman.io) or Docker (https://docker.com),\n")
-		fmt.Printf("    or run `wallfacer doctor --backend host` if you've installed claude / codex directly.\n")
-		issues++
-	} else {
-		out, err := cmdexec.New(runtimePath, "version", "--format", "{{.Client.Version}}").Output()
-		if err != nil {
-			fmt.Printf("[!] Container runtime found (%s) but not responding\n", runtimePath)
-			if strings.Contains(containerCmd, "podman") {
-				fmt.Printf("    Ensure Podman machine is running: podman machine start\n")
-			} else {
-				fmt.Printf("    Ensure Docker Desktop is running.\n")
-			}
-			issues++
-		} else {
-			fmt.Printf("[ok] Container runtime: %s (v%s)\n", runtimePath, out)
-		}
-	}
-
-	// --- Sandbox image ---
-	// The unified sandbox-agents image ships both Claude Code and Codex;
-	// the entrypoint dispatches via WALLFACER_AGENT. A single image check
-	// covers both agent types.
-	if lookErr == nil {
-		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage())
-		switch {
-		case imageExists(runtimePath, image):
-			fmt.Printf("[ok] Sandbox image: %s\n", image)
-		case image != fallbackSandboxImage && imageExists(runtimePath, fallbackSandboxImage):
-			fmt.Printf("[ ] Sandbox image %s not cached (fallback %s available)\n", image, fallbackSandboxImage)
-		default:
-			fmt.Printf("[ ] Sandbox image not cached (will be pulled on first task)\n")
-		}
-	}
-	return issues
 }
 
 // checkHostBackend resolves the claude and codex binaries and probes each
@@ -252,8 +182,8 @@ func checkHostBackend(vals map[string]string) int {
 
 // resolveHostBinary mirrors sandbox.NewHostBackend's resolver, but returns a
 // descriptive error instead of crashing. Used by doctor for readiness
-// reporting so the user sees the same hint they'd get from `wallfacer run
-// --backend host` failing at startup.
+// reporting so the user sees the same hint they'd get from `wallfacer run`
+// failing at startup.
 func resolveHostBinary(explicit, name string) (string, error) {
 	if explicit != "" {
 		if _, err := os.Stat(explicit); err != nil {
