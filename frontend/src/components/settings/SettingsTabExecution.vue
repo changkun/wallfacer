@@ -2,6 +2,39 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { api } from '../../api/client';
 import { useEnvConfig } from '../../composables/useEnvConfig';
+import { useTaskStore } from '../../stores/tasks';
+
+const taskStore = useTaskStore();
+
+// Automation toggles — autopilot, autotest, autosubmit, autosync, autopush.
+// Sourced from /api/config so the source of truth is the server, not the
+// shell env. Mirrors the legacy automation menu (ui/partials/automation-menu).
+type AutomationKey = 'autopilot' | 'autotest' | 'autosubmit' | 'autosync' | 'autopush';
+const AUTOMATION_KEYS: AutomationKey[] = ['autopilot', 'autotest', 'autosubmit', 'autosync', 'autopush'];
+const automationBusy = ref<Record<AutomationKey, boolean>>({
+  autopilot: false, autotest: false, autosubmit: false, autosync: false, autopush: false,
+});
+function automationOn(k: AutomationKey): boolean {
+  const cfg = taskStore.config;
+  return !!(cfg && (cfg as unknown as Record<string, boolean>)[k]);
+}
+async function toggleAutomation(k: AutomationKey) {
+  automationBusy.value[k] = true;
+  try {
+    const next = !automationOn(k);
+    await api('PUT', '/api/config', { [k]: next });
+    await taskStore.fetchConfig();
+  } finally {
+    automationBusy.value[k] = false;
+  }
+}
+const automationLabels: Record<AutomationKey, string> = {
+  autopilot: 'Implement (auto-promote backlog)',
+  autotest: 'Test (run verification automatically)',
+  autosubmit: 'Submit (mark waiting → done once verified)',
+  autosync: 'Catch up (rebase waiting tasks)',
+  autopush: 'Push (auto-push completed commits)',
+};
 
 const { env, fetchEnv, updateEnv } = useEnvConfig();
 
@@ -62,6 +95,7 @@ watch(env, syncFromEnv);
 onMounted(async () => {
   await fetchEnv();
   syncFromEnv();
+  if (!taskStore.config) await taskStore.fetchConfig();
 });
 
 async function saveMaxParallel() {
@@ -163,6 +197,34 @@ async function generateMissingOversight() {
 
 <template>
   <div class="settings-tab-content active" data-settings-tab="execution">
+    <div
+      style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
+    >
+      Automation
+    </div>
+    <div class="automation-grid">
+      <label
+        v-for="k in AUTOMATION_KEYS"
+        :key="k"
+        class="automation-row"
+      >
+        <input
+          type="checkbox"
+          :checked="automationOn(k)"
+          :disabled="automationBusy[k]"
+          @change="toggleAutomation(k)"
+        />
+        <span class="automation-label">{{ automationLabels[k] }}</span>
+        <span v-if="automationBusy[k]" class="automation-hint">saving…</span>
+      </label>
+    </div>
+    <div
+      style="margin: 4px 0 14px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
+    >
+      Each toggle drives one server-side watcher; see docs/guide/automation.md
+      for the full lifecycle and budgets.
+    </div>
+
     <div
       style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
     >
@@ -386,3 +448,27 @@ async function generateMissingOversight() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.automation-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.automation-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.automation-row input[type="checkbox"] { margin: 0; accent-color: var(--accent); }
+.automation-label { flex: 1; }
+.automation-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+</style>
