@@ -602,18 +602,6 @@ describe("_handleSessionsList", () => {
     expect(vm.runInContext('_sessions["s2"]', ctx)).toBeUndefined();
   });
 
-  it("uses container name as tab label (truncated if >24 chars)", () => {
-    const { ctx, tabList } = makeSessionContext();
-    vm.runInContext(
-      '_handleSessionsList([{id:"s1",active:true,container:"my-container-with-a-very-long-name-here"}])',
-      ctx,
-    );
-    const label = tabList.children[0].children.find(
-      (c) => c.className === "terminal-tab__label",
-    );
-    // Should be truncated to 24 chars + ellipsis
-    expect(label.textContent).toBe("my-container-with-a-very\u2026");
-  });
 });
 
 describe("_handleSessionClosed", () => {
@@ -725,7 +713,6 @@ describe("initTerminal", () => {
     const tabBar = makeElement("div");
     const canvas = makeElement("div");
     const addBtn = makeElement("button");
-    const containerBtn = makeElement("button");
     const mockTerm = makeMockTerminal();
     const mockFitAddon = makeMockFitAddon();
 
@@ -735,7 +722,6 @@ describe("initTerminal", () => {
         ["terminal-tab-bar", tabBar],
         ["terminal-canvas", canvas],
         ["terminal-tab-add", addBtn],
-        ["terminal-container-btn", containerBtn],
         ["status-bar-panel", makeElement("div")],
       ],
       _mockTerminal: mockTerm,

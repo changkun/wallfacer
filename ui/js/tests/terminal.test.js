@@ -610,10 +610,10 @@ describe("session wiring", () => {
 });
 
 // ---------------------------------------------------------------------------
-// container sessions
+// session tab labels
 // ---------------------------------------------------------------------------
 
-describe("container sessions", () => {
+describe("session tab labels", () => {
   function makeSessionContext() {
     const dom = makeDom();
     const ctx = loadTerminal(makeContext({ document: dom }));
@@ -622,26 +622,7 @@ describe("container sessions", () => {
     return ctx;
   }
 
-  it("container tab gets container name as label", () => {
-    const ctx = makeSessionContext();
-    const onmessage = ctx._mockWs.onmessage;
-    onmessage({
-      data: JSON.stringify({
-        type: "sessions",
-        sessions: [
-          { id: "s1", active: true, container: "wallfacer-worker-abc123" },
-        ],
-      }),
-    });
-    const tabs = ctx.document._tabList._children;
-    expect(tabs.length).toBe(1);
-    const label = tabs[0]._children.find(
-      (c) => c.className === "terminal-tab__label",
-    );
-    expect(label.textContent).toBe("wallfacer-worker-abc123");
-  });
-
-  it("host session gets Shell N label when no container", () => {
+  it("session gets a Shell N label", () => {
     const ctx = makeSessionContext();
     const onmessage = ctx._mockWs.onmessage;
     onmessage({
@@ -650,47 +631,11 @@ describe("container sessions", () => {
         sessions: [{ id: "s1", active: true }],
       }),
     });
-    const label = ctx.document._tabList._children[0]._children.find(
+    const tabs = ctx.document._tabList._children;
+    expect(tabs.length).toBe(1);
+    const label = tabs[0]._children.find(
       (c) => c.className === "terminal-tab__label",
     );
     expect(label.textContent).toBe("Shell 1");
-  });
-
-  it("long container name is truncated", () => {
-    const ctx = makeSessionContext();
-    const onmessage = ctx._mockWs.onmessage;
-    onmessage({
-      data: JSON.stringify({
-        type: "sessions",
-        sessions: [
-          {
-            id: "s1",
-            active: true,
-            container: "wallfacer-worker-very-long-container-name-here",
-          },
-        ],
-      }),
-    });
-    const label = ctx.document._tabList._children[0]._children.find(
-      (c) => c.className === "terminal-tab__label",
-    );
-    expect(label.textContent.length).toBeLessThanOrEqual(25); // 24 + ellipsis
-  });
-
-  it("create_session with container field is sent when picking", () => {
-    const ctx = makeSessionContext();
-    ctx._mockWs.readyState = 1;
-    // Simulate what the picker click handler does.
-    ctx._mockWs.send(
-      JSON.stringify({
-        type: "create_session",
-        container: "wallfacer-worker-abc",
-      }),
-    );
-    const lastCall =
-      ctx._mockWs.send.mock.calls[ctx._mockWs.send.mock.calls.length - 1][0];
-    const parsed = JSON.parse(lastCall);
-    expect(parsed.type).toBe("create_session");
-    expect(parsed.container).toBe("wallfacer-worker-abc");
   });
 });
