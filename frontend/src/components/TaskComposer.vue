@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { splitBatch, flowAllowsEmptyPrompt } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
+import TemplatePicker from './TemplatePicker.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
@@ -32,7 +33,6 @@ const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform
 const flows = ref<FlowOption[]>([]);
 const flow = ref('implement');
 const templates = ref<PromptTemplate[]>([]);
-const templatePick = ref('');
 // Tag chips: committed tags + a pending draft. comma/Enter commit the draft;
 // Backspace on an empty draft removes the last chip. Mirrors legacy tasks.js.
 const tags = ref<string[]>([]);
@@ -103,12 +103,8 @@ async function loadTemplates() {
   }
 }
 
-function insertTemplate() {
-  const id = templatePick.value;
-  if (!id) return;
-  const tmpl = templates.value.find((t) => t.id === id);
-  templatePick.value = '';
-  if (!tmpl) return;
+function insertTemplate(body: string) {
+  if (!body) return;
   const el = textareaRef.value;
   if (el) {
     const pos = el.selectionStart ?? el.value.length;
@@ -117,14 +113,14 @@ function insertTemplate() {
     // Insert with a leading newline if the cursor isn't at the start of a
     // blank line — keeps the inserted block from glueing onto the prior text.
     const sep = before && !before.endsWith('\n') ? '\n' : '';
-    prompt.value = before + sep + tmpl.body + after;
+    prompt.value = before + sep + body + after;
     nextTick(() => {
-      const newPos = (before + sep + tmpl.body).length;
+      const newPos = (before + sep + body).length;
       el.focus();
       el.setSelectionRange(newPos, newPos);
     });
   } else {
-    prompt.value = prompt.value ? prompt.value + '\n' + tmpl.body : tmpl.body;
+    prompt.value = prompt.value ? prompt.value + '\n' + body : body;
   }
 }
 
@@ -350,15 +346,7 @@ function onInput(e: Event) {
       </label>
       <label v-if="templates.length" class="composer__opt">
         <span class="composer__opt-label">Template</span>
-        <select
-          v-model="templatePick"
-          class="composer__select"
-          aria-label="Insert template"
-          @change="insertTemplate"
-        >
-          <option value="">Insert…</option>
-          <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
-        </select>
+        <TemplatePicker :templates="templates" @select="insertTemplate" />
       </label>
       <button
         type="button"
