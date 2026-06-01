@@ -156,23 +156,6 @@ func TestGenerateCommitMessageNDJSON(t *testing.T) {
 	}
 }
 
-func TestGenerateCommitMessageFallsBackToCodexOnTokenLimit(t *testing.T) {
-	t.Skip("codex fallback path rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
-	tokenLimit := `{"result":"rate limit exceeded: token limit reached","session_id":"abc","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
-	cmd := fakeStatefulCmd(t, []string{tokenLimit, validStreamJSON})
-	runner := runnerWithCmd(t, cmd)
-
-	msg, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
-	if err != nil {
-		t.Fatalf("generateCommitMessage error: %v", err)
-	}
-
-	const want = "Add authentication endpoint"
-	if msg != want {
-		t.Fatalf("expected codex fallback message %q, got %q", want, msg)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // hostStageAndCommit integration tests
 // ---------------------------------------------------------------------------

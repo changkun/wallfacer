@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -378,8 +379,11 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 }
 
 func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
-	t.Skip("commit pipeline spec emits container paths; reinstated in specs/shared/harness-abstraction/claude-and-codex-migration")
 	h := newTestHandler(t)
+	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*sandbox.HostBackend); ok {
+		hb.SetBinaryForTest(sandbox.Claude, "/usr/bin/false")
+		hb.SetBinaryForTest(sandbox.Codex, "/usr/bin/false")
+	}
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)

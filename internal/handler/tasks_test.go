@@ -20,6 +20,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -1300,8 +1301,9 @@ func TestUpdateTask_SetDependsOn_AbsentFieldNoOp(t *testing.T) {
 // lowest-position backlog task when its dependencies are not satisfied, and
 // promotes the next eligible task instead.
 func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
-	t.Skip("host backend caps default parallel to 1; rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	h, _ := newTestHandlerWithEnv(t)
+	h.runner = &runner.MockRunner{Host: false}
+	h.cachedMaxParallel.Invalidate()
 	h.autopilot.Store(true)
 
 	ctx := context.Background()
@@ -2101,7 +2103,6 @@ func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 }
 
 func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing.T) {
-	t.Skip("host backend caps default parallel to 1; rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
@@ -2121,13 +2122,22 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:    cmdPath,
-		Workspaces: []string{repo},
+		Command:          cmdPath,
+		Workspaces:       []string{repo},
+		HostClaudeBinary: cmdPath,
+		HostCodexBinary:  cmdPath,
 	})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 
 	h := NewHandler(s, r, t.TempDir(), []string{repo}, nil)
+	// Host backend caps default parallel to 1; swap in a non-host mock
+	// runner for the cap check so tryAutoPromote isn't artificially gated
+	// here. Production handler still talks to the real runner for the
+	// actual promote action because tryAutoPromote only uses h.runner for
+	// HostMode() via the cached limit.
+	h.runner = &runner.MockRunner{Host: false}
+	h.cachedMaxParallel.Invalidate()
 	h.SetAutopilot(true)
 	ctx := context.Background()
 
@@ -2526,8 +2536,15 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 }
 
 func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
-	t.Skip("commit pipeline spec emits container paths; rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	h := newTestHandler(t)
+	// Point Claude at /bin/false so commit-message generation fails and the
+	// runner falls back to the canned "wallfacer:" message. Without this the
+	// test machine's real claude runs and the assertion races against the
+	// real commit pipeline.
+	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*sandbox.HostBackend); ok {
+		hb.SetBinaryForTest(sandbox.Claude, "/usr/bin/false")
+		hb.SetBinaryForTest(sandbox.Codex, "/usr/bin/false")
+	}
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)
@@ -3718,10 +3735,12 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      cmd,
-		SandboxImage: "test:latest",
-		Workspaces:   []string{repo},
-		WorktreesDir: worktreesDir,
+		Command:          cmd,
+		SandboxImage:     "test:latest",
+		Workspaces:       []string{repo},
+		WorktreesDir:     worktreesDir,
+		HostClaudeBinary: cmd,
+		HostCodexBinary:  cmd,
 	})
 	// Cleanups run LIFO: first drain background goroutines and compaction,
 	// then remove temp directories.
@@ -3734,7 +3753,6 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 }
 
 func TestAutoRetry_ContainerCrash(t *testing.T) {
-	t.Skip("auto-retry fake-cmd path rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
@@ -3777,7 +3795,6 @@ func TestAutoRetry_ContainerCrash(t *testing.T) {
 }
 
 func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
-	t.Skip("auto-retry fake-cmd path rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
@@ -3808,7 +3825,6 @@ func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
 }
 
 func TestAutoRetry_MaxTotalCap(t *testing.T) {
-	t.Skip("auto-retry fake-cmd path rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
