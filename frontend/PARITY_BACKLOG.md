@@ -68,7 +68,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 ## Weaker (present but degraded)
 - [ ] tasks — dependency picker chips w/ remove buttons (vs plain select multiple)
 - [ ] modal-diff — highlight.js syntax coloring in diffs
-- [ ] modal-results — collapse older turns in <details>
+- [x] modal-results — collapse older turns in <details>
 - [ ] modal-logs — impl-vs-test phase log separation
 - [x] git — 409 conflict shows blocking_tasks list, not generic alert
 - [ ] command-palette — context actions: tab-switch jumps (testing/changes/flamegraph/timeline)
