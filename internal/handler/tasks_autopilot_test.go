@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/runner"
 	"github.com/google/uuid"
 
 	"changkun.de/x/wallfacer/internal/constants"
@@ -944,13 +945,14 @@ func TestMaxTestConcurrentTasks_Caching(t *testing.T) {
 // UpdateEnvConfig with a new MaxParallelTasks value invalidates the in-process
 // cache so that the next call to maxConcurrentTasks reflects the new limit.
 func TestUpdateEnvConfig_InvalidatesParallelLimitCache(t *testing.T) {
-	t.Skip("host backend caps default parallel to 1; rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	h, _ := newTestHandlerWithEnv(t)
 
-	// Prime the cache with the default (no env file entry → default 5).
+	// Prime the cache. Host mode caps parallelism to 1 when no explicit
+	// WALLFACER_MAX_PARALLEL is set — the value is what matters for cache
+	// invalidation, not the specific number.
 	initial := h.maxConcurrentTasks()
-	if initial != constants.DefaultMaxConcurrentTasks {
-		t.Fatalf("initial: want %d, got %d", constants.DefaultMaxConcurrentTasks, initial)
+	if initial < 1 {
+		t.Fatalf("initial parallel cap should be positive; got %d", initial)
 	}
 
 	// Call UpdateEnvConfig to change max_parallel_tasks to 9.
@@ -1453,8 +1455,12 @@ func TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError(t *testing.T) {
 // only a single best candidate, causing the promoter to advance one task per
 // 60-second tick even when multiple slots were available.
 func TestTryAutoPromote_PromotesMultipleTasks(t *testing.T) {
-	t.Skip("host backend caps default parallel to 1; rewires in specs/shared/harness-abstraction/claude-and-codex-migration")
 	h := newTestHandler(t)
+	// Host backend caps default parallel to 1 to avoid claude/codex state
+	// races; swap in a non-host runner so this test exercises the
+	// promote-up-to-N path independently of that cap.
+	h.runner = &runner.MockRunner{Host: false}
+	h.cachedMaxParallel.Invalidate()
 	h.SetAutopilot(true)
 
 	ctx := context.Background()
