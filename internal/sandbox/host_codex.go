@@ -137,11 +137,6 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 	return h, nil
 }
 
-// extractPromptAndModelFromClaudeArgv finds the `-p <value>` and optional
-// `--model <value>` in the runner's Cmd slice. Returns ("", "") when -p
-// is missing. Other flags (--verbose, --output-format, --resume) are
-// ignored — codex has no equivalents in exec mode.
-
 // sandboxFast reports whether WALLFACER_SANDBOX_FAST is effectively true.
 // Defaults to true when unset — matching the container-side default.
 func sandboxFast(specEnv map[string]string, childEnv []string) bool {
@@ -157,8 +152,13 @@ func sandboxFast(specEnv map[string]string, childEnv []string) bool {
 }
 
 // codexResultRecord is the Claude-compatible envelope the runner expects as
-// the last NDJSON line. Fields mirror agentOutput in internal/runner.
+// the last NDJSON line. It is a codex-native turn.completed event (not a
+// Claude-shaped record): codex's final assistant message is written to
+// --output-last-message rather than the event stream, so the launcher
+// recovers it from that file and emits it here as the terminal codex
+// event. harness.Codex.ParseEvent maps this to a KindResult.
 type codexResultRecord struct {
+	Type         string     `json:"type"`
 	Result       string     `json:"result"`
 	SessionID    string     `json:"session_id"`
 	StopReason   string     `json:"stop_reason"`
@@ -203,7 +203,7 @@ func teeCodexAndAppendResult(codexStdout io.Reader, out *io.PipeWriter, lastMsgF
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	record := codexResultRecord{StopReason: "end_turn"}
+	record := codexResultRecord{Type: "turn.completed", StopReason: "end_turn"}
 	hadStdout := false
 
 	scanner := bufio.NewScanner(codexStdout)
