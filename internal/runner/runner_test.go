@@ -101,7 +101,15 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 
 func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	t.Helper()
-	runner.command = fakeCmdScript(t, `{"result":"wallfacer: generated commit","session_id":"abc123","stop_reason":"end_turn","is_error":false}`, 0)
+	cmd := fakeCmdScript(t, `{"result":"wallfacer: generated commit","session_id":"abc123","stop_reason":"end_turn","is_error":false}`, 0)
+	runner.command = cmd
+	// Host backend resolved Claude/Codex binaries at construction; swap
+	// them to the fake script so commit-message generation does not shell
+	// out to the real CLI.
+	if hb, ok := runner.backend.(*sandbox.HostBackend); ok {
+		hb.SetBinaryForTest(sandbox.Claude, cmd)
+		hb.SetBinaryForTest(sandbox.Codex, cmd)
+	}
 }
 
 // newTestRunnerWithInstructions creates a Runner whose instructionsPath points
@@ -148,28 +156,12 @@ func hostPath(path, runtimeBin string) string {
 // TestContainerArgsMountsCLAUDEMD verifies that when instructionsPath is set
 // and the file exists, buildContainerArgs includes a read-only volume mount
 // that places it at /workspace/CLAUDE.md inside the container.
-func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	runner := newTestRunnerWithInstructions(t, instructionsFile)
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
-	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("args should contain --mount %q; got: %v", expectedMount, args)
-	}
-}
 
 // TestContainerArgsNoInstructionsPath verifies that when InstructionsPath is
 // empty no CLAUDE.md mount is added to the container args.
 func TestContainerArgsNoInstructionsPath(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
 	for _, a := range args {
 		if strings.Contains(a, "CLAUDE.md") {
 			t.Fatalf("expected no CLAUDE.md mount when InstructionsPath is empty; got arg: %q", a)
@@ -184,7 +176,6 @@ func TestContainerArgsMissingInstructionsFile(t *testing.T) {
 	missingPath := filepath.Join(t.TempDir(), "nonexistent.md")
 	runner := newTestRunnerWithInstructions(t, missingPath)
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
 	for _, a := range args {
 		if strings.Contains(a, "CLAUDE.md") {
 			t.Fatalf("expected no CLAUDE.md mount for missing file; got arg: %q", a)
@@ -194,153 +185,19 @@ func TestContainerArgsMissingInstructionsFile(t *testing.T) {
 
 // TestContainerArgsCLAUDEMDMountIsReadOnly verifies the mount is marked :ro
 // so the container cannot accidentally modify the shared instructions file.
-func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("content"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	runner := newTestRunnerWithInstructions(t, instructionsFile)
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
-	for i, a := range args {
-		if a == "--mount" && i+1 < len(args) && strings.Contains(args[i+1], "CLAUDE.md") {
-			mount := args[i+1]
-			if !strings.Contains(mount, "readonly") {
-				t.Fatalf("CLAUDE.md mount should be read-only, got: %q", mount)
-			}
-			return
-		}
-	}
-	t.Fatal("CLAUDE.md --mount not found in args")
-}
 
 // TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo verifies that when
 // there is exactly one workspace, CLAUDE.md is mounted inside the repo directory
 // (/workspace/<repo>/CLAUDE.md) so the agent stays anchored to the repo root
 // rather than treating /workspace/ as the project root.
-func TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	ws := t.TempDir()
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
-		InstructionsPath: instructionsFile,
-		Workspaces:       []string{ws},
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
-	basename := filepath.Base(ws)
-	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/" + basename + "/CLAUDE.md," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/%s/CLAUDE.md; got args: %v", basename, args)
-	}
-
-	// Must NOT be mounted at the workspace root.
-	rootMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
-	if containsConsecutive(args, "--mount", rootMount) {
-		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/CLAUDE.md")
-	}
-}
 
 // TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace verifies that when
 // there are multiple workspaces, CLAUDE.md is mounted at /workspace/CLAUDE.md
 // (the CWD for multi-workspace mode).
-func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	ws1 := t.TempDir()
-	ws2 := t.TempDir()
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
-		InstructionsPath: instructionsFile,
-		Workspaces:       []string{ws1, ws2},
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
-	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("multi workspace: CLAUDE.md should be at /workspace/CLAUDE.md; got args: %v", args)
-	}
-}
 
 // TestContainerArgsCodexMountsAGENTSMD verifies that codex sandbox mounts
 // workspace instructions at /workspace/AGENTS.md.
-func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
 
-	runner := newTestRunnerWithInstructions(t, instructionsFile)
-	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
-
-	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/AGENTS.md," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("codex sandbox: AGENTS.md should be mounted at /workspace/AGENTS.md; got args: %v", args)
-	}
-}
-
-func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	codexAuthDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt"}`), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
-		InstructionsPath: instructionsFile,
-		CodexAuthPath:    codexAuthDir,
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
-
-	expectedMount := "type=bind,src=" + hostPath(filepath.Join(codexAuthDir, "auth.json"), "podman") + ",dst=/home/agent/.codex/auth.json," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("codex sandbox: expected host codex auth.json mount %q; got args: %v", expectedMount, args)
-	}
-}
 
 func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
@@ -353,7 +210,6 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-
 	runner := NewRunner(s, RunnerConfig{
 		Command:          "podman",
 		SandboxImage:     "sandbox-agents:latest",
@@ -361,7 +217,6 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 	})
 	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
-
 	found := false
 	for _, a := range args {
 		if a == "sandbox-agents:latest" {
@@ -385,7 +240,6 @@ func TestHostCodexAuthStatus_Valid(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-
 	r := NewRunner(s, RunnerConfig{CodexAuthPath: codexAuthDir})
 	t.Cleanup(func() { r.Shutdown() })
 	ok, reason := r.HostCodexAuthStatus(time.Now())
@@ -405,7 +259,6 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-
 	r := NewRunner(s, RunnerConfig{CodexAuthPath: codexAuthDir})
 	t.Cleanup(func() { r.Shutdown() })
 	ok, _ := r.HostCodexAuthStatus(time.Now())
@@ -417,52 +270,6 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 // TestContainerArgsCLAUDEMDMountPosition verifies that the CLAUDE.md mount
 // appears before the image name in the args list, matching the expected
 // container launch order.
-func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("content"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	ws := t.TempDir()
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
-		InstructionsPath: instructionsFile,
-		Workspaces:       []string{ws},
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
-
-	claudeMDIdx := -1
-	imageIdx := -1
-	for i, a := range args {
-		if strings.Contains(a, "CLAUDE.md") {
-			claudeMDIdx = i
-		}
-		if a == "sandbox-agents:latest" {
-			imageIdx = i
-		}
-	}
-
-	if claudeMDIdx == -1 {
-		t.Fatal("CLAUDE.md mount not found in args")
-	}
-	if imageIdx == -1 {
-		t.Fatal("sandbox image not found in args")
-	}
-	if claudeMDIdx >= imageIdx {
-		t.Fatalf("CLAUDE.md mount (index %d) should appear before sandbox image (index %d)",
-			claudeMDIdx, imageIdx)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Board context mounts
@@ -470,16 +277,6 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 
 // TestBuildContainerArgs_BoardMount verifies that a non-empty boardDir adds
 // a read-only mount at /workspace/.tasks.
-func TestBuildContainerArgs_BoardMount(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	runner := newTestRunnerWithInstructions(t, "")
-	boardDir := t.TempDir()
-	args := runner.buildContainerArgs("name", "", "prompt", "", nil, boardDir, nil, "")
-	expected := "type=bind,src=" + hostPath(boardDir, "podman") + ",dst=/workspace/.tasks," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expected) {
-		t.Fatalf("expected board mount %q in args; got: %v", expected, args)
-	}
-}
 
 // TestBuildContainerArgs_NoBoardMount verifies that an empty boardDir does
 // not add a .tasks mount.
@@ -495,19 +292,6 @@ func TestBuildContainerArgs_NoBoardMount(t *testing.T) {
 
 // TestBuildContainerArgs_SiblingMounts verifies that sibling worktree mounts
 // are added as read-only volumes under /workspace/.tasks/worktrees/.
-func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	runner := newTestRunnerWithInstructions(t, "")
-	siblingDir := t.TempDir()
-	siblingMounts := map[string]map[string]string{
-		"abcd1234": {"/home/user/myrepo": siblingDir},
-	}
-	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", siblingMounts, "")
-	expected := "type=bind,src=" + hostPath(siblingDir, "podman") + ",dst=/workspace/.tasks/worktrees/abcd1234/myrepo," + expectedBuildROSuffix()
-	if !containsConsecutive(args, "--mount", expected) {
-		t.Fatalf("expected sibling mount %q in args; got: %v", expected, args)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Data race regression: workspace mounts survive concurrent snapshot updates
@@ -518,93 +302,6 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 // applyWorkspaceSnapshot is called concurrently. Before the fix, the
 // container spec builder read r.workspaces without storeMu, which could
 // produce zero workspace mounts during a workspace switch.
-func TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate(t *testing.T) {
-	t.Skip("container-mode mount assertion; dead after specs/shared/host-default")
-	ws1 := t.TempDir()
-	ws2 := t.TempDir()
-	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	// Start with ws1 only.
-	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		SandboxImage:     "sandbox-agents:latest",
-		InstructionsPath: instructionsFile,
-		Workspaces:       []string{ws1},
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-
-	// Concurrently update workspace snapshot while building container args.
-	// Without the fix (unprotected r.workspaces read), the race detector
-	// would flag this and the args could sporadically miss workspace mounts.
-	dataDir2 := t.TempDir()
-	s2, err := store.NewFileStore(dataDir2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s2.Close() })
-
-	var wg sync.WaitGroup
-	const iterations = 50
-
-	// Writer: repeatedly switch between workspace sets.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := range iterations {
-			if i%2 == 0 {
-				runner.applyWorkspaceSnapshot(workspace.Snapshot{
-					Store:            s2,
-					Key:              "two-ws",
-					Workspaces:       []string{ws1, ws2},
-					InstructionsPath: instructionsFile,
-				})
-			} else {
-				runner.applyWorkspaceSnapshot(workspace.Snapshot{
-					Store:            s,
-					Key:              "one-ws",
-					Workspaces:       []string{ws1},
-					InstructionsPath: instructionsFile,
-				})
-			}
-		}
-	}()
-
-	// Reader: build container args and verify workspace mounts are never empty.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for range iterations {
-			args := runner.buildContainerArgs("test", "", "prompt", "", nil, "", nil, "")
-
-			// Count workspace mounts by looking for /workspace/<basename> patterns.
-			mountCount := 0
-			for _, a := range args {
-				if strings.HasPrefix(a, "type=bind,") && strings.Contains(a, "dst=/workspace/") {
-					// Exclude /workspace/CLAUDE.md — that's the instructions mount.
-					if !strings.Contains(a, "CLAUDE.md") && !strings.Contains(a, ".tasks") {
-						mountCount++
-					}
-				}
-			}
-			if mountCount == 0 {
-				t.Errorf("container args have zero workspace mounts; args: %v", args)
-				return
-			}
-		}
-	}()
-
-	wg.Wait()
-}
 
 // ---------------------------------------------------------------------------
 // Worktree management
@@ -615,34 +312,28 @@ func TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate(t *testing.T) {
 func TestWorktreeSetup(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
-
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
 	if err != nil {
 		t.Fatal("setupWorktrees:", err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
-
 	if len(worktreePaths) != 1 {
 		t.Fatalf("expected 1 worktree, got %d", len(worktreePaths))
 	}
-
 	wt := worktreePaths[repo]
 	if wt == "" {
 		t.Fatal("missing worktree path for repo")
 	}
-
 	// Verify worktree directory exists.
 	if info, err := os.Stat(wt); err != nil || !info.IsDir() {
 		t.Fatalf("worktree dir should exist: %v", err)
 	}
-
 	// Verify worktree is on the correct branch.
 	branch := gitRun(t, wt, "branch", "--show-current")
 	if branch != branchName {
 		t.Fatalf("expected branch %q, got %q", branchName, branch)
 	}
-
 	// Verify parent files are visible.
 	if _, err := os.Stat(filepath.Join(wt, "README.md")); err != nil {
 		t.Fatal("README.md should exist in worktree:", err)
@@ -655,33 +346,28 @@ func TestWorktreeSetup(t *testing.T) {
 func TestWorktreeGitFilePointsToHost(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
-
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
 	if err != nil {
 		t.Fatal("setupWorktrees:", err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
-
 	wt := worktreePaths[repo]
 	gitFile := filepath.Join(wt, ".git")
 	content, err := os.ReadFile(gitFile)
 	if err != nil {
 		t.Fatal("reading .git file:", err)
 	}
-
 	// The .git file contains "gitdir: /absolute/host/path/..."
 	s := strings.TrimSpace(string(content))
 	if !strings.HasPrefix(s, "gitdir: ") {
 		t.Fatalf("unexpected .git file content: %s", s)
 	}
 	gitdirPath := strings.TrimPrefix(s, "gitdir: ")
-
 	// Verify it's an absolute host path (which would NOT exist inside a container).
 	if !filepath.IsAbs(gitdirPath) {
 		t.Fatal("expected absolute path in .git file, got:", gitdirPath)
 	}
-
 	// Verify the path exists on the host.
 	if _, err := os.Stat(gitdirPath); err != nil {
 		t.Fatal("gitdir path should exist on host:", err)
@@ -691,25 +377,20 @@ func TestWorktreeGitFilePointsToHost(t *testing.T) {
 // TestHostStageAndCommit verifies that host-side staging and committing works
 // correctly in a worktree.
 func TestHostStageAndCommit(t *testing.T) {
-	t.Skip("commit pipeline spec emits container paths; reinstated in specs/shared/harness-abstraction/claude-and-codex-migration")
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
-
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
-
 	wt := worktreePaths[repo]
-
 	// Simulate Claude making changes.
 	if err := os.WriteFile(filepath.Join(wt, "hello.txt"), []byte("hello world\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Run host-side commit.
 	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Add hello world file")
 	if err != nil {
@@ -718,13 +399,11 @@ func TestHostStageAndCommit(t *testing.T) {
 	if !committed {
 		t.Fatal("expected commit to be created")
 	}
-
 	// Verify commit exists in worktree on the task branch.
 	log := gitRun(t, wt, "log", "--oneline")
 	if !strings.Contains(log, "wallfacer:") {
 		t.Fatalf("expected wallfacer commit message, got:\n%s", log)
 	}
-
 	// Verify the commit is on the task branch, not on main.
 	branch := gitRun(t, wt, "branch", "--show-current")
 	if branch != branchName {
@@ -737,14 +416,12 @@ func TestHostStageAndCommit(t *testing.T) {
 func TestHostStageAndCommitNoChanges(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
-
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
-
 	// No changes made — commit should be a no-op.
 	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Nothing to do")
 	if err != nil {
@@ -762,20 +439,16 @@ func TestHostStageAndCommitNoChanges(t *testing.T) {
 // TestCommitPipelineBasic tests the full commit pipeline (Phase 1-3):
 // host commit → rebase → ff-merge → cleanup.
 func TestCommitPipelineBasic(t *testing.T) {
-	t.Skip("commit pipeline spec emits container paths; reinstated in specs/shared/harness-abstraction/claude-and-codex-migration")
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
-
 	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
-
 	// Create a task.
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add a greeting file", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Set up worktrees (simulates what Run() does when task starts).
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
@@ -787,25 +460,20 @@ func TestCommitPipelineBasic(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wt := worktreePaths[repo]
-
 	// Simulate Claude making changes in the worktree.
 	if err := os.WriteFile(filepath.Join(wt, "greeting.txt"), []byte("Hello, World!\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Run the commit pipeline.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 	// Verify a new commit exists on the default branch.
 	finalHash := gitRun(t, repo, "rev-parse", "HEAD")
 	if finalHash == initialHash {
 		t.Fatal("expected new commit on default branch, but HEAD hasn't changed")
 	}
-
 	// Verify the file exists in the main repo's working tree.
 	content, err := os.ReadFile(filepath.Join(repo, "greeting.txt"))
 	if err != nil {
@@ -814,13 +482,11 @@ func TestCommitPipelineBasic(t *testing.T) {
 	if string(content) != "Hello, World!\n" {
 		t.Fatalf("unexpected content: %q", content)
 	}
-
 	// Verify the commit message references the task.
 	log := gitRun(t, repo, "log", "--oneline")
 	if !strings.Contains(log, "wallfacer:") {
 		t.Fatalf("expected wallfacer commit in log:\n%s", log)
 	}
-
 	// Verify worktree is cleaned up.
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Fatal("worktree should have been cleaned up after commit pipeline")
@@ -834,13 +500,11 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
-
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add feature", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Set up worktrees.
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
@@ -852,33 +516,27 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wt := worktreePaths[repo]
-
 	// Simulate Claude making changes in the worktree.
 	if err := os.WriteFile(filepath.Join(wt, "feature.txt"), []byte("new feature\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Meanwhile, advance the default branch in the main repo.
 	if err := os.WriteFile(filepath.Join(repo, "other.txt"), []byte("other change\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "other change on main")
-
 	// Run the commit pipeline.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 	// Verify BOTH files exist on main (task changes rebased on top of main).
 	for _, f := range []string{"feature.txt", "other.txt"} {
 		if _, err := os.Stat(filepath.Join(repo, f)); err != nil {
 			t.Fatalf("%s should exist on main: %v", f, err)
 		}
 	}
-
 	// Verify the task commit is on top of the other commit.
 	log := gitRun(t, repo, "log", "--oneline")
 	lines := strings.Split(log, "\n")
@@ -893,13 +551,11 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 func TestCommitPipelineNoChanges(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
-
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "No changes task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -910,13 +566,10 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
-
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 	// There should be no new commits at all.
 	currentHash := gitRun(t, repo, "rev-parse", "HEAD")
 	if currentHash != initialHash {
@@ -932,19 +585,15 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 //  3. Call the Commit pipeline (as CompleteTask handler would)
 //  4. Verify that the changes end up on the default branch
 func TestCompleteTaskE2E(t *testing.T) {
-	t.Skip("commit pipeline spec emits container paths; reinstated in specs/shared/harness-abstraction/claude-and-codex-migration")
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
-
 	ctx := context.Background()
-
 	// Step 1: Create the task.
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add greeting feature", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Step 2: Simulate task going to in_progress → worktree is created.
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
@@ -961,26 +610,21 @@ func TestCompleteTaskE2E(t *testing.T) {
 	if err := s.UpdateTaskResult(ctx, task.ID, result, sessionID, "", 1); err != nil {
 		t.Fatal(err)
 	}
-
 	// Step 3: Simulate Claude making changes in the worktree during execution.
 	wt := worktreePaths[repo]
 	if err := os.WriteFile(filepath.Join(wt, "greeting.txt"), []byte("Hello from wallfacer!\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Step 4: Task goes to waiting (Claude needs feedback).
 	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
 		t.Fatal(err)
 	}
-
 	// Step 5: User clicks "Mark as Done" — this triggers Commit.
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	// Run the exact same code path as CompleteTask handler.
 	_ = runner.Commit(task.ID, sessionID)
-
 	// Step 6: Verify the changes are on the default branch.
 	content, err := os.ReadFile(filepath.Join(repo, "greeting.txt"))
 	if err != nil {
@@ -989,13 +633,11 @@ func TestCompleteTaskE2E(t *testing.T) {
 	if string(content) != "Hello from wallfacer!\n" {
 		t.Fatalf("unexpected content: %q", content)
 	}
-
 	// Verify commit is on the default branch.
 	log := gitRun(t, repo, "log", "--oneline")
 	if !strings.Contains(log, "wallfacer:") {
 		t.Fatalf("expected wallfacer commit on default branch:\n%s", log)
 	}
-
 	// Verify worktree is cleaned up.
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Fatal("worktree should have been cleaned up")
@@ -1009,13 +651,11 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
-
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task on stale branch", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Create worktree (branches from current HEAD of main).
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
@@ -1027,39 +667,31 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wt := worktreePaths[repo]
-
 	// Make changes in the worktree.
 	if err := os.WriteFile(filepath.Join(wt, "task-file.txt"), []byte("from task\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Advance main with TWO commits (simulating other tasks completing).
 	if err := os.WriteFile(filepath.Join(repo, "advance1.txt"), []byte("advance 1\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "advance main 1")
-
 	if err := os.WriteFile(filepath.Join(repo, "advance2.txt"), []byte("advance 2\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "advance main 2")
-
 	mainHashBefore := gitRun(t, repo, "rev-parse", "HEAD")
-
 	// Run the commit pipeline.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 	// Verify the task commit is a descendant of the latest main.
 	if _, err := gitRunMayFail(repo, "merge-base", "--is-ancestor", mainHashBefore, "HEAD"); err != nil {
 		t.Fatal("task commit should be on top of latest main (rebase should have applied)")
 	}
-
 	// Verify all files exist.
 	for _, f := range []string{"task-file.txt", "advance1.txt", "advance2.txt"} {
 		if _, err := os.Stat(filepath.Join(repo, f)); err != nil {
@@ -1076,7 +708,6 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
-
 	// Create two tasks.
 	taskA, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add file A", Timeout: 5})
 	if err != nil {
@@ -1086,7 +717,6 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Set up worktrees for both (simulating two tasks starting at the same time).
 	wtA, brA, err := runner.setupWorktrees(taskA.ID)
 	if err != nil {
@@ -1098,7 +728,6 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wtB, brB, err := runner.setupWorktrees(taskB.ID)
 	if err != nil {
 		t.Fatal("setup worktree B:", err)
@@ -1109,7 +738,6 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	// Both worktrees should exist and be on different branches.
 	pathA := wtA[repo]
 	pathB := wtB[repo]
@@ -1121,7 +749,6 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if branchA == branchB {
 		t.Fatal("worktree branches should differ")
 	}
-
 	// Simulate Claude making changes in each worktree.
 	if err := os.WriteFile(filepath.Join(pathA, "fileA.txt"), []byte("from task A\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -1129,22 +756,18 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(pathB, "fileB.txt"), []byte("from task B\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Commit task A first.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
-
 	// Then commit task B — must rebase on top of A's merge.
 	_ = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
-
 	// Verify both files exist on main.
 	for _, f := range []string{"fileA.txt", "fileB.txt"} {
 		if _, err := os.Stat(filepath.Join(repo, f)); err != nil {
 			t.Fatalf("%s should exist on main: %v", f, err)
 		}
 	}
-
 	// Verify linear history: B's commit is on top of A's.
 	// Expect 3 commits: initial + task A + task B (progress log was removed).
 	log := gitRun(t, repo, "log", "--oneline")
@@ -1152,7 +775,6 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if len(lines) < 3 {
 		t.Fatalf("expected at least 3 commits for two tasks, got %d:\n%s", len(lines), log)
 	}
-
 	// Verify no merge commits (all fast-forward).
 	mergeCount := gitRun(t, repo, "rev-list", "--merges", "--count", "HEAD")
 	if mergeCount != "0" {
@@ -1169,12 +791,10 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repoX, repoY})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
-
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Change both repos", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	wtPaths, brName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -1185,11 +805,9 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	if len(wtPaths) != 2 {
 		t.Fatalf("expected 2 worktrees (one per repo), got %d", len(wtPaths))
 	}
-
 	// Make changes in both worktrees.
 	if err := os.WriteFile(filepath.Join(wtPaths[repoX], "x.txt"), []byte("X\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -1197,11 +815,9 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(wtPaths[repoY], "y.txt"), []byte("Y\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, wtPaths, brName)
-
 	// Verify each file landed in the correct repo.
 	if _, err := os.Stat(filepath.Join(repoX, "x.txt")); err != nil {
 		t.Fatal("x.txt should exist in repoX:", err)
@@ -1226,7 +842,6 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
-
 	taskA, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add line to README", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
@@ -1235,7 +850,6 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	wtA, brA, err := runner.setupWorktrees(taskA.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -1246,7 +860,6 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wtB, brB, err := runner.setupWorktrees(taskB.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -1257,10 +870,8 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	pathA := wtA[repo]
 	pathB := wtB[repo]
-
 	// Task A: append to README.md.
 	readmeA, err := os.ReadFile(filepath.Join(pathA, "README.md"))
 	if err != nil {
@@ -1269,20 +880,16 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(pathA, "README.md"), append(readmeA, []byte("\nLine from task A\n")...), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Task B: create a NEW file (non-conflicting with A's README change).
 	if err := os.WriteFile(filepath.Join(pathB, "b_feature.txt"), []byte("feature B\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Commit A first.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
-
 	// Commit B — rebase should succeed since changes don't conflict.
 	_ = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
-
 	// Verify A's README change persists after B's merge.
 	readmeFinal, err := os.ReadFile(filepath.Join(repo, "README.md"))
 	if err != nil {
@@ -1291,7 +898,6 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if !strings.Contains(string(readmeFinal), "Line from task A") {
 		t.Fatalf("README.md should contain A's changes after B merged:\n%s", readmeFinal)
 	}
-
 	// Verify B's file exists.
 	if _, err := os.Stat(filepath.Join(repo, "b_feature.txt")); err != nil {
 		t.Fatal("b_feature.txt should exist:", err)
@@ -1306,17 +912,13 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 func TestSetupWorktreesRecreatesMissingDir(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
-
 	taskID := uuid.New()
-
 	// First call: creates the worktree directory and branch.
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
 	if err != nil {
 		t.Fatal("initial setupWorktrees:", err)
 	}
-
 	wt := worktreePaths[repo]
-
 	// Simulate Claude making changes and committing in the worktree.
 	if err := os.WriteFile(filepath.Join(wt, "change.txt"), []byte("work in progress\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -1324,7 +926,6 @@ func TestSetupWorktreesRecreatesMissingDir(t *testing.T) {
 	gitRun(t, wt, "add", ".")
 	gitRun(t, wt, "commit", "-m", "task: add change.txt")
 	commitBefore := gitRun(t, wt, "rev-parse", "HEAD")
-
 	// Simulate the worktree directory being deleted (e.g. server restart).
 	if err := os.RemoveAll(wt); err != nil {
 		t.Fatal("remove worktree dir:", err)
@@ -1332,13 +933,11 @@ func TestSetupWorktreesRecreatesMissingDir(t *testing.T) {
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Fatal("worktree dir should be gone after RemoveAll")
 	}
-
 	// The git branch must still exist in the repo (it lives in .git/refs).
 	branches, _ := gitRunMayFail(repo, "branch", "--list", branchName)
 	if !strings.Contains(branches, branchName) {
 		t.Fatalf("branch %s should still exist in repo even after dir removal", branchName)
 	}
-
 	// Second call with the same taskID: must recreate the directory by
 	// checking out the existing branch (not with -b, which would fail).
 	worktreePaths2, branchName2, err := runner.setupWorktrees(taskID)
@@ -1346,34 +945,28 @@ func TestSetupWorktreesRecreatesMissingDir(t *testing.T) {
 		t.Fatalf("setupWorktrees after dir deletion: %v", err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths2, branchName2) })
-
 	if branchName2 != branchName {
 		t.Fatalf("branch name changed: want %q, got %q", branchName, branchName2)
 	}
-
 	wt2 := worktreePaths2[repo]
 	if wt2 != wt {
 		t.Fatalf("worktree path changed: want %q, got %q", wt, wt2)
 	}
-
 	// Verify directory was recreated.
 	if info, err := os.Stat(wt2); err != nil || !info.IsDir() {
 		t.Fatal("worktree dir should exist after recreation:", err)
 	}
-
 	// Verify we are on the correct branch.
 	branch := gitRun(t, wt2, "branch", "--show-current")
 	if branch != branchName {
 		t.Fatalf("expected branch %q after recreation, got %q", branchName, branch)
 	}
-
 	// The previous commit must be preserved — we checked out the existing
 	// branch, not a fresh one from HEAD.
 	commitAfter := gitRun(t, wt2, "rev-parse", "HEAD")
 	if commitAfter != commitBefore {
 		t.Fatalf("commit should be preserved: want %q, got %q", commitBefore, commitAfter)
 	}
-
 	// The file committed before the dir was deleted must be visible.
 	if _, err := os.Stat(filepath.Join(wt2, "change.txt")); err != nil {
 		t.Fatal("change.txt should exist in recreated worktree:", err)
@@ -1386,13 +979,11 @@ func TestSetupWorktreesRecreatesMissingDir(t *testing.T) {
 func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
-
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test feedback resume", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Simulate task going in_progress: create worktrees and persist paths.
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
@@ -1401,9 +992,7 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-
 	wt := worktreePaths[repo]
-
 	// Simulate Claude making progress before going to waiting.
 	if err := os.WriteFile(filepath.Join(wt, "partial.txt"), []byte("partial work\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -1411,18 +1000,15 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	gitRun(t, wt, "add", ".")
 	gitRun(t, wt, "commit", "-m", "task: partial work")
 	commitOnBranch := gitRun(t, wt, "rev-parse", "HEAD")
-
 	// Task goes to waiting; worktree directory is still on disk at this point.
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
-
 	// ---- Server restart simulation ----
 	// The worktree directory disappears but task.json retains WorktreePaths.
 	if err := os.RemoveAll(wt); err != nil {
 		t.Fatal(err)
 	}
-
 	// Reload the task from the store to confirm WorktreePaths is still set.
 	reloaded, err := s.GetTask(ctx, task.ID)
 	if err != nil {
@@ -1434,7 +1020,6 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	if _, statErr := os.Stat(reloaded.WorktreePaths[repo]); !os.IsNotExist(statErr) {
 		t.Fatal("worktree directory should be gone from disk")
 	}
-
 	// Replicate the needSetup detection logic from runner.go Run():
 	// if any stored path is missing, call setupWorktrees again.
 	needSetup := false
@@ -1447,7 +1032,6 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	if !needSetup {
 		t.Fatal("needSetup should be true when a stored path is missing")
 	}
-
 	// Calling setupWorktrees must succeed and recreate the directory on the
 	// existing branch — this is what the fixed Run() does.
 	newPaths, newBranch, err := runner.setupWorktrees(task.ID)
@@ -1455,22 +1039,18 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 		t.Fatalf("setupWorktrees after simulated restart: %v", err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(task.ID, newPaths, newBranch) })
-
 	newWt := newPaths[repo]
-
 	// Verify the recreated worktree is on the correct branch.
 	branch := gitRun(t, newWt, "branch", "--show-current")
 	if branch != branchName {
 		t.Fatalf("expected branch %q, got %q", branchName, branch)
 	}
-
 	// Verify the commit made before the restart is still there.
 	commitAfter := gitRun(t, newWt, "rev-parse", "HEAD")
 	if commitAfter != commitOnBranch {
 		t.Fatalf("commit should be preserved after worktree recreation: want %q, got %q",
 			commitOnBranch, commitAfter)
 	}
-
 	// Verify the file is accessible (the worktree is fully functional).
 	if _, err := os.Stat(filepath.Join(newWt, "partial.txt")); err != nil {
 		t.Fatal("partial.txt should be present in the recreated worktree:", err)
@@ -1482,35 +1062,28 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 func TestParallelWorktreeIsolation(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
-
 	taskA := uuid.New()
 	taskB := uuid.New()
-
 	wtA, brA, err := runner.setupWorktrees(taskA)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskA, wtA, brA) })
-
 	wtB, brB, err := runner.setupWorktrees(taskB)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { runner.cleanupWorktrees(taskB, wtB, brB) })
-
 	pathA := wtA[repo]
 	pathB := wtB[repo]
-
 	// Write a file in worktree A.
 	if err := os.WriteFile(filepath.Join(pathA, "secret_a.txt"), []byte("only A\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Write a file in worktree B.
 	if err := os.WriteFile(filepath.Join(pathB, "secret_b.txt"), []byte("only B\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Files should NOT be visible across worktrees.
 	if _, err := os.Stat(filepath.Join(pathA, "secret_b.txt")); err == nil {
 		t.Fatal("secret_b.txt should NOT be visible in worktree A")
@@ -1518,7 +1091,6 @@ func TestParallelWorktreeIsolation(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(pathB, "secret_a.txt")); err == nil {
 		t.Fatal("secret_a.txt should NOT be visible in worktree B")
 	}
-
 	// Files should NOT be visible in the main repo.
 	if _, err := os.Stat(filepath.Join(repo, "secret_a.txt")); err == nil {
 		t.Fatal("secret_a.txt should NOT be visible in main repo before merge")
@@ -1540,7 +1112,6 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
-
 	// Create two tasks.
 	taskA, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Concurrent file A", Timeout: 5})
 	if err != nil {
@@ -1550,7 +1121,6 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Set up worktrees for both (branching from the same HEAD).
 	wtA, brA, err := runner.setupWorktrees(taskA.ID)
 	if err != nil {
@@ -1562,7 +1132,6 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wtB, brB, err := runner.setupWorktrees(taskB.ID)
 	if err != nil {
 		t.Fatal("setup worktree B:", err)
@@ -1573,10 +1142,8 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	pathA := wtA[repo]
 	pathB := wtB[repo]
-
 	// Simulate non-conflicting changes in each worktree.
 	if err := os.WriteFile(filepath.Join(pathA, "concA.txt"), []byte("from concurrent A\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -1584,11 +1151,9 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(pathB, "concB.txt"), []byte("from concurrent B\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Commit both concurrently.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-
 	var wg sync.WaitGroup
 	var errA, errB error
 	wg.Add(2)
@@ -1601,21 +1166,18 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 		errB = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
 	}()
 	wg.Wait()
-
 	if errA != nil {
 		t.Fatalf("commit A failed: %v", errA)
 	}
 	if errB != nil {
 		t.Fatalf("commit B failed: %v", errB)
 	}
-
 	// Verify both files exist on main.
 	for _, f := range []string{"concA.txt", "concB.txt"} {
 		if _, err := os.Stat(filepath.Join(repo, f)); err != nil {
 			t.Fatalf("%s should exist on main: %v", f, err)
 		}
 	}
-
 	// Verify linear history (no merge commits).
 	mergeCount := gitRun(t, repo, "rev-list", "--merges", "--count", "HEAD")
 	if mergeCount != "0" {
@@ -1627,17 +1189,14 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 // fails (e.g., due to a conflict that can't be resolved), the error is returned
 // and not silently swallowed.
 func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
-	t.Skip("commit pipeline spec emits container paths; reinstated in specs/shared/harness-abstraction/claude-and-codex-migration")
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
-
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Conflict task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	wtPaths, brName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -1648,25 +1207,20 @@ func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wt := wtPaths[repo]
-
 	// Modify README.md in the worktree (task branch).
 	if err := os.WriteFile(filepath.Join(wt, "README.md"), []byte("# Task version\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	// Also modify README.md on main with conflicting content.
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# Main version\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "conflicting change on main")
-
 	// The commit pipeline should fail because the rebase will encounter a
 	// conflict that the test runner can't resolve (no container available).
 	commitErr := runner.Commit(task.ID, "")
-
 	if commitErr == nil {
 		t.Fatal("expected Commit to return an error for conflicting changes, got nil")
 	}
@@ -1680,10 +1234,8 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
-
 	// Record main HEAD before creating a feature branch.
 	mainHash := gitRun(t, repo, "rev-parse", "main")
-
 	// Create and checkout a feature branch with an extra commit so that
 	// HEAD differs from the default branch.
 	gitRun(t, repo, "checkout", "-b", "feature-xyz")
@@ -1693,10 +1245,8 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "feature commit")
 	featureHash := gitRun(t, repo, "rev-parse", "HEAD")
-
 	// Go back to main so worktree branching works.
 	gitRun(t, repo, "checkout", "main")
-
 	// Create task and worktree.
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Base hash test", Timeout: 5})
 	if err != nil {
@@ -1712,18 +1262,14 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	wt := worktreePaths[repo]
 	if err := os.WriteFile(filepath.Join(wt, "task.txt"), []byte("task work\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 	updated, _ := s.GetTask(ctx, task.ID)
-
 	// BaseCommitHashes must contain main's HEAD, not the feature branch HEAD.
 	base := updated.BaseCommitHashes[repo]
 	if base == "" {
@@ -1745,13 +1291,11 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 // when no background goroutines are tracked.
 func TestRunnerShutdownNoGoroutines(t *testing.T) {
 	_, r := setupTestRunner(t, nil)
-
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		r.Shutdown()
 	}()
-
 	select {
 	case <-done:
 		// success — returned without blocking
@@ -1764,10 +1308,8 @@ func TestRunnerShutdownNoGoroutines(t *testing.T) {
 // tracked background goroutines finish, then returns.
 func TestRunnerShutdownWaitsForBackground(t *testing.T) {
 	_, r := setupTestRunner(t, nil)
-
 	started := make(chan struct{})
 	finish := make(chan struct{})
-
 	// Directly manipulate backgroundWg to simulate an in-flight background
 	// goroutine (e.g. oversight generation) without launching a real container.
 	r.backgroundWg.Add("test:goroutine")
@@ -1776,15 +1318,12 @@ func TestRunnerShutdownWaitsForBackground(t *testing.T) {
 		close(started)
 		<-finish // hold until test releases it
 	}()
-
 	<-started // ensure goroutine is running before we call Shutdown
-
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)
 		r.Shutdown()
 	}()
-
 	// Shutdown must be blocked while the background goroutine is still running.
 	select {
 	case <-shutdownDone:
@@ -1792,10 +1331,8 @@ func TestRunnerShutdownWaitsForBackground(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		// expected: still waiting
 	}
-
 	// Release the goroutine and verify Shutdown now completes.
 	close(finish)
-
 	select {
 	case <-shutdownDone:
 		// success
@@ -1809,27 +1346,23 @@ func TestRunnerShutdownWaitsForBackground(t *testing.T) {
 // promptly — without the test needing to manually unblock them.
 func TestRunnerShutdownCancelsBackgroundCtx(t *testing.T) {
 	_, r := setupTestRunner(t, nil)
-
 	// Register a background goroutine that blocks until shutdownCtx is cancelled.
 	r.backgroundWg.Add("test:shutdown-ctx")
 	go func() {
 		defer r.backgroundWg.Done("test:shutdown-ctx")
 		<-r.shutdownCtx.Done()
 	}()
-
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)
 		r.Shutdown()
 	}()
-
 	select {
 	case <-shutdownDone:
 		// success — Shutdown returned promptly after cancelling shutdownCtx
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("Shutdown did not return within 500ms after cancelling shutdownCtx")
 	}
-
 	if err := r.shutdownCtx.Err(); err != context.Canceled {
 		t.Fatalf("expected shutdownCtx.Err() == context.Canceled, got %v", err)
 	}
@@ -1841,12 +1374,10 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
-
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "No changes base hash test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -1857,13 +1388,10 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
-
 	mainHash := gitRun(t, repo, "rev-parse", "main")
-
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 	updated, _ := s.GetTask(ctx, task.ID)
 	base := updated.BaseCommitHashes[repo]
 	if base == "" {

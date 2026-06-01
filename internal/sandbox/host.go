@@ -76,6 +76,7 @@ type HostBackendConfig struct {
 // spec.Labels are ignored by this backend (labels are surfaced via
 // ContainerInfo.TaskID on List()).
 type HostBackend struct {
+	binaryMu     sync.RWMutex
 	claudeBinary string
 	codexBinary  string
 
@@ -85,6 +86,20 @@ type HostBackend struct {
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
+}
+
+// SetBinaryForTest overrides the resolved binary path for the given agent
+// type. Used by tests that need to swap in a fake-cmd script after the
+// backend is constructed.
+func (b *HostBackend) SetBinaryForTest(t Type, path string) {
+	b.binaryMu.Lock()
+	defer b.binaryMu.Unlock()
+	switch t {
+	case Claude:
+		b.claudeBinary = path
+	case Codex:
+		b.codexBinary = path
+	}
 }
 
 // NewHostBackend resolves binaries and returns a HostBackend ready to
@@ -131,6 +146,8 @@ func resolveBinary(explicit, name string) (string, error) {
 // Returns an error when the type is unknown or when the binary for a known
 // type was not resolvable at construction time.
 func (b *HostBackend) binaryFor(t Type) (string, error) {
+	b.binaryMu.RLock()
+	defer b.binaryMu.RUnlock()
 	switch t {
 	case Claude:
 		if b.claudeBinary == "" {
