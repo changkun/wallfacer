@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -132,7 +133,7 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 		Image:      "sandbox-agents:latest",
 		Workspaces: []string{tmpDir},
 	})
-	spec := p.buildContainerSpec("wallfacer-plan-test", sandbox.Claude)
+	spec := p.buildContainerSpec("wallfacer-plan-test", harness.Claude)
 
 	if spec.WorkDir != tmpDir {
 		t.Errorf("host mode WorkDir = %q, want host path %q", spec.WorkDir, tmpDir)
@@ -174,7 +175,7 @@ func TestBuildContainerSpec(t *testing.T) {
 		Memory:           "2g",
 	})
 
-	spec := p.buildContainerSpec("wallfacer-plan-test", sandbox.Claude)
+	spec := p.buildContainerSpec("wallfacer-plan-test", harness.Claude)
 
 	// Basic fields.
 	if spec.Name != "wallfacer-plan-test" {
@@ -184,8 +185,8 @@ func TestBuildContainerSpec(t *testing.T) {
 	// on WALLFACER_AGENT. Without it, host-backend planner execs error
 	// out with "WALLFACER_AGENT is missing or unknown". Regression test
 	// for a bug where planner spec didn't thread the agent through.
-	if got := spec.Env["WALLFACER_AGENT"]; got != string(sandbox.Claude) {
-		t.Errorf("spec.Env[WALLFACER_AGENT] = %q, want %q", got, sandbox.Claude)
+	if got := spec.Env["WALLFACER_AGENT"]; got != string(harness.Claude) {
+		t.Errorf("spec.Env[WALLFACER_AGENT] = %q, want %q", got, harness.Claude)
 	}
 	if spec.Image != "sandbox-agents:latest" {
 		t.Errorf("Image = %q, want %q", spec.Image, "sandbox-agents:latest")
@@ -270,7 +271,7 @@ func TestBuildContainerSpecMultiWorkspace(t *testing.T) {
 		Fingerprint: "multi",
 	})
 
-	spec := p.buildContainerSpec("wallfacer-plan-multi", sandbox.Claude)
+	spec := p.buildContainerSpec("wallfacer-plan-multi", harness.Claude)
 
 	// Multi-workspace: working directory should be /workspace.
 	if spec.WorkDir != "/workspace" {
@@ -312,7 +313,7 @@ func TestBuildContainerSpecNoSpecsDir(t *testing.T) {
 		Fingerprint: "nospecs",
 	})
 
-	spec := p.buildContainerSpec("wallfacer-plan-nospecs", sandbox.Claude)
+	spec := p.buildContainerSpec("wallfacer-plan-nospecs", harness.Claude)
 
 	wantRW := mountOpts("z")
 	for _, v := range spec.Volumes {
@@ -498,7 +499,7 @@ func TestAppendInstructionsMount_Codex(t *testing.T) {
 		InstructionsPath: instrFile,
 	})
 
-	volumes := p.appendInstructionsMount(nil, sandbox.Codex, []string{"repo"})
+	volumes := p.appendInstructionsMount(nil, harness.Codex, []string{"repo"})
 	if len(volumes) != 1 {
 		t.Fatalf("expected 1 volume, got %d", len(volumes))
 	}
@@ -518,7 +519,7 @@ func TestAppendInstructionsMount_MultiWorkspace(t *testing.T) {
 		InstructionsPath: instrFile,
 	})
 
-	volumes := p.appendInstructionsMount(nil, sandbox.Claude, []string{"repo1", "repo2"})
+	volumes := p.appendInstructionsMount(nil, harness.Claude, []string{"repo1", "repo2"})
 	if len(volumes) != 1 {
 		t.Fatalf("expected 1 volume, got %d", len(volumes))
 	}
@@ -533,7 +534,7 @@ func TestAppendInstructionsMount_MissingFile(t *testing.T) {
 		InstructionsPath: "/nonexistent/path/CLAUDE.md",
 	})
 
-	volumes := p.appendInstructionsMount(nil, sandbox.Claude, []string{"repo"})
+	volumes := p.appendInstructionsMount(nil, harness.Claude, []string{"repo"})
 	if len(volumes) != 0 {
 		t.Errorf("expected no volumes for missing instructions file, got %d", len(volumes))
 	}
@@ -549,7 +550,7 @@ func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 		Fingerprint: "fp",
 	})
 
-	spec := p.buildContainerSpec("test", sandbox.Claude)
+	spec := p.buildContainerSpec("test", harness.Claude)
 	// Empty workspaces should be skipped, so WorkDir should be empty.
 	if spec.WorkDir != "" {
 		t.Errorf("WorkDir = %q, want empty for all-blank workspaces", spec.WorkDir)
@@ -564,7 +565,7 @@ func TestBuildContainerSpec_NoEnvFile(t *testing.T) {
 		Fingerprint: "fp",
 	})
 
-	spec := p.buildContainerSpec("test", sandbox.Claude)
+	spec := p.buildContainerSpec("test", harness.Claude)
 	if spec.EnvFile != "" {
 		t.Errorf("EnvFile = %q, want empty when not configured", spec.EnvFile)
 	}
