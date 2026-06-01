@@ -137,11 +137,35 @@ const sections = computed<Section[]>(() => {
   return out;
 });
 
-const flatRows = computed<Task[]>(() => {
-  const out: Task[] = [];
-  for (const s of sections.value) for (const t of s.tasks) out.push(t);
+// Flat list of every keyboard-navigable row. Per-task actions interleave
+// directly under their parent task so ArrowDown walks Start / Resume /
+// Done / Retry without skipping. Doc rows live at the bottom.
+type FlatRow =
+  | { kind: 'task'; task: Task }
+  | { kind: 'action'; task: Task; action: ReturnType<typeof taskActions>[number] }
+  | { kind: 'doc'; slug: string };
+
+const flatRows = computed<FlatRow[]>(() => {
+  const out: FlatRow[] = [];
+  for (const s of sections.value) {
+    for (const t of s.tasks) {
+      out.push({ kind: 'task', task: t });
+      for (const a of taskActions(t)) out.push({ kind: 'action', task: t, action: a });
+    }
+  }
+  for (const d of docMatches.value) out.push({ kind: 'doc', slug: d.slug });
   return out;
 });
+
+function taskRowIndex(task: Task): number {
+  return flatRows.value.findIndex((r) => r.kind === 'task' && r.task.id === task.id);
+}
+function actionRowIndex(task: Task, actionId: CardAction): number {
+  return flatRows.value.findIndex((r) => r.kind === 'action' && r.task.id === task.id && r.action.id === actionId);
+}
+function docRowIndex(slug: string): number {
+  return flatRows.value.findIndex((r) => r.kind === 'doc' && r.slug === slug);
+}
 
 function clampActive() {
   const len = flatRows.value.length;
@@ -251,10 +275,6 @@ async function runTaskAction(action: CardAction, task: Task) {
   close();
 }
 
-function indexFor(task: Task): number {
-  return flatRows.value.indexOf(task);
-}
-
 function onKeydown(e: KeyboardEvent) {
   switch (e.key) {
     case 'ArrowDown': {
@@ -275,7 +295,10 @@ function onKeydown(e: KeyboardEvent) {
       e.preventDefault();
       clampActive();
       const row = flatRows.value[activeIndex.value];
-      if (row) pick(row);
+      if (!row) break;
+      if (row.kind === 'task') pick(row.task);
+      else if (row.kind === 'action') void runTaskAction(row.action.id, row.task);
+      else if (row.kind === 'doc') pickDoc(row.slug);
       break;
     }
     case 'Escape':
@@ -351,10 +374,10 @@ onUnmounted(() => {
                 role="button"
                 tabindex="0"
                 class="command-palette-row command-palette-row-task"
-                :class="{ active: indexFor(task) === activeIndex }"
+                :class="{ active: taskRowIndex(task) === activeIndex }"
                 @click="pick(task)"
                 @keydown.enter="pick(task)"
-                @mouseenter="activeIndex = indexFor(task)"
+                @mouseenter="activeIndex = taskRowIndex(task)"
               >
                 <div class="command-palette-row-title">
                   {{ taskTitle(task) || '(untitled)' }}
@@ -375,9 +398,10 @@ onUnmounted(() => {
                       :key="a.id"
                       type="button"
                       class="command-palette-action-btn"
-                      :class="a.cls"
+                      :class="[a.cls, { active: actionRowIndex(task, a.id) === activeIndex }]"
                       :title="a.title"
                       @click="runTaskAction(a.id, task)"
+                      @mouseenter="activeIndex = actionRowIndex(task, a.id)"
                     >{{ a.icon }} {{ a.label }}</button>
                   </span>
                 </div>
@@ -396,8 +420,10 @@ onUnmounted(() => {
               role="button"
               tabindex="0"
               class="command-palette-row command-palette-row-task"
+              :class="{ active: docRowIndex(d.slug) === activeIndex }"
               @click="pickDoc(d.slug)"
               @keydown.enter="pickDoc(d.slug)"
+              @mouseenter="activeIndex = docRowIndex(d.slug)"
             >
               <div class="command-palette-row-title">📖 {{ d.title }}</div>
             </div>
