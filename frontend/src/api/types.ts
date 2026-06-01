@@ -168,17 +168,6 @@ export interface PromptTemplate {
   body: string;
 }
 
-export interface SandboxImageInfo {
-  sandbox: string;
-  image: string;
-  cached: boolean;
-  size?: string;
-}
-
-export interface SandboxImagesResponse {
-  images: SandboxImageInfo[];
-}
-
 export interface SandboxTestResponse {
   task_id: string;
   sandbox: string;
