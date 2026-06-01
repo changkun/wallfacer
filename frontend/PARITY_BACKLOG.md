@@ -20,8 +20,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] modal-core — retry history section (past attempts: status/time/cost/turns, expandable)
 - [x] modal-core — usage breakdown table (per-agent token/cost: impl/test/refinement/oversight)
 - [x] modal-core — prompt history section (#1/#2 prior iterations)
-- [ ] modal-core — backlog spec Edit/Preview tabs (textarea vs rendered markdown)
-- [ ] tasks — modal-based backlog editing (debounced PATCH of prompt/timeout/sandbox/deps/tags/budgets/scheduled_at/model)
+- [x] modal-core — backlog spec Edit/Preview tabs (textarea vs rendered markdown)
+- [x] tasks — modal-based backlog editing (prompt/timeout/sandbox/deps/tags/budgets/scheduled_at/model; save-based not debounced)
 - [ ] modal-logs — test-phase log streaming + test oversight (/oversight/test), parallel Testing tab
 - [x] depgraph/unified-graph — Map view integrated (vendored; MapPage works)
 - [ ] modal-flamegraph — span timeline detail table + cumulative cost chart (/turn-usage) + oversight phase bands

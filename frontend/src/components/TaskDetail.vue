@@ -11,6 +11,7 @@ import { useToastStore } from '../stores/toast';
 import { useTaskStore } from '../stores/tasks';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
+import DependencyPicker from './DependencyPicker.vue';
 import type { SpanResult } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
 // Re-imported as a local binding so the template can call renderMarkdown()
@@ -507,18 +508,40 @@ async function syncTask() {
 // settings after creation without having to retype the prompt. Mirrors
 // the legacy modal-core editable settings (timeout/tags/deps/budget).
 const editingBacklog = ref(false);
+const editPrompt = ref('');
+const editPromptPreview = ref(false);
 const editTimeout = ref<number | null>(null);
 const editModel = ref('');
+const editSandbox = ref('');
 const editTags = ref('');
+const editDeps = ref<string[]>([]);
+const editScheduledAt = ref('');
 const editMaxCost = ref<number | null>(null);
 const editMaxTokens = ref<number | null>(null);
 const editSaving = ref(false);
 
+const editPromptHtml = computed(() => renderResultMarkdown(editPrompt.value || ''));
+
+// Convert an ISO timestamp to the value a <input type="datetime-local"> expects
+// (local YYYY-MM-DDTHH:MM), mirroring modal-core.js.
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function openBacklogEdit() {
   const t = props.task;
+  editPrompt.value = t.prompt ?? '';
+  editPromptPreview.value = false;
   editTimeout.value = t.timeout > 0 ? Math.round(t.timeout / 60) : null;
   editModel.value = t.model ?? '';
+  editSandbox.value = t.sandbox ?? '';
   editTags.value = (t.tags ?? []).join(', ');
+  editDeps.value = [...(t.depends_on ?? [])];
+  editScheduledAt.value = toDatetimeLocal(t.scheduled_at);
   editMaxCost.value = t.max_cost_usd && t.max_cost_usd > 0 ? t.max_cost_usd : null;
   editMaxTokens.value = t.max_input_tokens && t.max_input_tokens > 0 ? t.max_input_tokens : null;
   editingBacklog.value = true;
@@ -527,16 +550,22 @@ function openBacklogEdit() {
 async function saveBacklogEdit() {
   editSaving.value = true;
   try {
+    const t = props.task;
     const patch: Record<string, unknown> = {};
+    if (editPrompt.value.trim() !== (t.prompt ?? '').trim()) patch.prompt = editPrompt.value.trim();
     if (editTimeout.value !== null && editTimeout.value > 0) patch.timeout = editTimeout.value * 60;
-    if (editModel.value.trim() !== (props.task.model ?? '').trim()) patch.model = editModel.value.trim();
-    const parsedTags = editTags.value.split(',').map((t) => t.trim()).filter(Boolean);
-    if (JSON.stringify(parsedTags) !== JSON.stringify(props.task.tags ?? [])) patch.tags = parsedTags;
-    if ((editMaxCost.value ?? 0) !== (props.task.max_cost_usd ?? 0)) patch.max_cost_usd = editMaxCost.value ?? 0;
-    if ((editMaxTokens.value ?? 0) !== (props.task.max_input_tokens ?? 0)) patch.max_input_tokens = editMaxTokens.value ?? 0;
+    if (editModel.value.trim() !== (t.model ?? '').trim()) patch.model = editModel.value.trim();
+    if (editSandbox.value !== (t.sandbox ?? '')) patch.sandbox = editSandbox.value;
+    const parsedTags = editTags.value.split(',').map((x) => x.trim()).filter(Boolean);
+    if (JSON.stringify(parsedTags) !== JSON.stringify(t.tags ?? [])) patch.tags = parsedTags;
+    if (JSON.stringify(editDeps.value) !== JSON.stringify(t.depends_on ?? [])) patch.depends_on = [...editDeps.value];
+    const nextScheduled = editScheduledAt.value ? new Date(editScheduledAt.value).toISOString() : null;
+    if ((nextScheduled ?? '') !== (t.scheduled_at ?? '')) patch.scheduled_at = nextScheduled;
+    if ((editMaxCost.value ?? 0) !== (t.max_cost_usd ?? 0)) patch.max_cost_usd = editMaxCost.value ?? 0;
+    if ((editMaxTokens.value ?? 0) !== (t.max_input_tokens ?? 0)) patch.max_input_tokens = editMaxTokens.value ?? 0;
     if (Object.keys(patch).length === 0) { editingBacklog.value = false; return; }
-    await api('PATCH', `/api/tasks/${props.task.id}`, patch);
-    toast.push('Settings updated', { kind: 'success' });
+    await api('PATCH', `/api/tasks/${t.id}`, patch);
+    toast.push('Task updated', { kind: 'success' });
     editingBacklog.value = false;
   } catch (e) {
     toast.push(`Save failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
@@ -1105,11 +1134,21 @@ const isArchived = computed(() => !!props.task.archived);
                   <button v-if="!editingBacklog" type="button" class="aside-action" @click="openBacklogEdit">
                     <span class="aside-action__icon" aria-hidden="true">&#9998;</span>
                     <span class="aside-action__body">
-                      <span class="aside-action__label">Edit settings</span>
-                      <span class="aside-action__hint">timeout, tags, model, budget</span>
+                      <span class="aside-action__label">Edit task</span>
+                      <span class="aside-action__hint">prompt, deps, schedule, budget</span>
                     </span>
                   </button>
                   <div v-if="editingBacklog" class="backlog-edit">
+                    <div class="backlog-edit__field">
+                      <div class="backlog-edit__prompt-tabs">
+                        <span>Prompt</span>
+                        <button type="button" :class="{ active: !editPromptPreview }" @click="editPromptPreview = false">Edit</button>
+                        <button type="button" :class="{ active: editPromptPreview }" @click="editPromptPreview = true">Preview</button>
+                      </div>
+                      <textarea v-if="!editPromptPreview" v-model="editPrompt" class="backlog-edit__prompt" rows="6" placeholder="Task prompt (Markdown)"></textarea>
+                      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                      <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
+                    </div>
                     <label class="backlog-edit__field">
                       <span>Timeout (min)</span>
                       <input v-model.number="editTimeout" type="number" min="1" placeholder="15" />
@@ -1117,6 +1156,22 @@ const isArchived = computed(() => !!props.task.archived);
                     <label class="backlog-edit__field">
                       <span>Model</span>
                       <input v-model="editModel" type="text" placeholder="override model" />
+                    </label>
+                    <label class="backlog-edit__field">
+                      <span>Sandbox</span>
+                      <select v-model="editSandbox">
+                        <option value="">Default (agent)</option>
+                        <option value="claude">Claude</option>
+                        <option value="codex">Codex</option>
+                      </select>
+                    </label>
+                    <div class="backlog-edit__field">
+                      <span>Depends on</span>
+                      <DependencyPicker v-model="editDeps" :exclude-id="props.task.id" />
+                    </div>
+                    <label class="backlog-edit__field">
+                      <span>Scheduled</span>
+                      <input v-model="editScheduledAt" type="datetime-local" />
                     </label>
                     <label class="backlog-edit__field">
                       <span>Tags</span>
@@ -1508,7 +1563,9 @@ const isArchived = computed(() => !!props.task.archived);
   font-size: 11px;
   color: var(--text-muted);
 }
-.backlog-edit__field input {
+.backlog-edit__field input,
+.backlog-edit__field select,
+.backlog-edit__prompt {
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text);
@@ -1516,6 +1573,33 @@ const isArchived = computed(() => !!props.task.archived);
   padding: 4px 8px;
   font-size: 12px;
   font-family: var(--font-sans);
+}
+.backlog-edit__prompt { resize: vertical; line-height: 1.5; }
+.backlog-edit__prompt-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.backlog-edit__prompt-tabs span { margin-right: auto; }
+.backlog-edit__prompt-tabs button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.backlog-edit__prompt-tabs button.active { color: var(--accent); background: rgba(217, 119, 87, 0.1); }
+.backlog-edit__preview {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  max-height: 240px;
+  overflow-y: auto;
 }
 .backlog-edit__actions {
   display: flex;
