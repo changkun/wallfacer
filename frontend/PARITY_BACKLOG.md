@@ -75,9 +75,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] command-palette — recent-tasks fallback when palette opens empty
 - [x] search — multi-tag AND + text combination (DONE: lib/taskFilter)
 - [ ] modal-ndjson — thinking blocks inline-expandable (>5 lines "+N lines")
-- [ ] explorer — unsaved-changes dirty-confirm on close
+- [x] explorer — unsaved-changes dirty-confirm on close
 - [ ] explorer — 30+ extension/special-file semantic icon map (vs emoji)
-- [ ] explorer — Tab→indent in textarea edit
+- [x] explorer — Tab→indent in textarea edit
 - [x] terminal — container picker uses /api/debug/health (DONE earlier; per-state icons still minor)
 - [ ] tasks — brainstorm flow empty-prompt allowance + placeholder
 - [ ] tasks — routine creation interval/repeat controls detail
@@ -85,7 +85,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [ ] command-palette — remote/local result distinction + server snippet field
 - [ ] mention — file ranking path-substring boost
 - [ ] status-bar — terminal panel height persisted
-- [ ] explorer — Task Prompts relative updated_at timestamp
+- [x] explorer — Task Prompts relative updated_at timestamp
 - [x] explorer — md rendered/raw toggle (DONE earlier)
 - [ ] envconfig — OAuth button visibility reactive to base-URL
 - [ ] instructions — preloadedContent for re-init-from-template

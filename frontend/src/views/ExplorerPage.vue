@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { useDialogStore } from '../stores/dialog';
 import { renderMarkdown } from '../lib/markdown';
 import { mapEntries, type RawExplorerEntry, type TreeEntry } from '../lib/explorerTree';
 
@@ -15,6 +16,7 @@ interface TaskPromptEntry {
 
 const store = useTaskStore();
 const router = useRouter();
+const dialog = useDialogStore();
 
 // Task Prompts virtual section — backlog (+ waiting when toggled on)
 // tasks rendered as clickable entries above the regular file tree. The
@@ -106,9 +108,45 @@ function startEdit() {
   editing.value = true;
 }
 
-function cancelEdit() {
+async function cancelEdit() {
+  // Guard against discarding unsaved edits, matching the legacy dirty-close.
+  if (editBuffer.value !== (fileContent.value ?? '')) {
+    const ok = await dialog.confirm({
+      title: 'Discard changes?',
+      message: 'You have unsaved edits to this file. Discard them?',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      danger: true,
+    });
+    if (!ok) return;
+  }
   editing.value = false;
   saveError.value = '';
+}
+
+// Tab inserts two spaces in the editor instead of moving focus away.
+function onEditKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const ta = e.target as HTMLTextAreaElement;
+  const start = ta.selectionStart ?? 0;
+  const end = ta.selectionEnd ?? 0;
+  editBuffer.value = editBuffer.value.slice(0, start) + '  ' + editBuffer.value.slice(end);
+  void nextTick(() => { ta.selectionStart = ta.selectionEnd = start + 2; });
+}
+
+// Relative "x ago" for the Task Prompts updated_at column.
+function relAgo(iso: string): string {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return '';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 async function saveFile() {
@@ -333,6 +371,7 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
           >
             <span class="explorer-task-prompts__badge" :data-status="entry.status">{{ entry.status }}</span>
             <span class="explorer-task-prompts__title">{{ entry.title || entry.task_id.slice(0, 8) }}</span>
+            <span v-if="entry.updated_at" class="explorer-task-prompts__time">{{ relAgo(entry.updated_at) }}</span>
           </button>
         </div>
       </div>
@@ -398,6 +437,7 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
             v-model="editBuffer"
             class="explorer-edit-area"
             spellcheck="false"
+            @keydown="onEditKeydown"
           ></textarea>
           <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
           <div
@@ -494,6 +534,12 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
   flex-shrink: 0;
 }
 .explorer-task-prompts__badge[data-status="waiting"] { color: var(--warn, #c87b1c); }
+.explorer-task-prompts__time {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
 .explorer-task-prompts__title {
   flex: 1;
   min-width: 0;
