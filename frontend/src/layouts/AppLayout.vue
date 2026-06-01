@@ -18,6 +18,7 @@ import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { useKeyboard } from '../composables/useKeyboard';
+import { getStored, setStored } from '../lib/storage';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
@@ -26,13 +27,8 @@ const router = useRouter();
 // Sidebar collapse persists across refreshes — losing it on every reload
 // is a real micro-regression vs the legacy wallfacer-sidebar-collapsed.
 const SIDEBAR_KEY = 'wallfacer-sidebar-collapsed';
-const sidebarCollapsed = ref<boolean>(
-  typeof localStorage !== 'undefined' && localStorage.getItem(SIDEBAR_KEY) === '1',
-);
-watch(sidebarCollapsed, (v) => {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(SIDEBAR_KEY, v ? '1' : '0');
-});
+const sidebarCollapsed = ref<boolean>(getStored(SIDEBAR_KEY) === '1');
+watch(sidebarCollapsed, (v) => setStored(SIDEBAR_KEY, v ? '1' : '0'));
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
