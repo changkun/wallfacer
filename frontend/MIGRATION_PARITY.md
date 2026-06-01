@@ -211,6 +211,29 @@ Parity = **behavior**, not pixels. Cosmetic diffs are out of scope.
 
 ## Progress log
 
+- 2026-06-01: **Post-audit regression fixes.** A parallel audit of the
+  two frontends surfaced 8 real regressions that the headline tracker
+  had missed; all closed in this push:
+  1. Test verification badge on TaskCard (`badge-test-pass / -fail /
+     -none`) so waiting cards can again show verified / unverified.
+  2. Active 3 s oversight polling while status is `generating` /
+     `pending` (`fetchOversight` recursive setTimeout, cancelled on
+     tab/task switch + unmount) so the summary isn't stuck blank.
+  3. Results tab — one entry per `output` event newest-first with
+     Plan/Result chip (`detectResultType`, 11 tests), Markdown +
+     Raw toggle + Copy.
+  4. Behind-upstream banner on waiting/failed cards
+     (`useBehindCounts` composable, cached by (taskId, updatedAt))
+     with inline Sync button → POST /api/git/sync.
+  5. Empty-state composer — when the board has 0 tasks, four columns
+     collapse to a centred prompt with TaskComposer auto-expanded.
+  6. ANSI palette + CR collapsing helpers (`lib/ansi`, 9 tests) wired
+     into the Activity raw fallback so spinner / colour escapes
+     render correctly.
+  7. Activity search input + 5000-row cap + truncation banner.
+  8. Command palette per-task action rows are now keyboard-navigable
+     via a discriminated `FlatRow` union — ArrowDown / Up walks Start
+     / Resume / Done / Retry inline, Enter dispatches.
 - 2026-06-01: **Last mile — gap closure.** Workspace group management
   popover (switch/rename/delete inline in Sidebar + dialog/toast wiring),
   card-level keyboard nav (s/d/r/t/p + Enter/Space + arrow navigation),
