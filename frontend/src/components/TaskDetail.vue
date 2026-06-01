@@ -312,6 +312,12 @@ const activityTruncated = computed(() => {
   return activity.value.length > ACTIVITY_MAX_ROWS && len === ACTIVITY_MAX_ROWS;
 });
 
+// Server-side 8MB turn-output truncation: the backend injects a
+// truncation_notice sentinel into the NDJSON stream (see store SaveTurnOutput).
+// Mirrors ui/js/modal-logs.js's server truncation banner.
+const serverTruncated = computed(() => rawOutput.value.includes('"subtype":"truncation_notice"'));
+const logDownloadUrl = computed(() => `/api/tasks/${props.task.id}/logs`);
+
 interface OversightPhase {
   title: string;
   summary: string;
@@ -786,12 +792,17 @@ const isArchived = computed(() => !!props.task.archived);
                             {{ visibleActivity.length }} / {{ activity.length }}
                           </span>
                         </div>
+                        <div v-if="serverTruncated" class="ta-activity-truncated ta-activity-truncated--warn">
+                          ⚠ Turn output was truncated at the server (8&nbsp;MB limit). Some tool calls may be missing.
+                          <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
+                        </div>
                         <div
                           v-if="activityTruncated"
                           class="ta-activity-truncated"
                           :title="`Showing the last ${ACTIVITY_MAX_ROWS} rows; load the full log via /api/tasks/{id}/logs for the complete trace.`"
                         >
                           Showing last {{ ACTIVITY_MAX_ROWS.toLocaleString() }} rows.
+                          <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
                         </div>
                         <div class="ta-activity-log">
                           <div
@@ -1413,6 +1424,20 @@ const isArchived = computed(() => !!props.task.archived);
   color: var(--text-muted);
   font-style: italic;
   margin-bottom: 4px;
+}
+.ta-activity-truncated a {
+  margin-left: 6px;
+  color: var(--accent);
+  text-decoration: underline;
+  font-style: normal;
+}
+.ta-activity-truncated--warn {
+  font-style: normal;
+  color: var(--warn, #b8860b);
+  background: rgba(217, 119, 87, 0.08);
+  border: 1px solid rgba(217, 119, 87, 0.25);
+  border-radius: 6px;
+  padding: 6px 8px;
 }
 
 /* Backlog edit form inside the right aside. */
