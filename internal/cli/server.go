@@ -72,13 +72,11 @@ type IndexViewData struct {
 // ServerConfig holds the parsed flag values shared by RunServer and RunDesktop.
 // Each field corresponds to a CLI flag or environment variable override.
 type ServerConfig struct {
-	LogFormat    string
-	Addr         string
-	DataDir      string
-	ContainerCmd string
-	SandboxImage string
-	EnvFile      string
-	SkipCSRF     bool // Desktop mode: requests come from the local WebView, not a browser.
+	LogFormat string
+	Addr      string
+	DataDir   string
+	EnvFile   string
+	SkipCSRF  bool // Desktop mode: requests come from the local WebView, not a browser.
 	// UIDir, when non-empty, serves UI assets from this on-disk directory
 	// instead of the embedded filesystem. Used during frontend development
 	// so edits under ui/ take effect on reload without rebuilding the binary.
@@ -167,9 +165,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
 	}
 
-	// Host backend execs the claude/codex binaries directly, so no
-	// container image is pulled or used.
-	resolvedImage := cfg.SandboxImage
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
@@ -184,8 +179,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 
 	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:          cfg.ContainerCmd,
-		SandboxImage:     resolvedImage,
 		EnvFile:          cfg.EnvFile,
 		DefaultEnvFile:   filepath.Join(configDir, ".env"),
 		Workspaces:       workspaces,
@@ -280,8 +273,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 	// Create and wire the planning sandbox manager.
 	p := planner.New(planner.Config{
 		Backend:          r.SandboxBackend(),
-		Command:          cfg.ContainerCmd,
-		Image:            resolvedImage,
 		Workspaces:       snapshot.Workspaces,
 		EnvFile:          cfg.EnvFile,
 		Fingerprint:      snapshot.Key,
@@ -505,9 +496,7 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
 	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
-	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", detectContainerRuntime()), "container runtime command (podman or docker)")
-	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
-	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
+	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file with credentials and runtime settings")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
 	uiDir := fs.String("ui-dir", envOrDefault("UI_DIR", ""), "serve UI from this on-disk directory (dev mode; disables caching and reloads templates on every request)")
 	fs.Usage = func() {
@@ -519,13 +508,11 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 	_ = fs.Parse(args)
 
 	sc := initServer(configDir, ServerConfig{
-		LogFormat:    *logFormat,
-		Addr:         *addr,
-		DataDir:      *dataDir,
-		ContainerCmd: *containerCmd,
-		SandboxImage: *sandboxImage,
-		EnvFile:      *envFile,
-		UIDir:        *uiDir,
+		LogFormat: *logFormat,
+		Addr:      *addr,
+		DataDir:   *dataDir,
+		EnvFile:   *envFile,
+		UIDir:     *uiDir,
 	}, uiFS, vueDist, docsFS)
 	defer sc.Stop()
 
