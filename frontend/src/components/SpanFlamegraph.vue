@@ -12,30 +12,45 @@ const LANE_GAP = 3;
 const PAD_TOP = 24; // axis row
 
 const layout = computed(() => layoutSpans(props.spans));
-const laneCount = computed(() => {
-  let m = 0;
-  for (const b of layout.value.blocks) if (b.lane + 1 > m) m = b.lane + 1;
-  return Math.max(1, m);
-});
-const totalMs = computed(() => Math.max(1, layout.value.t1 - layout.value.t0));
+const laneCount = computed(() => Math.max(1, layout.value.laneCount));
 const svgHeight = computed(() => PAD_TOP + laneCount.value * (LANE_H + LANE_GAP));
 
-function blockX(startMs: number): number {
-  return ((startMs - layout.value.t0) / totalMs.value) * 100;
-}
-function blockW(startMs: number, endMs: number): number {
-  return Math.max(0.4, ((endMs - startMs) / totalMs.value) * 100);
-}
 function blockY(lane: number): number {
   return PAD_TOP + lane * (LANE_H + LANE_GAP);
 }
 
-// Generate ~5 evenly-spaced tick marks for the time axis.
+// Axis ticks at 5 evenly-spaced VISUAL positions. Because idle gaps are
+// compressed, each tick's label is the real elapsed time at that visual
+// fraction (timeMap.fromPercent), so the axis stays truthful even when the
+// horizontal scale is non-linear. Compressed gap segments get a hatched
+// marker so the break is legible.
 const ticks = computed(() => {
+  const lay = layout.value;
   const out: { pct: number; label: string }[] = [];
-  const steps = 5;
-  for (let i = 0; i <= steps; i++) {
-    out.push({ pct: (i / steps) * 100, label: formatMs((i / steps) * totalMs.value) });
+  for (let i = 0; i <= 5; i++) {
+    const pct = (i / 5) * 100;
+    const realMs = lay.timeMap.fromPercent(pct) - lay.t0;
+    out.push({ pct, label: formatMs(realMs) });
+  }
+  return out;
+});
+
+// Hatched markers for each compressed idle gap, positioned in visual space.
+const gapMarkers = computed(() => {
+  const lay = layout.value;
+  if (!lay.timeMap.compressed) return [];
+  const out: { left: number; width: number; title: string }[] = [];
+  for (const seg of lay.timeMap.segments) {
+    if (!seg.compressed) continue;
+    const left = lay.timeMap.toPercent(seg.start);
+    const right = lay.timeMap.toPercent(seg.end);
+    const width = right - left;
+    if (width < 0.1) continue;
+    out.push({
+      left,
+      width,
+      title: `Idle ${formatMs(seg.end - seg.start)}`,
+    });
   }
   return out;
 });
@@ -68,6 +83,19 @@ function hideTip() { hovered.value = null; }
       role="img"
       aria-label="Span timeline"
     >
+      <!-- Compressed idle-gap markers (hatched) behind everything else. -->
+      <rect
+        v-for="(g, i) in gapMarkers"
+        :key="'gap' + i"
+        :x="g.left"
+        :y="PAD_TOP"
+        :width="g.width"
+        :height="svgHeight - PAD_TOP"
+        class="flamegraph__gap"
+      >
+        <title>{{ g.title }}</title>
+      </rect>
+
       <!-- Axis ticks. The vertical lines extend down across all lanes
            so the user can eyeball alignment between blocks. -->
       <g v-for="t in ticks" :key="t.pct" class="flamegraph__tick">
@@ -75,13 +103,12 @@ function hideTip() { hovered.value = null; }
         <text :x="t.pct" :y="PAD_TOP - 8" text-anchor="middle">{{ t.label }}</text>
       </g>
 
-      <!-- Span blocks. Width is clamped to 0.4 vw so 0-duration spans
-           still render as a thin marker. -->
+      <!-- Span blocks, positioned in compressed visual space (leftPct/widthPct). -->
       <g v-for="(b, i) in layout.blocks" :key="i">
         <rect
-          :x="blockX(b.startMs)"
+          :x="b.leftPct"
           :y="blockY(b.lane)"
-          :width="blockW(b.startMs, b.endMs)"
+          :width="b.widthPct"
           :height="LANE_H"
           :fill="b.color"
           rx="2"
@@ -89,7 +116,7 @@ function hideTip() { hovered.value = null; }
           @mouseleave="hideTip"
         />
         <text
-          :x="blockX(b.startMs) + 0.5"
+          :x="b.leftPct + 0.5"
           :y="blockY(b.lane) + LANE_H / 2"
           dominant-baseline="middle"
           class="flamegraph__label"
@@ -124,6 +151,10 @@ function hideTip() { hovered.value = null; }
   font-size: 9px;
   fill: var(--text-muted);
   font-family: var(--font-mono);
+}
+.flamegraph__gap {
+  fill: var(--bg-sunk, rgba(127, 127, 127, 0.08));
+  opacity: 0.5;
 }
 .flamegraph__label {
   font-size: 10px;

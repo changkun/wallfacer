@@ -1,7 +1,10 @@
 // Helpers for the span-timeline flamegraph view. Pure + tested so the
 // layout logic is not buried inside the SVG component. Mirrors the
-// label / lane / humanise behaviour of the legacy ui/js/modal-flamegraph.js
-// but trimmed to the bits the Vue view actually renders.
+// label / lane / humanise behaviour of the legacy ui/js/modal-flamegraph.js,
+// including idle-gap compression via the shared time map (so a long
+// "waiting" gap doesn't squish all the real activity into a sliver).
+
+import { buildTimeMap, type TimeMap } from './timeMap';
 
 export interface SpanResult {
   phase: string;
@@ -19,6 +22,10 @@ export interface SpanBlock {
   lane: number;
   label: string;
   color: string;
+  // Visual x-extent as percentages of the full track width, after idle-gap
+  // compression. left/width are what the SVG actually draws.
+  leftPct: number;
+  widthPct: number;
 }
 
 /** Greedy lane-packing: place each span on the lowest lane whose last
@@ -67,11 +74,24 @@ export function labelHue(s: string): number {
   return Math.abs(h) % 360;
 }
 
-/** Lay out a list of SpanResults into renderable blocks (positions in
- *  milliseconds + lane indices + colour + human label).
- *  Returns blocks plus the overall time range. */
-export function layoutSpans(spans: SpanResult[]): { blocks: SpanBlock[]; t0: number; t1: number } {
-  if (!spans.length) return { blocks: [], t0: 0, t1: 0 };
+export interface FlamegraphLayout {
+  blocks: SpanBlock[];
+  t0: number;
+  t1: number;
+  timeMap: TimeMap;
+  laneCount: number;
+}
+
+/** Lay out a list of SpanResults into renderable blocks. Positions are
+ *  expressed both in milliseconds (for tooltips) and as compressed
+ *  percentages (leftPct/widthPct) via the shared time map, matching the
+ *  legacy flamegraph's idle-gap compression. */
+export function layoutSpans(spans: SpanResult[]): FlamegraphLayout {
+  const empty = (): FlamegraphLayout => ({
+    blocks: [], t0: 0, t1: 0, laneCount: 0,
+    timeMap: buildTimeMap(null, 0, 0),
+  });
+  if (!spans.length) return empty();
   const items = spans
     .map((raw) => {
       const startMs = new Date(raw.started_at).getTime();
@@ -81,24 +101,33 @@ export function layoutSpans(spans: SpanResult[]): { blocks: SpanBlock[]; t0: num
     })
     .filter((x) => !Number.isNaN(x.startMs))
     .sort((a, b) => a.startMs - b.startMs);
+  if (!items.length) return empty();
 
   const t0 = items[0].startMs;
   let t1 = items[0].endMs;
   for (const it of items) if (it.endMs > t1) t1 = it.endMs;
   if (t1 <= t0) t1 = t0 + 1;
 
+  // Compress idle gaps so positions reflect activity density, not wall clock.
+  const timeMap = buildTimeMap(items, t0, t1);
+
   const lanes = assignLanes(items);
+  let laneCount = 0;
   const blocks: SpanBlock[] = lanes.map(({ item, lane }) => {
-    const label = humanSpanLabel(item.raw.phase, item.raw.label);
+    if (lane + 1 > laneCount) laneCount = lane + 1;
+    const left = timeMap.toPercent(item.startMs);
+    const right = timeMap.toPercent(item.endMs);
     return {
       raw: item.raw,
       startMs: item.startMs,
       endMs: item.endMs,
       durationMs: item.endMs - item.startMs,
       lane,
-      label,
+      label: humanSpanLabel(item.raw.phase, item.raw.label),
       color: `hsl(${labelHue(item.raw.phase + ':' + item.raw.label)}, 55%, 55%)`,
+      leftPct: left,
+      widthPct: Math.max(0.4, right - left),
     };
   });
-  return { blocks, t0, t1 };
+  return { blocks, t0, t1, timeMap, laneCount };
 }
