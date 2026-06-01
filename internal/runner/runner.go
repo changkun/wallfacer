@@ -325,10 +325,6 @@ func (r *Runner) ideationExploitRatio() float64 {
 func (r *Runner) Shutdown() {
 	r.shutdownOnce.Do(func() {
 		r.shutdownCancel()
-		// Stop all per-task worker containers before waiting for background goroutines.
-		if wm, ok := r.backend.(sandbox.WorkerManager); ok {
-			wm.ShutdownWorkers()
-		}
 		// Signal the board-cache-invalidator goroutine to exit and wait for it.
 		close(r.shutdownCh)
 		r.boardSubscriptionWg.Wait()
@@ -918,23 +914,14 @@ func (r *Runner) KillContainer(taskID uuid.UUID) {
 	}
 }
 
-// WorkerStats returns aggregate worker lifecycle statistics. Returns an empty
-// result when the backend does not support worker management.
+// WorkerStats returns zero values. Retained on the interface for downstream
+// callers; the host backend does not manage worker containers.
 func (r *Runner) WorkerStats() sandbox.WorkerStatsInfo {
-	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
-		return wm.WorkerStats()
-	}
 	return sandbox.WorkerStatsInfo{}
 }
 
-// StopTaskWorker stops the per-task worker container for the given task, if
-// the backend supports worker management. No-op when the backend does not
-// implement sandbox.WorkerManager or when no worker exists for the task.
-func (r *Runner) StopTaskWorker(taskID uuid.UUID) {
-	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
-		wm.StopTaskWorker(taskID.String())
-	}
-}
+// StopTaskWorker is a no-op under the host backend.
+func (r *Runner) StopTaskWorker(_ uuid.UUID) {}
 
 // IdeateContainerName returns the name of the currently running ideation container,
 // or an empty string if no ideation is in progress.
