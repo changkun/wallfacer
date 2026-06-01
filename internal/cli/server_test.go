@@ -33,8 +33,6 @@ func TestInitServer(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -629,8 +627,6 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -676,8 +672,6 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -709,8 +703,6 @@ func TestInitServer_PortFallback(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         fmt.Sprintf(":%d", occupiedPort),
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -738,8 +730,6 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 	defer sc.Shutdown()
@@ -762,8 +752,6 @@ func TestShutdown_WithPlannerRunning(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 
@@ -784,8 +772,6 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 	}, testFS(t), testFS(t), testFS(t))
 
@@ -808,8 +794,6 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 		LogFormat:    "text",
 		Addr:         ":0",
 		DataDir:      filepath.Join(configDir, "data"),
-		ContainerCmd: "true",
-		SandboxImage: "sandbox-agents:latest",
 		EnvFile:      envFile,
 		SkipCSRF:     true,
 	}, testFS(t), testFS(t), testFS(t))
