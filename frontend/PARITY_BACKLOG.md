@@ -88,7 +88,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] explorer — Task Prompts relative updated_at timestamp
 - [x] explorer — md rendered/raw toggle (DONE earlier)
 - [x] envconfig — OAuth button visibility reactive to base-URL (verified: showClaudeOauthBtn/showCodexOauthBtn)
-- [ ] instructions — preloadedContent for re-init-from-template
+- [~] instructions — preloadedContent for re-init (DEAD: only test fixtures pass preloadedContent; sole production caller passes none. Real open+reinit flow is implemented.)
 - [x] events — visibilitychange→fetchTasks on tab refocus
 - [ ] task-stream — waitForTaskDelta SSE-resolve optimization
 - [ ] workspace — group popover active/switching state (partial in Sidebar)
