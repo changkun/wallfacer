@@ -4,15 +4,10 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 
 ## Prerequisites
 
-Pick one of the two execution backends:
-
-- **Container mode (default)** — **Podman** or **Docker**. Wallfacer auto-detects whichever is available, pulls the unified sandbox image on first use, and runs tasks in isolated containers.
-- **Host mode** — **claude** (and optionally **codex**) installed directly on your machine, invoked via `wallfacer run --backend host`. No container runtime, no image pull, no isolation. Use for fast iteration on trusted machines. See [Host mode](#host-mode) below.
-
-Plus:
-
-- **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (configured after install)
-- **Git** — recommended; non-git directories work as workspaces but git features (worktrees, diff, auto-push) are unavailable
+- **`claude` CLI** on your `PATH` (`npm i -g @anthropic-ai/claude-code`). Tasks exec it directly.
+- **`codex` CLI** (optional, `npm i -g @openai/codex`) for Codex-typed tasks.
+- **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (configured after install).
+- **Git** — recommended; non-git directories work as workspaces but git features (worktrees, diff, auto-push) are unavailable.
 
 ## Step 1 — Install Wallfacer
 
@@ -22,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh 
 
 This detects your OS and architecture, downloads the latest binary, and places it in `/usr/local/bin` (or `~/.local/bin`). Set `WALLFACER_INSTALL_DIR` to override the location, or `WALLFACER_VERSION=v0.0.5` for a specific version.
 
-> **Building from source?** See [Development Setup](../internals/development.md) for `go build`, `make` targets, and sandbox image builds.
+> **Building from source?** See [Development Setup](../internals/development.md) for `go build` and `make` targets.
 
 ## Step 2 — Start Wallfacer
 
@@ -34,7 +29,7 @@ On startup, Wallfacer restores the most recently used workspace group from your 
 
 On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
-The sandbox image (`ghcr.io/latere-ai/sandbox-agents:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB). The same image hosts both Claude Code and Codex; the runner sets `WALLFACER_AGENT` per task to pick the right CLI. To build the sandbox image locally instead, see [Building the sandbox image from source](#building-the-sandbox-image-from-source) below.
+Each task runs as a host process: Wallfacer execs `claude` (or `codex`) directly in the task's git worktree, setting `WALLFACER_AGENT` to select the CLI.
 
 ## Step 3 — Configure Your Credential
 
@@ -65,6 +60,8 @@ Wallfacer supports two Codex auth modes:
 2. **API key fallback**
    Set `OPENAI_API_KEY` in **Settings → Sandbox** and run **Test (Codex)** once.
 
+See [Configuration → Host mode](configuration.md#host-mode) for how Wallfacer translates Codex's CLI output into the Claude-compatible event stream the runner expects.
+
 ## Step 4 — Verify the Setup
 
 Run the doctor command to check that everything is configured correctly:
@@ -73,15 +70,18 @@ Run the doctor command to check that everything is configured correctly:
 wallfacer doctor
 ```
 
-This checks configuration paths, credentials, container runtime, sandbox images, and Git. Items marked `[ok]` are ready, `[!]` need attention, and `[ ]` are optional.
+This checks configuration paths, your Claude (and optional Codex) credential, the `claude` / `codex` binaries on your `PATH`, and Git. Items marked `[ok]` are ready, `[!]` need attention, and `[ ]` are optional.
 
-Once all required checks pass, create a test task: click **+ New Task**, enter a short prompt, click Add, and drag the card to **In Progress**. A sandbox container starts and live log output appears in the task detail panel.
+Once all required checks pass, create a test task: click **+ New Task**, enter a short prompt, click Add, and drag the card to **In Progress**. The task starts running and live log output appears in the task detail panel.
 
 If the task fails immediately, check:
 
 - The credential is correct (re-check in **Settings → Sandbox**)
-- The container runtime (Podman or Docker) is running and accessible to your user
-- Network access is available (the sandbox image is pulled from `ghcr.io` on first use)
+- The `claude` CLI is installed and on your `PATH` (`wallfacer doctor` reports its resolved path)
+
+## Security
+
+Tasks run as host processes with your user's permissions. A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. A warning banner appears in **Settings → Sandbox** while active.
 
 ## CLI Reference
 
@@ -91,8 +91,6 @@ wallfacer doctor                         # Check prerequisites and config
 wallfacer status                         # Print board state to terminal
 wallfacer status -watch                  # Live-updating board state
 wallfacer status -json                   # Machine-readable JSON output
-wallfacer exec <task-id-prefix>          # Attach to a running task container
-wallfacer exec --sandbox claude          # Open shell in a new sandbox
 ```
 
 Common `run` flags:
@@ -101,32 +99,10 @@ Common `run` flags:
 |------|---------|-------------|
 | `-addr` | `:8080` | Listen address |
 | `-no-browser` | `false` | Skip auto-opening the browser |
-| `--backend` | `container` | Sandbox backend: `container` (podman/docker) or `host` (exec claude/codex directly) |
-| `-container` | auto-detected | Container runtime (`podman` or `docker`) — container backend only |
+| `-env-file` | `~/.wallfacer/.env` | Env file with credentials and runtime settings |
 | `-log-format` | `text` | Log format: `text` or `json` |
 
 Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, etc.), see [Configuration](configuration.md).
-
-## Host mode
-
-Don't want to install podman or docker? If you already have `claude` (and optionally `codex`) on your machine, you can skip the container stack entirely:
-
-```bash
-npm i -g @anthropic-ai/claude-code    # required
-npm i -g @openai/codex                # optional, for Codex tasks
-make build-host                        # or download the prebuilt binary
-./wallfacer run --backend host
-```
-
-Or check readiness first:
-
-```bash
-wallfacer doctor --backend host
-```
-
-**Tradeoff:** host mode has **no filesystem isolation** — tasks run with your user's permissions and can touch any file your account can. Recommended only on trusted machines. A warning banner appears in **Settings → Sandbox** whenever host mode is active.
-
-See [Configuration → Host mode](configuration.md#host-mode) for env var overrides, known limitations, and details on how host mode translates codex's CLI output to the Claude-compatible event stream the runner expects.
 
 ## Windows
 
@@ -138,14 +114,14 @@ A pre-built `wallfacer-windows-amd64.exe` binary is available on the [releases p
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
 ```
 
-**Prerequisites:** Docker Desktop or Podman Desktop must be installed and running as the container runtime for task execution. Windows drive-letter paths (e.g., `C:\Users\alice\project`) are automatically translated for container volume mounts -- no manual path conversion is needed.
+**Prerequisites:** install the `claude` CLI (and optionally `codex`) and make sure they are on your `PATH`. Tasks exec them directly.
 
 ### WSL2
 
 Windows users can also run Wallfacer inside WSL2 with the same experience as native Linux:
 
 1. **Install WSL2** — run `wsl --install` in an elevated PowerShell (requires Windows 10 2004+ or Windows 11)
-2. **Inside WSL2**, install Go 1.25+ and Podman (or Docker Engine)
+2. **Inside WSL2**, install Go 1.25+ and the `claude` CLI (and optionally `codex`)
 3. **Clone the repo into the WSL2 filesystem** (not `/mnt/c/` — cross-filesystem I/O is much slower)
 4. Build and run:
    ```bash
@@ -153,21 +129,6 @@ Windows users can also run Wallfacer inside WSL2 with the same experience as nat
    ```
 5. The browser opens automatically on the Windows host via `cmd.exe /c start`
 6. Keep workspace repos on the WSL2 filesystem for best performance
-
-The container runtime override `CONTAINER_CMD` works on all platforms if the auto-detection picks the wrong binary.
-
-## Building the Sandbox Image from Source
-
-The sandbox image is pulled automatically from `ghcr.io/latere-ai/`. If you need to customize it or build offline, clone the images repository and build locally:
-
-```bash
-git clone https://github.com/latere-ai/images.git
-cd images
-make                   # Build the unified sandbox-agents image
-make RUNTIME=docker    # Use Docker instead of Podman
-```
-
-The local build tags the image as `sandbox-agents:latest`, which Wallfacer finds automatically. See the [images repository](https://github.com/latere-ai/images) for details on what's bundled, the `WALLFACER_AGENT` dispatch contract, and the JSON-envelope output expected by the runner.
 
 ## Next Steps
 

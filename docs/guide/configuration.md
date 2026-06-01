@@ -220,14 +220,9 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 #### Sandbox backend
 
-Wallfacer runs tasks through one of two backends, selected at server start via the `--backend` flag on `wallfacer run`:
+Wallfacer runs each task as a host process, execing the `claude` (and optionally `codex`) CLI directly in the task's git worktree.
 
-| Backend | Flag | How it runs | When to use |
-|---|---|---|---|
-| Container (default) | `--backend container` | `podman run` / `docker run` against the unified `sandbox-agents` image | You want filesystem isolation; you have a container runtime installed |
-| Host | `--backend host` | Execs `claude` (and optionally `codex`) directly on the host | You already have the CLIs installed and don't want to install a container runtime or pull the sandbox image |
-
-> **Host mode has no isolation.** Tasks run with your user's permissions and can touch any file your account can. Recommended for trusted machines only. The Settings → Sandbox tab surfaces a warning banner while host mode is active. See [Host mode](#host-mode) below.
+> **Tasks run with your user's permissions.** A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. The Settings → Sandbox tab shows this warning while active. See [Host mode](#host-mode) below.
 
 #### Container
 
@@ -240,7 +235,7 @@ Wallfacer runs tasks through one of two backends, selected at server start via t
 
 #### Host mode
 
-Set when running `wallfacer run --backend host`. These variables are optional; defaults resolve via `$PATH`.
+These variables are optional; the CLI binaries are resolved via `$PATH` by default.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -252,17 +247,17 @@ Set when running `wallfacer run --backend host`. These variables are optional; d
 - `npm i -g @anthropic-ai/claude-code` for Claude.
 - `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
 
-**Build the server for host mode:**
+**Build and run the server:**
 
 ```bash
-make build-host   # fmt + lint + ts build + binary, no image pull
-./wallfacer run --backend host
+make build   # fmt + lint + ts build + binary
+./wallfacer run
 ```
 
 **Verify readiness:**
 
 ```bash
-wallfacer doctor --backend host
+wallfacer doctor
 ```
 
 Reports the resolved binary paths and `--version` output for each CLI. Missing codex is a soft warning (tasks routed to codex will fail; claude-only workflows still work).
