@@ -5,7 +5,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -34,7 +34,7 @@ type agentBinding struct {
 	MountBoard  bool
 	SingleTurn  bool
 	ParseResult func(*agentOutput) (any, error)
-	Model       func(sandbox.Type) string
+	Model       func(harness.ID) string
 }
 
 // agentBindings keys the private per-slug dispatch info off the

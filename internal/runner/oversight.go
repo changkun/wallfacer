@@ -11,8 +11,8 @@ import (
 	"changkun.de/x/wallfacer/internal/agents"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -725,7 +725,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		ActivityOverride: agent,
 		// Oversight historically uses the same "small model" env var
 		// as title so operators can route both to a cheaper model.
-		ModelResolver: func(sb sandbox.Type) string { return r.titleModelFromEnvForSandbox(sb) },
+		ModelResolver: func(sb harness.ID) string { return r.titleModelFromEnvForSandbox(sb) },
 	})
 	if err != nil {
 		logger.Runner.Warn("oversight: agent container failed",

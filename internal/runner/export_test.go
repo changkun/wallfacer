@@ -1,6 +1,6 @@
 package runner
 
-import "changkun.de/x/wallfacer/internal/sandbox"
+import "changkun.de/x/wallfacer/internal/harness"
 
 // Test-only wrappers that call the ContainerSpec builders and flatten the result
 // into CLI argument slices via Build(). These exist in a non-_test.go file with
@@ -14,7 +14,7 @@ func (r *Runner) buildContainerArgs(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 ) []string {
-	return r.buildContainerSpecForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sandbox.Claude).Build()
+	return r.buildContainerSpecForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, harness.Claude).Build()
 }
 
 func (r *Runner) buildContainerArgsForSandbox(
@@ -23,7 +23,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
-	sb sandbox.Type,
+	sb harness.ID,
 ) []string {
 	return r.buildContainerSpecForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sb).Build()
 }

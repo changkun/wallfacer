@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -412,7 +413,7 @@ func TestCacheVolumeMountsPresent(t *testing.T) {
 
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
 	t.Cleanup(func() { r.Shutdown() })
-	spec := r.buildBaseContainerSpec("test-container", "", sandbox.Claude)
+	spec := r.buildBaseContainerSpec("test-container", "", harness.Claude)
 
 	found := map[string]bool{}
 	for _, v := range spec.Volumes {
@@ -442,7 +443,7 @@ func TestCacheVolumesNotPresentWhenDisabled(t *testing.T) {
 
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
 	t.Cleanup(func() { r.Shutdown() })
-	spec := r.buildBaseContainerSpec("test-container", "", sandbox.Claude)
+	spec := r.buildBaseContainerSpec("test-container", "", harness.Claude)
 
 	for _, v := range spec.Volumes {
 		if v.Named && strings.HasPrefix(v.Host, "wallfacer-cache-") {
