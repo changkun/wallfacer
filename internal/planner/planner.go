@@ -139,10 +139,6 @@ func (p *Planner) Stop() {
 		_ = p.handle.Kill()
 		p.handle = nil
 	}
-	// If the backend supports worker management, stop the planning worker.
-	if wm, ok := p.backend.(sandbox.WorkerManager); ok {
-		wm.StopTaskWorker(planningTaskID)
-	}
 	p.active = false
 }
 
