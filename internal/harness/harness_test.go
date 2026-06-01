@@ -6,8 +6,8 @@ import (
 )
 
 func TestRegistry_RegisterAndLookup(t *testing.T) {
-	t.Cleanup(clearForTest)
-	clearForTest()
+	prev := snapshotForTest()
+	t.Cleanup(func() { restoreForTest(prev) })
 
 	f := &FakeHarness{IDValue: Claude}
 	Register(f)
@@ -26,8 +26,8 @@ func TestRegistry_RegisterAndLookup(t *testing.T) {
 }
 
 func TestRegistry_DuplicateRegisterPanics(t *testing.T) {
-	t.Cleanup(clearForTest)
-	clearForTest()
+	prev := snapshotForTest()
+	t.Cleanup(func() { restoreForTest(prev) })
 
 	Register(&FakeHarness{IDValue: Claude})
 
@@ -40,8 +40,8 @@ func TestRegistry_DuplicateRegisterPanics(t *testing.T) {
 }
 
 func TestRegistry_AllIsSorted(t *testing.T) {
-	t.Cleanup(clearForTest)
-	clearForTest()
+	prev := snapshotForTest()
+	t.Cleanup(func() { restoreForTest(prev) })
 
 	Register(&FakeHarness{IDValue: Pi})
 	Register(&FakeHarness{IDValue: Claude})
