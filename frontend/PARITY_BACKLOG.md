@@ -40,8 +40,8 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] render — scheduled badge with relative time on backlog cards
 - [~] render — forked-task ancestry badge (DEAD: backend emits no forked_from field; legacy badge never rendered. No fork feature exists.)
 - [x] render — brainstorm category tag badges (BRAINSTORM_CATEGORIES from /api/config)
-- [ ] board-composer — empty-board composer dismiss-for-session persistence
-- [ ] board-composer — composer "@" action button (insert @ + fire mention)
+- [x] board-composer — empty-board composer dismiss-for-session persistence
+- [x] board-composer — composer "@" action button (insert @ + fire mention)
 - [x] sidebar-badge — board unread dot
 - [ ] planning-chat — queue item double-click edit mode
 - [x] planning-chat — send-mode toggle button (already present PlanningChatPanel.vue:45-61)
