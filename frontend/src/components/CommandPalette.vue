@@ -144,7 +144,20 @@ const sections = computed<Section[]>(() => {
 type FlatRow =
   | { kind: 'task'; task: Task }
   | { kind: 'action'; task: Task; action: ReturnType<typeof taskActions>[number] }
+  | { kind: 'jump'; task: Task; tab: string; label: string }
   | { kind: 'doc'; slug: string };
+
+// Tab-switch jumps: open a task's detail modal directly on a given tab
+// (mirrors ui/js/command-palette.js's open-task-{changes,spans,timeline}).
+function tabJumps(task: Task): { tab: string; label: string }[] {
+  if (task.status === 'backlog') return [];
+  const jumps = [{ tab: 'changes', label: 'Open changes' }];
+  if (task.turns > 0) {
+    jumps.push({ tab: 'results', label: 'Open results' });
+    jumps.push({ tab: 'timeline', label: 'Open timeline' });
+  }
+  return jumps;
+}
 
 // docMatches must be declared BEFORE flatRows references it — the
 // `<script setup>` compiler keeps the top-level order, so a forward
@@ -162,6 +175,7 @@ const flatRows = computed<FlatRow[]>(() => {
     for (const t of s.tasks) {
       out.push({ kind: 'task', task: t });
       for (const a of taskActions(t)) out.push({ kind: 'action', task: t, action: a });
+      for (const j of tabJumps(t)) out.push({ kind: 'jump', task: t, tab: j.tab, label: j.label });
     }
   }
   for (const d of docMatches.value) out.push({ kind: 'doc', slug: d.slug });
@@ -173,6 +187,9 @@ function taskRowIndex(task: Task): number {
 }
 function actionRowIndex(task: Task, actionId: CardAction): number {
   return flatRows.value.findIndex((r) => r.kind === 'action' && r.task.id === task.id && r.action.id === actionId);
+}
+function jumpRowIndex(task: Task, tab: string): number {
+  return flatRows.value.findIndex((r) => r.kind === 'jump' && r.task.id === task.id && r.tab === tab);
 }
 function docRowIndex(slug: string): number {
   return flatRows.value.findIndex((r) => r.kind === 'doc' && r.slug === slug);
@@ -259,6 +276,12 @@ function pick(task: Task) {
   close();
 }
 
+function pickJump(task: Task, tab: string) {
+  emit('select', task.id);
+  router.push({ path: '/', query: { task: task.id, tab } });
+  close();
+}
+
 function pickDoc(slug: string) {
   router.push({ path: `/docs/${slug}` });
   close();
@@ -304,6 +327,7 @@ function onKeydown(e: KeyboardEvent) {
       if (!row) break;
       if (row.kind === 'task') pick(row.task);
       else if (row.kind === 'action') void runTaskAction(row.action.id, row.task);
+      else if (row.kind === 'jump') pickJump(row.task, row.tab);
       else if (row.kind === 'doc') pickDoc(row.slug);
       break;
     }
@@ -409,6 +433,16 @@ onUnmounted(() => {
                       @click="runTaskAction(a.id, task)"
                       @mouseenter="activeIndex = actionRowIndex(task, a.id)"
                     >{{ a.icon }} {{ a.label }}</button>
+                    <button
+                      v-for="j in tabJumps(task)"
+                      :key="j.tab"
+                      type="button"
+                      class="command-palette-action-btn"
+                      :class="{ active: jumpRowIndex(task, j.tab) === activeIndex }"
+                      :title="j.label"
+                      @click="pickJump(task, j.tab)"
+                      @mouseenter="activeIndex = jumpRowIndex(task, j.tab)"
+                    >{{ j.label }}</button>
                   </span>
                 </div>
                 <div

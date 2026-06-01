@@ -71,7 +71,7 @@ Legend: `[ ]` open · `[x]` done · `[~]` intentionally won't-do (note why).
 - [x] modal-results — collapse older turns in <details>
 - [ ] modal-logs — impl-vs-test phase log separation
 - [x] git — 409 conflict shows blocking_tasks list, not generic alert
-- [ ] command-palette — context actions: tab-switch jumps (testing/changes/flamegraph/timeline)
+- [x] command-palette — context actions: tab-switch jumps (changes/results/timeline) + fixed task-open from query
 - [x] command-palette — recent-tasks fallback when palette opens empty (verified: sections "Recent" on empty query)
 - [x] search — multi-tag AND + text combination (DONE: lib/taskFilter)
 - [x] modal-ndjson — thinking blocks inline-expandable (>5 lines "+N lines")
