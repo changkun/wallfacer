@@ -190,7 +190,6 @@ The `Config` struct covers all known keys. Key categories:
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
 | **Host backend** | `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`) — optional explicit CLI paths; empty resolves via `$PATH` |
-| **Container** | `TaskWorkers` (`WALLFACER_TASK_WORKERS`, default `true`), `DependencyCaches` (`WALLFACER_DEPENDENCY_CACHES`, default `false`) |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `PlanningWindowDays` (`WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 | **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
