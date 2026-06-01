@@ -50,7 +50,7 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 		if f.Slug == "" {
 			return nil, fmt.Errorf("parse %s: slug is required", path)
 		}
-		if !IsValidSlug(f.Slug) {
+		if !slugutil.IsValid(f.Slug) {
 			return nil, fmt.Errorf("parse %s: slug %q is not kebab-case (2-40 chars)", path, f.Slug)
 		}
 		if f.Name == "" {
@@ -86,7 +86,7 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 // WriteUserFlow persists a single user-authored flow to
 // dir/<slug>.yaml using an atomic temp-file + rename.
 func WriteUserFlow(dir string, f Flow) error {
-	if !IsValidSlug(f.Slug) {
+	if !slugutil.IsValid(f.Slug) {
 		return fmt.Errorf("invalid slug %q", f.Slug)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -122,7 +122,7 @@ func WriteUserFlow(dir string, f Flow) error {
 // DeleteUserFlow removes dir/<slug>.yaml. Idempotent: missing file
 // yields nil.
 func DeleteUserFlow(dir, slug string) error {
-	if !IsValidSlug(slug) {
+	if !slugutil.IsValid(slug) {
 		return fmt.Errorf("invalid slug %q", slug)
 	}
 	path := filepath.Join(dir, slug+".yaml")
@@ -159,10 +159,6 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 	return NewRegistry(all...), nil
 }
 
-// IsValidSlug enforces the same slug format flows and agents share:
-// 2–40 chars, lowercase letters / digits / hyphens, no leading or
-// trailing hyphen.
-func IsValidSlug(s string) bool { return slugutil.IsValid(s) }
 
 // IsBuiltin reports whether slug names a built-in flow.
 func IsBuiltin(slug string) bool {
