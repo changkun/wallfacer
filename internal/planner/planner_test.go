@@ -342,7 +342,25 @@ func TestPlannerExec_BackendError(t *testing.T) {
 	}
 }
 
-// --- buildContainerSpec empty workspace and no env file ---
+// --- buildContainerSpec workspace selection, empty workspace, no env file ---
+
+// TestBuildContainerSpec_MultiWorkspaceUsesFirst documents that the host
+// planner runs in the first configured workspace; subsequent workspaces are
+// reachable as siblings but do not change the process CWD.
+func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
+	first := t.TempDir()
+	second := t.TempDir()
+	p := New(Config{
+		Command:     "podman",
+		Workspaces:  []string{first, second},
+		Fingerprint: "multi",
+	})
+
+	spec := p.buildContainerSpec("wallfacer-plan-multi", harness.Claude)
+	if spec.WorkDir != first {
+		t.Errorf("WorkDir = %q, want first workspace %q", spec.WorkDir, first)
+	}
+}
 
 func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 	p := New(Config{
