@@ -249,6 +249,8 @@
   [data-main-tab-section]:not([data-main-tab-section~="activity"]),
 #modal[data-main-tab="changes"]
   [data-main-tab-section]:not([data-main-tab-section~="changes"]),
+#modal[data-main-tab="results"]
+  [data-main-tab-section]:not([data-main-tab-section~="results"]),
 #modal[data-main-tab="flamegraph"]
   [data-main-tab-section]:not([data-main-tab-section~="flamegraph"]),
 #modal[data-main-tab="timeline"]
