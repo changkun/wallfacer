@@ -149,22 +149,69 @@ async function fetchSpans() {
   }
 }
 
+// --- Events tab: the actual event timeline (state_change / output /
+// feedback / error / system), not just usage stats. Mirrors the legacy
+// modal-core event list. ---
+interface TaskEvent {
+  id: number;
+  event_type: string;
+  data?: Record<string, unknown>;
+  created_at: string;
+}
+const events = ref<TaskEvent[]>([]);
+const eventsLoading = ref(false);
+const eventsFetched = ref(false);
+
+async function fetchEvents() {
+  if (!props.task) return;
+  eventsLoading.value = true;
+  try {
+    const data = await api<TaskEvent[] | { events?: TaskEvent[] }>('GET', `/api/tasks/${props.task.id}/events`);
+    events.value = Array.isArray(data) ? data : (data?.events ?? []);
+    eventsFetched.value = true;
+  } catch {
+    events.value = [];
+  } finally {
+    eventsLoading.value = false;
+  }
+}
+
+// One-line summary per event, by type. Mirrors the legacy _renderEventRow.
+function eventSummary(e: TaskEvent): string {
+  const d = e.data ?? {};
+  switch (e.event_type) {
+    case 'state_change': return `${d.from ?? '?'} → ${d.to ?? d.status ?? '?'}`;
+    case 'output': return typeof d.result === 'string' ? d.result.slice(0, 100) : 'output';
+    case 'feedback': return typeof d.text === 'string' ? d.text.slice(0, 100) : 'feedback';
+    case 'error': return typeof d.error === 'string' ? d.error.slice(0, 120) : (typeof d.message === 'string' ? d.message.slice(0, 120) : 'error');
+    case 'system': return typeof d.kind === 'string' ? d.kind : 'system';
+    default: return e.event_type;
+  }
+}
+const visibleEvents = computed(() =>
+  // span_start/span_end belong to the Timeline tab, not the event list.
+  events.value.filter((e) => e.event_type !== 'span_start' && e.event_type !== 'span_end'),
+);
+
 watch(mainTab, (t) => {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
   if (t === 'results' && !resultsFetched.value) fetchResults();
   if (t === 'timeline' && !spansFetched.value) fetchSpans();
+  if (t === 'events' && !eventsFetched.value) fetchEvents();
 });
 
-// Refetch spans when navigating to a different task while the timeline
+// Refetch per-tab data when navigating to a different task while a data
 // tab stays selected (e.g. via deep-link or sidebar nav).
 watch(
   () => props.task?.id,
   () => {
     spansFetched.value = false; spans.value = [];
     resultsFetched.value = false; implResults.value = []; testResults.value = [];
+    eventsFetched.value = false; events.value = [];
     if (mainTab.value === 'timeline') fetchSpans();
     if (mainTab.value === 'results') fetchResults();
+    if (mainTab.value === 'events') fetchEvents();
   },
 );
 
@@ -747,6 +794,22 @@ const isArchived = computed(() => !!props.task.archived);
 
                 <!-- EVENTS tab -->
                 <div data-main-tab-section="events">
+                  <h3 class="section-title">Events</h3>
+                  <div v-if="eventsLoading" class="text-xs text-v-muted mb-4">Loading events…</div>
+                  <div v-else-if="!visibleEvents.length" class="text-xs text-v-muted mb-4">No events recorded.</div>
+                  <ul v-else class="event-list mb-4">
+                    <li
+                      v-for="e in visibleEvents"
+                      :key="e.id"
+                      class="event-row"
+                      :data-event-type="e.event_type"
+                    >
+                      <span class="event-row__type">{{ e.event_type }}</span>
+                      <span class="event-row__summary">{{ eventSummary(e) }}</span>
+                      <span class="event-row__time">{{ timeStr(e.created_at) }}</span>
+                    </li>
+                  </ul>
+
                   <h3 class="section-title">Usage</h3>
                   <div class="usage-grid mb-4">
                     <div class="flex justify-between">
@@ -1259,6 +1322,36 @@ const isArchived = computed(() => !!props.task.archived);
   gap: 6px;
   margin-top: 4px;
 }
+
+/* Event timeline rows in the Events tab. */
+.event-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.event-row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+.event-row:hover { background: var(--bg-hover); }
+.event-row__type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.event-row[data-event-type="error"] .event-row__type { color: var(--err, #c0392b); }
+.event-row[data-event-type="state_change"] .event-row__type { color: var(--accent); }
+.event-row__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.event-row__time { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Pretty agent-activity rows (mirrors the planning chat's pcp-activity). */
 .ta-activity-log {
