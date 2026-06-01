@@ -504,9 +504,7 @@ function capitalize(s: string): string {
         <p style="margin: 4px 0 0 0">
           Tasks run directly on your machine with your user's permissions.
           Wallfacer cannot prevent an agent from writing outside the worktree.
-          Recommended only on trusted machines. Start with
-          <code>wallfacer run --backend container</code> to restore container
-          isolation.
+          Recommended only on trusted machines.
         </p>
       </div>
     </div>
