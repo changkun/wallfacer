@@ -4,14 +4,10 @@ import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 
 interface ContainerItem {
-  id?: string;
   task_id?: string;
   task_title?: string;
   name?: string;
-  image?: string;
   state?: string;
-  status?: string;
-  created_at?: number;
 }
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -31,12 +27,26 @@ function openTask(taskId: string | undefined) {
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
+interface HealthResponse {
+  running_containers?: {
+    count?: number;
+    items?: { task_id?: string; name?: string; state?: string }[];
+  };
+}
+
 async function fetchContainers(quiet = false) {
   if (!quiet) loading.value = true;
   try {
-    // Endpoint returns a JSON array of ContainerInfo directly.
-    const res = await api<ContainerItem[] | null>('GET', '/api/containers');
-    containers.value = Array.isArray(res) ? res : [];
+    // The dedicated /api/containers route was removed (host backend has no
+    // containers to list); the surviving source of truth for running
+    // sandbox containers is /api/debug/health → running_containers.items.
+    const res = await api<HealthResponse>('GET', '/api/debug/health');
+    const items = res?.running_containers?.items ?? [];
+    containers.value = items.map((c) => ({
+      task_id: c.task_id,
+      name: c.name,
+      state: c.state ?? 'running',
+    }));
     error.value = '';
     lastUpdated.value = `Last refreshed: ${new Date().toLocaleTimeString()}`;
   } catch (e) {
@@ -90,10 +100,6 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKey);
 });
 
-function shortId(id: string | undefined): string {
-  return id ? id.slice(0, 12) : '—';
-}
-
 function shortTaskId(id: string | undefined): string {
   return id ? id.slice(0, 8) : '';
 }
@@ -107,19 +113,6 @@ function stateColor(state: string | undefined): string {
     case 'dead': return '#d46868';
     default: return '#9c9890';
   }
-}
-
-function relativeTime(seconds: number | undefined): string {
-  if (!seconds || seconds <= 0) return '—';
-  const diff = Date.now() - seconds * 1000;
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }
 
 const isEmpty = computed(() => !loading.value && !error.value && containers.value.length === 0);
@@ -185,19 +178,13 @@ const hasContent = computed(() => !loading.value && !error.value && containers.v
               <table :style="{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }">
                 <thead>
                   <tr :style="{ borderBottom: '1px solid var(--border)' }">
-                    <th class="cm-th">Container ID</th>
                     <th class="cm-th">Task</th>
                     <th class="cm-th">Name</th>
                     <th class="cm-th">State</th>
-                    <th class="cm-th">Status</th>
-                    <th class="cm-th">Created</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(c, i) in containers" :key="(c.id || c.name || '') + i" class="cm-row">
-                    <td :style="{ padding: '8px 10px', fontFamily: 'monospace', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }">
-                      {{ shortId(c.id) }}
-                    </td>
+                  <tr v-for="(c, i) in containers" :key="(c.name || '') + i" class="cm-row">
                     <td :style="{ padding: '8px 10px', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
                       <button
                         v-if="c.task_id"
@@ -218,12 +205,6 @@ const hasContent = computed(() => !loading.value && !error.value && containers.v
                         <span :style="{ width: '7px', height: '7px', borderRadius: '50%', background: stateColor(c.state), flexShrink: '0' }" />
                         {{ c.state || '—' }}
                       </span>
-                    </td>
-                    <td :style="{ padding: '8px 10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }">
-                      {{ c.status || '—' }}
-                    </td>
-                    <td :style="{ padding: '8px 10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }">
-                      {{ relativeTime(c.created_at) }}
                     </td>
                   </tr>
                 </tbody>

@@ -283,8 +283,16 @@ function closeSession(id: string) {
 async function toggleContainerPicker() {
   if (containerPickerOpen.value) { containerPickerOpen.value = false; return; }
   try {
-    const containers = await api<{ id: string; name: string; state: string; task_title?: string }[]>('GET', '/api/containers');
-    containerList.value = containers ?? [];
+    // /api/containers was removed (host backend has no containers); the
+    // running-container list now lives in /api/debug/health.
+    const res = await api<{ running_containers?: { items?: { task_id?: string; name?: string; state?: string }[] } }>('GET', '/api/debug/health');
+    const items = res?.running_containers?.items ?? [];
+    containerList.value = items.map((c) => ({
+      id: '',
+      name: c.name ?? '',
+      state: c.state ?? 'running',
+      task_title: undefined,
+    }));
   } catch {
     containerList.value = [];
   }
