@@ -2,11 +2,11 @@
 
 Plan mode (formerly Specs) is where you explore ideas conversationally with an AI agent before committing to structured specs or tasks.
 
-The planning chat is a conversational interface for exploring ideas with an AI agent before committing to structured specs or tasks. It runs inside Plan mode and is backed by a persistent sandbox container that can read your codebase, create files, and execute commands.
+The planning chat is a conversational interface for exploring ideas with an AI agent before committing to structured specs or tasks. It runs inside Plan mode and is backed by a planning sandbox that can read your codebase, create files, and execute commands.
 
 ```mermaid
 flowchart LR
-  user["You"] -->|message / slash command| agent["Planning Agent<br/>(sandbox container)"]
+  user["You"] -->|message / slash command| agent["Planning Agent<br/>(host process)"]
   agent -->|reads| code["Workspace code"]
   agent -->|writes| specs["specs/"]
   specs -->|SSE snapshot| explorer["Spec Explorer"]
@@ -85,7 +85,7 @@ Keep typing while the agent is responding. New messages appear as queued chips b
 
 ### Clearing History
 
-Click **Clear** in the chat header to discard all messages in the current thread and start a fresh conversation on that thread. The underlying container session is preserved; only the visible message history is cleared.
+Click **Clear** in the chat header to discard all messages in the current thread and start a fresh conversation on that thread. The underlying agent session is preserved; only the visible message history is cleared.
 
 ### Empty vs Non-empty Workspace
 
@@ -98,7 +98,7 @@ The chat supports multiple named threads per workspace group. Tabs sit above the
 - Click **+** to create a new thread (default name `Chat N`). Click the pencil icon (or double-click the tab) to rename inline — Enter commits, Escape cancels.
 - Click **×** on a tab to archive it (the in-flight thread cannot be archived; interrupt it first). Archived threads are hidden from the tab bar but files are retained; a **▾** menu next to **+** lists archived threads for restore.
 - Each thread keeps its own Claude Code session and history. Switching tabs does not abort an in-flight agent — its output continues to land in its own thread. When a background thread finishes, its tab shows a small unread dot.
-- Only one agent turn runs at a time across all threads, since they share the single planner sandbox container. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the exec completes (global FIFO).
+- Only one agent turn runs at a time across all threads, since they share the single planner. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the exec completes (global FIFO).
 
 ### Undo
 
@@ -114,15 +114,15 @@ Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `
 
 ### Session Recovery
 
-If the Claude Code session inside the planning container is lost (container recreated, session expired, or server restart), the system automatically retries with the conversation history replayed as context. You do not need to re-enter previous messages.
+The agent process exits between turns, so its session is resumed on the next message. If the session cannot be resumed (it expired, or the server restarted), the system automatically replays the conversation history as context instead. You do not need to re-enter previous messages.
 
 ### Planning Sandbox
 
-The planning container is a long-lived, workspace-scoped sandbox keyed by a fingerprint of the mounted workspaces. It is the same backend type as task sandboxes (Claude or Codex) but is reused across messages rather than spun up fresh for each turn. The container is created lazily on the first message in a workspace group — nothing runs until you speak to it.
+The planner is a singleton, workspace-scoped sandbox keyed by a fingerprint of the active workspaces. It is the same harness as task sandboxes (Claude or Codex). Each message execs a fresh agent process; continuity comes from session resume (with history replay as a fallback), not a reused process. Nothing runs until you send the first message in a workspace group.
 
-Because threads share the single container, only one agent turn runs at a time globally. Messages sent to background threads while another is in-flight are queued FIFO and fire automatically as the in-flight round completes. When the active workspace group changes, `UpdateWorkspaces` restarts the container so it sees the new mount set; open threads keep their history intact.
+Because threads share the single planner, only one agent turn runs at a time globally. Messages sent to background threads while another is in-flight are queued FIFO and fire automatically as the in-flight round completes. When the active workspace group changes, `UpdateWorkspaces` re-scopes the planner to the new workspace set; open threads keep their history intact.
 
-Stopping the sandbox from **Settings → Planning** tears down the container but does not touch conversation history — the next message simply relaunches it.
+Stopping the planner from **Settings → Planning** ends any in-flight turn but does not touch conversation history — the next message simply starts a fresh process.
 
 ### Send Mode Toggle
 

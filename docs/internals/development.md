@@ -102,7 +102,7 @@ make                   # Build the unified sandbox-agents image
 make RUNTIME=docker    # Use Docker instead of Podman
 ```
 
-Local builds are tagged as `sandbox-agents:latest`. Wallfacer prefers this local image over a network pull whenever the versioned GHCR tag (e.g. `ghcr.io/latere-ai/sandbox-agents:v0.0.6`) is not yet cached, and still uses it as a fallback if a pull fails. This keeps `wallfacer run` in sync with the Makefile's `pull-images` target, so a sibling latere-ai/images checkout works without network round-trips.
+Local builds are tagged as `sandbox-agents:latest`.
 
 ## Release Workflow
 
