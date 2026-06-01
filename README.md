@@ -31,7 +31,7 @@ Every AI coding tool today pins you to one interaction mode. Chat-based tools ar
 
 **Spec as intermediate representation** — Ideas don't go straight to code. They become structured specs that agents can reason about, iterate on, and implement against. Specs are versioned and reviewable.
 
-**Isolation by default** — Per-task containers and git worktrees for safe parallel execution. Multiple agents work simultaneously without stepping on each other.
+**Per-task git worktrees** — Each task works in its own git worktree for safe parallel execution. Multiple agents work simultaneously without stepping on each other.
 
 **Operator visibility** — Live logs, traces, timelines, diff review, and usage/cost tracking. Full audit trail from idea to deployed code.
 
@@ -56,17 +56,16 @@ wallfacer doctor
 Start the server:
 
 ```bash
-wallfacer run                    # container backend (default) — uses podman/docker
-wallfacer run --backend host     # host mode — execs claude/codex directly, no container
+wallfacer run                    # execs claude/codex directly as host processes
 ```
 
-A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough, and [Configuration → Host mode](docs/guide/configuration.md#host-mode) if you'd rather skip the container runtime entirely.
+A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
 
 ## How It Works
 
 1. **Explore** — Describe what you want to build in chat. Wallfacer helps you shape the idea.
 2. **Specify** — The idea becomes a structured spec. Iterate on it until the design is right.
-3. **Execute** — Specs break into tasks on a board. Agents implement, test, and commit in isolated sandboxes.
+3. **Execute** — Specs break into tasks on a board. Agents implement, test, and commit in isolated git worktrees.
 4. **Ship** — Reviewed changes merge automatically. Auto-commit, auto-push, auto-build when you're ready.
 
 ```mermaid
@@ -113,7 +112,7 @@ Read more: [Agents & Flows](docs/guide/agents-and-flows.md).
 
 ![Wallfacer board overview](./assets/overview-board.png)
 
-Coordinate many agent tasks on a task board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs in an isolated container with its own git worktree.
+Coordinate many agent tasks on a task board. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs as a host process in its own git worktree.
 
 ### Plan Mode, Structured Design
 
@@ -138,7 +137,7 @@ Track token usage and cost by task, activity, and turn so operations stay measur
 
 - **Chat** — planning chat with slash commands and file-explorer context, refinement and brainstorm agents, conversational drift away from or back into specs.
 - **Spec** — six-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
-- **Task** — isolated containers or host-mode exec, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
+- **Task** — host-process execution, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code** — file explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, workspace-level AGENTS.md instructions.
 
 Built on seven composable sub-agent roles (Claude or Codex) arranged into flows (`implement`, `brainstorm`, `refine-only`, `test-only`, plus user-authored clones) that can be inspected or rewritten from the sidebar.
@@ -147,7 +146,7 @@ Built on seven composable sub-agent roles (Claude or Codex) arranged into flows 
 
 Development is organized into three parallel tracks with shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
 
-**Foundations** (complete): Sandbox backend interface, storage backend interface, container reuse, file explorer, host terminal, multi-workspace groups, Windows support.
+**Foundations** (complete): Sandbox backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
 
 **Local Product**: Desktop experience and developer workflow. Spec coordination (document model, planning UX, drift detection), agents & flows (composable sub-agent pipelines), routine tasks (scheduled spawns), desktop app, file/image attachments, host mounts, oversight risk scoring, visual verification, live serve.
 

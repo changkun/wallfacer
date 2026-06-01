@@ -2,9 +2,9 @@ This file provides guidance when working with code in this repository.
 
 ## Project Overview
 
-Wallfacer is a task-board runner for AI agents. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger AI agent execution in an isolated sandbox container, and results are inspected when done.
+Wallfacer is a task-board runner for AI agents. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger AI agent execution as a host process, and results are inspected when done.
 
-**Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and launches ephemeral sandbox containers via `os/exec` (podman/docker). Each task gets its own git worktree for isolation.
+**Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and execs the `claude`/`codex` CLI directly via `os/exec`. Each task gets its own git worktree for isolation.
 
 For detailed documentation see `docs/`. The user manual is at `docs/guide/usage.md` and the technical internals index is at `docs/internals/internals.md`.
 
@@ -27,8 +27,8 @@ The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). Wh
 ## Build & Run Commands
 
 ```bash
-make build          # Full gate: fmt + lint (Go + JS) + binary + pull sandbox images
-make build-binary   # Build just the Go binary (no fmt/lint/pull)
+make build          # Full gate: fmt + lint (Go + JS) + ts build + binary
+make build-binary   # Build just the Go binary (no fmt/lint)
 make lint           # Lint only (fastest way to catch style regressions)
 make fmt            # Format Go and JS in place
 make test           # lint + backend tests + frontend tests (matches CI)
@@ -48,10 +48,8 @@ CLI usage (after `make build-binary`):
 ```bash
 wallfacer run                                # Start server, restore last workspace group
 wallfacer run -addr :9090 -no-browser        # Custom port, no browser
-wallfacer run --backend host                 # Host mode: exec claude/codex directly (no container)
 wallfacer doctor                             # Check prerequisites and config
 wallfacer status [-watch]                    # Print board state
-wallfacer exec <task-id-prefix>              # Attach to running task container
 wallfacer spec validate [-json] [path...]    # Validate spec frontmatter
 wallfacer spec new specs/local/foo.md        # Scaffold a spec with valid defaults
 wallfacer auth login [--org=<uuid>]          # Local-mode sign-in (RFC 8628 device code)
@@ -61,25 +59,24 @@ wallfacer auth logout                        # Remove the locally stored token
 
 Local-mode token storage is `<UserConfigDir>/latere/token.json`, shared with the `latere` CLI: signing in via either tool carries over to the other. The local-mode SPA can also drive the same device-code flow without leaving the desktop window via the `POST /api/auth/device/start`, `GET /api/auth/device/poll`, and `POST /api/auth/device/cancel` endpoints (see `internal/handler/device_auth.go`).
 
-The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.
-
 ## Server Development
 
 The Go source lives at the top level. Module path: `changkun.de/x/wallfacer`. Go version: 1.25.7. The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
 
 Key server files:
 - `main.go` — Tiny entry point: embed FS declarations and subcommand dispatch
-- `internal/cli/` — CLI subcommand implementations (server, exec, status, env) and shared helpers
+- `internal/cli/` — CLI subcommand implementations (run, doctor, status, spec, auth, web, desktop) and shared helpers
 - `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
 - `internal/handler/` — HTTP API handlers (one file per concern)
 - `internal/oauth/` — OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex)
-- `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
+- `internal/runner/` — Host-process orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
 - `internal/store/` — Per-task directory persistence, data models, event sourcing, soft delete, search index; see `docs/internals/data-and-storage.md`
 - `internal/envconfig/` — `.env` file parsing and atomic update
 - `internal/gitutil/` — Git utility operations (ops, repo, status, stash, worktree)
 - `internal/workspace/` — Workspace manager; scopes data by workspace key; supports runtime workspace switching with concurrent multi-group execution
 - `internal/constants/` — Consolidated system parameters: timeouts, intervals, retry counts, size limits, concurrency caps, pagination defaults
-- `internal/sandbox/` — Sandbox type enumeration (Claude, Codex); Windows host path translation for container mounts
+- `internal/executor/` — Host process backend: spawn/stream/wait/kill the agent CLI; launch spec and event-stream parsing
+- `internal/harness/` — Harness abstraction: per-CLI argv building, NDJSON event parsing, and auth env (Claude, Codex)
 - `internal/prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management
 - `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
 
@@ -102,10 +99,10 @@ Categories:
 - **Routines** — `/api/routines*` (cron-like scheduler in `internal/routine/`; routine cards are tasks, deleted via `/api/tasks/{id}`)
 - **Spec Tree** — `/api/specs/*` (tree, stream, dispatch, undispatch, archive, unarchive)
 - **Planning Sandbox** — `/api/planning*` (sandbox lifecycle, threads, messages, SSE stream, interrupt, undo, slash commands)
-- **Usage & Statistics** — `/api/usage`, `/api/stats`, `/api/containers`, `/api/files`
+- **Usage & Statistics** — `/api/usage`, `/api/stats`, `/api/files`
 - **Sandbox Images** — `/api/images*` (cache check, pull, delete, SSE pull progress)
 - **File Explorer** — `/api/explorer/*` (tree, stream, file read/write)
-- **Terminal** — `/api/terminal/ws` WebSocket (multi-session tabs, host shell + container exec; not in apicontract; `?token=` auth)
+- **Terminal** — `/api/terminal/ws` WebSocket (multi-session host shell tabs; not in apicontract; `?token=` auth)
 - **OAuth Authentication** — `/api/auth/{provider}/*` for `claude` and `codex`
 - **Admin** — `/api/admin/rebuild-index`
 
@@ -125,7 +122,7 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - `max_tokens`/`pause_turn` → auto-continue in same session
 - Feedback on Waiting → resumes execution
 - "Mark as Done" on Waiting → Done + auto commit-and-push
-- "Cancel" on Backlog/In Progress/Waiting/Failed/Done → Cancelled; kills container, discards worktrees
+- "Cancel" on Backlog/In Progress/Waiting/Failed/Done → Cancelled; kills the task process, discards worktrees
 - "Resume" on Failed → continues in existing session
 - "Retry" on Failed/Done/Waiting/Cancelled → resets to Backlog (via PATCH with status change)
 - "Sync" on Waiting/Failed → rebases worktrees onto latest default branch without merging
@@ -141,8 +138,8 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Soft delete** via tombstone files; `DELETE /api/tasks/{id}` writes a tombstone, data pruned after retention window (`WALLFACER_TOMBSTONE_RETENTION_DAYS`, default 7)
 - **Git worktrees** per task for isolation; see `docs/internals/git-worktrees.md`
 - **Usage tracking** accumulates input/output tokens, cache tokens, and cost across turns; per-sub-agent breakdown; per-turn records available via `/api/tasks/{id}/turn-usage`
-- **Container execution** creates ephemeral containers via `os/exec`; mounts worktrees under `/workspace/<basename>`
-- **Workspace AGENTS.md** mounted read-only at `/workspace/AGENTS.md` so Claude Code picks it up automatically
+- **Host execution** execs the agent CLI via `os/exec` with the task's git worktree as the working directory
+- **Workspace AGENTS.md** delivered to the agent via `--append-system-prompt` (path passed as `WALLFACER_INSTRUCTIONS_PATH`)
 - **Oversight summaries** generated asynchronously when tasks reach waiting/done/failed
 - **System prompt templates** are overridable built-in prompts (`internal/prompts/*.tmpl`); users can customize via the UI or API
 - **Auto-retry** with per-failure-category budget
@@ -151,13 +148,13 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Frontend** uses SSE for live updates; escapes HTML to prevent XSS
 - **No framework** on backend (stdlib `net/http`) or frontend (vanilla JS)
 - **Server API key** authentication via `WALLFACER_SERVER_API_KEY`
-- **Circuit breaker** for container launches (`WALLFACER_CONTAINER_CB_THRESHOLD`)
+- **Circuit breaker** for agent process launches (`WALLFACER_CONTAINER_CB_THRESHOLD`)
 
 ## Workspace AGENTS.md (Instructions)
 
 Each unique combination of workspace directories gets its own `AGENTS.md` in `~/.wallfacer/instructions/`, identified by a SHA-256 fingerprint of the sorted workspace paths (order-independent).
 
-On first run the file is created from the `instructions.tmpl` template (overridable) plus a reference list of per-repo `AGENTS.md`/`CLAUDE.md` paths. Users can edit it from **Settings → AGENTS.md → Edit** or rebuild from repo files via **Re-init**. Mounted read-only into every task container at `/workspace/AGENTS.md`.
+On first run the file is created from the `instructions.tmpl` template (overridable) plus a reference list of per-repo `AGENTS.md`/`CLAUDE.md` paths. Users can edit it from **Settings → AGENTS.md → Edit** or rebuild from repo files via **Re-init**. Delivered to every task agent via `--append-system-prompt` (path passed as `WALLFACER_INSTRUCTIONS_PATH`).
 
 ## Configuration
 
@@ -180,7 +177,7 @@ Commonly-tuned variables (full list in `docs/guide/configuration.md`):
 
 ## End-to-end integration tests
 
-Two E2E scripts in `scripts/` exercise the full task lifecycle against a running wallfacer server with real sandbox containers. Run after changes to `internal/runner/`, `internal/handler/tasks*.go`, `internal/handler/execute.go`, `internal/gitutil/`, sandbox image updates, or before releases.
+Two E2E scripts in `scripts/` exercise the full task lifecycle against a running wallfacer server with the real agent CLIs. Run after changes to `internal/runner/`, `internal/handler/tasks*.go`, `internal/handler/execute.go`, `internal/gitutil/`, harness/executor changes, or before releases.
 
 ```bash
 wallfacer run &                              # requires a running server with valid credentials
@@ -189,7 +186,7 @@ make e2e-lifecycle SANDBOX=claude            # one sandbox
 make e2e-dependency-dag WORKSPACE=/path      # fan-out/fan-in DAG with conflict resolution
 ```
 
-`e2e-lifecycle` checks task creation, execution, commit pipeline, archive, and container cleanup. `e2e-dependency-dag` checks batch creation with dependencies, autopilot promotion, max-parallel caps, conflict resolution during rebase, autosync, and autosubmit. Tunables: `WALLFACER_URL`, `WALLFACER_SERVER_API_KEY`, `WALLFACER_TEST_TIMEOUT`.
+`e2e-lifecycle` checks task creation, execution, commit pipeline, archive, and process cleanup. `e2e-dependency-dag` checks batch creation with dependencies, autopilot promotion, max-parallel caps, conflict resolution during rebase, autosync, and autosubmit. Tunables: `WALLFACER_URL`, `WALLFACER_SERVER_API_KEY`, `WALLFACER_TEST_TIMEOUT`.
 
 ## Bug fixes require a reproducible test
 
