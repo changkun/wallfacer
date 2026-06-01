@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, computed, onMounted } from 'vue';
+import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import { parseTags, splitBatch } from '../lib/composer';
@@ -10,7 +10,19 @@ interface FlowOption { slug: string; name: string }
 
 const props = defineProps<{ autoExpand?: boolean }>();
 const store = useTaskStore();
-const prompt = ref('');
+
+// Composer draft persistence — losing typing on a stray refresh is a
+// real UX regression vs the legacy UI, which used wallfacer-new-task-draft.
+// Same key so users mid-migration don't lose work.
+const DRAFT_KEY = 'wallfacer-new-task-draft';
+const prompt = ref<string>(
+  typeof localStorage !== 'undefined' ? localStorage.getItem(DRAFT_KEY) ?? '' : '',
+);
+watch(prompt, (v) => {
+  if (typeof localStorage === 'undefined') return;
+  if (v.trim()) localStorage.setItem(DRAFT_KEY, v);
+  else localStorage.removeItem(DRAFT_KEY);
+});
 const mentions = useMentions({ setValue: (v) => { prompt.value = v; }, priorityPrefix: 'spec/' });
 const submitting = ref(false);
 const expanded = ref(false);
@@ -90,7 +102,11 @@ function insertTemplate() {
 
 // When `autoExpand` is passed (typically by the BoardPage empty state),
 // open the composer on mount so the user sees the prompt textarea first.
-onMounted(() => { if (props.autoExpand) void expand(); });
+onMounted(() => {
+  // Restoring a saved draft is just as much a signal to expand as an
+  // explicit autoExpand prop — surface the work the user already typed.
+  if (props.autoExpand || prompt.value.trim()) void expand();
+});
 
 async function expand() {
   expanded.value = true;

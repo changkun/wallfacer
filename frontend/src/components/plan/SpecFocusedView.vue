@@ -127,6 +127,19 @@ const isArchived = computed(() => status.value === 'archived');
 const isLeaf = computed(() => focusedNode.value?.is_leaf ?? true);
 const kindLabel = computed(() => (isLeaf.value ? 'implementation' : 'design'));
 
+// Dispatched task — frontmatter exposes the linked task id; show it as
+// a click-through pill in the header so users can jump back to the
+// running task without leaving Plan mode. Mirrors legacy spec-mode.js
+// _highlightTaskId.
+const dispatchedTaskId = computed(() => {
+  const raw = parsed.value.frontmatter.dispatched_task_id;
+  return raw && raw !== 'null' ? raw : '';
+});
+function openDispatchedTask() {
+  if (!dispatchedTaskId.value) return;
+  void router.push({ path: '/', query: { task: dispatchedTaskId.value } });
+}
+
 const metaParts = computed(() => {
   const out: string[] = [];
   const fm = parsed.value.frontmatter;
@@ -344,6 +357,13 @@ onUnmounted(() => {
           :class="'sf-kind--' + (isLeaf ? 'impl' : 'design')"
         >{{ kindLabel }}</span>
         <span v-if="effort" class="sf-effort">{{ effort }}</span>
+        <button
+          v-if="dispatchedTaskId"
+          type="button"
+          class="sf-dispatched-pill"
+          :title="`Linked task ${dispatchedTaskId} — click to open on board`"
+          @click="openDispatchedTask"
+        >→ task {{ dispatchedTaskId.slice(0, 8) }}</button>
         <span class="sf-spacer" />
         <button
           v-if="canArchive"
@@ -574,6 +594,20 @@ onUnmounted(() => {
   padding: 40px 0;
   font-size: 13px;
 }
+.sf-dispatched-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-tint, transparent);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.sf-dispatched-pill:hover { background: var(--accent); color: #fff; }
 .sf-frontmatter-warning {
   margin: 0 0 12px;
   padding: 8px 12px;

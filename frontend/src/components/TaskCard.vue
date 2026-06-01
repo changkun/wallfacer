@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
@@ -276,6 +277,15 @@ const cardActions = computed(() =>
 );
 
 const router = useRouter();
+const taskStore = useTaskStore();
+
+// Clicking a tag chip filters the board to that exact tag using the
+// `#tag` search prefix matchesFilter understands. stopPropagation keeps
+// the row click from also opening the task detail.
+function filterByTag(tag: string, e: Event) {
+  e.stopPropagation();
+  taskStore.filterQuery = ('#' + tag).toLowerCase();
+}
 
 async function runCardAction(action: CardAction, e: Event) {
   e.stopPropagation();
@@ -405,16 +415,19 @@ function onCardKeydown(e: KeyboardEvent) {
     <!-- Row 2: title -->
     <div v-if="props.task.title" class="card-title" :title="props.task.title">{{ props.task.title }}</div>
 
-    <!-- Row 3: tags (priority:*/impact:* get dedicated badges) -->
+    <!-- Row 3: tags (priority:*/impact:* get dedicated badges).
+         Click a tag to filter the board to that tag. -->
     <div v-if="props.task.tags?.length" class="tag-chip-row">
-      <span
+      <button
         v-for="tag in props.task.tags"
         :key="tag"
+        type="button"
         :class="renderedTag(tag).cls"
         :data-tag="tag"
         :style="renderedTag(tag).styled ? tagStyle(tag) : ''"
-        :title="`Tag: ${tag}`"
-      >{{ renderedTag(tag).label }}</span>
+        :title="`Filter board by tag: ${tag}`"
+        @click="filterByTag(tag, $event)"
+      >{{ renderedTag(tag).label }}</button>
     </div>
 
     <!-- Row 4: prompt preview (markdown) -->
