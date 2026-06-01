@@ -48,9 +48,6 @@ type Config struct {
 
 	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
 	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
-	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
-	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
-	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 	TaskWorkers      bool   // WALLFACER_TASK_WORKERS ("true"/"false"), defaults to true when unset
 	DependencyCaches bool   // WALLFACER_DEPENDENCY_CACHES ("true"/"false"), defaults to false
 	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
@@ -97,9 +94,6 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_FAST",
 	"WALLFACER_HOST_CLAUDE_BINARY",
 	"WALLFACER_HOST_CODEX_BINARY",
-	"WALLFACER_CONTAINER_NETWORK",
-	"WALLFACER_CONTAINER_CPUS",
-	"WALLFACER_CONTAINER_MEMORY",
 	"WALLFACER_TASK_WORKERS",
 	"WALLFACER_DEPENDENCY_CACHES",
 	"WALLFACER_TERMINAL_ENABLED",
@@ -203,12 +197,6 @@ func Parse(path string) (Config, error) {
 			cfg.HostClaudeBinary = v
 		case "WALLFACER_HOST_CODEX_BINARY":
 			cfg.HostCodexBinary = v
-		case "WALLFACER_CONTAINER_NETWORK":
-			cfg.ContainerNetwork = v
-		case "WALLFACER_CONTAINER_CPUS":
-			cfg.ContainerCPUs = v
-		case "WALLFACER_CONTAINER_MEMORY":
-			cfg.ContainerMemory = v
 		case "WALLFACER_TASK_WORKERS":
 			cfg.TaskWorkers = v != "false"
 		case "WALLFACER_DEPENDENCY_CACHES":
@@ -437,9 +425,6 @@ type Updates struct {
 	AutoPush             *string
 	AutoPushThreshold    *string
 	SandboxFast          *string
-	ContainerNetwork     *string
-	ContainerCPUs        *string
-	ContainerMemory      *string
 	TerminalEnabled      *string
 	Workspaces           *string
 }
@@ -466,9 +451,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
 		"WALLFACER_SANDBOX_FAST":            u.SandboxFast,
-		"WALLFACER_CONTAINER_NETWORK":       u.ContainerNetwork,
-		"WALLFACER_CONTAINER_CPUS":          u.ContainerCPUs,
-		"WALLFACER_CONTAINER_MEMORY":        u.ContainerMemory,
 		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}

@@ -114,9 +114,6 @@ type envConfigResponse struct {
 	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
 	AutoPushThreshold    int                                  `json:"auto_push_threshold"`
 	SandboxFast          bool                                 `json:"sandbox_fast"`
-	ContainerNetwork     string                               `json:"container_network"`
-	ContainerCPUs        string                               `json:"container_cpus"`
-	ContainerMemory      string                               `json:"container_memory"`
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
@@ -193,9 +190,6 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		AutoPushEnabled:      cfg.AutoPushEnabled,
 		AutoPushThreshold:    autoPushThreshold,
 		SandboxFast:          cfg.SandboxFast,
-		ContainerNetwork:     cfg.ContainerNetwork,
-		ContainerCPUs:        cfg.ContainerCPUs,
-		ContainerMemory:      cfg.ContainerMemory,
 	})
 }
 
@@ -429,9 +423,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
 		AutoPushThreshold    *int                                 `json:"auto_push_threshold"`
 		SandboxFast          *bool                                `json:"sandbox_fast"`
-		ContainerNetwork     *string                              `json:"container_network"`
-		ContainerCPUs        *string                              `json:"container_cpus"`
-		ContainerMemory      *string                              `json:"container_memory"`
 		TerminalEnabled      *bool                                `json:"terminal_enabled"`
 	}](w, r)
 	if !ok {
@@ -568,9 +559,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		AutoPush:             autoPush,
 		AutoPushThreshold:    autoPushThreshold,
 		SandboxFast:          sandboxFast,
-		ContainerNetwork:     req.ContainerNetwork,
-		ContainerCPUs:        req.ContainerCPUs,
-		ContainerMemory:      req.ContainerMemory,
 		TerminalEnabled:      terminalEnabled,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)

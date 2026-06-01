@@ -811,32 +811,6 @@ func TestUpdateEnvConfig_AutoPushThresholdClampedToOne(t *testing.T) {
 	}
 }
 
-// TestUpdateEnvConfig_ContainerResourceLimits verifies that container resource
-// limit fields (network, cpus, memory) can be set together.
-func TestUpdateEnvConfig_ContainerResourceLimits(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	body := `{"container_network":"bridge","container_cpus":"2","container_memory":"512m"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-	cfg, err := envconfig.Parse(envPath)
-	if err != nil {
-		t.Fatalf("parse env: %v", err)
-	}
-	if cfg.ContainerNetwork != "bridge" {
-		t.Errorf("ContainerNetwork = %q; want bridge", cfg.ContainerNetwork)
-	}
-	if cfg.ContainerCPUs != "2" {
-		t.Errorf("ContainerCPUs = %q; want 2", cfg.ContainerCPUs)
-	}
-	if cfg.ContainerMemory != "512m" {
-		t.Errorf("ContainerMemory = %q; want 512m", cfg.ContainerMemory)
-	}
-}
-
 // TestUpdateEnvConfig_SandboxFastFalse verifies that sandbox_fast=false is
 // stored correctly (exercises the false branch of the sandboxFast conversion).
 func TestUpdateEnvConfig_SandboxFastFalse(t *testing.T) {

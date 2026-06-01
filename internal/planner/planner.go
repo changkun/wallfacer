@@ -31,9 +31,6 @@ type Config struct {
 	EnvFile          string           // path to .env file for container
 	Fingerprint      string           // workspace fingerprint for keying the container
 	InstructionsPath string           // path to AGENTS.md / CLAUDE.md instructions file
-	Network          string           // container network (empty defaults to "host")
-	CPUs             string           // container CPU limit (e.g. "2.0")
-	Memory           string           // container memory limit (e.g. "4g")
 	ConfigDir        string           // base config directory (~/.wallfacer/) for conversation persistence
 }
 
