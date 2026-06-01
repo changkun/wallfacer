@@ -1,6 +1,6 @@
 ---
 title: Inline diffcache and commitsbehind_cache thin wrappers
-status: drafted
+status: archived
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
 affects:
@@ -80,3 +80,28 @@ covered.
   worth keeping as its own type. Possibly worth promoting to
   `internal/pkg/cache.StaleWhileRevalidate[K,V]` later, but separate
   from this spec.
+
+## Outcome — archived, decision: keep both wrappers (2026-06-01)
+
+A second pass while implementing the sibling backend-only specs
+re-examined this and concluded the original "leave them alone"
+decision from pass 1 was correct:
+
+- **`diffcache.set` encodes real policy** — choosing between
+  `SetPermanent` and `Set` based on `entry.immutable`. Inlining that
+  branch moves a single-sourced policy decision into the only caller
+  (`git.go:520`), which is a wash (one `if` either way) but loses
+  the type-name documentation (`diffCache.set` reads better than
+  `h.diffCache.SetPermanent` / `Set`).
+
+- **`commitsbehindCache.cachedCommitsBehind` is a real
+  read-through** — three callers in `tasks_autopilot.go` would each
+  inline a 7-line miss-then-fill block to replace one method call.
+  That's strictly worse.
+
+- **Test surface deletion would be large** — 11 tests across the two
+  files exercise the wrappers; rewriting them against the cache
+  primitive directly is more churn than the LOC saved.
+
+Marked archived. If a future change rebalances the cost (e.g. a third
+cache type with a similar shape appears), revisit.
