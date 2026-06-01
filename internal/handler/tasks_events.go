@@ -171,40 +171,8 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, _ *http.Request, id uuid.UU
 
 // GenerateMissingTitles triggers background title generation for untitled tasks.
 func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) {
-	limit := 10
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			limit = n
-		}
-	}
-
-	tasks, err := h.store.ListTasks(r.Context(), true)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var untitled []store.Task
-	for _, t := range tasks {
-		if t.Title == "" {
-			untitled = append(untitled, t)
-		}
-	}
-
-	total := len(untitled)
-	if limit > 0 && len(untitled) > limit {
-		untitled = untitled[:limit]
-	}
-
-	taskIDs := make([]string, len(untitled))
-	for i, t := range untitled {
-		taskIDs[i] = t.ID.String()
-		h.runner.GenerateTitleBackground(t.ID, t.Prompt)
-	}
-
-	httpjson.Write(w, http.StatusOK, map[string]any{
-		"queued":              len(untitled),
-		"total_without_title": total,
-		"task_ids":            taskIDs,
-	})
+	h.runBackfillBatch(w, r, "total_without_title",
+		func(t store.Task) bool { return t.Title == "" },
+		func(t store.Task) { h.runner.GenerateTitleBackground(t.ID, t.Prompt) },
+	)
 }
