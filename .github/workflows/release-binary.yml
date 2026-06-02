@@ -39,14 +39,6 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install UI dependencies
-        run: bun install --frozen-lockfile
-        working-directory: ui
-
-      - name: Compile TypeScript sources
-        run: node scripts/build-ts.mjs
-        working-directory: ui
-
       - name: Build Vue frontend
         run: bun install --frozen-lockfile && bun run build
         working-directory: frontend
