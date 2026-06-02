@@ -21,14 +21,6 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
-        working-directory: ui
-
-      - name: Compile TypeScript sources
-        run: node scripts/build-ts.mjs
-        working-directory: ui
-
       - name: Build Vue frontend
         run: bun install --frozen-lockfile && bun run build
         working-directory: frontend
@@ -62,7 +54,7 @@ jobs:
           fi
           echo "total=${js_total}" >> "$GITHUB_OUTPUT"
         id: js-coverage
-        working-directory: ui
+        working-directory: frontend
 
       - name: Coverage Summary
         run: |
@@ -83,7 +75,7 @@ jobs:
         with:
           files: |
             coverage.out
-            ui/coverage-js/lcov.info
+            frontend/coverage-js/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
@@ -91,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: js-coverage
-          path: ui/coverage-js
+          path: frontend/coverage-js
 
   test-macos:
     runs-on: macos-latest

@@ -4,10 +4,10 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server ui-css ui-ts frontend-build typecheck-js api-contract fmt fmt-go fmt-js lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-binary install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Full build gate: fmt + lint + binary.
-build: fmt lint ui-ts frontend-build build-binary
+build: fmt lint frontend-build build-binary
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -46,53 +46,24 @@ build-desktop-linux:
 server:
 	go build -o wallfacer . && ./wallfacer run
 
-# Dev mode: build once, then serve the UI from ./ui on disk so frontend
-# edits (HTML, CSS, JS) are visible on reload without rebuilding the binary.
-server-dev:
-	go build -o wallfacer . && WALLFACER_CLOUD=true ./wallfacer run -ui-dir ./ui
-
 # Regenerate derived API artifacts from the contract definition.
 # Run this after editing internal/apicontract/routes.go.
 # Staleness is enforced automatically by the tests in internal/apicontract/generate_test.go.
 # The route registration test verifies every contract route has a handler in BuildMux.
 api-contract:
 	go run scripts/gen-api-contract.go
-	bunx --bun prettier@3 --write ui/js/generated/
 	go test ./internal/cli/ -run TestContractRoutes_AllRegisteredInMux -count=1
 
-# Transpile TypeScript sources under ui/js/ to sibling .js files so the
-# embedded UI keeps working without a bundler. Uses esbuild as a pure
-# per-file transpiler (no IIFE wrap, no module shim) to preserve the
-# script-tag global-scope model. Re-run after editing any .ts source.
 # Build the Vue frontend SPA into frontend/dist/ for embedding.
 frontend-build:
 	cd frontend && bun install --frozen-lockfile && bun run build
 
-ui-ts:
-	cd ui && node scripts/build-ts.mjs
-
-# Run the TypeScript type checker without emitting output. Runs as part
-# of `make lint` so pre-commit catches type errors before shipping.
-typecheck-js:
-	cd ui && (bunx --bun tsc --noEmit || \
-		(bun install && bunx --bun tsc --noEmit))
-
-# Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
-# Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
-ui-css:
-	bunx --bun tailwindcss@3 -i ui/tailwind.input.css -o ui/css/tailwind.css \
-		--content './ui/**/*.{html,js}' --minify
-
-# Format all source files (Go + frontend)
-fmt: fmt-go fmt-js
+# Format all source files (Go).
+fmt: fmt-go
 
 # Format all Go source files
 fmt-go:
 	gofmt -w .
-
-# Format frontend JS, HTML, and CSS files
-fmt-js:
-	bunx --bun prettier@3 --write 'ui/**/*.{js,html,css}' '!ui/index.html' '!ui/js/vendor/**' '!ui/js/build/**' '!ui/css/vendor/**'
 
 # Run all linters (Go + frontend)
 lint: lint-go lint-js
@@ -106,26 +77,19 @@ lint-go:
 		go vet ./...; \
 	fi
 
-# Run frontend linter (Biome) over ui/js and ui/partials, plus TypeScript typecheck.
-lint-js: typecheck-js
-	cd ui && bunx --bun @biomejs/biome@1.9.4 lint --max-diagnostics=5000 js partials
+# Type-check the Vue frontend (vue-tsc --noEmit).
+lint-js:
+	cd frontend && bun run typecheck
 
 # Run all checks (fmt + lint + backend tests + frontend tests)
-test: fmt lint test-backend test-frontend test-frontend-vue
+test: fmt lint test-backend test-frontend
 
 # Run Go unit tests
 test-backend:
 	go test ./...
 
-# Run legacy ui/ JavaScript unit tests. Depends on ui-ts so vm-based
-# tests that readFileSync the compiled .js twins see fresh output.
-test-frontend: ui-ts
-	cd ui && bunx vitest@2 run
-
-# Run Vue SPA unit tests under frontend/. Kept separate from
-# test-frontend so the legacy and Vue suites stay independent during
-# the migration.
-test-frontend-vue:
+# Run Vue SPA unit tests under frontend/.
+test-frontend:
 	cd frontend && bunx vitest run
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex.
