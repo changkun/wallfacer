@@ -484,15 +484,14 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	cbThreshold := envutil.IntMin("WALLFACER_CONTAINER_CB_THRESHOLD", constants.DefaultCBThreshold, 1)
 	cbOpenSec := envutil.IntMin("WALLFACER_CONTAINER_CB_OPEN_SECONDS", 30, 1)
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
-	hb, err := executor.NewHostBackend(executor.HostBackendConfig{
+	// Best-effort construction: an unresolved agent binary yields a backend
+	// whose Launch returns a clear error, rather than crashing the process.
+	// The run command fails fast separately via executor.RequireClaude, so the
+	// constructor stays usable for tests and env-config probing.
+	hb, _ := executor.NewHostBackend(executor.HostBackendConfig{
 		ClaudeBinary: cfg.HostClaudeBinary,
 		CodexBinary:  cfg.HostCodexBinary,
 	})
-	if err != nil {
-		// Startup-time failure: fail fast with an actionable message rather
-		// than limping along with a half-configured runner.
-		logger.Fatal("host sandbox backend", "error", err)
-	}
 	r.backend = hb
 	r.hostMode = true
 	r.reg = cfg.Reg

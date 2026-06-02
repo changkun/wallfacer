@@ -59,6 +59,28 @@ func TestRunner_HostMode_AlwaysOn(t *testing.T) {
 	}
 }
 
+// TestNewRunner_UnresolvableClaudeDoesNotExit is a regression test for the
+// bug where NewRunner called logger.Fatal (os.Exit) when the claude binary
+// could not be resolved. That killed the whole test binary on any host
+// without the claude CLI installed (e.g. CI), failing the cli, handler, and
+// runner packages wholesale. Construction must now be best-effort: the runner
+// builds, and a launch surfaces the error instead.
+func TestNewRunner_UnresolvableClaudeDoesNotExit(t *testing.T) {
+	s := newStoreForTest(t)
+	r := NewRunner(s, RunnerConfig{
+		Command:          "true",
+		HostClaudeBinary: "/no/such/claude/binary",
+	})
+	t.Cleanup(func() { r.Shutdown() })
+
+	if r == nil {
+		t.Fatal("NewRunner returned nil")
+	}
+	if r.SandboxBackend() == nil {
+		t.Error("SandboxBackend() returned nil; runner must build a degraded backend")
+	}
+}
+
 // TestSandboxForTaskActivity_HostMode_PassesCodexThrough verifies that host
 // mode no longer coerces codex routing — the host backend supports codex
 // natively now, so explicit or env-routed codex choices pass through to the

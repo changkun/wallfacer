@@ -31,18 +31,43 @@ func buildFakeAgent(t *testing.T, name string) string {
 	return bin
 }
 
-func TestNewHostBackend_MissingClaudeFails(t *testing.T) {
-	// Claude is required at construction; an unresolved claude is a
-	// startup error so users get a clear message instead of a cryptic
-	// first-task failure.
-	_, err := NewHostBackend(HostBackendConfig{
+func TestNewHostBackend_UnresolvedClaudeDefersToLaunch(t *testing.T) {
+	// Construction is best-effort: an unresolvable claude must NOT block
+	// NewHostBackend. (Regression: it used to error here, and
+	// runner.NewRunner turned that into logger.Fatal/os.Exit, killing the
+	// whole test binary on hosts without the claude CLI — exactly what CI
+	// hit.) The error surfaces at Launch instead.
+	b, err := NewHostBackend(HostBackendConfig{
 		ClaudeBinary: "/no/such/binary",
 	})
-	if err == nil {
-		t.Fatal("expected error for missing claude")
+	if err != nil {
+		t.Fatalf("construction should be best-effort; got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "claude") || !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error should mention missing claude; got: %v", err)
+	if b == nil {
+		t.Fatal("expected non-nil backend")
+	}
+
+	_, lerr := b.Launch(context.Background(), ContainerSpec{
+		Name:    "wallfacer-test-unresolved-claude",
+		Env:     map[string]string{"WALLFACER_AGENT": "claude"},
+		WorkDir: t.TempDir(),
+	})
+	if lerr == nil {
+		t.Fatal("expected launch error for unresolved claude")
+	}
+	if !strings.Contains(lerr.Error(), "claude") {
+		t.Errorf("launch error should mention claude; got: %v", lerr)
+	}
+}
+
+func TestRequireClaude(t *testing.T) {
+	// RequireClaude is the explicit gate `wallfacer run` uses to fail fast.
+	if err := RequireClaude("/no/such/binary"); err == nil {
+		t.Error("expected error for missing claude binary")
+	}
+	bin := buildFakeAgent(t, "fakeagent")
+	if err := RequireClaude(bin); err != nil {
+		t.Errorf("expected nil error for resolvable claude; got: %v", err)
 	}
 }
 

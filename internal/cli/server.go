@@ -21,6 +21,7 @@ import (
 	"changkun.de/x/wallfacer/internal/auth"
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/executor"
 	"changkun.de/x/wallfacer/internal/handler"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
@@ -481,6 +482,21 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 	}
 }
 
+// requireClaudeOrExit fails fast when the claude CLI cannot be resolved, so
+// the user-facing `run`/`desktop` commands surface an actionable message at
+// startup instead of on the first task. The runner itself is built
+// best-effort (see runner.NewRunner) so it stays usable for tests and
+// env-config probing; this gate lives only at the command boundary.
+func requireClaudeOrExit(envFile string) {
+	explicit := ""
+	if parsed, err := envconfig.Parse(envFile); err == nil {
+		explicit = parsed.HostClaudeBinary
+	}
+	if err := executor.RequireClaude(explicit); err != nil {
+		logger.Fatal("host sandbox backend", "error", err)
+	}
+}
+
 // RunServer implements the `wallfacer run` subcommand.
 // uiFS and docsFS are the embedded (or on-disk) filesystems containing the
 // ui/ and docs/ directory trees respectively.
@@ -500,6 +516,8 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 		fs.PrintDefaults()
 	}
 	_ = fs.Parse(args)
+
+	requireClaudeOrExit(*envFile)
 
 	sc := initServer(configDir, ServerConfig{
 		LogFormat: *logFormat,

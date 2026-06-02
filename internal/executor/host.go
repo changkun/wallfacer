@@ -102,25 +102,30 @@ func (b *HostBackend) SetBinaryForTest(t harness.ID, path string) {
 	}
 }
 
-// NewHostBackend resolves binaries and returns a HostBackend ready to
-// Launch. Claude is required — failing here surfaces a clear message
-// instead of a cryptic first-task failure. Codex is optional for now
-// (host mode rejects codex launches anyway, see Launch); its binary is
-// resolved best-effort so the backend can still report a path to
-// `wallfacer doctor` but an unresolved codex does not block startup.
+// NewHostBackend resolves binaries best-effort and returns a HostBackend
+// ready to Launch. An unresolved binary becomes an empty path: Launch then
+// fails with a clear "not resolved" error (see binaryFor) rather than
+// blocking construction. This keeps the runner constructible — and testable
+// — on hosts without the agent CLI installed; `wallfacer run` enforces claude
+// availability up front via RequireClaude.
 func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
-	claude, err := resolveBinary(cfg.ClaudeBinary, "claude")
-	if err != nil {
-		return nil, err
-	}
-	// Best-effort: unresolved codex becomes an empty path; Launch rejects
-	// codex anyway until host-mode codex support lands.
+	claude, _ := resolveBinary(cfg.ClaudeBinary, "claude")
 	codex, _ := resolveBinary(cfg.CodexBinary, "codex")
 	return &HostBackend{
 		claudeBinary: claude,
 		codexBinary:  codex,
 		procs:        make(map[string]*hostHandle),
 	}, nil
+}
+
+// RequireClaude verifies the claude binary can be resolved, returning the
+// actionable error used by `wallfacer run` to fail fast at startup. Backend
+// construction is best-effort (see NewHostBackend); this is the explicit gate
+// for the run command so an operator gets a clear message instead of a cryptic
+// first-task failure.
+func RequireClaude(explicit string) error {
+	_, err := resolveBinary(explicit, "claude")
+	return err
 }
 
 // resolveBinary returns the explicit path if non-empty and stat-able,

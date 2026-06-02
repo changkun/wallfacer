@@ -45,6 +45,8 @@ func RunDesktop(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) er
 	}
 	_ = fs.Parse(args)
 
+	requireClaudeOrExit(*envFile)
+
 	sc := initServer(configDir, ServerConfig{
 		LogFormat: *logFormat,
 		Addr:      *addr,
