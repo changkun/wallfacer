@@ -328,14 +328,14 @@ After the revert commits, `extractDispatchedTaskIDs(diff)` greps the reverted di
 
 ## Frontend
 
-The Plan Mode UI is split across four vanilla-JS modules in `ui/js/`:
+The Plan Mode UI lives in the Vue SPA under `frontend/src/`:
 
-- `spec-mode.js` — layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; handles the `#plan/<path>` deep link so refresh preserves the focused spec.
-- `spec-explorer.js` — tree rendering. Groups roots by track, pins the roadmap entry when `TreeResponse.Index` is present, and draws status badges and per-spec progress indicators using `TreeResponse.Progress`.
-- `spec-minimap.js` — dependency DAG minimap. Renders the `depends_on` graph for the focused spec using the adjacency data from `TreeResponse`.
-- `planning-chat.js` — chat pane. Streams `GET /api/planning/messages/stream` responses, handles slash-command autocomplete against `GET /api/planning/commands`, renders the thread tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
+- `views/PlanPage.vue` + `components/plan/SpecFocusedView.vue` — layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; handles the `/plan/<path>` route so refresh preserves the focused spec.
+- `components/plan/SpecTreePanel.vue` — tree rendering. Groups roots by track, pins the roadmap entry when `TreeResponse.Index` is present, and draws status badges and per-spec progress indicators using `TreeResponse.Progress`.
+- `views/MapPage.vue` — dependency DAG map. Renders the `depends_on` graph using the adjacency data from `TreeResponse`.
+- `components/plan/PlanningChatPanel.vue` — chat pane. Streams `GET /api/planning/messages/stream` responses, handles slash-command autocomplete against `GET /api/planning/commands`, renders the thread tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
 
-All four consume the two SSE streams (`/api/specs/stream` and `/api/planning/messages/stream`) and the thread CRUD endpoints (`/api/planning/threads`) to stay in sync with server-side state.
+These consume the two SSE streams (`/api/specs/stream` and `/api/planning/messages/stream`) and the thread CRUD endpoints (`/api/planning/threads`) to stay in sync with server-side state.
 
 ## See Also
 

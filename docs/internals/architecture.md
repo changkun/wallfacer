@@ -147,7 +147,7 @@ See [Agents & Flows](../guide/agents-and-flows.md) for the full user-facing mode
 
 **Handler** (`internal/handler/`) — REST API and SSE endpoints organized by concern. Hosts automation toggle controls.
 
-**Frontend** (`ui/`) — Vanilla JS modules. Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
+**Frontend** (`frontend/`) — Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia). Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
 **Workspace Manager** (`internal/workspace/`) — Manages workspace configuration, workspace groups, and hot-swapping between workspace sets without server restart.
 
@@ -309,7 +309,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Debug a failing rebase | `internal/gitutil/ops.go` + `internal/gitutil/stash.go` |
 | Understand why a task failed | `data/<key>/<uuid>/traces/` + `outputs/turn-NNNN.json` |
 | Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
-| Change the UI | `ui/js/` (vanilla JS modules) + `ui/index.html` |
+| Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
 | Change pub/sub behaviour | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
 
@@ -320,7 +320,7 @@ Every `internal/` package and its role in the system:
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
 | `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload | `Registry`, `Agent`, `NewRegistry()`, `Load()` |
-| `apicontract` | Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js` | `Route`, `Routes` (slice), `Route.FullPattern()` |
+| `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `auth` | Cookie-based principal resolution and session validation for cloud mode | `CookiePrincipal`, `Middleware()` |
 | `cli` | CLI subcommand implementations (run, exec, status, doctor, spec) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |

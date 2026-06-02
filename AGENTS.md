@@ -27,15 +27,15 @@ The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). Wh
 ## Build & Run Commands
 
 ```bash
-make build          # Full gate: fmt + lint (Go + JS) + ts build + binary
+make build          # Full gate: fmt + lint (Go + Vue typecheck) + frontend build + binary
 make build-binary   # Build just the Go binary (no fmt/lint)
 make lint           # Lint only (fastest way to catch style regressions)
-make fmt            # Format Go and JS in place
+make fmt            # Format Go in place
 make test           # lint + backend tests + frontend tests (matches CI)
 make test-backend   # go test ./...
-make test-frontend  # vitest in ui/
+make test-frontend  # vitest in frontend/
 make server         # Build and run the Go server natively
-make ui-css         # Regenerate Tailwind CSS from UI sources
+make frontend-build # Build the Vue SPA into frontend/dist/ for embedding
 make api-contract   # Regenerate API route artifacts from apicontract/routes.go
 make e2e-lifecycle              # E2E: task lifecycle (requires running server)
 make e2e-dependency-dag WORKSPACE=/path/to/repo  # E2E: dependency DAG with conflicts
@@ -66,7 +66,7 @@ The Go source lives at the top level. Module path: `changkun.de/x/wallfacer`. Go
 Key server files:
 - `main.go` — Tiny entry point: embed FS declarations and subcommand dispatch
 - `internal/cli/` — CLI subcommand implementations (run, doctor, status, spec, auth, web, desktop) and shared helpers
-- `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
+- `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json`
 - `internal/handler/` — HTTP API handlers (one file per concern)
 - `internal/oauth/` — OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex)
 - `internal/runner/` — Host-process orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
@@ -78,7 +78,7 @@ Key server files:
 - `internal/executor/` — Host process backend: spawn/stream/wait/kill the agent CLI; launch spec and event-stream parsing
 - `internal/harness/` — Harness abstraction: per-CLI argv building, NDJSON event parsing, and auth env (Claude, Codex)
 - `internal/prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management
-- `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
+- `frontend/` — Single Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia); renders the task board in local mode and the cloud site in cloud mode. Built to `frontend/dist/` and embedded via `//go:embed`
 
 ## API Routes
 
@@ -144,8 +144,8 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Auto-retry** with per-failure-category budget
 - **Cost/token budgets** via `MaxCostUSD` and `MaxInputTokens` per task
 - **Failure categorization** classifies failures (timeout, budget_exceeded, worktree_setup, container_crash, agent_error, sync_error, unknown)
-- **Frontend** uses SSE for live updates; escapes HTML to prevent XSS
-- **No framework** on backend (stdlib `net/http`) or frontend (vanilla JS)
+- **Frontend** is a Vue 3 + TypeScript SPA; uses SSE for live updates
+- **No framework** on backend (stdlib `net/http`)
 - **Server API key** authentication via `WALLFACER_SERVER_API_KEY`
 - **Circuit breaker** for agent process launches (`WALLFACER_CONTAINER_CB_THRESHOLD`)
 
@@ -169,7 +169,6 @@ Commonly-tuned variables (full list in `docs/guide/configuration.md`):
 - `WALLFACER_WORKSPACES` — workspace paths (OS path-list separated)
 - `WALLFACER_SERVER_API_KEY` — bearer token for server API authentication
 - `WALLFACER_CLOUD` — gate for cloud-only UI surfaces; shell env only (defaults `false`)
-- `WALLFACER_LEGACY_UI` — when truthy, fall back to the vanilla-JS UI in `ui/` instead of the default Vue SPA in `frontend/dist/`. Older `WALLFACER_VUE_UI=false` is honoured for back-compat.
 - `AUTH_JWKS_URL` / `AUTH_ISSUER` — JWT validation in cloud mode (auto-derived from `AUTH_URL` when unset)
 
 **Cloud vs local partition.** `WALLFACER_CLOUD` is the single gate between local-only functionality and cloud surfaces. Cloud adds identity, not feature gates — task execution is identical in both modes. Full details in [`docs/cloud/README.md`](docs/cloud/README.md). Long-range design in [`specs/shared/authentication.md`](specs/shared/authentication.md).

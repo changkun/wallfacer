@@ -387,7 +387,6 @@ wallfacer run [flags] [workspace...]
 | `-data` | `DATA_DIR` | `~/.wallfacer/data` | Task data directory |
 | `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file with credentials and runtime settings |
 | `-no-browser` | -- | `false` | Skip auto-opening the browser |
-| `-ui-dir` | `UI_DIR` | -- | Serve the UI from this on-disk directory (dev mode) |
 | `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |
 
 #### wallfacer status

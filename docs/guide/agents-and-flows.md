@@ -376,6 +376,6 @@ For contributors:
 - `internal/runner/agent.go`, `runAgent` dispatch, `RunAgent` flow-engine adapter.
 - `internal/runner/execute.go`, `Run` selects the dispatch path (implement turn loop vs brainstorm fast path vs flow engine).
 - `internal/handler/agents.go` + `flows.go`, HTTP API surface.
-- `ui/js/agents.js` + `flows.js` + CSS, the split-pane tabs.
+- `frontend/src/views/AgentsPage.vue` + `FlowsPage.vue`, the management tabs.
 
 The design spec and breakdown live at [`specs/local/agents-and-flows.md`](../../specs/local/agents-and-flows.md). The post-completion refinements section records every follow-up made after the initial ship.
