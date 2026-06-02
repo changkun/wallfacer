@@ -959,35 +959,3 @@ func TestParse_CloudTruthyVariants(t *testing.T) {
 		})
 	}
 }
-
-// TestUseLegacyUI exercises every branch of the UI-selection truth
-// table so the default-to-Vue + back-compat behaviour is locked in.
-func TestUseLegacyUI(t *testing.T) {
-	cases := []struct {
-		name    string
-		legacy  string
-		vue     string
-		wantLeg bool
-	}{
-		{"both unset → Vue", "", "", false},
-		{"explicit legacy=1 → legacy", "1", "", true},
-		{"explicit legacy=true → legacy", "true", "", true},
-		{"vue=true (default Vue)", "", "true", false},
-		{"vue=false explicitly → legacy (back-compat)", "", "false", true},
-		{"vue=0 → legacy", "", "0", true},
-		{"vue=no → legacy", "", "no", true},
-		{"legacy wins when both set truthy/conflict", "1", "true", true},
-		{"legacy=false + vue=true → Vue", "false", "true", false},
-		{"whitespace vue is ignored", "", "   ", false},
-		{"case-insensitive yes", "YeS", "", true},
-	}
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			got := envconfig.UseLegacyUI(tc.legacy, tc.vue)
-			if got != tc.wantLeg {
-				t.Errorf("UseLegacyUI(%q, %q) = %v; want %v", tc.legacy, tc.vue, got, tc.wantLeg)
-			}
-		})
-	}
-}

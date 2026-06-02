@@ -9,11 +9,8 @@ import (
 	"changkun.de/x/wallfacer/internal/cli"
 )
 
-//go:embed ui
-var uiFiles embed.FS // uiFiles holds the frontend assets (HTML, JS, CSS) served by the web server.
-
 //go:embed all:frontend/dist
-var vueDist embed.FS // vueDist holds the Vue SPA dist (used when WALLFACER_VUE_UI=true).
+var vueDist embed.FS // vueDist holds the Vue SPA dist served by the web server.
 
 //go:embed docs
 var docsFiles embed.FS // docsFiles holds the user-facing documentation served at /docs.
@@ -48,9 +45,9 @@ func main() {
 	case "doctor", "env":
 		cli.RunDoctor(configDir, args)
 	case "run":
-		cli.RunServer(configDir, args, uiFiles, vueDist, docsFiles)
+		cli.RunServer(configDir, args, vueDist, docsFiles)
 	case "desktop":
-		if err := cli.RunDesktop(configDir, args, uiFiles, vueDist, docsFiles); err != nil {
+		if err := cli.RunDesktop(configDir, args, vueDist, docsFiles); err != nil {
 			fmt.Fprintln(os.Stderr, "wallfacer:", err)
 			os.Exit(1)
 		}
