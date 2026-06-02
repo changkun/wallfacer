@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 src/**/*.js
 src/**/*.vue.js
+# Vendored source .js (not build output) must stay tracked.
+!src/vendor/**/*.js
 
 # Local migration verification tooling (not product)
 .parity/
