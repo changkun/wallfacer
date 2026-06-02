@@ -601,7 +601,6 @@ describe("_handleSessionsList", () => {
     expect(vm.runInContext("Object.keys(_sessions).length", ctx)).toBe(1);
     expect(vm.runInContext('_sessions["s2"]', ctx)).toBeUndefined();
   });
-
 });
 
 describe("_handleSessionClosed", () => {
