@@ -34,7 +34,7 @@ func TestInitServer(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
@@ -126,7 +126,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), stubVueFS(t), false)
 
 	paths := []struct {
 		method string
@@ -188,7 +188,7 @@ func TestBuildMux_DocsEndpoints(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 
 	// GET /api/docs should return a JSON array.
 	rr := httptest.NewRecorder()
@@ -248,7 +248,7 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
@@ -278,7 +278,7 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
@@ -308,7 +308,7 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -341,7 +341,7 @@ func TestBuildMux_DocsInternals(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 
 	// GET /api/docs/internals/internals should return the internals index.
 	rr := httptest.NewRecorder()
@@ -352,8 +352,10 @@ func TestBuildMux_DocsInternals(t *testing.T) {
 	}
 }
 
-// TestBuildMux_IndexHTML verifies that /index.html serves the same content as /.
-func TestBuildMux_IndexHTML(t *testing.T) {
+// TestBuildMux_ServesVueSPA verifies that BuildMux mounts the Vue SPA at "/"
+// with the window.__WALLFACER__ runtime config injected, and that unmatched
+// non-API GET paths fall back to the SPA index for client-side routing.
+func TestBuildMux_ServesVueSPA(t *testing.T) {
 	workdir := t.TempDir()
 	worktrees := filepath.Join(workdir, "worktrees")
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
@@ -371,76 +373,30 @@ func TestBuildMux_IndexHTML(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), stubVueFS(t), false)
 
+	// "/" serves the injected SPA index.
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/index.html", nil)
-	mux.ServeHTTP(rr, req)
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /index.html: status %d, want 200", rr.Code)
+		t.Fatalf("GET /: status %d, want 200", rr.Code)
 	}
 	if ct := rr.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
 		t.Fatalf("expected HTML content type, got %q", ct)
 	}
-}
-
-// TestBuildMux_StaticAssets verifies that CSS and JS static files are served.
-func TestBuildMux_StaticAssets(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
+	body := rr.Body.String()
+	if !strings.Contains(body, "window.__WALLFACER__") {
+		t.Fatalf("expected window.__WALLFACER__ injection, got %q", body)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
+	if !strings.Contains(body, `"test-key"`) {
+		t.Fatalf("expected injected serverApiKey, got %q", body)
 	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
 
-	// A known CSS file should be served.
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/css/base.css", nil)
-	mux.ServeHTTP(rr, req)
+	// Unmatched non-API paths fall back to the SPA index (history routing).
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/some/client/route", nil))
 	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /css/base.css: status %d", rr.Code)
-	}
-}
-
-// TestBuildMux_IndexNonRoot verifies that non-root paths like /foo return 404
-// from the index handler.
-func TestBuildMux_IndexNonRoot(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
-
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for /nonexistent, got %d", rr.Code)
+		t.Fatalf("GET /some/client/route: status %d, want 200 (SPA fallback)", rr.Code)
 	}
 }
 
@@ -628,7 +584,7 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	// Start the server in the background.
@@ -673,7 +629,7 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.ActualPort == 0 {
@@ -704,7 +660,7 @@ func TestInitServer_PortFallback(t *testing.T) {
 		Addr:      fmt.Sprintf(":%d", occupiedPort),
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	// It should have found a different port.
@@ -731,7 +687,7 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
@@ -753,7 +709,7 @@ func TestShutdown_WithPlannerRunning(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 
 	// Planner is initialized but not running, so Shutdown should handle it.
 	sc.Shutdown()
@@ -773,7 +729,7 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 
 	// Start serving so that Shutdown has something to shut down.
 	go func() { _ = sc.Srv.Serve(sc.Ln) }()
@@ -796,7 +752,7 @@ func TestInitServer_SkipCSRF(t *testing.T) {
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
 		SkipCSRF:  true,
-	}, testFS(t), testFS(t), testFS(t))
+	}, testFS(t), testFS(t))
 	defer sc.Shutdown()
 
 	if sc.ActualPort == 0 {
@@ -996,80 +952,5 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	}
 	if vals[0].Value != 1.0 {
 		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
-	}
-}
-
-// TestBuildMux_UIDevModeReloadsOnDiskEdits verifies that serving the UI
-// via prefixFS (dev mode) picks up on-disk edits to index.html and static
-// assets without re-invoking BuildMux, and that responses carry no-cache
-// headers for static assets.
-func TestBuildMux_UIDevModeReloadsOnDiskEdits(t *testing.T) {
-	uiRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(uiRoot, "partials"), 0o755); err != nil {
-		t.Fatalf("MkdirAll partials: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(uiRoot, "css"), 0o755); err != nil {
-		t.Fatalf("MkdirAll css: %v", err)
-	}
-	writeFile := func(rel, content string) {
-		t.Helper()
-		if err := os.WriteFile(filepath.Join(uiRoot, rel), []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", rel, err)
-		}
-	}
-	writeFile("index.html", "INITIAL-INDEX")
-	writeFile("partials/placeholder.html", "") // required by ParseFS glob
-	writeFile("css/app.css", "INITIAL-CSS")
-
-	workdir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(workdir, "worktrees"), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewFileStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-
-	uiFS := prefixFS{inner: os.DirFS(uiRoot), prefix: "ui"}
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, uiFS, testFS(t), nil, false)
-
-	get := func(path string) *httptest.ResponseRecorder {
-		t.Helper()
-		rr := httptest.NewRecorder()
-		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
-		return rr
-	}
-
-	rr := get("/")
-	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "INITIAL-INDEX") {
-		t.Fatalf("initial index: code=%d body=%q", rr.Code, rr.Body.String())
-	}
-
-	rr = get("/css/app.css")
-	if rr.Code != http.StatusOK || rr.Body.String() != "INITIAL-CSS" {
-		t.Fatalf("initial css: code=%d body=%q", rr.Code, rr.Body.String())
-	}
-	if cc := rr.Header().Get("Cache-Control"); !strings.Contains(cc, "no-store") {
-		t.Errorf("expected no-store Cache-Control, got %q", cc)
-	}
-
-	// Overwrite on-disk files; no rebuild, no new BuildMux call.
-	writeFile("index.html", "UPDATED-INDEX")
-	writeFile("css/app.css", "UPDATED-CSS")
-
-	rr = get("/")
-	if !strings.Contains(rr.Body.String(), "UPDATED-INDEX") {
-		t.Fatalf("expected index to reload from disk, got %q", rr.Body.String())
-	}
-	rr = get("/css/app.css")
-	if rr.Body.String() != "UPDATED-CSS" {
-		t.Fatalf("expected css to reload from disk, got %q", rr.Body.String())
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"net"
 	"net/http"
@@ -34,38 +33,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// prefixFS wraps an inner fs.FS so its contents appear under a single
-// directory prefix. Used in dev mode to expose os.DirFS("…/ui") as if it
-// were the embedded uiFiles filesystem (which has "ui" at its root), so
-// that fs.Sub(uiFS, "ui") and subsequent template/static lookups work
-// identically against either source.
-type prefixFS struct {
-	inner  fs.FS
-	prefix string
-}
-
-// noCacheMiddleware sets response headers that disable browser caching,
-// used in UI dev mode so edits are visible on reload.
-func noCacheMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (p prefixFS) Open(name string) (fs.File, error) {
-	if name == p.prefix {
-		return p.inner.Open(".")
-	}
-	if rest, ok := strings.CutPrefix(name, p.prefix+"/"); ok {
-		return p.inner.Open(rest)
-	}
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
-}
-
-// IndexViewData holds the data passed to the index.html template.
+// IndexViewData carries server-injected runtime config for the Vue SPA's
+// index.html (delivered via the window.__WALLFACER__ script tag).
 type IndexViewData struct {
 	ServerAPIKey string
 }
@@ -78,10 +47,6 @@ type ServerConfig struct {
 	DataDir   string
 	EnvFile   string
 	SkipCSRF  bool // Desktop mode: requests come from the local WebView, not a browser.
-	// UIDir, when non-empty, serves UI assets from this on-disk directory
-	// instead of the embedded filesystem. Used during frontend development
-	// so edits under ui/ take effect on reload without rebuilding the binary.
-	UIDir string
 }
 
 // ServerComponents holds the initialized server components returned by initServer.
@@ -128,7 +93,7 @@ func (sc *ServerComponents) Shutdown() {
 // RunServer and RunDesktop. It creates the workspace manager, runner, handler,
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
-func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS) *ServerComponents {
+func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *ServerComponents {
 	logger.Init(cfg.LogFormat)
 	initConfigDir(configDir, cfg.EnvFile)
 
@@ -409,32 +374,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, vueDist, docsFS fs.FS)
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	if cfg.UIDir != "" {
-		absUI, err := filepath.Abs(cfg.UIDir)
-		if err != nil {
-			logger.Fatal("resolve ui-dir", "error", err)
-		}
-		info, err := os.Stat(absUI)
-		if err != nil || !info.IsDir() {
-			logger.Fatal("ui-dir is not a directory", "path", absUI, "error", err)
-		}
-		logger.Main.Info("serving UI from disk (dev mode)", "path", absUI)
-		uiFS = prefixFS{inner: os.DirFS(absUI), prefix: "ui"}
-	}
-
-	// UI selection: Vue is the default; the legacy vanilla-JS UI in ui/ is
-	// available as an escape hatch via WALLFACER_LEGACY_UI=1. The older
-	// WALLFACER_VUE_UI flag is honoured for backwards compatibility — see
-	// envconfig.UseLegacyUI for the precise truth table.
-	legacyUI := envconfig.UseLegacyUI(
-		envconfig.Lookup(envFileKV, "WALLFACER_LEGACY_UI"),
-		envconfig.Lookup(envFileKV, "WALLFACER_VUE_UI"),
-	)
-	var vueDistFS fs.FS
-	if !legacyUI {
-		vueDistFS = vueDist
-	}
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS, vueDistFS, cloudMode)
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist, cloudMode)
 
 	if cfg.SkipCSRF {
 		// Desktop mode: the Wails asset server reverse-proxies HTTP requests
@@ -498,9 +438,9 @@ func requireClaudeOrExit(envFile string) {
 }
 
 // RunServer implements the `wallfacer run` subcommand.
-// uiFS and docsFS are the embedded (or on-disk) filesystems containing the
-// ui/ and docs/ directory trees respectively.
-func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
+// vueDist and docsFS are the embedded filesystems containing the Vue SPA
+// dist (frontend/dist) and docs/ directory tree respectively.
+func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
@@ -508,7 +448,6 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file with credentials and runtime settings")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
-	uiDir := fs.String("ui-dir", envOrDefault("UI_DIR", ""), "serve UI from this on-disk directory (dev mode; disables caching and reloads templates on every request)")
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "Start the task board server and open the web UI.\n\n")
@@ -524,8 +463,7 @@ func RunServer(configDir string, args []string, uiFS, vueDist, docsFS fs.FS) {
 		Addr:      *addr,
 		DataDir:   *dataDir,
 		EnvFile:   *envFile,
-		UIDir:     *uiDir,
-	}, uiFS, vueDist, docsFS)
+	}, vueDist, docsFS)
 	defer sc.Stop()
 
 	if !*noBrowser {
@@ -629,7 +567,7 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 		}
 		http.NotFound(w, r)
 	})
-	logger.Main.Info("ui: serving Vue SPA (default; set WALLFACER_LEGACY_UI=1 to switch back)", "mode", mode)
+	logger.Main.Info("ui: serving Vue SPA", "mode", mode)
 }
 
 const (
@@ -669,55 +607,11 @@ func withAssetCache(next http.Handler) http.Handler {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, uiFS, docsFS, vueDist fs.FS, cloudMode bool) *http.ServeMux {
+func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, docsFS, vueDist fs.FS, cloudMode bool) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	if vueDist != nil {
 		mountVueSPA(mux, vueDist, indexData.ServerAPIKey, cloudMode)
-	} else {
-		// Legacy UI: Go templates served from the embedded ui/ directory.
-		uiSub, err := fs.Sub(uiFS, "ui")
-		if err != nil {
-			logger.Fatal("sub ui fs", "error", err)
-		}
-		_, devMode := uiFS.(prefixFS)
-		parseIndexTemplates := func() (*template.Template, error) {
-			return template.New("index.html").ParseFS(uiSub, "index.html", "partials/*.html")
-		}
-		indexTemplates, err := parseIndexTemplates()
-		if err != nil {
-			logger.Fatal("parse ui templates", "error", err)
-		}
-		serveIndex := func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-				http.NotFound(w, r)
-				return
-			}
-			tpl := indexTemplates
-			if devMode {
-				t, err := parseIndexTemplates()
-				if err != nil {
-					logger.Main.Error("reparse ui templates", "error", err)
-					http.Error(w, "failed to parse templates", http.StatusInternalServerError)
-					return
-				}
-				tpl = t
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			if err := tpl.ExecuteTemplate(w, "index.html", indexData); err != nil {
-				logger.Main.Error("render index", "error", err)
-				http.Error(w, "failed to render index", http.StatusInternalServerError)
-			}
-		}
-		mux.HandleFunc("GET /", serveIndex)
-
-		staticFS := http.FileServer(http.FS(uiSub))
-		if devMode {
-			staticFS = noCacheMiddleware(staticFS)
-		}
-		mux.Handle("GET /css/", staticFS)
-		mux.Handle("GET /js/", staticFS)
-		mux.Handle("GET /assets/", staticFS)
 	}
 
 	// Docs API — list and serve embedded documentation.

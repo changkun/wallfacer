@@ -50,7 +50,7 @@ func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 		h.SetAuth(fakeAuthProvider{})
 	}
 	reg := metrics.NewRegistry()
-	return BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t), nil, false)
+	return BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 }
 
 // TestAdminRebuildIndex_CloudSuperadmin200 mirrors the spec: cloud
