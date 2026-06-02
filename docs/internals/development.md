@@ -43,26 +43,25 @@ Alternatively, start the server and configure via **Settings → Sandbox** in th
 ```bash
 make test           # All tests (backend + frontend)
 make test-backend   # Go unit tests: go test ./...
-make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
+make test-frontend  # Frontend tests: cd frontend && bunx vitest run
 ```
 
 ## Make Targets
 
 | Target | Description |
 |---|---|
-| `make build` | Full gate: fmt + lint (Go + JS) + TypeScript build + binary |
+| `make build` | Full gate: fmt + lint (Go + Vue typecheck) + frontend build + binary |
 | `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
 | `make build-desktop` | Build the native desktop app for the current platform (uses `go tool wails`) |
 | `make build-desktop-darwin` / `-windows` / `-linux` | Cross-platform desktop builds |
 | `make install-wails` | Install the Wails CLI tracked as a tool in go.mod |
 | `make server` | Build and run the server natively |
-| `make server-dev` | Build and run the server with `-ui-dir ./ui` so UI edits reload without rebuilding |
-| `make fmt` | Format Go and JS in place |
-| `make lint` | Lint only (golangci-lint + Biome); fastest way to catch style regressions |
+| `make fmt` | Format Go in place |
+| `make lint` | Lint only (golangci-lint + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
 | `make test` | Lint + backend tests + frontend tests |
 | `make test-backend` | Go unit tests (`go test ./...`) |
-| `make test-frontend` | Frontend Vitest runner |
-| `make ui-css` | Regenerate Tailwind CSS from UI sources |
+| `make test-frontend` | Frontend Vitest runner (`cd frontend && bunx vitest run`) |
+| `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
 | `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
 | `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
 | `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
@@ -71,19 +70,18 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 
 ## Frontend Dev Mode
 
-UI assets (HTML, CSS, JS) are normally embedded into the binary via `go:embed`, so a frontend edit usually requires a rebuild. During active frontend work, use the `-ui-dir` flag to serve `ui/` from disk instead:
+The Vue SPA is built to `frontend/dist/` and embedded into the binary via
+`go:embed`, so an edit normally requires a rebuild. During active frontend
+work, run the Vite dev server instead:
 
 ```bash
-wallfacer run -ui-dir ./ui
-# or equivalently:
-make server-dev
-# or via environment variable:
-UI_DIR=./ui wallfacer run
+make server                 # Go server on :8080 (serves the embedded SPA + the API)
+cd frontend && bun run dev  # Vite on :5173 with hot-reload, proxies /api → :8080
 ```
 
-In this mode the server re-parses `index.html` and `partials/*.html` on every request and emits `Cache-Control: no-store` for `/css/`, `/js/`, and `/assets/`. Reloading the browser is enough to see edits — no binary rebuild, no server restart.
-
-Do not use this flag in production: it disables template caching and browser caching, and points the server at a mutable directory.
+Open `http://localhost:5173` and edit files under `frontend/src/` — Vite
+hot-reloads in the browser with no rebuild. The Go server only needs
+rebuilding when backend code changes.
 
 ## Release Workflow
 

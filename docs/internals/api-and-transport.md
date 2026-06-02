@@ -329,7 +329,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 - **`sessionRegistry`** (`terminal.go`): manages `map[string]*terminalSession`, tracks the active session, and provides `create`, `switchTo`, `remove`, `closeAll`, and `activeSession` methods. A `switchCh` channel signals the relay dispatcher when the active session changes.
 - **`relayDispatcher`**: the PTY→WS goroutine re-resolves the active session on each switch signal. The WS→PTY goroutine resolves `activeSession()` per message.
 - **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
-- **Frontend** (`ui/js/terminal.js`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
+- **Frontend** (`frontend/src/components/TerminalPanel.vue`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
 
 ## Host Execution
 
