@@ -2,7 +2,6 @@
 //
 // Routes is the canonical list used to:
 //   - Register handlers in the HTTP multiplexer (server.go buildMux).
-//   - Generate the frontend route helpers (ui/js/generated/routes.js).
 //   - Generate the machine-readable API contract (docs/internals/api-contract.json).
 //
 // To regenerate derived artifacts after editing Routes, run:
