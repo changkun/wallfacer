@@ -4,11 +4,10 @@
 // route definitions in internal/apicontract/routes.go.
 //
 // Generated files:
-//   - ui/js/generated/routes.js        — legacy-UI path-builder helpers (only
-//     when ui/ exists; the Vue frontend uses literal paths and consumes none
-//     of these, so once ui/ is deleted these two outputs are skipped)
-//   - ui/js/generated/types.js         — JSDoc @typedef declarations for domain types
 //   - docs/internals/api-contract.json — machine-readable route catalogue
+//
+// The Vue frontend uses literal /api/... paths, so no JS path-builder
+// helpers are generated.
 //
 // Usage (from the repository root):
 //
@@ -29,34 +28,6 @@ import (
 
 func main() {
 	root := repoRoot()
-
-	// The ui/js/generated/* artifacts are consumed only by the legacy
-	// vanilla-JS UI. The Vue frontend uses literal /api/... paths and
-	// imports none of them. Skip these writes when ui/ has been removed so
-	// the contract codegen (and `make api-contract`) keeps working after
-	// deprecation; the language-neutral docs JSON below is always written.
-	if _, err := os.Stat(filepath.Join(root, "ui", "js")); err == nil {
-		// Generate ui/js/generated/routes.js
-		routesJS := apicontract.GenerateRoutesJS()
-		routesJSPath := filepath.Join(root, "ui", "js", "generated", "routes.js")
-		if err := os.MkdirAll(filepath.Dir(routesJSPath), 0o755); err != nil {
-			log.Fatalf("mkdir %s: %v", filepath.Dir(routesJSPath), err)
-		}
-		if err := os.WriteFile(routesJSPath, []byte(routesJS), 0o644); err != nil {
-			log.Fatalf("write %s: %v", routesJSPath, err)
-		}
-		fmt.Printf("wrote %s (%d bytes)\n", routesJSPath, len(routesJS))
-
-		// Generate ui/js/generated/types.js
-		typesJS := apicontract.GenerateJSTypes()
-		typesJSPath := filepath.Join(root, "ui", "js", "generated", "types.js")
-		if err := os.WriteFile(typesJSPath, []byte(typesJS), 0o644); err != nil {
-			log.Fatalf("write %s: %v", typesJSPath, err)
-		}
-		fmt.Printf("wrote %s (%d bytes)\n", typesJSPath, len(typesJS))
-	} else {
-		fmt.Println("ui/ absent — skipping legacy routes.js/types.js generation")
-	}
 
 	// Generate docs/internals/api-contract.json
 	contractJSON, err := apicontract.GenerateContractJSON()
