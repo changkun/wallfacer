@@ -193,9 +193,9 @@ export const usePlanningStore = defineStore('planning', () => {
     if (match) {
       activeThreadId.value = match.id;
       api(
-        'POST',
-        '/api/planning/threads/' + encodeURIComponent(match.id) + '/activate',
-        {},
+        'PATCH',
+        '/api/planning/threads/' + encodeURIComponent(match.id),
+        { state: 'active' },
       ).catch(() => {});
       return;
     }
@@ -208,9 +208,9 @@ export const usePlanningStore = defineStore('planning', () => {
       });
       if (created?.id) {
         await api(
-          'POST',
-          '/api/planning/threads/' + encodeURIComponent(created.id) + '/activate',
-          {},
+          'PATCH',
+          '/api/planning/threads/' + encodeURIComponent(created.id),
+          { state: 'active' },
         ).catch(() => {});
         await loadThreads();
         activeThreadId.value = created.id;

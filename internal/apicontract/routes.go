@@ -356,27 +356,9 @@ var Routes = []Route{
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPatch, Pattern: "/api/planning/threads/{id}", Name: "RenamePlanningThread",
-		JSName:      "renameThread",
-		Description: "Rename a planning chat thread.",
-		Tags:        []string{"planning"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/planning/threads/{id}/archive", Name: "ArchivePlanningThread",
-		JSName:      "archiveThread",
-		Description: "Archive a planning chat thread (hide from tab bar; files retained).",
-		Tags:        []string{"planning"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/planning/threads/{id}/unarchive", Name: "UnarchivePlanningThread",
-		JSName:      "unarchiveThread",
-		Description: "Restore a planning chat thread from archive.",
-		Tags:        []string{"planning"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/planning/threads/{id}/activate", Name: "ActivatePlanningThread",
-		JSName:      "activateThread",
-		Description: "Set the UI's active planning chat thread.",
+		Method: http.MethodPatch, Pattern: "/api/planning/threads/{id}", Name: "PatchPlanningThread",
+		JSName:      "patchThread",
+		Description: "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
 		Tags:        []string{"planning"},
 	},
 

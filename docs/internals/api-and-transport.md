@@ -131,10 +131,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | **Planning chat threads** | |
 | `GET /api/planning/threads` | List non-archived threads; `?includeArchived=true` includes archived ones. Returns `{threads, active_id}`. |
 | `POST /api/planning/threads` | Create a new thread. Body `{name?}`; omitted name auto-generates `Chat N`. |
-| `PATCH /api/planning/threads/{id}` | Rename a thread. Body `{name}`. |
-| `POST /api/planning/threads/{id}/archive` | Archive a thread (hide from tab bar; files retained). 409 if the thread is in-flight. |
-| `POST /api/planning/threads/{id}/unarchive` | Restore an archived thread. |
-| `POST /api/planning/threads/{id}/activate` | Record the UI's active thread. Rejects archived/unknown IDs. |
+| `PATCH /api/planning/threads/{id}` | Mutate a thread. Body `{name}` renames; `{state}` transitions it — `archived` hides it from the tab bar (409 if in-flight), `visible` restores it, `active` records the UI's active thread. |
 
 ### Triggering Task Execution
 
