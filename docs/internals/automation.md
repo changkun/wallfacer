@@ -238,8 +238,8 @@ flowchart TD
 ```
 
 Served by:
-- `GET /api/tasks/{id}/oversight` — implementation run summary
-- `GET /api/tasks/{id}/oversight/test` — test-run summary (if a test was run)
+- `GET /api/tasks/{id}/oversight` — implementation run summary (default `?phase=impl`)
+- `GET /api/tasks/{id}/oversight?phase=test` — test-run summary (if a test was run)
 
 The UI renders phases in the Oversight tab and as an interactive flamegraph Timeline.
 

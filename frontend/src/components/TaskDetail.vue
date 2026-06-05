@@ -382,7 +382,7 @@ const oversightStatus = ref('');
 const oversightPhases = ref<OversightPhase[]>([]);
 const oversightError = ref('');
 // Test-phase oversight (the test agent's run), shown as a parallel "Testing"
-// section. Sourced from /oversight/test. Mirrors the legacy parallel Testing tab.
+// section. Sourced from /oversight?phase=test.
 const testOversightPhases = ref<OversightPhase[]>([]);
 let oversightTimer: ReturnType<typeof setTimeout> | null = null;
 let oversightTaskId = '';
@@ -404,7 +404,7 @@ async function fetchOversight() {
   }
   // Test-phase oversight (best-effort; only present once a test agent has run).
   try {
-    const t = await api<{ phases?: OversightPhase[] }>('GET', `/api/tasks/${props.task.id}/oversight/test`);
+    const t = await api<{ phases?: OversightPhase[] }>('GET', `/api/tasks/${props.task.id}/oversight?phase=test`);
     testOversightPhases.value = t?.phases ?? [];
   } catch { testOversightPhases.value = []; }
   try {

@@ -963,9 +963,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		},
 
 		// Task span / oversight analytics.
-		"GetTaskSpans":     withID(h.GetTaskSpans),
-		"GetOversight":     withID(h.GetOversight),
-		"GetTestOversight": withID(h.GetTestOversight),
+		"GetTaskSpans": withID(h.GetTaskSpans),
+		"GetOversight": withID(h.GetOversight),
 
 		// OAuth authentication
 		"StartOAuth":  http.HandlerFunc(h.StartOAuth),
