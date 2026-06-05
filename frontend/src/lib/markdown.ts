@@ -37,8 +37,37 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   return defaultFence(tokens, idx, options, env, self);
 };
 
-export function renderMarkdown(src: string): string {
-  return md.render(src);
+// Image renderer: doc-relative images (e.g. ![](images/board.png)) are rewritten
+// to the /api/docs-asset/<baseDir>/ route and emitted as a light+dark pair so
+// screenshots track the active theme. The dark variant is the same path with a
+// `-dark` suffix before the extension. External/absolute/data URLs render
+// normally. baseDir is passed via env from the docs viewer (the doc's category
+// dir, e.g. "guide").
+const defaultImage = md.renderer.rules.image;
+md.renderer.rules.image = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const src = token.attrGet('src') ?? '';
+  const external = /^(https?:)?\/\//.test(src) || src.startsWith('/') || src.startsWith('data:');
+  if (external) {
+    return defaultImage
+      ? defaultImage(tokens, idx, options, env, self)
+      : self.renderToken(tokens, idx, options);
+  }
+  const base = String((env as { baseDir?: string })?.baseDir ?? '').replace(/\/+$/, '');
+  const rel = src.replace(/^\.?\//, '');
+  const url = (p: string) => `/api/docs-asset/${base ? base + '/' : ''}${p}`;
+  const dark = rel.replace(/(\.[a-z0-9]+)$/i, '-dark$1');
+  const alt = escapeHtml(self.renderInlineAsText(token.children ?? [], options, env));
+  return (
+    '<span class="doc-shot">' +
+    `<img class="doc-shot__img doc-shot__img--light" src="${url(rel)}" alt="${alt}" loading="lazy">` +
+    `<img class="doc-shot__img doc-shot__img--dark" src="${url(dark)}" alt="${alt}" loading="lazy">` +
+    '</span>'
+  );
+};
+
+export function renderMarkdown(src: string, baseDir = ''): string {
+  return md.render(src, { baseDir });
 }
 
 export function stripFirstHeading(src: string): string {

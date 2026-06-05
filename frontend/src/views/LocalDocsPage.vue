@@ -141,7 +141,10 @@ async function loadDoc(slug: string) {
     const res = await fetch(`/api/docs/${encodeURI(slug)}`, { credentials: 'same-origin', headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const md = await res.text();
-    articleHtml.value = renderMarkdown(stripFirstHeading(md));
+    // baseDir is the doc's category dir (e.g. "guide" from "guide/board-and-tasks")
+    // so doc-relative image src resolves under /api/docs-asset/<baseDir>/.
+    const baseDir = slug.includes('/') ? slug.slice(0, slug.lastIndexOf('/')) : '';
+    articleHtml.value = renderMarkdown(stripFirstHeading(md), baseDir);
     // Reveal the body before querying it: the rendered markdown lives behind
     // v-else of articleLoading, so rewriteLinks/buildToc need it mounted.
     articleLoading.value = false;
