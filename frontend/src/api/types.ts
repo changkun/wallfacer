@@ -59,6 +59,7 @@ export interface Task {
   prompt_history?: string[];
   retry_history?: RetryRecord[];
   parent_task_id?: string | null;
+  spec_source_path?: string;
   environment?: ExecutionEnvironment | null;
 }
 

@@ -64,6 +64,20 @@ function openDep(id: string) {
   detailRouter.push({ path: '/', query: { task: id } });
 }
 
+// Source spec link (Links → spec). The basename is shown as the label; the
+// click deep-links to /plan focusing the spec (PlanPage honours ?spec=<path>).
+const specSourcePath = computed(() => props.task.spec_source_path ?? '');
+const specSourceLabel = computed(() => {
+  const p = specSourcePath.value;
+  if (!p) return '';
+  const parts = p.split('/');
+  return parts[parts.length - 1] || p;
+});
+function openSpec() {
+  if (!specSourcePath.value) return;
+  detailRouter.push({ path: '/plan', query: { spec: specSourcePath.value } });
+}
+
 // Modal focus trap — Tab cycles inside the dialog only, focus restores
 // to the element that triggered the open on close. Must be declared
 // AFTER defineProps so the `() => !!props.task` getter doesn't access
@@ -1424,7 +1438,10 @@ const isArchived = computed(() => !!props.task.archived);
                 <div class="mdl-h">Links</div>
                 <div class="row">
                   <span class="k">spec</span>
-                  <span class="v">—</span>
+                  <span class="v">
+                    <a v-if="specSourcePath" href="#" :title="specSourcePath" @click.prevent="openSpec">{{ specSourceLabel }}</a>
+                    <template v-else>—</template>
+                  </span>
                 </div>
                 <div class="row">
                   <span class="k">depends on</span>
