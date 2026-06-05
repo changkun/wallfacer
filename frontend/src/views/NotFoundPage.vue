@@ -4,7 +4,7 @@ import DefaultLayout from '../layouts/DefaultLayout.vue';
 import { useReveal } from '../composables/useReveal';
 
 useReveal();
-useHead({ title: '404 — Wallfacer' });
+useHead({ title: '404 | Wallfacer' });
 </script>
 
 <template>

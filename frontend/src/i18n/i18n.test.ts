@@ -14,9 +14,10 @@ describe('i18n dictionaries', () => {
 
   // Execution moved from containers to host processes; the marketing copy must
   // not reintroduce container-era language or non-existent CLI surfaces. Bare
-  // "sandbox" stays allowed (harness abstraction, planning sandbox).
-  it('contains no stale container-era or non-existent-command copy', () => {
-    const banned = [/container/i, /podman/i, /docker/i, /sandbox image/i, /wallfacer exec\b/i, /容器/, /沙箱镜像/];
+  // "sandbox" stays allowed (harness abstraction, planning sandbox). Em dashes
+  // are banned per house style: use commas, periods, colons, or hyphens.
+  it('contains no stale container-era copy, dead commands, or em dashes', () => {
+    const banned = [/container/i, /podman/i, /docker/i, /sandbox image/i, /wallfacer exec\b/i, /容器/, /沙箱镜像/, /&mdash;/i, /—/];
     for (const dict of [en, zh]) {
       for (const [key, value] of Object.entries(dict)) {
         for (const pattern of banned) {

@@ -6,7 +6,7 @@ import { useReveal } from '../composables/useReveal';
 
 const t = useT();
 useReveal();
-useHead({ title: 'Docs — Wallfacer', meta: [{ name: 'description', content: 'Everything you need to get started and go deep with Wallfacer.' }] });
+useHead({ title: 'Wallfacer Docs', meta: [{ name: 'description', content: 'Everything you need to get started and go deep with Wallfacer.' }] });
 </script>
 
 <template>
