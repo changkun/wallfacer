@@ -49,7 +49,7 @@ const articleHtml = computed(() => {
 useMermaid('.docs-article', html);
 
 useHead(computed(() => ({
-  title: entry.value ? `${entry.value.title} — Wallfacer Docs` : '404',
+  title: entry.value ? `${entry.value.title} | Wallfacer Docs` : '404',
 })));
 </script>
 

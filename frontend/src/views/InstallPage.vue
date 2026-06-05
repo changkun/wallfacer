@@ -6,7 +6,7 @@ import { useReveal } from '../composables/useReveal';
 
 const t = useT();
 useReveal();
-useHead({ title: 'Download — Wallfacer', meta: [{ name: 'description', content: 'Download Wallfacer for macOS, Windows, and Linux.' }] });
+useHead({ title: 'Download Wallfacer', meta: [{ name: 'description', content: 'Download Wallfacer for macOS, Windows, and Linux.' }] });
 
 function copyInstall() {
   navigator.clipboard.writeText('curl -fsSL https://latere.ai/wallfacer/install.sh | sh');
