@@ -455,6 +455,33 @@ const costDisplay = computed(() => {
 
 const tokenCount = (n: number) => (n || 0).toLocaleString();
 
+const gitBranches = computed(() => {
+  const repos = Object.keys(props.task.worktree_paths || {});
+  return repos.length ? repos.join(', ') : '—';
+});
+
+const gitWorktrees = computed(() => {
+  const n = Object.keys(props.task.worktree_paths || {}).length;
+  return n ? `${n} ${n === 1 ? 'repo' : 'repos'}` : 'none';
+});
+
+const dependsOnDisplay = computed(() => {
+  const n = (props.task.depends_on || []).length;
+  return n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : 'none';
+});
+
+// Budget usage as a percentage of the configured cost/token cap (0 when no cap).
+const budgetPct = computed(() => {
+  const u = props.task.usage;
+  if ((props.task.max_cost_usd ?? 0) > 0 && u?.cost_usd) {
+    return Math.min(1, u.cost_usd / props.task.max_cost_usd!) * 100;
+  }
+  if ((props.task.max_input_tokens ?? 0) > 0 && u?.input_tokens) {
+    return Math.min(1, u.input_tokens / props.task.max_input_tokens!) * 100;
+  }
+  return 0;
+});
+
 // Status → badge class, for retry-history rows (matches the board badges).
 function badgeClassFor(status: string): string {
   return `badge-${status}`;
@@ -1167,7 +1194,7 @@ const isArchived = computed(() => !!props.task.archived);
               <div class="mdl-section modal-aside__actions">
                 <div class="mdl-h">Actions</div>
 
-                <div v-if="isBacklog">
+                <div v-if="isBacklog" class="aside-action-group">
                   <button type="button" class="aside-action aside-action--primary" @click="startTask">
                     <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
                     <span class="aside-action__body">
@@ -1236,7 +1263,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </div>
                 </div>
 
-                <div v-if="isWaiting">
+                <div v-if="isWaiting" class="aside-action-group">
                   <button type="button" class="aside-action aside-action--success" @click="completeTask">
                     <span class="aside-action__icon" aria-hidden="true">&#10003;</span>
                     <span class="aside-action__body">
@@ -1246,7 +1273,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="isFailed && task.session_id">
+                <div v-if="isFailed && task.session_id" class="aside-action-group">
                   <button type="button" class="aside-action" @click="resumeTask">
                     <span class="aside-action__icon" aria-hidden="true">&#8635;</span>
                     <span class="aside-action__body">
@@ -1256,7 +1283,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="isWaiting || isDone || isFailed">
+                <div v-if="isWaiting || isDone || isFailed" class="aside-action-group">
                   <button type="button" class="aside-action" @click="testTask">
                     <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
                     <span class="aside-action__body">
@@ -1266,7 +1293,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="budgetExceeded && (isWaiting || isFailed)">
+                <div v-if="budgetExceeded && (isWaiting || isFailed)" class="aside-action-group">
                   <button type="button" class="aside-action" @click="raiseBudget">
                     <span class="aside-action__icon" aria-hidden="true">&#36;</span>
                     <span class="aside-action__body">
@@ -1276,7 +1303,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="isWaiting || isFailed">
+                <div v-if="isWaiting || isFailed" class="aside-action-group">
                   <button type="button" class="aside-action" @click="syncTask">
                     <span class="aside-action__icon" aria-hidden="true">&#8645;</span>
                     <span class="aside-action__body">
@@ -1286,7 +1313,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="isFailed || isCancelled">
+                <div v-if="isFailed || isCancelled" class="aside-action-group">
                   <button type="button" class="aside-action" @click="retryTask">
                     <span class="aside-action__icon" aria-hidden="true">&#8634;</span>
                     <span class="aside-action__body">
@@ -1296,7 +1323,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="(isDone || isCancelled) && !isArchived">
+                <div v-if="(isDone || isCancelled) && !isArchived" class="aside-action-group">
                   <button type="button" class="aside-action" @click="archiveTask">
                     <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
                     <span class="aside-action__body">
@@ -1306,7 +1333,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="isArchived">
+                <div v-if="isArchived" class="aside-action-group">
                   <button type="button" class="aside-action" @click="unarchiveTask">
                     <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
                     <span class="aside-action__body">
@@ -1316,7 +1343,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div v-if="isInProgress || isWaiting">
+                <div v-if="isInProgress || isWaiting" class="aside-action-group">
                   <button
                     type="button"
                     class="aside-action aside-action--warn"
@@ -1331,7 +1358,7 @@ const isArchived = computed(() => !!props.task.archived);
                   </button>
                 </div>
 
-                <div>
+                <div class="aside-action-group">
                   <button type="button" class="aside-action aside-action--danger" @click="deleteTask">
                     <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
                     <span class="aside-action__body">
@@ -1340,16 +1367,6 @@ const isArchived = computed(() => !!props.task.archived);
                     </span>
                   </button>
                 </div>
-              </div>
-
-              <div v-if="envRows.length" class="mdl-section">
-                <div class="mdl-h">Environment</div>
-                <dl class="env-provenance">
-                  <template v-for="row in envRows" :key="row.label">
-                    <dt>{{ row.label }}</dt>
-                    <dd :class="{ 'env-provenance__mono': row.mono }">{{ row.value }}</dd>
-                  </template>
-                </dl>
               </div>
 
               <div class="mdl-section">
@@ -1383,9 +1400,46 @@ const isArchived = computed(() => !!props.task.archived);
                   <span class="v mono">{{ costDisplay }}</span>
                 </div>
                 <div class="row">
-                  <span class="k">turns</span>
-                  <span class="v mono">{{ task.turns ?? 0 }}</span>
+                  <span class="k">timeout</span>
+                  <span class="v">{{ task.timeout ? task.timeout + ' min' : '—' }}</span>
                 </div>
+                <div v-if="budgetPct > 0" class="bar" style="margin-top: 6px">
+                  <i :style="{ width: budgetPct.toFixed(1) + '%' }"></i>
+                </div>
+              </div>
+
+              <div class="mdl-section">
+                <div class="mdl-h">Git</div>
+                <div class="row">
+                  <span class="k">branches</span>
+                  <span class="v">{{ gitBranches }}</span>
+                </div>
+                <div class="row">
+                  <span class="k">worktrees</span>
+                  <span class="v">{{ gitWorktrees }}</span>
+                </div>
+              </div>
+
+              <div class="mdl-section">
+                <div class="mdl-h">Links</div>
+                <div class="row">
+                  <span class="k">spec</span>
+                  <span class="v">—</span>
+                </div>
+                <div class="row">
+                  <span class="k">depends on</span>
+                  <span class="v">{{ dependsOnDisplay }}</span>
+                </div>
+              </div>
+
+              <div v-if="envRows.length" class="mdl-section">
+                <div class="mdl-h">Environment</div>
+                <dl class="env-provenance">
+                  <template v-for="row in envRows" :key="row.label">
+                    <dt>{{ row.label }}</dt>
+                    <dd :class="{ 'env-provenance__mono': row.mono }">{{ row.value }}</dd>
+                  </template>
+                </dl>
               </div>
             </aside>
           </div>
@@ -1622,6 +1676,10 @@ const isArchived = computed(() => !!props.task.archived);
   overflow-wrap: anywhere;
 }
 .env-provenance__mono { font-family: var(--font-mono, monospace); font-size: 10px; }
+
+/* Dissolve the per-state action wrappers so each button is a direct flex
+   child of .modal-aside__actions and inherits its 6px gap (matches old UI). */
+.aside-action-group { display: contents; }
 
 /* Backlog edit form inside the right aside. */
 .backlog-edit {
