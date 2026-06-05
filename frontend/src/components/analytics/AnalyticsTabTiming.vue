@@ -146,9 +146,8 @@ onMounted(() => fetchStats());
       "
     >
       <div>
-        <h3 style="font-size: 16px; font-weight: 600; margin: 0">Execution timing</h3>
         <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px">
-          Per-phase latency aggregated across all tasks. Throughput tiles summarise completed/failed counts and execution duration percentiles.
+          Per-phase latency aggregated across all tasks
         </div>
       </div>
     </div>
