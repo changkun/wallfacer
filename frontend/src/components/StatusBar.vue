@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { useToastStore } from '../stores/toast';
 import { api, ApiError } from '../api/client';
+import { useSse } from '../composables/useSse';
 import { formatGitConflict } from '../lib/gitConflict';
 import BranchDropdown from './BranchDropdown.vue';
 
 // connState is the tri-state SSE health ('ok' | 'reconnecting' | 'closed'),
-// mirroring the old status-bar.js _updateConnDot. Until App.vue/useSse thread
-// the tri-state through (see report), we derive it from the boolean `connected`
-// so the dot stays correct in steady state.
+// mirroring the old status-bar.js _updateConnDot. App.vue/useSse thread the
+// tasks-stream tri-state through; we fall back to the boolean `connected` when
+// only that is supplied.
 const props = defineProps<{
   connected: boolean;
   connState?: 'ok' | 'reconnecting' | 'closed';
@@ -130,34 +131,26 @@ async function runAction(ws: GitWorkspace, kind: 'push' | 'sync' | 'rebase') {
   }
 }
 
-let sse: EventSource | null = null;
-function startGitStream() {
-  if (typeof EventSource === 'undefined') return;
-  try {
-    let url = '/api/git/stream';
-    const key = window.__WALLFACER__?.serverApiKey;
-    if (key) url += `?token=${encodeURIComponent(key)}`;
-    sse = new EventSource(url);
-    // GitStatusStream sends `data: <bare array>` events with no event name,
-    // so the default `message` listener is the one we want.
-    sse.onmessage = (ev) => {
-      try {
-        const list = JSON.parse(ev.data) as GitWorkspace[];
-        if (Array.isArray(list)) workspaces.value = list;
-      } catch { /* ignore */ }
-    };
-  } catch {
-    /* sse optional */
-  }
-}
+// The git stream rides the same tab-leader relay as the tasks stream: only the
+// leader tab opens /api/git/stream, followers receive relayed events. This caps
+// the origin at one tasks-SSE + one git-SSE total regardless of tab count.
+// GitStatusStream sends `data: <bare array>` events with no event name, so the
+// default `message` channel (onMessage) is the one we want.
+useSse({
+  url: '/api/git/stream',
+  withCredentials: false,
+  onMessage: (ev) => {
+    try {
+      // Leader receives a raw string; followers receive the already-parsed
+      // value relayed verbatim.
+      const list = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+      if (Array.isArray(list)) workspaces.value = list as GitWorkspace[];
+    } catch { /* ignore */ }
+  },
+});
 
 onMounted(() => {
   refreshGitStatus();
-  startGitStream();
-});
-
-onUnmounted(() => {
-  sse?.close();
 });
 </script>
 
