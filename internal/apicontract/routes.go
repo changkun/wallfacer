@@ -777,9 +777,9 @@ var Routes = []Route{
 		Tags:        []string{"login"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/auth/switch-org", Name: "AuthSwitchOrg",
-		JSName:      "authSwitchOrg",
-		Description: "Switch active organization; clears session and returns a redirect to /login?org_id=<target>.",
+		Method: http.MethodPatch, Pattern: "/api/auth/me", Name: "PatchAuthMe",
+		JSName:      "patchAuthMe",
+		Description: "Mutate the signed-in principal — currently only org_id (active organization). Clears session and returns a redirect to /login?org_id=<target>.",
 		Tags:        []string{"login"},
 	},
 	{

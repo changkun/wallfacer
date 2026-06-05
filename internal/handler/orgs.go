@@ -5,7 +5,7 @@
 // using the session's access token, so the user only sees orgs they
 // are a member of.
 //
-// Switching (POST /api/auth/switch-org) clears the wallfacer session
+// Switching (PATCH /api/auth/me) clears the wallfacer session
 // cookie and returns a 303 redirect to /login?org_id=<target>. The
 // browser follows; oidc.HandleLogin forwards org_id to /authorize;
 // the auth service persists the choice on the SSO session and issues
@@ -131,32 +131,32 @@ type tokenRefresher interface {
 	UserFromRequest(http.ResponseWriter, *http.Request) *auth.User
 }
 
-// switchOrgRequest is the POST /api/auth/switch-org body. Only org_id
-// is required; the target is looked up and verified server-side.
-type switchOrgRequest struct {
+// patchAuthMeRequest is the PATCH /api/auth/me body. Only org_id is
+// supported today; the target is looked up and verified server-side.
+type patchAuthMeRequest struct {
 	OrgID string `json:"org_id"`
 }
 
-// switchOrgResponse is returned with 200 when the switch request is
+// patchAuthMeResponse is returned with 200 when the switch request is
 // accepted. The frontend follows RedirectURL; we don't 302 directly
-// because the frontend POSTs via fetch, which would make the browser
+// because the frontend PATCHes via fetch, which would make the browser
 // follow silently instead of navigating.
-type switchOrgResponse struct {
+type patchAuthMeResponse struct {
 	RedirectURL string `json:"redirect_url"`
 }
 
-// AuthSwitchOrg validates the caller is a member of the requested org,
+// PatchAuthMe validates the caller is a member of the requested org,
 // clears the wallfacer session cookie, and returns a JSON body with
 // the /login URL the frontend should navigate to. The actual token
 // refresh happens as part of that redirect (auth service honors
 // org_id on /authorize and mints a new token).
-func (h *Handler) AuthSwitchOrg(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PatchAuthMe(w http.ResponseWriter, r *http.Request) {
 	if h.auth == nil {
 		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "auth not configured"})
 		return
 	}
 
-	req, ok := httpjson.DecodeBody[switchOrgRequest](w, r)
+	req, ok := httpjson.DecodeBody[patchAuthMeRequest](w, r)
 	if !ok {
 		return
 	}
@@ -209,7 +209,7 @@ func (h *Handler) AuthSwitchOrg(w http.ResponseWriter, r *http.Request) {
 	// in the URL matters — absent ?org_id is a no-op on the auth
 	// side, which would preserve the user's previously-chosen org.
 	redirect := "/login?org_id=" + req.OrgID
-	httpjson.Write(w, http.StatusOK, switchOrgResponse{RedirectURL: redirect})
+	httpjson.Write(w, http.StatusOK, patchAuthMeResponse{RedirectURL: redirect})
 }
 
 // fetchOrgs calls auth.latere.ai/me/orgs with the given access token

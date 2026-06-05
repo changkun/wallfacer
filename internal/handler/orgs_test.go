@@ -14,7 +14,7 @@ import (
 
 // fakeAuthClientWithSession extends the fakeAuthProvider used in other
 // handler tests with a GetSession method so *Handler.AuthOrgs /
-// AuthSwitchOrg can pull the access token. Narrow to what the tested
+// PatchAuthMe can pull the access token. Narrow to what the tested
 // code path needs.
 type fakeAuthClientWithSession struct {
 	fakeAuthProvider
@@ -146,24 +146,24 @@ func TestAuthOrgs_LocalModeReturns204(t *testing.T) {
 	}
 }
 
-// TestAuthSwitchOrg_HappyPath covers the successful switch: valid
+// TestPatchAuthMe_HappyPath covers the successful switch: valid
 // target, member of that org, response contains the /login URL with
 // org_id, session cookie is cleared.
-func TestAuthSwitchOrg_HappyPath(t *testing.T) {
+func TestPatchAuthMe_HappyPath(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc"},{"id":"org-b","name":"Bob Corp"}]`)
 
 	body := bytes.NewBufferString(`{"org_id":"org-b"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/switch-org", body)
+	req := httptest.NewRequest(http.MethodPatch, "/api/auth/me", body)
 	w := httptest.NewRecorder()
-	h.AuthSwitchOrg(w, req)
+	h.PatchAuthMe(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
 	}
-	var got switchOrgResponse
+	var got patchAuthMeResponse
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -184,58 +184,58 @@ func TestAuthSwitchOrg_HappyPath(t *testing.T) {
 	}
 }
 
-// TestAuthSwitchOrg_NonMemberReturns403 closes the attack/mistake
+// TestPatchAuthMe_NonMemberReturns403 closes the attack/mistake
 // case: switching to an org the user is not a member of returns 403
 // instead of silently redirecting.
-func TestAuthSwitchOrg_NonMemberReturns403(t *testing.T) {
+func TestPatchAuthMe_NonMemberReturns403(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc"}]`)
 
 	body := bytes.NewBufferString(`{"org_id":"org-evil"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/switch-org", body)
+	req := httptest.NewRequest(http.MethodPatch, "/api/auth/me", body)
 	w := httptest.NewRecorder()
-	h.AuthSwitchOrg(w, req)
+	h.PatchAuthMe(w, req)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", w.Code)
 	}
 }
 
-// TestAuthSwitchOrg_Unauthenticated401 covers the no-session case.
-func TestAuthSwitchOrg_Unauthenticated401(t *testing.T) {
+// TestPatchAuthMe_Unauthenticated401 covers the no-session case.
+func TestPatchAuthMe_Unauthenticated401(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAuth(&fakeAuthClientWithSession{sess: nil, err: http.ErrNoCookie})
 
 	body := bytes.NewBufferString(`{"org_id":"org-a"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/switch-org", body)
+	req := httptest.NewRequest(http.MethodPatch, "/api/auth/me", body)
 	w := httptest.NewRecorder()
-	h.AuthSwitchOrg(w, req)
+	h.PatchAuthMe(w, req)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)
 	}
 }
 
-// TestAuthSwitchOrg_EmptyOrgIDSwitchesToPersonal covers the
+// TestPatchAuthMe_EmptyOrgIDSwitchesToPersonal covers the
 // switch-to-personal path: empty org_id is a valid request (not an
 // error), clears the session cookie, and returns a redirect to
 // /login?org_id= which the auth service reads as "clear
 // active_org on this SSO session".
-func TestAuthSwitchOrg_EmptyOrgIDSwitchesToPersonal(t *testing.T) {
+func TestPatchAuthMe_EmptyOrgIDSwitchesToPersonal(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
 
 	body := bytes.NewBufferString(`{"org_id":""}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/switch-org", body)
+	req := httptest.NewRequest(http.MethodPatch, "/api/auth/me", body)
 	w := httptest.NewRecorder()
-	h.AuthSwitchOrg(w, req)
+	h.PatchAuthMe(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	var got switchOrgResponse
+	var got patchAuthMeResponse
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
