@@ -492,7 +492,7 @@ function capitalize(s: string): string {
                 <option v-for="m in claudeModels" :key="m" :value="m" />
               </datalist>
               <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Default model for Claude tasks. Clear to use the container
+                Default model for Claude tasks. Clear to use the provider
                 default.
               </div>
             </div>

@@ -261,7 +261,7 @@ onMounted(async () => {
           <strong>{{ formatBytes(status.go_heap_alloc_bytes || 0) }}</strong>
         </div>
         <div>
-          Active processes:
+          Active agents:
           <strong>{{ status.active_containers || 0 }}</strong>
         </div>
         <div v-if="status.container_circuit">
