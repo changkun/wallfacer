@@ -7,7 +7,14 @@ import { api, ApiError } from '../api/client';
 import { formatGitConflict } from '../lib/gitConflict';
 import BranchDropdown from './BranchDropdown.vue';
 
-const props = defineProps<{ connected: boolean }>();
+// connState is the tri-state SSE health ('ok' | 'reconnecting' | 'closed'),
+// mirroring the old status-bar.js _updateConnDot. Until App.vue/useSse thread
+// the tri-state through (see report), we derive it from the boolean `connected`
+// so the dot stays correct in steady state.
+const props = defineProps<{
+  connected: boolean;
+  connState?: 'ok' | 'reconnecting' | 'closed';
+}>();
 defineEmits<{ shortcuts: [] }>();
 
 interface GitWorkspace {
@@ -44,10 +51,27 @@ function openBranchDropdown(ws: GitWorkspace, e: MouseEvent) {
   dropdownOpen.value = true;
 }
 
-const connDotClass = computed(() =>
-  props.connected ? 'status-bar-conn-dot--ok' : 'status-bar-conn-dot--closed',
+const connState = computed<'ok' | 'reconnecting' | 'closed'>(
+  () => props.connState ?? (props.connected ? 'ok' : 'closed'),
 );
-const connLabel = computed(() => (props.connected ? 'Connected' : 'Disconnected'));
+const connDotClass = computed(() => `status-bar-conn-dot--${connState.value}`);
+const connLabel = computed(() =>
+  connState.value === 'ok'
+    ? 'Connected'
+    : connState.value === 'reconnecting'
+      ? 'Reconnecting…'
+      : 'Disconnected',
+);
+
+// Center counts mirror the old _updateCounts: global board totals by status,
+// ignoring the active task filter and the archived flag. Binding to
+// store.inProgress / store.waiting would shrink these while a search is active.
+const inProgressCount = computed(
+  () => store.tasks.filter(t => t.status === 'in_progress' || t.status === 'committing').length,
+);
+const waitingCount = computed(
+  () => store.tasks.filter(t => t.status === 'waiting' || t.status === 'failed').length,
+);
 
 const workspaceLabel = computed(() => {
   const ws = store.config?.workspaces ?? [];
@@ -216,7 +240,7 @@ onUnmounted(() => {
             stroke-linecap="round"
           />
         </svg>
-        <span id="status-bar-in-progress">{{ store.inProgress.length }}</span>
+        <span id="status-bar-in-progress">{{ inProgressCount }}</span>
       </span>
       <span class="status-bar-count" title="Waiting">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
@@ -232,7 +256,7 @@ onUnmounted(() => {
           />
           <circle cx="5" cy="7" r="0.6" fill="currentColor" />
         </svg>
-        <span id="status-bar-waiting">{{ store.waiting.length }}</span>
+        <span id="status-bar-waiting">{{ waitingCount }}</span>
       </span>
     </div>
     <div class="status-bar__right">

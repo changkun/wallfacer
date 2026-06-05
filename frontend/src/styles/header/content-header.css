@@ -340,12 +340,17 @@
   line-height: 16px;
 }
 .col-stats {
+  min-width: 0;
+  overflow: hidden;
   font-size: 10px;
   color: var(--ink-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
 .col-btn {
   margin-left: auto;
+  flex-shrink: 0;
   border: none;
   background: transparent;
   color: var(--ink-3);
@@ -353,6 +358,7 @@
   padding: 2px 8px;
   border-radius: var(--r-sm);
   cursor: pointer;
+  white-space: nowrap;
   line-height: 16px;
 }
 .col-btn:hover {

@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useDialogStore } from '../stores/dialog';
+import hljs from 'highlight.js/lib/common';
 import { renderMarkdown } from '../lib/markdown';
+import { extToLang, splitHighlightedLines } from '../lib/diffHighlight';
 import { mapEntries, type RawExplorerEntry, type TreeEntry } from '../lib/explorerTree';
 import { fileIcon, type FileIcon } from '../lib/fileIcon';
 
@@ -67,6 +69,50 @@ const editing = ref(false);
 const editBuffer = ref('');
 const saving = ref(false);
 const saveError = ref('');
+
+// Drag-resizable panel width, persisted to localStorage. Clamp lives between
+// the min and 50vw; explorer.css owns the matching min/max.
+const EXPLORER_DEFAULT_WIDTH = 260;
+const EXPLORER_MIN_WIDTH = 200;
+const EXPLORER_WIDTH_KEY = 'wallfacer-explorer-width';
+const panelWidth = ref(EXPLORER_DEFAULT_WIDTH);
+let resizeStartX = 0;
+let resizeStartW = 0;
+const resizing = ref(false);
+
+function maxPanelWidth(): number {
+  return Math.floor(window.innerWidth * 0.5);
+}
+
+function onResizeMove(e: PointerEvent) {
+  const delta = e.clientX - resizeStartX;
+  panelWidth.value = Math.min(maxPanelWidth(), Math.max(EXPLORER_MIN_WIDTH, resizeStartW + delta));
+}
+
+function onResizeEnd() {
+  resizing.value = false;
+  window.removeEventListener('pointermove', onResizeMove);
+  window.removeEventListener('pointerup', onResizeEnd);
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+  localStorage.setItem(EXPLORER_WIDTH_KEY, String(panelWidth.value));
+}
+
+function onResizeStart(e: PointerEvent) {
+  e.preventDefault();
+  resizeStartX = e.clientX;
+  resizeStartW = panelWidth.value;
+  resizing.value = true;
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+  window.addEventListener('pointermove', onResizeMove);
+  window.addEventListener('pointerup', onResizeEnd);
+}
+
+function resetWidth() {
+  panelWidth.value = EXPLORER_DEFAULT_WIDTH;
+  localStorage.setItem(EXPLORER_WIDTH_KEY, String(EXPLORER_DEFAULT_WIDTH));
+}
 
 function workspace(): string {
   return store.config?.workspaces?.[0] ?? '';
@@ -148,18 +194,11 @@ function onEditKeydown(e: KeyboardEvent) {
   void nextTick(() => { ta.selectionStart = ta.selectionEnd = start + 2; });
 }
 
-// Relative "x ago" for the Task Prompts updated_at column.
-function relAgo(iso: string): string {
+// Absolute locale date for the Task Prompts updated_at column.
+function entryDate(iso: string): string {
   if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms)) return '';
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString();
 }
 
 async function saveFile() {
@@ -293,10 +332,33 @@ function fileName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-function previewLines(): string[] {
-  if (fileContent.value == null) return [];
-  return fileContent.value.split('\n');
+// Syntax-highlighted source lines (ported from the old _renderHighlightedContent):
+// explicit language when known, hljs auto-detect otherwise, plain escape on
+// failure. Each entry is per-line hljs HTML rendered via v-html in __lc.
+function highlightCode(content: string, filename: string): string[] {
+  const lang = extToLang(filename);
+  let highlighted: string;
+  try {
+    highlighted = lang
+      ? hljs.highlight(content, { language: lang }).value
+      : hljs.highlightAuto(content).value;
+  } catch {
+    highlighted = escapeHtml(content);
+  }
+  return splitHighlightedLines(highlighted);
 }
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const previewLines = computed<string[]>(() =>
+  fileContent.value == null ? [] : highlightCode(fileContent.value, fileName(selectedPath.value ?? '')),
+);
 
 async function closePreview() {
   if (editing.value) {
@@ -347,6 +409,8 @@ function startExplorerStream() {
 }
 
 onMounted(async () => {
+  const stored = parseInt(localStorage.getItem(EXPLORER_WIDTH_KEY) ?? '', 10);
+  if (stored >= EXPLORER_MIN_WIDTH) panelWidth.value = stored;
   if (!store.config) await store.fetchConfig();
   if (workspace()) await loadRoot();
   else treeLoading.value = false;
@@ -364,6 +428,8 @@ watch(taskPromptsIncludeWaiting, () => { void loadTaskPrompts(); });
 onUnmounted(() => {
   explorerStream?.close();
   window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('pointermove', onResizeMove);
+  window.removeEventListener('pointerup', onResizeEnd);
 });
 
 watch(() => store.config?.workspaces?.[0], (ws) => {
@@ -372,7 +438,7 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
 </script>
 
 <template>
-  <aside class="explorer-panel">
+  <aside class="explorer-panel" :style="{ width: panelWidth + 'px' }">
     <div class="explorer-panel__header">
       <span class="explorer-panel__title">Explorer</span>
       <button
@@ -384,24 +450,26 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
       >&times;</button>
     </div>
     <div v-if="taskPrompts.length" class="explorer-task-prompts">
-      <button
-        type="button"
+      <div
         class="explorer-task-prompts__header"
+        role="button"
+        tabindex="0"
         :aria-expanded="taskPromptsExpanded"
         @click="taskPromptsExpanded = !taskPromptsExpanded"
+        @keydown.enter.prevent="taskPromptsExpanded = !taskPromptsExpanded"
+        @keydown.space.prevent="taskPromptsExpanded = !taskPromptsExpanded"
       >
-        <span>{{ taskPromptsExpanded ? '▼' : '▶' }}</span>
+        <span class="explorer-node__toggle">{{ taskPromptsExpanded ? '▼' : '▶' }}</span>
         <span class="explorer-task-prompts__label">Task Prompts</span>
-        <span class="explorer-task-prompts__count">{{ taskPrompts.length }}</span>
-      </button>
+        <button
+          type="button"
+          class="explorer-task-prompts__waiting-toggle"
+          :title="taskPromptsIncludeWaiting ? 'Hide waiting tasks' : 'Show waiting tasks'"
+          :aria-pressed="taskPromptsIncludeWaiting"
+          @click.stop="taskPromptsIncludeWaiting = !taskPromptsIncludeWaiting"
+        >{{ taskPromptsIncludeWaiting ? 'W' : 'w' }}</button>
+      </div>
       <div v-if="taskPromptsExpanded">
-        <label class="explorer-task-prompts__toggle">
-          <input
-            v-model="taskPromptsIncludeWaiting"
-            type="checkbox"
-          />
-          Include waiting
-        </label>
         <button
           v-for="entry in taskPrompts"
           :key="entry.task_id"
@@ -412,7 +480,7 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
         >
           <span class="explorer-task-prompts__badge" :class="`explorer-task-prompts__badge--${entry.status}`">{{ entry.status }}</span>
           <span class="explorer-task-prompts__title">{{ entry.title || entry.task_id.slice(0, 8) }}</span>
-          <span v-if="entry.updated_at" class="explorer-task-prompts__time">{{ relAgo(entry.updated_at) }}</span>
+          <span v-if="entry.updated_at" class="explorer-task-prompts__time">{{ entryDate(entry.updated_at) }}</span>
         </button>
       </div>
     </div>
@@ -457,6 +525,13 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
         </div>
       </template>
     </div>
+    <div
+      class="explorer-panel__resize-handle"
+      :class="{ 'explorer-panel__resize-handle--active': resizing }"
+      title="Drag to resize, double-click to reset"
+      @pointerdown="onResizeStart"
+      @dblclick="resetWidth"
+    ></div>
   </aside>
 
   <!-- File preview modal: the board grid occupies the space an inline pane
@@ -474,10 +549,10 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
             type="button"
             class="explorer-preview__edit-btn"
             @click="previewMode = previewMode === 'rendered' ? 'source' : 'rendered'"
-          >{{ previewMode === 'rendered' ? 'Source' : 'Render' }}</button>
+          >{{ previewMode === 'rendered' ? 'Raw' : 'Preview' }}</button>
           <template v-if="editing">
             <button type="button" class="explorer-preview__save-btn" :disabled="saving" @click="saveFile">{{ saving ? 'Saving…' : 'Save' }}</button>
-            <button type="button" class="explorer-preview__discard-btn" :disabled="saving" @click="cancelEdit">Cancel</button>
+            <button type="button" class="explorer-preview__discard-btn" :disabled="saving" @click="cancelEdit">Discard</button>
           </template>
           <button v-else type="button" class="explorer-preview__edit-btn" @click="startEdit">Edit</button>
           <button type="button" class="explorer-preview__close" title="Close" aria-label="Close preview" @click="closePreview">&times;</button>
@@ -495,23 +570,21 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
         <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
         <div
           v-else-if="isMarkdownFile && previewMode === 'rendered'"
-          class="explorer-preview__markdown prose"
+          class="explorer-preview__markdown"
           v-html="renderedHtml"
         />
-        <pre v-else class="explorer-preview__code"><code>
-          <div
-            v-for="(line, idx) in previewLines()"
+        <!-- eslint-disable-next-line vue/no-v-html — hljs token spans only -->
+        <pre v-else class="explorer-preview__code"><code><span
+            v-for="(line, idx) in previewLines"
             :key="idx"
             class="explorer-preview__line"
-          ><span class="explorer-preview__ln">{{ idx + 1 }}</span><span class="explorer-preview__lc">{{ line }}</span></div>
-        </code></pre>
+          ><span class="explorer-preview__ln">{{ idx + 1 }}</span><span class="explorer-preview__lc" v-html="line || ' '"></span></span></code></pre>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.explorer-panel { width: 280px; min-width: 220px; }
 .explorer-panel__header { justify-content: space-between; }
 .explorer-panel__close {
   background: none;

@@ -36,6 +36,7 @@ const detailCache = ref<Record<string, Agent>>({});
 const detailLoading = ref(false);
 const saveError = ref('');
 const saving = ref(false);
+const editingDraft = ref<Draft | null>(null);
 
 const defaultHarness = computed(() => store.config?.default_sandbox || 'claude');
 
@@ -81,7 +82,12 @@ async function loadAgents() {
 async function selectAgent(a: Agent) {
   draft.value = null;
   selectedSlug.value = a.slug;
-  if (!detailCache.value[a.slug]) {
+  // User-authored agents edit in place. Seed synchronously from the
+  // list row so the editor renders immediately, then refresh from the
+  // full detail (which carries prompt_tmpl) once it resolves.
+  const cached = !!detailCache.value[a.slug];
+  editingDraft.value = a.builtin ? null : seedDraft(detailCache.value[a.slug] || a);
+  if (!cached) {
     detailLoading.value = true;
     try {
       const full = await api<Agent>('GET', `/api/agents/${encodeURIComponent(a.slug)}`);
@@ -91,7 +97,23 @@ async function selectAgent(a: Agent) {
     } finally {
       detailLoading.value = false;
     }
+    // Refresh the edit form with the full detail (carries prompt_tmpl).
+    if (selectedSlug.value === a.slug && !a.builtin && detailCache.value[a.slug]) {
+      editingDraft.value = seedDraft(detailCache.value[a.slug]);
+    }
   }
+}
+
+function seedDraft(d: Agent): Draft {
+  return {
+    slug: d.slug,
+    title: d.title || '',
+    description: d.description || '',
+    harness: d.harness || '',
+    multiturn: !!d.multiturn,
+    capabilities: (d.capabilities || []).slice(),
+    prompt_tmpl: d.prompt_tmpl || '',
+  };
 }
 
 function openNewEditor() {
@@ -173,20 +195,10 @@ async function saveAgent() {
   }
 }
 
-const editingDraft = ref<Draft | null>(null);
-
-function startEdit() {
-  if (!selectedAgent.value || !selectedDetail.value) return;
-  const d = selectedDetail.value;
-  editingDraft.value = {
-    slug: d.slug,
-    title: d.title || '',
-    description: d.description || '',
-    harness: d.harness || '',
-    multiturn: !!d.multiturn,
-    capabilities: (d.capabilities || []).slice(),
-    prompt_tmpl: d.prompt_tmpl || '',
-  };
+function cancelUserEdit() {
+  // Revert edits and stay in the editor (there is no read-only user view).
+  if (selectedDetail.value) editingDraft.value = seedDraft(selectedDetail.value);
+  saveError.value = '';
 }
 
 async function saveEdit() {
@@ -201,7 +213,7 @@ async function saveEdit() {
     );
     const slug = selectedAgent.value.slug;
     delete detailCache.value[slug];
-    editingDraft.value = null;
+    // Keep the editor mounted during reload; selectAgent re-seeds it.
     await loadAgents();
     const a = agents.value.find((x) => x.slug === slug);
     if (a) await selectAgent(a);
@@ -473,19 +485,12 @@ onMounted(async () => {
                   class="agents-detail__btn-primary"
                   @click="startClone(selectedAgent)"
                 >Clone</button>
-                <template v-else>
-                  <button
-                    v-if="!editingDraft"
-                    type="button"
-                    class="agents-detail__btn-ghost"
-                    @click="startEdit"
-                  >Edit</button>
-                  <button
-                    type="button"
-                    class="agents-detail__btn-danger"
-                    @click="deleteAgent(selectedAgent.slug)"
-                  >Delete</button>
-                </template>
+                <button
+                  v-else
+                  type="button"
+                  class="agents-detail__btn-danger"
+                  @click="deleteAgent(selectedAgent.slug)"
+                >Delete</button>
               </div>
             </div>
 
@@ -520,6 +525,10 @@ onMounted(async () => {
                     @click="editingDraft.harness = opt.value"
                   >{{ opt.label }}</button>
                 </div>
+                <span class="agents-detail__field-hint">
+                  Default inherits from the workspace setting.
+                  Claude and Codex pin this agent to a specific harness regardless of task or env config.
+                </span>
               </div>
               <div class="agents-detail__field">
                 <span class="agents-detail__field-label">Capabilities</span>
@@ -537,14 +546,26 @@ onMounted(async () => {
               <label class="agents-detail__field agents-detail__field--check">
                 <input v-model="editingDraft.multiturn" type="checkbox" />
                 <span>Multi-turn</span>
+                <span class="agents-detail__field-hint">
+                  Advisory only: the runner's binding table is the source of truth for dispatch.
+                </span>
               </label>
               <div class="agents-detail__field agents-detail__field--prompt">
                 <span class="agents-detail__field-label">System Prompt</span>
                 <textarea v-model="editingDraft.prompt_tmpl" rows="14" name="prompt_tmpl"></textarea>
+                <span class="agents-detail__field-hint">
+                  Optional preamble prepended to every invocation of this agent
+                  through the flow engine. The agent sees this text first, then
+                  a blank line, then the caller's prompt. Leave empty to use the
+                  agent's default behaviour. Note: built-in sub-agents invoked by
+                  the implement turn loop (title, oversight, commit-msg) use
+                  their embedded templates regardless; put custom prompts on a
+                  clone referenced from a custom flow.
+                </span>
               </div>
               <p v-if="saveError" class="agents-detail__editor-err">{{ saveError }}</p>
               <div class="agents-detail__editor-actions">
-                <button type="button" class="agents-detail__btn-ghost" @click="editingDraft = null">Cancel</button>
+                <button type="button" class="agents-detail__btn-ghost" @click="cancelUserEdit">Cancel</button>
                 <button type="submit" class="agents-detail__btn-primary" :disabled="saving">
                   {{ saving ? 'Saving...' : 'Save' }}
                 </button>
