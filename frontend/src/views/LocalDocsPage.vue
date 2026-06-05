@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import { renderMarkdown, stripFirstHeading } from '../lib/markdown';
+import { enhanceMermaid, watchThemeReinit } from '../lib/mermaidRender';
 
 interface DocEntry {
   slug: string;
@@ -152,6 +153,9 @@ async function loadDoc(slug: string) {
     if (articleEl.value) articleEl.value.scrollTop = 0;
     rewriteLinks();
     buildToc();
+    // Render ```mermaid fences (placeholders emitted by the markdown renderer)
+    // into SVG. Idempotent and a no-op when the doc has no diagrams.
+    void enhanceMermaid(bodyEl.value);
   } catch (e) {
     articleHtml.value = `<p class="docs-error">Failed to load: ${e instanceof Error ? e.message : String(e)}</p>`;
     articleLoading.value = false;
@@ -190,6 +194,8 @@ function selectSlug(slug: string) {
 }
 
 onMounted(async () => {
+  // Re-color mermaid diagrams when the theme toggles (idempotent global watcher).
+  watchThemeReinit();
   await loadIndex();
   await loadDoc(activeSlug.value);
 });
