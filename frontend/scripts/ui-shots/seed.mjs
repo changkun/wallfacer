@@ -55,8 +55,11 @@ const groupKey = (paths) =>
 const KEY = groupKey([wsDir]);
 const groupDir = join(dataDir, KEY);
 
-// Deterministic clock: everything is relative to a fixed "now".
-const NOW = new Date('2026-06-05T12:00:00Z');
+// Deterministic clock: everything is relative to a fixed "now", anchored a day
+// before the project reference date so every derived time stays in the past
+// against any real wall clock (otherwise the detail "elapsed" goes negative
+// when the clock trails the anchor).
+const NOW = new Date('2026-06-04T12:00:00Z');
 const iso = (minsAgo) => new Date(NOW.getTime() - minsAgo * 60000).toISOString();
 
 const usage = (i, o, cr, cc, cost) => ({
