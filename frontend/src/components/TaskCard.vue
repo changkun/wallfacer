@@ -569,12 +569,6 @@ function onCardKeydown(e: KeyboardEvent) {
     >
       <span v-if="props.task.turns > 0" class="card-meta-time" :title="'Turns: ' + props.task.turns">{{ props.task.turns }} turn{{ props.task.turns === 1 ? '' : 's' }}</span>
       <span class="card-meta-cost" title="Total cost">{{ formatCost(props.task.usage.cost_usd) }}</span>
-      <span
-        v-if="props.task.session_id"
-        class="card-meta-session"
-        style="margin-left:auto;font-family:var(--font-mono);"
-        :title="'Session: ' + props.task.session_id"
-      >{{ props.task.session_id.slice(0, 7) }}</span>
     </div>
 
     <!-- Row 8a: routine footer (replaces action buttons for routine cards) -->
