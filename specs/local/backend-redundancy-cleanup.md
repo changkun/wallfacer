@@ -52,7 +52,7 @@ parameterised endpoint).
 | [api-oversight-phase.md](backend-redundancy-cleanup/api-oversight-phase.md) | Small | `/oversight/test` sibling → `?phase=test` query on the base route. |
 | [api-task-actions-patch.md](backend-redundancy-cleanup/api-task-actions-patch.md) | Medium | 4 POSTs (cancel/archive/unarchive/restore) → PATCH body fields. Keeps `done`/`resume`/`sync`/`test` as dedicated side-effect endpoints. Also lands the cross-cutting `transitionTask` helper. |
 | [api-auth-org-patch.md](backend-redundancy-cleanup/api-auth-org-patch.md) | Small | `POST /api/auth/switch-org` → `PATCH /api/auth/me`. |
-| [api-ideate-routines.md](backend-redundancy-cleanup/api-ideate-routines.md) | Small | Either remove the `/api/ideate` triple (route ideation through the routines list filter) or document the facade. |
+| [api-ideate-routines.md](backend-redundancy-cleanup/api-ideate-routines.md) | Archived | Premise no longer holds. `/api/ideate` is not routine-backed: the always-on `system:ideation` routine was retired (reconcile now deletes any leftover), and `POST /api/ideate` creates a one-shot `idea-agent` task directly. Neither "remove the facade" nor "document the facade over /api/routines" applies; the in-code comments are already accurate. See Outcome in the child spec. |
 
 ## Considered but skipped
 
