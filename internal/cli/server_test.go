@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/handler"
@@ -225,6 +226,70 @@ func TestBuildMux_DocsEndpoints(t *testing.T) {
 	mux.ServeHTTP(rr4, req4)
 	if rr4.Code != http.StatusBadRequest && rr4.Code != http.StatusNotFound {
 		t.Fatalf("path traversal: status %d, want 400 or 404", rr4.Code)
+	}
+}
+
+// TestBuildMux_DocsAsset verifies the docs-asset route serves embedded images
+// with the right content type, and rejects non-image extensions, traversal,
+// and missing files — so doc screenshots referenced from guide markdown render
+// in-app without leaking other embedded files.
+func TestBuildMux_DocsAsset(t *testing.T) {
+	workdir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workdir, "worktrees"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command: "true", EnvFile: filepath.Join(workdir, ".env"),
+		WorktreesDir: filepath.Join(workdir, "worktrees"), Workspaces: []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+
+	pngBytes := []byte("\x89PNG\r\n\x1a\nfake-png-bytes")
+	docsFS := fstest.MapFS{
+		"docs/guide/images/board.png": {Data: pngBytes},
+		"docs/guide/board.md":         {Data: []byte("# Board\n")},
+	}
+	mux := BuildMux(h, reg, IndexViewData{}, docsFS, nil, false)
+
+	// The path goes in the URL so the mux populates {path...} itself (a
+	// pre-set PathValue would be overwritten during routing).
+	get := func(urlPath string) *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/docs-asset/"+urlPath, nil)
+		mux.ServeHTTP(rr, req)
+		return rr
+	}
+
+	// A real image is served with the image content type and exact bytes.
+	rr := get("guide/images/board.png")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("asset: status %d, want 200", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "image/png" {
+		t.Fatalf("content type %q, want image/png", ct)
+	}
+	if rr.Body.String() != string(pngBytes) {
+		t.Fatalf("asset bytes mismatch")
+	}
+
+	// Non-image extensions (e.g. markdown) are rejected, so the route cannot
+	// be used to read arbitrary embedded docs.
+	if rr := get("guide/board.md"); rr.Code != http.StatusBadRequest {
+		t.Fatalf("markdown via asset route: status %d, want 400", rr.Code)
+	}
+	// Path traversal is rejected (%2F keeps the ".." in the captured value
+	// instead of being cleaned away by the router).
+	if rr := get("..%2F..%2Fetc%2Fpasswd.png"); rr.Code != http.StatusBadRequest {
+		t.Fatalf("traversal: status %d, want 400", rr.Code)
+	}
+	// Missing image is a 404.
+	if rr := get("guide/images/missing.png"); rr.Code != http.StatusNotFound {
+		t.Fatalf("missing asset: status %d, want 404", rr.Code)
 	}
 }
 

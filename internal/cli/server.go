@@ -600,6 +600,27 @@ func withAssetCache(next http.Handler) http.Handler {
 	})
 }
 
+// docAssetContentType maps a docs asset path to its image content type, or ""
+// if the extension is not an embeddable doc image. The whitelist doubles as an
+// access guard: only image files under docs/ are reachable via the asset route,
+// never markdown or other embedded content.
+func docAssetContentType(p string) string {
+	switch {
+	case strings.HasSuffix(p, ".png"):
+		return "image/png"
+	case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
+		return "image/jpeg"
+	case strings.HasSuffix(p, ".svg"):
+		return "image/svg+xml"
+	case strings.HasSuffix(p, ".webp"):
+		return "image/webp"
+	case strings.HasSuffix(p, ".gif"):
+		return "image/gif"
+	default:
+		return ""
+	}
+}
+
 // BuildMux constructs the HTTP request router.
 //
 // All API routes are registered from apicontract.Routes (the single source of
@@ -771,6 +792,33 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 		if _, err := w.Write(data); err != nil {
 			logger.Main.Debug("docs content response write failed", "error", err)
+		}
+	})
+
+	// Docs assets — serve embedded images referenced by guide markdown, e.g.
+	// ![](images/board.png). The client rewrites a doc-relative src to
+	// /api/docs-asset/<category>/<path>; only whitelisted image extensions are
+	// served, so this cannot leak markdown or other embedded files.
+	mux.HandleFunc("GET /api/docs-asset/{path...}", func(w http.ResponseWriter, r *http.Request) {
+		p := r.PathValue("path")
+		if strings.Contains(p, "..") {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+		ctype := docAssetContentType(p)
+		if ctype == "" {
+			http.Error(w, "unsupported asset type", http.StatusBadRequest)
+			return
+		}
+		data, err := fs.ReadFile(docsFS, "docs/"+p)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		if _, err := w.Write(data); err != nil {
+			logger.Main.Debug("docs asset response write failed", "error", err)
 		}
 	})
 

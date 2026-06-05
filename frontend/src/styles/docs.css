@@ -504,3 +504,27 @@
   margin: 0;
   line-height: 1.5;
 }
+
+/* Doc screenshots — light/dark pair toggled by the active theme. The renderer
+   (lib/markdown.ts) emits both variants; only the one matching [data-theme]
+   shows. See /api/docs-asset image serving. */
+.doc-shot {
+  display: block;
+  margin: 20px 0;
+}
+.doc-shot__img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.doc-shot__img--dark {
+  display: none;
+}
+[data-theme="dark"] .doc-shot__img--light {
+  display: none;
+}
+[data-theme="dark"] .doc-shot__img--dark {
+  display: block;
+}
