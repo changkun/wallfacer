@@ -113,13 +113,13 @@ wallfacer doctor                   # Check prerequisites
 wallfacer status                   # Print board state
 wallfacer status -watch            # Live-updating board
 wallfacer status -json             # JSON output
-wallfacer exec &lt;task-id&gt;           # Attach to container
-wallfacer exec --sandbox claude    # New sandbox shell</code></pre>
+wallfacer auth login               # Local-mode sign-in
+wallfacer auth whoami              # Print saved principal</code></pre>
               <p>Common flags for <code>wallfacer run</code>:</p>
               <table>
                 <tr><td><code>-addr</code></td><td><code>:8080</code></td><td>Listen address</td></tr>
                 <tr><td><code>-no-browser</code></td><td><code>false</code></td><td>Skip auto-opening browser</td></tr>
-                <tr><td><code>-container</code></td><td>auto</td><td>Container runtime (<code>podman</code> or <code>docker</code>)</td></tr>
+                <tr><td><code>-data</code></td><td><code>~/.wallfacer/data</code></td><td>Data directory</td></tr>
                 <tr><td><code>-log-format</code></td><td><code>text</code></td><td>Log format: <code>text</code> or <code>json</code></td></tr>
               </table>
             </div>
