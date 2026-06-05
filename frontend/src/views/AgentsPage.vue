@@ -285,7 +285,7 @@ onMounted(async () => {
           <button
             type="button"
             class="agents-mode__default-edit"
-            title="Change the default in Settings, Sandbox"
+            title="Change the default in Settings, Harness"
             @click="openSandboxSettings"
           >
             Change

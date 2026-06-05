@@ -452,7 +452,7 @@ function onCardKeydown(e: KeyboardEvent) {
     :aria-label="`Task: ${props.task.title || props.task.prompt || props.task.id}`"
     @keydown="onCardKeydown"
   >
-    <!-- Row 1: status badge + meta-right (sandbox, timeout, time) -->
+    <!-- Row 1: status badge + meta-right (harness, timeout, time) -->
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
         <span v-if="props.rank" class="card-rank" title="Backlog position">#{{ props.rank }}</span>
@@ -483,7 +483,7 @@ function onCardKeydown(e: KeyboardEvent) {
       <div class="flex items-center gap-1.5 card-meta-right">
         <span
           class="text-xs text-v-muted"
-          :title="'Sandbox: ' + sandboxLabel(props.task)"
+          :title="'Harness: ' + sandboxLabel(props.task)"
         >{{ sandboxLabel(props.task) }}</span>
         <span class="text-xs text-v-muted" title="Timeout">{{ formatTimeout(props.task.timeout) }}</span>
         <span class="text-xs text-v-muted" :title="'Created ' + props.task.created_at">{{ timeAgo(props.task.created_at) }}</span>

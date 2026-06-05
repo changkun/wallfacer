@@ -16,7 +16,7 @@ const activeTab = ref<TabKey>('appearance');
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'appearance', label: 'Appearance' },
   { key: 'execution', label: 'Execution' },
-  { key: 'sandbox', label: 'Sandbox' },
+  { key: 'sandbox', label: 'Harness' },
   { key: 'workspace', label: 'Workspace' },
   { key: 'prompts', label: 'Prompts' },
   { key: 'trash', label: 'Trash' },

@@ -45,20 +45,14 @@ const blockedBy = computed<DepRow[]>(() => {
 });
 const blockedByUnmet = computed(() => blockedBy.value.filter((d) => !d.satisfied).length);
 
-// Execution-environment provenance rows (container digest, instructions hash,
-// API endpoint, recorded time). Mirrors modal-core.js's environment section.
+// Execution-environment provenance rows (harness, model, instructions hash,
+// API endpoint, recorded time).
 const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() => {
   const e = props.task.environment;
   if (!e) return [];
   const rows: { label: string; value: string; mono?: boolean }[] = [];
-  rows.push({ label: 'Sandbox', value: e.sandbox || '(default)' });
+  rows.push({ label: 'Harness', value: e.sandbox || '(default)' });
   rows.push({ label: 'Model', value: e.model_name || '(unknown)' });
-  const digest = e.container_digest ? e.container_digest.slice(0, 12) : '';
-  rows.push({
-    label: 'Container',
-    value: e.container_image ? e.container_image + (digest ? ` @ ${digest}` : '') : '(unknown)',
-    mono: !!e.container_image,
-  });
   if (e.instructions_hash) {
     rows.push({ label: 'Instructions SHA-256', value: e.instructions_hash.slice(0, 12), mono: true });
   }
@@ -503,7 +497,7 @@ async function cancelTask() {
   if (!ok) return;
   cancelling.value = true;
   try {
-    await api('POST', `/api/tasks/${props.task.id}/cancel`);
+    await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'cancelled' });
   } finally {
     // Hold the visual a moment so the user sees the shutdown phase even
     // if the API replies instantly — the actual container kill is async.
@@ -644,13 +638,13 @@ const budgetExceeded = computed(() =>
 );
 async function archiveTask() {
   const id = props.task.id;
-  await api('POST', `/api/tasks/${id}/archive`);
+  await api('PATCH', `/api/tasks/${id}`, { archived: true });
   toast.pushWithAction('Task archived', 'Undo', () => {
-    api('POST', `/api/tasks/${id}/unarchive`).catch((e) => console.error('unarchive:', e));
+    api('PATCH', `/api/tasks/${id}`, { archived: false }).catch((e) => console.error('unarchive:', e));
   }, { kind: 'success' });
 }
 async function unarchiveTask() {
-  await api('POST', `/api/tasks/${props.task.id}/unarchive`);
+  await api('PATCH', `/api/tasks/${props.task.id}`, { archived: false });
 }
 async function deleteTask() {
   const ok = await dialog.confirm({
@@ -1170,16 +1164,6 @@ const isArchived = computed(() => !!props.task.archived);
                 </button>
               </div>
 
-              <div v-if="envRows.length" class="mdl-section">
-                <div class="mdl-h">Environment</div>
-                <dl class="env-provenance">
-                  <template v-for="row in envRows" :key="row.label">
-                    <dt>{{ row.label }}</dt>
-                    <dd :class="{ 'env-provenance__mono': row.mono }">{{ row.value }}</dd>
-                  </template>
-                </dl>
-              </div>
-
               <div class="mdl-section modal-aside__actions">
                 <div class="mdl-h">Actions</div>
 
@@ -1218,7 +1202,7 @@ const isArchived = computed(() => !!props.task.archived);
                       <input v-model="editModel" type="text" placeholder="override model" />
                     </label>
                     <label class="backlog-edit__field">
-                      <span>Sandbox</span>
+                      <span>Harness</span>
                       <select v-model="editSandbox">
                         <option value="">Default (agent)</option>
                         <option value="claude">Claude</option>
@@ -1342,7 +1326,7 @@ const isArchived = computed(() => !!props.task.archived);
                     <span class="aside-action__icon" aria-hidden="true">{{ cancelling ? '…' : '⏹' }}</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">{{ cancelling ? 'Shutting down…' : 'Cancel' }}</span>
-                      <span class="aside-action__hint">{{ cancelling ? 'stopping container' : 'discard changes' }}</span>
+                      <span class="aside-action__hint">{{ cancelling ? 'stopping process' : 'discard changes' }}</span>
                     </span>
                   </button>
                 </div>
@@ -1358,10 +1342,20 @@ const isArchived = computed(() => !!props.task.archived);
                 </div>
               </div>
 
+              <div v-if="envRows.length" class="mdl-section">
+                <div class="mdl-h">Environment</div>
+                <dl class="env-provenance">
+                  <template v-for="row in envRows" :key="row.label">
+                    <dt>{{ row.label }}</dt>
+                    <dd :class="{ 'env-provenance__mono': row.mono }">{{ row.value }}</dd>
+                  </template>
+                </dl>
+              </div>
+
               <div class="mdl-section">
                 <div class="mdl-h">Agent</div>
                 <div class="row">
-                  <span class="k">sandbox</span>
+                  <span class="k">harness</span>
                   <span class="v">{{ task.sandbox || '—' }}</span>
                 </div>
                 <div class="row">

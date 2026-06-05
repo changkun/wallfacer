@@ -376,10 +376,10 @@ function capitalize(s: string): string {
       </div>
     </div>
 
-    <!-- Sandbox Configuration -->
+    <!-- Harness Configuration -->
     <div class="settings-card">
       <div class="settings-card-head">
-        <h4>Sandbox Configuration</h4>
+        <h4>Harness Configuration</h4>
         <p>
           Changes are written to
           <code style="font-family: monospace">~/.wallfacer/.env</code>
@@ -668,12 +668,12 @@ function capitalize(s: string): string {
           </div>
         </div>
 
-        <!-- Global Sandbox Routing -->
+        <!-- Global Harness Routing -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Global Sandbox Routing</label>
+          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Global Harness Routing</label>
           <div style="display: flex; flex-direction: column; gap: 10px">
             <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Default Sandbox (WALLFACER_DEFAULT_SANDBOX)</label>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Default Harness (WALLFACER_DEFAULT_SANDBOX)</label>
               <select
                 id="env-default-sandbox"
                 v-model="defaultSandbox"
@@ -687,7 +687,7 @@ function capitalize(s: string): string {
               </select>
             </div>
             <p style="font-size: 11px; color: var(--text-muted); line-height: 1.5; margin: 0 0 4px;">
-              Activity-specific sandbox routing (Implementation, Testing, etc.) now
+              Activity-specific harness routing (Implementation, Testing, etc.) now
               lives on the <strong>agent</strong> definition: clone a built-in
               from the Agents tab and set its <strong>Harness</strong> field to
               pin that step to Claude or Codex. Workspace-wide fallbacks still
@@ -695,7 +695,7 @@ function capitalize(s: string): string {
             </p>
             <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary);">
               <input id="env-sandbox-fast" v-model="sandboxFast" type="checkbox" />
-              <span>Enable <code style="font-family: monospace">/fast</code> for sandbox runs</span>
+              <span>Enable <code style="font-family: monospace">/fast</code> for harness runs</span>
             </label>
           </div>
         </div>
@@ -703,7 +703,7 @@ function capitalize(s: string): string {
 
       <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px">
         <button type="button" class="btn btn-accent" @click="saveConfig">
-          Save Sandbox Configuration
+          Save Harness Configuration
         </button>
         <button type="button" class="btn-ghost" @click="revertConfig">
           Revert

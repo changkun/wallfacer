@@ -40,7 +40,7 @@ const data = ref<SpansResponse | null>(null);
 const PHASE_INFO: Record<string, { label: string; desc: string }> = {
   worktree_setup: { label: 'Worktree Setup', desc: 'Creates an isolated git worktree for the task' },
   agent_turn: { label: 'Agent Turn', desc: 'One execution turn of the Claude Code agent (start → stop_reason)' },
-  container_run: { label: 'Container Run', desc: 'Full sandbox container lifecycle from start to exit' },
+  container_run: { label: 'Harness Run', desc: 'Full harness process lifecycle from start to exit' },
   commit: { label: 'Commit Pipeline', desc: 'Commits and pushes task changes to the git repository' },
 };
 
