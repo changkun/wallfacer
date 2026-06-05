@@ -467,37 +467,6 @@
   transition: width 0.2s ease;
 }
 
-/* Environment section — uses dt/dd grid emitted by _renderModalEnvironment */
-.modal-aside__env {
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 3px 8px;
-  font-size: 11px;
-  align-items: baseline;
-}
-.modal-aside__env dt {
-  color: var(--text-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  font-weight: 500;
-}
-.modal-aside__env dd {
-  margin: 0;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.modal-aside__env dd code {
-  background: transparent;
-  padding: 0;
-}
-
 /* Collapse aside on narrow viewports — the main split already competes for
    space and an extra 260px rail becomes unreadable under ~1200px. */
 @media (max-width: 1200px) {

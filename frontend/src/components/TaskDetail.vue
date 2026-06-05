@@ -1170,7 +1170,7 @@ const isArchived = computed(() => !!props.task.archived);
                 </button>
               </div>
 
-              <div v-if="envRows.length" class="mdl-section modal-aside__env">
+              <div v-if="envRows.length" class="mdl-section">
                 <div class="mdl-h">Environment</div>
                 <dl class="env-provenance">
                   <template v-for="row in envRows" :key="row.label">
@@ -1608,12 +1608,25 @@ const isArchived = computed(() => !!props.task.archived);
 .env-provenance {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 2px 10px;
+  gap: 3px 10px;
   margin: 0;
   font-size: 11px;
+  align-items: baseline;
 }
-.env-provenance dt { color: var(--text-muted); white-space: nowrap; }
-.env-provenance dd { margin: 0; color: var(--text-secondary); word-break: break-word; }
+.env-provenance dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.env-provenance dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
 .env-provenance__mono { font-family: var(--font-mono, monospace); font-size: 10px; }
 
 /* Backlog edit form inside the right aside. */
