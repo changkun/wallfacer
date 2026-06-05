@@ -9,6 +9,7 @@ import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import SearchBar from '../components/SearchBar.vue';
+import ExplorerPanel from '../components/ExplorerPanel.vue';
 import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
 
@@ -196,7 +197,14 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
     <div class="app-header__actions">
       <SearchBar />
       <div class="app-header__button-row">
-        <router-link to="/explorer" class="settings-btn" title="Open Explorer">
+        <button
+          type="button"
+          class="settings-btn"
+          :class="{ 'settings-btn--active': ui.showExplorer }"
+          :title="ui.showExplorer ? 'Close Explorer' : 'Open Explorer'"
+          :aria-pressed="ui.showExplorer"
+          @click="ui.toggleExplorer()"
+        >
           <svg
             width="18"
             height="18"
@@ -210,7 +218,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
             <line x1="9" y1="9" x2="9" y2="21"></line>
           </svg>
-        </router-link>
+        </button>
         <router-link
           to="/settings?tab=execution"
           class="settings-btn"
@@ -232,6 +240,11 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       </div>
     </div>
   </header>
+
+  <div class="board-with-explorer">
+    <!-- Left side panel; only renders once a workspace exists (nothing to
+         browse before one is picked). The board stays visible beside it. -->
+    <ExplorerPanel v-if="ui.showExplorer && hasWorkspace" @close="ui.closeExplorer()" />
 
   <main v-if="needsWorkspace" class="board-empty">
     <div class="board-empty__inner">
@@ -333,6 +346,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       </div>
     </div>
   </main>
+  </div>
 
   <!-- Mobile-only column nav: jump between the snap-scrolled columns. -->
   <nav v-if="!isEmptyBoard && !needsWorkspace" class="board-mobile-nav" aria-label="Board columns">

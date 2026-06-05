@@ -12,6 +12,10 @@
 .settings-btn:hover {
   color: var(--text);
 }
+.settings-btn--active {
+  color: var(--accent);
+  background: var(--accent-tint, var(--bg-hover));
+}
 
 .command-palette-trigger-btn {
   border: 1px solid var(--border);

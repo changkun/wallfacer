@@ -18,6 +18,7 @@ export const useUiStore = defineStore('ui', () => {
   const showSystemPrompts = ref(false);
   const showTemplates = ref(false);
   const showTerminal = ref(false);
+  const showExplorer = ref(false);
   const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
@@ -61,13 +62,16 @@ export const useUiStore = defineStore('ui', () => {
   function openTerminal() { showTerminal.value = true; }
   function closeTerminal() { showTerminal.value = false; }
   function toggleTerminal() { showTerminal.value = !showTerminal.value; }
+  function openExplorer() { showExplorer.value = true; }
+  function closeExplorer() { showExplorer.value = false; }
+  function toggleExplorer() { showExplorer.value = !showExplorer.value; }
   function openShortcuts() { showShortcuts.value = true; }
   function closeShortcuts() { showShortcuts.value = false; }
 
   return {
     showSettings, showWorkspaces, showPalette,
     showInstructions, showSystemPrompts, showTemplates, showTerminal,
-    showShortcuts, showArchived, setShowArchived,
+    showExplorer, showShortcuts, showArchived, setShowArchived,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
     openSettings, closeSettings,
@@ -78,6 +82,7 @@ export const useUiStore = defineStore('ui', () => {
     openSystemPrompts, closeSystemPrompts,
     openTemplates, closeTemplates,
     openTerminal, closeTerminal, toggleTerminal,
+    openExplorer, closeExplorer, toggleExplorer,
     openShortcuts, closeShortcuts,
   };
 });
