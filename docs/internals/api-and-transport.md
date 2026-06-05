@@ -102,8 +102,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/{id}/outputs/{filename}` | Raw Claude Code output file for a single agent turn |
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
-| `GET /api/tasks/{id}/oversight` | Oversight summary for a completed task |
-| `GET /api/tasks/{id}/oversight/test` | Test oversight summary for a task |
+| `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |

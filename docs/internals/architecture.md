@@ -413,7 +413,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `execute.go` | Task execution trigger (delegates to runner) | — (internal, called by task status transitions) |
 | `refine.go` | Prompt refinement agent lifecycle | `POST /api/tasks/{id}/refine`, `DELETE /api/tasks/{id}/refine`, `POST /api/tasks/{id}/refine/apply` |
 | `ideate.go` | Brainstorm/ideation agent lifecycle | `GET /api/ideate`, `POST /api/ideate`, `DELETE /api/ideate` |
-| `oversight.go` | Task oversight summary retrieval | `GET /api/tasks/{id}/oversight`, `GET /api/tasks/{id}/oversight/test` |
+| `oversight.go` | Task oversight summary retrieval | `GET /api/tasks/{id}/oversight` (impl + test phases via `?phase=`) |
 | `usage.go` | Aggregated token and cost usage statistics | `GET /api/usage` |
 | `stats.go` | Task status and workspace cost statistics | `GET /api/stats` |
 | `spans.go` | Span timing statistics (per-task and aggregate) | `GET /api/debug/spans`, `GET /api/tasks/{id}/spans` |

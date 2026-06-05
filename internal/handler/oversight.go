@@ -15,18 +15,27 @@ type oversightResponse struct {
 	PhaseCount int `json:"phase_count"`
 }
 
-// GetOversight returns the aggregated oversight summary for a task.
-// The summary is generated asynchronously when the task transitions to waiting
-// or done; this endpoint returns the current state (pending/generating/ready/failed).
+// GetOversight returns the oversight summary for a task. The `?phase=` query
+// parameter selects between the implementation-phase summary (default `impl`,
+// generated asynchronously when the task transitions to waiting or done) and
+// the test-phase summary (`test`, generated when a test run transitions back
+// to waiting). Both phases share the same JSON envelope.
 func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	if _, err := h.store.GetTask(r.Context(), id); err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
 
-	oversight, err := h.store.GetOversight(id)
+	read := h.store.GetOversight
+	errMsg := "failed to read oversight"
+	if r.URL.Query().Get("phase") == "test" {
+		read = h.store.GetTestOversight
+		errMsg = "failed to read test oversight"
+	}
+
+	oversight, err := read(id)
 	if err != nil {
-		http.Error(w, "failed to read oversight", http.StatusInternalServerError)
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -34,24 +43,6 @@ func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.U
 		TaskOversight: *oversight,
 		PhaseCount:    len(oversight.Phases),
 	})
-}
-
-// GetTestOversight returns the test-agent oversight summary for a task.
-// The summary is generated synchronously when a test run transitions back to
-// waiting; this endpoint returns the current state (pending/generating/ready/failed).
-func (h *Handler) GetTestOversight(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	if _, err := h.store.GetTask(r.Context(), id); err != nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
-	}
-
-	oversight, err := h.store.GetTestOversight(id)
-	if err != nil {
-		http.Error(w, "failed to read test oversight", http.StatusInternalServerError)
-		return
-	}
-
-	httpjson.Write(w, http.StatusOK, oversight)
 }
 
 // GenerateMissingOversight triggers background oversight generation for completed

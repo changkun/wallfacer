@@ -680,12 +680,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/oversight", Name: "GetOversight",
-		Description: "Oversight summary for a completed task.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/oversight/test", Name: "GetTestOversight",
-		Description: "Test oversight summary for a task.",
+		Description: "Oversight summary for a task. ?phase=impl (default) or ?phase=test selects the implementation- or test-agent summary.",
 		Tags:        []string{"tasks"},
 	},
 

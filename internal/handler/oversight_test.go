@@ -91,28 +91,28 @@ func TestGetOversight_ReturnsStoredOversight(t *testing.T) {
 	}
 }
 
-// --- GetTestOversight ---
+// --- GetOversight ?phase=test ---
 
-func TestGetTestOversight_NotFound(t *testing.T) {
+func TestGetOversight_TestPhase_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	id := uuid.New()
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+id.String()+"/test-oversight", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+id.String()+"/oversight?phase=test", nil)
 	w := httptest.NewRecorder()
-	h.GetTestOversight(w, req, id)
+	h.GetOversight(w, req, id)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
 	}
 }
 
-func TestGetTestOversight_PendingWhenNoFile(t *testing.T) {
+func TestGetOversight_TestPhase_PendingWhenNoFile(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/test-oversight", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/oversight?phase=test", nil)
 	w := httptest.NewRecorder()
-	h.GetTestOversight(w, req, task.ID)
+	h.GetOversight(w, req, task.ID)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -125,7 +125,7 @@ func TestGetTestOversight_PendingWhenNoFile(t *testing.T) {
 	}
 }
 
-func TestGetTestOversight_ReturnsStoredOversight(t *testing.T) {
+func TestGetOversight_TestPhase_ReturnsStoredOversight(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
@@ -138,21 +138,70 @@ func TestGetTestOversight_ReturnsStoredOversight(t *testing.T) {
 		t.Fatalf("save test oversight: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/test-oversight", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/oversight?phase=test", nil)
 	w := httptest.NewRecorder()
-	h.GetTestOversight(w, req, task.ID)
+	h.GetOversight(w, req, task.ID)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var oversight store.TaskOversight
-	_ = json.NewDecoder(w.Body).Decode(&oversight)
+	var resp oversightResponse
+	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-	if oversight.Status != store.OversightStatusReady {
-		t.Errorf("expected ready, got %s", oversight.Status)
+	if resp.Status != store.OversightStatusReady {
+		t.Errorf("expected ready, got %s", resp.Status)
 	}
-	if len(oversight.Phases) == 0 || oversight.Phases[0].Summary != "Test passed" {
-		t.Errorf("expected phase summary 'Test passed', got %+v", oversight.Phases)
+	if len(resp.Phases) == 0 || resp.Phases[0].Summary != "Test passed" {
+		t.Errorf("expected phase summary 'Test passed', got %+v", resp.Phases)
+	}
+	if resp.PhaseCount != 1 {
+		t.Errorf("expected phase_count=1, got %d", resp.PhaseCount)
+	}
+}
+
+// TestGetOversight_TestPhase_ServedByBaseRoute confirms the test-phase summary
+// is reachable through the unified base route + ?phase=test, replacing the
+// removed /oversight/test endpoint. Regression guard for the route collapse.
+func TestGetOversight_TestPhase_ServedByBaseRoute(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+
+	implOversight := store.TaskOversight{
+		Status: store.OversightStatusReady,
+		Phases: []store.OversightPhase{{Title: "Impl", Summary: "impl summary"}},
+	}
+	testOversight := store.TaskOversight{
+		Status: store.OversightStatusReady,
+		Phases: []store.OversightPhase{{Title: "Test", Summary: "test summary"}},
+	}
+	if err := h.store.SaveOversight(task.ID, implOversight); err != nil {
+		t.Fatalf("save impl oversight: %v", err)
+	}
+	if err := h.store.SaveTestOversight(task.ID, testOversight); err != nil {
+		t.Fatalf("save test oversight: %v", err)
+	}
+
+	// phase=test must return the test summary, not the impl summary.
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/oversight?phase=test", nil)
+	w := httptest.NewRecorder()
+	h.GetOversight(w, req, task.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp oversightResponse
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	if got := resp.Phases[0].Summary; got != "test summary" {
+		t.Errorf("phase=test summary: want %q, got %q", "test summary", got)
+	}
+
+	// No phase param defaults to impl.
+	req = httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/oversight", nil)
+	w = httptest.NewRecorder()
+	h.GetOversight(w, req, task.ID)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	if got := resp.Phases[0].Summary; got != "impl summary" {
+		t.Errorf("default phase summary: want %q, got %q", "impl summary", got)
 	}
 }
 
