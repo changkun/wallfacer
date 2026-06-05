@@ -827,12 +827,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateWorkspaces": h.UpdateWorkspaces,
 
 		// Spec tree.
-		"GetSpecTree":     h.GetSpecTree,
-		"SpecTreeStream":  h.SpecTreeStream,
-		"DispatchSpecs":   h.DispatchSpecs,
-		"UndispatchSpecs": h.UndispatchSpecs,
-		"ArchiveSpec":     h.ArchiveSpec,
-		"UnarchiveSpec":   h.UnarchiveSpec,
+		"GetSpecTree":    h.GetSpecTree,
+		"SpecTreeStream": h.SpecTreeStream,
+		"SpecTransition": h.SpecTransition,
 
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
@@ -993,6 +990,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	bodyLimits := map[string]int64{
 		// Server configuration.
 		"UpdateConfig": handler.BodyLimitDefault,
+
+		// Spec tree.
+		"SpecTransition": handler.BodyLimitDefault,
 
 		// Ideation agent.
 		"TriggerIdeation": handler.BodyLimitDefault,

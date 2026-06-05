@@ -298,7 +298,7 @@ async function dispatchSelected() {
   if (!confirm(`Dispatch ${paths.length} specs to the task board?`)) return;
   dispatchPending.value = true;
   try {
-    const resp = await api<DispatchResp>('POST', '/api/specs/dispatch', { paths, run: false });
+    const resp = await api<DispatchResp>('POST', '/api/specs/transition', { action: 'dispatch', paths, run: false });
     selectedPaths.value = new Set();
     // Pulse the freshly-created cards when the board next renders them.
     ui.markDispatched((resp.dispatched ?? []).map((d) => d.task_id).filter(Boolean));

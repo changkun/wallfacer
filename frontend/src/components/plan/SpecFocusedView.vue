@@ -199,7 +199,8 @@ async function onDispatch() {
   if (!confirm('Dispatch this spec to the task board?')) return;
   actionBusy.value = true;
   try {
-    const resp = await api<DispatchResp>('POST', '/api/specs/dispatch', {
+    const resp = await api<DispatchResp>('POST', '/api/specs/transition', {
+      action: 'dispatch',
       paths: [focusedSpecPath.value],
       run: false,
     });
@@ -241,9 +242,9 @@ function dismissToast(id: number) {
   toasts.value = toasts.value.filter(t => t.id !== id);
 }
 
-async function callArchiveEndpoint(url: string, path: string): Promise<boolean> {
+async function callSpecTransition(action: ArchiveAction['action'], path: string): Promise<boolean> {
   try {
-    await api('POST', url, { path });
+    await api('POST', '/api/specs/transition', { action, path });
     return true;
   } catch (e) {
     alert(e instanceof Error ? e.message : String(e));
@@ -258,7 +259,7 @@ async function onArchive() {
     return;
   }
   const path = focusedSpecPath.value;
-  if (await callArchiveEndpoint('/api/specs/archive', path)) {
+  if (await callSpecTransition('archive', path)) {
     showToast('Spec archived: ' + path, { action: 'archive', path });
     await loadCurrent();
   }
@@ -267,15 +268,15 @@ async function onArchive() {
 async function onUnarchive() {
   if (!focusedSpecPath.value) return;
   const path = focusedSpecPath.value;
-  if (await callArchiveEndpoint('/api/specs/unarchive', path)) {
+  if (await callSpecTransition('unarchive', path)) {
     showToast('Spec unarchived: ' + path, { action: 'unarchive', path });
     await loadCurrent();
   }
 }
 
 async function undoToast(toast: { id: number; action: ArchiveAction }) {
-  const reverseUrl = toast.action.action === 'archive' ? '/api/specs/unarchive' : '/api/specs/archive';
-  if (await callArchiveEndpoint(reverseUrl, toast.action.path)) {
+  const reverseAction = toast.action.action === 'archive' ? 'unarchive' : 'archive';
+  if (await callSpecTransition(reverseAction, toast.action.path)) {
     dismissToast(toast.id);
     await loadCurrent();
   }

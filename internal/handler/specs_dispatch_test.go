@@ -87,6 +87,71 @@ func doDispatch(t *testing.T, h *Handler, paths []string, run bool) (*httptest.R
 	return w, resp
 }
 
+// doSpecTransition posts a body to the unified SpecTransition entry
+// point and returns the recorder. action is folded into the JSON body.
+func doSpecTransition(t *testing.T, h *Handler, body map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/specs/transition", strings.NewReader(string(data)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.SpecTransition(w, req)
+	return w
+}
+
+// TestSpecTransition_DispatchDelegates confirms action=dispatch reaches
+// DispatchSpecs through the unified endpoint and creates a board task.
+func TestSpecTransition_DispatchDelegates(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/test.md", testSpecValidated)
+
+	w := doSpecTransition(t, h, map[string]any{
+		"action": "dispatch",
+		"paths":  []string{"specs/local/test.md"},
+		"run":    false,
+	})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	var resp dispatchResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Dispatched) != 1 || resp.Dispatched[0].TaskID == "" {
+		t.Fatalf("expected one dispatched task, got %+v", resp.Dispatched)
+	}
+}
+
+// TestSpecTransition_ArchiveUnarchiveDelegates confirms action=archive
+// and action=unarchive reach the single-path handlers and return the
+// specTransitionResponse envelope.
+func TestSpecTransition_ArchiveUnarchiveDelegates(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	writeTestSpec(t, ws, "specs/local/test.md", testSpecDrafted)
+
+	w := doSpecTransition(t, h, map[string]any{"action": "archive", "path": "specs/local/test.md"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("archive status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	var arch specTransitionResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &arch)
+	if arch.Status != string(spec.StatusArchived) {
+		t.Errorf("archive status = %q, want %q", arch.Status, spec.StatusArchived)
+	}
+
+	w = doSpecTransition(t, h, map[string]any{"action": "unarchive", "path": "specs/local/test.md"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("unarchive status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestSpecTransition_UnknownAction rejects an unrecognized action with 400.
+func TestSpecTransition_UnknownAction(t *testing.T) {
+	h, _ := newDispatchTestHandler(t)
+	w := doSpecTransition(t, h, map[string]any{"action": "frobnicate", "paths": []string{"x"}})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", w.Code)
+	}
+}
+
 func TestDispatchSpecs_SingleSpec(t *testing.T) {
 	h, ws := newDispatchTestHandler(t)
 	writeTestSpec(t, ws, "specs/local/test.md", testSpecValidated)

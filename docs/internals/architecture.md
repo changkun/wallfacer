@@ -435,8 +435,8 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `planning_system_prompt.go` | Per-turn selection of the planning-agent system prompt (empty vs non-empty workspace variants) and archived-spec guard | — (internal) |
 | `planning_threads.go` | Planning chat thread CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/planning/threads`, `PATCH /api/planning/threads/{id}` (`{name}` renames; `{state: archived\|visible\|active}` archives, restores, or activates) |
 | `planning_undo.go` | Undo the caller thread's most recent planning round via `git revert`; cancels board tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/planning/undo` |
-| `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/archive`, `POST /api/specs/unarchive` |
-| `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter (rollback on partial failure) | `POST /api/specs/dispatch`, `POST /api/specs/undispatch` |
+| `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/transition` (`action: archive\|unarchive`) |
+| `specs_dispatch.go` | `SpecTransition` discriminator plus the atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter (rollback on partial failure) | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
 | `terminal.go` | WebSocket terminal relay for host shell and container exec | `GET /api/terminal/ws` |
 
 ## Structured Logging
