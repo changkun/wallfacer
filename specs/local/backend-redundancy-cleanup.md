@@ -1,13 +1,13 @@
 ---
 title: Backend Redundancy Cleanup
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/
   - specs/local/backend-redundancy-cleanup/
 effort: large
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-05
 author: changkun
 dispatched_task_id: null
 ---
@@ -28,6 +28,21 @@ remaining items split cleanly into two groups:
 Each child below is a leaf spec sized for one task. Dispatch them
 individually rather than treating this umbrella as a single unit.
 
+## Outcome — complete (2026-06-05)
+
+All children have landed or been retired. The two **Backend-only**
+children that shipped did so in Pass 1; the other two were
+consciously declined (see their rows). The six **API-surface** children
+all landed as individual commits on `main` (June 2026), each one a
+focused route collapse with tests, docs, and the Vue `frontend/`
+migrated — the legacy `ui/` was already removed by
+vue-frontend-migration, so that half was skipped. `api-ideate-routines`
+was archived: its routine-backed premise no longer matched the code.
+Net API-surface reduction: 123 → 113 routes. One follow-up is tracked,
+not done — the `transitionTask` ritual helper (deferred in
+`api-task-actions-patch`) and the still-stale routine-backed ideation
+docs (flagged in `api-ideate-routines`).
+
 ## Backend-only (run anytime)
 
 | Spec | Status | What |
@@ -38,20 +53,21 @@ individually rather than treating this umbrella as a single unit.
 | [cache-wrappers-inline.md](backend-redundancy-cleanup/cache-wrappers-inline.md) | Archived | Decided against. The diffcache `set` immutable-branch and commitsbehind `cachedCommitsBehind` read-through are real policy; inlining would push them to every caller for negative LOC and worse readability. Eleven tests would need rewriting. See Outcome in the child spec. |
 | [agents-flow-generic-registry.md](backend-redundancy-cleanup/agents-flow-generic-registry.md) | Archived | Decided against. The asymmetry (flow clones on Get; agents doesn't) and the three `Resolve*` methods only on flow.Registry mean a shared `Registry[T]` needs a clone hook + wrapper types + Resolve* forwarding, totalling more LOC than the duplication it removed. The smaller `ResolveForTask` / `ResolveRoutineFlow` consolidation landed as a focused micro-refactor in `flow/registry.go`. |
 
-## API-surface (block on vue-frontend-migration)
+## API-surface — done (June 2026)
 
-Each of these touches the API contract, the generated frontend
-routes table, and both `ui/` (legacy) and `frontend/` (Vue). Each
-collapses 2–4 verb-specific routes into one PATCH (or one
-parameterised endpoint).
+These touched the API contract and the Vue `frontend/`. The legacy
+`ui/` was already gone by the time they ran (vue-frontend-migration
+landed), so the legacy half of each child was skipped. Each collapsed
+2–4 verb-specific routes into one PATCH (or one parameterised
+endpoint); the route table went from 123 to 113 routes.
 
-| Spec | Effort | Removes |
+| Spec | Status | Result |
 |---|---|---|
-| [api-planning-threads-patch.md](backend-redundancy-cleanup/api-planning-threads-patch.md) | Small | 3 POSTs (archive/unarchive/activate) → 1 PATCH. Handler bodies already share `mutatePlanningThread`. |
-| [api-spec-actions-collapse.md](backend-redundancy-cleanup/api-spec-actions-collapse.md) | Medium | 4 POSTs (dispatch/undispatch/archive/unarchive) → 1 `/api/specs/transition` with `action`. Internal logic stays per-action; only the HTTP edge moves. |
-| [api-oversight-phase.md](backend-redundancy-cleanup/api-oversight-phase.md) | Small | `/oversight/test` sibling → `?phase=test` query on the base route. |
-| [api-task-actions-patch.md](backend-redundancy-cleanup/api-task-actions-patch.md) | Medium | 4 POSTs (cancel/archive/unarchive/restore) → PATCH body fields. Keeps `done`/`resume`/`sync`/`test` as dedicated side-effect endpoints. Also lands the cross-cutting `transitionTask` helper. |
-| [api-auth-org-patch.md](backend-redundancy-cleanup/api-auth-org-patch.md) | Small | `POST /api/auth/switch-org` → `PATCH /api/auth/me`. |
+| [api-planning-threads-patch.md](backend-redundancy-cleanup/api-planning-threads-patch.md) | **Done** | 3 POSTs (archive/unarchive/activate) + the rename PATCH → one `PATCH /api/planning/threads/{id}` (`{name}` renames; `{state: archived\|visible\|active}`). |
+| [api-spec-actions-collapse.md](backend-redundancy-cleanup/api-spec-actions-collapse.md) | **Done** | 4 POSTs (dispatch/undispatch/archive/unarchive) → 1 `POST /api/specs/transition` with `action`. A thin `SpecTransition` peeks the discriminator and delegates; internal logic stays per-action. |
+| [api-oversight-phase.md](backend-redundancy-cleanup/api-oversight-phase.md) | **Done** | `/oversight/test` sibling → `?phase=test` query on the base route; both phases share the `phase_count`-wrapped envelope. |
+| [api-task-actions-patch.md](backend-redundancy-cleanup/api-task-actions-patch.md) | **Done** | 4 POSTs (cancel/archive/unarchive/restore) → PATCH body fields (`status=cancelled`, `archived`, `deleted=false`); `done`/`resume`/`sync`/`test` stay dedicated. The handlers became internal `applyCancel`/`applyArchive`/`applyRestore`. The cross-cutting `transitionTask` helper was **deferred** as a separate refactor (see the child spec) — the four absorbed actions each already centralise their own cascade. |
+| [api-auth-org-patch.md](backend-redundancy-cleanup/api-auth-org-patch.md) | **Done** | `POST /api/auth/switch-org` → `PATCH /api/auth/me` (handler `AuthSwitchOrg` → `PatchAuthMe`). |
 | [api-ideate-routines.md](backend-redundancy-cleanup/api-ideate-routines.md) | Archived | Premise no longer holds. `/api/ideate` is not routine-backed: the always-on `system:ideation` routine was retired (reconcile now deletes any leftover), and `POST /api/ideate` creates a one-shot `idea-agent` task directly. Neither "remove the facade" nor "document the facade over /api/routines" applies; the in-code comments are already accurate. See Outcome in the child spec. |
 
 ## Considered but skipped
