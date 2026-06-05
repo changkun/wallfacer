@@ -33,7 +33,7 @@ Each task runs as a host process: Wallfacer execs `claude` (or `codex`) directly
 
 ## Step 3 — Configure Your Credential
 
-Open **Settings → Sandbox** in the browser and enter your credential:
+Open **Settings → Harness** in the browser and enter your credential:
 
 **Option A — Sign in with Claude (easiest)**
 
@@ -58,7 +58,7 @@ Wallfacer supports two Codex auth modes:
 1. **Host auth cache (recommended)**
    If `~/.codex/auth.json` exists on your host machine, Wallfacer validates it at startup and enables Codex automatically.
 2. **API key fallback**
-   Set `OPENAI_API_KEY` in **Settings → Sandbox** and run **Test (Codex)** once.
+   Set `OPENAI_API_KEY` in **Settings → Harness** and run **Test (Codex)** once.
 
 See [Configuration → Host mode](configuration.md#host-mode) for how Wallfacer translates Codex's CLI output into the Claude-compatible event stream the runner expects.
 
@@ -76,12 +76,12 @@ Once all required checks pass, create a test task: click **+ New Task**, enter a
 
 If the task fails immediately, check:
 
-- The credential is correct (re-check in **Settings → Sandbox**)
+- The credential is correct (re-check in **Settings → Harness**)
 - The `claude` CLI is installed and on your `PATH` (`wallfacer doctor` reports its resolved path)
 
 ## Security
 
-Tasks run as host processes with your user's permissions. A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. A warning banner appears in **Settings → Sandbox** while active.
+Tasks run as host processes with your user's permissions. A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. A warning banner appears in **Settings → Harness** while active.
 
 ## CLI Reference
 
