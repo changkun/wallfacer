@@ -125,7 +125,7 @@ const sections = computed<Section[]>(() => {
   const q = query.value.trim();
   if (!q) {
     return recentTasks.value.length
-      ? [{ title: 'Recent', tasks: recentTasks.value }]
+      ? [{ title: 'Tasks', tasks: recentTasks.value }]
       : [];
   }
   const out: Section[] = [];
@@ -170,7 +170,8 @@ function tabJumps(task: Task): { tab: string; label: string }[] {
 // reference produces a TDZ ReferenceError on first eval.
 const docMatches = computed(() => {
   const q = query.value.trim();
-  if (!q) return [];
+  // On empty query, dump all docs (matches OLD's open-state Docs group).
+  if (!q) return docIndex.slice(0, 20);
   // Title-prefix > title-substring > slug, alphabetical tie-break (see lib/docSearch).
   return rankDocs(docIndex, q, 6);
 });
@@ -179,7 +180,8 @@ const docMatches = computed(() => {
 // (mirrors ui/js/command-palette.js's spec rows).
 const specMatches = computed<SpecNode[]>(() => {
   const q = query.value.trim();
-  if (!q) return [];
+  // On empty query, dump the spec tree (matches OLD's open-state Plan group).
+  if (!q) return planning.tree.filter((n) => n.spec).slice(0, 20);
   const scored: { node: SpecNode; score: number }[] = [];
   for (const n of planning.tree) {
     const title = n.spec?.title || n.path;
@@ -418,7 +420,7 @@ onUnmounted(() => {
           <span class="command-palette-label">
             <strong>Command palette</strong>
           </span>
-          <span class="command-palette-hints">&#8984;/ Ctrl+K</span>
+          <span class="command-palette-hints">{{ flatRows.length ? '↑↓ navigate • Enter run • Esc close' : 'Esc close' }}</span>
         </div>
         <input
           ref="inputRef"
@@ -493,14 +495,15 @@ onUnmounted(() => {
                 <!-- eslint-disable-next-line vue/no-v-html — snippet is server-escaped -->
                 <div v-if="task.snippet" class="command-palette-task-snippet" v-html="task.snippet" />
                 <div
-                  v-else-if="!task.title && task.prompt"
+                  v-else-if="task.prompt"
                   class="command-palette-task-snippet"
                 >{{ task.prompt.slice(0, 180) }}</div>
               </div>
             </section>
           </template>
-          <section v-if="specMatches.length" class="command-palette-section">
+          <section v-if="specMatches.length || !query.trim()" class="command-palette-section">
             <div class="command-palette-section-title">Plan</div>
+            <div v-if="!specMatches.length" class="command-palette-empty">No entries</div>
             <div
               v-for="n in specMatches"
               :key="n.path"
@@ -512,7 +515,7 @@ onUnmounted(() => {
               @keydown.enter="pickSpec(n.path)"
               @mouseenter="activeIndex = specRowIndex(n.path)"
             >
-              <div class="command-palette-row-title">📋 {{ n.spec?.title || n.path }}</div>
+              <div class="command-palette-row-title">{{ n.spec?.title || n.path }}</div>
               <div class="command-palette-row-meta">
                 <span class="command-palette-task-id">{{ n.path }}</span>
                 <span v-if="n.spec?.status" class="badge">{{ n.spec.status }}</span>
@@ -532,7 +535,10 @@ onUnmounted(() => {
               @keydown.enter="pickDoc(d.slug)"
               @mouseenter="activeIndex = docRowIndex(d.slug)"
             >
-              <div class="command-palette-row-title">📖 {{ d.title }}</div>
+              <div class="command-palette-row-title">{{ d.title }}</div>
+              <div class="command-palette-row-meta">
+                <span class="command-palette-task-id">{{ d.slug }}</span>
+              </div>
             </div>
           </section>
           <div v-if="!sections.length && !specMatches.length && !docMatches.length" class="command-palette-empty">
