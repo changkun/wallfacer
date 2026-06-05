@@ -9,6 +9,7 @@ import { useToastStore } from '../stores/toast';
 import { api } from '../api/client';
 import { derivePresence } from '../lib/presence';
 import { hasUnseen } from '../lib/unread';
+import { basename, groupLabel } from '../lib/workspaceLabel';
 
 interface WorkspaceGroup {
   name?: string;
@@ -135,14 +136,7 @@ const activeWorkspaceLabel = computed(() => {
   const key = JSON.stringify(ws);
   const matched = groups.find(g => JSON.stringify(g.workspaces) === key);
   if (matched?.name) return matched.name;
-  if (ws.length === 1) {
-    const parts = ws[0].replace(/\/+$/, '').split('/');
-    return parts[parts.length - 1] || ws[0];
-  }
-  return ws.map(p => {
-    const parts = p.replace(/\/+$/, '').split('/');
-    return parts[parts.length - 1] || p;
-  }).join(' + ');
+  return ws.map(basename).join(' + ');
 });
 
 function onBrandClick() {
@@ -247,7 +241,7 @@ watch(wsPopoverOpen, (open) => {
           @click="switchToGroup(g)"
         >
           <span class="sb-ws-popover__check">{{ isActiveGroup(g) ? '✓' : '' }}</span>
-          <span class="sb-ws-popover__label">{{ g.name || g.workspaces[0] || 'Workspace' }}</span>
+          <span class="sb-ws-popover__label">{{ groupLabel(g) }}</span>
           <span v-if="isSwitching(g)" class="sb-ws-popover__switching">switching…</span>
           <span v-else class="sb-ws-popover__counts">
             <span v-if="groupBadge(g).inProgress > 0" class="badge badge-in_progress" :title="`${groupBadge(g).inProgress} running`">{{ groupBadge(g).inProgress }}</span>
