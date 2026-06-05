@@ -162,12 +162,17 @@ function close() {
   emit('update:modelValue', false);
 }
 
+// First run (no persisted workspaces) forces a selection: the close control,
+// backdrop click, and Escape are all suppressed until a workspace exists.
+const dismissable = computed(() => (store.config?.workspaces?.length ?? 0) > 0);
+
 function onBackdrop(e: MouseEvent) {
+  if (!dismissable.value) return;
   if ((e.target as HTMLElement).classList.contains('modal-overlay')) close();
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') close();
+  if (e.key === 'Escape' && dismissable.value) close();
 }
 
 function filteredEntries() {
@@ -180,6 +185,13 @@ function filteredEntries() {
     entries = entries.filter((e) => e.name.toLowerCase().includes(f));
   }
   return entries;
+}
+
+// Collapse a home directory prefix to '~' for display (full path stays in title).
+function shortenPath(path: string) {
+  const m = path.match(/^(\/(?:Users|home)\/[^/]+|[A-Z]:\\Users\\[^\\]+)/);
+  if (m) return '~' + path.substring(m[1].length);
+  return path;
 }
 
 function breadcrumbSegments() {
@@ -209,6 +221,7 @@ function breadcrumbSegments() {
           </p>
         </div>
         <button
+          v-if="dismissable"
           type="button"
           class="btn-ghost"
           style="font-size: 18px; padding: 2px 8px; flex-shrink: 0"
@@ -236,15 +249,25 @@ function breadcrumbSegments() {
 
           <div class="ws-picker__breadcrumb">
             <template v-for="(seg, i) in breadcrumbSegments()" :key="seg.path">
-              <button
-                type="button"
-                class="btn-ghost"
-                style="padding: 1px 4px; font-size: 11px"
-                @click="browse(seg.path)"
-              >
-                {{ seg.label }}
-              </button>
-              <span v-if="i < breadcrumbSegments().length - 1" style="opacity: 0.5">/</span>
+              <span v-if="seg.label === '/'" style="color: var(--text-muted)">/</span>
+              <template v-else>
+                <span v-if="i > 1" style="color: var(--text-muted)">/</span>
+                <button
+                  type="button"
+                  :style="{
+                    border: 'none',
+                    background: 'none',
+                    color: i === breadcrumbSegments().length - 1 ? 'var(--text)' : 'var(--accent)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: 0,
+                    fontWeight: i === breadcrumbSegments().length - 1 ? 600 : 400,
+                  }"
+                  @click="browse(seg.path)"
+                >
+                  {{ seg.label }}
+                </button>
+              </template>
             </template>
           </div>
 
@@ -255,20 +278,20 @@ function breadcrumbSegments() {
             </label>
             <button
               type="button"
-              class="btn-ghost ws-picker__add-folder-btn"
-              :disabled="workspaces.includes(browsePath)"
-              @click="addWorkspace(browsePath)"
-            >
-              + Add current folder
-            </button>
-            <button
-              type="button"
               class="btn-ghost ws-picker__new-folder-btn"
               :disabled="browsePath === '/'"
               title="Create a new folder here"
               @click="createFolder"
             >
-              + New folder
+              + New Folder
+            </button>
+            <button
+              type="button"
+              class="btn-ghost ws-picker__add-folder-btn"
+              :disabled="workspaces.includes(browsePath)"
+              @click="addWorkspace(browsePath)"
+            >
+              + Add current folder
             </button>
           </div>
 
@@ -294,7 +317,7 @@ function breadcrumbSegments() {
                 class="ws-entry--parent"
                 @click="navigateUp"
               >
-                <span>&#x21B0;</span> ..
+                <span>..</span>
               </button>
               <div
                 v-for="entry in filteredEntries()"
@@ -307,7 +330,6 @@ function breadcrumbSegments() {
                   :title="entry.path"
                   @click="navigateInto(entry)"
                 >
-                  <span>&#x1F4C1;</span>
                   <span style="overflow: hidden; text-overflow: ellipsis">{{ entry.name }}</span>
                   <span v-if="entry.is_git_repo" class="ws-entry__badge">git</span>
                 </button>
@@ -323,15 +345,15 @@ function breadcrumbSegments() {
                   class="btn-ghost ws-entry__add"
                   @click="addWorkspace(entry.path)"
                 >
-                  Add
+                  + Add
                 </button>
-                <span v-else class="ws-entry__added">Added</span>
+                <span v-else class="ws-entry__added">added</span>
               </div>
               <div
                 v-if="!browseLoading && filteredEntries().length === 0 && browsePath !== '/'"
                 style="padding: 8px; font-size: 11px; color: var(--text-muted)"
               >
-                No subdirectories.
+                {{ filter.trim() ? 'No matches.' : 'Empty.' }}
               </div>
             </div>
           </div>
@@ -354,20 +376,20 @@ function breadcrumbSegments() {
               v-if="workspaces.length === 0"
               style="font-size: 11px; color: var(--text-muted); padding: 4px 2px"
             >
-              No workspaces selected.
+              No folders selected.
             </div>
             <div
               v-for="(ws, i) in workspaces"
               :key="ws"
               class="ws-selected-item"
             >
-              <span class="ws-selected-item__path" :title="ws">{{ ws }}</span>
+              <span class="ws-selected-item__path" :title="ws">{{ shortenPath(ws) }}</span>
               <button
                 type="button"
                 class="btn-ghost ws-selected-item__remove"
                 @click="removeWorkspace(i)"
               >
-                Remove
+                &times;
               </button>
             </div>
           </div>

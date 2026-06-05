@@ -34,24 +34,50 @@ function onKeydown(e: KeyboardEvent) {
   <Teleport to="body">
     <div
       v-if="dialog.active"
-      class="confirm-overlay"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+      style="z-index: 60;"
       tabindex="-1"
       @click.self="dialog.dismiss()"
       @keydown="onKeydown"
     >
-      <div ref="cardRef" class="confirm-card" role="dialog" aria-modal="true">
-        <h3 v-if="dialog.active.title" class="confirm-title">{{ dialog.active.title }}</h3>
-        <p class="confirm-message">{{ dialog.active.message }}</p>
-        <input
-          v-if="dialog.active.prompt"
-          ref="promptInput"
-          type="text"
-          class="confirm-input"
-          :value="promptText"
-          :placeholder="dialog.active.prompt.placeholder || ''"
-          @input="onPromptInput"
-        />
-        <div class="confirm-actions">
+      <div
+        ref="cardRef"
+        class="modal-card"
+        style="max-width: 420px; width: 100%;"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="p-6">
+          <h3 v-if="dialog.active.title" class="confirm-title">{{ dialog.active.title }}</h3>
+          <div class="confirm-body">
+            <svg
+              v-if="dialog.active.danger"
+              class="confirm-icon"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p class="confirm-message">{{ dialog.active.message }}</p>
+          </div>
+          <input
+            v-if="dialog.active.prompt"
+            ref="promptInput"
+            type="text"
+            class="confirm-input"
+            :value="promptText"
+            :placeholder="dialog.active.prompt.placeholder || ''"
+            @input="onPromptInput"
+          />
+          <div class="confirm-actions">
           <button
             v-if="!dialog.active.alert"
             type="button"
@@ -64,6 +90,7 @@ function onKeydown(e: KeyboardEvent) {
             :class="dialog.active.danger ? 'confirm-btn--danger' : 'confirm-btn--primary'"
             @click="dialog.accept()"
           >{{ dialog.active.confirmLabel }}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -71,27 +98,10 @@ function onKeydown(e: KeyboardEvent) {
 </template>
 
 <style scoped>
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 16px;
-}
-.confirm-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-  max-width: 420px;
-  width: 100%;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-}
 .confirm-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--text); }
-.confirm-message { margin: 0 0 16px; font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+.confirm-body { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 16px; }
+.confirm-icon { color: #e05252; flex-shrink: 0; margin-top: 1px; }
+.confirm-message { margin: 0; font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
 .confirm-input {
   display: block;
   width: 100%;

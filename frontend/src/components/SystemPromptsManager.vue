@@ -199,7 +199,7 @@ watch(
             "
           >
             <h3 style="font-size: 16px; font-weight: 600; margin: 0">
-              System Prompts
+              System Prompt Templates
             </h3>
             <button
               type="button"

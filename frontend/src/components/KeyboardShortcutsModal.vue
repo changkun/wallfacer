@@ -57,6 +57,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKey));
                   <td style="padding: 5px 0; color: var(--text-muted);">Toggle terminal</td>
                 </tr>
                 <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 5px 0;"><kbd>e</kbd></td>
+                  <td style="padding: 5px 0; color: var(--text-muted);">Toggle Explorer</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 5px 0;"><kbd>p</kbd></td>
+                  <td style="padding: 5px 0; color: var(--text-muted);">Switch to Plan mode</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
                   <td style="padding: 5px 0;"><kbd>Ctrl</kbd> + <kbd>,</kbd></td>
                   <td style="padding: 5px 0; color: var(--text-muted);">Open settings</td>
                 </tr>
