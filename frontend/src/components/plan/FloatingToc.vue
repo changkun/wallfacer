@@ -74,6 +74,7 @@ function jumpTo(ev: Event, id: string) {
 
 <template>
   <nav v-if="entries.length > 0" class="floating-toc" aria-label="On this page">
+    <div class="floating-toc__title">Contents</div>
     <a
       v-for="e in entries"
       :key="e.id"
@@ -89,27 +90,39 @@ function jumpTo(ev: Event, id: string) {
 <style scoped>
 .floating-toc {
   position: absolute;
-  top: 80px;
-  right: 16px;
-  width: 200px;
-  max-height: calc(100% - 100px);
+  top: 72px;
+  right: 12px;
+  width: 180px;
+  max-height: calc(100% - 88px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 8px 6px;
+  padding: 6px 8px;
   font-size: 11px;
   color: var(--ink-3);
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border-radius: 4px;
+  opacity: 0.85;
   pointer-events: auto;
-  z-index: 1;
+  z-index: 2;
+}
+
+.floating-toc:hover { opacity: 1; }
+
+.floating-toc__title {
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-3);
+  margin-bottom: 4px;
 }
 
 .floating-toc__entry {
-  padding: 3px 6px;
-  border-left: 2px solid transparent;
+  display: block;
+  padding: 1px 0;
   color: var(--ink-3);
   text-decoration: none;
   white-space: nowrap;
@@ -118,16 +131,16 @@ function jumpTo(ev: Event, id: string) {
   line-height: 1.4;
 }
 
-.floating-toc__entry--l1 { padding-left: 6px; font-weight: 500; }
-.floating-toc__entry--l2 { padding-left: 14px; }
-.floating-toc__entry--l3 { padding-left: 22px; }
-.floating-toc__entry--l4 { padding-left: 30px; }
+.floating-toc__entry--l1 { padding-left: 0; }
+.floating-toc__entry--l2 { padding-left: 8px; }
+.floating-toc__entry--l3 { padding-left: 16px; }
+.floating-toc__entry--l4 { padding-left: 24px; }
 
 .floating-toc__entry:hover { color: var(--ink); }
 
 .floating-toc__entry--active {
-  color: var(--accent);
-  border-left-color: var(--accent);
+  color: var(--ink);
+  font-weight: 500;
 }
 
 @media (max-width: 1100px) {
