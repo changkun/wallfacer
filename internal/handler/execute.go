@@ -333,31 +333,25 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// CancelTask cancels a task in backlog, in_progress, waiting, or failed state.
-func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
-	if err != nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
-	}
+// cancellableStatuses lists the statuses a task may be cancelled from.
+var cancellableStatuses = map[store.TaskStatus]bool{
+	store.TaskStatusBacklog:    true,
+	store.TaskStatusInProgress: true,
+	store.TaskStatusWaiting:    true,
+	store.TaskStatusFailed:     true,
+}
 
-	cancellable := map[store.TaskStatus]bool{
-		store.TaskStatusBacklog:    true,
-		store.TaskStatusInProgress: true,
-		store.TaskStatusWaiting:    true,
-		store.TaskStatusFailed:     true,
-	}
-	if !cancellable[task.Status] {
-		http.Error(w, "task cannot be cancelled in its current status", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.cancelTaskInternal(r.Context(), *task); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+// applyCancel runs the full cancellation cascade for a task: kill its
+// container, clean worktrees, archive task-mode threads, and cascade to
+// routine children / disarm the parent routine. The caller must verify
+// the task is in a cancellableStatuses state. Invoked from the PATCH
+// status=cancelled path (UpdateTask).
+func (h *Handler) applyCancel(ctx context.Context, task store.Task) error {
+	if err := h.cancelTaskInternal(ctx, task); err != nil {
+		return err
 	}
 	if task.Status == store.TaskStatusBacklog || task.Status == store.TaskStatusWaiting {
-		h.cascadeArchiveThreadsForTask(id.String())
+		h.cascadeArchiveThreadsForTask(task.ID.String())
 	}
 
 	// If this is a routine card, cascade Cancel to any still-live spawned
@@ -365,7 +359,7 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// keep running or clutter the board. Terminal children (done/failed/
 	// cancelled) are left alone so the user can still review results.
 	if task.IsRoutine() {
-		h.cascadeCancelRoutineChildren(r.Context(), id)
+		h.cascadeCancelRoutineChildren(ctx, task.ID)
 		// Cancelling a routine card means "stop this routine for good". Clear
 		// RoutineEnabled and drop its engine timer so the enabled flag stays
 		// consistent with the cancelled status. Otherwise the card lingers in
@@ -373,19 +367,18 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		// spawning instances if its status were ever moved back to an active
 		// lane (Done/Failed routines intentionally keep their flag so a move
 		// back to Backlog re-arms them; an explicit Cancel does not).
-		if err := h.store.UpdateRoutineEnabled(r.Context(), id, false); err != nil {
-			logger.Handler.Warn("cancel routine: clear enabled", "routine", id, "error", err)
+		if err := h.store.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
+			logger.Handler.Warn("cancel routine: clear enabled", "routine", task.ID, "error", err)
 		}
-		h.unregisterRoutine(id)
+		h.unregisterRoutine(task.ID)
 	}
 
 	// If this is the last live instance spawned by a routine, disable the
 	// routine so it stops spawning new instances. Users expect "I cancelled
 	// the thing, now make it go away" — leaving the parent routine armed
 	// keeps creating new instances on the next tick and is confusing.
-	h.cascadeDisableRoutineIfLastLiveInstance(r.Context(), *task)
-
-	httpjson.Write(w, http.StatusOK, map[string]string{"status": "cancelled"})
+	h.cascadeDisableRoutineIfLastLiveInstance(ctx, task)
+	return nil
 }
 
 // spawnedByRoutineID extracts the parent routine id from a task's tags,
@@ -456,8 +449,8 @@ func (h *Handler) cascadeDisableRoutineIfLastLiveInstance(ctx context.Context, c
 
 // cancelTaskInternal runs the full cancel pipeline (container kill, store
 // update, event emission, worktree cleanup) without writing an HTTP response.
-// It is shared by the CancelTask handler and the routine-cascade path.
-// The caller is responsible for validating that task.Status is cancellable.
+// It is shared by applyCancel (the PATCH status=cancelled path) and the
+// routine-cascade path. The caller validates that task.Status is cancellable.
 func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error {
 	oldStatus := task.Status
 	if oldStatus == store.TaskStatusWaiting {
@@ -574,57 +567,43 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, map[string]any{"archived": len(archived)})
 }
 
-// ArchiveTask archives a done task.
-func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
-	if err != nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
+// applyArchive flips a task's archived flag and runs the matching thread
+// cascade. Archiving (archived=true) also stops any leaked worker, halts
+// routine children, and disarms the routine card. The caller verifies the
+// task exists and (for archived=true) is in a done/cancelled status.
+// Invoked from the PATCH archived path (UpdateTask).
+func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bool) error {
+	if archived {
+		// Safety net: stop any leaked worker containers.
+		h.runner.StopTaskWorker(task.ID)
 	}
-	if task.Status != store.TaskStatusDone && task.Status != store.TaskStatusCancelled {
-		http.Error(w, "only done or cancelled tasks can be archived", http.StatusBadRequest)
-		return
+	if err := h.store.SetTaskArchived(ctx, task.ID, archived); err != nil {
+		return err
 	}
-	// Safety net: stop any leaked worker containers.
-	h.runner.StopTaskWorker(id)
-	if err := h.store.SetTaskArchived(r.Context(), id, true); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	to := "unarchived"
+	if archived {
+		to = "archived"
 	}
-	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"to":      "archived",
+	h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange, map[string]string{
+		"to":      to,
 		"trigger": string(store.TriggerUser),
 	})
-	// Archiving a routine card should also stop any still-live spawned
-	// instances that were enqueued before the unregister, and clear the
-	// enabled flag so the put-away routine can never resume firing.
-	if task.IsRoutine() {
-		h.cascadeCancelRoutineChildren(r.Context(), id)
-		if err := h.store.UpdateRoutineEnabled(r.Context(), id, false); err != nil {
-			logger.Handler.Warn("archive routine: clear enabled", "routine", id, "error", err)
+	if archived {
+		// Archiving a routine card should also stop any still-live spawned
+		// instances that were enqueued before the unregister, and clear the
+		// enabled flag so the put-away routine can never resume firing.
+		if task.IsRoutine() {
+			h.cascadeCancelRoutineChildren(ctx, task.ID)
+			if err := h.store.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
+				logger.Handler.Warn("archive routine: clear enabled", "routine", task.ID, "error", err)
+			}
+			h.unregisterRoutine(task.ID)
 		}
-		h.unregisterRoutine(id)
+		h.cascadeArchiveThreadsForTask(task.ID.String())
+	} else {
+		h.cascadeUnarchiveThreadsForTask(task.ID.String())
 	}
-	h.cascadeArchiveThreadsForTask(id.String())
-	httpjson.Write(w, http.StatusOK, map[string]string{"status": "archived"})
-}
-
-// UnarchiveTask restores an archived task.
-func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	if _, err := h.store.GetTask(r.Context(), id); err != nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
-	}
-	if err := h.store.SetTaskArchived(r.Context(), id, false); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"to":      "unarchived",
-		"trigger": string(store.TriggerUser),
-	})
-	h.cascadeUnarchiveThreadsForTask(id.String())
-	httpjson.Write(w, http.StatusOK, map[string]string{"status": "unarchived"})
+	return nil
 }
 
 // TestTask runs a verification agent on the same task to check its acceptance criteria.

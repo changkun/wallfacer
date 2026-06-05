@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -613,8 +614,13 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		DependsOn         *[]string                             `json:"depends_on"`
 		Tags              *[]string                             `json:"tags"`
-		MaxCostUSD        *float64                              `json:"max_cost_usd"`
-		MaxInputTokens    *int                                  `json:"max_input_tokens"`
+		// Archived flips the archived flag (replaces POST /archive,/unarchive).
+		Archived *bool `json:"archived"`
+		// Deleted=false restores a soft-deleted task (replaces POST /restore).
+		// Soft-delete itself uses DELETE /api/tasks/{id}, not PATCH.
+		Deleted        *bool    `json:"deleted"`
+		MaxCostUSD     *float64 `json:"max_cost_usd"`
+		MaxInputTokens *int     `json:"max_input_tokens"`
 		// Model sets the per-task model override; empty string clears it.
 		Model *string `json:"model"`
 		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)
@@ -632,9 +638,50 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
+	// Restore (deleted=false) operates on a tombstoned task, which the
+	// GetTask lookup below would not find. Handle it up front. Only
+	// deleted=false is accepted; soft-delete uses DELETE /api/tasks/{id}.
+	if req.Deleted != nil {
+		if *req.Deleted {
+			http.Error(w, "soft-delete uses DELETE /api/tasks/{id}, not PATCH", http.StatusBadRequest)
+			return
+		}
+		if err := h.applyRestore(r.Context(), id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		restored, err := s.GetTask(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, restored)
+		return
+	}
+
 	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+
+	// Archived flag flip (replaces POST /archive and /unarchive). It is a
+	// standalone mutation, independent of status, so it short-circuits.
+	if req.Archived != nil {
+		if *req.Archived && task.Status != store.TaskStatusDone && task.Status != store.TaskStatusCancelled {
+			http.Error(w, "only done or cancelled tasks can be archived", http.StatusBadRequest)
+			return
+		}
+		if err := h.applyArchive(r.Context(), *task, *req.Archived); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		updated, err := s.GetTask(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, updated)
 		return
 	}
 
@@ -769,6 +816,32 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	if req.Status != nil {
+		oldStatus := task.Status
+		newStatus := *req.Status
+
+		// Cancel is a side-effecting transition (kill container, clean
+		// worktrees, cascade to routine children) that bypasses the state
+		// machine. Intercept it before the routine guard and planner-lock
+		// check below so cancelling a routine card still runs its cascade,
+		// matching the old POST /api/tasks/{id}/cancel behaviour.
+		if newStatus == store.TaskStatusCancelled {
+			if !cancellableStatuses[oldStatus] {
+				http.Error(w, "task cannot be cancelled in its current status", http.StatusBadRequest)
+				return
+			}
+			if err := h.applyCancel(r.Context(), *task); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			updated, err := s.GetTask(r.Context(), id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			httpjson.Write(w, http.StatusOK, updated)
+			return
+		}
+
 		// Routine cards are schedule templates, not executable work. They
 		// live outside the normal lifecycle and must stay in backlog; any
 		// attempt to move them via the generic PATCH is a programmer
@@ -777,8 +850,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			http.Error(w, "routine tasks cannot change status; use /api/routines endpoints", http.StatusUnprocessableEntity)
 			return
 		}
-		oldStatus := task.Status
-		newStatus := *req.Status
 
 		// Reject status changes on tasks that have an in-flight plan turn.
 		if oldStatus != newStatus {
@@ -946,18 +1017,15 @@ func (h *Handler) ListDeletedTasks(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, tasks)
 }
 
-// RestoreTask removes the tombstone from a soft-deleted task, making it active again.
-func (h *Handler) RestoreTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	s, ok := h.requireStore(w)
-	if !ok {
-		return
-	}
-	if err := s.RestoreTask(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+// applyRestore removes the tombstone from a soft-deleted task, making it
+// active again, and reverses the lifecycle-cascade thread archiving.
+// Invoked from the PATCH deleted=false path (UpdateTask).
+func (h *Handler) applyRestore(ctx context.Context, id uuid.UUID) error {
+	if err := h.store.RestoreTask(ctx, id); err != nil {
+		return err
 	}
 	h.cascadeUnarchiveThreadsForTask(id.String())
-	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 // validateCustomPatterns compiles each pattern to ensure it is valid RE2 syntax.

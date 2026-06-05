@@ -98,7 +98,7 @@ Alternatively, the user can mark the task done from `waiting`, which skips furth
 
 ## Cancellation
 
-Any task in `backlog`, `in_progress`, `waiting`, `failed`, or `done` can be cancelled via `POST /api/tasks/{id}/cancel`. The handler:
+Any task in `backlog`, `in_progress`, `waiting`, or `failed` can be cancelled via `PATCH /api/tasks/{id}` with `{"status": "cancelled"}`. The handler:
 
 1. **Kills the container** (if `in_progress`) — sends `<runtime> kill wallfacer-<uuid>`. The running goroutine detects the cancelled status and exits without overwriting it to `failed`.
 2. **Cleans up worktrees** — removes the git worktree and deletes the task branch, discarding all prepared changes.

@@ -153,7 +153,7 @@ export const useTaskStore = defineStore('tasks', () => {
   }
 
   async function cancelTask(id: string) {
-    return api<void>('POST', `/api/tasks/${id}/cancel`);
+    return api<Task>('PATCH', `/api/tasks/${id}`, { status: 'cancelled' });
   }
 
   async function deleteTask(id: string) {

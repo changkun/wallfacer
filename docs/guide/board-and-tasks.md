@@ -315,7 +315,7 @@ Toggle this via the "Resume previous session" checkbox in the retry or backlog s
 
 Deleting a task creates a tombstone rather than immediately removing data. Soft-deleted tasks are recoverable for 7 days (configurable via `WALLFACER_TOMBSTONE_RETENTION_DAYS`). The confirmation dialog warns about this retention period. After the retention window, data is permanently pruned on the next server startup.
 
-To restore a deleted task, use `POST /api/tasks/{id}/restore` or view deleted tasks via `GET /api/tasks/deleted`.
+To restore a deleted task, use `PATCH /api/tasks/{id}` with `{"deleted": false}`, or view deleted tasks via `GET /api/tasks/deleted`.
 
 ### Task Actions Reference
 

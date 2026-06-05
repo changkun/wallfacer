@@ -84,16 +84,12 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/summaries` | List immutable task summaries for completed tasks (cost dashboard) |
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
-| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start |
+| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees, cascades to routine children), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
 | `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
 | `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |
-| `POST /api/tasks/{id}/cancel` | Cancel a task: kill container and discard worktrees |
 | `POST /api/tasks/{id}/resume` | Resume a failed or waiting task using its existing session |
-| `POST /api/tasks/{id}/restore` | Restore a soft-deleted task by removing its tombstone |
-| `POST /api/tasks/{id}/archive` | Move a done/cancelled task to the archived state |
-| `POST /api/tasks/{id}/unarchive` | Restore an archived task |
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto the latest default branch |
 | `POST /api/tasks/{id}/test` | Trigger the test agent for a task |
 
