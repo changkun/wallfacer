@@ -34,10 +34,17 @@ const PAD_TOP = 24; // axis row
 
 const layout = computed(() => layoutSpans(props.spans));
 const laneCount = computed(() => Math.max(1, layout.value.laneCount));
-const svgHeight = computed(() => PAD_TOP + laneCount.value * (LANE_H + LANE_GAP));
+const trackHeight = computed(() => PAD_TOP + laneCount.value * (LANE_H + LANE_GAP));
 
 function blockY(lane: number): number {
   return PAD_TOP + lane * (LANE_H + LANE_GAP);
+}
+
+// Tick labels are HTML, anchored at their percentage. Edge labels hug the
+// track edges (first left-aligned, last right-aligned) so they stay inside.
+function tickLabelStyle(pct: number): Record<string, string> {
+  const transform = pct <= 0 ? 'none' : pct >= 100 ? 'translateX(-100%)' : 'translateX(-50%)';
+  return { left: pct + '%', transform };
 }
 
 // Axis ticks at 5 evenly-spaced VISUAL positions. Because idle gaps are
@@ -78,7 +85,7 @@ const gapMarkers = computed(() => {
 
 const hovered = ref<{ label: string; range: string; lane: number; x: number; y: number } | null>(null);
 function showTip(ev: MouseEvent, b: typeof layout.value.blocks[number]) {
-  const rect = (ev.currentTarget as SVGElement).getBoundingClientRect();
+  const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
   hovered.value = {
     label: b.label,
     range: `${formatMs(b.startMs - layout.value.t0)} → ${formatMs(b.endMs - layout.value.t0)} (${formatMs(b.durationMs)})`,
@@ -111,55 +118,41 @@ const detailRows = computed(() => {
     <div v-if="!layout.blocks.length" class="flamegraph__empty">
       No timing spans recorded yet.
     </div>
-    <svg
-      v-else
-      :viewBox="`0 0 100 ${svgHeight}`"
-      preserveAspectRatio="none"
-      width="100%"
-      :height="svgHeight"
-      role="img"
-      aria-label="Span timeline"
-    >
+    <!-- Bars, labels, and axis are percentage-positioned HTML overlays, not
+         SVG <text>. An SVG with preserveAspectRatio="none" stretches text
+         horizontally by the (width / 100) scale factor, smearing labels into
+         an unreadable mess at real widths. HTML positioning sidesteps that. -->
+    <div v-else class="flamegraph__track" :style="{ height: trackHeight + 'px' }">
       <!-- Compressed idle-gap markers (hatched) behind everything else. -->
-      <rect
+      <div
         v-for="(g, i) in gapMarkers"
         :key="'gap' + i"
-        :x="g.left"
-        :y="PAD_TOP"
-        :width="g.width"
-        :height="svgHeight - PAD_TOP"
         class="flamegraph__gap"
-      >
-        <title>{{ g.title }}</title>
-      </rect>
+        :style="{ left: g.left + '%', width: g.width + '%', top: PAD_TOP + 'px', height: (trackHeight - PAD_TOP) + 'px' }"
+        :title="g.title"
+      />
 
-      <!-- Axis ticks. The vertical lines extend down across all lanes
-           so the user can eyeball alignment between blocks. -->
-      <g v-for="t in ticks" :key="t.pct" class="flamegraph__tick">
-        <line :x1="t.pct" :y1="PAD_TOP - 4" :x2="t.pct" :y2="svgHeight" />
-        <text :x="t.pct" :y="PAD_TOP - 8" text-anchor="middle">{{ t.label }}</text>
-      </g>
+      <!-- Axis ticks: a gridline down the lanes plus a time label on top. -->
+      <template v-for="t in ticks" :key="t.pct">
+        <div
+          class="flamegraph__tick-line"
+          :style="{ left: t.pct + '%', top: (PAD_TOP - 4) + 'px', height: (trackHeight - PAD_TOP + 4) + 'px' }"
+        />
+        <span class="flamegraph__tick-label" :style="tickLabelStyle(t.pct)">{{ t.label }}</span>
+      </template>
 
       <!-- Span blocks, positioned in compressed visual space (leftPct/widthPct). -->
-      <g v-for="(b, i) in layout.blocks" :key="i">
-        <rect
-          :x="b.leftPct"
-          :y="blockY(b.lane)"
-          :width="b.widthPct"
-          :height="LANE_H"
-          :fill="b.color"
-          rx="2"
-          @mouseenter="(e) => showTip(e, b)"
-          @mouseleave="hideTip"
-        />
-        <text
-          :x="b.leftPct + 0.5"
-          :y="blockY(b.lane) + LANE_H / 2"
-          dominant-baseline="middle"
-          class="flamegraph__label"
-        >{{ b.label }}</text>
-      </g>
-    </svg>
+      <div
+        v-for="(b, i) in layout.blocks"
+        :key="i"
+        class="flamegraph__block"
+        :style="{ left: b.leftPct + '%', width: b.widthPct + '%', top: blockY(b.lane) + 'px', height: LANE_H + 'px', background: b.color }"
+        @mouseenter="(e) => showTip(e, b)"
+        @mouseleave="hideTip"
+      >
+        <span class="flamegraph__label">{{ b.label }}</span>
+      </div>
+    </div>
     <div
       v-if="hovered"
       class="flamegraph__tip"
@@ -220,28 +213,52 @@ const detailRows = computed(() => {
   color: var(--text-muted);
   text-align: center;
 }
-.flamegraph__tick line {
-  stroke: var(--rule);
-  stroke-width: 0.05;
-  vector-effect: non-scaling-stroke;
+.flamegraph__track { position: relative; width: 100%; }
+.flamegraph__tick-line {
+  position: absolute;
+  width: 1px;
+  background: var(--rule);
+  pointer-events: none;
 }
-.flamegraph__tick text {
+.flamegraph__tick-label {
+  position: absolute;
+  top: 2px;
   font-size: 9px;
-  fill: var(--text-muted);
+  color: var(--text-muted);
   font-family: var(--font-mono);
+  white-space: nowrap;
+  pointer-events: none;
 }
 .flamegraph__gap {
-  fill: var(--bg-sunk, rgba(127, 127, 127, 0.08));
-  opacity: 0.5;
+  position: absolute;
+  background: repeating-linear-gradient(
+    120deg,
+    transparent,
+    transparent 3px,
+    var(--border) 3px,
+    var(--border) 4px
+  );
+  opacity: 0.4;
+  pointer-events: none;
+}
+.flamegraph__block {
+  position: absolute;
+  border-radius: 2px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  overflow: hidden;
+  cursor: default;
 }
 .flamegraph__label {
   font-size: 10px;
-  fill: #fff;
+  color: #fff;
   font-family: var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
-  /* SVG text in a non-uniformly-scaled viewBox squashes horizontally.
-     Negative letter-spacing pulls it back so labels remain readable. */
-  letter-spacing: -0.5px;
 }
 .flamegraph__tip {
   position: fixed;
