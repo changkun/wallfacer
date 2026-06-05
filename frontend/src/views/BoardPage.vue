@@ -82,7 +82,21 @@ const doneStats = computed(() => {
   return `${i.toLocaleString()} in / ${o.toLocaleString()} out / $${c.toFixed(2)}`;
 });
 
-const maxParallel = computed(() => store.config?.max_parallel ?? 5);
+// In-Progress "max N" cap. The live /api/config omits max_parallel, so the
+// authoritative value is /api/env's max_parallel_tasks, with an optional
+// per-group override from config.workspace_groups[].max_parallel. Mirrors the
+// old ui/js render.js + workspace.js read path.
+const envMaxParallel = ref<number>(0);
+const maxParallel = computed<string | number>(() => {
+  const cfg = store.config;
+  const activeKey = cfg?.active_groups?.[0]?.key;
+  const group = cfg?.workspace_groups?.find((g) => g.key === activeKey);
+  // A per-group override of 0 is a deliberate "unlimited" setting.
+  if (group?.max_parallel === 0) return '∞';
+  if (group?.max_parallel != null) return group.max_parallel;
+  if (envMaxParallel.value > 0) return envMaxParallel.value;
+  return cfg?.max_parallel ?? 5;
+});
 
 // Empty-state composer: when the whole board is empty (no tasks across
 // every column, archived or not), show a centred prompt + auto-expanded
@@ -134,6 +148,10 @@ function setupColObserver() {
 onMounted(async () => {
   if (!store.tasks.length) await store.fetchTasks({ includeArchived: ui.showArchived });
   if (!store.config) await store.fetchConfig();
+  try {
+    const env = await api<{ max_parallel_tasks?: number }>('GET', '/api/env');
+    if (typeof env.max_parallel_tasks === 'number') envMaxParallel.value = env.max_parallel_tasks;
+  } catch { /* env optional; fall back to config/default */ }
   syncSelectedFromQuery();
   await nextTick();
   setupColObserver();

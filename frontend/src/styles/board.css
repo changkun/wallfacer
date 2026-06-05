@@ -140,7 +140,8 @@
 }
 /* Send to Plan: neutral warm tint, distinct from Start (green) and
    Resume (blue) since it is a sibling action on the backlog card. */
-.card-action-send-to-plan {
+.card-action-send-to-plan,
+.card-action-plan {
   background: var(--tint-amber);
   color: var(--tint-amber-ink);
   border-color: color-mix(in oklab, var(--tint-amber-ink), transparent 70%);
@@ -928,10 +929,30 @@ select.composer__input {
 
 /* Backlog position number + drag affordances. */
 .card-rank {
+  background: var(--tint-blue);
+  color: var(--tint-blue-ink);
+  padding: 1px 7px;
+  border-radius: var(--r-sm);
   font-size: 10px;
   font-family: var(--font-mono);
-  color: var(--text-muted);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Backlog "+ New Task" affordance (mirrors old .btn-dashed). */
+.composer-add {
+  width: 100%;
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  font-size: var(--fs-md);
+  color: var(--ink-3);
+  background: transparent;
+  cursor: pointer;
+}
+.composer-add:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+  background: var(--bg-hover);
 }
 .card-drag-ghost { opacity: 0.4; }
 .card-drag-chosen { box-shadow: 0 0 0 2px var(--accent); }
