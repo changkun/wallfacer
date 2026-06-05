@@ -8,6 +8,12 @@ import { renderMarkdown } from '../lib/markdown';
 import { mapEntries, type RawExplorerEntry, type TreeEntry } from '../lib/explorerTree';
 import { fileIcon, type FileIcon } from '../lib/fileIcon';
 
+// Collapsible file-explorer side panel. Lives inside BoardPage to the left of
+// the board grid (see specs/foundations/file-explorer.md) so browsing files
+// never hides the board. File preview opens in a modal because the board grid
+// occupies the space an inline preview pane would have used.
+const emit = defineEmits<{ close: [] }>();
+
 interface TaskPromptEntry {
   task_id: string;
   title: string;
@@ -39,7 +45,8 @@ async function loadTaskPrompts() {
 }
 
 function openTaskPrompt(entry: TaskPromptEntry) {
-  // Deep-link via the hash route handler in App.vue.
+  // Deep-link via the hash route handler in App.vue. The panel already lives
+  // on the board route, so this just opens the task detail overlay.
   void router.push({ path: '/', hash: `#${entry.task_id}` });
 }
 
@@ -291,6 +298,16 @@ function previewLines(): string[] {
   return fileContent.value.split('\n');
 }
 
+async function closePreview() {
+  if (editing.value) {
+    // Honour the dirty-edit guard before tearing the modal down.
+    await cancelEdit();
+    if (editing.value) return;
+  }
+  selectedPath.value = null;
+  fileContent.value = null;
+}
+
 // Markdown preview: rendered by default for .md / .markdown files; the
 // user can switch back to the line-numbered source view via a toolbar
 // button. Edit mode always shows the raw textarea regardless.
@@ -300,6 +317,13 @@ const renderedHtml = computed(() =>
   isMarkdownFile.value && fileContent.value ? renderMarkdown(fileContent.value) : '',
 );
 watch(selectedPath, () => { previewMode.value = 'rendered'; });
+
+// Escape closes the preview modal first, then the panel.
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return;
+  if (selectedPath.value) { void closePreview(); return; }
+  emit('close');
+}
 
 // Live tree refresh: subscribes to /api/explorer/stream and re-fetches the
 // affected directories whenever the server detects a content change (3 s
@@ -325,8 +349,10 @@ function startExplorerStream() {
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   if (workspace()) await loadRoot();
+  else treeLoading.value = false;
   startExplorerStream();
   await loadTaskPrompts();
+  window.addEventListener('keydown', onKeydown);
 });
 
 // Refresh the Task Prompts virtual section whenever the global task list
@@ -335,7 +361,10 @@ onMounted(async () => {
 watch(() => store.tasks.length, () => { void loadTaskPrompts(); });
 watch(taskPromptsIncludeWaiting, () => { void loadTaskPrompts(); });
 
-onUnmounted(() => { explorerStream?.close(); });
+onUnmounted(() => {
+  explorerStream?.close();
+  window.removeEventListener('keydown', onKeydown);
+});
 
 watch(() => store.config?.workspaces?.[0], (ws) => {
   if (ws) loadRoot();
@@ -343,226 +372,161 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
 </script>
 
 <template>
-  <div class="board-with-explorer explorer-page-root">
-    <aside class="explorer-panel">
-      <div class="explorer-panel__header">
-        <span class="explorer-panel__title">Explorer</span>
-      </div>
-      <div v-if="taskPrompts.length" class="explorer-task-prompts">
-        <button
-          type="button"
-          class="explorer-task-prompts__header"
-          :aria-expanded="taskPromptsExpanded"
-          @click="taskPromptsExpanded = !taskPromptsExpanded"
-        >
-          <span>{{ taskPromptsExpanded ? '▼' : '▶' }}</span>
-          <span>Task Prompts</span>
-          <span class="explorer-task-prompts__count">{{ taskPrompts.length }}</span>
-        </button>
-        <div v-if="taskPromptsExpanded">
-          <label class="explorer-task-prompts__toggle">
-            <input
-              v-model="taskPromptsIncludeWaiting"
-              type="checkbox"
-            />
-            Include waiting
-          </label>
-          <button
-            v-for="entry in taskPrompts"
-            :key="entry.task_id"
-            type="button"
-            class="explorer-task-prompts__item"
-            :title="entry.title"
-            @click="openTaskPrompt(entry)"
-          >
-            <span class="explorer-task-prompts__badge" :data-status="entry.status">{{ entry.status }}</span>
-            <span class="explorer-task-prompts__title">{{ entry.title || entry.task_id.slice(0, 8) }}</span>
-            <span v-if="entry.updated_at" class="explorer-task-prompts__time">{{ relAgo(entry.updated_at) }}</span>
-          </button>
-        </div>
-      </div>
-      <div class="explorer-panel__tree">
-        <div v-if="treeLoading" class="explorer-panel__empty">Loading...</div>
-        <div v-else-if="errorMsg" class="explorer-panel__empty explorer-panel__empty--error">{{ errorMsg }}</div>
-        <div v-else-if="!children.get('')?.length" class="explorer-panel__empty">No files found.</div>
-        <template v-else>
-          <div
-            v-for="{ entry, depth } in visibleEntries()"
-            :key="entry.path"
-            class="explorer-node"
-            :class="[
-              entry.is_dir ? 'explorer-node--dir' : 'explorer-node--file',
-              { 'explorer-node--active': selectedPath === entry.path },
-            ]"
-            :style="{ paddingLeft: (8 + depth * 14) + 'px' }"
-            :data-path="entry.path"
-            tabindex="0"
-            role="treeitem"
-            :aria-expanded="entry.is_dir ? expanded.has(entry.path) : undefined"
-            @click="entry.is_dir ? toggleDir(entry) : selectFile(entry)"
-            @keydown="(e) => onTreeKeydown(e, entry)"
-          >
-            <span class="explorer-node__toggle">
-              <template v-if="entry.is_dir">{{ expanded.has(entry.path) ? '▼' : '▶' }}</template>
-            </span>
-            <span class="explorer-node__icon" aria-hidden="true">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                :stroke="iconFor(entry).color"
-                v-html="iconFor(entry).paths"
-              ></svg>
-            </span>
-            <span class="explorer-node__name">{{ entry.name }}</span>
-          </div>
-        </template>
-      </div>
-    </aside>
-
-    <section class="explorer-content-pane">
-      <div v-if="fileLoading" class="explorer-preview__placeholder">Loading...</div>
-      <div v-else-if="!selectedPath" class="explorer-preview__placeholder">
-        Select a file to view its contents.
-      </div>
-      <template v-else>
-        <div class="explorer-preview__header">
-          <span class="explorer-preview__path" :title="selectedPath">
-            {{ fileName(selectedPath) }}
-          </span>
-          <span class="explorer-preview__actions">
-            <span v-if="saveError" class="explorer-save-error" :title="saveError">save failed</span>
-            <button
-              v-if="!editing && isMarkdownFile"
-              type="button"
-              class="explorer-edit-btn"
-              @click="previewMode = previewMode === 'rendered' ? 'source' : 'rendered'"
-            >{{ previewMode === 'rendered' ? 'Source' : 'Render' }}</button>
-            <template v-if="editing">
-              <button type="button" class="explorer-edit-btn" :disabled="saving" @click="saveFile">{{ saving ? 'Saving…' : 'Save' }}</button>
-              <button type="button" class="explorer-edit-btn" :disabled="saving" @click="cancelEdit">Cancel</button>
-            </template>
-            <button v-else type="button" class="explorer-edit-btn" @click="startEdit">Edit</button>
-          </span>
-        </div>
-        <div class="explorer-preview__content">
-          <textarea
-            v-if="editing"
-            v-model="editBuffer"
-            class="explorer-edit-area"
-            spellcheck="false"
-            @keydown="onEditKeydown"
-          ></textarea>
-          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-          <div
-            v-else-if="isMarkdownFile && previewMode === 'rendered'"
-            class="explorer-preview__md prose"
-            v-html="renderedHtml"
+  <aside class="explorer-panel">
+    <div class="explorer-panel__header">
+      <span class="explorer-panel__title">Explorer</span>
+      <button
+        type="button"
+        class="explorer-panel__close"
+        title="Close explorer"
+        aria-label="Close explorer"
+        @click="emit('close')"
+      >&times;</button>
+    </div>
+    <div v-if="taskPrompts.length" class="explorer-task-prompts">
+      <button
+        type="button"
+        class="explorer-task-prompts__header"
+        :aria-expanded="taskPromptsExpanded"
+        @click="taskPromptsExpanded = !taskPromptsExpanded"
+      >
+        <span>{{ taskPromptsExpanded ? '▼' : '▶' }}</span>
+        <span class="explorer-task-prompts__label">Task Prompts</span>
+        <span class="explorer-task-prompts__count">{{ taskPrompts.length }}</span>
+      </button>
+      <div v-if="taskPromptsExpanded">
+        <label class="explorer-task-prompts__toggle">
+          <input
+            v-model="taskPromptsIncludeWaiting"
+            type="checkbox"
           />
-          <pre v-else class="explorer-preview__code"><code>
-            <div
-              v-for="(line, idx) in previewLines()"
-              :key="idx"
-              class="explorer-preview__line"
-            ><span class="explorer-preview__ln">{{ idx + 1 }}</span><span class="explorer-preview__lc">{{ line }}</span></div>
-          </code></pre>
+          Include waiting
+        </label>
+        <button
+          v-for="entry in taskPrompts"
+          :key="entry.task_id"
+          type="button"
+          class="explorer-task-prompts__entry"
+          :title="entry.title"
+          @click="openTaskPrompt(entry)"
+        >
+          <span class="explorer-task-prompts__badge" :class="`explorer-task-prompts__badge--${entry.status}`">{{ entry.status }}</span>
+          <span class="explorer-task-prompts__title">{{ entry.title || entry.task_id.slice(0, 8) }}</span>
+          <span v-if="entry.updated_at" class="explorer-task-prompts__time">{{ relAgo(entry.updated_at) }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="explorer-panel__tree">
+      <div v-if="treeLoading" class="explorer-panel__empty">Loading...</div>
+      <div v-else-if="errorMsg" class="explorer-panel__empty explorer-panel__empty--error">{{ errorMsg }}</div>
+      <div v-else-if="!children.get('')?.length" class="explorer-panel__empty">No files found.</div>
+      <template v-else>
+        <div
+          v-for="{ entry, depth } in visibleEntries()"
+          :key="entry.path"
+          class="explorer-node"
+          :class="[
+            entry.is_dir ? 'explorer-node--dir' : 'explorer-node--file',
+            { 'explorer-node--active': selectedPath === entry.path },
+          ]"
+          :style="{ paddingLeft: (8 + depth * 14) + 'px' }"
+          :data-path="entry.path"
+          tabindex="0"
+          role="treeitem"
+          :aria-expanded="entry.is_dir ? expanded.has(entry.path) : undefined"
+          @click="entry.is_dir ? toggleDir(entry) : selectFile(entry)"
+          @keydown="(e) => onTreeKeydown(e, entry)"
+        >
+          <span class="explorer-node__toggle">
+            <template v-if="entry.is_dir">{{ expanded.has(entry.path) ? '▼' : '▶' }}</template>
+          </span>
+          <span class="explorer-node__icon" aria-hidden="true">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              :stroke="iconFor(entry).color"
+              v-html="iconFor(entry).paths"
+            ></svg>
+          </span>
+          <span class="explorer-node__name">{{ entry.name }}</span>
         </div>
       </template>
-    </section>
+    </div>
+  </aside>
+
+  <!-- File preview modal: the board grid occupies the space an inline pane
+       would use, so previews open over the board (legacy modal styles). -->
+  <div v-if="selectedPath" class="explorer-preview-backdrop" @click.self="closePreview">
+    <div class="explorer-preview" role="dialog" aria-modal="true">
+      <div class="explorer-preview__header">
+        <span class="explorer-preview__path" :title="selectedPath">
+          {{ fileName(selectedPath) }}
+        </span>
+        <span class="explorer-preview__actions">
+          <span v-if="saveError" class="explorer-save-error" :title="saveError">save failed</span>
+          <button
+            v-if="!editing && isMarkdownFile"
+            type="button"
+            class="explorer-preview__edit-btn"
+            @click="previewMode = previewMode === 'rendered' ? 'source' : 'rendered'"
+          >{{ previewMode === 'rendered' ? 'Source' : 'Render' }}</button>
+          <template v-if="editing">
+            <button type="button" class="explorer-preview__save-btn" :disabled="saving" @click="saveFile">{{ saving ? 'Saving…' : 'Save' }}</button>
+            <button type="button" class="explorer-preview__discard-btn" :disabled="saving" @click="cancelEdit">Cancel</button>
+          </template>
+          <button v-else type="button" class="explorer-preview__edit-btn" @click="startEdit">Edit</button>
+          <button type="button" class="explorer-preview__close" title="Close" aria-label="Close preview" @click="closePreview">&times;</button>
+        </span>
+      </div>
+      <div class="explorer-preview__content">
+        <div v-if="fileLoading" class="explorer-preview__placeholder">Loading...</div>
+        <textarea
+          v-else-if="editing"
+          v-model="editBuffer"
+          class="explorer-preview__textarea"
+          spellcheck="false"
+          @keydown="onEditKeydown"
+        ></textarea>
+        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+        <div
+          v-else-if="isMarkdownFile && previewMode === 'rendered'"
+          class="explorer-preview__markdown prose"
+          v-html="renderedHtml"
+        />
+        <pre v-else class="explorer-preview__code"><code>
+          <div
+            v-for="(line, idx) in previewLines()"
+            :key="idx"
+            class="explorer-preview__line"
+          ><span class="explorer-preview__ln">{{ idx + 1 }}</span><span class="explorer-preview__lc">{{ line }}</span></div>
+        </code></pre>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.explorer-page-root {
-  height: 100%;
-  overflow: hidden;
-}
-.explorer-page-root :deep(.explorer-panel) {
-  width: 280px;
-  min-width: 220px;
-}
-.explorer-content-pane {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-}
-.explorer-task-prompts {
-  border-bottom: 1px solid var(--rule);
-  padding: 4px 6px 6px;
-  font-size: 11px;
-}
-.explorer-task-prompts__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  background: transparent;
+.explorer-panel { width: 280px; min-width: 220px; }
+.explorer-panel__header { justify-content: space-between; }
+.explorer-panel__close {
+  background: none;
   border: none;
-  padding: 4px 4px;
   cursor: pointer;
-  color: var(--ink-2);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10px;
-  text-align: left;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  color: var(--text-muted);
 }
-.explorer-task-prompts__count {
-  margin-left: auto;
-  background: var(--bg-sunk);
-  color: var(--ink-3);
-  padding: 0 5px;
-  border-radius: 999px;
+.explorer-panel__close:hover { color: var(--text); }
+.explorer-panel__empty {
+  padding: 12px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
-.explorer-task-prompts__toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 4px 6px;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-.explorer-task-prompts__item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 4px 4px;
-  cursor: pointer;
-  color: var(--ink-2);
-  text-align: left;
-}
-.explorer-task-prompts__item:hover { background: var(--bg-hover); }
-.explorer-task-prompts__badge {
-  font-size: 9px;
-  text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--bg-sunk);
-  color: var(--ink-3);
-  flex-shrink: 0;
-}
-.explorer-task-prompts__badge[data-status="waiting"] { color: var(--warn, #c87b1c); }
-.explorer-task-prompts__time {
-  flex-shrink: 0;
-  color: var(--ink-4);
-  font-size: 9px;
-  font-variant-numeric: tabular-nums;
-}
-.explorer-task-prompts__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.explorer-panel__empty--error { color: var(--err, #c0392b); }
 </style>

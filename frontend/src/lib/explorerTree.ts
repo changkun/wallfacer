@@ -1,5 +1,5 @@
 // Maps the raw /api/explorer/tree response into the tree-node shape the
-// ExplorerPage renders. The backend returns one level of a directory as
+// ExplorerPanel renders. The backend returns one level of a directory as
 // `{ name, type, size, modified }` entries — it does NOT send an absolute
 // `path` or an `is_dir` flag. The client reconstructs both: `path` from the
 // parent request path + entry name (matching the legacy ui/js/explorer.js

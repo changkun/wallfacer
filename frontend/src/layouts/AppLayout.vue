@@ -109,7 +109,12 @@ useKeyboard({
   onSettings: () => { void router.push('/settings'); },
   onTerminal: () => { ui.toggleTerminal(); },
   onShortcuts: () => { ui.openShortcuts(); },
-  onExplorer: () => { void router.push('/explorer'); },
+  onExplorer: () => {
+    // The explorer is an in-board panel now; jump to the board first if we're
+    // on another route, then toggle it.
+    if (router.currentRoute.value.path === '/') ui.toggleExplorer();
+    else { void router.push('/'); ui.openExplorer(); }
+  },
   onToggleMode: () => { void router.push(router.currentRoute.value.path.startsWith('/plan') ? '/' : '/plan'); },
 });
 </script>
