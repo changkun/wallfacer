@@ -24,8 +24,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <AppLayout v-if="isLocal" v-slot="{ connected }">
-    <RouterView :connected="connected" />
+  <AppLayout v-if="isLocal" v-slot="{ connected, connState }">
+    <RouterView :connected="connected" :conn-state="connState" />
   </AppLayout>
   <RouterView v-else />
 </template>
