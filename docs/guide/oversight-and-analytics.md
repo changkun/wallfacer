@@ -41,6 +41,8 @@ Open a task by clicking its card, then look at the **Implementation** tab on the
 - **Pretty** -- Parsed and syntax-highlighted agent output.
 - **Raw** -- Unprocessed agent output with ANSI codes stripped.
 
+![Task detail modal showing the oversight summary in the Implementation tab](images/task-detail.png)
+
 If the task has a test run, the **Testing** tab provides the same three modes for the test agent's output and oversight.
 
 ### Oversight Statuses
@@ -232,6 +234,8 @@ Click the stats button in the header to open the Stats modal. This provides a co
 - **By Activity table** -- Input tokens, output tokens, and cost grouped by sub-agent type (implementation, test, refinement, title, oversight, oversight-test), sorted in a logical order.
 - **By Workspace table** -- When multiple workspaces are active, shows task count, token totals, and cost per workspace. Workspaces are sorted by cost (highest first). Hover over a workspace name to see the full path.
 - **Top 10 Tasks by Cost** -- The most expensive tasks with their title (clickable to open the task), status, and cost. Useful for identifying outlier tasks.
+
+![Stats dashboard with cost summary tiles, daily spend chart, and per-activity cost tables](images/analytics.png)
 
 The stats endpoint also supports workspace-scoped queries:
 

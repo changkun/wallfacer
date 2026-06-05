@@ -337,6 +337,8 @@ specific time. The auto-promoter checks this field and skips tasks whose
 scheduled time has not yet arrived. A 60-second polling ticker ensures
 scheduled tasks are picked up promptly once their time arrives.
 
+![Scheduled routines listed with their cron timing and next run](images/routines.png)
+
 Scheduled execution works with dependencies: a task must satisfy both
 its schedule and its dependency requirements before it is eligible for
 promotion.

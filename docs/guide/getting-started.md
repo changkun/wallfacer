@@ -29,6 +29,8 @@ On startup, Wallfacer restores the most recently used workspace group from your 
 
 On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
+![The Wallfacer task board](images/board.png)
+
 Each task runs as a host process: Wallfacer execs `claude` (or `codex`) directly in the task's git worktree, setting `WALLFACER_AGENT` to select the CLI.
 
 ## Step 3 — Configure Your Credential

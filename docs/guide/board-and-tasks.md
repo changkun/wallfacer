@@ -17,6 +17,8 @@ Wallfacer organizes work on a four-column task board. You create tasks as cards 
 
 Archived tasks (done or cancelled) are hidden from the Done column by default. Toggle "Show archived tasks" in Settings to reveal them.
 
+![The four-column task board with cards across Backlog, In Progress, Waiting, and Done](images/board.png)
+
 ### Task States
 
 The full state machine is:
@@ -103,6 +105,8 @@ A task fails when the container crashes, the timeout expires, a budget limit is 
 ### Reviewing Results
 
 Click any task card to open its detail modal. The layout adapts based on the task's state.
+
+![Task detail drawer showing the main tab bar, agent output, and the left-side Actions rail](images/task-detail.png)
 
 **Left panel** (always visible):
 
