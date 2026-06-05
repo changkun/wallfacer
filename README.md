@@ -185,6 +185,8 @@ Development is organized into three parallel tracks with shared foundations. See
 | 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
 | 8 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 
+Contributing? See **[CONTRIBUTOR.md](CONTRIBUTOR.md)** for the developer orientation, build commands, and conventions.
+
 ## Origin
 
 Wallfacer started as a task board for coordinating concurrent agent runs and grew into its own gaps from there: spec coordination, oversight, refinement, an integrated IDE. Most recent capabilities were developed by Wallfacer itself. See [docs/origin.md](docs/origin.md) for the long version.
