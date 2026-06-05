@@ -384,8 +384,8 @@ function onInput(e: Event) {
         <DependencyPicker v-model="dependsOn" />
       </div>
       <label class="composer__opt">
-        <span class="composer__opt-label">Sandbox</span>
-        <select v-model="sandbox" class="composer__select" aria-label="Sandbox override">
+        <span class="composer__opt-label">Harness</span>
+        <select v-model="sandbox" class="composer__select" aria-label="Harness override">
           <option value="">Default (agent)</option>
           <option value="claude">Claude</option>
           <option value="codex">Codex</option>

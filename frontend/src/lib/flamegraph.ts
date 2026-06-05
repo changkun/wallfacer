@@ -60,7 +60,7 @@ export function humanSpanLabel(phase: string, label: string): string {
     if ((m = label.match(/^agent_turn_(\d+)$/))) return `Turn ${m[1]}`;
     return label || phase;
   }
-  if (phase === 'container_run') return label || 'Container';
+  if (phase === 'container_run') return label || 'Harness';
   if (phase === 'commit') return 'Commit';
   if (phase === 'oversight') return 'Oversight';
   if (phase === 'title_gen') return 'Title gen';

@@ -25,7 +25,7 @@ export const en: Record<string, string> = {
   'wf.feat.5.title': 'Operator visibility',
   'wf.feat.5.desc': 'Real-time logs, traces, timelines, diff review, and usage/cost tracking. Full audit trail from idea to deployed code.',
   'wf.feat.6.title': 'Model flexibility',
-  'wf.feat.6.desc': 'Works with Claude Code, Codex, and custom sandbox setups. Not locked to any single LLM provider.',
+  'wf.feat.6.desc': 'Works with Claude Code, Codex, and custom harness setups. Not locked to any single LLM provider.',
   'wf.how.label': 'How it works',
   'wf.how.1.title': 'Explore',
   'wf.how.1.desc': 'Describe what you want to build in a conversation. Wallfacer helps shape the idea.',
