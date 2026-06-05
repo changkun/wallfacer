@@ -1,0 +1,155 @@
+/* --- Routines page --- */
+.routines-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+}
+.routines-page__inner {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Empty state: a centered hero (icon + line + the create form). */
+.routines-page--empty {
+  justify-content: center;
+}
+.routines-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.routines-hero__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.routines-hero__title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+.routines-hero__sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: -8px 0 2px;
+  max-width: 380px;
+}
+
+/* Header (shown when routines exist). */
+.routines-head {
+  margin-bottom: 16px;
+}
+.routines-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+.routines-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+/* Create form: compact textarea + inline controls row. */
+.routine-create {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.routine-create__prompt {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 52px;
+  max-height: 220px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  font-family: var(--font-sans);
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+}
+.routine-create__prompt:focus {
+  border-color: var(--accent);
+}
+.routine-create__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+.routine-create__opt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.routine-create__select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-size: 12px;
+}
+.routine-create__btn {
+  margin-left: auto;
+}
+
+/* List of existing routines. */
+.routines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+.routine-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.routine-row > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.routine-delete {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.routine-delete:hover {
+  color: var(--err);
+  border-color: var(--err);
+}
+.routines-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
