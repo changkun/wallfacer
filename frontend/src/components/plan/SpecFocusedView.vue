@@ -448,7 +448,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <div
           v-if="renderedBody"
           ref="bodyRef"
-          class="sf-content prose-content"
+          class="sf-content sf-content--spec prose-content"
           v-html="renderedBody"
         />
         <div v-else-if="!loading && !parsed.warning" class="sf-loading">Select a spec from the tree.</div>
@@ -573,10 +573,15 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
 .sf-title {
   display: block;
-  margin-top: 6px;
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
   color: var(--ink);
+  max-width: 52em;
+  word-break: break-word;
 }
 
 .sf-meta {
@@ -600,8 +605,14 @@ defineExpose({ dispatchFocused, breakdownFocused });
 .sf-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 24px 80px;
+  padding: 20px 28px 80px;
   animation: sf-fade-in 0.18s ease-out;
+}
+
+.sf-content--spec {
+  max-width: 52em;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 @keyframes sf-fade-in {
@@ -651,6 +662,34 @@ defineExpose({ dispatchFocused, breakdownFocused });
 .sf-content :deep(h1) { font-size: 22px; }
 .sf-content :deep(h2) { font-size: 17px; border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
 .sf-content :deep(h3) { font-size: 14px; }
+
+/* Spec body reading scale — larger headings and a drop-cap on the first
+   paragraph (mirrors golden .spec-focused-view__body-inner). Gated to spec
+   bodies so the task-prompt body keeps the compact scale above. */
+.sf-content--spec.prose-content :deep(h2) {
+  font-size: 20px;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin: 28px 0 10px;
+}
+.sf-content--spec.prose-content :deep(h3) {
+  font-size: 15px;
+  color: var(--ink);
+  margin: 22px 0 8px;
+}
+.sf-content--spec.prose-content :deep(p:first-of-type::first-letter) {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 3em;
+  line-height: 0.9;
+  float: left;
+  padding: 4px 10px 0 0;
+  color: var(--accent);
+}
+.sf-content--spec.prose-content :deep(p:first-of-type) {
+  font-size: 15px;
+  line-height: 1.72;
+}
 
 .sf-content :deep(p) { margin: 0.6em 0; line-height: 1.6; }
 .sf-content :deep(ul),
