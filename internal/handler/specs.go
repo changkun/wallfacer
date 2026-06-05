@@ -492,7 +492,8 @@ func revertArchiveCommit(ctx context.Context, ws, sha string) error {
 }
 
 type specTransitionRequest struct {
-	Path string `json:"path"`
+	Action string `json:"action,omitempty"` // discriminator from SpecTransition; ignored here
+	Path   string `json:"path"`
 }
 
 type specTransitionResponse struct {

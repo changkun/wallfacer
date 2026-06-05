@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,9 +18,54 @@ import (
 	"github.com/google/uuid"
 )
 
+// SpecTransition is the unified entry point for the four spec lifecycle
+// actions (POST /api/specs/transition). It reads the `action`
+// discriminator from the request body and delegates to the existing
+// per-action handler, which re-decodes the body for its own fields.
+// Response envelopes stay per-action: dispatch/undispatch return
+// per-spec arrays; archive/unarchive return a single
+// specTransitionResponse.
+func (h *Handler) SpecTransition(w http.ResponseWriter, r *http.Request) {
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			httpjson.Write(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+			return
+		}
+		http.Error(w, "read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var probe struct {
+		Action string `json:"action"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Reset the body so the delegated handler can decode its own fields.
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+
+	switch probe.Action {
+	case "dispatch":
+		h.DispatchSpecs(w, r)
+	case "undispatch":
+		h.UndispatchSpecs(w, r)
+	case "archive":
+		h.ArchiveSpec(w, r)
+	case "unarchive":
+		h.UnarchiveSpec(w, r)
+	default:
+		http.Error(w, "action must be one of: dispatch, undispatch, archive, unarchive", http.StatusBadRequest)
+	}
+}
+
 type dispatchRequest struct {
-	Paths []string `json:"paths"`
-	Run   bool     `json:"run"`
+	Action string   `json:"action,omitempty"` // discriminator from SpecTransition; ignored here
+	Paths  []string `json:"paths"`
+	Run    bool     `json:"run"`
 }
 
 type dispatchResult struct {
@@ -238,7 +287,8 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 }
 
 type undispatchRequest struct {
-	Paths []string `json:"paths"`
+	Action string   `json:"action,omitempty"` // discriminator from SpecTransition; ignored here
+	Paths  []string `json:"paths"`
 }
 
 type undispatchResult struct {

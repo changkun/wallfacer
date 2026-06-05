@@ -249,23 +249,8 @@ var Routes = []Route{
 		Tags:        []string{"specs", "sse"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/specs/dispatch", Name: "DispatchSpecs",
-		Description: "Dispatch validated specs to create board tasks atomically.",
-		Tags:        []string{"specs"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/specs/undispatch", Name: "UndispatchSpecs",
-		Description: "Cancel dispatched tasks and clear spec dispatch linkage.",
-		Tags:        []string{"specs"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/specs/archive", Name: "ArchiveSpec",
-		Description: "Archive a spec — transition its status to archived.",
-		Tags:        []string{"specs"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/specs/unarchive", Name: "UnarchiveSpec",
-		Description: "Unarchive a spec — transition its status from archived back to drafted.",
+		Method: http.MethodPost, Pattern: "/api/specs/transition", Name: "SpecTransition",
+		Description: "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive take a single path and return {path, status}.",
 		Tags:        []string{"specs"},
 	},
 

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 120,
+  "route_count": 117,
   "routes": [
     {
       "method": "GET",
@@ -285,36 +285,9 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/specs/dispatch",
-      "name": "DispatchSpecs",
-      "description": "Dispatch validated specs to create board tasks atomically.",
-      "tags": [
-        "specs"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/specs/undispatch",
-      "name": "UndispatchSpecs",
-      "description": "Cancel dispatched tasks and clear spec dispatch linkage.",
-      "tags": [
-        "specs"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/specs/archive",
-      "name": "ArchiveSpec",
-      "description": "Archive a spec — transition its status to archived.",
-      "tags": [
-        "specs"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/specs/unarchive",
-      "name": "UnarchiveSpec",
-      "description": "Unarchive a spec — transition its status from archived back to drafted.",
+      "pattern": "/api/specs/transition",
+      "name": "SpecTransition",
+      "description": "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive take a single path and return {path, status}.",
       "tags": [
         "specs"
       ]
