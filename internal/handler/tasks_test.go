@@ -4313,9 +4313,7 @@ func TestCancelTask_ClearsOrphanedDependency(t *testing.T) {
 	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 15})
 	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 15, DependsOn: []string{a.ID.String()}})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, a.ID)
+	w := patchTaskAction(t, h, a.ID, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("CancelTask: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -4366,9 +4364,7 @@ func TestCancelTask_RemovesOnlyOrphanedEntry(t *testing.T) {
 	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 15})
 	c, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "c", Timeout: 15, DependsOn: []string{a.ID.String(), b.ID.String()}})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, a.ID)
+	w := patchTaskAction(t, h, a.ID, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("CancelTask: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -4395,9 +4391,7 @@ func TestAutoPromote_PromotesAfterOrphanedDepCleared(t *testing.T) {
 	c, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "c", Timeout: 15, DependsOn: []string{a.ID.String(), b.ID.String()}})
 
 	// Cancel A — C.DependsOn should become [B].
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, a.ID)
+	w := patchTaskAction(t, h, a.ID, `{"status":"cancelled"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("CancelTask A: expected 200, got %d", w.Code)
 	}

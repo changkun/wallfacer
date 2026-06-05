@@ -20,6 +20,19 @@ import (
 	"github.com/google/uuid"
 )
 
+// patchTaskAction issues PATCH /api/tasks/{id} with the given JSON body
+// and invokes UpdateTask, returning the recorder. Tests use it after the
+// cancel/archive/unarchive/restore POSTs were folded into PATCH
+// (status=cancelled, archived=true/false, deleted=false respectively).
+func patchTaskAction(t *testing.T, h *Handler, id uuid.UUID, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+id.String(), strings.NewReader(body))
+	req.SetPathValue("id", id.String())
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, id)
+	return w
+}
+
 // jsonObj builds a JSON object string with properly escaped values.
 // Usage: jsonObj("workspace", repo, "branch", "main")
 func jsonObj(kvs ...string) string {

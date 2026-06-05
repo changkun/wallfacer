@@ -437,9 +437,7 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 func TestCancelTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	id := uuid.New()
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, id)
+	w := patchTaskAction(t, h, id, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
@@ -452,9 +450,7 @@ func TestCancelTask_RejectsDone(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for done task, got %d", w.Code)
@@ -466,9 +462,7 @@ func TestCancelTask_BacklogTask(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -486,9 +480,7 @@ func TestCancelTask_WaitingTask(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -505,9 +497,7 @@ func TestCancelTask_FailedTask(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"status":"cancelled"}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -523,9 +513,9 @@ func TestCancelTask_InsertsCancelledEvent(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, task.ID)
+	if w := patchTaskAction(t, h, task.ID, `{"status":"cancelled"}`); w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
 
 	events, _ := h.store.GetEvents(ctx, task.ID)
 	found := false
@@ -822,9 +812,7 @@ func TestArchiveAllDone_ArchivesCancelledTasks(t *testing.T) {
 func TestArchiveTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	id := uuid.New()
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/archive", nil)
-	w := httptest.NewRecorder()
-	h.ArchiveTask(w, req, id)
+	w := patchTaskAction(t, h, id, `{"archived":true}`)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
@@ -837,9 +825,7 @@ func TestArchiveTask_RejectsNonDone(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	// Task is in backlog.
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/archive", nil)
-	w := httptest.NewRecorder()
-	h.ArchiveTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"archived":true}`)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for backlog task, got %d", w.Code)
@@ -852,9 +838,7 @@ func TestArchiveTask_ArchivesDoneTask(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/archive", nil)
-	w := httptest.NewRecorder()
-	h.ArchiveTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"archived":true}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -873,9 +857,7 @@ func TestArchiveTask_ArchivesCancelledTask(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancelled", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/archive", nil)
-	w := httptest.NewRecorder()
-	h.ArchiveTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"archived":true}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -887,9 +869,7 @@ func TestArchiveTask_ArchivesCancelledTask(t *testing.T) {
 func TestUnarchiveTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	id := uuid.New()
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/unarchive", nil)
-	w := httptest.NewRecorder()
-	h.UnarchiveTask(w, req, id)
+	w := patchTaskAction(t, h, id, `{"archived":false}`)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
@@ -904,9 +884,7 @@ func TestUnarchiveTask_Success(t *testing.T) {
 
 	_ = h.store.SetTaskArchived(ctx, task.ID, true)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/unarchive", nil)
-	w := httptest.NewRecorder()
-	h.UnarchiveTask(w, req, task.ID)
+	w := patchTaskAction(t, h, task.ID, `{"archived":false}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -927,9 +905,9 @@ func TestUnarchiveTask_InsertsEvent(t *testing.T) {
 
 	_ = h.store.SetTaskArchived(ctx, task.ID, true)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/unarchive", nil)
-	w := httptest.NewRecorder()
-	h.UnarchiveTask(w, req, task.ID)
+	if w := patchTaskAction(t, h, task.ID, `{"archived":false}`); w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
 
 	events, _ := h.store.GetEvents(ctx, task.ID)
 	found := false
@@ -1190,9 +1168,7 @@ func TestCancelTask_CascadesToLiveRoutineChildren(t *testing.T) {
 	ctx := context.Background()
 	routineID, children, siblingID := makeRoutineWithChildren(t, h)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, routineID)
+	w := patchTaskAction(t, h, routineID, `{"status":"cancelled"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("cancel routine: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1231,9 +1207,7 @@ func TestCancelTask_DisablesRoutineCard(t *testing.T) {
 		t.Fatalf("precondition: routine should start enabled")
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, routineID)
+	w := patchTaskAction(t, h, routineID, `{"status":"cancelled"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("cancel routine: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1250,6 +1224,21 @@ func TestCancelTask_DisablesRoutineCard(t *testing.T) {
 	}
 }
 
+// TestPatchRoutineStatus_RejectsNonCancel guards the cancel-interception
+// ordering in UpdateTask: status=cancelled must reach the cancel cascade
+// (above), while any other status change on a routine card stays blocked by
+// the routine guard with 422. A regression here would mean the cancel
+// interception swallowed all routine status changes.
+func TestPatchRoutineStatus_RejectsNonCancel(t *testing.T) {
+	h := newTestHandler(t)
+	routineID, _, _ := makeRoutineWithChildren(t, h)
+
+	w := patchTaskAction(t, h, routineID, `{"status":"in_progress"}`)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("routine in_progress: expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestArchiveTask_CascadesToLiveRoutineChildren(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
@@ -1260,9 +1249,7 @@ func TestArchiveTask_CascadesToLiveRoutineChildren(t *testing.T) {
 		t.Fatalf("force routine cancelled: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+routineID.String()+"/archive", nil)
-	w := httptest.NewRecorder()
-	h.ArchiveTask(w, req, routineID)
+	w := patchTaskAction(t, h, routineID, `{"archived":true}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("archive routine: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1295,9 +1282,7 @@ func TestCancelTask_NonRoutineDoesNotCascade(t *testing.T) {
 	})
 	_ = h.store.ForceUpdateTaskStatus(ctx, child.ID, store.TaskStatusBacklog)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+parent.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, parent.ID)
+	w := patchTaskAction(t, h, parent.ID, `{"status":"cancelled"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -1343,9 +1328,7 @@ func TestCancelTask_CascadeDisablesRoutineOnLastLiveInstance(t *testing.T) {
 		t.Fatalf("force dead failed: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+live.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, live.ID)
+	w := patchTaskAction(t, h, live.ID, `{"status":"cancelled"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("cancel instance: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1391,9 +1374,7 @@ func TestCancelTask_PreservesRoutineWhenSiblingStillLive(t *testing.T) {
 		t.Fatalf("force b: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
-	w := httptest.NewRecorder()
-	h.CancelTask(w, req, a.ID)
+	w := patchTaskAction(t, h, a.ID, `{"status":"cancelled"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("cancel a: expected 200, got %d: %s", w.Code, w.Body.String())
 	}

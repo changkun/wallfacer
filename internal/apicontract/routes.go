@@ -560,7 +560,7 @@ var Routes = []Route{
 	{
 		Method: http.MethodPatch, Pattern: "/api/tasks/{id}", Name: "UpdateTask",
 		JSName:      "update",
-		Description: "Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start.",
+		Description: "Update task fields: status (incl. status=cancelled, which kills the worker and cleans worktrees), prompt, timeout, sandbox, dependencies, fresh_start, archived (true/false), deleted=false (restore).",
 		Tags:        []string{"tasks"},
 	},
 	{
@@ -585,28 +585,8 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/cancel", Name: "CancelTask",
-		Description: "Cancel a task: kill container and discard worktrees.",
-		Tags:        []string{"tasks"},
-	},
-	{
 		Method: http.MethodPost, Pattern: "/api/tasks/{id}/resume", Name: "ResumeTask",
 		Description: "Resume a failed or waiting task using its existing session.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/restore", Name: "RestoreTask",
-		Description: "Restore a soft-deleted task by removing its tombstone.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/archive", Name: "ArchiveTask",
-		Description: "Move a done task to the archived state.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/unarchive", Name: "UnarchiveTask",
-		Description: "Restore an archived task to the done state.",
 		Tags:        []string{"tasks"},
 	},
 	{

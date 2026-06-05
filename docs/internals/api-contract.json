@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 117,
+  "route_count": 113,
   "routes": [
     {
       "method": "GET",
@@ -731,7 +731,7 @@
       "method": "PATCH",
       "pattern": "/api/tasks/{id}",
       "name": "UpdateTask",
-      "description": "Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start.",
+      "description": "Update task fields: status (incl. status=cancelled, which kills the worker and cleans worktrees), prompt, timeout, sandbox, dependencies, fresh_start, archived (true/false), deleted=false (restore).",
       "tags": [
         "tasks"
       ]
@@ -774,45 +774,9 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/tasks/{id}/cancel",
-      "name": "CancelTask",
-      "description": "Cancel a task: kill container and discard worktrees.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
       "pattern": "/api/tasks/{id}/resume",
       "name": "ResumeTask",
       "description": "Resume a failed or waiting task using its existing session.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/restore",
-      "name": "RestoreTask",
-      "description": "Restore a soft-deleted task by removing its tombstone.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/archive",
-      "name": "ArchiveTask",
-      "description": "Move a done task to the archived state.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/unarchive",
-      "name": "UnarchiveTask",
-      "description": "Restore an archived task to the done state.",
       "tags": [
         "tasks"
       ]

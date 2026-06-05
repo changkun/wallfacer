@@ -477,14 +477,14 @@ flowchart LR
     B --> C["Move task from s.tasks to s.deleted"]
     C --> D["Remove from search index"]
     D --> E["Notify SSE subscribers (deleted=true)"]
-    F["POST /api/tasks/{id}/restore"] --> G["Remove tombstone.json"]
+    F["PATCH /api/tasks/{id} {deleted:false}"] --> G["Remove tombstone.json"]
     G --> H["Move task back to s.tasks"]
     H --> I["Rebuild search index entry"]
 ```
 
 - **Retention**: `PurgeExpiredTombstones` runs periodically and removes task directories whose tombstone `DeletedAt` exceeds the retention window. Configured via `WALLFACER_TOMBSTONE_RETENTION_DAYS` (default 7).
 - **Listing deleted tasks**: `GET /api/tasks/deleted` returns all tombstoned tasks sorted by `UpdatedAt` descending.
-- **Restoring**: `POST /api/tasks/{id}/restore` removes the tombstone file and moves the task back into the active set.
+- **Restoring**: `PATCH /api/tasks/{id}` with `{"deleted": false}` removes the tombstone file and moves the task back into the active set.
 - **Purging**: After the retention window, `purgeTaskLocked` calls `os.RemoveAll` on the entire task directory and removes all in-memory state.
 
 ## Task Summaries

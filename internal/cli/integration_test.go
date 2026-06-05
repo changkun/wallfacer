@@ -82,6 +82,20 @@ func postJSON(t *testing.T, url, body string) *http.Response {
 	return resp
 }
 
+func patchJSON(t *testing.T, url, body string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatalf("new PATCH %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PATCH %s: %v", url, err)
+	}
+	return resp
+}
+
 // mustCreateTask creates a task via the API and returns its ID.
 func mustCreateTask(t *testing.T, srvURL string) uuid.UUID {
 	t.Helper()
@@ -189,20 +203,20 @@ func TestPatchTaskToInProgress(t *testing.T) {
 	t.Fatalf("RunBackground not called with task ID %s; calls: %v", taskID, runs)
 }
 
-// TestCancelTask verifies that POST /api/tasks/{id}/cancel → 200 and the task
-// status becomes "cancelled".
+// TestCancelTask verifies that PATCH /api/tasks/{id} {status:cancelled} → 200
+// and the task status becomes "cancelled".
 func TestCancelTask(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	taskID := mustCreateTask(t, srv.URL)
 
-	// Cancel the task.
-	resp := postJSON(t, fmt.Sprintf("%s/api/tasks/%s/cancel", srv.URL, taskID), "")
+	// Cancel the task via PATCH (the dedicated /cancel POST was folded in).
+	resp := patchJSON(t, fmt.Sprintf("%s/api/tasks/%s", srv.URL, taskID), `{"status":"cancelled"}`)
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("POST cancel: status %d, body: %s", resp.StatusCode, b)
+		t.Fatalf("PATCH cancel: status %d, body: %s", resp.StatusCode, b)
 	}
 
 	// Verify the status is now "cancelled".
@@ -344,7 +358,7 @@ func TestUnknownTaskID(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 
 	nonExistent := uuid.MustParse("00000000-0000-0000-0000-000000000000")
-	resp := postJSON(t, fmt.Sprintf("%s/api/tasks/%s/cancel", srv.URL, nonExistent), "")
+	resp := patchJSON(t, fmt.Sprintf("%s/api/tasks/%s", srv.URL, nonExistent), `{"status":"cancelled"}`)
 	defer func() {
 		_ = resp.Body.Close()
 	}()

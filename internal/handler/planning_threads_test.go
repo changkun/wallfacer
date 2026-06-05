@@ -419,12 +419,9 @@ func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
 	pinThreadToTask(t, tm, threadID, task.ID.String())
 
 	// Archive the task (this should cascade-archive the thread).
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/archive", nil)
-	req.SetPathValue("id", task.ID.String())
-	h.ArchiveTask(rec, req, task.ID)
+	rec := patchTaskAction(t, h, task.ID, `{"archived":true}`)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("ArchiveTask status = %d: %s", rec.Code, rec.Body.String())
+		t.Fatalf("archive status = %d: %s", rec.Code, rec.Body.String())
 	}
 
 	meta, err := tm.Meta(threadID)
@@ -436,12 +433,9 @@ func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
 	}
 
 	// Unarchive the task — thread should be un-archived too.
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/unarchive", nil)
-	req.SetPathValue("id", task.ID.String())
-	h.UnarchiveTask(rec, req, task.ID)
+	rec = patchTaskAction(t, h, task.ID, `{"archived":false}`)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("UnarchiveTask status = %d: %s", rec.Code, rec.Body.String())
+		t.Fatalf("unarchive status = %d: %s", rec.Code, rec.Body.String())
 	}
 
 	meta, err = tm.Meta(threadID)
@@ -474,10 +468,7 @@ func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
 	pinThreadToTask(t, tm, threadID, task.ID.String())
 
 	// Archive task → cascade-archive thread.
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/archive", nil)
-	req.SetPathValue("id", task.ID.String())
-	h.ArchiveTask(rec, req, task.ID)
+	_ = patchTaskAction(t, h, task.ID, `{"archived":true}`)
 
 	// Manually unarchive just the thread (simulates user action).
 	// Under the new semantics, Unarchive() intentionally keeps
@@ -500,10 +491,7 @@ func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
 	if err := h.store.SetTaskArchived(ctx, task.ID, false); err != nil {
 		t.Fatalf("SetTaskArchived false: %v", err)
 	}
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest("POST", "/api/tasks/"+task.ID.String()+"/archive", nil)
-	req.SetPathValue("id", task.ID.String())
-	h.ArchiveTask(rec, req, task.ID)
+	_ = patchTaskAction(t, h, task.ID, `{"archived":true}`)
 
 	meta, _ = tm.Meta(threadID)
 	if meta.Archived {

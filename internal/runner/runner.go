@@ -372,7 +372,7 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 		// Note: StopTaskWorker is NOT deferred here because title, oversight,
 		// and commit agents run in separate background goroutines after Run()
 		// returns and need the worker container alive. Worker cleanup happens
-		// in CleanupWorktrees (commit pipeline), CancelTask, and Shutdown.
+		// in CleanupWorktrees (commit pipeline), the cancel path, and Shutdown.
 		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
 	})
 }

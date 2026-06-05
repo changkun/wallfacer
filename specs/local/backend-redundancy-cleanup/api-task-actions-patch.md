@@ -67,6 +67,18 @@ cascade ritual repeated across all eight current handlers and the
 PATCH paths. Land it as part of this spec since PATCH is about to
 absorb four more of those rituals.
 
+> **Deferred (2026-06-05).** The route collapse landed without the
+> generic `transitionTask` helper. The four absorbed actions are not
+> pure status transitions — cancel runs container-kill + worktree
+> cleanup + routine cascades (`applyCancel`), archive flips a boolean
+> flag with its own routine cascade (`applyArchive`), and restore
+> removes a tombstone (`applyRestore`). Each already centralises its
+> own ritual behind a single helper, so a generic
+> `transitionTask(id, newStatus, opts)` would only unify the diff-cache
+> + event-log + thread-cascade for the *remaining* plain status moves —
+> a separable refactor that touches the in_progress / backlog / waiting
+> paths this spec does not. Tracked as a follow-up, not a blocker.
+
 ## Acceptance
 
 - Four POST endpoints removed.

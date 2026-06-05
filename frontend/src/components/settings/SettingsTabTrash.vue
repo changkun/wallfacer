@@ -35,7 +35,7 @@ async function loadDeletedTasks() {
 async function restoreTask(id: string) {
   restoring.value = { ...restoring.value, [id]: true };
   try {
-    await api('POST', `/api/tasks/${id}/restore`);
+    await api('PATCH', `/api/tasks/${id}`, { deleted: false });
     deletedTasks.value = deletedTasks.value.filter((t) => t.id !== id);
     await store.fetchTasks();
     toast.push('Task restored to the board', { kind: 'success' });

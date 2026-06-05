@@ -122,13 +122,11 @@ func TestListDeletedTasks_AfterSoftDelete(t *testing.T) {
 	}
 }
 
-// TestRestoreTask_NotFound verifies that RestoreTask returns 500 when the task
-// ID does not correspond to a deleted task.
+// TestRestoreTask_NotFound verifies that PATCH {deleted:false} returns 500
+// when the task ID does not correspond to a deleted task.
 func TestRestoreTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/restore", nil)
-	w := httptest.NewRecorder()
-	h.RestoreTask(w, req, uuid.New())
+	w := patchTaskAction(t, h, uuid.New(), `{"deleted":false}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500 for unknown task ID, got %d", w.Code)
 	}
@@ -154,11 +152,9 @@ func TestRestoreTask_Success(t *testing.T) {
 		t.Fatalf("expected 1 deleted task before restore, got %d (err=%v)", len(deleted), err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/restore", nil)
-	w := httptest.NewRecorder()
-	h.RestoreTask(w, req, task.ID)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	w := patchTaskAction(t, h, task.ID, `{"deleted":false}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
 	// Task should now be active again.

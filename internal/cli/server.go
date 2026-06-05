@@ -934,11 +934,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetEvents":      withID(h.GetEvents),
 		"SubmitFeedback": withID(h.SubmitFeedback),
 		"CompleteTask":   withID(h.CompleteTask),
-		"CancelTask":     withID(h.CancelTask),
 		"ResumeTask":     withID(h.ResumeTask),
-		"RestoreTask":    withID(h.RestoreTask),
-		"ArchiveTask":    withID(h.ArchiveTask),
-		"UnarchiveTask":  withID(h.UnarchiveTask),
 		"SyncTask":       withID(h.SyncTask),
 		"TestTask":       withID(h.TestTask),
 

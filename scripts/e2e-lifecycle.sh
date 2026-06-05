@@ -188,7 +188,7 @@ test_sandbox() {
     # 7. Archive the task.
     step "archiving task"
     local archive_resp
-    archive_resp=$(api POST "/api/tasks/$task_id/archive" -d '{}')
+    archive_resp=$(api PATCH "/api/tasks/$task_id" -d '{"archived":true}')
     local archived
     archived=$(api GET "/api/tasks?include_archived=true" | jq -r --arg id "$task_id" '.[] | select(.id == $id) | .archived')
     if [ "$archived" = "true" ]; then
