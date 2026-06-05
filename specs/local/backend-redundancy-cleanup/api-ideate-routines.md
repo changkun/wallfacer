@@ -1,6 +1,6 @@
 ---
 title: Retire /api/ideate facade or document it as routine sugar
-status: drafted
+status: archived
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
   - specs/local/vue-frontend-migration.md
@@ -14,10 +14,47 @@ affects:
   - ui/js/
 effort: small
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-05
 author: changkun
 dispatched_task_id: null
 ---
+
+## Outcome — archived, premise no longer holds (2026-06-05)
+
+This spec assumed `/api/ideate` is **routine-backed** — that it
+scaffolds a `system:ideation` routine card with
+`RoutineSpawnFlow=brainstorm`, making the triple "a thin convenience
+facade over `/api/routines`." That stopped being true.
+
+The current code retired the always-on ideation routine entirely:
+
+- `internal/handler/routines_engine.go:reconcileRoutines` now **deletes**
+  any routine card still carrying the `system:ideation` tag from a
+  prior deployment, via `cleanupLegacyIdeationRoutine`. Nothing creates
+  one.
+- `POST /api/ideate` (`TriggerIdeation`) creates a one-shot
+  `Kind=idea-agent` task and runs it through the normal execute path —
+  not a routine, not a `/api/routines` facade.
+- `GET /api/ideate` reports running status; `DELETE /api/ideate`
+  cancels in-flight idea-agent tasks. The `enabled` / `next_run_at`
+  response fields are vestigial.
+- `system:ideation` survives only as a legacy-cleanup lookup key.
+
+So neither option survives review: **Option A** (route ideation through
+the routines list with a `system:ideation` filter) is moot — there is no
+such routine. **Option B** (annotate the triple as "a thin facade over
+`/api/routines`") would document a relationship that no longer exists;
+`internal/handler/ideate.go`'s in-code comments are already accurate.
+
+No surface change is warranted. Archived rather than implemented.
+
+**Separate follow-up (not this spec):** several docs/comments still
+describe the retired routine-backed model and are stale — `CLAUDE.md`
+("Ideation — `/api/ideate` (routine-backed; …)"),
+`docs/internals/automation.md` ("Fire system:ideation routine"),
+`internal/cli/server.go:251`, and `internal/handler/config.go:373`.
+Reconciling them needs the ideation-interval scheduler path mapped and
+belongs in a focused doc-accuracy pass, not here.
 
 # Retire /api/ideate facade or document it as routine sugar
 
