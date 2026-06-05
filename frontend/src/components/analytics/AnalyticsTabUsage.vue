@@ -123,12 +123,6 @@ watch(period, () => fetchStats());
         gap: 12px;
       "
     >
-      <div>
-        <h3 style="font-size: 16px; font-weight: 600; margin: 0">Usage</h3>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px">
-          Token and cost totals broken down by task status and sub-agent for the selected window.
-        </div>
-      </div>
       <div style="display: flex; align-items: center; gap: 12px">
         <label style="font-size: 12px; color: var(--text-muted)">
           Period:
