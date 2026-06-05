@@ -13,6 +13,8 @@
 //   --out  <dir>      output dir (default /tmp/wf-shots)
 //   --only <a,b,c>    comma list of surface names (default: all)
 //   --list            print surface names and exit
+//   --theme <t>       light (default) or dark; dark sets the wallfacer-theme
+//                     localStorage key and suffixes output files with -dark
 //   --width/--height  viewport (default 1440x900); deviceScaleFactor is 2x
 //
 // Prints JSON: [{name, file, errors}] so callers can detect page errors.
@@ -51,6 +53,8 @@ const outDir = arg('out', '/tmp/wf-shots');
 const width = Number(arg('width', 1440));
 const height = Number(arg('height', 900));
 const only = arg('only', '');
+const theme = arg('theme', 'light') === 'dark' ? 'dark' : 'light';
+const suffix = theme === 'dark' ? '-dark' : '';
 
 if (arg('list', false) === true) {
   console.log(Object.keys(SURFACES).join('\n'));
@@ -63,7 +67,11 @@ mkdirSync(outDir, { recursive: true });
 const BOOT = { mode: 'local', serverApiKey: '', version: 'dev' };
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
-await ctx.addInitScript((b) => { window.__WALLFACER__ = b; }, BOOT);
+// Inject boot config and pin the theme (prefs.ts reads wallfacer-theme on init).
+await ctx.addInitScript(({ boot, t }) => {
+  window.__WALLFACER__ = boot;
+  try { window.localStorage.setItem('wallfacer-theme', t); } catch { /* ignore */ }
+}, { boot: BOOT, t: theme });
 
 const results = [];
 for (const name of names) {
@@ -94,7 +102,7 @@ for (const name of names) {
     }
   }
 
-  const file = `${outDir}/${name}.png`;
+  const file = `${outDir}/${name}${suffix}.png`;
   await page.screenshot({ path: file });
   await page.close();
   results.push({ name, file, errors });

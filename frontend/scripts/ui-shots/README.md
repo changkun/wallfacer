@@ -69,3 +69,21 @@ Works against any local-mode origin: the embedded SPA on the booted server
 Flags: `--base` (default `http://localhost:8099`), `--out`
 (`/tmp/wf-shots`), `--only <a,b,c>`, `--list`, `--width` / `--height`
 (`1440x900`; deviceScaleFactor is always 2).
+
+### Light + dark capture
+
+`snap.mjs --theme dark` pins `wallfacer-theme=dark` (read by prefs.ts on init)
+and suffixes output files with `-dark`. Capture both for theme-adaptive docs:
+
+```bash
+node frontend/scripts/ui-shots/snap.mjs --base http://localhost:8099 --out /tmp/wf-shots
+node frontend/scripts/ui-shots/snap.mjs --base http://localhost:8099 --out /tmp/wf-shots --theme dark
+```
+
+## Docs screenshots
+
+Guide images live in `docs/guide/images/` as a `foo.png` (light) + `foo-dark.png`
+(dark) pair. Reference only the light name in markdown: `![alt](images/foo.png)`.
+The docs renderer (`frontend/src/lib/markdown.ts`) emits both variants toggled by
+`[data-theme]`, served via the `/api/docs-asset/<category>/<path>` route. Downscale
+the 2x captures to a doc-friendly width first, e.g. `sips --resampleWidth 1600`.
