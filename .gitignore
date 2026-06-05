@@ -18,6 +18,9 @@ frontend/dist/
 
 # Local Playwright captures
 *.png
+# ...except committed product assets: landing screenshots and guide doc images.
+!frontend/public/static/*.png
+!docs/guide/images/*.png
 .playwright-mcp/
 frontend/test-results/
 release-evidence/
