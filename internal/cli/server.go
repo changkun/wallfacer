@@ -873,12 +873,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateTaskPromptTool":     h.UpdateTaskPromptTool,
 
 		// Planning chat threads.
-		"ListPlanningThreads":     h.ListPlanningThreads,
-		"CreatePlanningThread":    h.CreatePlanningThread,
-		"RenamePlanningThread":    h.RenamePlanningThread,
-		"ArchivePlanningThread":   h.ArchivePlanningThread,
-		"UnarchivePlanningThread": h.UnarchivePlanningThread,
-		"ActivatePlanningThread":  h.ActivatePlanningThread,
+		"ListPlanningThreads":  h.ListPlanningThreads,
+		"CreatePlanningThread": h.CreatePlanningThread,
+		"PatchPlanningThread":  h.PatchPlanningThread,
 
 		// Environment configuration.
 		"GetEnvConfig":    h.GetEnvConfig,
@@ -1012,11 +1009,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UndoPlanningRound":        handler.BodyLimitDefault,
 
 		// Planning chat threads.
-		"CreatePlanningThread":    handler.BodyLimitDefault,
-		"RenamePlanningThread":    handler.BodyLimitDefault,
-		"ArchivePlanningThread":   handler.BodyLimitDefault,
-		"UnarchivePlanningThread": handler.BodyLimitDefault,
-		"ActivatePlanningThread":  handler.BodyLimitDefault,
+		"CreatePlanningThread": handler.BodyLimitDefault,
+		"PatchPlanningThread":  handler.BodyLimitDefault,
 
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,

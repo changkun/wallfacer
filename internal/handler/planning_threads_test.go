@@ -74,16 +74,17 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{"name":"Auth refactor"}`))
 	req.SetPathValue("id", id)
-	h.RenamePlanningThread(rec, req)
+	h.PatchPlanningThread(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("rename status = %d: %s", rec.Code, rec.Body.String())
 	}
 
 	// Archive.
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/planning/threads/"+id+"/archive", nil)
+	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
+		strings.NewReader(`{"state":"archived"}`))
 	req.SetPathValue("id", id)
-	h.ArchivePlanningThread(rec, req)
+	h.PatchPlanningThread(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("archive status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -106,9 +107,10 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 
 	// Unarchive brings it back.
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/planning/threads/"+id+"/unarchive", nil)
+	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
+		strings.NewReader(`{"state":"visible"}`))
 	req.SetPathValue("id", id)
-	h.UnarchivePlanningThread(rec, req)
+	h.PatchPlanningThread(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("unarchive status = %d", rec.Code)
 	}
@@ -123,12 +125,55 @@ func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
 	defer h.planner.SetBusy(false, "")
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost,
-		"/api/planning/threads/"+id+"/archive", nil)
+	req := httptest.NewRequest(http.MethodPatch,
+		"/api/planning/threads/"+id, strings.NewReader(`{"state":"archived"}`))
 	req.SetPathValue("id", id)
-	h.ArchivePlanningThread(rec, req)
+	h.PatchPlanningThread(rec, req)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409 (busy)", rec.Code)
+	}
+}
+
+// TestPatchPlanningThread_Activate confirms the activate path sets the
+// active thread via the unified PATCH endpoint.
+func TestPatchPlanningThread_Activate(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	// Create a second thread so there is a non-active target to activate.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
+		strings.NewReader(`{"name":"Second"}`))
+	h.CreatePlanningThread(rec, req)
+	var created map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	id := created["id"].(string)
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
+		strings.NewReader(`{"state":"active"}`))
+	req.SetPathValue("id", id)
+	h.PatchPlanningThread(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("activate status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := h.planner.Threads().ActiveID(); got != id {
+		t.Errorf("active id = %q, want %q", got, id)
+	}
+}
+
+// TestPatchPlanningThread_RejectsEmptyBody confirms a body with neither
+// name nor a recognized state returns 400.
+func TestPatchPlanningThread_RejectsEmptyBody(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	id := h.planner.Threads().List(false)[0].ID
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
+		strings.NewReader(`{}`))
+	req.SetPathValue("id", id)
+	h.PatchPlanningThread(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
 

@@ -454,7 +454,7 @@ async function switchToThread(id: string) {
     t.lastViewedAt = Date.now();
   }
   // Server-side activate (fire and forget).
-  api('POST', '/api/planning/threads/' + encodeURIComponent(id) + '/activate', {}).catch(() => {});
+  api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
   await loadHistory();
 }
 
@@ -493,8 +493,8 @@ function cancelRename() {
 async function archiveThread(id: string) {
   if (!confirm('Archive this thread? You can restore it later.')) return;
   try {
-    const res = await fetch('/api/planning/threads/' + encodeURIComponent(id) + '/archive', {
-      method: 'POST',
+    const res = await fetch('/api/planning/threads/' + encodeURIComponent(id), {
+      method: 'PATCH',
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
@@ -502,6 +502,7 @@ async function archiveThread(id: string) {
           ? { Authorization: 'Bearer ' + window.__WALLFACER__.serverApiKey }
           : {}),
       },
+      body: JSON.stringify({ state: 'archived' }),
     });
     if (res.status === 409) {
       appendSystem('Thread is busy — interrupt it before archiving.');
@@ -522,7 +523,7 @@ async function archiveThread(id: string) {
 
 async function unarchiveThread(id: string) {
   try {
-    await api('POST', '/api/planning/threads/' + encodeURIComponent(id) + '/unarchive', {});
+    await api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'visible' });
     await planning.loadThreads();
     await switchToThread(id);
     archiveMenuOpen.value = false;
