@@ -973,13 +973,13 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Latere.ai sign-in (cloud mode). Always mounted; handlers self-gate
 		// to 503/204 when the auth provider is not configured.
-		"Login":         http.HandlerFunc(h.Login),
-		"Callback":      http.HandlerFunc(h.Callback),
-		"Logout":        http.HandlerFunc(h.Logout),
-		"LogoutNotify":  http.HandlerFunc(h.LogoutNotify),
-		"AuthMe":        http.HandlerFunc(h.AuthMe),
-		"AuthOrgs":      http.HandlerFunc(h.AuthOrgs),
-		"AuthSwitchOrg": http.HandlerFunc(h.AuthSwitchOrg),
+		"Login":        http.HandlerFunc(h.Login),
+		"Callback":     http.HandlerFunc(h.Callback),
+		"Logout":       http.HandlerFunc(h.Logout),
+		"LogoutNotify": http.HandlerFunc(h.LogoutNotify),
+		"AuthMe":       http.HandlerFunc(h.AuthMe),
+		"AuthOrgs":     http.HandlerFunc(h.AuthOrgs),
+		"PatchAuthMe":  http.HandlerFunc(h.PatchAuthMe),
 
 		// Local-mode RFC 8628 device-code sign-in. The local SPA's prompt
 		// drives the flow over these three routes; the resulting token is

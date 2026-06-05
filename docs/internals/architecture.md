@@ -392,7 +392,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `flows.go` | User-authored flow catalog CRUD backed by `~/.wallfacer/flows/` | `GET/POST /api/flows`, `PUT/DELETE /api/flows/{slug}` |
 | `routines.go` | Routine card CRUD (list, create, update schedule, trigger) | `GET/POST /api/routines`, `PATCH /api/routines/{id}/schedule`, `POST /api/routines/{id}/trigger` |
 | `routines_engine.go` | Scheduler loop that fires routine tasks on their configured cadence | — (internal) |
-| `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/auth/me`, `GET /api/auth/orgs`, `POST /api/auth/switch-org` |
+| `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/auth/me`, `GET /api/auth/orgs`, `PATCH /api/auth/me` |
 | `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
 | `force_login.go` | Force-login gate used when a session must be re-authenticated | — (internal) |
 | `commitsbehind_cache.go` | LRU cache for per-workspace commits-behind-default counts | — (internal) |

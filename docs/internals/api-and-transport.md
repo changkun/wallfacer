@@ -37,7 +37,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /logout/notify` | Notify peers that this browser session has logged out |
 | `GET /api/auth/me` | Return the current principal (user + active org) |
 | `GET /api/auth/orgs` | List organizations the current user can switch to |
-| `POST /api/auth/switch-org` | Switch the active organization for subsequent requests |
+| `PATCH /api/auth/me` | Mutate the signed-in principal (currently only `org_id`); switches the active organization for subsequent requests |
 | **Ideation / brainstorm** | |
 | `GET /api/ideate` | Get brainstorm/ideation agent status |
 | `POST /api/ideate` | Trigger the ideation agent to generate new task ideas |

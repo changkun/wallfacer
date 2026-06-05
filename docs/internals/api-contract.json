@@ -1081,10 +1081,10 @@
       ]
     },
     {
-      "method": "POST",
-      "pattern": "/api/auth/switch-org",
-      "name": "AuthSwitchOrg",
-      "description": "Switch active organization; clears session and returns a redirect to /login?org_id=\u003ctarget\u003e.",
+      "method": "PATCH",
+      "pattern": "/api/auth/me",
+      "name": "PatchAuthMe",
+      "description": "Mutate the signed-in principal — currently only org_id (active organization). Clears session and returns a redirect to /login?org_id=\u003ctarget\u003e.",
       "tags": [
         "login"
       ]
