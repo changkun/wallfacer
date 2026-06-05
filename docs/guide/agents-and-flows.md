@@ -70,6 +70,8 @@ Seven agents ship with Wallfacer, each mapped to a specific sub-agent role the r
 
 Browse them in the sidebar **Agents** tab. Clicking a row shows its full descriptor, including the rendered prompt template.
 
+![Agents tab listing built-in agents with the selected agent's descriptor in the detail pane](images/agents.png)
+
 ### Cloning a built-in
 
 Built-in agents are read-only. To change anything, the harness, the system prompt, the capabilities, **clone** instead of edit:
@@ -164,6 +166,8 @@ refine?  →  impl  →  test  →  ┌ commit-msg ‖ title ‖ oversight ┐
 
 - A trailing `?` on a chip marks an optional step (flow skips it on failure).
 - `‖` between chips inside a box means they run concurrently via an errgroup.
+
+![Flows tab rendering each flow's step chain as pills with parallel groups boxed](images/flows.png)
 
 ### Cloning a built-in flow
 

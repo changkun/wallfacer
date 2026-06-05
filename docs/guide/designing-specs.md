@@ -30,6 +30,8 @@ Plan mode picks one of two layouts based on the workspace's spec tree:
   - **Right pane** — planning chat (toggleable with **C**)
 - **Chat-first** — when the workspace has no specs and no Roadmap, the chat renders as a centered card (max-width ~720px) with a prominent empty-state hint — `Try /create <title> to save this thread as a spec` — above the composer, and the composer placeholder invites free-form planning ("Describe what you'd like to plan, or /create <title>…"). The spatial position mirrors the empty-Board composer so switching modes on a fresh workspace reads as visually continuous. The hint disappears as soon as the thread has its first message. The **C** shortcut is a no-op in this layout because the chat pane is already the only visible surface. The layout flips automatically once specs appear (via the spec tree SSE stream).
 
+![Plan mode three-pane layout with spec tree, rendered spec, and planning chat](images/plan.png)
+
 ### Spec Explorer
 
 The explorer shows all specs organized by track — the top-level directories under `specs/`. Tracks are user-defined: create a directory under `specs/` and it becomes a track. For example, a project might organize specs as `specs/backend/`, `specs/frontend/`, `specs/infra/`.
