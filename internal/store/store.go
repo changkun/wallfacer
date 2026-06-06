@@ -205,14 +205,20 @@ func (s *Store) loadAll() error {
 
 		// Check for a tombstone marker; if present this task is soft-deleted.
 		// Soft-deleted tasks are kept in s.deleted (not s.tasks) so they are
-		// excluded from ListTasks but can still be restored or purged.
+		// excluded from ListTasks but can still be restored or purged. The
+		// presence of the marker is authoritative: a corrupt/unparseable
+		// tombstone still means deleted, otherwise a soft-deleted task would
+		// resurrect as live on restart (and could be picked up by the
+		// auto-promoter). Parsing only populates metadata.
 		if tombRaw, err := s.backend.ReadBlob(id, "tombstone.json"); err == nil {
 			var tomb Tombstone
-			if jsonUnmarshal(tombRaw, &tomb) == nil {
-				s.deleted[id] = task
-				s.eventsLoaded[id] = false
-				continue
+			if perr := jsonUnmarshal(tombRaw, &tomb); perr != nil {
+				logger.Store.Warn("startup: corrupt tombstone, keeping task soft-deleted",
+					"task", id, "error", perr)
 			}
+			s.deleted[id] = task
+			s.eventsLoaded[id] = false
+			continue
 		}
 
 		// Prune oversized slices on load so the in-memory task is bounded from
