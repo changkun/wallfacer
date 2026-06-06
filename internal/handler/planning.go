@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/harness"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/livelog"
@@ -676,42 +675,7 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	ch := make(chan []byte, 4)
-	go func() {
-		defer close(ch)
-		for {
-			data, err := lr.ReadChunk(r.Context())
-			if len(data) > 0 {
-				ch <- data
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
-
-	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
-	defer keepalive.Stop()
-
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case data, ok := <-ch:
-			if !ok {
-				return
-			}
-			if _, err := w.Write(data); err != nil {
-				return
-			}
-			flusher.Flush()
-		case <-keepalive.C:
-			if _, err := w.Write([]byte("\n")); err != nil {
-				return
-			}
-			flusher.Flush()
-		}
-	}
+	relayLiveChunks(w, flusher, r, lr)
 }
 
 // ClearPlanningMessages clears a thread's conversation history and

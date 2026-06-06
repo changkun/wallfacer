@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -232,20 +233,23 @@ func (h *Handler) streamLiveLog(w http.ResponseWriter, r *http.Request, flusher 
 	h.writeStoredTurns(w, id)
 	flusher.Flush()
 
-	// Stream the current turn's live output via a reader goroutine.
+	// Stream the current turn's live output.
+	relayLiveChunks(w, flusher, r, lr)
+}
+
+// chunkReader is the minimal reader the live-chunk relay needs. Both the live
+// log reader and the planning log reader satisfy it.
+type chunkReader interface {
+	ReadChunk(ctx context.Context) ([]byte, error)
+}
+
+// relayLiveChunks streams chunks from lr to w as text/plain until the reader
+// ends or the request context is cancelled, emitting keepalive newlines while
+// idle. The producer goroutine's send is guarded by the request context so a
+// disconnected client with a full channel buffer cannot strand it forever.
+func relayLiveChunks(w http.ResponseWriter, flusher http.Flusher, r *http.Request, lr chunkReader) {
 	ch := make(chan []byte, 4)
-	go func() {
-		defer close(ch)
-		for {
-			data, err := lr.ReadChunk(r.Context())
-			if len(data) > 0 {
-				ch <- data
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
+	go pumpChunks(r.Context(), lr, ch)
 
 	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
 	defer keepalive.Stop()
@@ -267,6 +271,28 @@ func (h *Handler) streamLiveLog(w http.ResponseWriter, r *http.Request, flusher 
 				return
 			}
 			flusher.Flush()
+		}
+	}
+}
+
+// pumpChunks reads chunks from lr and forwards them to ch until the reader
+// ends or ctx is cancelled, closing ch on exit. The send is guarded by ctx so
+// a cancelled (disconnected) consumer with a full buffer cannot strand this
+// goroutine — ReadChunk is otherwise the only place that observes ctx, and it
+// is not reached while the producer is blocked on a full channel.
+func pumpChunks(ctx context.Context, lr chunkReader, ch chan<- []byte) {
+	defer close(ch)
+	for {
+		data, err := lr.ReadChunk(ctx)
+		if len(data) > 0 {
+			select {
+			case ch <- data:
+			case <-ctx.Done():
+				return
+			}
+		}
+		if err != nil {
+			return
 		}
 	}
 }
