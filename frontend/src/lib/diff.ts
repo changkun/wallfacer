@@ -36,16 +36,27 @@ export function parseDiffFiles(diff: string): DiffFile[] {
   let currentWorkspace = '';
   // Split before each "diff --git " header so each block is one file.
   const blocks = diff.split(/(?=^diff --git )/m);
-  for (const block of blocks) {
-    if (!block.trim()) continue;
-    const rawLines = block.split('\n');
-    // A "=== name ===" separator marks which workspace the following files belong to.
+  // applyWorkspaceSeparators advances currentWorkspace for any "=== name ==="
+  // line in the block. The server emits "=== name ===\n<diff>" with no trailing
+  // separator, so after the split a separator lands at the TAIL of the previous
+  // file's block — it belongs to the NEXT file, not the current one. We
+  // therefore apply separators only AFTER pushing the current block's file.
+  const applyWorkspaceSeparators = (rawLines: string[]) => {
     for (const line of rawLines) {
       const ws = line.match(WORKSPACE_RE);
       if (ws) currentWorkspace = ws[1];
     }
+  };
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+    const rawLines = block.split('\n');
     const header = rawLines[0].match(/^diff --git a\/.+ b\/(.+)$/);
-    if (!header) continue; // bare separator block, no file
+    if (!header) {
+      // Bare separator block (e.g. the leading "=== name ===" before the first
+      // file): set the workspace for the following files.
+      applyWorkspaceSeparators(rawLines);
+      continue;
+    }
     const filename = header[1];
     let adds = 0;
     let dels = 0;
@@ -58,6 +69,8 @@ export function parseDiffFiles(diff: string): DiffFile[] {
       lines.push({ kind, text: line });
     }
     files.push({ filename, workspace: currentWorkspace, adds, dels, lines });
+    // A separator at the tail of this block introduces the next workspace.
+    applyWorkspaceSeparators(rawLines);
   }
   return files;
 }

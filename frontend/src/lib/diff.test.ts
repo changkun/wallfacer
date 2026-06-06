@@ -78,4 +78,34 @@ describe('parseDiffFiles', () => {
     expect(files[0].workspace).toBe('service-a');
     expect(files[0].lines.some(l => l.text.includes('=== service-a ==='))).toBe(false);
   });
+
+  it('attributes the last file of a non-final workspace correctly', () => {
+    // The server emits "=== name ===\n<diff>" with no trailing separator, so a
+    // separator sits at the tail of the previous workspace's last file block.
+    const diff = [
+      '=== ws1 ===',
+      'diff --git a/f1.txt b/f1.txt',
+      '--- a/f1.txt',
+      '+++ b/f1.txt',
+      '@@ -1 +1 @@',
+      '+a',
+      'diff --git a/f2.txt b/f2.txt',
+      '--- a/f2.txt',
+      '+++ b/f2.txt',
+      '@@ -1 +1 @@',
+      '+b',
+      '=== ws2 ===',
+      'diff --git a/f3.txt b/f3.txt',
+      '--- a/f3.txt',
+      '+++ b/f3.txt',
+      '@@ -1 +1 @@',
+      '+c',
+    ].join('\n');
+    const files = parseDiffFiles(diff);
+    expect(files.map(f => [f.filename, f.workspace])).toEqual([
+      ['f1.txt', 'ws1'],
+      ['f2.txt', 'ws1'], // last file of ws1 must NOT be stamped ws2
+      ['f3.txt', 'ws2'],
+    ]);
+  });
 });
