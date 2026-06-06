@@ -71,7 +71,7 @@ func missingTaskWorktrees(task *store.Task) []string {
 // for a task that is about to enter the commit pipeline. Returns the updated
 // task with refreshed worktree paths, or the original task if no restoration
 // was needed.
-func (h *Handler) restoreTaskWorktreesForCommit(ctx context.Context, task *store.Task) (*store.Task, error) {
+func (h *Handler) restoreTaskWorktreesForCommit(ctx context.Context, s *store.Store, task *store.Task) (*store.Task, error) {
 	if task == nil || len(task.WorktreePaths) == 0 || h.runner == nil {
 		return task, nil
 	}
@@ -83,10 +83,10 @@ func (h *Handler) restoreTaskWorktreesForCommit(ctx context.Context, task *store
 	if err != nil {
 		return task, err
 	}
-	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		return task, err
 	}
-	updated, err := h.store.GetTask(ctx, task.ID)
+	updated, err := s.GetTask(ctx, task.ID)
 	if err != nil {
 		return task, err
 	}
@@ -210,20 +210,24 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 // On success it transitions the task to done; on failure it transitions to
 // failed (or back to waiting for recoverable commit-message errors). The
 // trigger identifies whether this was user-initiated or auto-submit.
-func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigger store.Trigger, failurePrefix string) {
+func (h *Handler) runCommitTransition(s *store.Store, taskID uuid.UUID, sessionID string, trigger store.Trigger, failurePrefix string) {
 	go func() {
+		if s == nil {
+			logger.Handler.Error("commit transition skipped: no store", "task", taskID)
+			return
+		}
 		bgCtx := h.runner.ShutdownCtx()
-		task, err := h.store.GetTask(bgCtx, taskID)
+		task, err := s.GetTask(bgCtx, taskID)
 		if err == nil && task != nil {
-			task, err = h.restoreTaskWorktreesForCommit(bgCtx, task)
+			task, err = h.restoreTaskWorktreesForCommit(bgCtx, s, task)
 			if err != nil {
 				logger.Handler.Error("restore task worktrees for commit", "task", taskID, "error", err)
 			}
 			if err := validateTaskWorktreesForCommit(task); err != nil {
-				if waitErr := h.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
-					h.insertEventOrLog(bgCtx, taskID, store.EventTypeStateChange,
+				if waitErr := s.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
+					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
 						store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusWaiting, trigger, nil))
-					h.insertEventOrLog(bgCtx, taskID, store.EventTypeError, map[string]string{
+					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeError, map[string]string{
 						"error": err.Error(),
 					})
 					return
@@ -232,10 +236,10 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigge
 		}
 		if err := h.runner.Commit(taskID, sessionID); err != nil {
 			if runnerpkg.IsCommitMessageGenerationError(err) {
-				if waitErr := h.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
-					h.insertEventOrLog(bgCtx, taskID, store.EventTypeStateChange,
+				if waitErr := s.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
+					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
 						store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusWaiting, trigger, nil))
-					h.insertEventOrLog(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeSystem, map[string]string{
 						"result": "Commit aborted: commit message generation failed. Task returned to waiting for review.",
 					})
 					if trigger != store.TriggerUser {
@@ -244,30 +248,34 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigge
 					return
 				}
 			}
-			if statusErr := h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed); statusErr != nil {
+			if statusErr := s.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed); statusErr != nil {
 				logger.Handler.Error("update task status to failed after commit error", "task", taskID, "error", statusErr)
 			}
-			h.insertEventOrLog(bgCtx, taskID, store.EventTypeError, map[string]string{
+			h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeError, map[string]string{
 				"error": failurePrefix + err.Error(),
 			})
-			h.insertEventOrLog(bgCtx, taskID, store.EventTypeStateChange,
+			h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusFailed, trigger, nil))
 			if trigger != store.TriggerUser {
 				h.pauseAllAutomation(&taskID, "auto-submit", err.Error())
 			}
 			return
 		}
-		if statusErr := h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone); statusErr != nil {
+		if statusErr := s.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone); statusErr != nil {
 			logger.Handler.Error("update task status to done after commit", "task", taskID, "error", statusErr)
 		}
-		h.insertEventOrLog(bgCtx, taskID, store.EventTypeStateChange,
+		h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, trigger, nil))
 	}()
 }
 
 // CompleteTask marks a waiting task as done and triggers the commit pipeline.
 func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -285,18 +293,18 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			logger.Handler.Warn("complete idea-agent task: create backlog tasks", "task", id, "error", createErr)
 		}
 		h.runner.StopTaskWorker(id)
-		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
+		if err := s.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
+		h.insertEventOrLogTo(r.Context(), s, id, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerUser, nil))
 		httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
 
 	if task.SessionID != nil && *task.SessionID != "" {
-		task, err = h.restoreTaskWorktreesForCommit(r.Context(), task)
+		task, err = h.restoreTaskWorktreesForCommit(r.Context(), s, task)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -312,21 +320,21 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		// Transition to "committing" while auto-commit runs in the background.
 		// Use ForceUpdateTaskStatus since waiting → committing is a legitimate
 		// user-initiated flow not in the automated state machine.
-		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusCommitting); err != nil {
+		if err := s.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusCommitting); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
+		h.insertEventOrLogTo(r.Context(), s, id, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerUser, nil))
-		h.runCommitTransition(id, *task.SessionID, store.TriggerUser, "commit failed: ")
+		h.runCommitTransition(s, id, *task.SessionID, store.TriggerUser, "commit failed: ")
 	} else {
 		// No session to commit — go directly to done (bypasses state machine
 		// since waiting→done is deliberately blocked to protect the commit pipeline).
-		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
+		if err := s.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
+		h.insertEventOrLogTo(r.Context(), s, id, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerUser, nil))
 	}
 

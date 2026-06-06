@@ -1020,7 +1020,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					}
 					h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
 						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
-					h.runCommitTransition(t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
+					h.runCommitTransition(c.store, t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
 				} else {
 					// No session — skip commit pipeline. Stop the worker directly.
 					h.runner.StopTaskWorker(t.ID)

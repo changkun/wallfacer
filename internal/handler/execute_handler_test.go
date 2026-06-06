@@ -1094,7 +1094,7 @@ func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
 	_ = exec.Command("git", "-C", worktreeDir, "commit", "--allow-empty", "-m", "init").Run()
 	_ = s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{worktreeDir: worktreeDir}, "task/branch")
 
-	h.runCommitTransition(task.ID, "session-1", store.TriggerUser, "commit error: ")
+	h.runCommitTransition(s, task.ID, "session-1", store.TriggerUser, "commit error: ")
 
 	// Poll until the background goroutine completes the commit transition.
 	var updated *store.Task

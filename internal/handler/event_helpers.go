@@ -21,8 +21,24 @@ import (
 // write carries the caller's sub + actor type without requiring each
 // handler to thread it manually.
 func (h *Handler) insertEventOrLog(ctx context.Context, taskID uuid.UUID, eventType store.EventType, data any) {
+	s, _ := h.currentStore()
+	h.insertEventOrLogTo(ctx, s, taskID, eventType, data)
+}
+
+// insertEventOrLogTo is insertEventOrLog against an explicitly captured store.
+// Background goroutines that outlive their originating request must capture the
+// store once (via currentStore) and use this so every write targets the same
+// store, rather than re-reading the lock-guarded h.store field which the
+// workspace-switch subscription goroutine may reassign concurrently.
+func (h *Handler) insertEventOrLogTo(ctx context.Context, s *store.Store, taskID uuid.UUID, eventType store.EventType, data any) {
+	if s == nil {
+		logger.Handler.Error("InsertEvent skipped: no store",
+			"task", taskID, "event_type", eventType)
+		h.incAutopilotAction("event_write", "error")
+		return
+	}
 	ctx = stampEventActor(ctx)
-	if err := h.store.InsertEvent(ctx, taskID, eventType, data); err != nil {
+	if err := s.InsertEvent(ctx, taskID, eventType, data); err != nil {
 		logger.Handler.Error("InsertEvent failed",
 			"task", taskID, "event_type", eventType, "error", err)
 		h.incAutopilotAction("event_write", "error")
