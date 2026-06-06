@@ -5,7 +5,12 @@ package dagscorer
 // Score returns the length of the longest downstream dependency chain from
 // start. The children function returns the direct dependents of a node.
 // An unknown node (one not returned by any children call) scores 0.
-// Cycles are detected and broken (cycle nodes count as 1).
+//
+// The graph is expected to be acyclic; results are best-effort (and may
+// under-count) for cyclic input. A back-edge is broken to avoid infinite
+// recursion — the revisited node counts as 1 — but that truncated value can be
+// memoized, so a node also reachable by an acyclic path may then be
+// under-counted. Callers that require exact scores must pass a DAG.
 func Score[Node comparable](start Node, children func(Node) []Node) int {
 	return score(start, children, make(map[Node]int), make(map[Node]bool))
 }
