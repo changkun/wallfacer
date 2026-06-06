@@ -1,5 +1,36 @@
 import { nextTick, onMounted, onUnmounted, watch, type Ref } from 'vue';
 
+// openMermaidOverlay shows a zoomed copy of a rendered mermaid diagram in a
+// full-screen overlay, closable by backdrop click or Escape. Both close paths
+// route through a single close() so the document keydown listener is always
+// removed (a backdrop click previously left it attached, leaking one listener
+// per open-then-backdrop-close).
+export function openMermaidOverlay(source: HTMLElement) {
+  const svg = source.querySelector('svg');
+  if (!svg) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'mermaid-overlay';
+
+  const inner = document.createElement('div');
+  inner.className = 'mermaid-overlay-inner';
+  inner.innerHTML = svg.outerHTML;
+  overlay.appendChild(inner);
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onEsc);
+  };
+  const onEsc = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') close();
+  };
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(overlay);
+}
+
 export function useMermaid(containerSelector: string, trigger?: Ref<unknown>) {
   let cleanup: (() => void) | null = null;
 
@@ -31,33 +62,11 @@ export function useMermaid(containerSelector: string, trigger?: Ref<unknown>) {
     if (cleanup) cleanup();
     const handlers: Array<[Element, EventListener]> = [];
     container.querySelectorAll('.mermaid').forEach(div => {
-      const handler = () => openOverlay(div as HTMLElement);
+      const handler = () => openMermaidOverlay(div as HTMLElement);
       div.addEventListener('click', handler);
       handlers.push([div, handler]);
     });
     cleanup = () => handlers.forEach(([el, h]) => el.removeEventListener('click', h));
-  }
-
-  function openOverlay(source: HTMLElement) {
-    const svg = source.querySelector('svg');
-    if (!svg) return;
-
-    const overlay = document.createElement('div');
-    overlay.className = 'mermaid-overlay';
-
-    const inner = document.createElement('div');
-    inner.className = 'mermaid-overlay-inner';
-    inner.innerHTML = svg.outerHTML;
-    overlay.appendChild(inner);
-
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onEsc); }
-    };
-    document.addEventListener('keydown', onEsc);
-    document.body.appendChild(overlay);
   }
 
   onMounted(init);
