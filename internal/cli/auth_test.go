@@ -51,6 +51,7 @@ func TestSplitFields(t *testing.T) {
 		{"a b c", []string{"a", "b", "c"}},
 		{"a, b, c", []string{"a", "b", "c"}},
 		{"  a  b ", []string{"a", "b"}},
+		{"a\tb\nc", []string{"a", "b", "c"}}, // tab and newline delimiters
 	}
 	for _, tc := range cases {
 		got := splitFields(tc.in)

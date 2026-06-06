@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"latere.ai/x/pkg/authkit"
@@ -165,24 +166,12 @@ func getenvOr(key, fallback string) string {
 	return fallback
 }
 
+// splitFields splits s on spaces, commas, tabs and newlines, discarding empty
+// fields. Used to parse OAuth scope lists.
 func splitFields(s string) []string {
-	out := []string{}
-	cur := ""
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == ' ' || c == ',' || c == '\t' || c == '\n' {
-			if cur != "" {
-				out = append(out, cur)
-				cur = ""
-			}
-			continue
-		}
-		cur += string(c)
-	}
-	if cur != "" {
-		out = append(out, cur)
-	}
-	return out
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return r == ' ' || r == ',' || r == '\t' || r == '\n'
+	})
 }
 
 // fsSet reports whether a flag was explicitly set on the command line.
