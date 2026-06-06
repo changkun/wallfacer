@@ -522,6 +522,9 @@ func updateFile(path string, updates map[string]*string) error {
 func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) error {
 	lines := strings.Split(string(raw), "\n")
 	seen := map[string]bool{}
+	// Indices blanked by the clear phase below; only these are dropped during
+	// cleanup so pre-existing blank separators in the file are preserved.
+	blanked := map[int]bool{}
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -545,6 +548,7 @@ func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) e
 		if *ptr == "" {
 			// Clear: remove the line by blanking it.
 			lines[i] = ""
+			blanked[i] = true
 		} else {
 			lines[i] = k + "=" + *ptr
 		}
@@ -562,12 +566,14 @@ func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) e
 		lines = append(lines, k+"="+*ptr)
 	}
 
-	// Remove blank lines introduced by clearing, then ensure a single trailing newline.
+	// Drop only the lines blanked by the clear phase, then ensure a single
+	// trailing newline. Pre-existing blank separators are left intact.
 	var kept []string
-	for _, l := range lines {
-		if strings.TrimSpace(l) != "" || !isBlankRemovable(l) {
-			kept = append(kept, l)
+	for idx, l := range lines {
+		if blanked[idx] {
+			continue
 		}
+		kept = append(kept, l)
 	}
 	content := strings.TrimRight(strings.Join(kept, "\n"), "\n") + "\n"
 
@@ -582,13 +588,6 @@ func unquote(v string) string {
 		}
 	}
 	return v
-}
-
-// isBlankRemovable returns true for lines that consist only of whitespace.
-// These lines are removed during the cleanup phase of updateRawWithUpdates
-// to prevent gaps left by cleared keys from accumulating across updates.
-func isBlankRemovable(l string) bool {
-	return strings.TrimSpace(l) == ""
 }
 
 // MaskToken returns a redacted representation of a token for display.
