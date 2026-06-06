@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"gopkg.in/yaml.v3"
 )
 
@@ -110,33 +110,13 @@ func UpdateFrontmatter(path string, updates map[string]any) error {
 	out.WriteString("\n---\n")
 	out.WriteString(body)
 
-	// Atomic write: temp file + rename.
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".spec-update-*.md")
-	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
+	// Atomic write (temp file + rename), preserving the original file's mode.
+	perm := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode()
 	}
-	tmpName := tmp.Name()
-
-	if _, err := tmp.WriteString(out.String()); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("write temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("close temp file: %w", err)
-	}
-
-	// Preserve original file permissions.
-	info, err := os.Stat(path)
-	if err == nil {
-		_ = os.Chmod(tmpName, info.Mode())
-	}
-
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("rename temp file: %w", err)
+	if err := atomicfile.Write(path, []byte(out.String()), perm); err != nil {
+		return fmt.Errorf("write spec file: %w", err)
 	}
 
 	return nil
