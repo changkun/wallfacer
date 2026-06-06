@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"html"
+	"maps"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -19,7 +20,10 @@ var ErrRefinementAlreadyRunning = errors.New("refinement already running")
 // UpdateTaskWorktrees updates the worktree paths and branch name for a task.
 func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePaths map[string]string, branchName string) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.WorktreePaths = worktreePaths
+		// Clone the caller's map: the store owns task state and hands out deep
+		// clones on read (maps.Clone), so storing the caller's map by reference
+		// would let a later caller mutation race a concurrent reader.
+		t.WorktreePaths = maps.Clone(worktreePaths)
 		t.BranchName = branchName
 		return nil
 	})
@@ -28,7 +32,7 @@ func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePat
 // UpdateTaskCommitHashes stores the post-merge commit hash per repo path.
 func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes map[string]string) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.CommitHashes = hashes
+		t.CommitHashes = maps.Clone(hashes)
 		return nil
 	})
 }
@@ -104,7 +108,7 @@ func (s *Store) UpdateTaskCommitMessage(_ context.Context, id uuid.UUID, msg str
 // extracted back to the original workspace directory.
 func (s *Store) UpdateTaskSnapshotDiffs(_ context.Context, id uuid.UUID, diffs map[string]string) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.SnapshotDiffs = diffs
+		t.SnapshotDiffs = maps.Clone(diffs)
 		return nil
 	})
 }
@@ -112,7 +116,7 @@ func (s *Store) UpdateTaskSnapshotDiffs(_ context.Context, id uuid.UUID, diffs m
 // UpdateTaskBaseCommitHashes stores the default-branch HEAD captured before merge.
 func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hashes map[string]string) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.BaseCommitHashes = hashes
+		t.BaseCommitHashes = maps.Clone(hashes)
 		return nil
 	})
 }
