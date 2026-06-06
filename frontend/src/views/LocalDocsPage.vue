@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../api/client';
+import { api, authHeaders } from '../api/client';
 import { renderMarkdown, stripFirstHeading } from '../lib/markdown';
 import { enhanceMermaid, watchThemeReinit } from '../lib/mermaidRender';
 
@@ -136,9 +136,7 @@ async function loadDoc(slug: string) {
   articleHtml.value = '';
   teardownToc();
   try {
-    const headers: Record<string, string> = { Accept: 'text/markdown' };
-    const key = window.__WALLFACER__?.serverApiKey;
-    if (key) headers['Authorization'] = `Bearer ${key}`;
+    const headers: Record<string, string> = { Accept: 'text/markdown', ...authHeaders() };
     const res = await fetch(`/api/docs/${encodeURI(slug)}`, { credentials: 'same-origin', headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const md = await res.text();

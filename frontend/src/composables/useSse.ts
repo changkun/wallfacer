@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from 'vue';
 import { isLeader, onLeadershipChange, relay, subscribeAsFollower } from '../lib/tabLeader';
+import { withAuthToken } from '../api/client';
 
 /** Tri-state SSE health, mirroring the legacy status-bar conn dot. */
 export type ConnState = 'ok' | 'reconnecting' | 'closed';
@@ -45,13 +46,7 @@ export function useSse(opts: UseSseOptions) {
   // Track follower unsubscribes so leadership changes can tear them down.
   let followerUnsubs: Array<() => void> = [];
 
-  function addAuthParam(url: string): string {
-    if (typeof window !== 'undefined' && window.__WALLFACER__?.serverApiKey) {
-      const sep = url.includes('?') ? '&' : '?';
-      return url + sep + 'token=' + encodeURIComponent(window.__WALLFACER__.serverApiKey);
-    }
-    return url;
-  }
+  const addAuthParam = withAuthToken;
 
   function markEvent() {
     lastEventAt = Date.now();

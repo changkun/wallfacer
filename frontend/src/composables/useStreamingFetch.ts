@@ -15,12 +15,7 @@ export interface StreamingFetchHandle {
   abort: () => void;
 }
 
-function authHeaders(): Record<string, string> {
-  if (typeof window !== 'undefined' && window.__WALLFACER__?.serverApiKey) {
-    return { Authorization: `Bearer ${window.__WALLFACER__.serverApiKey}` };
-  }
-  return {};
-}
+import { authHeaders } from '../api/client';
 
 export function startStreamingFetch(opts: StreamingFetchOptions): StreamingFetchHandle {
   const ctrl = new AbortController();

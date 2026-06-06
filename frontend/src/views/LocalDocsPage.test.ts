@@ -20,6 +20,7 @@ vi.mock('../lib/mermaidRender', () => ({ enhanceMermaid, watchThemeReinit }));
 // Docs list comes from api(); doc content from global fetch().
 vi.mock('../api/client', () => ({
   api: vi.fn(async () => [{ slug: 'guide/demo', title: 'Demo', category: 'guide', order: 1 }]),
+  authHeaders: () => ({}),
 }));
 
 const MERMAID_DOC = '# Demo\n\nIntro paragraph.\n\n```mermaid\ngraph TD; A-->B;\n```\n';

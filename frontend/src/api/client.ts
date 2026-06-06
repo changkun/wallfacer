@@ -8,11 +8,30 @@ export class ApiError extends Error {
   }
 }
 
-function getServerApiKey(): string {
+// getServerApiKey reads the local-mode server API key injected into the page.
+// It is the single source for the key so callers don't each reach into the
+// window global; if auth ever moves off window.__WALLFACER__ only this changes.
+export function getServerApiKey(): string {
   if (typeof window !== 'undefined' && window.__WALLFACER__) {
     return window.__WALLFACER__.serverApiKey || '';
   }
   return '';
+}
+
+// authHeaders returns the Authorization header for fetch when a server API key
+// is configured, or an empty object otherwise.
+export function authHeaders(): Record<string, string> {
+  const key = getServerApiKey();
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
+// withAuthToken appends the server API key as a ?token= query parameter, used
+// by EventSource/WebSocket endpoints that cannot set an Authorization header.
+// It is a no-op when no key is configured.
+export function withAuthToken(url: string): string {
+  const key = getServerApiKey();
+  if (!key) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(key);
 }
 
 export async function api<T = unknown>(

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
-import { api } from '../../api/client';
+import { api, authHeaders } from '../../api/client';
 import { renderMarkdown } from '../../lib/markdown';
 import { enhanceMermaid } from '../../lib/mermaidRender';
 import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
@@ -32,13 +32,6 @@ const workspace = computed(() => {
   const ws = tasks.config?.workspaces ?? [];
   return ws.length > 0 ? ws[0] : '';
 });
-
-function authHeaders(): Record<string, string> {
-  if (typeof window !== 'undefined' && window.__WALLFACER__?.serverApiKey) {
-    return { Authorization: `Bearer ${window.__WALLFACER__.serverApiKey}` };
-  }
-  return {};
-}
 
 async function loadCurrent() {
   const ws = workspace.value;
