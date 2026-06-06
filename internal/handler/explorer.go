@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/sse"
 	"changkun.de/x/wallfacer/internal/store"
@@ -370,25 +371,9 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Atomic write: temp file in the same directory, then rename.
-	tmp, err := os.CreateTemp(dir, ".wallfacer-write-*")
-	if err != nil {
-		http.Error(w, "failed to create temp file", http.StatusInternalServerError)
-		return
-	}
-	tmpName := tmp.Name()
-
 	data := []byte(req.Content)
-	_, writeErr := tmp.Write(data)
-	closeErr := tmp.Close()
-	if writeErr != nil || closeErr != nil {
-		_ = os.Remove(tmpName)
+	if err := atomicfile.Write(resolved, data, 0o644); err != nil {
 		http.Error(w, "failed to write file", http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.Rename(tmpName, resolved); err != nil {
-		_ = os.Remove(tmpName)
-		http.Error(w, "failed to rename temp file", http.StatusInternalServerError)
 		return
 	}
 
