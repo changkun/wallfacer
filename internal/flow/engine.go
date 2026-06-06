@@ -167,14 +167,18 @@ func buildParallelGroups(steps []Step) [][]Step {
 		indexBySlug[s.AgentSlug] = i
 	}
 
-	// Build adjacency via RunInParallelWith. Unknown siblings are
-	// dropped silently — the launcher will surface them as a
-	// dispatch error if they're actually referenced.
+	// Build adjacency via RunInParallelWith. The relation is symmetric ("these
+	// run together"), so an edge declared on one side links both — otherwise a
+	// step that lists an earlier-indexed peer that does not list it back would
+	// be silently grouped separately and run sequentially. Unknown siblings are
+	// dropped silently — the launcher surfaces them as a dispatch error if
+	// they're actually referenced.
 	adj := make([][]int, len(steps))
 	for i, s := range steps {
 		for _, peer := range s.RunInParallelWith {
 			if j, ok := indexBySlug[peer]; ok && j != i {
 				adj[i] = append(adj[i], j)
+				adj[j] = append(adj[j], i)
 			}
 		}
 	}
