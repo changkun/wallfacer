@@ -5,7 +5,42 @@ import {
   extractError,
   activityIcon,
   bubbleFromMessage,
+  applyStreamingUpdate,
+  type RenderedBubble,
 } from './planningBubble';
+
+describe('applyStreamingUpdate', () => {
+  const mk = (id: string, rawText: string): RenderedBubble => ({
+    id,
+    role: 'assistant',
+    contentHtml: '',
+    rawText,
+    planRound: 0,
+    reverted: false,
+    activity: [],
+    hasActivity: false,
+    isStreaming: true,
+  });
+
+  it('updates the bubble matching the id in place', () => {
+    const msgs = [mk('a', 'one'), mk('stream-1', '')];
+    const ok = applyStreamingUpdate(msgs, 'stream-1', { rawText: 'hello' });
+    expect(ok).toBe(true);
+    expect(msgs[1].rawText).toBe('hello');
+    expect(msgs[0].rawText).toBe('one'); // untouched
+  });
+
+  it('drops the update and mutates nothing when the id is absent', () => {
+    // Simulates the rendered list being replaced (thread switch) mid-stream:
+    // the streaming bubble's id is gone, so a late chunk must not corrupt any
+    // unrelated bubble at a now-stale index.
+    const msgs = [mk('other-1', 'foreign'), mk('other-2', 'also foreign')];
+    const ok = applyStreamingUpdate(msgs, 'stream-1', { rawText: 'leaked' });
+    expect(ok).toBe(false);
+    expect(msgs.map((b) => b.rawText)).toEqual(['foreign', 'also foreign']);
+    expect(msgs).toHaveLength(2);
+  });
+});
 
 describe('timeOf', () => {
   it('returns empty for undefined or invalid', () => {

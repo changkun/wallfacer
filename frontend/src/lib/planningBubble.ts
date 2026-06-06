@@ -17,6 +17,28 @@ export interface RenderedBubble {
   hasActivity: boolean;
   isStreaming: boolean;
   errorText?: string;
+  // id is a stable client-side identifier assigned to a streaming bubble so
+  // its incremental updates can locate it by identity rather than by a cached
+  // array index (which goes stale if the rendered list is replaced mid-stream).
+  id?: string;
+}
+
+/**
+ * Apply a streaming update to the bubble identified by id, mutating messages in
+ * place. Returns false and mutates nothing when no bubble with that id exists —
+ * which happens when the active thread changed mid-stream and the rendered list
+ * was replaced (loadHistory). Dropping the update then is correct: applying it
+ * at a stale index would append a foreign bubble or overwrite an unrelated one.
+ */
+export function applyStreamingUpdate(
+  messages: RenderedBubble[],
+  id: string,
+  patch: Partial<RenderedBubble>,
+): boolean {
+  const i = messages.findIndex((b) => b.id === id);
+  if (i === -1) return false;
+  messages.splice(i, 1, { ...messages[i], ...patch });
+  return true;
 }
 
 export function timeOf(ts?: string): string {
