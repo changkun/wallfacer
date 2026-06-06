@@ -514,6 +514,52 @@ func TestExplorerWriteFile_OutsideWorkspace(t *testing.T) {
 	}
 }
 
+// TestExplorerWriteFile_NewFileViaSymlinkRejected verifies that writing a new
+// (not-yet-existing) file through an in-workspace symlink that points outside
+// the workspace is rejected. Before the fix the new-file fallback did a textual
+// prefix check only and followed the symlink, landing the write outside.
+func TestExplorerWriteFile_NewFileViaSymlinkRejected(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	outside := t.TempDir()
+	// An in-workspace symlink pointing outside the workspace.
+	link := filepath.Join(ws, "escape")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(link, "pwned.txt") // resolves to outside/pwned.txt
+	req := writeFileRequest(t, target, ws, "owned")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for symlink escape, got %d: %s", w.Code, w.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(outside, "pwned.txt")); err == nil {
+		t.Fatal("write escaped the workspace via symlink")
+	}
+}
+
+// TestExplorerWriteFile_NewFileInWorkspace verifies the new-file fallback still
+// allows writing a not-yet-existing file whose parent is within the workspace.
+func TestExplorerWriteFile_NewFileInWorkspace(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	fp := filepath.Join(ws, "brand-new.txt")
+	req := writeFileRequest(t, fp, ws, "hello")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for new in-workspace file, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := os.ReadFile(fp)
+	if err != nil || string(got) != "hello" {
+		t.Fatalf("new file not written correctly: %q err=%v", got, err)
+	}
+}
+
 func TestExplorerWriteFile_TooLarge(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 

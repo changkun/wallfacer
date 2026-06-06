@@ -339,17 +339,23 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 
 	resolved, err := isWithinWorkspace(req.Path, req.Workspace)
 	if err != nil {
-		// isWithinWorkspace fails for non-existent paths because
-		// EvalSymlinks requires the target to exist. For writes the
-		// target file may not exist yet; do a manual containment check.
+		// isWithinWorkspace fails for non-existent paths because EvalSymlinks
+		// requires the target to exist. For writes the target file may not
+		// exist yet, but its parent directory must (we do not create missing
+		// directories). Resolve the parent through symlinks and verify IT is
+		// within the workspace, so a symlinked parent cannot redirect the
+		// write outside the tree (a plain textual prefix check would not).
 		cleaned := filepath.Clean(req.Path)
-		wsClean := filepath.Clean(req.Workspace)
-		if cleaned == wsClean || strings.HasPrefix(cleaned, wsClean+string(filepath.Separator)) {
-			resolved = cleaned
-		} else {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		parentResolved, perr := filepath.EvalSymlinks(filepath.Dir(cleaned))
+		if perr != nil {
+			http.Error(w, "parent directory does not exist", http.StatusBadRequest)
 			return
 		}
+		if _, werr := isWithinWorkspace(parentResolved, req.Workspace); werr != nil {
+			http.Error(w, werr.Error(), http.StatusBadRequest)
+			return
+		}
+		resolved = filepath.Join(parentResolved, filepath.Base(cleaned))
 	}
 
 	// Verify parent directory exists — do not create missing directories.
