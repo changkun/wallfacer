@@ -280,6 +280,15 @@ type batchCreateRequest struct {
 	Tasks []batchTaskInput `json:"tasks"`
 }
 
+// batchRefLabel returns a human-readable label for a batch task in error
+// messages: its caller-supplied ref, or "<index N>" when no ref was given.
+func batchRefLabel(ref string, i int) string {
+	if ref != "" {
+		return ref
+	}
+	return fmt.Sprintf("<index %d>", i)
+}
+
 // BatchCreateTasks creates multiple tasks atomically with dependency wiring via
 // symbolic ref names declared within the batch. The handler runs a full preflight
 // validation phase before any persistence: duplicate refs, empty prompts, sandbox
@@ -347,18 +356,12 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	// batch lands.
 	for i, t := range req.Tasks {
 		if t.Sandbox != nil {
-			ref := t.Ref
-			if ref == "" {
-				ref = fmt.Sprintf("<index %d>", i)
-			}
+			ref := batchRefLabel(t.Ref, i)
 			http.Error(w, fmt.Sprintf("ref %q: \"sandbox\" is no longer accepted on POST /api/tasks/batch; pin the harness on the agent a flow step references", ref), http.StatusBadRequest)
 			return
 		}
 		if t.SandboxByActivity != nil {
-			ref := t.Ref
-			if ref == "" {
-				ref = fmt.Sprintf("<index %d>", i)
-			}
+			ref := batchRefLabel(t.Ref, i)
 			http.Error(w, fmt.Sprintf("ref %q: \"sandbox_by_activity\" is no longer accepted on POST /api/tasks/batch", ref), http.StatusBadRequest)
 			return
 		}
@@ -369,10 +372,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		for _, dep := range t.DependsOnRefs {
 			if _, ok := refToIdx[dep]; !ok {
 				if _, err := uuid.Parse(dep); err != nil {
-					ref := t.Ref
-					if ref == "" {
-						ref = fmt.Sprintf("<index %d>", i)
-					}
+					ref := batchRefLabel(t.Ref, i)
 					http.Error(w, fmt.Sprintf("ref %q: unknown ref in depends_on_refs: %q", ref, dep), http.StatusBadRequest)
 					return
 				}
@@ -423,10 +423,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		var cycleRefs []string
 		for i, t := range req.Tasks {
 			if !processed[i] {
-				ref := t.Ref
-				if ref == "" {
-					ref = fmt.Sprintf("<index %d>", i)
-				}
+				ref := batchRefLabel(t.Ref, i)
 				cycleRefs = append(cycleRefs, ref)
 			}
 		}
@@ -454,10 +451,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 				// Batch-internal ref — already validated by Kahn's.
 				if refToIdx[dep] == i {
 					// Self-dep through batch ref (redundant guard; Kahn's catches it).
-					ref := t.Ref
-					if ref == "" {
-						ref = fmt.Sprintf("<index %d>", i)
-					}
+					ref := batchRefLabel(t.Ref, i)
 					http.Error(w, fmt.Sprintf("ref %q: task cannot depend on itself", ref), http.StatusBadRequest)
 					return
 				}
@@ -466,10 +460,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			// External UUID — verify it exists.
 			depID, _ := uuid.Parse(dep) // already confirmed parseable in step 4
 			if _, err := s.GetTask(r.Context(), depID); err != nil {
-				ref := t.Ref
-				if ref == "" {
-					ref = fmt.Sprintf("<index %d>", i)
-				}
+				ref := batchRefLabel(t.Ref, i)
 				httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
 					"error": fmt.Sprintf("ref %q: dependency task not found: %s", ref, dep),
 				})
@@ -513,10 +504,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		myID := preAssignedIDs[i]
 		for _, depID := range combinedAdj[myID] {
 			if taskReachableInAdj(combinedAdj, depID, myID) {
-				ref := t.Ref
-				if ref == "" {
-					ref = fmt.Sprintf("<index %d>", i)
-				}
+				ref := batchRefLabel(t.Ref, i)
 				httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
 					"error": fmt.Sprintf("ref %q: dependency would create a cycle", ref),
 				})
