@@ -155,6 +155,11 @@ func (m *Manager) Cancel(providerName string) {
 }
 
 func (m *Manager) runFlow(flow *Flow, redirectURI string) {
+	// Release the 5-minute WithTimeout context on every terminal outcome so its
+	// timer is stopped. On the success path nothing else calls flow.cancel()
+	// until the next Start for this provider, leaving the timer armed.
+	defer flow.cancel()
+
 	result, err := flow.callback.Wait()
 	if err != nil {
 		flow.mu.Lock()
