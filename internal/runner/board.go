@@ -120,7 +120,11 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 	}
 	r.boardCache.mu.Unlock()
 
-	tasks, err := r.store.ListTasks(r.shutdownCtx, false)
+	s := r.currentStore()
+	if s == nil {
+		return nil, nil, nil
+	}
+	tasks, err := s.ListTasks(r.shutdownCtx, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -471,7 +475,11 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 // prepareBoardContext writes board.json to a temp directory and returns the
 // directory path. The caller must defer os.RemoveAll(dir).
 func (r *Runner) prepareBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (string, error) {
-	dir, _, err := streamBoardJSON(ctx, r.store, selfTaskID, mountWorktrees)
+	s := r.currentStore()
+	if s == nil {
+		return "", nil
+	}
+	dir, _, err := streamBoardJSON(ctx, s, selfTaskID, mountWorktrees)
 	return dir, err
 }
 

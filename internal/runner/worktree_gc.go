@@ -141,6 +141,11 @@ func (r *Runner) StartWorktreeHealthWatcher(ctx context.Context) {
 // Tasks in backlog, in_progress, waiting, committing, or failed still need
 // their worktrees and are skipped.
 func (r *Runner) ScanOrphanedWorktrees(ctx context.Context) ([]uuid.UUID, error) {
+	s := r.currentStore()
+	if s == nil {
+		return nil, nil
+	}
+
 	entries, err := os.ReadDir(r.worktreesDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -159,7 +164,7 @@ func (r *Runner) ScanOrphanedWorktrees(ctx context.Context) ([]uuid.UUID, error)
 			continue // skip non-UUID directories
 		}
 
-		task, getErr := r.store.GetTask(ctx, id)
+		task, getErr := s.GetTask(ctx, id)
 		if getErr != nil {
 			// Task not found in the current store — it may belong to a
 			// different workspace scope. Leave it alone; the next prune

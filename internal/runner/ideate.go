@@ -144,8 +144,8 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, userFocus strin
 
 	var rejectedTitles []string
 	round := 0
-	if r.store != nil {
-		if hist, err := LoadHistory(r.currentStore().DataDir()); err == nil {
+	if s := r.currentStore(); s != nil {
+		if hist, err := LoadHistory(s.DataDir()); err == nil {
 			rejectedTitles = hist.RejectedTitles()
 			round = hist.Round()
 		} else {
