@@ -578,6 +578,17 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// isValidBranchName rejects branch names that are empty, contain "..", contain
+// whitespace/control characters, or begin with "-". The branch is passed
+// positionally to git without a "--" separator, so a leading dash would be
+// interpreted as a flag (e.g. "-f", "--orphan") rather than a branch name.
+func isValidBranchName(b string) bool {
+	if b == "" || strings.Contains(b, "..") || strings.ContainsAny(b, " \t\n\r") {
+		return false
+	}
+	return !strings.HasPrefix(b, "-")
+}
+
 // GitCheckout switches the active branch for a workspace.
 func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
@@ -596,8 +607,7 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate branch name: must not contain "..", spaces, or control characters.
-	if req.Branch == "" || strings.Contains(req.Branch, "..") || strings.ContainsAny(req.Branch, " \t\n\r") {
+	if !isValidBranchName(req.Branch) {
 		http.Error(w, "invalid branch name", http.StatusBadRequest)
 		return
 	}
@@ -634,8 +644,7 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate branch name: must not contain "..", spaces, or control characters.
-	if req.Branch == "" || strings.Contains(req.Branch, "..") || strings.ContainsAny(req.Branch, " \t\n\r") {
+	if !isValidBranchName(req.Branch) {
 		http.Error(w, "invalid branch name", http.StatusBadRequest)
 		return
 	}

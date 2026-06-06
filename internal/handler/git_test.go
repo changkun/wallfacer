@@ -55,6 +55,24 @@ func gitRun(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// TestIsValidBranchName covers branch-name validation, in particular rejecting
+// leading-dash names that git would interpret as flags (the value is passed
+// positionally to `git checkout`/`checkout -b` with no "--" separator).
+func TestIsValidBranchName(t *testing.T) {
+	valid := []string{"main", "feature/x", "task/1234", "release-1.2", "a"}
+	for _, b := range valid {
+		if !isValidBranchName(b) {
+			t.Errorf("expected %q to be valid", b)
+		}
+	}
+	invalid := []string{"", "-f", "--orphan", "-", "a..b", "with space", "tab\tname", "new\nline"}
+	for _, b := range invalid {
+		if isValidBranchName(b) {
+			t.Errorf("expected %q to be rejected", b)
+		}
+	}
+}
+
 // setupRepo creates a temporary git repo with an initial commit on "main".
 func setupRepo(t *testing.T) string {
 	t.Helper()
