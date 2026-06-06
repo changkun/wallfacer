@@ -224,9 +224,10 @@ func (tm *TrayManager) poll() {
 	tm.mUptime.SetTitle(fmt.Sprintf("Uptime: %s", formatDuration(data.UptimeSeconds)))
 }
 
-// fetchHealth performs an HTTP GET to the health endpoint.
-func (tm *TrayManager) fetchHealth() (*healthData, error) {
-	req, err := http.NewRequest("GET", tm.serverURL+"/api/debug/health", nil)
+// trayGetJSON performs an authenticated GET against tm.serverURL+path and
+// decodes the JSON body into T. label names the endpoint in status errors.
+func trayGetJSON[T any](tm *TrayManager, path, label string) (*T, error) {
+	req, err := http.NewRequest("GET", tm.serverURL+path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -239,13 +240,18 @@ func (tm *TrayManager) fetchHealth() (*healthData, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("health returned %d", resp.StatusCode)
+		return nil, fmt.Errorf("%s returned %d", label, resp.StatusCode)
 	}
-	var data healthData
+	var data T
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, err
 	}
 	return &data, nil
+}
+
+// fetchHealth performs an HTTP GET to the health endpoint.
+func (tm *TrayManager) fetchHealth() (*healthData, error) {
+	return trayGetJSON[healthData](tm, "/api/debug/health", "health")
 }
 
 // iconState returns the icon variant name based on task status counts.
@@ -319,26 +325,7 @@ func setChecked(item *systray.MenuItem, checked bool) {
 
 // fetchConfig performs an HTTP GET to the config endpoint.
 func (tm *TrayManager) fetchConfig() (*configData, error) {
-	req, err := http.NewRequest("GET", tm.serverURL+"/api/config", nil)
-	if err != nil {
-		return nil, err
-	}
-	if tm.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+tm.apiKey)
-	}
-	resp, err := tm.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("config returned %d", resp.StatusCode)
-	}
-	var data configData
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
-	}
-	return &data, nil
+	return trayGetJSON[configData](tm, "/api/config", "config")
 }
 
 // handleToggle sends a PUT /api/config to invert the given toggle.
@@ -386,26 +373,7 @@ func (tm *TrayManager) pollStats() {
 
 // fetchStats performs an HTTP GET to the stats endpoint.
 func (tm *TrayManager) fetchStats() (*statsData, error) {
-	req, err := http.NewRequest("GET", tm.serverURL+"/api/stats", nil)
-	if err != nil {
-		return nil, err
-	}
-	if tm.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+tm.apiKey)
-	}
-	resp, err := tm.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("stats returned %d", resp.StatusCode)
-	}
-	var data statsData
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
-	}
-	return &data, nil
+	return trayGetJSON[statsData](tm, "/api/stats", "stats")
 }
 
 // extractTodayCost finds today's cost from the daily_usage array.
