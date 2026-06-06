@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"slices"
 
 	"github.com/google/uuid"
 )
@@ -24,16 +25,24 @@ func (s *Store) RebuildSearchIndex(ctx context.Context) (int, error) {
 			return repaired, err
 		}
 		// Per-task processing uses short lock holds: a read lock to snapshot
-		// the task pointer, then unlocked disk I/O for oversight, then a
-		// write lock only to update the index entry.
+		// the indexed fields, then unlocked disk I/O for oversight, then a
+		// write lock only to update the index entry. The fields are copied
+		// (not the live *Task pointer) so buildIndexEntry never reads
+		// Title/Prompt/Tags while mutateTask rewrites them in place.
 		s.mu.RLock()
 		task, ok := s.tasks[id]
+		var snap Task
+		if ok {
+			snap.Title = task.Title
+			snap.Prompt = task.Prompt
+			snap.Tags = slices.Clone(task.Tags)
+		}
 		s.mu.RUnlock()
 		if !ok {
 			continue
 		}
 		oversightRaw, _ := s.LoadOversightText(id)
-		entry := buildIndexEntry(task, oversightRaw)
+		entry := buildIndexEntry(&snap, oversightRaw)
 		s.mu.Lock()
 		if existing, found := s.searchIndex[id]; !found || existing != entry {
 			s.searchIndex[id] = entry
