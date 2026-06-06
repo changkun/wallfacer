@@ -718,3 +718,52 @@ func TestManager_FullFlow(t *testing.T) {
 		t.Errorf("writtenToken = %q; want %q", writtenToken, "full-flow-token")
 	}
 }
+
+// TestManager_RunFlowCancelsContextOnSuccess verifies that runFlow releases the
+// flow context on the success path. Before the fix runFlow returned on success
+// without calling flow.cancel(), leaving the 5-minute WithTimeout timer armed
+// until the next Start or an explicit Cancel.
+func TestManager_RunFlowCancelsContextOnSuccess(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+	}))
+	defer ts.Close()
+
+	p := testProvider
+	p.TokenURL = ts.URL
+
+	cb, err := NewCallbackServer(context.Background(), 0, "/callback")
+	if err != nil {
+		t.Fatalf("NewCallbackServer: %v", err)
+	}
+
+	const state = "success-state"
+	canceled := make(chan struct{})
+	flow := &Flow{
+		provider: p,
+		verifier: "verifier",
+		state:    state,
+		callback: cb,
+		cancel:   func() { close(canceled) },
+		status:   FlowStatus{State: FlowPending},
+	}
+
+	m := NewManager()
+	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", cb.Port())
+	go m.runFlow(flow, redirectURI)
+
+	// Deliver a valid callback so the flow reaches FlowSuccess.
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?code=auth-code&state=%s", cb.Port(), state))
+	if err != nil {
+		t.Fatalf("callback GET: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	select {
+	case <-canceled:
+		// runFlow released the context on success.
+	case <-time.After(5 * time.Second):
+		t.Fatal("flow.cancel was not called after the flow completed (timer leak)")
+	}
+}
