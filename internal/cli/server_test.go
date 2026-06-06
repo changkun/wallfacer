@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -96,6 +97,36 @@ func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
 	}), reg).ServeHTTP(uiRR, uiReq)
 	if uiRR.Code != http.StatusOK {
 		t.Fatalf("expected UI middleware to preserve default status, got %d", uiRR.Code)
+	}
+}
+
+// TestLoggingMiddleware_UnmatchedRoutesCollapseToSentinel verifies that
+// requests with no matched mux pattern (r.Pattern empty, e.g. 404s) are
+// recorded under a single "<unmatched>" route label rather than their raw URL
+// path, which would give unbounded Prometheus label cardinality on path scans.
+func TestLoggingMiddleware_UnmatchedRoutesCollapseToSentinel(t *testing.T) {
+	reg := metrics.NewRegistry()
+	h := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}), reg)
+
+	for _, p := range []string{"/api/does-not-exist", "/another/unknown/path", "/random"} {
+		rr := httptest.NewRecorder()
+		// A bare handler never sets r.Pattern, mirroring an unmatched mux route.
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, p, nil))
+	}
+
+	var buf bytes.Buffer
+	reg.WritePrometheus(&buf)
+	out := buf.String()
+
+	if got := strings.Count(out, `route="<unmatched>"`); got == 0 {
+		t.Fatalf("expected an <unmatched> route series, got none:\n%s", out)
+	}
+	for _, p := range []string{"/api/does-not-exist", "/another/unknown/path", "/random"} {
+		if strings.Contains(out, `route="`+p+`"`) {
+			t.Fatalf("raw path %q must not appear as a metric label:\n%s", p, out)
+		}
 	}
 }
 
