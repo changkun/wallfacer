@@ -173,7 +173,7 @@ srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 
 | Layer | Location | Behaviour |
 |---|---|---|
-| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels. |
+| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels; unmatched requests (404, empty `r.Pattern`) collapse to a single `route="<unmatched>"` series to bound label cardinality. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
 | **CookiePrincipal** | `internal/auth` `CookiePrincipal()` | Cloud-mode only: resolves the session cookie into a principal (user + org claims) and injects it into the request context. No-op when the request has no cookie or cloud mode is disabled. |
 | **OptionalAuth** | `internal/auth` `OptionalAuth()` | Cloud-mode only: if a `Bearer` JWT is present, validates it against the configured JWKS and puts the resulting `*Claims` into the request context. JWT wins over the cookie when both are present; missing tokens pass through. |

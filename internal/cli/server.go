@@ -1232,9 +1232,12 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 
 		// Use the matched pattern when available so parameterised routes are
 		// collapsed (e.g. "GET /api/tasks/{id}" rather than a unique path per task).
+		// Unmatched requests (404, e.g. write methods to unknown paths) have an
+		// empty r.Pattern; collapse them into a single sentinel series instead of
+		// the raw URL path, which would give unbounded metric label cardinality.
 		route := r.Pattern
 		if route == "" {
-			route = r.URL.Path
+			route = "<unmatched>"
 		}
 
 		httpReqs.Inc(map[string]string{
