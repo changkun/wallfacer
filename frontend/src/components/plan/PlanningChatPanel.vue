@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { api } from '../../api/client';
+import { api, authHeaders } from '../../api/client';
 import { renderMarkdown } from '../../lib/markdown';
 import { startStreamingFetch, type StreamingFetchHandle } from '../../composables/useStreamingFetch';
 import { hasActivity, parseActivity } from '../../lib/prettyNdjson';
@@ -255,9 +255,7 @@ async function sendMessage(text: string, opts?: { threadID?: string }): Promise<
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        ...(window.__WALLFACER__?.serverApiKey
-          ? { Authorization: 'Bearer ' + window.__WALLFACER__.serverApiKey }
-          : {}),
+        ...authHeaders(),
       },
       body: JSON.stringify(body),
     });
@@ -297,9 +295,7 @@ async function onInterrupt() {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        ...(window.__WALLFACER__?.serverApiKey
-          ? { Authorization: 'Bearer ' + window.__WALLFACER__.serverApiKey }
-          : {}),
+        ...authHeaders(),
       },
     });
   } catch { /* swallow */ }
@@ -318,9 +314,7 @@ async function clearHistory() {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        ...(window.__WALLFACER__?.serverApiKey
-          ? { Authorization: 'Bearer ' + window.__WALLFACER__.serverApiKey }
-          : {}),
+        ...authHeaders(),
       },
     });
   } catch { /* swallow */ }
@@ -502,9 +496,7 @@ async function archiveThread(id: string) {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        ...(window.__WALLFACER__?.serverApiKey
-          ? { Authorization: 'Bearer ' + window.__WALLFACER__.serverApiKey }
-          : {}),
+        ...authHeaders(),
       },
       body: JSON.stringify({ state: 'archived' }),
     });
@@ -559,9 +551,7 @@ async function undoRound(bubble: RenderedBubble) {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        ...(window.__WALLFACER__?.serverApiKey
-          ? { Authorization: 'Bearer ' + window.__WALLFACER__.serverApiKey }
-          : {}),
+        ...authHeaders(),
       },
     });
     let body: { round?: number; summary?: string; files_reverted?: string[]; error?: string } = {};

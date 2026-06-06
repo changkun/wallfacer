@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
+import { withAuthToken } from '../api/client';
 import { useUiStore } from '../stores/ui';
 import { getStored, setStored } from '../lib/storage';
 import { clampPanelHeight, PANEL_MIN_HEIGHT, PANEL_HEIGHT_KEY } from '../lib/panelHeight';
@@ -72,11 +73,8 @@ function buildTermTheme() {
 
 function getWsUrl(cols: number, rows: number): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  let url = `${proto}//${location.host}/api/terminal/ws?cols=${cols}&rows=${rows}`;
-  if (typeof window !== 'undefined' && window.__WALLFACER__?.serverApiKey) {
-    url += '&token=' + encodeURIComponent(window.__WALLFACER__.serverApiKey);
-  }
-  return url;
+  // withAuthToken uses & since the URL already carries a query string.
+  return withAuthToken(`${proto}//${location.host}/api/terminal/ws?cols=${cols}&rows=${rows}`);
 }
 
 const tabs = computed(() => sessionsOrder.value.map(id => ({

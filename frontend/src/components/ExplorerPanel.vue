@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { api } from '../api/client';
+import { api, withAuthToken } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useDialogStore } from '../stores/dialog';
 import hljs from 'highlight.js/lib/common';
@@ -395,9 +395,7 @@ let explorerStream: EventSource | null = null;
 function startExplorerStream() {
   if (typeof EventSource === 'undefined') return;
   explorerStream?.close();
-  let url = '/api/explorer/stream';
-  const key = window.__WALLFACER__?.serverApiKey;
-  if (key) url += `?token=${encodeURIComponent(key)}`;
+  const url = withAuthToken('/api/explorer/stream');
   explorerStream = new EventSource(url);
   explorerStream.addEventListener('refresh', async () => {
     // Re-fetch the root + every currently-expanded directory. Children are
