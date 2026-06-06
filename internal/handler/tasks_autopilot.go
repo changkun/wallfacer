@@ -998,42 +998,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
 			submitted := false
 			for _, c := range candidates {
-				t := c.task
-				if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(&t)) > 0 {
-					continue
+				if h.submitAutoSubmitCandidate(ctx, c) {
+					submitted = true
 				}
-				logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
-				autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
-				if c.naturallyComplete {
-					autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
-				}
-				h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-					"result": autoSubmitMsg,
-				})
-				h.closeFeedbackWaitingSpan(ctx, t.ID)
-
-				if t.SessionID != nil && *t.SessionID != "" {
-					if err := c.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
-						logger.Handler.Error("auto-submit: update task status", "task", t.ID, "error", err)
-						h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())
-						continue
-					}
-					h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
-						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
-					h.runCommitTransition(c.store, t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
-				} else {
-					// No session — skip commit pipeline. Stop the worker directly.
-					h.runner.StopTaskWorker(t.ID)
-					if err := c.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
-						logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
-						h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())
-						continue
-					}
-					h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
-						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerAutoSubmit, nil))
-				}
-				submitted = true
-				h.incAutopilotAction("auto_submitter", "submitted")
 			}
 			if !h.breakers["auto-submit"].isOpen() {
 				h.breakers["auto-submit"].recordSuccess()
@@ -1041,4 +1008,58 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 			return submitted, nil
 		},
 	})
+}
+
+// submitAutoSubmitCandidate re-reads the candidate's fresh state and, if it is
+// still an eligible waiting task with present worktrees, submits it (commit
+// pipeline when a session exists, otherwise direct to done). It returns true
+// only when it actually submitted.
+//
+// The re-fetch is essential: Phase 1 runs without promoteMu while doing slow
+// git I/O, so a candidate may have left waiting in the meantime (user resume,
+// auto-test promotion). Acting on the stale Phase-1 snapshot could force a
+// no-longer-waiting task to done via ForceUpdateTaskStatus, which bypasses the
+// state machine. This mirrors the auto-promote / auto-test watchers, which also
+// re-read fresh state before acting.
+func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCandidate) bool {
+	ft, err := c.store.GetTask(ctx, c.task.ID)
+	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting || ft.IsTestRun {
+		return false
+	}
+	t := *ft
+	if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(&t)) > 0 {
+		return false
+	}
+	logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
+	autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
+	if c.naturallyComplete {
+		autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
+	}
+	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+		"result": autoSubmitMsg,
+	})
+	h.closeFeedbackWaitingSpan(ctx, t.ID)
+
+	if t.SessionID != nil && *t.SessionID != "" {
+		if err := c.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
+			logger.Handler.Error("auto-submit: update task status", "task", t.ID, "error", err)
+			h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())
+			return false
+		}
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
+		h.runCommitTransition(c.store, t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
+	} else {
+		// No session — skip commit pipeline. Stop the worker directly.
+		h.runner.StopTaskWorker(t.ID)
+		if err := c.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
+			logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
+			h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())
+			return false
+		}
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerAutoSubmit, nil))
+	}
+	h.incAutopilotAction("auto_submitter", "submitted")
+	return true
 }
