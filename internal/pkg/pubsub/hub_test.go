@@ -201,6 +201,30 @@ func TestHub_WithClone(t *testing.T) {
 	}
 }
 
+// TestHub_PublishClonesOncePerConsumer verifies that Publish performs exactly
+// one clone per consumer: one for the replay ring plus one per subscriber. The
+// previous code also cloned an intermediate value that nothing read, so each
+// subscriber received a clone-of-a-clone (2+N clones for N subscribers).
+func TestHub_PublishClonesOncePerConsumer(t *testing.T) {
+	var clones int
+	h := NewHub(WithClone(func(v int) int {
+		clones++
+		return v
+	}))
+
+	// Two subscribers → expect 1 (ring) + 2 (subscribers) = 3 clones per publish.
+	id1, _ := h.Subscribe()
+	defer h.Unsubscribe(id1)
+	id2, _ := h.Subscribe()
+	defer h.Unsubscribe(id2)
+
+	clones = 0
+	h.Publish(7)
+	if clones != 3 {
+		t.Fatalf("expected 3 clones (1 ring + 2 subscribers), got %d", clones)
+	}
+}
+
 // TestHub_ConcurrentSafe stress-tests that concurrent Publish, Subscribe,
 // SubscribeWake, and Since operations do not race (validated by -race detector).
 func TestHub_ConcurrentSafe(_ *testing.T) {

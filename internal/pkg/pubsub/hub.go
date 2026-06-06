@@ -95,9 +95,10 @@ func (h *Hub[T]) cloneValue(v T) T {
 // their channel closed and are evicted.
 func (h *Hub[T]) Publish(value T) {
 	seq := h.deltaSeq.Add(1)
-	sd := Sequenced[T]{Seq: seq, Value: h.cloneValue(value)}
 
-	// Append to bounded replay buffer.
+	// Append to bounded replay buffer. Clone directly from value: each consumer
+	// (the ring entry below and every subscriber) gets its own clone, so there
+	// is no need for an intermediate clone-of-value to re-clone from.
 	h.replayMu.Lock()
 	h.replayBuf = append(h.replayBuf, Sequenced[T]{Seq: seq, Value: h.cloneValue(value)})
 	if len(h.replayBuf) > h.replayCap {
@@ -112,7 +113,7 @@ func (h *Hub[T]) Publish(value T) {
 	h.subMu.Lock()
 	for id, ch := range h.subscribers {
 		select {
-		case ch <- Sequenced[T]{Seq: sd.Seq, Value: h.cloneValue(sd.Value)}:
+		case ch <- Sequenced[T]{Seq: seq, Value: h.cloneValue(value)}:
 		default:
 			close(ch)
 			overflowed = append(overflowed, id)
