@@ -1,15 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { authHeaders, withAuthToken, getServerApiKey } from './client';
 
-declare global {
-  interface Window {
-    __WALLFACER__?: { serverApiKey?: string } & Record<string, unknown>;
-  }
-}
-
 function setKey(key: string | undefined) {
-  // @ts-expect-error test shim for the injected boot global
-  window.__WALLFACER__ = key === undefined ? undefined : { serverApiKey: key };
+  if (key === undefined) {
+    (window as { __WALLFACER__?: unknown }).__WALLFACER__ = undefined;
+  } else {
+    (window as { __WALLFACER__?: { serverApiKey: string } }).__WALLFACER__ = { serverApiKey: key };
+  }
 }
 
 describe('client auth helpers', () => {
