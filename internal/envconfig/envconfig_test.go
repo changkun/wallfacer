@@ -217,6 +217,29 @@ func TestUpdateClearsField(t *testing.T) {
 	}
 }
 
+// TestUpdatePreservesBlankSeparators verifies that clearing one key does not
+// also strip user-authored blank separator lines. Before the fix the cleanup
+// removed every whitespace-only line, collapsing the seeded template's blank
+// separators on the first update.
+func TestUpdatePreservesBlankSeparators(t *testing.T) {
+	content := "CLAUDE_DEFAULT_MODEL=m1\nANTHROPIC_BASE_URL=https://old\n\nCLAUDE_TITLE_MODEL=m2\n"
+	path := writeEnvFile(t, content)
+
+	// Clear only the middle key; the blank separator after it must survive.
+	if err := envconfig.Update(path, envconfig.Updates{BaseURL: ptr("")}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	raw, _ := os.ReadFile(path)
+	got := string(raw)
+	if strings.Contains(got, "ANTHROPIC_BASE_URL") {
+		t.Errorf("cleared key should be gone, got:\n%s", got)
+	}
+	if !strings.Contains(got, "\n\n") {
+		t.Errorf("user-authored blank separator should survive, got:\n%q", got)
+	}
+}
+
 // TestUpdateAppendsNewKeys verifies that keys not present in the file are appended.
 func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
