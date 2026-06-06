@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
@@ -421,10 +422,16 @@ func SpecCompletionHook(workspaceFn func() []string) func(store.Task) {
 
 // findSpecFile locates a spec file across workspaces. The relPath is relative
 // to the workspace root (e.g. "specs/local/foo.md"). Returns the absolute
-// path if found, or empty string if not found.
+// path if found, or empty string if not found. Candidates that escape the
+// workspace (e.g. via "../") are rejected so the spec endpoints cannot read or
+// write files outside the workspace tree.
 func findSpecFile(workspaces []string, relPath string) string {
 	for _, ws := range workspaces {
 		abs := filepath.Join(ws, relPath)
+		rel, err := filepath.Rel(ws, abs)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue // escapes the workspace
+		}
 		if _, err := os.Stat(abs); err == nil {
 			return abs
 		}
