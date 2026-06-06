@@ -15,6 +15,7 @@ import {
   extractError,
   activityIcon,
   bubbleFromMessage,
+  applyStreamingUpdate,
 } from '../../lib/planningBubble';
 import { usePlanningAutocomplete } from '../../composables/usePlanningAutocomplete';
 
@@ -68,6 +69,8 @@ const interruptedAt = ref<number>(-1);
 // ── Streaming buffer ───────────────────────────────────────────────
 
 let streamHandle: StreamingFetchHandle | null = null;
+// Monotonic counter for stable streaming-bubble ids (see applyStreamingUpdate).
+let streamBubbleSeq = 0;
 
 async function loadHistory() {
   if (!activeThreadId.value) {
@@ -105,7 +108,9 @@ function appendSystem(text: string) {
 
 function startStreaming() {
   streaming.value = true;
+  const bubbleId = 'stream-' + String(++streamBubbleSeq);
   const bubble: RenderedBubble = {
+    id: bubbleId,
     role: 'assistant',
     contentHtml: '',
     rawText: '',
@@ -119,7 +124,6 @@ function startStreaming() {
   renderedMessages.value.push(bubble);
   void scrollToBottom();
 
-  const idx = renderedMessages.value.length - 1;
   let rawBuffer = '';
   let receivedContent = false;
   let retried = false;
@@ -140,16 +144,18 @@ function startStreaming() {
         const hasAct = hasActivity(rawBuffer);
         if (!receivedContent && (text || hasAct)) receivedContent = true;
         if (receivedContent) {
-          const updated: RenderedBubble = {
-            ...renderedMessages.value[idx],
+          // Locate the bubble by id, not a cached index: if the active thread
+          // changed mid-stream, loadHistory replaced renderedMessages and the
+          // streaming bubble is gone — drop the update rather than corrupt an
+          // unrelated message.
+          applyStreamingUpdate(renderedMessages.value, bubbleId, {
             rawText: text,
             contentHtml: text ? renderMarkdown(text) : '',
             rawOutput: rawBuffer,
             activity,
             hasActivity: hasAct,
             errorText: errorText || undefined,
-          };
-          renderedMessages.value.splice(idx, 1, updated);
+          });
         }
         void scrollToBottom();
       },
@@ -162,8 +168,7 @@ function startStreaming() {
         const text = extractAssistantText(rawBuffer);
         const errorText = extractError(rawBuffer);
         const activity = parseActivity(rawBuffer);
-        const updated: RenderedBubble = {
-          ...renderedMessages.value[idx],
+        applyStreamingUpdate(renderedMessages.value, bubbleId, {
           rawText: text,
           contentHtml: text ? renderMarkdown(text) : '',
           rawOutput: rawBuffer,
@@ -171,8 +176,7 @@ function startStreaming() {
           hasActivity: activity.length > 0,
           errorText: errorText || undefined,
           isStreaming: false,
-        };
-        renderedMessages.value.splice(idx, 1, updated);
+        });
         finishStreaming(false);
       },
       onError: () => {
