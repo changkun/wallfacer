@@ -126,6 +126,32 @@ func TestTTLCache_MaxSize_UpdateDoesNotEvict(t *testing.T) {
 	}
 }
 
+// TestTTLCache_SetOverPermanentReleasesLRUSlot verifies that overwriting a
+// permanent key with Set (perm -> volatile) releases its LRU slot. Before the
+// fix, Set left the old permanent entry's *list.Element linked in the LRU list,
+// so it kept counting against MaxSize and a later SetPermanent evicted a live
+// entry (the orphaned element sat at the front and was wrongly chosen).
+func TestTTLCache_SetOverPermanentReleasesLRUSlot(t *testing.T) {
+	c := New[string, int](time.Minute, WithMaxSize[string, int](2))
+
+	c.SetPermanent("a", 1)
+	c.SetPermanent("b", 2)
+	c.Set("a", 11) // a transitions permanent -> volatile; its LRU slot must free
+	c.SetPermanent("c", 3)
+
+	// With only b and c permanent (within the cap of 2), nothing should be
+	// evicted: a survives as a volatile entry, b and c as permanent.
+	if v, ok := c.Get("a"); !ok || v != 11 {
+		t.Fatalf("expected volatile 'a'=11 to survive, got (%d, %v)", v, ok)
+	}
+	if v, ok := c.Get("b"); !ok || v != 2 {
+		t.Fatalf("expected permanent 'b' to survive, got (%d, %v)", v, ok)
+	}
+	if v, ok := c.Get("c"); !ok || v != 3 {
+		t.Fatalf("expected permanent 'c' to exist, got (%d, %v)", v, ok)
+	}
+}
+
 // TestTTLCache_Invalidate verifies that Invalidate removes a TTL-based entry.
 func TestTTLCache_Invalidate(t *testing.T) {
 	c := New[string, int](time.Minute)

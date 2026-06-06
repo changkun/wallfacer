@@ -82,10 +82,15 @@ func (c *TTLCache[K, V]) Get(key K) (V, bool) {
 	return e.value, true
 }
 
-// Set stores a value with the cache's default TTL.
+// Set stores a value with the cache's default TTL. If the key was previously a
+// permanent entry, its LRU element is removed so it no longer counts against
+// MaxSize and cannot be double-tracked by a later SetPermanent.
 func (c *TTLCache[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if e, ok := c.entries[key]; ok && e.elem != nil {
+		c.lru.Remove(e.elem)
+	}
 	c.entries[key] = entry[K, V]{
 		key:       key,
 		value:     value,
