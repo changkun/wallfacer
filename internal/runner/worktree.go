@@ -170,7 +170,8 @@ func (r *Runner) PruneUnknownWorktrees() {
 		return
 	}
 
-	if r.store == nil {
+	s := r.currentStore()
+	if s == nil {
 		return
 	}
 
@@ -181,7 +182,7 @@ func (r *Runner) PruneUnknownWorktrees() {
 	// their worktrees removed. Tasks not in the store are left alone
 	// because they may belong to a different workspace scope.
 	pruneIDs := map[string]bool{}
-	tasks, _ := r.store.ListTasks(ctx, true)
+	tasks, _ := s.ListTasks(ctx, true)
 	for _, t := range tasks {
 		if t.Archived ||
 			t.Status == store.TaskStatusDone ||
@@ -190,7 +191,7 @@ func (r *Runner) PruneUnknownWorktrees() {
 		}
 	}
 	// Also include soft-deleted (tombstoned) tasks.
-	deleted, _ := r.store.ListDeletedTasks(ctx)
+	deleted, _ := s.ListDeletedTasks(ctx)
 	for _, t := range deleted {
 		pruneIDs[t.ID.String()] = true
 	}
