@@ -1,8 +1,7 @@
 ---
-title: "Task Revert — Agent-Assisted Undo of Merged Task Changes"
+title: "Task Revert: Agent-Assisted Undo of Merged Task Changes"
 status: drafted
-depends_on:
-  - specs/intent/intent-commits.md
+depends_on: []
 affects:
   - internal/runner/revert.go
   - internal/handler/revert.go
@@ -10,16 +9,16 @@ affects:
   - internal/gitutil/ops.go
   - internal/store/models.go
   - internal/prompts/revert.tmpl
-  - ui/js/modal.js
-  - ui/js/render.js
+  - frontend/src/components/TaskDetail.vue
+  - frontend/src/components/TaskCard.vue
 effort: medium
 created: 2026-04-01
-updated: 2026-04-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
 
-# Task Revert — Agent-Assisted Undo of Merged Task Changes
+# Task Revert: Agent-Assisted Undo of Merged Task Changes
 
 ---
 
@@ -40,7 +39,7 @@ Users need a one-click revert that handles these cases, including agent-assisted
 1. Add a "Revert" action on done/cancelled tasks whose `CommitHashes` are recorded.
 2. Perform `git revert` on each workspace's merged commit.
 3. When the revert applies cleanly, commit automatically with a descriptive message.
-4. When conflicts arise, launch a sandbox agent to resolve them, using the original task context (prompt, diff, oversight) as guidance.
+4. When conflicts arise, launch an executor agent to resolve them, using the original task context (prompt, diff, oversight) as guidance.
 5. Track the revert as a first-class operation with its own event trail and UI state.
 
 ---
@@ -52,7 +51,7 @@ Users need a one-click revert that handles these cases, including agent-assisted
 A task is revertible when all of the following hold:
 
 - Status is `done` or `cancelled` (terminal states that went through the commit pipeline).
-- `CommitHashes` is non-empty (the task actually merged changes).
+- `CommitHashes` is non-empty (the task actually merged changes). This map (`internal/store/models.go`) records host `repoPath` to the merged commit hash; `BaseCommitHashes` records the default-branch HEAD before merge.
 - The commit hashes still exist in the repo history (`git cat-file -t <hash>` succeeds). If the repo has been force-pushed or the commit is unreachable, the revert is not possible.
 - No revert is already in progress for this task.
 
@@ -103,7 +102,7 @@ Two new endpoints in `internal/apicontract/routes.go`:
 
 **DELETE /api/tasks/{id}/revert**
 
-- Cancels an in-progress revert (kills agent container if running).
+- Cancels an in-progress revert (kills the agent worktree run if running).
 - Aborts any in-progress `git revert` / `git rebase` state.
 - Sets `RevertStatus = ""` (reset to no revert).
 - Returns `200 OK`.
@@ -126,7 +125,7 @@ For each workspace in task.CommitHashes:
 
 For each `(repoPath, commitHash)` in `task.CommitHashes`:
 
-1. `git cat-file -t <commitHash>` — verify the commit exists.
+1. `git cat-file -t <commitHash>`, verify the commit exists.
 2. `git revert <commitHash> --no-edit` on the default branch.
 3. If exit code 0: record the new revert commit hash in `RevertCommits[repoPath]`.
 4. If conflicts: proceed to Phase 2.
@@ -138,10 +137,10 @@ When `git revert` produces conflicts:
 1. Abort the failed revert: `git revert --abort`.
 2. Create a temporary worktree on a branch `revert/<task-uuid8>` from the current default branch HEAD.
 3. In the worktree, attempt `git revert <commitHash> --no-edit` again (to get the conflict state in the worktree, not on the default branch).
-4. Launch a sandbox agent container with:
-   - The worktree mounted at `/workspace/<basename>`.
+4. Launch an executor agent run with:
+   - The worktree as the workspace.
    - A system prompt from `internal/prompts/revert.tmpl` containing:
-     - The original task prompt and goal.
+     - The original task prompt.
      - The original diff (`task.CommitMessage` or regenerated from `BaseCommitHashes..CommitHashes`).
      - The list of conflicted files.
      - The conflict markers in each file.
@@ -176,7 +175,6 @@ reverted, but later commits have created conflicts.
 
 ## Original Task
 Prompt: {{.Prompt}}
-Goal: {{.Goal}}
 
 ## Original Changes
 {{.OriginalDiff}}
@@ -193,7 +191,7 @@ Goal: {{.Goal}}
 3. If a later commit depends on the original task's changes, make a judgment call:
    adapt the later code to work without the reverted changes.
 4. Stage all resolved files with `git add`.
-5. Do NOT run `git commit` — the host will handle that.
+5. Do NOT run `git commit`, the host will handle that.
 ```
 
 ### Events
@@ -201,14 +199,14 @@ Goal: {{.Goal}}
 Emit events to the task's event trail:
 
 - `system` event: "Revert started" / "Revert completed" / "Revert failed: <reason>"
-- `system` event: "Revert conflict in <workspace> — launching agent" (when Phase 2 triggers)
+- `system` event: "Revert conflict in <workspace>, launching agent" (when Phase 2 triggers)
 - `span_start` / `span_end` for the revert operation (for timing in the spans API)
 
 These appear in the task timeline alongside existing events.
 
 ### Usage Tracking
 
-Add a new `SandboxActivity`:
+Add a new `SandboxActivity` (`store.SandboxActivity`):
 
 ```go
 SandboxActivityRevert SandboxActivity = "revert"
@@ -220,14 +218,16 @@ Token usage from the conflict resolution agent is attributed to this activity in
 
 #### Task Card
 
-- Done/cancelled tasks with non-empty `CommitHashes` show a "Revert" button in the action menu (kebab menu or detail modal).
+In `frontend/src/components/TaskCard.vue`:
+
+- Done/cancelled tasks with non-empty `CommitHashes` show a "Revert" button in the action menu (kebab menu or detail view).
 - If `RevertStatus == "reverting"`: show a spinner and "Reverting..." label. Disable the button. Show "Cancel Revert" option.
-- If `RevertStatus == "reverted"`: show a "Reverted" badge on the card. The revert button changes to "Reverted" (disabled). Show `RevertCommits` in the detail modal.
-- If `RevertStatus == "revert_failed"`: show a warning badge. The button becomes "Retry Revert". Show `RevertError` in the detail modal.
+- If `RevertStatus == "reverted"`: show a "Reverted" badge on the card. The revert button changes to "Reverted" (disabled). Show `RevertCommits` in the task detail.
+- If `RevertStatus == "revert_failed"`: show a warning badge. The button becomes "Retry Revert". Show `RevertError` in the task detail.
 
-#### Detail Modal
+#### Task Detail
 
-Add a "Revert" section in the task detail modal (below the diff section):
+Add a "Revert" section in `frontend/src/components/TaskDetail.vue` (below the diff/Changes tab):
 
 - **Not reverted:** "Revert" button.
 - **Reverting:** Progress indicator + "Cancel" link.
@@ -236,11 +236,11 @@ Add a "Revert" section in the task detail modal (below the diff section):
 
 #### SSE Updates
 
-The existing SSE delta system (`/api/tasks/stream`) already pushes full task state on changes. Adding `RevertStatus` / `RevertCommits` to the `Task` model means the UI receives updates automatically — no new SSE channel needed.
+The existing SSE delta system (`/api/tasks/stream`) already pushes full task state on changes. Adding `RevertStatus` / `RevertCommits` to the `Task` model means the UI receives updates automatically, no new SSE channel needed.
 
-### Container Logs
+### Agent Logs
 
-While the revert agent is running, its container logs are streamable via the existing `/api/tasks/{id}/logs` endpoint (reusing the same infrastructure as implementation/test/refinement containers).
+While the revert agent is running, its logs are streamable via the existing `/api/tasks/{id}/logs` endpoint (reusing the same infrastructure as implementation and test runs).
 
 ---
 
@@ -258,7 +258,7 @@ While the revert agent is running, its container logs are streamable via the exi
 - Revert of in-progress or waiting tasks (use "Cancel" instead).
 - Revert of tasks that never merged (no `CommitHashes`).
 - Batch revert of multiple tasks at once (revert one at a time; the user can chain them).
-- "Undo revert" (reverting a revert) — handled by creating a new task if needed.
+- "Undo revert" (reverting a revert), handled by creating a new task if needed.
 - Interactive conflict resolution by the user (the agent resolves; if it fails, the user can fix manually in the terminal).
 
 ---

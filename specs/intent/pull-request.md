@@ -1,30 +1,29 @@
 ---
-title: "Pull Request Creation — Agent-Generated PR from Current Branch"
+title: "Pull Request Creation: Agent-Generated PR from Current Branch"
 status: drafted
-depends_on:
-  - specs/intent/intent-commits.md
+depends_on: []
 affects:
   - internal/runner/pullrequest.go
   - internal/handler/git.go
   - internal/apicontract/routes.go
   - internal/prompts/pullrequest.tmpl
   - internal/store/models.go
-  - ui/js/git.js
-  - ui/js/render.js
+  - frontend/src/components/StatusBar.vue
+  - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-04-01
-updated: 2026-04-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
 
-# Pull Request Creation — Agent-Generated PR from Current Branch
+# Pull Request Creation: Agent-Generated PR from Current Branch
 
 ---
 
 ## Problem
 
-After tasks complete and changes are pushed, the user must manually create a GitHub pull request — writing a title and description that summarizes the branch's changes. Wallfacer already has the machinery to run lightweight sandbox containers for text generation (title generation, commit message generation) and knows exactly which commits and diffs the branch contains, but there is no way to turn that into a PR from within the UI.
+After tasks complete and changes are pushed, the user must manually create a GitHub pull request, writing a title and description that summarizes the branch's changes. Wallfacer already has the machinery to run lightweight sandbox containers for text generation (title generation, commit message generation) and knows exactly which commits and diffs the branch contains, but there is no way to turn that into a PR from within the UI.
 
 ---
 
@@ -116,7 +115,7 @@ The PR creation pipeline is a synchronous request handler (not a background goro
 
 #### Step 1: Collect Branch Context (deterministic, host-side)
 
-All data collection is plain git commands — no sandbox involved.
+All data collection is plain git commands, no sandbox involved.
 
 ```go
 // Inputs gathered deterministically:
@@ -133,10 +132,10 @@ type PRContext struct {
 }
 ```
 
-1. `git log --format="%h %s" origin/<base>..HEAD` — one-line commit summary.
-2. `git diff --stat origin/<base>..HEAD` — file change summary.
-3. `git diff origin/<base>..HEAD` — full diff, truncated to 100 KB to fit sandbox context.
-4. `git log --format="%h %s%n%n%b" origin/<base>..HEAD` — full commit messages with bodies.
+1. `git log --format="%h %s" origin/<base>..HEAD`, one-line commit summary.
+2. `git diff --stat origin/<base>..HEAD`, file change summary.
+3. `git diff origin/<base>..HEAD`, full diff, truncated to 100 KB to fit sandbox context.
+4. `git log --format="%h %s%n%n%b" origin/<base>..HEAD`, full commit messages with bodies.
 
 #### Step 2: Generate PR Title and Description (sandbox)
 
@@ -144,7 +143,7 @@ Launch a lightweight container following the same pattern as title generation:
 
 - Container name: `wallfacer-pr-<workspace-hash8>`
 - Timeout: 90 seconds (same as commit message generation).
-- Sandbox: route via a new `SandboxActivity`:
+- Sandbox: route via a new `SandboxActivity` (`store.SandboxActivity`):
 
 ```go
 SandboxActivityPR SandboxActivity = "pull_request"
@@ -216,7 +215,7 @@ This follows the exact same pattern as `generateCommitMessage()`:
 3. Launch, read stdout/stderr, wait.
 4. Parse with `parseOutput()`.
 5. Split result into title + body.
-6. Accumulate usage (no task ID — this is a workspace-level operation, so usage is logged but not attributed to a task).
+6. Accumulate usage (no task ID, this is a workspace-level operation, so usage is logged but not attributed to a task).
 
 ### Usage Tracking
 
@@ -229,7 +228,7 @@ Since PR creation is a workspace-level operation (not tied to a specific task), 
 
 #### Git Panel
 
-The git status panel already shows per-workspace branch state (branch name, ahead/behind counts, push/sync buttons). Add:
+The git status panel (`frontend/src/components/StatusBar.vue`) already shows per-workspace branch state (branch name, ahead/behind counts, push/sync buttons). Add:
 
 - **"Create PR" button:** shown when the branch is not the default branch and has commits ahead. Disabled with tooltip when `gh` is not installed/authenticated.
 - **"View PR" link:** shown when `existing_pr_url` is non-null (a PR already exists for this branch). Opens in the OS browser.
@@ -253,10 +252,10 @@ Add a note in the configuration panel under "Prerequisites" showing `gh` CLI sta
 or:
 
 ```
-⚠ gh CLI not found — PR creation will not be available
+⚠ gh CLI not found, PR creation will not be available
 ```
 
-This is informational only — `gh` is not required for core functionality.
+This is informational only, `gh` is not required for core functionality.
 
 ---
 
