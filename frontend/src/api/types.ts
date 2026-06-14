@@ -108,7 +108,6 @@ export interface ServerConfig {
   max_parallel: number;
   sandboxes: string[];
   default_sandbox: string;
-  host_mode: boolean;
   terminal_enabled: boolean;
   auth_enabled: boolean;
   ideation_categories?: string[];
