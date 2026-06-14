@@ -74,7 +74,7 @@ onUnmounted(() => document.removeEventListener('keydown', onGlobalKeydown));
       v-model="query"
       type="search"
       class="task-search-input"
-      placeholder="Filter tasks… (/ to focus, @ to search server)"
+      placeholder="Filter tasks… (/ focus, @ search)"
       autocomplete="off"
       @keydown="onKeydown"
     />
