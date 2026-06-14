@@ -206,7 +206,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	sb := harness.Claude
 	if req.Sandbox != nil {
 		if !req.Sandbox.IsValid() {
-			http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
+			http.Error(w, "invalid sandbox: unknown harness", http.StatusBadRequest)
 			return
 		}
 		sb = *req.Sandbox

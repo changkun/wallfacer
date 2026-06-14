@@ -54,7 +54,7 @@ func ssrfHardenedTransport() *http.Transport {
 }
 
 // availableSandboxes returns all sandbox types the UI should display,
-// combining the built-in Claude and Codex sandboxes with any user-configured
+// combining the built-in (registered) harnesses with any user-configured
 // default or per-activity sandbox overrides.
 func availableSandboxes(cfg envconfig.Config) []harness.ID {
 	sandboxSet := map[harness.ID]bool{}
@@ -67,10 +67,13 @@ func availableSandboxes(cfg envconfig.Config) []harness.ID {
 		sandboxSet[name] = true
 		sandboxes = append(sandboxes, name)
 	}
-	// Always expose both built-in sandboxes in the UI so users can select
-	// either provider even before model/env values are configured.
-	add(harness.Claude)
-	add(harness.Codex)
+	// Always expose every registered harness in the UI so users can select
+	// any provider even before model/env values are configured. Driving this
+	// from the registry means a newly registered harness reaches the UI
+	// without editing this list.
+	for _, id := range harness.All() {
+		add(id)
+	}
 
 	if cfg.DefaultSandbox != "" {
 		add(cfg.DefaultSandbox)
@@ -79,6 +82,18 @@ func availableSandboxes(cfg envconfig.Config) []harness.ID {
 		add(v)
 	}
 	return sandboxes
+}
+
+// allSandboxesUsable returns a usability map seeded true for every
+// registered harness. Per-harness credential checks downgrade entries
+// afterwards. Built from the registry so a new harness is included
+// automatically.
+func allSandboxesUsable() map[harness.ID]bool {
+	usable := map[harness.ID]bool{}
+	for _, id := range harness.All() {
+		usable[id] = true
+	}
+	return usable
 }
 
 // defaultSandbox determines which sandbox type should be pre-selected for new
@@ -234,9 +249,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"instructions_path":        instructionsPath,
 		"prompts_dir":              promptsDir,
 		"sandbox_activities":       store.SandboxActivities,
-		"sandboxes":                []harness.ID{harness.Claude, harness.Codex},
+		"sandboxes":                harness.All(),
 		"default_sandbox":          harness.Claude,
-		"sandbox_usable":           map[harness.ID]bool{harness.Claude: true, harness.Codex: true},
+		"sandbox_usable":           allSandboxesUsable(),
 		"sandbox_reasons":          map[string]string{},
 		"activity_sandboxes":       map[string]string{},
 		"autopilot":                h.AutopilotEnabled(),
@@ -270,10 +285,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	sandboxes := availableSandboxes(*cfg)
-	sandboxUsable := map[harness.ID]bool{
-		harness.Claude: true,
-		harness.Codex:  true,
-	}
+	sandboxUsable := allSandboxesUsable()
 	sandboxReasons := map[string]string{}
 
 	// Credential checks.
