@@ -34,7 +34,7 @@ Derive the output file path: `specs/<track>/<name>.md`.
 
 1. Read `specs/README.md` to understand the track organization, dependency
    graph, and what already exists.
-2. Read `specs/local/spec-coordination/spec-document-model.md` (first 80 lines)
+2. Read `specs/spec-coordination/spec-coordination/spec-document-model.md` (first 80 lines)
    to review the frontmatter schema and spec conventions.
 3. Grep spec files for any existing specs that overlap with the proposed topic
    — check by name and by `affects` paths. If a closely related spec exists,
