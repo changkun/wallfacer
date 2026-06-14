@@ -34,18 +34,21 @@ At minimum, you need one of these credentials configured in **Settings > Harness
 
 **Codex configuration:** similarly, use the **Sign in with OpenAI** button for OAuth or paste an API key manually.
 
+**Cursor configuration:** paste a `CURSOR_API_KEY`, or run `cursor-agent login` once and the CLI reuses that session. Use the **Test** button to verify connectivity.
+
 The sign-in buttons are hidden when a custom base URL is configured (custom endpoints don't use standard OAuth). On first launch with no credentials for any provider, a prompt guides you to set up credentials.
 
 All changes are written to `~/.wallfacer/.env` and take effect on the next task run. Leave token fields blank to preserve the existing value.
 
 ### Verifying the CLIs
 
-Wallfacer launches the `claude` and `codex` CLIs from your `$PATH`. Install them with:
+Wallfacer launches the `claude`, `codex`, and `cursor-agent` CLIs from your `$PATH`. Install them with:
 
 - `npm i -g @anthropic-ai/claude-code` for Claude.
 - `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
+- `cursor-agent` from [cursor.com/docs/cli](https://cursor.com/docs/cli) for Cursor (optional).
 
-Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex is a soft warning: codex-routed tasks will fail, but claude-only workflows still work.
+Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex or cursor-agent is a soft warning: tasks routed to that agent will fail, but claude-only workflows still work.
 
 ### Key Environment Variables
 
@@ -153,14 +156,21 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 - Title Model (`CODEX_TITLE_MODEL`) -- falls back to the Codex default model
 - **Test** button -- runs a Codex connectivity check
 
+### Cursor Configuration
+
+**Cursor configuration:**
+- API Key (`CURSOR_API_KEY`) -- headless credential for `cursor-agent`; create one in Cursor under Settings > API Keys, or run `cursor-agent login` interactively
+- **Test** button -- runs a Cursor connectivity check
+
 ### Agent Routing
 
-**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex) or "default".
+**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex, cursor) or "default".
 
-Wallfacer supports two agents, selected per activity. Both run as host processes; the difference is which CLI the runner execs:
+Wallfacer supports three agents, selected per activity. All run as host processes; the difference is which CLI the runner execs:
 
 - **Claude** -- runs the Claude Code CLI (`WALLFACER_AGENT=claude`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
 - **Codex** -- runs the OpenAI Codex CLI (`WALLFACER_AGENT=codex`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **Cursor** -- runs the Cursor CLI (`WALLFACER_AGENT=cursor`). Requires `CURSOR_API_KEY` or an interactive `cursor-agent login`. Headless runs inject `--force` so edits are applied, not just proposed.
 
 Each task can be assigned a specific agent when created or edited. The task-level selection overrides the global default for that task's implementation run.
 
@@ -230,6 +240,14 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 \* If host auth cache is unavailable, `OPENAI_API_KEY` plus a successful **Test (Codex)** is required.
 
+#### Cursor
+
+| Variable | Required | Description |
+|---|---|---|
+| `CURSOR_API_KEY` | no\* | Headless credential for `cursor-agent` |
+
+\* Alternatively, sign in once with an interactive `cursor-agent login`; the CLI then reuses that session.
+
 #### Concurrency
 
 | Variable | Default | Description |
@@ -245,6 +263,7 @@ These variables are optional; the CLI binaries are resolved via `$PATH` by defau
 |---|---|---|
 | `WALLFACER_HOST_CLAUDE_BINARY` | `exec.LookPath("claude")` | Explicit path to the Claude CLI binary |
 | `WALLFACER_HOST_CODEX_BINARY` | `exec.LookPath("codex")` | Explicit path to the Codex CLI binary (optional; codex-typed tasks require it) |
+| `WALLFACER_HOST_CURSOR_BINARY` | `exec.LookPath("cursor-agent")` | Explicit path to the Cursor CLI binary (optional; cursor-typed tasks require it) |
 | `WALLFACER_AGENTS_DIR` | `~/.wallfacer/agents` | Directory scanned for user-authored agent descriptors (`*.yaml`). A missing directory is not an error: Wallfacer falls back to the built-in agent catalog. |
 | `WALLFACER_FLOWS_DIR` | `~/.wallfacer/flows` | Directory scanned for user-authored flow descriptors (`*.yaml`). Same fallback semantics as `WALLFACER_AGENTS_DIR`. |
 
@@ -289,9 +308,29 @@ These variables are optional; the CLI binaries are resolved via `$PATH` by defau
 |---|---|---|
 | `WALLFACER_SERVER_API_KEY` | -- | Bearer token for server API authentication; when set, all API requests must include `Authorization: Bearer <key>` |
 
-#### Cloud mode
+#### Account Sign-In (latere.ai)
 
-Wallfacer can optionally sign the user in to [latere.ai](https://latere.ai) and display their avatar + username in the status bar. Cloud-mode documentation lives in [`docs/cloud/`](../cloud/) -- start with [`docs/cloud/README.md`](../cloud/README.md) for the env-var reference, deployment constraints, and the cloud/local partition. The sign-in badge is hidden entirely when `WALLFACER_CLOUD` is unset, so local-only deployments are unchanged.
+A plain `wallfacer run` offers browser sign-in against [auth.latere.ai](https://auth.latere.ai) with no setup. Sign-in is available, not mandatory: the board stays fully usable signed out, and an absent or expired session never redirects you. A sign-in chip appears in the sidebar; once signed in, the account menu (avatar, org switcher, theme, sign out) replaces it.
+
+Under the hood, `wallfacer run` fills the `AUTH_*` config with the secret-less public "wallfacer" client: `AUTH_URL=https://auth.latere.ai`, a loopback `/callback` redirect, and `openid email profile offline_access` scopes. The session-cookie key is generated once and persisted at `~/.wallfacer/cookie-key`. Any `AUTH_*` value you set yourself takes precedence over these defaults.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AUTH_URL` | `https://auth.latere.ai` | OIDC auth service base URL |
+| `AUTH_CLIENT_ID` | `wallfacer` | OAuth client id. The default is the public client |
+| `AUTH_CLIENT_SECRET` | -- | Set to use a confidential client. When set, the cookie key derives from the secret and the auto-generated `cookie-key` file is skipped |
+| `AUTH_REDIRECT_URL` | `http://localhost:<port>/callback` | OAuth callback URL. A loopback HTTP callback serves the session cookie insecurely (browsers reject `Secure` cookies over plain HTTP); a non-loopback host is assumed to terminate TLS and uses `https` |
+| `AUTH_COOKIE_KEY` | auto-generated | Hex-encoded 32-byte key encrypting the session cookie. Auto-created at `~/.wallfacer/cookie-key` for the public client; set explicitly to pin it |
+| `AUTH_ISSUER` | derived from `AUTH_URL` | Override the expected JWT issuer (advanced) |
+| `AUTH_JWKS_URL` | derived from `AUTH_URL` | Override the JWKS endpoint for token validation (advanced) |
+
+**Precedence.** Every `AUTH_*` value resolves from the shell environment first, then `~/.wallfacer/.env`, then the public-client default. So `AUTH_CLIENT_ID=other wallfacer run` is a clean one-shot override without editing the file.
+
+**Pointing at a different auth service.** Set `AUTH_URL` and a matching `AUTH_CLIENT_ID` to sign in against your own OIDC deployment. For a confidential client, also set `AUTH_CLIENT_SECRET`; the session-cookie key is then derived from the secret instead of the generated file.
+
+**Forced sign-in.** `WALLFACER_CLOUD` does not control whether sign-in is *available* (it always is). It controls whether sign-in is *required*: with `WALLFACER_CLOUD` set, anonymous HTML navigation is redirected to `/login`. Local mode never installs this gate.
+
+**Headless sign-in.** On machines without a browser, use the device-authorization flow: `wallfacer auth login` (see [`wallfacer auth`](#wallfacer-auth) above). Full cloud-mode deployment (`wallfacer web`) is documented in [`docs/cloud/`](../cloud/); start with [`docs/cloud/README.md`](../cloud/README.md).
 
 ### System Prompt Templates
 
