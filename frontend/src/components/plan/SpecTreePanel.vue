@@ -487,8 +487,11 @@ onUnmounted(() => {
 
 <style scoped>
 .spec-tree-panel {
-  width: 280px;
-  min-width: 240px;
+  /* Width is driven by PlanPage's resize splitter via --stp-width; falls
+     back to the default when unset. */
+  width: var(--stp-width, 280px);
+  min-width: 200px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--rule);
@@ -512,6 +515,14 @@ onUnmounted(() => {
   border-radius: var(--r-sm);
   background: var(--bg);
   color: var(--ink);
+}
+
+/* Keep the native dropdown caret. Extra right padding leaves room for the
+   platform-drawn arrow. */
+.stp-status {
+  appearance: auto;
+  padding-right: 24px;
+  cursor: pointer;
 }
 
 .stp-search:focus,
@@ -612,13 +623,14 @@ onUnmounted(() => {
   width: 14px;
   text-align: center;
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   flex-shrink: 0;
   transition: transform 0.15s;
 }
 
 .stp-chev.open {
   transform: rotate(90deg);
+  color: var(--ink-2);
 }
 
 .stp-checkbox {

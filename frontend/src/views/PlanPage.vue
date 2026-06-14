@@ -77,6 +77,35 @@ function startChatResize(ev: MouseEvent) {
   document.addEventListener('mouseup', onUp);
 }
 
+// ── Spec tree sidebar resize (persisted) ──────────────────────────
+
+const SIDEBAR_WIDTH_KEY = 'wallfacer-spec-sidebar-width';
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 520;
+
+const sidebarWidth = ref<number>(parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '280', 10));
+
+function startSidebarResize(ev: MouseEvent) {
+  ev.preventDefault();
+  const startX = ev.clientX;
+  const startW = sidebarWidth.value;
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+  function onMove(mv: MouseEvent) {
+    const delta = mv.clientX - startX;
+    sidebarWidth.value = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, startW + delta));
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value));
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
 // ── Hash deep-link redirect ────────────────────────────────────────
 //
 // Old UI used #plan/<path> and #spec/<path> hash anchors to deep-link to
@@ -217,7 +246,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 <template>
   <div class="plan-page" :data-layout="layout">
-    <SpecTreePanel v-if="layout === 'three-pane'" />
+    <SpecTreePanel
+      v-if="layout === 'three-pane'"
+      :style="{ '--stp-width': sidebarWidth + 'px' }"
+    />
+    <div
+      v-if="layout === 'three-pane'"
+      class="plan-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      @mousedown="startSidebarResize"
+    />
     <SpecFocusedView
       v-if="layout === 'three-pane'"
       ref="focusedViewRef"
