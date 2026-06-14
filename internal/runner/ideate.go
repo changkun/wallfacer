@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/set"
-	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/set"
+	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

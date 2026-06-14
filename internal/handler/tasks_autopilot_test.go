@@ -16,14 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/runner"
 	"github.com/google/uuid"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/planner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 type autopilotPhase1Store struct {

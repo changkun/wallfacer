@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/dag"
+	"latere.ai/x/wallfacer/internal/pkg/dag"
 )
 
 // Severity classifies a validation result.

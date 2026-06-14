@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/flow"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestRunner_FlowRegistryResolvesTasks verifies the flow registry

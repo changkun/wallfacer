@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 func scanAll(lines []string) []Directive {

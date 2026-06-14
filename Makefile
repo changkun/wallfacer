@@ -14,7 +14,7 @@ build: fmt lint frontend-build build-binary
 VERSION ?=
 LDFLAGS := -s -w
 ifneq ($(VERSION),)
-LDFLAGS += -X changkun.de/x/wallfacer/internal/cli.Version=$(VERSION)
+LDFLAGS += -X latere.ai/x/wallfacer/internal/cli.Version=$(VERSION)
 endif
 
 build-binary:

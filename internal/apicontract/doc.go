@@ -9,7 +9,7 @@
 //
 // # Connected packages
 //
-// Consumed by [changkun.de/x/wallfacer/internal/cli] (server startup registers
+// Consumed by [latere.ai/x/wallfacer/internal/cli] (server startup registers
 // handlers from Routes) and scripts/gen-api-contract.go (generates frontend JS and
 // API contract JSON). When adding or modifying an API route, update Routes here first,
 // then re-run make api-contract to regenerate derived artifacts.

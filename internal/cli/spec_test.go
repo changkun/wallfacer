@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // writeSpecFile stages a spec file with the given frontmatter + body on

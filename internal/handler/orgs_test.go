@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // fakeAuthClientWithSession extends the fakeAuthProvider used in other

@@ -3,9 +3,9 @@
 package cli
 
 import (
-	"changkun.de/x/wallfacer/assets/icons"
+	"latere.ai/x/wallfacer/assets/icons"
 
-	"changkun.de/x/wallfacer/internal/pkg/systray"
+	"latere.ai/x/wallfacer/internal/pkg/systray"
 )
 
 // platformTraySetup performs Windows-specific tray initialization.

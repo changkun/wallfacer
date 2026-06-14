@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/runner"
 )
 
 // initPlanningTestRepo creates a temp git repo with one initial commit so

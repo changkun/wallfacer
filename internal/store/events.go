@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/pagination"
+	"latere.ai/x/wallfacer/internal/pkg/pagination"
 	"github.com/google/uuid"
 )
 

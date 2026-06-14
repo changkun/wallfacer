@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/metrics"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/metrics"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 package flow
 
-import "changkun.de/x/wallfacer/internal/store"
+import "latere.ai/x/wallfacer/internal/store"
 
 // Registry is the merged catalog of built-in and (future) user-
 // authored flows. Today it wraps the embedded built-ins and exposes a

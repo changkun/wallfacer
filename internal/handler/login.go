@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // AuthProvider is the subset of *auth.Client the HTTP handlers need. Kept

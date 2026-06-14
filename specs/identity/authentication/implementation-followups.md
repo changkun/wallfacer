@@ -195,7 +195,7 @@ Final tags that make up the shipped Phase 2 surface:
 |------|-----|--------|
 | `latere.ai/auth` | `v0.5.8` | Migration 13 + `active_org_id`, JWT `iss`, `/me/orgs` cast, `/userinfo` name/picture, `/authorize` `org_id` forward |
 | `latere.ai/x/pkg` | `v0.10.2` | `AuthCodeURLWithOpts` + `HandleLogin` empty-value forward, `UserFromRequest` `/userinfo` fetch |
-| `changkun.de/x/wallfacer` | `main` (`3537cd83`) | Middleware chain, principal filter matrix, badge, e2e scripts, per-group toggles |
+| `latere.ai/x/wallfacer` | `main` (`3537cd83`) | Middleware chain, principal filter matrix, badge, e2e scripts, per-group toggles |
 
 ## What did *not* change
 

@@ -3,7 +3,7 @@ package flow
 import (
 	"context"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // AgentLauncher is the narrow interface the flow Engine uses to

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

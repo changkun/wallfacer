@@ -41,7 +41,7 @@ Create `.github/workflows/release-desktop.yml` triggered on `v*` tags (same as `
    - **macOS:** Xcode command line tools (pre-installed on `macos-latest`)
    - **Windows:** WebView2 runtime (pre-installed on `windows-latest`), NSIS for installer (optional)
    - **Linux:** `libgtk-3-dev`, `libwebkit2gtk-4.0-dev` (for WebKitGTK)
-5. Run `wails build -tags desktop -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION}"`
+5. Run `wails build -tags desktop -ldflags "-s -w -X latere.ai/x/wallfacer/internal/cli.Version=${VERSION}"`
 6. Platform-specific post-processing (see below)
 7. Upload artifacts to the GitHub Release via `softprops/action-gh-release@v2`
 

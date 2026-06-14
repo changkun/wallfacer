@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // StashIfDirty stashes uncommitted changes in worktreePath if the working tree

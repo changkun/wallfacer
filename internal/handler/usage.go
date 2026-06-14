@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // usageResponse is the JSON body returned by GET /api/usage.

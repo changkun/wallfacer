@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // ErrEmptyRepo is returned when the repository has no commits (HEAD is invalid).

@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"sync"
 
-	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/flow"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pkg/slugutil"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/slugutil"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // flowRegistry returns the merged built-in + user-authored flow

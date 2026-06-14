@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // resubscribingWakeSource implements watcher.WakeSource by forwarding wake

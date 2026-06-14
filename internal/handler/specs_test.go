@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 func doTransition(t *testing.T, fn http.HandlerFunc, path string) *httptest.ResponseRecorder {

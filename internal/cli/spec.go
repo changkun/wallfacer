@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // RunSpec dispatches `wallfacer spec <subcommand> [args]`. Currently supports

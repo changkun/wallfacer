@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 	"github.com/google/uuid"
 )
 

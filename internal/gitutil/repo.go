@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // ErrConflict is returned by RebaseOntoDefault when a merge conflict is detected.

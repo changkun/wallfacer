@@ -5,7 +5,7 @@ package handler
 import (
 	"net/http"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // HandleTerminalWS is not supported on Windows.

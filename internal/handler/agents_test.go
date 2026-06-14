@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/agents"
 )
 
 // TestListAgents_ReturnsBuiltins asserts every built-in role shows up

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

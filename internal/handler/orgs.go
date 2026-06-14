@@ -23,9 +23,9 @@ import (
 	"net/http"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // httpGet is a package-level indirection so tests can substitute a

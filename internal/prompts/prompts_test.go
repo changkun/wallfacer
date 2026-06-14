@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 // TestNewManager_OverrideRendered verifies that a valid override file in

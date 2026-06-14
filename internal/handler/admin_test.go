@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 func TestRebuildIndex_EmptyStore_Returns200(t *testing.T) {

@@ -74,7 +74,7 @@ Land `internal/harness/` as a new package with the `Harness` interface, canonica
 
 - `go build ./internal/harness/...` passes.
 - `go test ./internal/harness/...` passes.
-- Importing `harness` from anywhere outside `internal/harness/` is allowed but **no file outside the package imports it yet** — `grep -r '"changkun.de/x/wallfacer/internal/harness"' --include='*.go' .` returns only files under `internal/harness/`.
+- Importing `harness` from anywhere outside `internal/harness/` is allowed but **no file outside the package imports it yet** — `grep -r '"latere.ai/x/wallfacer/internal/harness"' --include='*.go' .` returns only files under `internal/harness/`.
 - The compat shim in `internal/sandbox/sandbox.go` makes existing tests pass unchanged.
 
 ## Why isolate this task

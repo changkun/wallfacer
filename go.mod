@@ -1,4 +1,4 @@
-module changkun.de/x/wallfacer
+module latere.ai/x/wallfacer
 
 go 1.25.7
 

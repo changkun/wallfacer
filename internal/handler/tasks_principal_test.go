@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // withClaims returns a request whose context carries the given claims,

@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // rebuildIndexResponse is the JSON shape returned by POST /api/admin/rebuild-index.

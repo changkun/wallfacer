@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // mockLister is a test double for ContainerLister.

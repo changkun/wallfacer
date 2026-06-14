@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestInsertEvent_StampsActorFromContext covers the main contract:

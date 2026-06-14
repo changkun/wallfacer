@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"gopkg.in/yaml.v3"
 )
 

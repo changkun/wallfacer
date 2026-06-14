@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/pkg/dag"
+	"latere.ai/x/wallfacer/internal/pkg/dag"
 )
 
 func TestReverseIndex_Simple(t *testing.T) {

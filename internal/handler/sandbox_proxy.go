@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // SandboxProxyConfig is everything the three trust-plane endpoints

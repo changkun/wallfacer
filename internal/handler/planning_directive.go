@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/planner"
-	"changkun.de/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // Directive is a single /spec-new request extracted from the planning

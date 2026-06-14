@@ -3,8 +3,8 @@ package runner
 import (
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/pkg/set"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/pkg/set"
 )
 
 // --- normalizeIdeationPriority tests ---

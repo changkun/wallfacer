@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 func TestClassifyFailure(t *testing.T) {

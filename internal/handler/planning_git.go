@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 // commitMessageGenerator is the task-free commit-message entry point from

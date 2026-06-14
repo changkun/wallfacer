@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/harness"
 )
 
 // newHostModeRunner creates a Runner with hostMode forced on for testing

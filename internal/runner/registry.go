@@ -3,8 +3,8 @@ package runner
 import (
 	"io"
 
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/pkg/syncmap"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/pkg/syncmap"
 	"github.com/google/uuid"
 )
 

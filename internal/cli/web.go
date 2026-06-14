@@ -13,8 +13,8 @@ import (
 
 	"latere.ai/x/pkg/otel"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/webserver"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/webserver"
 )
 
 // RunWeb starts the wallfacer web frontend server with OIDC authentication.

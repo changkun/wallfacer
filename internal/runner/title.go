@@ -5,9 +5,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // parseTitleResult extracts the trimmed title string from an

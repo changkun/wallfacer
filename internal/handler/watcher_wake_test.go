@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestResubscribingWakeSourceForwardsSignals verifies that wake signals from

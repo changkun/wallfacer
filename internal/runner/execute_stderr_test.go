@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestRunEmitsSystemEventForNonEmptyStderr verifies that when a task turn

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/ndjson"
-	"changkun.de/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 // PlanningGroupKey returns the path-safe fingerprint used to scope a

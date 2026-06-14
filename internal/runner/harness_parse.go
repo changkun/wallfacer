@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/harness"
 )
 
 // parseAgentStream parses raw agent NDJSON output via the harness for sb.

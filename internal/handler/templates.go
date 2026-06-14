@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"github.com/google/uuid"
 )
 

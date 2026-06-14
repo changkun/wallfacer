@@ -9,8 +9,8 @@ package handler
 import (
 	"net/http"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // principalFromRequest returns the caller's store.Principal when the

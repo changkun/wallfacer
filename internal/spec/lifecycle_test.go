@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 )
 
 func TestStatusMachine_AllValid(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/pkg/set"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/set"
 )
 
 // Group represents a named set of workspace paths.

@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"changkun.de/x/wallfacer/internal/routine"
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/routine"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // installRoutineEngine replaces h.routineEngine with a version that

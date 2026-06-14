@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/planner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // newPlannerHandlerWithThreads returns a handler backed by a planner

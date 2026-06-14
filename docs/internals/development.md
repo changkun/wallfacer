@@ -92,7 +92,7 @@ Releases are triggered by pushing a version tag (`v*`). Two GitHub Actions workf
 | `release-binary.yml` | `wallfacer-{linux,darwin,windows}-{amd64,arm64}` binaries on the GitHub Release |
 | `release-desktop.yml` | Signed desktop apps (`Wallfacer-Desktop-*`) on the GitHub Release |
 
-**Version embedding.** Release binaries are built with `-ldflags "-X changkun.de/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output.
+**Version embedding.** Release binaries are built with `-ldflags "-X latere.ai/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output.
 
 **Creating a release:**
 

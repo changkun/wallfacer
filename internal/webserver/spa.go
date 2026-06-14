@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	spaembed "changkun.de/x/wallfacer/internal/webserver/spa"
+	spaembed "latere.ai/x/wallfacer/internal/webserver/spa"
 )
 
 // MountSPA registers handlers for static asset paths from the embedded SPA dist.

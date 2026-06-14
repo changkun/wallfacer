@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // runBackfillBatch is the shared scaffolding for "scan all tasks, queue

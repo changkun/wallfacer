@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/oauth"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/oauth"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // providerByName maps URL path values to OAuth provider configs.

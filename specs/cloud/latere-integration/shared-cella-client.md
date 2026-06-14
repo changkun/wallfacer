@@ -22,7 +22,7 @@ different layers and with different control flows:
 | Product | Where the agent runs | Sandbox role | Natural API shape |
 |---------|----------------------|--------------|-------------------|
 | **Topos** (`latere.ai/x/agents`) | harness **outside**, in `toposd` | dumb workspace the harness pokes at | many small `Exec` / `ReadFile` / `WriteFile` against one long-lived sandbox |
-| **Wallfacer** (`changkun.de/x/wallfacer`) | harness **inside** — the agent CLI runs in the sandbox | the agent's whole world | one `Launch` per turn, stream stdout until the CLI exits |
+| **Wallfacer** (`latere.ai/x/wallfacer`) | harness **inside** — the agent CLI runs in the sandbox | the agent's whole world | one `Launch` per turn, stream stdout until the CLI exits |
 | **Cella** (`latere.ai/x/sandbox`) | n/a — it *is* the sandbox platform | runtime owner | ships OpenAPI; no Go client today |
 
 Today, the **only Go client** for Cella's REST API is buried inside Topos at

@@ -15,11 +15,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/handler"
-	"changkun.de/x/wallfacer/internal/metrics"
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/handler"
+	"latere.ai/x/wallfacer/internal/metrics"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestInitServer verifies that initServer returns valid components with a

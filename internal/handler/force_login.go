@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // unprotectedPaths are exact HTML / API endpoints that must never

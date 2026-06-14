@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"changkun.de/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
 )
 

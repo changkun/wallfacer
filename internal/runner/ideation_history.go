@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/envutil"
-	"changkun.de/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/envutil"
+	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 )
 
 // ideationHistoryTTL is how long rejected-idea records are retained (default 30 days).

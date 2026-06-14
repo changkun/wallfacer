@@ -8,7 +8,7 @@ import (
 	"slices"
 	"sync"
 
-	"changkun.de/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/executor"
 )
 
 // ContainerResponse holds the pre-configured response for a single Launch invocation.

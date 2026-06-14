@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 func TestAppendPlanningUsage_RoundtripsRecord(t *testing.T) {

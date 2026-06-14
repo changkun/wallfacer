@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestCaptureExecutionEnvironment_ModelFromEnvconfig verifies that ModelName is

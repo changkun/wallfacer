@@ -1,6 +1,6 @@
 package flow
 
-import "changkun.de/x/wallfacer/internal/store"
+import "latere.ai/x/wallfacer/internal/store"
 
 // builtins is the embedded catalog seeded on first boot. Each Flow
 // references agents by Role.Slug from internal/agents — the flow
