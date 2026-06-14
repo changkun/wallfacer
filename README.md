@@ -37,7 +37,7 @@ Every AI coding tool today pins you to one interaction mode. Chat-based tools ar
 
 **Self-development.** Wallfacer builds Wallfacer. Most recent capabilities were developed by the system itself.
 
-**Model flexibility.** Works with Claude Code and Codex through a pluggable harness layer. Not locked to any single provider.
+**Harness flexibility.** Works with Claude Code, Codex, Cursor, OpenCode, and Pi through a pluggable harness layer. Pick one per task or per agent role; not locked to any single provider.
 
 ## Quick Start
 
@@ -56,7 +56,7 @@ wallfacer doctor
 Start the server:
 
 ```bash
-wallfacer run                    # execs claude/codex directly as host processes
+wallfacer run                    # execs your chosen harness CLI directly as a host process
 ```
 
 A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full walkthrough.
@@ -99,7 +99,7 @@ Read more: [The Autonomy Spectrum](docs/guide/autonomy-spectrum.md), [Designing 
 
 Wallfacer runs every task through a small, composable set of primitives:
 
-- **Agents** are sub-roles (impl, test, commit-msg, title, oversight, ideate), each with a harness pin (Claude or Codex), capabilities, and an optional system prompt.
+- **Agents** are sub-roles (impl, test, commit-msg, title, oversight, ideate), each with a harness pin (Claude, Codex, Cursor, OpenCode, or Pi), capabilities, and an optional system prompt.
 - **Flows** compose agents into an ordered pipeline. Built-ins are `implement`, `brainstorm`, and `test-only`.
 - **Tasks** pick a flow; the runner walks the flow's step chain.
 - **Routines** spawn tasks against a flow on a schedule.
@@ -137,7 +137,7 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 - **Task.** Host-process execution, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, workspace-level AGENTS.md instructions.
 
-Six composable sub-agent roles (Claude or Codex) arrange into flows (`implement`, `brainstorm`, `test-only`, plus user-authored clones) that you can inspect or rewrite from the sidebar.
+Six composable sub-agent roles (each pinned to any installed harness) arrange into flows (`implement`, `brainstorm`, `test-only`, plus user-authored clones) that you can inspect or rewrite from the sidebar.
 
 ## Roadmap
 
