@@ -126,6 +126,36 @@ func workspaceVisible(groups []workspace.Group, workspaces []string) bool {
 	return false
 }
 
+// workspaceVisibleTo reports whether the active workspace set is visible to the
+// request's principal. Local mode (no principal) always passes. Mirrors the
+// org/personal isolation buildConfigResponse applies, so every browser-facing
+// surface agrees on whether a workspace is active for this caller.
+func (h *Handler) workspaceVisibleTo(ctx context.Context, workspaces []string) bool {
+	if len(workspaces) == 0 {
+		return false
+	}
+	c, ok := auth.PrincipalFromContext(ctx)
+	if !ok || c == nil {
+		return true
+	}
+	groups, _ := workspace.LoadGroups(h.configDir)
+	groups = workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+	return workspaceVisible(groups, workspaces)
+}
+
+// visibleWorkspaces returns the active workspaces, or nil when the active
+// workspace group is hidden from the request's principal. Browser-facing
+// read handlers (files, specs, plan, terminal) use this instead of
+// currentWorkspaces() so an org-scoped workspace does not leak into a
+// session that config.go reports as having "no workspace".
+func (h *Handler) visibleWorkspaces(ctx context.Context) []string {
+	workspaces := h.currentWorkspaces()
+	if h.workspaceVisibleTo(ctx, workspaces) {
+		return workspaces
+	}
+	return nil
+}
+
 // buildConfigResponse assembles the full configuration payload returned by
 // GET /api/config and reused by UpdateWorkspaces after a workspace switch.
 // When cfg is nil (env file not readable), sandbox-related fields use safe defaults.

@@ -26,8 +26,8 @@ import (
 // single TreeResponse and attaches the roadmap index (specs/README.md
 // from the first workspace that has one). Shared by GetSpecTree and
 // the SSE SpecTreeStream so both surfaces emit the same shape.
-func (h *Handler) collectSpecTree() spec.TreeResponse {
-	workspaces := h.currentWorkspaces()
+func (h *Handler) collectSpecTree(ctx context.Context) spec.TreeResponse {
+	workspaces := h.visibleWorkspaces(ctx)
 
 	var allNodes []spec.NodeResponse
 	allProgress := make(map[string]spec.Progress)
@@ -58,8 +58,8 @@ func (h *Handler) collectSpecTree() spec.TreeResponse {
 // GetSpecTree returns the full spec tree with metadata, progress, and
 // an optional roadmap index for all workspaces. Each workspace's specs/
 // directory is scanned and the results are merged into a single response.
-func (h *Handler) GetSpecTree(w http.ResponseWriter, _ *http.Request) {
-	httpjson.Write(w, http.StatusOK, h.collectSpecTree())
+func (h *Handler) GetSpecTree(w http.ResponseWriter, r *http.Request) {
+	httpjson.Write(w, http.StatusOK, h.collectSpecTree(r.Context()))
 }
 
 // SpecTreeStream sends SSE notifications when the spec tree changes.
@@ -74,7 +74,7 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collectTree := h.collectSpecTree
+	collectTree := func() spec.TreeResponse { return h.collectSpecTree(r.Context()) }
 
 	send := func(tree spec.TreeResponse) ([]byte, bool) {
 		data, err := json.Marshal(tree)

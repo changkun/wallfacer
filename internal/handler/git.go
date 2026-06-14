@@ -134,9 +134,9 @@ func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *htt
 	return true
 }
 
-// GitStatus returns git status for every configured workspace.
-func (h *Handler) GitStatus(w http.ResponseWriter, _ *http.Request) {
-	httpjson.Write(w, http.StatusOK, collectWorkspaceStatuses(h.currentWorkspaces()))
+// GitStatus returns git status for every workspace visible to the caller.
+func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
+	httpjson.Write(w, http.StatusOK, collectWorkspaceStatuses(h.visibleWorkspaces(r.Context())))
 }
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
@@ -147,7 +147,7 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	collect := func() []gitutil.WorkspaceGitStatus {
-		return collectWorkspaceStatuses(h.currentWorkspaces())
+		return collectWorkspaceStatuses(h.visibleWorkspaces(r.Context()))
 	}
 
 	send := func(statuses []gitutil.WorkspaceGitStatus) bool {
@@ -218,7 +218,7 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Workspace) {
+	if !h.isAllowedWorkspace(r.Context(), req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -246,7 +246,7 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Workspace) {
+	if !h.isAllowedWorkspace(r.Context(), req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -291,7 +291,7 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Workspace) {
+	if !h.isAllowedWorkspace(r.Context(), req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -545,7 +545,7 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace query param required", http.StatusBadRequest)
 		return
 	}
-	if !h.isAllowedWorkspace(ws) {
+	if !h.isAllowedWorkspace(r.Context(), ws) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -599,7 +599,7 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Workspace) {
+	if !h.isAllowedWorkspace(r.Context(), req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -636,7 +636,7 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Workspace) {
+	if !h.isAllowedWorkspace(r.Context(), req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -672,7 +672,7 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Path) {
+	if !h.isAllowedWorkspace(r.Context(), req.Path) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -695,9 +695,12 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// isAllowedWorkspace checks that the workspace path is one the server was started with.
-func (h *Handler) isAllowedWorkspace(ws string) bool {
-	for _, configured := range h.currentWorkspaces() {
+// isAllowedWorkspace checks that the workspace path is one the server was
+// started with AND is visible to the request's principal. The visibility
+// check keeps an org-scoped workspace from being read or mutated through a
+// session that config.go reports as having "no workspace".
+func (h *Handler) isAllowedWorkspace(ctx context.Context, ws string) bool {
+	for _, configured := range h.visibleWorkspaces(ctx) {
 		if configured == ws {
 			return true
 		}

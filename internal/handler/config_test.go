@@ -216,6 +216,139 @@ func TestUpdateConfig_PersistsWorkspaceGroups(t *testing.T) {
 	}
 }
 
+// TestUpdateWorkspaces_RoundTripsToConfig pins the picker "Activate" flow:
+// PUT /api/workspaces with a folder must make that folder visible on the very
+// next GET /api/config, so the board leaves the "Pick a workspace" empty state.
+func TestUpdateWorkspaces_RoundTripsToConfig(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+	pick := t.TempDir()
+
+	body, _ := json.Marshal(map[string]any{"workspaces": []string{pick}})
+	req := httptest.NewRequest(http.MethodPut, "/api/workspaces", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("PUT /api/workspaces: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	cfgReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	cfgW := httptest.NewRecorder()
+	h.GetConfig(cfgW, cfgReq)
+	if cfgW.Code != http.StatusOK {
+		t.Fatalf("GET /api/config: expected 200, got %d", cfgW.Code)
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(cfgW.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	workspaces, ok := resp["workspaces"].([]any)
+	if !ok || len(workspaces) == 0 {
+		t.Fatalf("expected activated workspace in config, got %#v", resp["workspaces"])
+	}
+	if workspaces[0].(string) != pick {
+		t.Errorf("expected workspace %q, got %q", pick, workspaces[0])
+	}
+}
+
+// TestUpdateWorkspaces_RoundTripsForOrgPrincipal pins the same Activate flow
+// for an authenticated org caller: a freshly activated group must be claimed
+// for the caller's org so the very next GET /api/config does not hide it as
+// cross-org (which would drop the board back to "Pick a workspace").
+func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+	pick := t.TempDir()
+
+	id := &auth.Identity{Sub: "user-1", OrgID: "org-a"}
+	body, _ := json.Marshal(map[string]any{"workspaces": []string{pick}})
+	req := httptest.NewRequest(http.MethodPut, "/api/workspaces", bytes.NewReader(body))
+	req = req.WithContext(auth.WithIdentity(req.Context(), id))
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("PUT /api/workspaces: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	cfgReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	cfgReq = cfgReq.WithContext(auth.WithIdentity(cfgReq.Context(), id))
+	cfgW := httptest.NewRecorder()
+	h.GetConfig(cfgW, cfgReq)
+	var resp map[string]any
+	if err := json.NewDecoder(cfgW.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	workspaces, ok := resp["workspaces"].([]any)
+	if !ok || len(workspaces) == 0 {
+		t.Fatalf("expected activated workspace visible to org principal, got %#v", resp["workspaces"])
+	}
+	if workspaces[0].(string) != pick {
+		t.Errorf("expected workspace %q, got %q", pick, workspaces[0])
+	}
+}
+
+// TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal is the
+// regression guard for the isolation leak: when the active workspace group is
+// stamped to org A, a personal (or org-B) caller must see no active workspace,
+// matching what buildConfigResponse already reports. Local callers (no
+// principal) and the owning org still see it.
+func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
+		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Local mode (no principal): visible.
+	if got := h.visibleWorkspaces(context.Background()); len(got) != 1 || got[0] != ws {
+		t.Errorf("local visibleWorkspaces = %v, want [%s]", got, ws)
+	}
+	// Owning org: visible.
+	ctxA := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
+	if got := h.visibleWorkspaces(ctxA); len(got) != 1 || got[0] != ws {
+		t.Errorf("org-a visibleWorkspaces = %v, want [%s]", got, ws)
+	}
+	// Personal caller: hidden (org group not in personal view).
+	ctxPersonal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
+	if got := h.visibleWorkspaces(ctxPersonal); len(got) != 0 {
+		t.Errorf("personal visibleWorkspaces = %v, want empty", got)
+	}
+	// Different org: hidden.
+	ctxB := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-b"})
+	if got := h.visibleWorkspaces(ctxB); len(got) != 0 {
+		t.Errorf("org-b visibleWorkspaces = %v, want empty", got)
+	}
+}
+
+// TestGetSpecTree_HiddenForMismatchedPrincipal proves the leak fix reaches a
+// browser-facing read surface: the Plan spec tree must be empty for a caller
+// who cannot see the org-stamped active workspace, even though the workspace
+// has specs on disk.
+func TestGetSpecTree_HiddenForMismatchedPrincipal(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	specsDir := filepath.Join(ws, "specs")
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specsDir, "README.md"), []byte("# Specs\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
+		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Local caller sees the roadmap index.
+	if tree := h.collectSpecTree(context.Background()); tree.Index == nil {
+		t.Fatal("expected roadmap index for local caller, got nil")
+	}
+	// Personal caller (cannot see org workspace) gets an empty tree.
+	ctxPersonal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
+	if tree := h.collectSpecTree(ctxPersonal); tree.Index != nil || len(tree.Nodes) != 0 {
+		t.Errorf("expected empty spec tree for mismatched principal, got index=%v nodes=%d", tree.Index, len(tree.Nodes))
+	}
+}
+
 func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
@@ -850,14 +983,14 @@ func TestGitStatus_WithWorkspace(t *testing.T) {
 
 func TestIsAllowedWorkspace_AllowsConfigured(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
-	if !h.isAllowedWorkspace(ws) {
+	if !h.isAllowedWorkspace(context.Background(), ws) {
 		t.Errorf("expected %q to be allowed workspace", ws)
 	}
 }
 
 func TestIsAllowedWorkspace_RejectsUnknown(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	if h.isAllowedWorkspace("/tmp/not-a-workspace") {
+	if h.isAllowedWorkspace(context.Background(), "/tmp/not-a-workspace") {
 		t.Error("expected /tmp/not-a-workspace to be rejected")
 	}
 }
