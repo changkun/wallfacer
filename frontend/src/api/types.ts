@@ -110,7 +110,7 @@ export interface ServerConfig {
   default_sandbox: string;
   host_mode: boolean;
   terminal_enabled: boolean;
-  cloud_mode: boolean;
+  auth_enabled: boolean;
   ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }
