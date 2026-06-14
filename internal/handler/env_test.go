@@ -242,29 +242,6 @@ func TestUpdateEnvConfig_OversightIntervalRoundTrip(t *testing.T) {
 	}
 }
 
-func TestUpdateEnvConfig_SandboxFastRoundTrip(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"sandbox_fast":false}`))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
-	w2 := httptest.NewRecorder()
-	h.GetEnvConfig(w2, req2)
-
-	var resp envConfigResponse
-	if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if resp.SandboxFast {
-		t.Fatal("sandbox_fast = true; want false")
-	}
-}
-
 func TestUpdateEnvConfig_CodexModelRoundTrip(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 
@@ -851,19 +828,6 @@ func TestUpdateEnvConfig_AutoPushThresholdClampedToOne(t *testing.T) {
 	}
 	if cfg.AutoPushThreshold < 1 {
 		t.Errorf("AutoPushThreshold = %d; want >= 1", cfg.AutoPushThreshold)
-	}
-}
-
-// TestUpdateEnvConfig_SandboxFastFalse verifies that sandbox_fast=false is
-// stored correctly (exercises the false branch of the sandboxFast conversion).
-func TestUpdateEnvConfig_SandboxFastFalse(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	body := `{"sandbox_fast":false}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

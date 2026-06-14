@@ -114,7 +114,6 @@ type envConfigResponse struct {
 	ArchivedTasksPerPage int                                  `json:"archived_tasks_per_page"`
 	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
 	AutoPushThreshold    int                                  `json:"auto_push_threshold"`
-	SandboxFast          bool                                 `json:"sandbox_fast"`
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
@@ -147,7 +146,6 @@ type sandboxTestRequest struct {
 	CodexTitleModel   *string                              `json:"codex_title_model"`
 	DefaultSandbox    *harness.ID                          `json:"default_sandbox"`
 	SandboxByActivity map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
-	SandboxFast       *bool                                `json:"sandbox_fast"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -192,7 +190,6 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPushEnabled:      cfg.AutoPushEnabled,
 		AutoPushThreshold:    autoPushThreshold,
-		SandboxFast:          cfg.SandboxFast,
 	})
 }
 
@@ -378,7 +375,6 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		TitleModel:        req.TitleModel,
 		CodexDefaultModel: req.CodexDefaultModel,
 		CodexTitleModel:   req.CodexTitleModel,
-		SandboxFast:       reqBoolString(req.SandboxFast),
 	}); err != nil {
 		return "", err
 	}
@@ -422,7 +418,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
 		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
 		AutoPushThreshold    *int                                 `json:"auto_push_threshold"`
-		SandboxFast          *bool                                `json:"sandbox_fast"`
 		TerminalEnabled      *bool                                `json:"terminal_enabled"`
 	}](w, r)
 	if !ok {
@@ -513,15 +508,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		autoPushThreshold = &s
 	}
 
-	var sandboxFast *string
-	if req.SandboxFast != nil {
-		v := "false"
-		if *req.SandboxFast {
-			v = "true"
-		}
-		sandboxFast = &v
-	}
-
 	var terminalEnabled *string
 	if req.TerminalEnabled != nil {
 		v := "false"
@@ -562,7 +548,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPush:             autoPush,
 		AutoPushThreshold:    autoPushThreshold,
-		SandboxFast:          sandboxFast,
 		TerminalEnabled:      terminalEnabled,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
