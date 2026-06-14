@@ -6,6 +6,7 @@ import { splitBatch, flowAllowsEmptyPrompt } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
 import TemplatePicker from './TemplatePicker.vue';
+import HarnessSelect from './HarnessSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
@@ -71,6 +72,17 @@ const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
 const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'>('');
+// Harness options for the picker: prefer the server's registered list so a
+// newly added harness appears without editing this component; fall back to
+// the known set before config loads.
+const harnessOptions = computed<string[]>(() =>
+  store.config?.sandboxes?.length
+    ? store.config.sandboxes
+    : ['claude', 'codex', 'cursor', 'pi', 'opencode'],
+);
+function onHarnessChange(v: string): void {
+  sandbox.value = v as typeof sandbox.value;
+}
 const batchMode = ref(false);
 const scheduled = ref(false);
 const intervalMinutes = ref<number | null>(null);
@@ -383,17 +395,14 @@ function onInput(e: Event) {
         <span class="composer__opt-label">Depends on</span>
         <DependencyPicker v-model="dependsOn" />
       </div>
-      <label class="composer__opt">
+      <div class="composer__opt">
         <span class="composer__opt-label">Harness</span>
-        <select v-model="sandbox" class="composer__select" aria-label="Harness override">
-          <option value="">Default (agent)</option>
-          <option value="claude">Claude</option>
-          <option value="codex">Codex</option>
-          <option value="cursor">Cursor</option>
-          <option value="pi">Pi</option>
-          <option value="opencode">OpenCode</option>
-        </select>
-      </label>
+        <HarnessSelect
+          :model-value="sandbox"
+          :options="harnessOptions"
+          @update:model-value="onHarnessChange"
+        />
+      </div>
     </div>
     <div class="composer__actions">
       <label class="composer__toggle">
