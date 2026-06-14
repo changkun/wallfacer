@@ -60,7 +60,7 @@ export const en: Record<string, string> = {
 
   // Download page
   'wf.dl.title': '<span class="wallfacer-brand">Download</span>',
-  'wf.dl.sub': 'Native app for macOS, Windows, and Linux.',
+  'wf.dl.sub': 'CLI for macOS, Windows, and Linux.',
   'wf.dl.macos.arch': 'Universal (Apple Silicon &amp; Intel)',
   'wf.dl.windows.arch': 'x86_64',
   'wf.dl.linux.arch': 'x86_64',
