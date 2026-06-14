@@ -1,6 +1,6 @@
 ---
 title: Inline Diff Feedback
-status: drafted
+status: archived
 depends_on: []
 affects:
   - ui/js/modal-diff.js
@@ -12,7 +12,7 @@ affects:
   - internal/store/models.go
 effort: medium
 created: 2026-04-02
-updated: 2026-04-02
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -189,3 +189,18 @@ No new API routes. The existing `POST /api/tasks/{id}/feedback` with `{message: 
 - Verify comments persist across modal close/reopen within the same session.
 - Verify comments are cleared after submission.
 - Verify the general feedback textarea in Overview tab still works independently.
+
+## Outcome
+
+Archived (2026-06-14). Never implemented, and the entire design targets the
+legacy vanilla-JS frontend. All five frontend files in its `affects` list
+(`ui/js/modal-diff.js`, `ui/js/modal-core.js`, `ui/js/tasks.js`,
+`ui/css/diffs.css`, `ui/partials/task-detail-modal.html`) were removed in
+`06c5517a` ("ui: remove the legacy vanilla-JS frontend"). The new Vue
+`frontend/src/lib/diff.ts` only classifies diff line kinds for highlighting;
+it has no comment gutter or inline-commenting surface. Archived following
+the same convention applied to the other old-frontend specs in `824b47ec`
+(typescript-migration, typed-dom-hooks). The code-review-style inline
+comment feature is still wanted; a fresh spec targeting the Vue diff
+components supersedes this one: [[diff-review-comments]]
+(`specs/local/diff-review-comments.md`).

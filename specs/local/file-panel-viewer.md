@@ -1,6 +1,6 @@
 ---
 title: Inline File Panel Viewer
-status: drafted
+status: archived
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
@@ -12,7 +12,7 @@ affects:
   - internal/handler/files.go
 effort: large
 created: 2026-03-28
-updated: 2026-04-19
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -154,3 +154,17 @@ The modal-based preview (`_openFilePreview`, `closeExplorerPreview`) is replaced
 - Do NOT add split-view / side-by-side file comparison (that's a diff viewer concern)
 - Do NOT add file creation, deletion, or renaming from the panel (separate spec)
 - Do NOT stream large files — the existing 2 MB limit for text files stays; media files use the browser's native streaming via direct URL
+
+## Outcome
+
+Archived (2026-06-14). Never implemented, and every file, symbol, and
+migration step it names is gone. The design migrates the vanilla-JS modal
+preview out of `ui/js/explorer.js` / `ui/css/explorer.css` into an inline
+tabbed panel, but that frontend was deleted in `06c5517a` ("ui: remove the
+legacy vanilla-JS frontend"). The explorer is now Vue
+(`frontend/src/components/ExplorerPanel.vue`), where the preview is still a
+modal, so the user-facing problem remains unsolved. The Phase 2 raw-content
+endpoint also never landed (`internal/apicontract/routes.go` exposes only
+`GET/PUT /api/explorer/file`). The inline-panel and multi-modal-preview idea
+is still worth pursuing against the Vue architecture: see the fresh spec
+[[inline-file-panel]] (`specs/local/inline-file-panel.md`).

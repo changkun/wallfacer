@@ -1,6 +1,6 @@
 ---
 title: "File & Image Drag-and-Drop Attachments for Task Prompts"
-status: drafted
+status: archived
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
@@ -12,7 +12,7 @@ affects:
   - ui/js/tasks.js
 effort: medium
 created: 2026-02-21
-updated: 2026-03-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -438,3 +438,15 @@ No changes to the sandbox `Dockerfile`, `go.mod`, or any git/instructions logic.
 - MCP servers, external storage, or cloud services.
 - Changes to the git worktree isolation system.
 - New dependencies (Go stdlib `mime/multipart`, `net/http` already handle uploads).
+
+## Outcome
+
+Archived (2026-06-14). Never implemented, and the design is written against
+architecture that no longer exists: it adds UI to `ui/index.html` and
+`ui/js/tasks.js` (the vanilla-JS frontend removed in `06c5517a`) and mounts
+attachments into a container via `buildContainerArgs()` (the per-task
+container model was removed in favor of the host backend, so
+`buildContainerArgs` no longer exists). The feature is still wanted; a fresh
+spec targeting the Vue frontend and host-mode workspace staging supersedes
+this one: [[task-prompt-attachments]]
+(`specs/local/task-prompt-attachments.md`).
