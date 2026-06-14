@@ -15,13 +15,18 @@ Identity - the live edge (auth + platform convergence)
   ○ Multi-User Collaboration       ○ Third-Party OIDC
   ○ Remote Control                 ○ Agent Token Exchange
 
-Local Product - 10 shipped, 1 in progress, rest pending
+Spec Coordination - in progress (its own track; spec tree, planning, dispatch)
+  ✅ Document Model                ✅ Spec Archival
+  ✅ Planning UX                   ✅ Chat-First Mode
+  ✅ Planning Chat Threads         ○ Spec State Control Plane
+
+Local Product - 10 shipped, rest pending
   ⊘ Desktop App (code removed)     ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
-  ✅ Pixel Agent Avatars           ◐ Spec Coordination
-  ✅ Routine Tasks                 ✅ Agents & Flows
-  ✅ Refinement Into Plan          ✅ Vue Frontend Migration
-  ✅ Rebrand Module Path           ✅ Backend Redundancy Cleanup
+  ✅ Pixel Agent Avatars           ✅ Routine Tasks
+  ✅ Agents & Flows                ✅ Refinement Into Plan
+  ✅ Vue Frontend Migration        ✅ Rebrand Module Path
+  ✅ Backend Redundancy Cleanup
   ○ Task Prompt Attachments        ○ Inline File Panel
   ○ Diff Review Comments           ○ Test Criteria
   ○ Visual Verification            ○ Scoped Command Registry
@@ -86,9 +91,9 @@ Auth-by-default is the active convergence work. Multi-user collaboration is the 
 
 ---
 
-## Local Product
+## Spec Coordination
 
-Desktop experience and developer workflow improvements. No cloud dependency. Ships value to single-user deployments. The largest active item is the **Spec Coordination** umbrella (its own nested subtree).
+Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automation. Promoted to its own track (`specs/spec-coordination/`): it is the largest self-contained body of work in the project. Most subtrees are complete; the state control plane remains.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
@@ -100,6 +105,15 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | ↳↳ [planning-chat-threads.md](spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md) | **Complete** | Multi-tab planning chat: independent conversation threads sharing the single planner, per-thread session/history/unread, inline rename, archive-only deletion, `git revert` thread-scoped undo, crash-safe migration. Shipped (ThreadManager, `/api/planning/threads`, PlanningChatPanel.vue). |
 | ↳↳ [session-persistence.md](spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/session-persistence.md) | Stale | Faithful planning-conversation resume. The lossy `BuildHistoryContext` fallback is still the live behavior, so the degraded-resume problem remains; needs re-scoping against the host-process planner or archiving. |
 | ↳ [spec-state-control-plane.md](spec-coordination/spec-coordination/spec-state-control-plane.md) | Not started | Server-managed lifecycle transitions: chat-edit fan-out → `stale`, dispatch → `validated`, task done → tester-mediated drift verdict → `complete` or `stale`, periodic staleness scan, downstream propagation. `SpecCompletionHook` still writes `complete` unconditionally today; the drift gate is unbuilt. |
+
+---
+
+## Local Product
+
+Desktop experience and developer workflow improvements. No cloud dependency. Ships value to single-user deployments.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. |
 | [inline-file-panel.md](local/inline-file-panel.md) | Drafted | Inline tabbed file panel with multi-modal preview (image/video/audio/PDF/hex) over `ExplorerPanel.vue` + a raw-content endpoint. Supersedes the archived file-panel-viewer. |
 | [diff-review-comments.md](local/diff-review-comments.md) | Drafted | Code-review-style inline comments anchored to diff lines, batched into the existing feedback channel. Supersedes the archived inline-diff-feedback. |
