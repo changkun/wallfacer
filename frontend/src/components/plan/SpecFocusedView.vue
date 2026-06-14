@@ -323,10 +323,14 @@ function onBodyClick(ev: MouseEvent) {
 }
 
 // Re-run mermaid enhancement on every body change, including the initial
-// mount (immediate) where renderedBody is already computed. enhanceMermaid is
-// idempotent — already-rendered blocks carry the .mermaid-rendered marker
-// and are skipped on subsequent passes.
-watch([renderedBody, renderedTaskPrompt], () => {
+// mount (immediate) and navigation between specs. bodyRef is in the source
+// list because the keyed <main> is replaced through an out-in crossfade: when
+// a new spec is focused, renderedBody changes before the new element mounts,
+// so the body content alone fires too early (the old element is still fading
+// out). bodyRef updates once the new <main> mounts, re-firing this watch
+// against the live element. enhanceMermaid is idempotent — already-rendered
+// blocks carry the .mermaid-rendered marker and are skipped on later passes.
+watch([renderedBody, renderedTaskPrompt, bodyRef], () => {
   void nextTick(() => {
     if (bodyRef.value) void enhanceMermaid(bodyRef.value);
   });
