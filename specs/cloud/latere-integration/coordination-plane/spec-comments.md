@@ -167,15 +167,26 @@ Reposition runs in the coordinator when it relays a thread set for a spec, and i
 re-run client-side against the loaded body so the marker lands on the rendered line.
 Both sides use the same normalization, so they agree.
 
-### Open question (residual risk)
+### Threshold (decided, tunable)
 
-Threshold tuning is a false-orphan versus mis-attach tradeoff: too strict orphans
-threads on trivial edits, too loose risks re-anchoring a comment onto an unrelated
-line after a large rewrite. No anchor survives an arbitrary rewrite of the anchored
-text. The orphan re-place UX (who is nudged, how a stale thread is surfaced without
-nagging) is unresolved. Start with a conservative threshold that prefers orphaning
-over mis-attaching (a visible "re-place" is safer than a silently wrong pin) and tune
-on real edit traffic. This is the spec's primary open risk.
+The policy is **prefer-orphan over mis-attach**: a visible "re-place" affordance is
+safer than a silently wrong pin. Concrete starting values, tuned later on real edit
+traffic:
+
+- **Step 2 (exact-ambiguous disambiguation):** pick a candidate only if its
+  combined `prefix`/`suffix` context similarity is >= **0.6** and beats the
+  runner-up by a clear margin; otherwise fall through.
+- **Step 3 (fuzzy within section):** reattach only if the best line's combined
+  `prefix`/`suffix` similarity is >= **0.8** (token-level Jaccard over normalized
+  lines); otherwise orphan.
+
+Similarity is computed on the frozen-normalized lines so cloud and the future
+git-export path score identically. These numbers are deliberately conservative
+(high bar to move a pin) and live in one place so tuning is a constant change, not
+a redesign.
+
+The genuinely-open residual is the **orphan re-place UX**: who is nudged when a
+thread orphans, and how a stale thread is surfaced without nagging. Tracked below.
 
 ## Real-time relay
 
@@ -270,11 +281,11 @@ it is referenced here, not specified.
 
 ## Future: git-export (separate leaf)
 
-A follow-up leaf adds export/import so threads materialize into the repo
-(`.wallfacer/comments/<spec>.ndjson`) and travel with the project, restoring
-portability and offline access. The v1 schema above (ULID ids, content-hash anchors,
-flat records, frozen normalization) is designed so that path is a serializer, not a
-rewrite. Not specified here.
+[git-export.md](spec-comments/git-export.md) (vague) adds export/import so threads
+materialize into the repo (`.wallfacer/comments/<spec>.ndjson`) and travel with the
+project, restoring portability and offline access. The v1 schema above (ULID ids,
+content-hash anchors, flat records, frozen normalization) is designed so that path
+is a serializer, not a rewrite.
 
 ## Acceptance criteria
 
@@ -297,9 +308,11 @@ rewrite. Not specified here.
 
 ## Open questions
 
-1. **Anchoring threshold (primary risk).** False-orphan versus mis-attach tradeoff;
-   no anchor survives arbitrary rewrites; the orphan re-place UX is unresolved. Start
-   conservative (prefer orphaning over mis-attaching), tune on real edit traffic.
+1. **Orphan re-place UX (residual risk).** The anchoring thresholds are decided
+   (prefer-orphan, see "Threshold (decided, tunable)"). What stays open is the
+   re-place experience: who is nudged when a thread orphans, and how a stale thread
+   is surfaced without nagging. No anchor survives an arbitrary rewrite of its text;
+   the re-place affordance is the floor, and its UX needs design.
 2. **Comment edit and delete.** v1 allows author edit (`edited_at`). Whether to allow
    hard delete (versus tombstone for the audit trail) is deferred; tombstone is the
    likely answer to keep the export append-friendly.
