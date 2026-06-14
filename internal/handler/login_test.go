@@ -7,8 +7,62 @@ import (
 	"strings"
 	"testing"
 
+	"latere.ai/x/pkg/oidc"
+
 	"latere.ai/x/wallfacer/internal/auth"
 )
+
+// fakeMeAuth is an AuthProvider that also implements meBuilder, so AuthMe takes
+// the BuildMe branch (the real-client path) and returns the full principal.
+type fakeMeAuth struct {
+	fakeAuth
+	me *oidc.Me
+}
+
+func (f *fakeMeAuth) BuildMe(http.ResponseWriter, *http.Request) (*oidc.Me, error) {
+	return f.me, nil
+}
+
+// TestAuthMe_BuildMe_IncludesOrgs guards the account-menu contract: /api/me must
+// serialize the org list (and principal_id) from BuildMe so the shared
+// AccountMenu can render the org switcher. Empty orgs was the "no orgs showing"
+// bug after the stale-token fetch was replaced with BuildMe.
+func TestAuthMe_BuildMe_IncludesOrgs(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	h.SetAuth(&fakeMeAuth{me: &oidc.Me{
+		Sub:     "u-1",
+		Email:   "a@b.com",
+		Name:    "Alice",
+		OrgID:   "o1",
+		OrgName: "Acme",
+		Orgs: []oidc.OrgEntry{
+			{ID: "o1", Name: "Acme", Owner: true},
+			{ID: "o2", Name: "Beta"},
+		},
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	w := httptest.NewRecorder()
+	h.AuthMe(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got["principal_id"] != "u-1" {
+		t.Errorf("principal_id = %v, want u-1", got["principal_id"])
+	}
+	orgs, _ := got["orgs"].([]any)
+	if len(orgs) != 2 {
+		t.Fatalf("orgs = %v, want 2 entries", got["orgs"])
+	}
+	if got["org_id"] != "o1" {
+		t.Errorf("org_id = %v, want o1", got["org_id"])
+	}
+}
 
 // fakeAuth implements AuthProvider so tests can exercise the handler branches
 // without constructing a real OIDC client (which would require a live auth

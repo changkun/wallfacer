@@ -3,7 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
+
+	"latere.ai/x/pkg/oidc"
 
 	"latere.ai/x/wallfacer/internal/auth"
 )
@@ -88,87 +89,56 @@ func (h *Handler) LogoutNotify(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// meBuilder is the optional subset of AuthProvider that assembles the full
+// principal (identity + /userinfo avatar + /me/orgs list) with correct
+// single-refresh token handling. *auth.Client satisfies it via oidc.BuildMe;
+// test doubles don't and fall back to the identity-only branch below.
+type meBuilder interface {
+	BuildMe(http.ResponseWriter, *http.Request) (*oidc.Me, error)
+}
+
 // AuthMe returns the current signed-in principal for the account menu. 204 No
 // Content means "no session" (not an error). 200 returns the latere-ui
-// Principal shape (principal_id, identity, active org, org list, superadmin,
-// auth_url) so the shared AccountMenu can render the avatar, the org switcher,
-// and the dashboard link without extra round-trips.
+// Principal shape (identity, avatar/initials, active org, org list) so the
+// shared AccountMenu renders the avatar and org switcher, the same payload
+// cella/lectio serve.
 func (h *Handler) AuthMe(w http.ResponseWriter, r *http.Request) {
 	if h.auth == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	// Real OIDC client: BuildMe resolves /userinfo + /me/orgs off one
+	// up-front token refresh. A degraded error still yields a usable `me`
+	// (identity present, org list possibly empty), so it is non-fatal here.
+	if mb, ok := h.auth.(meBuilder); ok {
+		me, _ := mb.BuildMe(w, r)
+		if me == nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(struct {
+			*oidc.Me
+			PrincipalID string `json:"principal_id"`
+			AuthURL     string `json:"auth_url,omitempty"`
+		}{Me: me, PrincipalID: me.Sub, AuthURL: h.authURL})
+		return
+	}
+
+	// Fallback for providers without BuildMe (test doubles): identity only.
 	u := h.auth.UserFromRequest(w, r)
 	if u == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-
-	// Best-effort org list for the switcher. A failure (token just expired,
-	// auth unreachable) degrades to identity-only rather than failing the call.
-	orgs := []orgEntry{}
-	orgName := ""
-	if sr, ok := h.auth.(sessionReader); ok {
-		if sess, err := sr.GetSession(r); err == nil && sess != nil && sess.AccessToken != "" {
-			if list, err := fetchOrgs(r.Context(), h.authURL, sess.AccessToken); err == nil {
-				orgs = list
-				for _, o := range list {
-					if o.ID == u.OrgID {
-						orgName = o.Name
-						break
-					}
-				}
-			}
-		}
-	}
-
-	display := u.DisplayName
-	if display == "" {
-		display = u.Name
-	}
-	avatar := u.AvatarURL
-	if avatar == "" {
-		avatar = u.Picture
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(struct {
-		PrincipalID  string     `json:"principal_id"`
-		Email        string     `json:"email"`
-		Name         string     `json:"name"`
-		DisplayName  string     `json:"display_name,omitempty"`
-		AvatarURL    string     `json:"avatar_url,omitempty"`
-		Initials     string     `json:"initials,omitempty"`
-		OrgID        string     `json:"org_id"`
-		OrgName      string     `json:"org_name,omitempty"`
-		Orgs         []orgEntry `json:"orgs"`
-		IsSuperadmin bool       `json:"is_superadmin"`
-		AuthURL      string     `json:"auth_url,omitempty"`
-	}{
-		PrincipalID:  u.Sub,
-		Email:        u.Email,
-		Name:         u.Name,
-		DisplayName:  display,
-		AvatarURL:    avatar,
-		Initials:     userInitials(display, u.Email),
-		OrgID:        u.OrgID,
-		OrgName:      orgName,
-		Orgs:         orgs,
-		IsSuperadmin: u.IsSuperadmin,
-		AuthURL:      h.authURL,
-	})
-}
-
-// userInitials returns a single uppercase initial from the name, falling back
-// to the email, then "?". The shared AccountMenu shows it when no avatar_url.
-func userInitials(name, email string) string {
-	s := strings.TrimSpace(name)
-	if s == "" {
-		s = strings.TrimSpace(email)
-	}
-	if s == "" {
-		return "?"
-	}
-	return strings.ToUpper(s[:1])
+		Sub     string `json:"sub"`
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
+		AuthURL string `json:"auth_url,omitempty"`
+	}{u.Sub, u.Email, u.Name, u.Picture, h.authURL})
 }
