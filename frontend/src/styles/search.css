@@ -25,24 +25,33 @@ mark.search-highlight {
   align-items: center;
 }
 .task-search-input {
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 6px;
-  padding: 6px 28px 6px 30px;
+  border-radius: var(--r-md, 6px);
+  /* Left pad clears the absolutely-positioned search icon; right pad clears
+     the × clear button at right: 7px. */
+  padding: 7px 28px 7px 30px;
   font-size: 13px;
+  line-height: 1.4;
   outline: none;
-  width: 100%;
-  min-width: 220px;
-  max-width: 320px;
   font-family: inherit;
   transition:
-    width 0.2s ease,
-    border-color 0.15s;
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
 }
-.task-search-input:focus {
+.task-search-input:hover {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+}
+.task-search-input:focus,
+.task-search-input:focus-visible {
+  outline: none;
   border-color: var(--accent);
-  max-width: 380px;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
 }
 .task-search-input::placeholder {
   color: var(--text-muted);

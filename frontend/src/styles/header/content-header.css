@@ -25,8 +25,8 @@
 }
 
 .app-header__search {
-  flex: 1 1 240px;
-  max-width: 320px;
+  flex: 1 1 280px;
+  max-width: 440px;
 }
 
 .app-header__button-row {
