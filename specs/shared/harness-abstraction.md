@@ -1,6 +1,6 @@
 ---
 title: Harness Abstraction
-status: drafted
+status: validated
 depends_on:
   - specs/shared/host-default.md
   - specs/shared/agent-abstraction.md
@@ -13,7 +13,7 @@ affects:
   - internal/store/
 effort: xlarge
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -187,3 +187,12 @@ The abstraction is sound when:
 
 - Should `harness.Permission` map 1:1 onto each CLI's permission knob, or normalize across harnesses (e.g., "Edit" always means "can write within cwd, no shell elevation")? Lean toward a normalized 3-value enum that each adapter translates; document divergences in `Capabilities`.
 - Where do user-supplied environment overrides per harness live? Current env config has `WALLFACER_SANDBOX_<ACTIVITY>` per role; do we add `WALLFACER_HARNESS_<NAME>_*` for harness-specific knobs (e.g., Cursor's `CURSOR_API_KEY`, OpenCode's `OPENCODE_SERVER_PASSWORD`)? Resolved in [interface](harness-abstraction/interface.md).
+
+## Outcome
+
+Partially shipped. The abstraction and the two existing harnesses landed; the three new harnesses are designed but not built.
+
+- **Done:** [interface](harness-abstraction/interface.md) — `internal/harness/` package with the `Harness` interface, value types, registry, and a fake harness for tests. [claude-and-codex-migration](harness-abstraction/claude-and-codex-migration.md) — Claude and Codex argv/parse logic moved into `claude.go`/`codex.go`, both `Register`ed at init; `sandbox.Type` became `harness.ID`.
+- **Drafted, not implemented:** [cursor](harness-abstraction/cursor.md), [opencode](harness-abstraction/opencode.md), [pi](harness-abstraction/pi.md). Their IDs exist as constants in `harness.go` (`Cursor`, `OpenCode`, `Pi`) but no adapter is registered yet, so only Claude and Codex are selectable.
+
+Status is `validated` rather than `complete`: the design is locked and the core is built, but three leaf specs remain open. It flips to `complete` once Cursor/OpenCode/Pi ship (or are explicitly dropped).
