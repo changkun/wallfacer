@@ -2,17 +2,17 @@
 
 Wallfacer uses circuit breakers to automatically pause automation when
 something goes wrong, preventing cascading failures. They self-heal
-once the problem resolves — no manual intervention required.
+once the problem resolves, with no manual intervention required.
 
 There are two independent systems: **watcher breakers** (per-automation)
-and the **container breaker** (runtime-level).
+and the **agent-launch breaker** (runtime-level).
 
 ## Watcher Breakers
 
-Each automation watcher (Promote, Retry, Test, Submit, Catch Up,
-Refine) has its own circuit breaker. When a watcher encounters repeated
-errors, its breaker opens and suppresses that watcher while leaving all
-others running.
+Each automation watcher (Promote, Retry, Test, Submit, Catch Up) has its
+own circuit breaker. When a watcher encounters repeated errors, its
+breaker opens and suppresses that watcher while leaving all others
+running.
 
 ### What you see
 
@@ -30,7 +30,7 @@ trips, a red indicator appears showing:
 A breaker opens when the watcher's internal logic encounters an error
 during its scan-and-act cycle. For example:
 
-- The auto-promoter fails to launch a container
+- The auto-promoter fails to launch an agent process
 - The auto-retrier encounters an unexpected store error
 - The auto-submitter fails to commit changes
 
@@ -47,7 +47,7 @@ Watcher breakers use **exponential backoff**:
 | 5th+      | 5 minutes (cap) |
 
 After each cooldown, the watcher tries again. A single success resets
-the breaker completely — the failure counter goes back to zero and the
+the breaker completely: the failure counter goes back to zero and the
 watcher resumes normal operation.
 
 ### What still works
@@ -62,58 +62,62 @@ Automation toggles (Autopilot, Auto-test, etc.) remain independent of
 breaker state. The breaker is a transient safety layer, not a
 configuration change.
 
-## Container Breaker
+## Agent-Launch Breaker
 
-The container breaker protects against the container runtime (Docker or
-Podman) being unavailable. If the runtime crashes, gets uninstalled, or
-the daemon stops, wallfacer stops trying to launch containers until the
-runtime recovers.
+The agent-launch breaker protects against the agent CLI being
+unavailable. Wallfacer runs each task by launching the selected agent
+(claude or codex) as a host process in the task's git worktree. If that
+launch fails repeatedly, wallfacer stops trying to start new agent
+processes until the problem clears.
 
 ### What triggers it
 
-The container breaker opens after **5 consecutive runtime errors**
-(configurable). Only true runtime failures count:
+The agent-launch breaker opens after **5 consecutive launch failures**
+(configurable). Only failures to *start* the agent process count, for
+example:
 
-- Exit code 125 (container engine failure)
-- Connection refused (daemon not running)
-- Binary not found
+- The agent binary cannot be found (not on `$PATH`, or the configured
+  path does not exist)
+- The host process fails to spawn
 
-Normal agent failures (exit codes 1–124) do **not** trip the breaker.
+Normal agent failures (an agent that starts but exits with a non-zero
+code) do **not** trip the breaker. Those are task-level outcomes, not
+launch failures.
 
 ### How it recovers
 
-The container breaker uses a three-state model:
+The agent-launch breaker uses a three-state model:
 
-1. **Closed** (normal): All container launches proceed.
+1. **Closed** (normal): All agent launches proceed.
 2. **Open** (tripped): All launches blocked for 30 seconds.
 3. **Half-open** (probing): One launch is allowed as a probe.
-   - If the probe succeeds → circuit closes, operations resume.
-   - If the probe fails → circuit reopens for another 30 seconds.
+   - If the probe succeeds, the circuit closes and operations resume.
+   - If the probe fails, the circuit reopens for another 30 seconds.
 
 ### What you see
 
-The container breaker is not directly shown in the UI. Its effects are
-visible as:
+The agent-launch breaker is not directly shown in the UI. Its effects
+are visible as:
 
 - Auto-promote stops picking up new tasks
-- Auto-retry stops retrying tasks that failed due to container crashes
+- Auto-retry stops retrying tasks that failed to launch
 - The board appears to "pause" temporarily
 
-Once the container runtime is available again, the next probe succeeds
-and everything resumes automatically.
+Once the agent CLI can be launched again, the next probe succeeds and
+everything resumes automatically.
 
-The container breaker state is available via `GET /api/debug/runtime`
-(the `container_circuit` field) for monitoring.
+The breaker state is available via `GET /api/debug/runtime` (the
+`container_circuit` field) for monitoring.
 
 ## Configuration
 
 Both breakers are configurable via process-level environment variables
-(set in your shell, systemd unit, or container environment):
+(set in your shell or systemd unit):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WALLFACER_CONTAINER_CB_THRESHOLD` | 5 | Consecutive runtime failures before the container breaker opens |
-| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | 30 | How long the container breaker stays open before probing |
+| `WALLFACER_CONTAINER_CB_THRESHOLD` | 5 | Consecutive agent-process launch failures before the breaker opens |
+| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | 30 | How long the breaker stays open before probing |
 
 Watcher breaker timing (30s base, 5min cap) is not currently
 configurable.
@@ -121,10 +125,11 @@ configurable.
 ## Design Rationale
 
 Circuit breakers exist because wallfacer runs automation continuously in
-the background. Without them, a transient failure (e.g. Docker daemon
-restarting) would cause every watcher to spam failed attempts, flood
-logs, and potentially exhaust resources. The breakers provide automatic
-backoff and recovery with no user action needed.
+the background. Without them, a transient failure (e.g. the agent CLI
+temporarily missing from `$PATH`) would cause every watcher to spam
+failed attempts, flood logs, and potentially exhaust resources. The
+breakers provide automatic backoff and recovery with no user action
+needed.
 
 Key design choices:
 
