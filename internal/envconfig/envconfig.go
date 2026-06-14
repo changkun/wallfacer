@@ -37,6 +37,9 @@ type Config struct {
 	CodexDefaultModel string // CODEX_DEFAULT_MODEL
 	CodexTitleModel   string // CODEX_TITLE_MODEL
 
+	// Cursor sandbox fields.
+	CursorAPIKey string // CURSOR_API_KEY
+
 	DefaultSandbox        harness.ID // WALLFACER_DEFAULT_SANDBOX
 	ImplementationSandbox harness.ID // WALLFACER_SANDBOX_IMPLEMENTATION
 	TestingSandbox        harness.ID // WALLFACER_SANDBOX_TESTING
@@ -48,6 +51,7 @@ type Config struct {
 
 	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
 	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
+	HostCursorBinary string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
 	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
@@ -74,6 +78,7 @@ var knownKeys = []string{
 	"CLAUDE_TITLE_MODEL",
 	"CODEX_DEFAULT_MODEL",
 	"CODEX_TITLE_MODEL",
+	"CURSOR_API_KEY",
 	"WALLFACER_MAX_PARALLEL",
 	"WALLFACER_MAX_TEST_PARALLEL",
 	"WALLFACER_OVERSIGHT_INTERVAL",
@@ -91,6 +96,7 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_FAST",
 	"WALLFACER_HOST_CLAUDE_BINARY",
 	"WALLFACER_HOST_CODEX_BINARY",
+	"WALLFACER_HOST_CURSOR_BINARY",
 	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
 	"WALLFACER_CLOUD",
@@ -171,6 +177,8 @@ func Parse(path string) (Config, error) {
 			cfg.CodexDefaultModel = v
 		case "CODEX_TITLE_MODEL":
 			cfg.CodexTitleModel = v
+		case "CURSOR_API_KEY":
+			cfg.CursorAPIKey = v
 		case "WALLFACER_DEFAULT_SANDBOX":
 			cfg.DefaultSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_IMPLEMENTATION":
@@ -191,6 +199,8 @@ func Parse(path string) (Config, error) {
 			cfg.HostClaudeBinary = v
 		case "WALLFACER_HOST_CODEX_BINARY":
 			cfg.HostCodexBinary = v
+		case "WALLFACER_HOST_CURSOR_BINARY":
+			cfg.HostCursorBinary = v
 		case "WALLFACER_TERMINAL_ENABLED":
 			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":
@@ -384,6 +394,7 @@ type Updates struct {
 	ServerAPIKey         *string
 	OpenAIAPIKey         *string
 	OpenAIBaseURL        *string
+	CursorAPIKey         *string
 	DefaultModel         *string
 	TitleModel           *string
 	CodexDefaultModel    *string
@@ -410,6 +421,7 @@ func Update(path string, u Updates) error {
 		"WALLFACER_SERVER_API_KEY":          u.ServerAPIKey,
 		"OPENAI_API_KEY":                    u.OpenAIAPIKey,
 		"OPENAI_BASE_URL":                   u.OpenAIBaseURL,
+		"CURSOR_API_KEY":                    u.CursorAPIKey,
 		"CLAUDE_DEFAULT_MODEL":              u.DefaultModel,
 		"CLAUDE_TITLE_MODEL":                u.TitleModel,
 		"CODEX_DEFAULT_MODEL":               u.CodexDefaultModel,
