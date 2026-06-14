@@ -23,7 +23,7 @@ import (
 //
 // The token is stored at <UserConfigDir>/latere/token.json, the same
 // location latere-cli uses, so a single login carries over between both
-// tools and (eventually) wallfacer's local-mode desktop UI.
+// tools and wallfacer's local-mode web UI.
 func RunAuth(_ string, args []string) {
 	if len(args) == 0 {
 		printAuthUsage()
@@ -55,7 +55,7 @@ func RunAuth(_ string, args []string) {
 }
 
 func printAuthUsage() {
-	fmt.Fprintf(os.Stderr, `Authenticate the wallfacer CLI (and local-mode desktop UI) against
+	fmt.Fprintf(os.Stderr, `Authenticate the wallfacer CLI (and local-mode web UI) against
 auth.latere.ai using the RFC 8628 device-authorization flow.
 
 Usage:
