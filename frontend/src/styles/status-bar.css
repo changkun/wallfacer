@@ -241,7 +241,9 @@
   background: var(--terminal-bg);
   flex-shrink: 0;
   min-height: 26px;
-  padding: 0 4px;
+  /* Left inset matches #terminal-canvas so "Shell 1" lines up with the prompt
+     (tab adds its own 10px; 2px here lands the label near the 12px content edge). */
+  padding: 0 4px 0 2px;
   font-family: var(--font-mono);
 }
 .terminal-tab-bar[hidden] {
@@ -301,11 +303,14 @@
 #terminal-canvas {
   flex: 1;
   overflow: hidden;
-  padding: 6px 0 0;
+  /* Horizontal inset keeps the prompt off the sidebar edge.
+     Fit addon refits to the reduced inner width. */
+  padding: 6px 12px 0;
 }
 #status-bar-panel .xterm {
   height: 100%;
-  padding: 0 10px;
+  /* Inset lives on #terminal-canvas; avoid doubling the left gap. */
+  padding: 0;
   background: var(--terminal-bg);
 }
 #status-bar-panel .xterm-viewport {
