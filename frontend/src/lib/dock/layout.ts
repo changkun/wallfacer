@@ -320,11 +320,15 @@ export function deserialize(raw: string | null): DockLayout | null {
   return { regions, sizes, maximized, version: DOCK_LAYOUT_VERSION };
 }
 
-// Seed a layout from the legacy single-bottom-drawer state: a bottom-docked
-// terminal at the persisted 'wallfacer-panel-height' (or the default). Called
-// once, only when no v1 layout exists yet.
+// Seed a layout from the legacy single-bottom-drawer state. The legacy terminal
+// was closed by default (visibility was never persisted), so migration must NOT
+// auto-dock it — that would surface the terminal for every user on first load.
+// It only carries forward the size *preference*: the persisted
+// 'wallfacer-panel-height' is stamped onto sizes.bottom so the terminal adopts
+// its old height the first time it is docked there. Called once, when no v1
+// layout exists yet.
 export function migrateLegacy(legacyHeight: string | null): DockLayout {
-  const layout = dockPanel(defaultLayout(), 'terminal', 'bottom');
+  const layout = defaultLayout();
   const h = Number(legacyHeight);
   if (Number.isFinite(h) && h >= REGION_MIN_SIZE) {
     layout.sizes.bottom = clampRegionSize(h);
