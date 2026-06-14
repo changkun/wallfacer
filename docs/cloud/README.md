@@ -11,7 +11,7 @@ Identity is fully landed. Sign-in, JWT validation, the principal/org model, supe
 What is shipped:
 
 - `WALLFACER_CLOUD` feature flag with fail-fast startup validation.
-- **Sign-in badge** in the status bar: avatar + username when signed in, "Sign in" link otherwise. Hidden entirely in local mode.
+- **Account control** in the sidebar: a "Sign in" chip when signed out, the account menu (avatar, username, org switcher, sign out) when signed in. Since auth-by-default this surface is present in local mode too; cloud mode does not add it, it makes sign-in *required* (see [`auth-by-default.md`](../../specs/identity/auth-by-default.md)).
 - **OIDC sign-in routes:** `/login`, `/callback`, `/logout`, `/logout/notify` (mounted unconditionally; handlers self-gate to 503/204 when the OIDC client is nil).
 - **Principal endpoints:** `GET /api/me` returns the current signed-in user, or 204 when unauthenticated.
 - **Org-switch routes:** `GET /api/auth/orgs` lists the user's organizations (204 when single-org or unauthenticated); `PATCH /api/auth/me` and `POST /api/me/switch-org` both validate membership, clear the session, and return a redirect to `/login?org_id=<target>`.
