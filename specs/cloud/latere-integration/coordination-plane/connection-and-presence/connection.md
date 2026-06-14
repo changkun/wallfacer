@@ -212,11 +212,10 @@ Valkey is a **cache**, eviction-unsafe under memory pressure, so it holds only
 authoritative** data does **not** live in Valkey:
 
 - **Spec comments** are cloud-authoritative (the one relay-not-mirror exception),
-  so their system of record is **Postgres** (`latere-pg`), not the cache. wallfacer
-  has no database on `latere-pg` today (it is filesystem-storage), so this is a
-  new infra dependency tracked in [spec-comments](../spec-comments.md) and gated
-  on a provisioning decision. It does **not** block this phase: connection and
-  presence are Valkey-only.
+  so their system of record is **Postgres** (`latere-pg`), not the cache. The
+  `wallfacer` database and `WALLFACER_DATABASE_URL` are provisioned (see
+  [spec-comments](../spec-comments.md)). Connection and presence themselves are
+  Valkey-only and need no Postgres.
 - **Metadata projection** live read-model may sit in Valkey (it is a cache of
   record, regenerable by replay); only its long-retention rollups want Postgres
   (see [metadata-projection](../metadata-projection.md)).
