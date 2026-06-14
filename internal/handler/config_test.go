@@ -461,6 +461,9 @@ func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 	if !slices.Contains(sandboxes, "cursor") {
 		t.Fatalf("expected sandboxes to include cursor, got %v", sandboxes)
 	}
+	if !slices.Contains(sandboxes, "opencode") {
+		t.Fatalf("expected sandboxes to include opencode, got %v", sandboxes)
+	}
 }
 
 // TestAvailableSandboxes_IncludesRegisteredHarnesses asserts the built-in
@@ -468,7 +471,7 @@ func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 // (cursor) appears without being hardcoded.
 func TestAvailableSandboxes_IncludesRegisteredHarnesses(t *testing.T) {
 	got := availableSandboxes(envconfig.Config{})
-	for _, want := range []harness.ID{harness.Claude, harness.Codex, harness.Cursor} {
+	for _, want := range []harness.ID{harness.Claude, harness.Codex, harness.Cursor, harness.OpenCode} {
 		if !slices.Contains(got, want) {
 			t.Errorf("availableSandboxes missing %q: %v", want, got)
 		}
@@ -496,6 +499,31 @@ func TestGetConfig_CursorUsableByDefault(t *testing.T) {
 	}
 	if usable["cursor"] != true {
 		t.Fatalf("expected sandbox_usable.cursor=true, got %v", usable["cursor"])
+	}
+}
+
+// TestGetConfig_OpenCodeUsableByDefault asserts opencode is reported usable in
+// the GetConfig response. opencode manages provider auth itself, so it has no
+// codex-style key gate.
+func TestGetConfig_OpenCodeUsableByDefault(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	usable, ok := resp["sandbox_usable"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sandbox_usable object, got %T (%v)", resp["sandbox_usable"], resp["sandbox_usable"])
+	}
+	if usable["opencode"] != true {
+		t.Fatalf("expected sandbox_usable.opencode=true, got %v", usable["opencode"])
 	}
 }
 
