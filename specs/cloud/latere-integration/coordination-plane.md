@@ -77,6 +77,11 @@ or a place local data is backed up. Pull the plug on wf.latere.ai and every
 local instance keeps working exactly as today; only cross-instance features go
 dark.
 
+**One scoped exception:** inline spec comments are cloud-resident in v1 (see
+capability 4). The coordinator is authoritative for that one collaboration
+artifact, never for local task or spec *data*. The exception is bounded to
+comments and is paid down by a planned git-export path.
+
 ### Why this is not "absorbing"
 
 Consume-don't-absorb forbids wallfacer reimplementing Cella (runtime), FS (file
@@ -137,6 +142,24 @@ presence design from "process-local within one hosted instance" to
 "coordinator-aggregated across instances." The avatar-stack / focus / typing UI
 from that spec is unchanged; only the source of the presence list moves.
 
+#### Two deployment models, one coordinator
+
+Both topologies are supported and are just different clients of the same
+coordinator (decided: keep both as parallel deployments):
+
+- **Local-first sync (primary).** N teammates each run their own local
+  `wallfacer`, each connected outbound to the coordinator. Presence and
+  collaboration aggregate across instances. This is the lead model.
+- **Hosted shared (alternative).** One wallfacerd serves an org and members
+  point browsers at it (the instance-per-org model in multi-user-collaboration).
+  That hosted instance is itself one more coordinator client; its in-process
+  presence and the coordinator's cross-instance presence reconcile to one list.
+
+multi-user-collaboration's RBAC matrix, audit log, attribution, and
+optimistic-concurrency are valid under **both** models and are re-homed, not
+rewritten; only the *source* of the presence/collaboration feed moves to the
+coordinator.
+
 ### 2. Remote control
 
 The user's browser on wf.latere.ai (or a phone) lists their online instances and
@@ -155,21 +178,29 @@ allow-list, push" seam, now with a defined destination.
 
 ### 4. Collaboration: inline spec comments
 
-Teammates on the same workspace (same git remote) comment on spec lines, see who
-commented, and resolve. **Durable comment data lives in git** (a structured file
-under the repo, e.g. `.wallfacer/comments/<spec>.ndjson`, committed and synced
-through the team's existing remote). The coordinator **relays** comment events
-to currently-connected peers for real-time visibility; it stores at most an
-ephemeral relay copy, never the durable record.
+Teammates on the same workspace (joined by git-remote identity) comment on spec
+lines, see who commented, and resolve. Storage is **hybrid: cloud-now,
+git-export later** (decided).
 
-Rationale: specs already live in git, so their comments belong there too:
-portable, offline-capable, attributable through the same actor model, and no
-cloud lock-in for a core artifact, consistent with the privacy ethos. The
-relay buys real-time UX without making the cloud authoritative. Tradeoff:
-cross-machine *durability* requires a shared git remote (which a collaborating
-team already has); without one, comments are local and unrelayed. This is the
-one genuinely new durable type the coordination work introduces, and it is
-deliberately kept on the local-source-of-truth side of the line.
+- **v1, cloud-resident.** Comment threads live in the coordinator, authoritative
+  there, pushed to connected peers in real time. This ships fastest and works
+  even when teammates have no shared git remote yet. It is the **one scoped
+  exception** to relay-not-mirror: the coordinator is authoritative for *spec
+  comments* (a new collaboration artifact), but never for local task or spec
+  *data*, which stays projection-only. The exception is bounded to this one
+  type and is paid down by:
+- **later, git-export.** A follow-up adds export/import so comment threads can be
+  materialized into the repo (e.g. `.wallfacer/comments/<spec>.ndjson`) and
+  travel with the project, restoring portability and offline access. Specced as
+  its own leaf; the v1 schema is designed export-friendly from the start (stable
+  ids, content-hash anchors) so the later path is not a rewrite.
+
+Rationale for cloud-now: real-time visibility and "works without a shared
+remote" are the collaboration value users actually asked for; git-resident-first
+would gate the feature on every team having a shared remote and on git sync
+cadence. The lock-in risk is contained by committing to the export path and an
+export-friendly schema up front. Comments are attributed through the same actor
+model (`ActorSub`) as task events.
 
 ## Data boundary
 
@@ -189,7 +220,8 @@ governed coordination channel," with:
 
 ## Non-goals
 
-- **Cloud as system of record.** Never. Relay + projection only.
+- **Cloud as system of record for local task/spec data.** Never. Relay +
+  projection only. (Spec comments are the one scoped, paid-down exception.)
 - **Remote execution** (Axis B): agent runs going to Cella/Topos live in those
   specs.
 - **A new Latere service.** The coordinator is a role of wallfacerd, not a new
@@ -209,13 +241,18 @@ governed coordination channel," with:
 4. **Spec comments**: git-resident store + coordinator relay + the comment UI.
 5. **Data-boundary widening**: opt-in gate + allow-list test (lands alongside 1).
 
-## Child breakdown (proposed, surface before dispatch)
+## Child breakdown
 
-- `coordination-plane/connection.md` (phase 1 transport + registry + presence)
-- `coordination-plane/metadata-projection.md` (phase 2)
-- re-home `identity/remote-control.md` as the command-router capability (phase 3)
-- `coordination-plane/spec-comments.md` (phase 4)
-- widen `cloud/data-boundary-enforcement.md` (phase 5, lands with phase 1)
+- `coordination-plane/connection-and-presence.md` (phase 1 transport + registry
+  + heartbeat + org-wide presence; the lead child)
+- `coordination-plane/metadata-projection.md` (phase 2 allow-listed push + org
+  dashboards + the coordinator read-model store)
+- re-home `identity/remote-control.md` as the command-router capability on this
+  connection (phase 3)
+- `coordination-plane/spec-comments.md` (phase 4 cloud-resident threads + relay;
+  export-friendly schema; git-export is a follow-up leaf)
+- widen `cloud/data-boundary-enforcement.md` to govern the phone-home channel
+  (phase 5, lands with phase 1)
 
 ## Open questions
 
