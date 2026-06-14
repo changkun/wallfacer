@@ -254,19 +254,174 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Community detection
+  //
+  // The Map reads as a "knowledge graph": nodes are grouped into a handful
+  // of sub-communities so the structure is obvious at a glance. We derive
+  // communities from the data we already have rather than running an
+  // opaque clustering pass, so the assignment is deterministic and aligns
+  // with the layout (same-community nodes already cluster spatially because
+  // spec containment drives both the Sugiyama layering and the grouping).
+  //
+  // Rules, in order:
+  //   1. A spec's community is the first segment of its path (the
+  //      top-level track directory, e.g. "cloud", "foundations"). This is
+  //      the natural grouping authors already maintain on disk.
+  //   2. A task inherits the community of any spec/task it is connected to,
+  //      propagated over the undirected edge set via union-find so a chain
+  //      of task deps all land in the same community as the spec that
+  //      dispatched them.
+  //   3. Anything left with no spec anchor (a free-floating task or chain)
+  //      is grouped as "unconnected" so singletons collect into one
+  //      labelled shelf instead of scattering.
+  //
+  // Returns { byNode: {id -> community}, order: [community,...] } where
+  // `order` is a stable, deterministic list of the communities present
+  // (spec tracks alphabetical, then "unconnected" last). Every node id in
+  // the graph appears exactly once in byNode.
+  var UNCONNECTED_COMMUNITY = "unconnected";
+
+  function _specTrack(node) {
+    var path = node && node.extra && node.extra.path ? node.extra.path : "";
+    if (!path) return "";
+    var idx = path.indexOf("/");
+    return idx === -1 ? path : path.slice(0, idx);
+  }
+
+  function assignCommunities(graph) {
+    var nodes = graph && Array.isArray(graph.nodes) ? graph.nodes : [];
+    var edges = graph && Array.isArray(graph.edges) ? graph.edges : [];
+
+    // Union-find over node ids so connected nodes share a representative.
+    var parent = Object.create(null);
+    function find(x) {
+      while (parent[x] !== x) {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+      }
+      return x;
+    }
+    function union(a, b) {
+      var ra = find(a);
+      var rb = find(b);
+      if (ra === rb) return;
+      // Deterministic merge: keep the lexicographically smaller root so the
+      // representative for a set never depends on edge iteration order.
+      if (ra < rb) parent[rb] = ra;
+      else parent[ra] = rb;
+    }
+
+    var present = Object.create(null);
+    for (var i = 0; i < nodes.length; i++) {
+      var id = nodes[i].id;
+      parent[id] = id;
+      present[id] = true;
+    }
+    for (var e = 0; e < edges.length; e++) {
+      var ed = edges[e];
+      if (!present[ed.from] || !present[ed.to]) continue;
+      union(ed.from, ed.to);
+    }
+
+    // Pick a community label per union-find set. A set's label is the
+    // alphabetically-first spec track among its members; sets with no spec
+    // member fall back to "unconnected".
+    var setTrack = Object.create(null);
+    for (var j = 0; j < nodes.length; j++) {
+      var n = nodes[j];
+      if (n.kind !== "spec") continue;
+      var track = _specTrack(n);
+      if (!track) continue;
+      var root = find(n.id);
+      if (setTrack[root] === undefined || track < setTrack[root]) {
+        setTrack[root] = track;
+      }
+    }
+
+    var byNode = Object.create(null);
+    var seen = Object.create(null);
+    var order = [];
+    for (var k = 0; k < nodes.length; k++) {
+      var nid = nodes[k].id;
+      var r = find(nid);
+      var community =
+        setTrack[r] !== undefined ? setTrack[r] : UNCONNECTED_COMMUNITY;
+      byNode[nid] = community;
+      if (!seen[community]) {
+        seen[community] = true;
+        order.push(community);
+      }
+    }
+
+    // Stable order: spec tracks alphabetical, "unconnected" always last so
+    // the shelf of singletons reads as a footnote, not a peer track.
+    order.sort(function (a, b) {
+      if (a === UNCONNECTED_COMMUNITY) return 1;
+      if (b === UNCONNECTED_COMMUNITY) return -1;
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+
+    return { byNode: byNode, order: order };
+  }
+
+  // A small, tasteful accent palette for community dots/hulls. Indexed by
+  // the community's position in the deterministic `order` list so the
+  // colour assignment is stable across renders. The last slot is reserved
+  // for the "unconnected" shelf (a neutral grey).
+  var COMMUNITY_PALETTE = [
+    "#3a6db3", // blue
+    "#b07045", // terracotta
+    "#3f7a4a", // green
+    "#6a4aa3", // violet
+    "#a56a12", // amber
+    "#2d6d5a", // teal
+    "#a3536d", // rose
+    "#516a8e", // slate-blue
+  ];
+  var UNCONNECTED_COLOR = "#8e8a80";
+
+  function _communityColor(community, order) {
+    if (community === UNCONNECTED_COMMUNITY) return UNCONNECTED_COLOR;
+    var idx = order.indexOf(community);
+    if (idx < 0) return UNCONNECTED_COLOR;
+    return COMMUNITY_PALETTE[idx % COMMUNITY_PALETTE.length];
+  }
+
+  // _truncateLabel returns a compact single-line label for the node body.
+  // The full title lives in the hover <title> tooltip, so the canvas stays
+  // clean and relations dominate. Breaks on a word boundary when one falls
+  // inside the budget; otherwise hard-truncates with an ellipsis.
+  var COMPACT_LABEL_MAX = 20;
+  function _truncateLabel(label) {
+    var s = String(label == null ? "" : label).trim();
+    if (s.length <= COMPACT_LABEL_MAX) return s;
+    var slice = s.slice(0, COMPACT_LABEL_MAX);
+    var sp = slice.lastIndexOf(" ");
+    // Prefer a word break if it keeps at least ~60% of the budget.
+    if (sp >= COMPACT_LABEL_MAX * 0.6) slice = slice.slice(0, sp);
+    return slice.replace(/[\s.,;:-]+$/, "") + "…";
+  }
+
+  // ---------------------------------------------------------------------------
   // Layout + SVG rendering
   // ---------------------------------------------------------------------------
 
   var PAD = 24;
-  var NODE_W = 220;
-  // NODE_H is a floor only; labels that wrap to multiple lines grow the
-  // node vertically via _computeNodeHeight.
-  var NODE_H = 52;
-  // H_GAP is the empty horizontal corridor between adjacent layers. At
-  // ~0.55*NODE_W it leaves clear room for arrowheads and the slight
-  // diagonal of edges that change row between columns, so a node's label
-  // never sits flush against the incoming edge of the next column.
-  var H_GAP = 120;
+  // Compact nodes: the full title now lives in the hover tooltip, so the
+  // node body only carries a short truncated label + the SPEC/TASK chip +
+  // a community dot. A narrower, fixed-height card keeps the canvas clean
+  // so relations and community structure dominate instead of a wall of
+  // wrapped titles.
+  var NODE_W = 168;
+  // NODE_H is the fixed card height. _computeNodeHeight returns this
+  // constant for every real node now (no multi-line growth), which tightens
+  // the whole layout automatically since height feeds the sweep + packing.
+  var NODE_H = 40;
+  // H_GAP is the empty horizontal corridor between adjacent layers. It
+  // leaves clear room for arrowheads and the slight diagonal of edges that
+  // change row between columns, so a node never sits flush against the
+  // incoming edge of the next column.
+  var H_GAP = 96;
   // V_GAP is a loose ordering gap used only while seeding/sweeping a
   // column. It keeps barycenter math stable but is intentionally smaller
   // than MIN_NODE_GAP: the final rendered vertical spacing is owned by
@@ -336,13 +491,12 @@
     return _wrapLabel(node.label || "", maxChars);
   }
 
-  // _computeNodeHeight returns the total pixel height for a node, driven
-  // by how many lines its label wraps to.
-  function _computeNodeHeight(node) {
-    var lines = _nodeLabelLines(node);
-    var contentH =
-      LABEL_TOP_PAD + lines.length * LABEL_LINE_H + LABEL_BOTTOM_PAD;
-    return Math.max(NODE_H, contentH);
+  // _computeNodeHeight returns the pixel height for a node. Compact nodes
+  // are a single fixed-height card (the full title is in the tooltip, not
+  // the body), so every real node is NODE_H tall. Returning a constant
+  // keeps the sweep/overlap math and the component packing tight.
+  function _computeNodeHeight() {
+    return NODE_H;
   }
 
   // Status → visual style. Nodes render as tinted-fill rounded rectangles
@@ -443,11 +597,15 @@
   //
   // task_dep has a secondary state — when the prerequisite task is already
   // done, the edge goes solid to signal "this dependency is satisfied."
+  // Edges are quiet by default so relations only "pop" on hover/focus
+  // (the hover highlight un-dims the neighbourhood). Containment is the
+  // structural backbone so it stays a touch more present; dependency
+  // edges are thin and dashed. `opacity` is the calm resting state.
   var EDGE_STYLES = {
-    containment: { width: 1.2, dash: null },
-    dispatch: { width: 1.5, dash: null },
-    spec_dep: { width: 1.5, dash: "6 3" },
-    task_dep: { width: 1.5, dash: "4 2" },
+    containment: { width: 1, dash: null, opacity: 0.4 },
+    dispatch: { width: 1, dash: "1 3", opacity: 0.4 },
+    spec_dep: { width: 1, dash: "5 4", opacity: 0.32 },
+    task_dep: { width: 1, dash: "3 3", opacity: 0.32 },
   };
 
   function svgNs(tag) {
@@ -1977,6 +2135,11 @@
         ? opts.pinnedIds
         : null;
 
+    // Community assignment drives the per-node accent dot and the faint
+    // background hulls. Render-time only — it never feeds the layout, so
+    // the layout cache fingerprint stays valid.
+    var communities = assignCommunities(graph);
+
     // Let the canvas swallow clicks on empty space → clear focus. Placed
     // as the first child (behind everything) so a click that hits a node
     // still fires the node's handler first.
@@ -2020,6 +2183,78 @@
     });
     svg.appendChild(defs);
 
+    // --- Community hulls (faint background regions) ---
+    // Group real node boxes by community, then draw one rounded rect behind
+    // each community that holds 2+ nodes plus a small track label at its
+    // top-left. Decoration only: drawn first so edges and nodes sit on top.
+    // A single bounding box per community reads clean precisely because
+    // path-prefix communities are already spatially contiguous under the
+    // Sugiyama layout.
+    var HULL_PAD = 16;
+    var communityBoxes = Object.create(null);
+    layout.positions.forEach(function (pos) {
+      if (pos.kind === "dummy" || !pos.node) return;
+      var community = communities.byNode[pos.node.id];
+      if (!community) return;
+      var h = pos.height || NODE_H;
+      var box = communityBoxes[community];
+      if (!box) {
+        box = {
+          minX: pos.x,
+          minY: pos.y,
+          maxX: pos.x + NODE_W,
+          maxY: pos.y + h,
+          count: 0,
+        };
+        communityBoxes[community] = box;
+      }
+      if (pos.x < box.minX) box.minX = pos.x;
+      if (pos.y < box.minY) box.minY = pos.y;
+      if (pos.x + NODE_W > box.maxX) box.maxX = pos.x + NODE_W;
+      if (pos.y + h > box.maxY) box.maxY = pos.y + h;
+      box.count++;
+    });
+    var hullLayer = svgNs("g");
+    hullLayer.setAttribute("data-role", "community-hulls");
+    communities.order.forEach(function (community) {
+      var box = communityBoxes[community];
+      if (!box || box.count < 2) return; // skip lone-node communities
+      var color = _communityColor(community, communities.order);
+      var hx = box.minX - HULL_PAD;
+      var hy = box.minY - HULL_PAD - 14; // extra top room for the label
+      var hw = box.maxX - box.minX + HULL_PAD * 2;
+      var hh = box.maxY - box.minY + HULL_PAD * 2 + 14;
+      var hg = svgNs("g");
+      hg.setAttribute("data-role", "community-hull");
+      hg.setAttribute("data-community", community);
+      var hrect = svgNs("rect");
+      hrect.setAttribute("x", String(hx));
+      hrect.setAttribute("y", String(hy));
+      hrect.setAttribute("width", String(hw));
+      hrect.setAttribute("height", String(hh));
+      hrect.setAttribute("rx", "16");
+      hrect.setAttribute("fill", color);
+      hrect.setAttribute("fill-opacity", "0.05");
+      hrect.setAttribute("stroke", color);
+      hrect.setAttribute("stroke-opacity", "0.22");
+      hrect.setAttribute("stroke-width", "1");
+      hrect.setAttribute("stroke-dasharray", "4 4");
+      hg.appendChild(hrect);
+      var hlabel = svgNs("text");
+      hlabel.setAttribute("x", String(hx + 12));
+      hlabel.setAttribute("y", String(hy + 14));
+      hlabel.setAttribute("font-size", "10");
+      hlabel.setAttribute("font-family", "system-ui, sans-serif");
+      hlabel.setAttribute("font-weight", "600");
+      hlabel.setAttribute("letter-spacing", "0.06em");
+      hlabel.setAttribute("fill", color);
+      hlabel.setAttribute("fill-opacity", "0.7");
+      hlabel.textContent = community.toUpperCase();
+      hg.appendChild(hlabel);
+      hullLayer.appendChild(hg);
+    });
+    svg.appendChild(hullLayer);
+
     // Per-node mutable position index — live-updated during drag so
     // incident edges can be re-routed without touching the layout cache.
     // Each value points to the SAME object stored on the DOM-backed
@@ -2057,6 +2292,7 @@
         color: _edgeColor(readVar, e.kind),
         width: base.width,
         dash: base.dash,
+        opacity: typeof base.opacity === "number" ? base.opacity : 0.35,
       };
       if (e.kind === "task_dep") {
         var src = nodeById.get(e.from);
@@ -2071,6 +2307,11 @@
       path.setAttribute("stroke-width", String(style.width));
       path.setAttribute("fill", "none");
       path.setAttribute("stroke-linecap", "round");
+      // Resting calm via stroke-opacity (NOT the `opacity` attribute): the
+      // read-only hover-highlight in depgraph.js dims/un-dims by toggling
+      // `opacity`, so keeping the resting fade on a different property lets
+      // both coexist — hover multiplies down, un-hover returns to calm.
+      path.setAttribute("stroke-opacity", String(style.opacity));
       path.setAttribute(
         "marker-end",
         "url(#dg-arr-" + e.kind.replace("_", "-") + ")",
