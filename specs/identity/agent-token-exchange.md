@@ -191,18 +191,17 @@ That is a real point in the proxy's favor.
 
 ## Open Decisions
 
-- **Proxy vs env-injection (blocking, needs a human).** The trust plane
+- **Proxy vs env-injection - RESOLVED: extend the proxy.** The trust plane
   already shipped as a server-side proxy (`sandbox_proxy.go`) that performs
   `act.sub` delegation and credential substitution per request, so secrets
-  never enter the worktree and there is no token TTL to manage. This spec's
-  original design injects a 15-minute `agent_token` into the agent
-  environment. These are alternative architectures for the same goal. Lean:
-  the proxy model is already proven for LLM and GitHub credentials and
-  removes the refresh problem, so prefer extending it (route fs.latere.ai
-  and telemetry through the proxy, carrying `act.sub`) over env injection.
-  But env injection may still be required for services the proxy cannot
-  front (direct agent-to-service calls outside wallfacer's network path).
-  Decide before implementing; the rest of this spec branches on the answer.
+  never enter the worktree and there is no token TTL to manage. The chosen
+  design extends that proxy (route fs.latere.ai and telemetry through it,
+  carrying `act.sub`) rather than injecting a 15-minute `agent_token` into
+  the agent environment: the proxy model is already proven for LLM and
+  GitHub credentials and removes the refresh problem. Env injection is kept
+  only as a documented fallback for services the proxy genuinely cannot
+  front (direct agent-to-service calls outside wallfacer's network path);
+  the env-injection sections below apply only to that fallback.
 - **Where to store the minted agent token** (env-injection variant only),
   in-memory on the running task versus persisted to
   `store.ExecutionEnvironment`. In-memory keeps the secret out of disk;
