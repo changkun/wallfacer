@@ -218,6 +218,52 @@ Indicative breakdown for `/wf-spec-breakdown` (parent spec):
    the dock system; wire the inline file panel ([[inline-file-panel]]) as a dock
    panel once it lands.
 
+## Implementation Status (2026-06-14)
+
+Phases 1 and 2 are shipped and verified (Vitest + Playwright); the Phase 3
+reducer layer is in place. What landed:
+
+- **`frontend/src/lib/dock/`** — the pure core: `types.ts` (DockLayout tree),
+  `layout.ts` reducers (dock / ensure / close / resize / activate /
+  maximize-restore / serialize-deserialize / `migrateLegacy`, plus Phase 3
+  `dropPanel` / `moveTab` / `groups` / `groupIdOf`), and `drag.ts`
+  (`hitTestZone`). 49 unit tests across `layout.test.ts` + `drag.test.ts`.
+- **`frontend/src/stores/dock.ts`** — reactive store, source of truth for the
+  layout, synchronous `localStorage` persistence (`wallfacer-dock-layout-v1`),
+  last-region memory, viewport-aware resize clamping. `ui.ts` terminal
+  visibility delegates here. 6 store tests.
+- **`frontend/src/components/DockWorkspace.vue`** — wraps the RouterView in
+  `AppLayout`; lays panels around the four edges with resize gutters, a maximize
+  overlay, and a drag-to-dock drop-zone overlay.
+- **`frontend/src/components/TerminalPanel.vue`** — now a dockable panel: its
+  body teleports into the current region (live xterm + WebSocket survive moves,
+  confirmed in-browser); header has dock-to-edge, maximize/restore, close, and a
+  drag handle.
+- **`frontend/src/styles/dock.css`** — workspace + drop-zone chrome.
+
+**`migrateLegacy` deviation from the spec:** the legacy bottom drawer was closed
+by default (visibility was never persisted), so migration does NOT auto-dock the
+terminal — it only carries the old `wallfacer-panel-height` forward as the bottom
+size preference. Auto-docking would have surfaced the terminal for every user.
+
+### Remaining (Phase 3 rendering + Phase 4) — a clean child-task handoff
+
+The reducers exist; the UI does not yet render splits or tab-groups, because a
+meaningful split needs a second dockable panel (the explorer), and that is the
+risky, product-sensitive part. Decouple as separate tasks:
+
+- **Phase 3 rendering.** A recursive `SplitContainer.vue` rendering split/group
+  nodes with gutters; a per-group teleport-mount registry so each group hosts
+  the active panel; move the dock chrome (drag/dock/maximize/close) up to a
+  group-level header; render group tab-bars. Verify tab-group rendering with the
+  terminal alone first, then drag-to-split via a trivial second panel before
+  touching the explorer. Keep `TerminalPanel`'s current chrome until the
+  group-level chrome is proven beside it (don't re-churn verified code blind).
+- **Phase 4 explorer migration — settle first:** at AppLayout level the dock
+  store must route-gate the explorer (present on `/`, hidden on `/plan`), and a
+  decision is needed for what a left-docked explorer does on navigation to Plan.
+  Pin this behavior down before moving `ExplorerPanel` out of `BoardPage`.
+
 ## Testing Strategy
 
 The split between unit-testable logic and visually-verified behavior follows the
