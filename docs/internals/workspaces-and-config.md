@@ -1,6 +1,6 @@
 # Workspaces & Configuration
 
-This document consolidates workspace management, instructions lifecycle, sandbox routing, and configuration systems. These components control how Wallfacer scopes task data, provisions agent environments, and propagates user settings.
+This document consolidates workspace management, instructions lifecycle, activity routing, and configuration systems. These components control how Wallfacer scopes task data, selects the host CLI for each agent, and propagates user settings.
 
 ## Workspace Manager
 
@@ -21,13 +21,12 @@ type Snapshot struct {
 
 ### Workspace Key Hashing
 
-Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `prompts.InstructionsKey()` (`internal/prompts/instructions.go`):
+Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `prompts.InstructionsKey()` (`internal/prompts/instructions.go:22`):
 
 ```go
-func Key(workspaces []string) string {
-    sorted := make([]string, len(workspaces))
-    copy(sorted, workspaces)
-    sort.Strings(sorted)
+func InstructionsKey(workspaces []string) string {
+    sorted := slices.Clone(workspaces)
+    slices.Sort(sorted)
     h := sha256.Sum256([]byte(strings.Join(sorted, ":")))
     return fmt.Sprintf("%x", h[:8]) // 16 hex chars
 }
@@ -104,11 +103,13 @@ The filename is derived from the same SHA-256 fingerprint used for workspace sco
 
 When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInstructionsContent()` (`internal/prompts/instructions.go`) assembles the initial content from:
 
-1. **Default template** -- general guidance for agents (complete tasks as described, make focused changes, run tests, write clear commit messages, etc.). Also includes board context documentation explaining `/workspace/.tasks/board.json` and sibling worktree paths.
+1. **Default template** -- general guidance for agents (complete tasks as described, make focused changes, run tests, write clear commit messages, etc.). It also documents a read-only board-context path (`.tasks/board.json`) and sibling worktree paths the agent can read for cross-task awareness.
 
-2. **Workspace layout section** -- lists each workspace as `/workspace/<basename>/` and instructs agents to keep all file operations within these directories.
+2. **Workspace layout section** -- lists each active workspace by basename and instructs agents to keep all file operations within those directories.
 
-3. **Repo-specific instruction references** -- scans each workspace for `AGENTS.md` or legacy `CLAUDE.md` files and appends a "Repo-Specific Instructions" section with paths like `/workspace/myapp/AGENTS.md` so the agent can read them on demand.
+3. **Repo-specific instruction references** -- scans each workspace for `AGENTS.md` or legacy `CLAUDE.md` files and appends a "Repo-Specific Instructions" section with the per-repo paths so the agent can read them on demand.
+
+The embedded `instructions.tmpl` still phrases these path references with a `/workspace/` prefix (`internal/prompts/instructions.tmpl`). Under host-process execution the agent runs with its git worktree as CWD, so treat the `/workspace/` strings as legacy path framing: the meaningful unit is the workspace basename and the per-repo instruction filename, not a literal mount root.
 
 ### Re-init Logic
 
@@ -116,48 +117,56 @@ When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInst
 
 ### Instructions Delivery
 
-The workspace instructions file is delivered to the agent process via `--append-system-prompt` when the CLI supports it, falling back to prepending it to the `-p` prompt. The runner passes its path to the host backend as `WALLFACER_INSTRUCTIONS_PATH` (see `internal/runner/container.go` and `internal/executor/host.go`). Each task also runs with its git worktree as the working directory, so the agent picks up any per-repo `AGENTS.md` / `CLAUDE.md` natively.
+The workspace instructions file is delivered to the agent process via `--append-system-prompt` when the CLI supports it, falling back to prepending it to the `-p` prompt. The runner passes its path to the host backend as `WALLFACER_INSTRUCTIONS_PATH` (see `internal/runner/container.go` and `internal/executor/host.go`). Each task runs with its git worktree as the working directory, so the agent also picks up any per-repo `AGENTS.md` / `CLAUDE.md` natively.
 
-## Sandbox Type System
+## Harness Routing
 
-### Claude vs Codex
+### Registered harnesses
 
-The `internal/harness` package defines harness identities as `ID` constants:
+The `internal/harness` package defines harness identities as `ID` constants and keeps a package-level registry (`internal/harness/registry.go`). Three harnesses register at init time:
 
-- **`Claude`** (`"claude"`) — Execs the Claude Code CLI with `WALLFACER_AGENT=claude`. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **`Codex`** (`"codex"`) — Execs the OpenAI Codex CLI with `WALLFACER_AGENT=codex`. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **`Claude`** (`"claude"`): execs the Claude Code CLI. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`. `harness.Default()` returns Claude.
+- **`Codex`** (`"codex"`): execs the OpenAI Codex CLI. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **`Cursor`** (`"cursor"`): adapts the `cursor-agent` CLI and emits Claude-style stream-json so the runner parses it on the same path.
 
-The `WALLFACER_AGENT` env var selects which CLI the host backend execs.
+Execution is host-process. The runner execs the selected CLI as a host process with the task's git worktree as CWD (`internal/runner/runner.go`, `HostBackend` in `internal/executor/host.go`); there is no container start, image pull, or bind-mount. The `WALLFACER_AGENT` env var the runner injects records which CLI was selected.
 
 `harness.DefaultFrom(value)` returns the parsed identity or falls back to `Claude` for unknown values.
 
 ### Activity routing
 
-Each task can override its sandbox type per-activity via `Task.SandboxByActivity` (a `map[SandboxActivity]sandbox.Type`). The resolution chain in `Runner.sandboxForTaskActivity()` is:
+`Runner.runAgent()` resolves the effective harness per agent run, newest tier first (`internal/runner/agent.go:179-194`):
 
-1. **Per-task per-activity override** — `task.SandboxByActivity[activity]` if set and valid.
-2. **Per-task default** — `task.Sandbox` if set and valid.
-3. **Global per-activity env config** — `WALLFACER_SANDBOX_<ACTIVITY>` environment variable (e.g. `WALLFACER_SANDBOX_TESTING=codex`).
-4. **Global default** — `WALLFACER_DEFAULT_SANDBOX` environment variable.
-5. **Hardcoded fallback** — `Claude`.
+1. **Agent/role harness pin** (`role.Harness` if set and valid). This top tier wins over every per-task and env tier, so a role authored or cloned with harness `codex` always reaches Codex regardless of task or env settings.
+2. **Per-task per-activity override, deprecated** (`task.SandboxByActivity[activity]` if set and valid). Back-compat only: new tasks do not populate this map (matching `data-and-storage.md`), but the runner still reads it when present.
+3. **Per-task default** (`task.Sandbox` if set and valid).
+4. **Env-file per-activity setting** (`WALLFACER_SANDBOX_<ACTIVITY>`, e.g. `WALLFACER_SANDBOX_TESTING=codex`).
+5. **Env-file default** (`WALLFACER_DEFAULT_SANDBOX`).
+6. **Hardcoded fallback** (`Claude`).
 
-The seven routable activities (defined as `SandboxActivity` constants in `internal/store/models.go`):
+Tiers 2-6 live in `Runner.sandboxForTaskActivity()` (`internal/runner/container.go:253`); tier 1 sits above them in `runAgent`, so the pin short-circuits the per-task chain entirely. `Task.SandboxByActivity` is typed `map[SandboxActivity]harness.ID` (`internal/store/models.go:283`).
+
+Activities consulted by the env-file tier (`Runner.sandboxFromEnvForActivity()`, `internal/runner/container.go:275`):
 
 | Activity | Env variable | Purpose |
 |---|---|---|
 | `implementation` | `WALLFACER_SANDBOX_IMPLEMENTATION` | Main task execution |
 | `testing` | `WALLFACER_SANDBOX_TESTING` | Test verification agent |
-| `refinement` | `WALLFACER_SANDBOX_REFINEMENT` | Prompt refinement agent |
 | `title` | `WALLFACER_SANDBOX_TITLE` | Auto title generation |
 | `oversight` | `WALLFACER_SANDBOX_OVERSIGHT` | Oversight summary generation |
 | `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
 | `idea_agent` | `WALLFACER_SANDBOX_IDEA_AGENT` | Brainstorm/ideation agent |
 
-Two additional activities (`test`, `oversight-test`) are usage-attribution-only and not used for sandbox routing.
+The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `planning`, `test`, and `oversight-test`. These are not switched on by the env-file tier (the resolution switch covers only the six rows above). `test` and `oversight-test` exist for usage attribution, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent.
 
-### Container image
+### Host CLI resolution
 
-The runner uses the configured `--image` flag value verbatim for every task and sub-agent — there is no per-sandbox image rewriting. The default is `ghcr.io/latere-ai/sandbox-agents:latest`, the unified image that ships both Claude Code and Codex. The agent CLI is selected at container start by the `WALLFACER_AGENT` env var the runner injects (`claude` or `codex`).
+There is no `--image` flag and no container start. The host backend selects the CLI by `WALLFACER_AGENT` and resolves its path from the env file:
+
+- `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`): explicit path to the Claude Code CLI; empty resolves `claude` via `$PATH`.
+- `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`): explicit path to the Codex CLI; empty resolves `codex` via `$PATH`.
+
+`wallfacer doctor` probes readiness via `checkHostBackend` (`internal/cli/doctor.go:147`): it resolves the `claude` (required) and `codex` (optional) binaries and runs `--version` on each, printing the same hint the runner would surface at startup if a binary is missing. A claude-only host is valid; codex-typed tasks fail if the codex CLI is absent.
 
 ### Model selection
 
@@ -166,9 +175,9 @@ The runner uses the configured `--image` flag value verbatim for every task and 
 - Claude: `CLAUDE_DEFAULT_MODEL` (title generation uses `CLAUDE_TITLE_MODEL` with fallback to the default).
 - Codex: `CODEX_DEFAULT_MODEL` (title generation uses `CODEX_TITLE_MODEL` with fallback to the default).
 
-### Sandbox gate
+### Credential gate
 
-Before launching any task, `Handler.sandboxUsable()` validates that the selected sandbox has valid credentials. For Codex, this checks (in order): host `~/.codex/auth.json`, then `OPENAI_API_KEY` in the env file, and requires a successful sandbox test (`POST /api/env/test`). Tasks are rejected with an error if credentials are missing.
+Before launching any task, `Handler.sandboxUsable()` validates that the selected harness has valid credentials. For Codex, this checks (in order): host `~/.codex/auth.json`, then `OPENAI_API_KEY` in the env file, and requires a successful env test (`POST /api/env/test`). Tasks are rejected with an error if credentials are missing.
 
 ## Environment Configuration
 
@@ -176,7 +185,7 @@ Before launching any task, `Handler.sandboxUsable()` validates that the selected
 
 The environment configuration lives at `~/.wallfacer/.env` (auto-generated on first run with commented-out defaults). It is a standard dotenv file: blank lines and lines starting with `#` are ignored, an optional `export ` prefix is stripped, values may be quoted (single or double), and inline comments after unquoted values are stripped while literal `#` inside quoted strings is preserved.
 
-`envconfig.Parse(path)` (`internal/envconfig/envconfig.go`) reads the file and returns a typed `envconfig.Config` struct. The parser is permissive — unknown keys are silently skipped, and integer fields that fail to parse are left at their zero value (which triggers default behavior downstream).
+`envconfig.Parse(path)` (`internal/envconfig/envconfig.go`) reads the file and returns a typed `envconfig.Config` struct. The parser is permissive, unknown keys are silently skipped, and integer fields that fail to parse are left at their zero value (which triggers default behavior downstream).
 
 ### Config Fields
 
@@ -188,13 +197,13 @@ The `Config` struct covers all known keys. Key categories:
 | **Claude model** | `BaseURL`, `DefaultModel`, `TitleModel` |
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
-| **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
-| **Host backend** | `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`) — optional explicit CLI paths; empty resolves via `$PATH` |
+| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` (all typed `harness.ID` except `SandboxFast`) |
+| **Host backend** | `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `PlanningWindowDays` (`WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 | **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
 
-The `SandboxFast` field defaults to `true` when unset — the parser initializes it before scanning lines, and it is only set to `false` when the env file explicitly contains `WALLFACER_SANDBOX_FAST=false`.
+The `SandboxFast` field defaults to `true` when unset, the parser initializes it before scanning lines, and it is only set to `false` when the env file explicitly contains `WALLFACER_SANDBOX_FAST=false`.
 
 ### Atomic Updates
 
@@ -208,13 +217,13 @@ The `SandboxFast` field defaults to `true` when unset — the parser initializes
 3. New keys not already in the file are appended in the stable order defined by `knownKeys`.
 4. The result is written atomically via a temp file + `os.Rename`.
 
-This design means that `PUT /api/env` can safely omit token fields — they are preserved in the file as-is. The handler only sets a pointer when the caller explicitly provides a value.
+This design means that `PUT /api/env` can safely omit token fields, they are preserved in the file as-is. The handler only sets a pointer when the caller explicitly provides a value.
 
 ### Propagation to Running Components
 
-The env file is re-read on every agent process launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new tasks without a server restart. Already-running tasks are unaffected — they received their environment when the process was spawned.
+The env file is re-read on every agent process launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new tasks without a server restart. Already-running tasks are unaffected, they received their environment when the process was spawned.
 
-The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location — e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque podman `--env-file … no such file` exit 125. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. Host mode is independently resilient — `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
+The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque podman `--env-file … no such file` exit 125. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. Host mode is independently resilient, `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
 
 Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env file changes. They read configuration values from in-memory state on the `Handler` or `Runner` structs, which are populated from the env file at startup. Some values (like `MaxParallelTasks`) are re-read from the env file whenever they are needed by the promoter logic.
 
@@ -237,7 +246,7 @@ Eight prompt templates are embedded into the binary at compile time via `go:embe
 
 ### Override Storage
 
-User overrides are stored at `~/.wallfacer/prompts/<apiName>.tmpl`. The `Manager` checks this directory on every render call — no caching, so edits take effect immediately.
+User overrides are stored at `~/.wallfacer/prompts/<apiName>.tmpl`. The `Manager` checks this directory on every render call, no caching, so edits take effect immediately.
 
 ### Render Pipeline
 
@@ -263,11 +272,11 @@ Key design: a broken override never crashes the server. Parse or execution error
 
 All templates (embedded and override) share a single `FuncMap`:
 
-- `add(a, b int) int` — integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
-- `mul(a, b float64) float64` — floating-point multiplication.
-- `sub(a, b float64) float64` — floating-point subtraction.
-- `exploitCount(ratio float64, total int) int` — compute exploitation count for ideation.
-- `exploreCount(ratio float64, total int) int` — compute exploration count for ideation.
+- `add(a, b int) int`, integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
+- `mul(a, b float64) float64`, floating-point multiplication.
+- `sub(a, b float64) float64`, floating-point subtraction.
+- `exploitCount(ratio float64, total int) int`, compute exploitation count for ideation.
+- `exploreCount(ratio float64, total int) int`, compute exploration count for ideation.
 
 ### Validation
 
@@ -318,7 +327,7 @@ All templates are stored in a single JSON file at `~/.wallfacer/templates.json` 
 
 ## See Also
 
-- [Architecture](architecture.md) — System overview, state machine, concurrency model
-- [Git Worktrees](git-worktrees.md) — Worktree setup, commit pipeline, branch management, orphan pruning
-- [API & Transport](api-and-transport.md) — HTTP API routes, SSE, metrics, middleware
-- [Task Lifecycle](task-lifecycle.md) — State transitions, data models, event sourcing
+- [Architecture](architecture.md), System overview, state machine, concurrency model
+- [Git Worktrees](git-worktrees.md), Worktree setup, commit pipeline, branch management, orphan pruning
+- [API & Transport](api-and-transport.md), HTTP API routes, SSE, metrics, middleware
+- [Task Lifecycle](task-lifecycle.md), State transitions, data models, event sourcing
