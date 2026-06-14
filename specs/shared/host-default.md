@@ -27,7 +27,7 @@ affects:
   - ui/js/images.js
 effort: large
 created: 2026-06-01
-updated: 2026-06-02
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -124,3 +124,16 @@ Each step is a separable commit; the order keeps the tree green at every point.
 ## Why a separate spec from harness abstraction
 
 Removing the container is an orthogonal change from refactoring Claude/Codex into a `Harness` interface. They can ship independently; this spec is the prerequisite that makes the harness work clean (no `/workspace/<basename>` translation to carry through). Bundling them would conflate "we're dropping containerization" with "we're abstracting over harnesses" — two distinct decisions reviewers should be able to accept or reject independently.
+
+## Outcome
+
+Shipped. Host is the only local execution path; the container backend is gone.
+
+- **Backend collapsed to host.** The `internal/sandbox/` package was deleted and execution moved to `internal/executor/`, where `HostBackend` (`host.go` + `host_codex.go`) is the only `executor.Backend` implementation. The runner builds it unconditionally (`internal/runner/runner.go`, `executor.NewHostBackend`); the `--backend` flag and the `SandboxBackend` env knob are removed. `LocalBackend` and the per-task worker-container plumbing are deleted.
+- **Image surface removed.** The agent `Dockerfile` is gone (only `Dockerfile.wallfacerd`, the web-server image, remains). `/api/images*` routes, the Settings image picker, and the `pull-sandbox-images` Makefile target are removed. `codex-agent.sh` is gone — Codex argv translation lives on the host path in `host_codex.go`.
+- **Worktree-per-task isolation kept**; fresh host processes replace the worker container.
+
+Carried forward (residual naming, not behavior):
+
+- `Sandbox*` identifiers still pepper the Go code (`SandboxActivity`, `SandboxBackend()`, `SandboxProxy`, `SandboxHandle`) and persisted JSON tags (`json:"sandbox"`, `json:"sandbox_by_activity"`). The Go-identifier cleanup is a follow-up; the JSON tags stay until a store migration is warranted.
+- The planner still routes through `HostBackend` but kept container-flavored comments and helper names; those are cleaned up separately (the spec's deferred planning-host follow-up).
