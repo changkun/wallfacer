@@ -1,31 +1,36 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
 import { withAuthToken } from '../api/client';
-import { useUiStore } from '../stores/ui';
-import { getStored, setStored } from '../lib/storage';
-import { clampPanelHeight, PANEL_MIN_HEIGHT, PANEL_HEIGHT_KEY } from '../lib/panelHeight';
+import { useDockStore } from '../stores/dock';
+import type { DockRegion } from '../lib/dock/types';
 
-const ui = useUiStore();
+// The terminal is a dockable panel. DockWorkspace mounts this component once and
+// passes the mount element its body should teleport into (the current region, or
+// the maximize overlay). Teleport preserves the component instance across moves,
+// so the xterm instance and WebSocket survive being docked to another edge — the
+// load-bearing constraint in specs/local/dockable-panel-workspace.md. Only the
+// DOM renderer is loaded; a canvas/WebGL addon would lose its context on
+// re-parent and must not be added.
+const props = defineProps<{ target: HTMLElement | null }>();
+
+const dock = useDockStore();
+const open = computed(() => dock.isOpen('terminal'));
+const isMaximized = computed(() => dock.maximized === 'terminal');
+const currentRegion = computed<DockRegion | null>(() => dock.regionOf('terminal'));
 
 const termContainer = ref<HTMLElement | null>(null);
-const panelHeight = ref(restorePanelHeight());
-
-// Restore the persisted terminal panel height, clamped to the current
-// viewport. Mirrors ui/js/status-bar.js's wallfacer-panel-height storage.
-function restorePanelHeight(): number {
-  const stored = Number(getStored(PANEL_HEIGHT_KEY));
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
-  if (Number.isFinite(stored) && stored >= PANEL_MIN_HEIGHT) {
-    return clampPanelHeight(stored, vh);
-  }
-  return 260;
-}
-const dragging = ref(false);
 const sessions = ref<Record<string, { label: string; buffer: Uint8Array[] }>>({});
 const activeId = ref<string | null>(null);
 const sessionsOrder = ref<string[]>([]);
 const tabCounter = ref(0);
 const SESSION_BUFFER_LIMIT = 100_000;
+
+const DOCK_TARGETS: { region: DockRegion; label: string; glyph: string }[] = [
+  { region: 'left', label: 'Dock left', glyph: '⊣' },
+  { region: 'bottom', label: 'Dock bottom', glyph: '⊥' },
+  { region: 'top', label: 'Dock top', glyph: '⊤' },
+  { region: 'right', label: 'Dock right', glyph: '⊢' },
+];
 
 let term: import('@xterm/xterm').Terminal | null = null;
 let fitAddon: import('@xterm/addon-fit').FitAddon | null = null;
@@ -83,6 +88,10 @@ const tabs = computed(() => sessionsOrder.value.map(id => ({
   active: id === activeId.value,
 })));
 
+function refit() {
+  try { fitAddon?.fit(); } catch { /* hidden */ }
+}
+
 async function init() {
   if (initialized || !termContainer.value) return;
   initialized = true;
@@ -100,7 +109,7 @@ async function init() {
   fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   term.open(termContainer.value);
-  try { fitAddon.fit(); } catch { /* hidden */ }
+  refit();
 
   term.onData((data) => {
     if (ws?.readyState === WebSocket.OPEN) {
@@ -128,7 +137,7 @@ async function init() {
   });
 
   resizeObserver = new ResizeObserver(() => {
-    if (ui.showTerminal) { try { fitAddon?.fit(); } catch { /* ignore */ } }
+    if (open.value) refit();
   });
   resizeObserver.observe(termContainer.value);
 
@@ -143,7 +152,7 @@ async function init() {
 function connect() {
   if (!term) return;
   if (ws && ws.readyState === WebSocket.OPEN) {
-    try { fitAddon?.fit(); } catch { /* ignore */ }
+    refit();
     term.focus();
     return;
   }
@@ -154,7 +163,7 @@ function connect() {
 
   ws.onopen = () => {
     reconnectDelay = 1000;
-    try { fitAddon?.fit(); } catch { /* ignore */ }
+    refit();
     term?.focus();
   };
 
@@ -192,7 +201,7 @@ function connect() {
       term?.write('\r\n\x1b[33mDisconnected. Reconnecting…\x1b[0m\r\n');
       scheduleReconnect();
     } else {
-      ui.closeTerminal();
+      dock.closeTerminal();
       sessions.value = {};
       sessionsOrder.value = [];
       activeId.value = null;
@@ -294,8 +303,13 @@ function closeSession(id: string) {
   }
 }
 
-watch(() => ui.showTerminal, async (open) => {
-  if (!open) return;
+// Dock controls (header). Moving regions re-parents the live xterm via Teleport.
+function dockTo(region: DockRegion) { dock.dockTo('terminal', region); }
+function toggleMaximize() { dock.toggleMaximize('terminal'); }
+function closePanel() { dock.closeTerminal(); }
+
+watch(open, async (isOpen) => {
+  if (!isOpen) return;
   await nextTick();
   if (!initialized) {
     await init();
@@ -306,14 +320,19 @@ watch(() => ui.showTerminal, async (open) => {
     clearTermScreen();
     connect();
   }
-  setTimeout(() => {
-    try { fitAddon?.fit(); } catch { /* ignore */ }
-    term?.focus();
-  }, 60);
+  setTimeout(() => { refit(); term?.focus(); }, 60);
+});
+
+// The panel moved to a different region (or maximize toggled): the xterm node is
+// re-parented by Teleport, so reflow it to the new size and refocus.
+watch(() => props.target, async () => {
+  if (!open.value) return;
+  await nextTick();
+  setTimeout(() => { refit(); term?.focus(); }, 60);
 });
 
 onMounted(async () => {
-  if (ui.showTerminal) {
+  if (open.value) {
     await nextTick();
     await init();
   }
@@ -326,77 +345,79 @@ onUnmounted(() => {
   ws?.close();
   term?.dispose();
 });
-
-function onHandleDown(e: MouseEvent) {
-  dragging.value = true;
-  e.preventDefault();
-  const startY = e.clientY;
-  const startH = panelHeight.value;
-  function onMove(ev: MouseEvent) {
-    const dy = startY - ev.clientY;
-    panelHeight.value = clampPanelHeight(startH + dy, window.innerHeight);
-  }
-  function onUp() {
-    dragging.value = false;
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-    setStored(PANEL_HEIGHT_KEY, String(panelHeight.value));
-    try { fitAddon?.fit(); } catch { /* ignore */ }
-  }
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
-}
 </script>
 
 <template>
-  <div
-    v-show="ui.showTerminal"
-    class="status-bar-panel-resize"
-    :class="{ 'status-bar-panel-resize--active': dragging }"
-    role="separator"
-    aria-orientation="horizontal"
-    aria-label="Resize terminal panel"
-    @mousedown="onHandleDown"
-  ></div>
-  <div
-    v-show="ui.showTerminal"
-    class="status-bar-panel"
-    role="region"
-    aria-label="Terminal panel"
-    :style="{ height: panelHeight + 'px' }"
-  >
-    <div class="terminal-tab-bar" :hidden="tabs.length === 0">
-      <div id="terminal-tab-list">
-        <div
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="terminal-tab"
-          :aria-selected="tab.active ? 'true' : 'false'"
-          :data-session-id="tab.id"
+  <Teleport :to="props.target" :disabled="!props.target">
+    <div
+      v-show="open"
+      class="dock-panel terminal-panel"
+      role="region"
+      aria-label="Terminal panel"
+    >
+      <div class="terminal-tab-bar">
+        <div id="terminal-tab-list">
+          <div
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="terminal-tab"
+            :aria-selected="tab.active ? 'true' : 'false'"
+            :data-session-id="tab.id"
+            @mousedown.prevent
+            @click="switchSession(tab.id)"
+          >
+            <span class="terminal-tab__label">{{ tab.label }}</span>
+            <button
+              type="button"
+              class="terminal-tab__close"
+              aria-label="Close session"
+              tabindex="-1"
+              @mousedown.prevent
+              @click.stop="closeSession(tab.id)"
+            >×</button>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="terminal-tab-add"
+          title="New session"
+          aria-label="New terminal session"
+          tabindex="-1"
           @mousedown.prevent
-          @click="switchSession(tab.id)"
-        >
-          <span class="terminal-tab__label">{{ tab.label }}</span>
+          @click="newSession"
+        >+</button>
+        <div class="dock-panel__controls" @mousedown.prevent>
+          <button
+            v-for="d in DOCK_TARGETS"
+            :key="d.region"
+            type="button"
+            class="dock-panel__btn"
+            :class="{ 'dock-panel__btn--active': currentRegion === d.region && !isMaximized }"
+            :title="d.label"
+            :aria-label="d.label"
+            tabindex="-1"
+            @click="dockTo(d.region)"
+          >{{ d.glyph }}</button>
           <button
             type="button"
-            class="terminal-tab__close"
-            aria-label="Close session"
+            class="dock-panel__btn"
+            :class="{ 'dock-panel__btn--active': isMaximized }"
+            :title="isMaximized ? 'Restore' : 'Maximize'"
+            :aria-label="isMaximized ? 'Restore terminal' : 'Maximize terminal'"
             tabindex="-1"
-            @mousedown.prevent
-            @click.stop="closeSession(tab.id)"
+            @click="toggleMaximize"
+          >{{ isMaximized ? '❐' : '⛶' }}</button>
+          <button
+            type="button"
+            class="dock-panel__btn dock-panel__btn--close"
+            title="Close terminal"
+            aria-label="Close terminal"
+            tabindex="-1"
+            @click="closePanel"
           >×</button>
         </div>
       </div>
-      <button
-        type="button"
-        class="terminal-tab-add"
-        title="New session"
-        aria-label="New terminal session"
-        tabindex="-1"
-        @mousedown.prevent
-        @click="newSession"
-      >+</button>
+      <div ref="termContainer" id="terminal-canvas" />
     </div>
-    <div ref="termContainer" id="terminal-canvas" />
-  </div>
+  </Teleport>
 </template>
