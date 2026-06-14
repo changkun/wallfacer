@@ -11,16 +11,16 @@ import (
 	"net/http"
 	"strings"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/jwtauth"
+	"latere.ai/x/pkg/oidc"
 )
 
-// claimsCtxKey scopes the context value used to carry validated claims
-// through the middleware chain. Defined here (not in the platform
-// package) so both Auth and OptionalAuth share one key that
-// PrincipalFromContext can read uniformly. The platform package's own
-// context helper is never used inside wallfacer, so handlers never need
-// to check two places.
-type claimsCtxKey struct{}
+// identityCtxKey scopes the context value used to carry the resolved principal
+// through the middleware chain. A pointer (nil = anonymous) preserves the
+// (Identity, ok) presence semantics PrincipalFromContext exposes — distinct
+// from authkit.IdentityFromContext, which cannot tell "absent" from "zero".
+type identityCtxKey struct{}
 
 // BuildValidator constructs a Validator from the auth configuration.
 // JWKS endpoint is auto-derived from cfg.AuthURL when not passed
@@ -51,86 +51,105 @@ func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
 	return jwtauth.New(jc)
 }
 
-// OptionalAuth validates a Bearer JWT when present and injects claims
-// into the request context. Missing, malformed, or expired tokens pass
-// through as anonymous rather than returning 401. Use this on routes
-// that may identify the caller but never require it.
+// OptionalAuth validates a Bearer JWT when present and injects the resolved
+// Identity into the request context. Missing, malformed, or expired tokens pass
+// through as anonymous rather than returning 401. Use this on routes that may
+// identify the caller but never require it.
 //
 // Semantics:
-//   - No Authorization header           -> pass through, no claims
-//   - Authorization header not "Bearer" -> pass through, no claims
-//   - Bearer present, validation fails  -> pass through, no claims
-//   - Bearer present, validation ok     -> inject *Claims into ctx
+//   - No Authorization header           -> pass through, no identity
+//   - Authorization header not "Bearer" -> pass through, no identity
+//   - Bearer present, validation fails  -> pass through, no identity
+//   - Bearer present, validation ok     -> inject *Identity into ctx
 //
 // A nil validator (local mode) returns next unchanged.
 func OptionalAuth(v *Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
+	jwt := authkit.NewJWT(v, nil)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tok, ok := bearerToken(r)
-		if !ok {
-			next.ServeHTTP(w, r)
+		if id, err := jwt.Authenticate(r); err == nil {
+			next.ServeHTTP(w, withIdentity(r, &id))
 			return
 		}
-		claims, err := v.Validate(tok)
-		if err != nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-		next.ServeHTTP(w, withClaims(r, claims))
+		next.ServeHTTP(w, r)
 	})
 }
 
 // Auth validates a Bearer JWT and rejects the request on failure with
 // 401. Use this on routes that strictly require an authenticated
 // principal. A nil validator returns next unchanged (local mode).
-//
-// Phase 2 does not apply Auth to any route; OptionalAuth is the only
-// gate installed. Strict-auth opt-in happens in later specs
-// (scope-and-superadmin.md, cloud-forced-login.md).
 func Auth(v *Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
+	jwt := authkit.NewJWT(v, nil)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tok, ok := bearerToken(r)
-		if !ok {
+		if _, ok := bearerToken(r); !ok {
 			writeUnauthorized(w, "missing bearer token")
 			return
 		}
-		claims, err := v.Validate(tok)
+		id, err := jwt.Authenticate(r)
 		if err != nil {
 			writeUnauthorized(w, err.Error())
 			return
 		}
-		next.ServeHTTP(w, withClaims(r, claims))
+		next.ServeHTTP(w, withIdentity(r, &id))
 	})
 }
 
-// PrincipalFromContext returns the validated claims if the request was
-// authenticated by OptionalAuth or Auth. The second return is false for
-// anonymous requests (no header, expired token, local mode).
-func PrincipalFromContext(ctx context.Context) (*Claims, bool) {
-	c, ok := ctx.Value(claimsCtxKey{}).(*Claims)
+// CookieAuth resolves the principal from the encrypted session cookie when no
+// Bearer-sourced identity is already present, via the shared
+// authkit.SessionAuthenticator (which trusts the AES-GCM-authenticated cookie —
+// the platform-canonical posture, replacing wallfacer's former bespoke
+// re-validation). A nil client (local mode) returns next unchanged.
+//
+// Behavior matrix:
+//
+//	identity already in ctx     -> pass through unchanged
+//	no cookie / decode failure  -> pass through anonymous
+//	cookie decodes              -> inject *Identity, proceed
+func CookieAuth(client *oidc.Client, next http.Handler) http.Handler {
+	if client == nil {
+		return next
+	}
+	sess := authkit.NewSessionAuthenticator(client)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, already := PrincipalFromContext(r.Context()); already {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if id, err := sess.Authenticate(r); err == nil {
+			next.ServeHTTP(w, withIdentity(r, &id))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// PrincipalFromContext returns the resolved Identity if the request was
+// authenticated by OptionalAuth, Auth, or CookieAuth. The second return is
+// false for anonymous requests (no header, expired token, local mode).
+func PrincipalFromContext(ctx context.Context) (*Identity, bool) {
+	c, ok := ctx.Value(identityCtxKey{}).(*Identity)
 	if !ok || c == nil {
 		return nil, false
 	}
 	return c, true
 }
 
-// WithClaims returns a context carrying the given claims. Exported so
-// handler-layer tests can exercise downstream middleware (e.g. the
-// BearerAuth claims-bypass) without standing up a full JWKS server and
-// signing a real token. Production code should only inject claims via
-// OptionalAuth / Auth after validation.
-func WithClaims(ctx context.Context, c *Claims) context.Context {
-	return context.WithValue(ctx, claimsCtxKey{}, c)
+// WithIdentity returns a context carrying the given Identity. Exported so
+// handler-layer tests can exercise downstream middleware without standing up a
+// full JWKS server and signing a real token. Production code should only inject
+// an Identity via OptionalAuth / Auth / CookieAuth after validation.
+func WithIdentity(ctx context.Context, id *Identity) context.Context {
+	return context.WithValue(ctx, identityCtxKey{}, id)
 }
 
-// withClaims attaches claims to the request's context.
-func withClaims(r *http.Request, c *Claims) *http.Request {
-	return r.WithContext(WithClaims(r.Context(), c))
+// withIdentity attaches an Identity to the request's context.
+func withIdentity(r *http.Request, id *Identity) *http.Request {
+	return r.WithContext(WithIdentity(r.Context(), id))
 }
 
 // BearerToken extracts a token from an Authorization header value.

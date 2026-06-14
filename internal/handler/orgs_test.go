@@ -98,7 +98,7 @@ func TestAuthOrgs_MultiOrgReturns200(t *testing.T) {
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc"},{"id":"org-b","name":"Bob Corp"}]`)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/orgs", nil)
-	req = req.WithContext(auth.WithClaims(req.Context(), &auth.Claims{Sub: "u1", OrgID: "org-b"}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "u1", OrgID: "org-b"}))
 	w := httptest.NewRecorder()
 	h.AuthOrgs(w, req)
 

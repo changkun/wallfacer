@@ -1,6 +1,6 @@
 // Authorization primitives: RequireSuperadmin and RequireScope. Both
 // are thin wrappers that inspect the validated principal already in
-// context (placed there by OptionalAuth / Auth / CookiePrincipal) and
+// context (placed there by OptionalAuth / Auth / CookieAuth) and
 // short-circuit the request with 403 when the caller lacks the
 // required privilege.
 //

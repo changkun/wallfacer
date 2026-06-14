@@ -122,7 +122,7 @@ func TestForceLogin_AuthenticatedPassesThrough(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/mode/board", nil)
 	req.Header.Set("Accept", "text/html")
-	req = req.WithContext(auth.WithClaims(req.Context(), &auth.Claims{Sub: "alice"}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "alice"}))
 	w := httptest.NewRecorder()
 	mw.ServeHTTP(w, req)
 
