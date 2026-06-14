@@ -17,6 +17,37 @@ Wallfacer organizes work on a four-column task board. You create tasks as cards 
 
 Archived tasks (done or cancelled) are hidden from the Done column by default. Toggle "Show archived tasks" in Settings to reveal them.
 
+<!-- In-app animated illustration: a task card flowing across the board columns.
+     Renders in the in-app docs viewer; GitHub shows the table and screenshot below. -->
+<svg viewBox="0 0 720 150" role="img" aria-label="A task card moving from Backlog to In Progress to Waiting to Done" style="display:block;width:100%;max-width:720px;margin:1rem auto;font-family:inherit">
+  <g>
+    <rect x="16"  y="40" width="160" height="96" rx="10" fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)"/>
+    <rect x="192" y="40" width="160" height="96" rx="10" fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)"/>
+    <rect x="368" y="40" width="160" height="96" rx="10" fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)"/>
+    <rect x="544" y="40" width="160" height="96" rx="10" fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)"/>
+    <text x="96"  y="28" text-anchor="middle" font-size="13" fill="var(--text-muted,#8a8f98)">Backlog</text>
+    <text x="272" y="28" text-anchor="middle" font-size="13" fill="var(--text-muted,#8a8f98)">In Progress</text>
+    <text x="448" y="28" text-anchor="middle" font-size="13" fill="var(--text-muted,#8a8f98)">Waiting</text>
+    <text x="624" y="28" text-anchor="middle" font-size="13" fill="var(--text-muted,#8a8f98)">Done</text>
+  </g>
+  <g>
+    <animateTransform attributeName="transform" type="translate"
+      values="0,0; 0,0; 176,0; 176,0; 352,0; 352,0; 528,0; 528,0; 0,0; 0,0"
+      keyTimes="0; 0.09; 0.22; 0.34; 0.47; 0.59; 0.72; 0.84; 0.86; 1"
+      dur="11s" repeatCount="indefinite"/>
+    <animate attributeName="opacity"
+      values="1; 1; 1; 0; 1"
+      keyTimes="0; 0.83; 0.85; 0.9; 0.96"
+      dur="11s" repeatCount="indefinite"/>
+    <rect x="32" y="40" width="128" height="96" rx="10" fill="var(--accent-soft,rgba(99,102,241,0.12))"/>
+    <rect x="40" y="62" width="112" height="52" rx="8" fill="var(--bg-elevated,#ffffff)" stroke="var(--accent,#6366f1)" stroke-width="1.5"/>
+    <circle cx="56" cy="78" r="5" fill="var(--accent,#6366f1)"/>
+    <rect x="68" y="74" width="74" height="7" rx="3.5" fill="var(--text-muted,#8a8f98)" opacity="0.6"/>
+    <rect x="48" y="94" width="94" height="6" rx="3" fill="var(--text-muted,#8a8f98)" opacity="0.35"/>
+    <rect x="48" y="104" width="60" height="6" rx="3" fill="var(--text-muted,#8a8f98)" opacity="0.35"/>
+  </g>
+</svg>
+
 ![The four-column task board with cards across Backlog, In Progress, Waiting, and Done](images/board.png)
 
 ### Task States
