@@ -52,13 +52,12 @@ type Config struct {
 	OversightSandbox      harness.ID // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  harness.ID // WALLFACER_SANDBOX_COMMIT_MESSAGE
 	IdeaAgentSandbox      harness.ID // WALLFACER_SANDBOX_IDEA_AGENT
-	SandboxFast           bool       // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
 	HostClaudeBinary   string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
 	HostCodexBinary    string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
 	HostCursorBinary   string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
 	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
-	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
+	TerminalEnabled    bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 
@@ -100,7 +99,6 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_OVERSIGHT",
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_SANDBOX_IDEA_AGENT",
-	"WALLFACER_SANDBOX_FAST",
 	"WALLFACER_HOST_CLAUDE_BINARY",
 	"WALLFACER_HOST_CODEX_BINARY",
 	"WALLFACER_HOST_CURSOR_BINARY",
@@ -117,15 +115,14 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// SandboxFast and TerminalEnabled default to true; only an explicit
-	// "false" value in the file disables them. This opt-out semantic means
-	// missing keys preserve the safer default (features enabled).
+	// TerminalEnabled defaults to true; only an explicit "false" value in the
+	// file disables it. This opt-out semantic means a missing key preserves the
+	// safer default (feature enabled).
 	//
 	// PlanningWindowDays defaults to 30 so the planning-cost period picker
 	// opens on a sensible "last month" view when the user hasn't configured
 	// anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
-		SandboxFast:        true,
 		TerminalEnabled:    true,
 		PlanningWindowDays: 30,
 	}
@@ -203,8 +200,6 @@ func Parse(path string) (Config, error) {
 			cfg.CommitMessageSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_IDEA_AGENT":
 			cfg.IdeaAgentSandbox = harness.NormalizeID(v)
-		case "WALLFACER_SANDBOX_FAST":
-			cfg.SandboxFast = v != "false"
 		case "WALLFACER_HOST_CLAUDE_BINARY":
 			cfg.HostClaudeBinary = v
 		case "WALLFACER_HOST_CODEX_BINARY":
@@ -417,7 +412,6 @@ type Updates struct {
 	ArchivedTasksPerPage *string
 	AutoPush             *string
 	AutoPushThreshold    *string
-	SandboxFast          *string
 	TerminalEnabled      *string
 	Workspaces           *string
 }
@@ -444,7 +438,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
-		"WALLFACER_SANDBOX_FAST":            u.SandboxFast,
 		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
