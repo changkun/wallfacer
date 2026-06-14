@@ -9,14 +9,18 @@ const cloudRoutes: RouteRecordRaw[] = [
   { path: '/:pathMatch(.*)*', component: () => import('./views/NotFoundPage.vue') },
 ];
 
-const localRoutes: RouteRecordRaw[] = [
-  { path: '/', component: () => import('./views/BoardPage.vue') },
-  { path: '/agents', component: () => import('./views/AgentsPage.vue') },
-  { path: '/flows', component: () => import('./views/FlowsPage.vue') },
-  { path: '/routines', component: () => import('./views/RoutinesPage.vue') },
-  { path: '/analytics', component: () => import('./views/AnalyticsPage.vue') },
-  { path: '/plan', component: () => import('./views/PlanPage.vue') },
-  { path: '/map', component: () => import('./views/MapPage.vue') },
+// needsWorkspace marks routes that render workspace-scoped data; App.vue
+// shows the WorkspaceRequired prompt for these when no workspace is visible,
+// so the board, plan/chat, agents, etc. stay consistent with /api/config's
+// "no workspace" state. Settings and docs are workspace-independent.
+export const localRoutes: RouteRecordRaw[] = [
+  { path: '/', component: () => import('./views/BoardPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/agents', component: () => import('./views/AgentsPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/flows', component: () => import('./views/FlowsPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/routines', component: () => import('./views/RoutinesPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/analytics', component: () => import('./views/AnalyticsPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/plan', component: () => import('./views/PlanPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/map', component: () => import('./views/MapPage.vue'), meta: { needsWorkspace: true } },
   { path: '/settings', component: () => import('./views/SettingsPage.vue') },
   { path: '/docs', component: () => import('./views/LocalDocsPage.vue') },
   { path: '/docs/:slug(.*)', component: () => import('./views/LocalDocsPage.vue') },
