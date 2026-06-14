@@ -730,6 +730,12 @@ var Routes = []Route{
 		Tags:        []string{"login"},
 	},
 	{
+		Method: http.MethodPost, Pattern: "/api/me/switch-org", Name: "SwitchOrg",
+		JSName:      "switchOrg",
+		Description: "Switch the active organization (latere-ui session convention). Validates membership, clears the session, and returns {redirect} to /login?org_id=<target>.",
+		Tags:        []string{"login"},
+	},
+	{
 		Method: http.MethodPost, Pattern: "/api/auth/device/start", Name: "AuthDeviceStart",
 		JSName:      "authDeviceStart",
 		Description: "Local-mode RFC 8628 device-code: start a sign-in flow and return the user code + verification URI.",

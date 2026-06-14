@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import { ConsoleSidebar, type ConsoleNavModel } from 'latere-ui';
 import 'latere-ui/console';
+import AccountControl from './AccountControl.vue';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
 import { useUiStore } from '../stores/ui';
@@ -336,36 +337,12 @@ watch(wsPopoverOpen, (open) => {
       </div>
     </template>
 
-    <!-- Cloud-mode account chip (only when /api/me responds) -->
+    <!-- Account menu: identity, org switcher, theme/language, sign in/out.
+         Shown whenever the server wired an OIDC client. The shared latere-ui
+         component matches every other latere console and handles the collapsed
+         rail itself. -->
     <template #foot>
-      <a
-        v-if="authEnabled && auth.me"
-        class="sb-account"
-        :href="auth.me.auth_url ? auth.me.auth_url + '/me' : '#'"
-        target="_blank"
-        rel="noopener"
-        :title="auth.me.email"
-      >
-        <img v-if="auth.me.picture" class="sb-account-avatar" :src="auth.me.picture" alt="" />
-        <span v-else class="sb-account-avatar sb-account-avatar--mono">
-          {{ (auth.me.name || auth.me.email || '?').slice(0, 1).toUpperCase() }}
-        </span>
-        <span class="sb-account-text">
-          <span class="sb-account-name">{{ auth.me.name || auth.me.email }}</span>
-          <span class="sb-account-meta">Signed in</span>
-        </span>
-      </a>
-      <a
-        v-else-if="authEnabled && auth.loaded && !auth.me"
-        class="sb-account sb-account--signin"
-        href="/login"
-      >
-        <span class="sb-account-avatar sb-account-avatar--mono">→</span>
-        <span class="sb-account-text">
-          <span class="sb-account-name">Sign in</span>
-          <span class="sb-account-meta">Not signed in</span>
-        </span>
-      </a>
+      <AccountControl v-if="authEnabled" placement="bottom-start" />
     </template>
   </ConsoleSidebar>
 </template>

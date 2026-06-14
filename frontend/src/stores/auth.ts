@@ -1,27 +1,30 @@
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { api, ApiError } from '../api/client';
-import type { Me } from '../api/types';
+// The session store is the shared latere-ui factory, the same one every other
+// latere SPA uses: it holds the resolved principal and the login / logout /
+// switch-org actions, and resolves the session from GET /api/me. wallfacer
+// keeps its own fetch wrapper (which injects the local-mode server API key), so
+// we adapt it to latere-ui's ApiClient shape rather than swapping the client.
+//
+// expiredSessionMode is 'graceful': a local `wallfacer run` is reachable
+// anonymously, so an absent/expired session must never bounce the user to
+// /login. Org switch follows the server's {redirect} round-trip.
+import { createSessionStore } from 'latere-ui';
 
-export const useAuthStore = defineStore('auth', () => {
-  const me = ref<Me | null>(null);
-  const loaded = ref(false);
-  const error = ref<string | null>(null);
+import { api as rawApi } from '../api/client';
 
-  async function fetchMe() {
-    try {
-      me.value = await api<Me>('GET', '/api/me');
-      error.value = null;
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        me.value = null;
-      } else {
-        error.value = (e as Error).message;
-      }
-    } finally {
-      loaded.value = true;
-    }
-  }
+const sessionClient = {
+  api: <T = unknown>(method: string, path: string, body?: unknown): Promise<T> =>
+    rawApi<T>(method, path, body),
+  apiUpload: <T = unknown>(): Promise<T> =>
+    Promise.reject(new Error('apiUpload is not supported in wallfacer')),
+  csrfToken: () => '',
+};
 
-  return { me, loaded, error, fetchMe };
+export const useAuthStore = createSessionStore({
+  client: sessionClient,
+  storeId: 'auth',
+  meEndpoint: '/api/me',
+  switchOrgEndpoint: '/api/me/switch-org',
+  defaultReturnTo: '/',
+  expiredSessionMode: 'graceful',
+  switchOrgMode: 'follow-redirect',
 });

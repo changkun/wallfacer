@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 113,
+  "route_count": 114,
   "routes": [
     {
       "method": "GET",
@@ -995,6 +995,15 @@
       "pattern": "/api/auth/me",
       "name": "PatchAuthMe",
       "description": "Mutate the signed-in principal — currently only org_id (active organization). Clears session and returns a redirect to /login?org_id=\u003ctarget\u003e.",
+      "tags": [
+        "login"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/me/switch-org",
+      "name": "SwitchOrg",
+      "description": "Switch the active organization (latere-ui session convention). Validates membership, clears the session, and returns {redirect} to /login?org_id=\u003ctarget\u003e.",
       "tags": [
         "login"
       ]

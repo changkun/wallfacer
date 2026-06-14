@@ -1087,6 +1087,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"AuthMe":       http.HandlerFunc(h.AuthMe),
 		"AuthOrgs":     http.HandlerFunc(h.AuthOrgs),
 		"PatchAuthMe":  http.HandlerFunc(h.PatchAuthMe),
+		"SwitchOrg":    http.HandlerFunc(h.SwitchOrg),
 
 		// Local-mode RFC 8628 device-code sign-in. The local SPA's prompt
 		// drives the flow over these three routes; the resulting token is
