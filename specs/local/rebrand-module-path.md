@@ -27,7 +27,7 @@ The `/x/` segment mirrors the sibling latere Go modules (`latere.ai/x/agents`, `
 |------|---------|--------|
 | Go module path | `changkun.de/x/wallfacer` | `latere.ai/x/wallfacer` |
 | Sandbox images | — | `ghcr.io/latere-ai/sandbox-agents` (done — moved to `github.com/latere-ai/images`) |
-| App image (`wallfacer web`/server) | `ghcr.io/changkun/wallfacerd` | `ghcr.io/latere-ai/wallfacerd` (still pending — referenced in `wallfacerd.yml`, `deploy-wallfacerd.yml`, `deploy/prod/deployment.yaml`) |
+| App image (`wallfacer web`/server) | `ghcr.io/changkun/wallfacerd` | **Deferred — stays `ghcr.io/changkun/wallfacerd`** (see Open Questions; referenced in `wallfacerd.yml`, `deploy-wallfacerd.yml`, `deploy/prod/deployment.yaml`) |
 | macOS bundle ID | `ai.latere.wallfacer` | Already correct (set in desktop-app task-08) |
 | Import statements | ~200 files | Bulk rename |
 | CI ldflags | Makefile, release-binary.yml | Update module prefix |
@@ -38,12 +38,12 @@ The `/x/` segment mirrors the sibling latere Go modules (`latere.ai/x/agents`, `
 1. `go mod edit -module latere.ai/x/wallfacer`
 2. Bulk find-replace `changkun.de/x/wallfacer` → `latere.ai/x/wallfacer` across all `.go` files
 3. Update Makefile ldflags, CI workflows, documentation
-4. Update container image base path if registry org changes
+4. ~~Update container image base path~~ — deferred; `wallfacerd` image stays at `ghcr.io/changkun` (see Open Questions)
 5. Run `go build ./...` and `go test ./...` to verify
 6. Consider adding a `go.mod` retract or vanity import redirect at the old path
 
 ## Open Questions
 
-- ~~Target container registry org~~ — resolved: `ghcr.io/latere-ai`. Sandbox images already migrated (`sandbox-agents`); the `wallfacerd` app image still publishes under `ghcr.io/changkun` and is part of this rebrand.
+- ~~Target container registry org~~ — sandbox images already migrated (`ghcr.io/latere-ai/sandbox-agents`). The `wallfacerd` app image **stays at `ghcr.io/changkun/wallfacerd` for now**: the repo is `github.com/changkun/wallfacer` and CI pushes with the default `GITHUB_TOKEN` (`packages: write`), which can write to `ghcr.io/changkun/*` but not the `latere-ai` org. Renaming to `ghcr.io/latere-ai/wallfacerd` is blocked until the repo moves under the `latere-ai` org or an org PAT secret grants this repo GHCR package-write. Revisit then.
 - Whether to set up a vanity import server at `latere.ai/x/wallfacer` (like `golang.org/x/` style)
 - Timing relative to other work (standalone migration or bundled with a release)
