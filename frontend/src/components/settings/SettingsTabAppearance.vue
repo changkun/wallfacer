@@ -1,47 +1,11 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { usePrefsStore } from '../../stores/prefs';
 import { useUiStore } from '../../stores/ui';
 
-const prefs = usePrefsStore();
-const { theme } = storeToRefs(prefs);
 const ui = useUiStore();
 </script>
 
 <template>
   <div class="settings-tab-content active" data-settings-tab="appearance">
-    <div class="settings-card">
-      <div class="settings-card-head">
-        <h4>Theme</h4>
-        <p>Choose the interface color mode for the current session.</p>
-      </div>
-      <div
-        class="theme-switch settings-theme-switch"
-        id="theme-switch"
-        role="group"
-        aria-label="Theme mode"
-      >
-        <button
-          type="button"
-          data-mode="light"
-          :class="{ active: theme === 'light' }"
-          @click="theme = 'light'"
-        >Light</button>
-        <button
-          type="button"
-          data-mode="dark"
-          :class="{ active: theme === 'dark' }"
-          @click="theme = 'dark'"
-        >Dark</button>
-        <button
-          type="button"
-          data-mode="auto"
-          :class="{ active: theme === 'auto' }"
-          @click="theme = 'auto'"
-        >Auto</button>
-      </div>
-    </div>
-
     <div class="settings-card">
       <div class="settings-card-head">
         <h4>Done Column</h4>
