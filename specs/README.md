@@ -36,9 +36,9 @@ Local Product - 10 shipped, rest pending
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback, Spatial Canvas
 
-Shared Design - 3 complete
+Shared Design - 4 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
-  ✅ Host as Only Backend          ◐ Harness Abstraction (interface + Claude/Codex shipped)
+  ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
   ○ Token & Cost Optimization      ○ Extensible Prompts
   ⊘ Overlay Snapshots (obsolete under host exec)
 
