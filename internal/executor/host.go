@@ -53,9 +53,11 @@ func requestFromClaudeSpec(spec ContainerSpec) harness.Request {
 // HostBackendConfig configures a HostBackend. Empty binary paths trigger a
 // $PATH lookup; tests use explicit paths to inject a fake agent.
 type HostBackendConfig struct {
-	ClaudeBinary string // path to `claude` CLI; empty ⇒ exec.LookPath
-	CodexBinary  string // path to `codex` CLI;  empty ⇒ exec.LookPath
-	CursorBinary string // path to `cursor-agent` CLI; empty ⇒ exec.LookPath
+	ClaudeBinary   string // path to `claude` CLI; empty ⇒ exec.LookPath
+	CodexBinary    string // path to `codex` CLI;  empty ⇒ exec.LookPath
+	CursorBinary   string // path to `cursor-agent` CLI; empty ⇒ exec.LookPath
+	OpenCodeBinary string // path to `opencode` CLI; empty ⇒ exec.LookPath
+	PiBinary       string // path to `pi` CLI; empty ⇒ exec.LookPath
 }
 
 // HostBackend runs the agent CLI directly as a host process — no container.
@@ -77,10 +79,12 @@ type HostBackendConfig struct {
 // spec.Labels are ignored by this backend (labels are surfaced via
 // ContainerInfo.TaskID on List()).
 type HostBackend struct {
-	binaryMu     sync.RWMutex
-	claudeBinary string
-	codexBinary  string
-	cursorBinary string
+	binaryMu       sync.RWMutex
+	claudeBinary   string
+	codexBinary    string
+	cursorBinary   string
+	openCodeBinary string
+	piBinary       string
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
@@ -99,6 +103,10 @@ func (b *HostBackend) SetBinaryForTest(t harness.ID, path string) {
 		b.codexBinary = path
 	case harness.Cursor:
 		b.cursorBinary = path
+	case harness.OpenCode:
+		b.openCodeBinary = path
+	case harness.Pi:
+		b.piBinary = path
 	}
 }
 
@@ -112,11 +120,15 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	claude, _ := resolveBinary(cfg.ClaudeBinary, "claude")
 	codex, _ := resolveBinary(cfg.CodexBinary, "codex")
 	cursor, _ := resolveBinary(cfg.CursorBinary, "cursor-agent")
+	opencode, _ := resolveBinary(cfg.OpenCodeBinary, "opencode")
+	pi, _ := resolveBinary(cfg.PiBinary, "pi")
 	return &HostBackend{
-		claudeBinary: claude,
-		codexBinary:  codex,
-		cursorBinary: cursor,
-		procs:        make(map[string]*hostHandle),
+		claudeBinary:   claude,
+		codexBinary:    codex,
+		cursorBinary:   cursor,
+		openCodeBinary: opencode,
+		piBinary:       pi,
+		procs:          make(map[string]*hostHandle),
 	}, nil
 }
 
@@ -169,6 +181,16 @@ func (b *HostBackend) binaryFor(t harness.ID) (string, error) {
 			return "", fmt.Errorf("cursor-agent binary not resolved")
 		}
 		return b.cursorBinary, nil
+	case harness.OpenCode:
+		if b.openCodeBinary == "" {
+			return "", fmt.Errorf("opencode binary not resolved")
+		}
+		return b.openCodeBinary, nil
+	case harness.Pi:
+		if b.piBinary == "" {
+			return "", fmt.Errorf("pi binary not resolved")
+		}
+		return b.piBinary, nil
 	default:
 		return "", fmt.Errorf("unknown sandbox type %q", t)
 	}
@@ -198,6 +220,10 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 		return b.launchCodex(ctx, spec)
 	case harness.Cursor:
 		return b.launchCursor(ctx, spec)
+	case harness.OpenCode:
+		return b.launchOpenCode(ctx, spec)
+	case harness.Pi:
+		return b.launchPi(ctx, spec)
 	default:
 		return nil, fmt.Errorf("host backend: unsupported agent %q", agent)
 	}
