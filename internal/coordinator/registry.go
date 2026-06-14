@@ -53,9 +53,18 @@ type Event struct {
 // metadata (principal, org, instance id, host label, version, served workspace
 // remotes, capabilities), never task or content data.
 //
-// The keyed indices the capability leaves consume are derived from a single
-// source of truth (byInstance), which is correct and simple at org scale
-// (dozens of instances per org).
+// Scope: this is the SINGLE-REPLICA view plus this replica's local socket table.
+// Its queries (Snapshot, PrincipalsInOrg, InstancesForRemote) cover only the
+// instances THIS replica terminates. wallfacerd runs multiple replicas, so under
+// horizontal scaling these whole-org queries must go through a Redis-backed
+// Directory (Valkey index + pub/sub) instead; see
+// specs/.../connection-and-presence/connection.md. This type is the
+// memDirectory (single-replica) impl plus the local socket table that every
+// replica keeps for delivery. Do not wire presence to these queries directly in
+// multi-replica mode, or each replica shows a partial org list.
+//
+// The indices are derived from a single source of truth (byInstance), correct
+// and simple at org scale (dozens of instances per org).
 type Registry struct {
 	mu         sync.RWMutex
 	byInstance map[string]Instance // instance_id -> instance
