@@ -34,7 +34,7 @@ func (b *HostBackend) launchCursor(ctx context.Context, spec ContainerSpec) (Han
 	}
 
 	env := b.buildChildEnv(spec)
-	req := requestFromClaudeSpec(spec, env)
+	req := requestFromClaudeSpec(spec)
 	if req.Prompt == "" {
 		return nil, fmt.Errorf("host backend: cursor launch requires a -p <prompt> argument in spec.Cmd")
 	}
