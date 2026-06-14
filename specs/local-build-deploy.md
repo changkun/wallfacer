@@ -1,6 +1,6 @@
 ---
 title: Local-First Build and Deploy (wallfacerd)
-status: abandoned
+status: archived
 depends_on:
   - ../../auth/specs/local-build-deploy.md
   - ../../terraform/specs/local-build-deploy.md
@@ -14,7 +14,7 @@ affects:
 effort: small
 trigger: parent umbrella spec; wallfacerd image and prod deploy only (desktop/binary releases unchanged)
 created: 2026-05-31
-updated: 2026-06-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -97,3 +97,19 @@ Two wallfacer-specific wrinkles:
 ## Rollback
 
 `git revert` the spec commit; recover the build job in `wallfacerd.yml` and the deleted `deploy-wallfacerd.yml` from history.
+
+## Outcome
+
+Archived (2026-06-14). Implemented and worked end-to-end (`d7c5e39d`), then
+deliberately reverted in favor of GitHub Actions (`0ba7b225` "revert: roll
+back local-build-deploy migration"). The local flow serialised
+build/push/deploy on the dev machine; GHA runs them asynchronously off the
+laptop and handles cross-arch builds (amd64 cluster from arm64 Apple
+Silicon) without the local qemu / BUILDPLATFORM workarounds.
+
+Reality contradicts every acceptance criterion: `deploy-wallfacerd.yml`
+still exists, `wallfacerd.yml` keeps its `build` job, and no `make deploy`
+target or `DEPLOY_LOG.md` was kept. The release-evidence pattern (smoke +
+evidence body + GitHub release) was lifted into GHA instead (`151e7903`)
+rather than into a local `make release`. Status `abandoned` was not a valid
+lifecycle value; archived records the deliberate reversal.

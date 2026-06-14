@@ -1,6 +1,6 @@
 ---
 title: Rebrand Module Path to latere.ai
-status: in_progress
+status: complete
 depends_on: []
 affects:
   - go.mod
@@ -8,7 +8,7 @@ affects:
   - "**/*.go"
 effort: medium
 created: 2026-03-28
-updated: 2026-05-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -60,4 +60,7 @@ Deferred (both blocked on the same precondition — wallfacer moving into the `l
 - `wallfacerd` app image stays at `ghcr.io/changkun/wallfacerd`; `deployment.yaml` and the wallfacerd workflows are unchanged.
 - The `vanityOwners["wallfacer"]` override remains until the repo migrates, after which it should be removed.
 
-Status stays `in_progress` until those two follow-ups land.
+Marked `complete` (2026-06-14): the primary deliverable (module path
+migration) shipped and is verified. The two follow-ups above are external,
+gated on the `wallfacer` repo moving into the `latere-ai` GitHub org, and
+are tracked here as Deferred rather than blocking completion.
