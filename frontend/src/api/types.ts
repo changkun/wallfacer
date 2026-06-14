@@ -134,7 +134,6 @@ export interface EnvConfig {
   archived_tasks_per_page: number;
   auto_push_enabled: boolean;
   auto_push_threshold: number;
-  sandbox_fast: boolean;
 }
 
 export interface EnvUpdatePayload {
@@ -156,7 +155,6 @@ export interface EnvUpdatePayload {
   archived_tasks_per_page?: number;
   auto_push_enabled?: boolean;
   auto_push_threshold?: number;
-  sandbox_fast?: boolean;
 }
 
 export interface SystemPromptTemplate {
