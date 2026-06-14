@@ -8,7 +8,7 @@ affects:
   - deploy/
 effort: medium
 created: 2026-03-28
-updated: 2026-05-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -18,7 +18,7 @@ dispatched_task_id: null
 > **Rescoped 2026-05-30.** This spec previously had wallfacer provision its own
 > K8s sandbox execution (RBAC for Jobs, a dedicated sandbox node pool,
 > NetworkPolicy for sandbox pods, a `K8sBackend` creating Jobs directly). That
-> half is gone: **Cella owns sandbox runtime** — wallfacer dispatches to it
+> half is gone: **Cella owns sandbox runtime** - wallfacer dispatches to it
 > through the runtime seam ([latere-integration/cella-runtime.md](latere-integration/cella-runtime.md)),
 > it does not schedule sandboxes itself. What remains is the part that is
 > genuinely wallfacer's: **deploying the task-board server into the existing
@@ -26,7 +26,7 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer runs locally today — a Go binary on the host, storing task data on the
+Wallfacer runs locally today - a Go binary on the host, storing task data on the
 local filesystem. To offer a hosted task board under latere.ai, the **task-board
 server** (`wallfacer run`) must be deployed as a workload in the existing DOKS
 `latere` cluster, alongside the other latere.ai services.
@@ -54,13 +54,13 @@ website doesn't need: **durable task-data storage**.
 | Concern | Owner |
 |---------|-------|
 | K8s cluster, node pools, Spaces, DNS, TLS ClusterIssuer | latere.ai/terraform |
-| **Sandbox runtime** (scheduling, pods, warm pools, egress, hardening, RBAC for Jobs) | **Cella** (`latere.ai/sandbox`) — consumed via [cella-runtime.md](latere-integration/cella-runtime.md) |
+| **Sandbox runtime** (scheduling, pods, warm pools, egress, hardening, RBAC for Jobs) | **Cella** (`latere.ai/sandbox`) - consumed via [cella-runtime.md](latere-integration/cella-runtime.md) |
 | Identity / sign-in | Identity (auth.latere.ai), already wired in `wallfacerd` |
 | Workspace files | FS (fs.latere.ai), see [tenant-filesystem.md](tenant-filesystem.md) |
 | Task-board server Deployment, Service, Ingress, PVC, Secret | **wallfacer** (`deploy/`) |
 
 Wallfacer does **not** add RBAC for Job creation, a sandbox node pool, or a
-sandbox NetworkPolicy — those moved to Cella with the runtime seam.
+sandbox NetworkPolicy - those moved to Cella with the runtime seam.
 
 ## What the task-board server needs in the cluster
 
@@ -71,10 +71,10 @@ A second Deployment in `latere` running the task-board server, modeled on
 
 - Command `wallfacer run` (not `web`), serving the board API/UI on `:8080`.
 - Larger resource requests than the website's `10m`/`32Mi` (it holds the store
-  and runs automation loops) — size from load, start modest.
+  and runs automation loops) - size from load, start modest.
 - A mounted data volume (see PVC below).
-- Runtime backend selects **Cella** in cloud mode (`--backend cella`), not local
-  podman — so the pod needs no container runtime or privileged access.
+- Runtime executor selects **Cella** in cloud mode (`--executor cella`), not the
+  host agent process, so the pod needs no container runtime or privileged access.
 - Env: LLM creds (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, optional
   `OPENAI_API_KEY`), `WALLFACER_SERVER_API_KEY`, `WALLFACER_CLOUD=true`,
   `AUTH_*` (as `wallfacerd` already sets), `CELLA_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
@@ -104,7 +104,7 @@ spec:
       storage: 20Gi
 ```
 
-`ReadWriteOnce` ties the server to a single replica — fine for v1. Multi-replica
+`ReadWriteOnce` ties the server to a single replica - fine for v1. Multi-replica
 (a Postgres/object-storage `StorageBackend`) is deferred; see
 [storage-backends.md](../foundations/storage-backends.md) (those backend tasks
 are archived until multi-instance scaling is actually needed).
@@ -118,7 +118,7 @@ A K8s Secret (mirroring `wallfacerd-auth`) supplying the env above.
 ```
 deploy/
 ├── prod/
-│   ├── deployment.yaml      # wallfacerd (website) — exists
+│   ├── deployment.yaml      # wallfacerd (website) - exists
 │   ├── service.yaml         # exists
 │   ├── ingress.yaml         # exists
 │   ├── board-deployment.yaml  # NEW: task-board server
@@ -128,14 +128,14 @@ deploy/
 └── secret.yaml.example      # template for the board Secret
 ```
 
-(No `rbac.yaml`, no `networkpolicy.yaml` — sandbox concerns are Cella's.)
+(No `rbac.yaml`, no `networkpolicy.yaml` - sandbox concerns are Cella's.)
 
 ## Implementation tasks
 
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
 | 1 | Add board `Deployment`/`Service`/`Ingress`/`PVC` manifests under `deploy/prod/`, modeled on `wallfacerd` | runtime seam defined ([cella-runtime.md](latere-integration/cella-runtime.md)) | Small |
-| 2 | Extend the existing `wallfacerd` CI to build/push the board image (or reuse the same image, different command) | — | Small |
+| 2 | Extend the existing `wallfacerd` CI to build/push the board image (or reuse the same image, different command) | - | Small |
 | 3 | Board Ingress host + TLS cert in terraform (DNS A record + Certificate, same pattern as `wf.latere.ai`) | 1 | Small |
 | 4 | E2E: deploy to `latere`, sign in, create a task, run it via Cella, verify task data persists across pod restart | 1, 2, 3, Cella backend | Medium |
 | 5 | Document the deploy workflow (manifests, secrets, terraform additions) | 4 | Small |
@@ -146,18 +146,18 @@ deploy/
 |------|------|
 | Task-board server pod | +$0 (fits existing node pool) |
 | `wallfacer-data` PVC (20Gi `do-block-storage`) | ~$2/mo |
-| Sandbox compute | **$0 here** — owned and billed by Cella, not this spec |
+| Sandbox compute | **$0 here** - owned and billed by Cella, not this spec |
 
 The sandbox node-pool line items from the previous version are gone: Cella runs
 sandboxes on its own (tainted) pool and accounts for that compute.
 
 ## Dependencies
 
-- [storage-backends.md](../foundations/storage-backends.md) — `FilesystemBackend` on the PVC (complete).
-- [latere-integration.md](latere-integration.md) — the umbrella; the runtime
+- [storage-backends.md](../foundations/storage-backends.md) - `FilesystemBackend` on the PVC (complete).
+- [latere-integration.md](latere-integration.md) - the umbrella; the runtime
   ([cella-runtime.md](latere-integration/cella-runtime.md)) and FS
   ([tenant-filesystem.md](tenant-filesystem.md)) seams the deployed server consumes.
-- Identity (auth.latere.ai) — already wired into `wallfacerd`; the board server reuses the same `AUTH_*` config.
+- Identity (auth.latere.ai) - already wired into `wallfacerd`; the board server reuses the same `AUTH_*` config.
 
 ## What depends on this
 
@@ -168,6 +168,6 @@ sandboxes on its own (tainted) pool and accounts for that compute.
 
 - Postgres + S3 `StorageBackend` for multi-replica scaling (storage tasks are
   archived until demand exists).
-- Autoscaling / multi-region — terraform concerns, not wallfacer's.
-- Self-hosted deployment guide — the manifests work on any cluster; only
+- Autoscaling / multi-region - terraform concerns, not wallfacer's.
+- Self-hosted deployment guide - the manifests work on any cluster; only
   StorageClass and Ingress differ.
