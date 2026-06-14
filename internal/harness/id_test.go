@@ -31,8 +31,8 @@ func TestParseID(t *testing.T) {
 		t.Errorf("ParseID(CODEX) = %q,%v", id, ok)
 	}
 	// Unregistered harness ID: zero value, not ok.
-	if id, ok := ParseID("cursor"); ok || id != "" {
-		t.Errorf("ParseID(cursor) = %q,%v; want \"\",false (not registered)", id, ok)
+	if id, ok := ParseID("opencode"); ok || id != "" {
+		t.Errorf("ParseID(opencode) = %q,%v; want \"\",false (not registered)", id, ok)
 	}
 }
 
@@ -49,11 +49,11 @@ func TestIDIsValidOrDefault(t *testing.T) {
 	if !Claude.IsValid() {
 		t.Error("Claude should be valid (registered)")
 	}
-	if Cursor.IsValid() {
-		t.Error("Cursor not implemented yet, should be invalid")
+	if OpenCode.IsValid() {
+		t.Error("OpenCode not implemented yet, should be invalid")
 	}
-	if got := Cursor.OrDefault(); got != Default() {
-		t.Errorf("Cursor.OrDefault() = %q, want %q", got, Default())
+	if got := OpenCode.OrDefault(); got != Default() {
+		t.Errorf("OpenCode.OrDefault() = %q, want %q", got, Default())
 	}
 	if got := Codex.OrDefault(); got != Codex {
 		t.Errorf("Codex.OrDefault() = %q", got)
