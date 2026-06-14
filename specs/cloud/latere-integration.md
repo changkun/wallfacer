@@ -43,6 +43,22 @@ This umbrella defines **how wallfacer integrates with those services** so that
 the local-first product keeps working unchanged while cloud mode gains
 ecosystem value incrementally.
 
+## Two axes
+
+Cloud work splits into two independent axes that share only the auth principal.
+Conflating them muddied the older specs; they are now named separately.
+
+| Axis | What | Boundary | Status | Anchor |
+|------|------|----------|--------|--------|
+| **A. Coordination plane** | Signed-in local instances hold one outbound connection to a coordinator role on wallfacerd (wf.latere.ai). Presence, remote control, metadata projection, collaboration relay. **Local stays source of truth.** | Allow-listed metadata + presence + comment anchors only | **Cloud v1, lead** | [coordination-plane.md](latere-integration/coordination-plane.md) |
+| **B. Remote execution** | Dispatch agent *runs* to Cella / Topos / Managed Agents / Antigravity. | Source + worktree leave deliberately | Cloud v2+, demand-gated | [cella-runtime.md](latere-integration/cella-runtime.md) |
+
+Axis A is the north star's "Cloud v1 is metadata coordination": local-first
+sync, not hosted execution. It is **relay + projection, never mirror** (the
+coordinator is never authoritative for local task data). Axis B crosses the data
+boundary on purpose and is the later, opt-in phase. The rest of this umbrella
+catalogs the per-service seams both axes draw on.
+
 ## Principle: consume, don't absorb
 
 From the product north star (`latere.ai/specs/products/wallfacer.md`):
@@ -74,7 +90,7 @@ seam is inert and local behavior is byte-identical to today.
 | **Deploy** | terraform (DOKS) | thin deploy module + `pkg/otel` OTLP emit | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |
 | **Model keys** | Lux | credential injection into task env | future | - (specced when scheduled) |
 | **MCP catalog** | MCP Registry | approved-tool resolution | future | - |
-| **Cloud metadata / history / usage** | (TBD cloud metadata service) | tap the `store.TaskEvent` stream, redact to an allow-list, push | undefined - **pending scope decision** | - (candidate: a `metadata-sync.md` leaf) |
+| **Coordination plane** (presence, remote control, metadata projection, collaboration) | coordinator role on wallfacerd (wf.latere.ai) | one outbound connection per signed-in instance; tap `store.TaskEvent`, redact to an allow-list, push | **drafted (Cloud v1 lead)** | [latere-integration/coordination-plane.md](latere-integration/coordination-plane.md) |
 
 ## Design rules
 
@@ -99,12 +115,16 @@ seam is inert and local behavior is byte-identical to today.
 ## Phasing
 
 - **Phase 1 - done.** Identity sign-in + JWT + principal/org model.
-- **Phase 2 - integration interfaces (this track).** Define each seam's contract
-  and the config selection. The runtime seam ([cella-runtime.md](latere-integration/cella-runtime.md))
-  is the lead example because it adds a cloud runtime behind the existing
-  `executor.Backend` interface.
-- **Phase 3+ - gated by demand & FS Workspace API.** Cella execution, FS
-  workspace staging, agent token exchange, model-key routing via Lux.
+- **Phase 2 - Axis A, coordination plane (Cloud v1).** The
+  [coordination-plane](latere-integration/coordination-plane.md) anchor: one
+  outbound connection per signed-in instance carrying presence, remote control,
+  the metadata projection, and the collaboration relay. Local stays source of
+  truth. This is the lead because it delivers cross-instance value (presence,
+  team visibility, spec comments) without crossing the source/diff boundary.
+- **Phase 3+ - Axis B, remote execution (gated by demand & FS Workspace API).**
+  Cella execution, FS workspace staging, agent token exchange, model-key routing
+  via Lux. The runtime seam ([cella-runtime.md](latere-integration/cella-runtime.md))
+  is its lead, behind the existing `executor.Backend` interface.
 
 ## Boundaries
 
