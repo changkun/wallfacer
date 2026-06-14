@@ -10,23 +10,13 @@ This guide explains each primitive, how they plug into each other, and works thr
 
 ## Mental model
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│  Task                                                           │
-│    prompt + metadata + a flow slug                              │
-│       │                                                          │
-│       ▼                                                          │
-│  Flow          (implement | brainstorm | test-only | custom)     │
-│    ordered chain of agent slugs                                  │
-│       │                                                          │
-│       ▼                                                          │
-│  Agent         (impl | test | title | oversight | …)             │
-│    title, system prompt, harness, capabilities                   │
-│       │                                                          │
-│       ▼                                                          │
-│  Harness       (Claude | Codex)                                  │
-│    the selected CLI run as a host process in the task's worktree │
-└────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Task["Task<br/>prompt, metadata, and a flow slug"]
+    Flow["Flow<br/>implement, brainstorm, test-only, or custom<br/>an ordered chain of agent slugs"]
+    Agent["Agent<br/>impl, test, title, oversight, and more<br/>title, system prompt, harness, capabilities"]
+    Harness["Harness<br/>Claude or Codex<br/>the selected CLI, run as a host process in the task worktree"]
+    Task --> Flow --> Agent --> Harness
 ```
 
 The four primitives, bottom up:
@@ -164,9 +154,15 @@ A flow is an ordered list of steps, where each step references an agent by slug.
 
 In the **Flows** tab, each built-in row renders its step chain as pills separated by `→`. Parallel groups appear inside a dashed blue box:
 
+```mermaid
+flowchart LR
+    impl --> test
+    test --> commit["commit-msg"]
+    test --> title
+    test --> oversight
 ```
-impl  →  test  →  ┌ commit-msg ‖ title ‖ oversight ┐
-```
+
+In the UI this chain renders as pills: `impl → test → [ commit-msg ‖ title ‖ oversight ]`, with the parallel group boxed.
 
 - A trailing `?` on a chip marks an optional step (flow skips it on failure).
 - `‖` between chips inside a box means they run concurrently via an errgroup.
@@ -254,19 +250,7 @@ Watched the same way as agents. Override the directory with `WALLFACER_FLOWS_DIR
 
 ### The composer Flow picker
 
-The **+ New Task** form in the Backlog column has a **Flow** dropdown populated from `/api/flows`. Default is `implement`. Switch to any built-in or user-authored flow to run the task against that chain.
-
-```
-┌─────────────────────────────────────────┐
-│  Flow: [Implement ▼]       [Templates]  │
-├─────────────────────────────────────────┤
-│  Describe the task...                   │
-│                                         │
-├─────────────────────────────────────────┤
-│  Agent: Claude   Timeout: 1 hour        │
-│  ...                                    │
-└─────────────────────────────────────────┘
-```
+The **+ New Task** form in the Backlog column has a **Flow** dropdown populated from `/api/flows`. Default is `implement`. Switch to any built-in or user-authored flow to run the task against that chain. The same form exposes a Templates button, the task description field, and per-task Agent and Timeout controls.
 
 When the flow is `brainstorm`, the prompt field becomes optional (the ideate agent derives the topic from the workspace itself).
 
@@ -282,15 +266,7 @@ Via the UI today you pick the flow at creation and cannot change it after. Via t
 
 ## Routines spawn tasks against a flow
 
-A **routine** is a board card (`Kind=routine`) with a schedule. When its timer fires, the routine spawns a fresh task against the flow you picked.
-
-```
-┌─────────────────────────────────────────┐
-│  Routine: nightly idea scan             │
-│  every 24h   •   flow: brainstorm       │
-│  next fire: tomorrow 09:00              │
-└─────────────────────────────────────────┘
-```
+A **routine** is a board card (`Kind=routine`) with a schedule. When its timer fires, the routine spawns a fresh task against the flow you picked. A routine card shows its cadence, its target flow, and its next fire time (for example, "nightly idea scan, every 24h, flow: brainstorm, next fire tomorrow 09:00").
 
 The `spawn_flow` field replaces the legacy `spawn_kind`. Create one via the composer's "Repeat on a schedule" toggle or directly via `POST /api/routines`.
 
