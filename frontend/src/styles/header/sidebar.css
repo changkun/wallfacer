@@ -6,7 +6,6 @@
   width: var(--sb-w);
   border-right: 1px solid var(--rule);
   background: var(--bg-sidebar);
-  --wails-draggable: drag;
   padding: var(--sp-3) 0;
   transition:
     width 0.18s ease,
@@ -17,17 +16,6 @@
 
 .app-sidebar.collapsed {
   width: var(--sb-w-icon);
-}
-
-/* Inset top padding for macOS traffic lights in desktop mode. */
-html.wails-desktop .app-sidebar {
-  padding-top: 32px;
-}
-
-/* Interactive elements must not be draggable. */
-.app-sidebar button,
-.app-sidebar a {
-  --wails-draggable: no-drag;
 }
 
 /* Brand row */
