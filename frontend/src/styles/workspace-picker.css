@@ -358,3 +358,86 @@
   padding: 1px 6px;
   flex-shrink: 0;
 }
+
+/* --- Control polish ---------------------------------------------------------
+   The shared btn-ghost/btn-icon rendered as flat, washed-out boxes inside the
+   modal. Give the picker controls a clean, consistent secondary-button look
+   with a soft focus ring (not the global bold accent outline box). Prefixed
+   with .ws-picker to win over the single-class global button rules. */
+.ws-picker .ws-picker__go-btn,
+.ws-picker .ws-picker__new-folder-btn,
+.ws-picker .ws-picker__add-folder-btn,
+.ws-picker .ws-entry__add,
+.ws-picker .ws-picker__clear-btn,
+.ws-picker .ws-selected-item__remove {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.4;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.ws-picker .ws-picker__go-btn,
+.ws-picker .ws-picker__new-folder-btn,
+.ws-picker .ws-picker__add-folder-btn {
+  padding: 5px 12px;
+}
+.ws-picker .ws-entry__add,
+.ws-picker .ws-picker__clear-btn {
+  padding: 3px 10px;
+}
+.ws-picker .ws-picker__go-btn:hover:not(:disabled),
+.ws-picker .ws-picker__new-folder-btn:hover:not(:disabled),
+.ws-picker .ws-picker__add-folder-btn:hover:not(:disabled),
+.ws-picker .ws-entry__add:hover:not(:disabled),
+.ws-picker .ws-picker__clear-btn:hover:not(:disabled),
+.ws-picker .ws-selected-item__remove:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  color: var(--text);
+}
+.ws-picker .ws-picker__go-btn:disabled,
+.ws-picker .ws-picker__new-folder-btn:disabled,
+.ws-picker .ws-picker__add-folder-btn:disabled,
+.ws-picker .ws-entry__add:disabled,
+.ws-picker .ws-picker__clear-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ws-picker .ws-picker__go-btn:focus-visible,
+.ws-picker .ws-picker__new-folder-btn:focus-visible,
+.ws-picker .ws-picker__add-folder-btn:focus-visible,
+.ws-picker .ws-entry__add:focus-visible,
+.ws-picker .ws-picker__clear-btn:focus-visible,
+.ws-picker .ws-selected-item__remove:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
+}
+
+/* Rename stays a quiet inline icon, not a filled button. */
+.ws-picker .ws-entry__rename {
+  border: none;
+  background: none;
+  border-radius: 4px;
+}
+.ws-picker .ws-entry__rename:hover {
+  background: var(--bg-hover);
+}
+
+/* Inputs: soft accent focus ring to match the buttons. */
+.ws-picker .ws-picker__path-input:focus,
+.ws-picker .ws-picker__filter:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
+}
+
+/* Stepper: replace the global bold accent focus box with a soft ring on the
+   numbered circle (the active step already reads via its filled circle). */
+.ws-picker .ws-step:focus-visible {
+  outline: none;
+}
+.ws-picker .ws-step:focus-visible .ws-step__circle {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+}
