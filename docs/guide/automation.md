@@ -111,6 +111,36 @@ flowchart LR
     Failed -->|auto-retry| Implement
 ```
 
+<!-- In-app animated illustration: a pulse flowing through the autopilot pipeline.
+     Renders in the in-app docs viewer; GitHub shows the diagram above. -->
+<svg viewBox="0 0 720 96" role="img" aria-label="A pulse moving through the autopilot pipeline: Implement, Catch Up, Test, Submit, Push" style="display:block;width:100%;max-width:720px;margin:1rem auto;font-family:inherit">
+  <line x1="72" y1="40" x2="648" y2="40" stroke="var(--border,#e2e4e8)" stroke-width="2"/>
+  <g fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)" stroke-width="1.5">
+    <circle cx="72"  cy="40" r="18"/>
+    <circle cx="216" cy="40" r="18"/>
+    <circle cx="360" cy="40" r="18"/>
+    <circle cx="504" cy="40" r="18"/>
+    <circle cx="648" cy="40" r="18"/>
+  </g>
+  <g font-size="12" text-anchor="middle" fill="var(--text-muted,#8a8f98)">
+    <text x="72"  y="80">Implement</text>
+    <text x="216" y="80">Catch Up</text>
+    <text x="360" y="80">Test</text>
+    <text x="504" y="80">Submit</text>
+    <text x="648" y="80">Push</text>
+  </g>
+  <circle r="13" fill="var(--accent,#6366f1)" opacity="0.18">
+    <animate attributeName="cx" values="72;72;216;216;360;360;504;504;648;648;72" keyTimes="0;0.06;0.20;0.26;0.40;0.46;0.60;0.66;0.80;0.92;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="40" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.18;0.18;0;0.18" keyTimes="0;0.9;0.94;1" dur="9s" repeatCount="indefinite"/>
+  </circle>
+  <circle r="6" fill="var(--accent,#6366f1)">
+    <animate attributeName="cx" values="72;72;216;216;360;360;504;504;648;648;72" keyTimes="0;0.06;0.20;0.26;0.40;0.46;0.60;0.66;0.80;0.92;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="40" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0;1" keyTimes="0;0.9;0.94;1" dur="9s" repeatCount="indefinite"/>
+  </circle>
+</svg>
+
 1. 🤖 **Implement** (Autopilot) -- promote backlog tasks to In Progress.
 2. 🔗 **Catch Up** -- rebase waiting tasks onto the latest branch to prevent merge conflicts.
 3. 🧪 **Test** -- run the verification agent on waiting tasks.
