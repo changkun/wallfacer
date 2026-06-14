@@ -1,0 +1,11 @@
+# Keep the build context clean and reproducible: force the image to build the
+# frontend itself (the frontend stage) rather than inheriting a stale local
+# dist. Without this, a developer's local frontend/dist leaks into COPY . . and
+# masks a broken embed.
+.git
+**/node_modules
+frontend/dist
+internal/webserver/spa/dist
+/wallfacer
+*.out
+coverage*
