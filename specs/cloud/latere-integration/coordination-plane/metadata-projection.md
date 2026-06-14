@@ -196,11 +196,11 @@ read-model must be shared, not per-replica:
   (namespaced `wf:coord:proj:*`).
 - **Long-retention rollups in Postgres** (`latere-pg`): the daily/weekly usage
   buckets and the >90-day history that instances may no longer be able to replay.
-  These are durable and want a real query store, not an eviction-unsafe cache.
-  wallfacer has no database on `latere-pg` today, so the rollup tier shares the
-  **same provisioning decision** as authoritative spec comments (see
-  [spec-comments](spec-comments.md)); until then, projection is live-only (Valkey)
-  and history is bounded to what replay reconstructs.
+  These are durable and want a real query store, not an eviction-unsafe cache. The
+  `wallfacer` database and `WALLFACER_DATABASE_URL` are **provisioned** (shared
+  with authoritative spec comments, see [spec-comments](spec-comments.md)); the
+  implementation owns the rollup schema. Live projection stays in Valkey
+  (regenerable by replay); only the durable rollups land in Postgres.
 
 Rejected for the durable tier: Identity org metadata (would absorb
 wallfacer-domain data) and FS (a blob plane, not queryable). It holds only the

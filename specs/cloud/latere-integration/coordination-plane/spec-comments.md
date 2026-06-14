@@ -283,13 +283,13 @@ under memory pressure and would silently drop system-of-record data. Authoritati
 threads therefore persist in **Postgres** (`latere-pg`). Valkey is used only for the
 real-time relay (pub/sub fan-out, presence-aware delivery), never as the store.
 
-This is a **new infra dependency**: wallfacer is filesystem-storage today and has no
-database on `latere-pg` (unlike auth/cella/fs/lux/web). Standing up authoritative
-comments requires provisioning a `wallfacer` database on `latere-pg` plus the
-`kubernetes_secret` wiring, the same pattern every other service uses. Until that
-decision lands, this leaf is blocked at the storage line; the schema, anchoring,
-relay, and UI above are storage-agnostic and can be designed ahead. The provisioning
-decision is shared with [metadata-projection](metadata-projection.md)'s rollup tier.
+This was a new infra dependency (wallfacer was filesystem-storage, with no database
+on `latere-pg` unlike auth/cella/fs/lux/web) and is now **provisioned**: a
+`wallfacer` database on `latere-pg` plus a `wallfacer-db` secret exposing
+`WALLFACER_DATABASE_URL`, wired into the wallfacerd deployment (the same pattern
+every other service uses). The implementation owns the schema, migrations, and the
+read/write path against that database; the relay still rides Valkey. The store is
+shared with [metadata-projection](metadata-projection.md)'s rollup tier.
 
 ## Future: git-export (separate leaf)
 

@@ -138,8 +138,8 @@ already co-tenant): a TTL-refreshed instance index plus pub/sub fan-out, namespa
 `wf:coord:*`, config-gated by `WALLFACER_REDIS_URL` with an in-memory
 single-replica fallback for local dev. Valkey is a cache and holds only ephemeral
 coordination state; **durable, authoritative** data (spec comments, the projection
-long-tail rollups) lives in **Postgres** (`latere-pg`), a new infra dependency
-since wallfacer is filesystem-storage today. The full design is in
+long-tail rollups) lives in **Postgres** (`latere-pg`, the `wallfacer` database now
+provisioned alongside the cache secret). The full design is in
 [connection](latere-integration/coordination-plane/connection-and-presence/connection.md);
 the durable-tier provisioning is an open decision (see Open questions).
 
@@ -273,14 +273,12 @@ governed coordination channel," with:
 1. **Connection shape.** Long-lived WSS (real-time, server cost scales with live
    instances) vs heartbeat-poll (cheap, latency floor). Remote-control's design
    space already framed this; WSS is the lead because presence needs push.
-2. **Durable store for authoritative data (blocks comments + projection
-   rollups).** Ephemeral coordination lives in Valkey, decided. But spec comments
-   are cloud-authoritative and the projection long-tail wants durability, and a
-   cache is eviction-unsafe for a system of record. wallfacer has **no database on
-   `latere-pg`** today (it is filesystem-storage). The open decision: provision a
-   `wallfacer` Postgres database on `latere-pg` (the pattern every other service
-   uses), or revisit the cloud-now comment-storage choice. Does **not** block
-   phase-1 connection + presence, which are Valkey-only.
+2. **Durable store for authoritative data (resolved).** Ephemeral coordination
+   lives in Valkey; authoritative spec comments and the projection long-tail
+   rollups live in Postgres (a cache is eviction-unsafe for a system of record).
+   wallfacer had no `latere-pg` database; one is now **provisioned** (`wallfacer`
+   db + `wallfacer-db` secret / `WALLFACER_DATABASE_URL`, wired into the
+   deployment). The implementation owns the schema and migrations.
 3. **Comment anchoring across spec edits.** A comment pins to a spec
    line/section; the underlying spec changes in git. Anchor on content hash +
    fuzzy reposition, or section id? Decided in `spec-comments.md`.
