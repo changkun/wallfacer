@@ -142,6 +142,46 @@ func TestLogin_WithClient_Delegates(t *testing.T) {
 	}
 }
 
+// TestLogin_PublicClient_RedirectsToAuthorize is the end-to-end guard for the
+// default sign-in path: a real public (secret-less) client redirects /login to
+// the auth service's /authorize with client_id=wallfacer and the loopback
+// redirect_uri registered for that client. If either drifts, the auth service
+// rejects the flow, which is exactly the "login doesn't work" failure.
+func TestLogin_PublicClient_RedirectsToAuthorize(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	client := auth.New(auth.Config{
+		AuthURL:         "https://auth.latere.ai",
+		ClientID:        "wallfacer",
+		RedirectURL:     "http://localhost:8080/callback",
+		CookieKey:       "0123456789abcdef0123456789abcdef",
+		InsecureCookies: true,
+	})
+	if client == nil {
+		t.Fatal("auth.New returned nil for a public browser client")
+	}
+	h.SetAuth(client)
+
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	w := httptest.NewRecorder()
+	h.Login(w, req)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("status = %d, want 302", w.Code)
+	}
+	loc := w.Header().Get("Location")
+	for _, want := range []string{
+		"https://auth.latere.ai/authorize",
+		"client_id=wallfacer",
+		// redirect_uri=http://localhost:8080/callback, URL-encoded.
+		"redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fcallback",
+		"code_challenge=", // PKCE is mandatory for public clients
+	} {
+		if !strings.Contains(loc, want) {
+			t.Errorf("Location %q missing %q", loc, want)
+		}
+	}
+}
+
 // TestLogoutNotify_ClearsCookie covers the front-channel logout path: the
 // auth service broadcasts by loading /logout/notify in a hidden iframe, and
 // we must clear the cookie even when the AuthProvider is nil (the cookie
