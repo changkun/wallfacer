@@ -1,6 +1,6 @@
 ---
 title: Vue Frontend Migration
-status: complete
+status: archived
 depends_on: []
 affects:
   - frontend/
@@ -403,8 +403,10 @@ to point at the Vue dist.
 
 ## Outcome
 
-Complete (2026-06-14). The two frontends converged onto the single Vue 3 +
-TypeScript SPA in `frontend/`.
+Archived (2026-06-14). Shipped: the two frontends converged onto the single
+Vue 3 + TypeScript SPA in `frontend/`. Archived once done, matching the
+sibling convention for shipped standalone features (terminal-sessions,
+oauth-token-setup, routine-tasks, agents-and-flows).
 
 ### What Shipped
 

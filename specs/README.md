@@ -72,7 +72,6 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer |
 | [refinement-into-plan.md](local/refinement-into-plan.md) | **Complete** | Retired the bespoke refine pipeline. Plan mode edits task prompts directly via a Task Prompts explorer section and a task-aware `update_task_prompt` tool. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. Auto-refine removed entirely (no replacement in this spec). |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
-| [vue-frontend-migration.md](local/vue-frontend-migration.md) | **Complete** | Converged the vanilla-JS `ui/` board and the Vue `frontend/` site into one Vue 3 + TypeScript SPA with runtime local/cloud mode switching. Legacy `ui/` and its build/CI pipeline removed; a single embedded `frontend/dist` is served by the Go server. Superseded typescript-migration and typed-dom-hooks. |
 | [backend-redundancy-cleanup.md](local/backend-redundancy-cleanup.md) | **Complete** | Umbrella for follow-ups to the June 2026 pass-1 cleanup. All children landed or retired: backend-only leaves done in pass 1 (two declined), and the 6 API-surface leaves (planning threads, spec actions, oversight phase, task actions, auth orgs, ideate facade) collapsed verb-specific routes into PATCH/parameterised endpoints (123 → 113 routes). `ideate` archived (premise stale); `transitionTask` helper deferred. |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | **Complete** | Migrated the module path and import refs from `changkun.de/x/wallfacer` to `latere.ai/x/wallfacer` (267 files, `ffce4807`). Two follow-ups (wallfacerd image rename, vanityOwners override removal) are deferred, gated on the repo moving into the `latere-ai` GitHub org. |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the planning-only slash command registry to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting). Task board and other UI surfaces can then trigger their own `/` commands via the shared autocomplete widget. |
@@ -309,6 +308,7 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 | [terminal-container-exec.md](local/terminal-container-exec.md) | Attach to running task containers from the terminal panel |
 | [oauth-token-setup.md](local/oauth-token-setup.md) | Browser-based OAuth sign-in for Claude and Codex credentials |
 | [pixel-agents.md](local/pixel-agents.md) | Pixel art office view — animated characters representing task agents |
+| [vue-frontend-migration.md](local/vue-frontend-migration.md) | Converged the vanilla-JS `ui/` board and the Vue `frontend/` site into one Vue 3 + TypeScript SPA with runtime local/cloud mode switching; legacy `ui/` and its build/CI pipeline removed, single embedded `frontend/dist` served by the Go server. Superseded typescript-migration and typed-dom-hooks. |
 
 ### Local — Archived (superseded or dropped)
 
