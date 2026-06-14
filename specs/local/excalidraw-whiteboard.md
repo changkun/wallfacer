@@ -3,15 +3,15 @@ title: Excalidraw Whiteboard
 status: drafted
 depends_on: []
 affects:
-  - ui/js/
-  - ui/css/
-  - ui/partials/
+  - frontend/src/views/
+  - frontend/src/router.ts
+  - frontend/src/components/Sidebar.vue
   - internal/handler/
-  - internal/store/
+  - internal/apicontract/routes.go
   - internal/workspace/
 effort: medium
 created: 2026-04-03
-updated: 2026-04-03
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -20,169 +20,199 @@ dispatched_task_id: null
 
 ## Overview
 
-Add an Excalidraw-based whiteboard as a peer view alongside the task board,
-spec tree, and docs views. Users can draft architecture diagrams, brainstorm
-ideas, and sketch designs on an infinite canvas that persists per workspace.
-This is a focused integration — embed Excalidraw as a drawing tool, not a
-full spatial-canvas rethinking of the UI (see `spatial-canvas.md` for that).
+Add an Excalidraw-based whiteboard as a peer view alongside the board, plan,
+and map views. Users can draft architecture diagrams, brainstorm ideas, and
+sketch designs on an infinite canvas that persists per workspace. This is a
+focused integration, embedding Excalidraw as a drawing tool, not a full
+spatial-canvas rethinking of the UI (see `spatial-canvas.md` for that).
 
 ## Current State
 
-Wallfacer has three top-level views, switched via a string-based mode registry
-in `ui/js/spec-mode.js`:
+The frontend is a single Vue 3 SPA under `frontend/src/`, built with Vite and
+embedded into the binary via `go:embed` (`internal/webserver/spa/embed.go`,
+`//go:embed all:dist`). The vanilla `ui/` tree (HTML partials, `ui/js/`,
+`ui/css/`) has been deleted; there is no `spec-mode.js` mode registry and no
+`localStorage["wallfacer-mode"]` toggle anymore.
 
-```
-_validModes = { board: true, spec: true, docs: true }
-```
+Top-level views are vue-router routes registered in `frontend/src/router.ts`.
+In local mode the peer views are board (`/`), plan (`/plan`), agents
+(`/agents`), flows (`/flows`), routines (`/routines`), map (`/map`),
+analytics (`/analytics`), docs (`/docs`), and settings (`/settings`). Each page
+is a lazy-imported SFC under `frontend/src/views/` (for example
+`MapPage.vue`, `PlanPage.vue`). The left rail in
+`frontend/src/components/Sidebar.vue` drives navigation through `to:` items
+grouped under "Workspace" and "Inspect", each with an inline SVG icon.
 
-Each mode has an HTML container partial (`ui/partials/board.html`,
-`spec-mode.html`, `docs-mode.html`), a sidebar navigation button in
-`ui/partials/sidebar.html`, and visibility toggling in `_applyMode()`.
-The active mode persists to `localStorage["wallfacer-mode"]`.
+Theme lives in the `prefs` store (`frontend/src/stores/prefs.ts`), which writes
+`data-theme="light|dark"` on `<html>` and persists to
+`localStorage["wallfacer-theme"]`. Components read the resolved theme from that
+store rather than touching localStorage directly.
 
 There is no current drawing or diagramming capability. Mermaid diagrams in
-spec documents render as static images in the docs/spec viewers.
+spec documents render as static SVG in the docs/spec viewers.
 
-Per-workspace data lives in `~/.wallfacer/data/<workspace-key>/` where the
-key is a SHA256 fingerprint of sorted workspace paths (see
-`internal/prompts/instructions.go:InstructionsKey()`). Task data is stored
-per-task via `StorageBackend.SaveBlob()`/`ReadBlob()`, but there is no
-existing pattern for workspace-level (non-task) blob storage.
+Per-workspace data lives in `~/.wallfacer/data/<workspace-key>/` where the key
+is a SHA256 fingerprint of sorted workspace paths (see
+`internal/prompts/instructions.go:InstructionsKey()`). The active workspace
+group exposes this directory directly: `workspace.Snapshot.ScopedDataDir`
+(`internal/workspace/manager.go`) is exactly
+`~/.wallfacer/data/<workspace-key>/`. Task data is stored per-task via the
+filesystem store backend (`internal/store/backend_fs.go`), but there is no
+existing pattern for workspace-level (non-task) blob storage; workspace-scoped
+files such as the merged `AGENTS.md` are read and written directly through
+handler helpers (see `internal/handler/instructions.go`).
 
 ## Architecture
 
 ```mermaid
 graph TB
   subgraph Frontend
-    SB[Sidebar Nav] -->|switchMode 'draw'| SM[spec-mode.js]
-    SM -->|_applyMode| DC[#draw-mode-container]
-    DC --> ER[Excalidraw React mount]
-    ER -->|onChange debounced| API[fetch PUT /api/whiteboard]
-    API -->|response| ER
+    SB[Sidebar nav item /whiteboard] -->|router| WP[views/WhiteboardPage.vue]
+    WP -->|dynamic import| ER[Excalidraw React root]
+    ER -->|onChange debounced| API[api PUT /api/whiteboard]
+    API -->|GET on mount| ER
   end
 
   subgraph Backend
-    WH[handler/whiteboard.go] -->|read/write| WS[Workspace-scoped file]
+    WH[handler/whiteboard.go] -->|read/write| WS[workspace-scoped file]
     WS -->|path| DP["~/.wallfacer/data/{key}/whiteboard.json"]
   end
 
   API --> WH
 ```
 
-Excalidraw is a React component. Since Wallfacer's frontend is vanilla JS,
-we mount a minimal React root only inside the whiteboard container. This is a
-common pattern — React can coexist with vanilla JS when scoped to a single
-DOM node. The React/ReactDOM bundle is loaded only when the whiteboard view
-is first activated (lazy load).
+Excalidraw is a React component. The Vue SPA does not otherwise use React, so
+`WhiteboardPage.vue` mounts a single React root into one container element via
+a dynamic `import()` of `react`, `react-dom/client`, and
+`@excalidraw/excalidraw`. The import is code-split by Vite so the React +
+Excalidraw chunk is fetched only when the whiteboard route is first visited
+(the dependencies are installed through `frontend/package.json`/bun and bundled
+at build time; there is no runtime CDN or hand-vendored UMD bundle). The React
+root is torn down in `onBeforeUnmount` so leaving the route releases it.
 
 ## Components
 
 ### Frontend: Whiteboard View
 
 **New files:**
-- `ui/partials/whiteboard.html` — Container div for the React mount point
-- `ui/js/whiteboard.js` — Lazy-load Excalidraw, manage save/load lifecycle
-- `ui/css/whiteboard.css` — Minimal overrides for Excalidraw's default styles
+- `frontend/src/views/WhiteboardPage.vue` - peer view that hosts the React
+  root, manages the save/load lifecycle, and syncs theme.
 
 **Modifications:**
-- `ui/js/spec-mode.js` — Add `draw` to `_validModes`, add case to `_applyMode()`
-- `ui/partials/sidebar.html` — Add whiteboard nav button (pencil/draw icon)
-- `ui/partials/scripts.html` — Add `whiteboard.js` script tag
-- `ui/index.html` — Include `whiteboard.html` partial in the `board-with-explorer` container
+- `frontend/src/router.ts` - add `{ path: '/whiteboard', component: () =>
+  import('./views/WhiteboardPage.vue') }` to `localRoutes`.
+- `frontend/src/components/Sidebar.vue` - add a nav item under the "Workspace"
+  group: `{ id: 'whiteboard', label: 'Whiteboard', to: '/whiteboard', icon:
+  'whiteboard' }`, plus an inline SVG branch for the `whiteboard` icon (a
+  pencil/draw glyph) in the `#icon` template.
+- `frontend/package.json` - add `react`, `react-dom`, and
+  `@excalidraw/excalidraw` dependencies (installed via bun).
 
 **Lifecycle:**
-1. User clicks sidebar "Draw" button → `switchMode('draw')`
-2. `_applyMode('draw')` shows `#draw-mode-container`, hides others
-3. On first activation, `whiteboard.js` dynamically loads React, ReactDOM,
-   and `@excalidraw/excalidraw` from vendored bundles (or CDN as fallback)
-4. Mounts `<Excalidraw>` component into the container with loaded scene data
-5. On `onChange`, debounces (1-2 seconds) and PUTs the scene JSON to the server
-6. On mode switch away, the React root stays mounted (preserves undo history)
-   but stops auto-saving
+1. User clicks the sidebar "Whiteboard" item, router navigates to
+   `/whiteboard`, vue-router lazy-loads `WhiteboardPage.vue`.
+2. On `onMounted`, the page `GET /api/whiteboard` to fetch the saved scene,
+   then dynamically `import()`s React + Excalidraw and mounts the
+   `<Excalidraw>` component into the container with the loaded scene.
+3. On Excalidraw `onChange`, the page debounces (1.5s idle) and `PUT`s the
+   scene JSON to the server.
+4. On `onBeforeUnmount` (route change or workspace switch), the page flushes a
+   pending save and unmounts the React root.
 
 **Excalidraw configuration:**
-- Theme: sync with Wallfacer's dark/light theme (`localStorage["wallfacer-theme"]`)
-- UI: Show Excalidraw's built-in toolbar (shape tools, text, arrows, etc.)
-- Collaboration: Disabled (single-user, no WebSocket needed)
-- Library: Enable Excalidraw's shape library for reusable components
+- Theme: read the resolved theme from the `prefs` store
+  (`frontend/src/stores/prefs.ts`) and pass it to Excalidraw; `watch` the store
+  so theme changes propagate live.
+- UI: show Excalidraw's built-in toolbar (shape tools, text, arrows, etc.).
+- Collaboration: disabled (single-user, no WebSocket needed).
+- Library: enable Excalidraw's shape library for reusable components.
 
 ### Backend: Whiteboard Storage
 
 **New files:**
-- `internal/handler/whiteboard.go` — HTTP handlers for whiteboard CRUD
+- `internal/handler/whiteboard.go` - HTTP handlers for whiteboard load/save.
 
 **Modifications:**
-- `internal/apicontract/routes.go` — Register whiteboard routes
+- `internal/apicontract/routes.go` - register the whiteboard routes (the
+  `Name` field maps to the `Handler` method of the same name; see the
+  `/api/instructions` block for the pattern).
 
 The whiteboard scene is stored as a single JSON file per workspace. This is
-workspace-level data (not task-level), so it lives directly in the workspace
-data directory rather than under a task UUID subdirectory.
+workspace-level data (not task-level), so it lives directly in the active
+group's scoped data directory rather than under a task UUID subdirectory.
 
-**Storage path:** `~/.wallfacer/data/<workspace-key>/whiteboard.json`
+**Storage path:** `<workspace.Snapshot.ScopedDataDir>/whiteboard.json`, i.e.
+`~/.wallfacer/data/<workspace-key>/whiteboard.json`. The handler resolves the
+directory through the workspace snapshot, the same way
+`currentInstructionsPath()` resolves the AGENTS.md path; add a small
+`currentWhiteboardPath()` helper alongside it in
+`internal/handler/handler.go` that joins `ScopedDataDir` with
+`whiteboard.json` (returning `""` when no workspace is configured).
 
 The file contains the raw Excalidraw scene JSON (elements array, app state,
 files for embedded images). Excalidraw scenes are typically 10KB-1MB depending
 on complexity.
 
-**Write strategy:** Atomic write via temp-file-rename, following the existing
-pattern in `internal/store/` (see `atomicfile.WriteJSON()`). The handler
-receives the full scene JSON and overwrites the file — no incremental updates.
-This is safe because there is only one writer (the single browser session).
+**Write strategy:** atomic write via temp-file-rename, using
+`internal/pkg/atomicfile` (`atomicfile.Write(path, data, 0o644)`), the same
+helper the explorer and templates handlers already use. The handler receives
+the full scene JSON and overwrites the file (no incremental updates). This is
+safe because there is only one writer (the single browser session).
 
-### Vendoring Strategy
+### Frontend dependency packaging
 
-Excalidraw and its React dependencies need to be available to the frontend.
-Options (in order of preference):
-
-1. **Vendor pre-built bundles** — Download UMD/ESM builds of `react`,
-   `react-dom`, and `@excalidraw/excalidraw` into `ui/vendor/`. Load via
-   `<script>` tags. This avoids a build step and keeps the vanilla JS
-   philosophy (no bundler, no node_modules at runtime). Total size ~1.5MB
-   gzipped.
-
-2. **CDN with local fallback** — Load from a CDN (unpkg/esm.sh) with a
-   fallback to vendored copies. Faster initial setup but adds an external
-   dependency.
-
-The vendored approach is preferred since Wallfacer already embeds all UI
-assets via `embed.FS` in `main.go`.
+Excalidraw and its React dependencies are added to `frontend/package.json` and
+installed with bun, then bundled by Vite into a lazily-loaded route chunk. No
+runtime CDN, no hand-maintained `ui/vendor/` UMD copies: the build step Vite
+already runs handles tree-shaking and chunk splitting, and the resulting
+`dist/` is embedded via `go:embed all:dist`
+(`internal/webserver/spa/embed.go`). Keep the Excalidraw import dynamic so the
+React + Excalidraw chunk (~1.5MB gzipped) is fetched only when the whiteboard
+route is opened.
 
 ## API Surface
 
 ### Whiteboard
 
-- `GET /api/whiteboard` — Load the current workspace's whiteboard scene JSON.
-  Returns `200` with the scene or `204` if no whiteboard exists yet.
-- `PUT /api/whiteboard` — Save the whiteboard scene JSON. Request body is the
-  raw Excalidraw scene. Returns `204` on success.
+- `GET /api/whiteboard` - load the current workspace's whiteboard scene JSON.
+  Returns `200` with the scene, or `200` with an empty body / `204` when no
+  whiteboard exists yet (mirror the empty-content convention
+  `GetInstructions` uses for a missing file).
+- `PUT /api/whiteboard` - save the whiteboard scene JSON. The request body is
+  the raw Excalidraw scene. Returns `200` (`{"status":"ok"}`) on success.
 
 Both routes are scoped to the active workspace via the workspace manager
-snapshot, following the same pattern as `GET/PUT /api/instructions`.
+snapshot, following the same pattern as `GET/PUT /api/instructions`. When no
+workspace is configured, return `503` as the instructions handlers do.
 
 ## Data Flow
 
-1. **Load:** Browser activates draw mode → `GET /api/whiteboard` →
-   handler reads `data/<key>/whiteboard.json` → returns scene JSON →
-   Excalidraw initializes with scene data.
-
-2. **Save:** User draws on canvas → Excalidraw `onChange` fires →
-   debounced (1.5s idle) → `PUT /api/whiteboard` with scene JSON →
-   handler writes atomically to `data/<key>/whiteboard.json` → `204`.
-
-3. **Workspace switch:** User changes workspace group → draw mode
-   container is unmounted and re-initialized on next activation →
-   loads new workspace's whiteboard data.
+1. **Load:** route mounts, page `GET /api/whiteboard`, handler reads
+   `<ScopedDataDir>/whiteboard.json`, returns scene JSON (or empty), Excalidraw
+   initializes with the scene.
+2. **Save:** user draws, Excalidraw `onChange` fires, debounced (1.5s idle),
+   page `PUT /api/whiteboard` with scene JSON, handler writes atomically to
+   `<ScopedDataDir>/whiteboard.json`.
+3. **Workspace switch:** the workspace snapshot changes `ScopedDataDir`, so a
+   subsequent `GET /api/whiteboard` resolves the new group's file. The page
+   reloads the scene when the active workspace changes (re-fetch and re-seed
+   the Excalidraw scene), keeping per-workspace isolation.
 
 ## Testing Strategy
 
 **Backend:**
-- Unit test `handler/whiteboard.go`: GET returns 204 when no file exists,
-  PUT saves and GET retrieves, invalid JSON rejected. Follow the pattern
-  in `handler/instructions_test.go` (if it exists) or `handler/env_test.go`.
+- Unit test `handler/whiteboard.go`: GET returns the empty convention when no
+  file exists, PUT saves and a subsequent GET retrieves the same bytes, no
+  workspace configured returns `503`, two distinct workspace keys stay
+  isolated. Follow the pattern in `handler/instructions_test.go` (the closest
+  workspace-scoped file analog) and `handler/explorer_test.go` (which already
+  exercises `atomicfile`-backed writes through a temp-dir handler).
 
 **Frontend:**
-- Vitest unit test for `whiteboard.js`: verify lazy-load trigger, debounce
-  timing, theme sync. Mock the Excalidraw component (don't load the real
-  React bundle in tests).
-- Manual test: draw shapes, reload page, verify persistence. Switch
-  workspaces, verify isolation.
+- Vitest unit test for `WhiteboardPage.vue`: verify the GET-on-mount call, the
+  debounced save (timing), and theme sync against the `prefs` store. Mock the
+  dynamic `@excalidraw/excalidraw` import so the real React bundle is not
+  loaded in tests (follow the dynamic-import-mocking approach used by
+  `MapPage.test.ts` for its vendored renderer).
+- Manual test: draw shapes, reload the page, verify persistence; switch
+  workspace groups, verify isolation; toggle theme, verify Excalidraw follows.

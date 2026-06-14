@@ -1,25 +1,27 @@
 ---
-title: "Terminal UI — Full TUI Mode for Wallfacer"
+title: "Terminal UI - Full TUI Mode for Wallfacer"
 status: drafted
 depends_on: []
 affects:
   - internal/tui/
   - internal/cli/tui.go
   - main.go
+  - internal/cli/cli.go
+  - internal/cli/server.go
 effort: xlarge
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
 
-# Terminal UI — Full TUI Mode for Wallfacer
+# Terminal UI - Full TUI Mode for Wallfacer
 
 ---
 
 ## Problem
 
-Wallfacer currently requires either a web browser (`:8080`) or a native desktop app (Wails) to operate. This makes it unusable in environments where a graphical display is unavailable or impractical:
+Wallfacer currently requires a web browser to operate: `wallfacer run` starts the embedded server and opens the Vue SPA in a browser. This makes it unusable in environments where a graphical display is unavailable or impractical:
 
 - **Remote servers** accessed via SSH (the most common development setup for many teams).
 - **Headless CI/dev containers** where no browser is available.
@@ -31,16 +33,23 @@ Beyond environment constraints, many power users simply prefer terminal interfac
 
 ---
 
-## Current State (as of 2026-03-30)
+## Current State (as of 2026-06-14)
 
-- **Web UI**: Vanilla HTML/JS/Tailwind served from embedded `ui/` directory. Full task board, drag-and-drop, SSE live updates, log streaming, file explorer, terminal panel.
-- **Desktop app**: Wails wrapper around the same web UI. macOS `.app`, Windows `.exe`, Linux binary.
-- **CLI**: `wallfacer run` starts the server, `wallfacer status` prints a static board snapshot, `wallfacer status -watch` polls and reprints. `wallfacer exec` attaches to containers.
-- **HTTP API**: All operations are exposed via REST. The web UI is a pure API client — no server-side rendering logic.
-- **SSE streams**: `GET /api/tasks/stream` pushes task state changes, `GET /api/git/stream` pushes git status updates.
-- **WebSocket terminal**: `GET /api/terminal/ws` provides interactive shell access.
+- **Web UI**: A Vue SPA under `frontend/src/`, built to `frontend/dist/` and embedded into the binary via `//go:embed all:frontend/dist` in `main.go`. Components live under `frontend/src/components/` (task board via `TaskCard.vue`, `TaskComposer.vue`, `TaskDetail.vue`, `ExplorerPanel.vue`, `TerminalPanel.vue`, `StatusBar.vue`, etc.) with Pinia stores under `frontend/src/stores/` (`tasks.ts`, `planning.ts`, `auth.ts`, `boot.ts`). The vanilla `ui/` HTML/JS tree has been deleted. The SPA is a pure API client; the server holds no per-page render logic.
+- **CLI subcommands** (dispatched from `main.go`):
+  - `wallfacer run` - starts the embedded task board server (`internal/cli/server.go`) and, unless `-no-browser` is passed, opens the Vue SPA in a browser.
+  - `wallfacer status` - prints a static board snapshot to the terminal; `wallfacer status -watch` clears and reprints every 2 seconds until Ctrl-C.
+  - `wallfacer spec` - spec document tools (validate, ...).
+  - `wallfacer doctor` / `wallfacer env` - prerequisite and config checks.
+  - `wallfacer auth` - auth login/token helpers.
+  - `wallfacer web` - separate public OIDC frontend server (`internal/cli/web.go`); not the local task board. Out of scope here.
+- **Runtime**: tasks run host-only in dedicated git worktrees via `internal/executor/` (the `executor.Backend` interface). There is no container backend; the former `internal/sandbox/` package and its `LocalBackend` have been removed. A task's configured harness is stored as `Sandbox harness.ID` ("claude", "codex", etc.) on `store.Task`.
+- **HTTP API**: all operations are exposed via REST, declared in `internal/apicontract/routes.go`. The web UI is a pure API client.
+- **SSE streams**: `GET /api/tasks/stream` pushes a full snapshot then incremental task-updated/task-deleted events; `GET /api/git/stream` pushes git status updates; `GET /api/tasks/{id}/logs` streams live task logs.
+- **WebSocket terminal**: `GET /api/terminal/ws` provides interactive host shell access (PTY-backed, `internal/handler/terminal.go`). It is mounted directly in `server.go`, not declared in `apicontract`.
+- **Server auth**: API requests authenticate via a Bearer token (`WALLFACER_SERVER_API_KEY`) or an OIDC cookie/JWT identity. The TUI client uses the Bearer path.
 
-The existing `wallfacer status -watch` is a minimal terminal view — it polls and reprints a text table. It has no interactivity, no task management, no log viewing.
+The existing `wallfacer status -watch` is a minimal terminal view: it polls and reprints a text table. It has no interactivity, no task management, no log viewing.
 
 ---
 
@@ -50,11 +59,11 @@ The existing `wallfacer status -watch` is a minimal terminal view — it polls a
 
 The TUI operates in two modes:
 
-1. **Standalone mode** (default): The TUI binary starts the wallfacer server in-process (same as `wallfacer run`) and connects to it internally. The server does not open a browser. This is the zero-config experience: `wallfacer tui` gives you everything.
+1. **Standalone mode** (default): The TUI binary starts the wallfacer task board server in-process (the same setup `wallfacer run` performs) and connects to it internally. It does not open a browser. This is the zero-config experience: `wallfacer tui` gives you everything.
 
 2. **Client mode**: The TUI connects to an already-running wallfacer server via `--addr`. Useful when the server runs as a daemon or on a remote host: `wallfacer tui --addr http://remote:8080`. Also useful for multiple views into the same server (e.g., one TUI per tmux pane for different concerns).
 
-In both modes, the TUI is a pure API client — it uses the same HTTP endpoints and SSE streams as the web UI. No new server-side code is needed for core functionality.
+In both modes, the TUI is a pure API client. It uses the same HTTP endpoints and SSE streams as the web UI. No new server-side code is needed for core functionality.
 
 ### TUI Framework
 
@@ -102,10 +111,10 @@ The TUI uses a panel-based layout inspired by `lazygit` and `k9s`. The terminal 
 
 **Regions:**
 
-1. **Header bar** — Workspace name, running/waiting task counts, server connection status.
-2. **Board panel** (left) — Task cards grouped by status column (Backlog, In Progress, Waiting, Done, Failed, Cancelled). Vertically scrollable. Focused task highlighted.
-3. **Detail panel** (right) — Shows information about the selected task. Tabs switch between sub-views: Logs, Diff, Events, Oversight, Turn Usage.
-4. **Status bar** (bottom) — Context-sensitive key hints. Changes based on the focused panel and selected task state.
+1. **Header bar** - Workspace name, running/waiting task counts, server connection status.
+2. **Board panel** (left) - Task cards grouped by status column. The current status set is Backlog, In Progress, Waiting, Committing, Done, Failed, Cancelled (mirror the order used by `internal/cli/status.go`'s `statusOrder`). Vertically scrollable. Focused task highlighted.
+3. **Detail panel** (right) - Shows information about the selected task. Tabs switch between sub-views: Logs, Diff, Events, Oversight, Turn Usage.
+4. **Status bar** (bottom) - Context-sensitive key hints. Changes based on the focused panel and selected task state.
 
 ### Navigation Model
 
@@ -116,7 +125,7 @@ Keyboard-driven with vim-style bindings as primary, arrow keys as fallback:
 | `j` / `k` or `Up` / `Down` | Move selection within board panel |
 | `h` / `l` or `Left` / `Right` | Switch focus between board and detail panel |
 | `Tab` | Cycle through detail sub-views (Logs, Diff, Events, ...) |
-| `1`-`5` | Jump to status column (1=Backlog, 2=In Progress, 3=Waiting, 4=Done, 5=Failed) |
+| `1`-`6` | Jump to status column (1=Backlog, 2=In Progress, 3=Waiting, 4=Committing, 5=Done, 6=Failed) |
 | `Enter` | Open detail for selected task / confirm action |
 | `n` | New task (opens prompt input) |
 | `s` | Start selected backlog task (move to In Progress) |
@@ -124,7 +133,7 @@ Keyboard-driven with vim-style bindings as primary, arrow keys as fallback:
 | `f` | Submit feedback on waiting task |
 | `d` | Mark waiting task as done |
 | `r` | Resume failed task / retry |
-| `y` | Sync task (rebase worktree) |
+| `y` | Sync task (rebase worktree onto the default branch) |
 | `t` | Run test verification |
 | `g` | Git operations menu (push, sync, rebase) |
 | `w` | Workspace switcher |
@@ -145,17 +154,18 @@ Pressing `n` opens a multi-line text input at the bottom of the screen (similar 
 | Prompt: Fix the authentication bug in the login handler.            |
 |         The session token is not being refreshed on re-login.       |
 |                                                                      |
-| Goal:   [optional, Tab to switch]                                   |
 | Timeout: 30m   Sandbox: claude   Fresh start: no                    |
 | [Enter] create  [Esc] cancel  [Tab] next field                     |
 +---------------------------------------------------------------------+
 ```
 
+Fields map to the `POST /api/tasks` payload: prompt, timeout, sandbox (the `harness.ID` to run: claude, codex, ...), and the fresh-start flag. There is no separate "Goal" field; that field was removed from the task model.
+
 For multi-line prompts, the input area expands. `Ctrl+Enter` or a dedicated key submits; `Esc` cancels.
 
 ### Feedback Input
 
-When a task is in `waiting` state, pressing `f` opens a similar input area for feedback text. Pressing `d` marks it done (with a confirmation prompt).
+When a task is in `waiting` state, pressing `f` opens a similar input area for feedback text (`POST /api/tasks/{id}/feedback`). Pressing `d` marks it done (`POST /api/tasks/{id}/done`, with a confirmation prompt).
 
 ### Log Streaming
 
@@ -189,7 +199,12 @@ Pressing `g` opens a floating menu:
   [Esc] close
 ```
 
-Each action calls the corresponding `/api/git/` endpoint and shows the result inline.
+Each action maps to the corresponding endpoint and shows the result inline:
+
+- Push -> `POST /api/git/push`
+- Sync -> `POST /api/git/sync`
+- Rebase on main -> `POST /api/git/rebase-on-main`
+- Browse branches -> `GET /api/git/branches`
 
 ### Workspace Switcher
 
@@ -215,7 +230,7 @@ Terminal height affects how many tasks are visible per column. Columns with many
 
 The TUI maintains persistent SSE connections for live updates:
 
-1. **Task stream** (`GET /api/tasks/stream`): Receives task list deltas. On each event, the TUI model updates its task list and triggers a re-render. No polling.
+1. **Task stream** (`GET /api/tasks/stream`): Receives a full snapshot followed by incremental task-updated/task-deleted events. On each event, the TUI model updates its task list and triggers a re-render. No polling.
 2. **Git stream** (`GET /api/git/stream`): Receives git status updates for the header bar.
 3. **Log stream** (`GET /api/tasks/{id}/logs`): Connected when viewing a specific task's logs. Disconnected when switching away.
 
@@ -245,17 +260,20 @@ wallfacer tui [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | (none) | Connect to existing server instead of starting embedded |
+| `--api-key` | (none) | Bearer token for the server; falls back to `WALLFACER_SERVER_API_KEY` |
 | `--no-mouse` | `false` | Disable mouse support |
 | `--color` | `auto` | Color mode: `auto`, `256`, `truecolor`, `none` |
 
-When `--addr` is not specified, the TUI starts the server in-process on an ephemeral port (no need to bind `:8080`). The server's HTTP listener is internal-only — no browser launch, no external access.
+When `--addr` is not specified, the TUI starts the server in-process on an ephemeral port (no need to bind `:8080`). The server's HTTP listener is internal-only: no browser launch, no external access. Standalone mode reuses the same in-process server setup as `wallfacer run` minus the browser-open step (`run` already supports a `-no-browser` flag, so the no-browser path exists today).
+
+Wiring: `main.go` dispatches the `tui` subcommand to a new `cli.RunTUI(configDir, args, vueDist, docsFiles)`, mirroring how `run` is dispatched to `cli.RunServer`. Add `tui` to the command list in `PrintUsage` (`internal/cli/cli.go`). The new command lives in `internal/cli/tui.go`.
 
 ### Interaction with Existing Commands
 
-- `wallfacer run` remains unchanged — starts server + opens browser.
-- `wallfacer status` remains unchanged — static/watch text output.
+- `wallfacer run` remains unchanged - starts the embedded server and opens the browser (suppress with `-no-browser`).
+- `wallfacer status` remains unchanged - static/watch text output (`-watch`).
 - `wallfacer tui` is the new fully interactive terminal experience.
-- `wallfacer desktop` remains unchanged — Wails native app.
+- `wallfacer web` (public OIDC frontend server) is unrelated and untouched.
 
 ---
 
@@ -296,11 +314,13 @@ type Model struct {
 }
 ```
 
+The `tasks` slice can decode the server's task JSON directly or use a local mirror struct (as `internal/cli/status.go` does with `taskSummary`). Decoding into `store.Task` keeps the field shapes (including `Sandbox harness.ID` and `UsageBreakdown`) authoritative.
+
 ---
 
 ## Implementation Phases
 
-### Phase 1 — Scaffold and board view
+### Phase 1 - Scaffold and board view
 
 | File | Change |
 |------|--------|
@@ -309,15 +329,16 @@ type Model struct {
 | `internal/tui/board.go` | Board panel: task list grouped by status, selection, scrolling |
 | `internal/tui/styles.go` | Lip Gloss style definitions (colors, borders, highlights) |
 | `internal/tui/keys.go` | Key bindings map |
-| `internal/tui/client.go` | HTTP API client (fetch tasks, patch status, create task) |
+| `internal/tui/client.go` | HTTP API client (fetch tasks, patch status, create task), Bearer auth |
 | `internal/cli/tui.go` (new) | `wallfacer tui` subcommand wiring |
-| `main.go` | Register `tui` subcommand |
+| `main.go` | Dispatch `tui` subcommand to `cli.RunTUI` |
+| `internal/cli/cli.go` | Add `tui` to `PrintUsage` command list |
 
-**Deliverable:** Board panel renders tasks grouped by column. Navigation with `j`/`k`, column jumps with `1`-`5`. No detail panel yet. Reads task list via `GET /api/tasks` on startup.
+**Deliverable:** Board panel renders tasks grouped by column. Navigation with `j`/`k`, column jumps with `1`-`6`. No detail panel yet. Reads task list via `GET /api/tasks` on startup.
 
 **Effort:** Medium.
 
-### Phase 2 — SSE live updates
+### Phase 2 - SSE live updates
 
 | File | Change |
 |------|--------|
@@ -330,7 +351,7 @@ type Model struct {
 
 **Effort:** Medium.
 
-### Phase 3 — Detail panel and log streaming
+### Phase 3 - Detail panel and log streaming
 
 | File | Change |
 |------|--------|
@@ -343,12 +364,12 @@ type Model struct {
 
 **Effort:** Medium-High. Log streaming with ANSI rendering and auto-scroll is the most complex component.
 
-### Phase 4 — Task actions (create, start, cancel, feedback, done)
+### Phase 4 - Task actions (create, start, cancel, feedback, done)
 
 | File | Change |
 |------|--------|
 | `internal/tui/input.go` (new) | Task creation form, feedback input, confirmation dialogs |
-| `internal/tui/actions.go` (new) | API calls for task mutations (PATCH, POST, DELETE) |
+| `internal/tui/actions.go` (new) | API calls for task mutations (PATCH `/api/tasks/{id}`, POST feedback/done/resume/sync/test, DELETE) |
 | `internal/tui/model.go` | Wire action keybindings to input flows |
 | `internal/tui/statusbar.go` (new) | Context-sensitive key hints |
 
@@ -356,43 +377,43 @@ type Model struct {
 
 **Effort:** Medium.
 
-### Phase 5 — Diff, events, oversight views
+### Phase 5 - Diff, events, oversight views
 
 | File | Change |
 |------|--------|
-| `internal/tui/diff.go` (new) | Diff viewer with syntax highlighting and folding |
-| `internal/tui/events.go` (new) | Event timeline viewer |
-| `internal/tui/oversight.go` (new) | Oversight summary display |
-| `internal/tui/usage.go` (new) | Turn usage / cost display |
+| `internal/tui/diff.go` (new) | Diff viewer (`GET /api/tasks/{id}/diff`) with syntax highlighting and folding |
+| `internal/tui/events.go` (new) | Event timeline viewer (`GET /api/tasks/{id}/events`) |
+| `internal/tui/oversight.go` (new) | Oversight summary display (`GET /api/tasks/{id}/oversight`) |
+| `internal/tui/usage.go` (new) | Turn usage / cost display (`GET /api/tasks/{id}/turn-usage`) |
 
 **Deliverable:** All detail tabs are functional.
 
 **Effort:** Medium.
 
-### Phase 6 — Git operations and workspace switcher
+### Phase 6 - Git operations and workspace switcher
 
 | File | Change |
 |------|--------|
-| `internal/tui/git.go` (new) | Git operations floating menu |
-| `internal/tui/workspace.go` (new) | Workspace selection dialog |
-| `internal/tui/search.go` (new) | Search bar with live filtering |
+| `internal/tui/git.go` (new) | Git operations floating menu (push, sync, rebase-on-main, branches) |
+| `internal/tui/workspace.go` (new) | Workspace selection dialog (`GET /api/config`, `PUT /api/workspaces`) |
+| `internal/tui/search.go` (new) | Search bar with live filtering (`GET /api/tasks/search`) |
 
 **Deliverable:** Git push/sync/rebase, workspace switching, task search all work from TUI.
 
 **Effort:** Low-Medium.
 
-### Phase 7 — Standalone mode (embedded server)
+### Phase 7 - Standalone mode (embedded server)
 
 | File | Change |
 |------|--------|
 | `internal/cli/tui.go` | Start server in-process on ephemeral port when `--addr` not given |
-| `internal/cli/server.go` | Extract server setup into reusable function (used by both `run` and `tui`) |
+| `internal/cli/server.go` | Reuse the existing `initServer` setup (already used by `run`); start it without the browser-open step |
 
-**Deliverable:** `wallfacer tui` works with zero flags — starts server internally, no browser.
+**Deliverable:** `wallfacer tui` works with zero flags: starts server internally, no browser.
 
-**Effort:** Low. Server startup logic already exists; this just reuses it without the browser-open step.
+**Effort:** Low. `initServer` already exists and `run` already supports a no-browser path; this reuses it and connects the TUI client to `sc.ActualPort`.
 
-### Phase 8 — Tests, docs, polish
+### Phase 8 - Tests, docs, polish
 
 | File | Change |
 |------|--------|
@@ -409,13 +430,13 @@ type Model struct {
 
 | Pattern | Source | Reused For |
 |---------|--------|------------|
-| SSE client | `ui/js/app.js` (JS SSE handling) | Go SSE client for task/git streams |
-| Task list rendering | `ui/js/board.js` | Board panel task grouping and display |
-| Log streaming | `ui/js/taskLogs.js` | Log viewer with auto-scroll |
-| Diff rendering | `ui/js/taskDiff.js` | Diff viewer with color highlighting |
-| API client patterns | `ui/js/generated/routes.js` | Go HTTP client for all endpoints |
-| Server startup | `internal/cli/server.go` | Embedded server for standalone mode |
-| Status display | `internal/cli/status.go` | Base patterns for terminal task display |
+| SSE client | `frontend/src/stores/tasks.ts` (SSE handling for `/api/tasks/stream`) | Go SSE client for task/git streams |
+| Task list rendering | `frontend/src/components/TaskCard.vue` and the board grouping in `tasks.ts` | Board panel task grouping and display |
+| Log streaming | `frontend/src/components/TaskDetail.vue` (logs view) | Log viewer with auto-scroll |
+| Diff rendering | `frontend/src/components/TaskDetail.vue` (diff view) | Diff viewer with color highlighting |
+| API client patterns | `internal/apicontract/routes.go` (route catalog) | Go HTTP client for all endpoints |
+| Server startup | `internal/cli/server.go` (`initServer`) | Embedded server for standalone mode |
+| Status display | `internal/cli/status.go` (`statusOrder`, ANSI colors) | Base patterns for terminal task display |
 
 ---
 
@@ -423,7 +444,7 @@ type Model struct {
 
 ### 1. ANSI rendering fidelity
 
-Container logs contain raw ANSI escape sequences (colors, cursor movement, clearing). Bubble Tea's viewport renders these natively since it operates in an alternate screen buffer that understands ANSI. However, some sequences (like cursor positioning or screen clearing) from Claude Code's output may cause rendering artifacts. The log viewer should strip or neutralize cursor-positioning sequences while preserving color codes.
+Task logs contain raw ANSI escape sequences (colors, cursor movement, clearing). Bubble Tea's viewport renders these natively since it operates in an alternate screen buffer that understands ANSI. However, some sequences (like cursor positioning or screen clearing) from Claude Code's output may cause rendering artifacts. The log viewer should strip or neutralize cursor-positioning sequences while preserving color codes.
 
 ### 2. Terminal capabilities
 
@@ -454,61 +475,62 @@ Both should be supported. The inline textarea for quick prompts, `$EDITOR` for c
 ### 5. SSH and remote access
 
 When connecting to a remote wallfacer server via `wallfacer tui --addr http://remote:8080`:
-- **Authentication**: The `--api-key` flag or `WALLFACER_SERVER_API_KEY` env var provides the bearer token.
+- **Authentication**: The `--api-key` flag or `WALLFACER_SERVER_API_KEY` env var provides the Bearer token, matching the server's `BearerAuthMiddleware`.
 - **Latency**: SSE events may arrive with delay. The TUI should show "last updated" timestamps and handle reconnection gracefully.
 - **Network interruption**: The SSE client should reconnect with backoff. During disconnection, the board shows a "disconnected" indicator and the last-known state.
 
 ### 6. Accessibility
 
 - All actions must be keyboard-accessible (no mouse-only interactions).
-- Color is never the sole indicator of state — status text labels accompany colored indicators.
+- Color is never the sole indicator of state: status text labels accompany colored indicators.
 - Screen reader compatibility is limited in TUI applications, but semantic structure (clear labels, logical tab order) helps.
 
 ### 7. Concurrent terminal usage
 
-Users may run the TUI in one tmux pane while using `wallfacer exec` in another. The TUI must not interfere with other terminal sessions. Since it runs in an alternate screen buffer (Bubble Tea default), switching away and back should restore the display cleanly.
+Users may run the TUI in one tmux pane while using a host shell or the web terminal (`/api/terminal/ws`) in another. The TUI must not interfere with other terminal sessions. Since it runs in an alternate screen buffer (Bubble Tea default), switching away and back should restore the display cleanly.
 
 ### 8. Startup time
 
 The TUI should render the first frame within 200ms. This means:
 - Fetch task list asynchronously after initial render (show spinner or "Loading..." while fetching).
 - In standalone mode, start the server in a background goroutine and connect when ready.
-- Cache nothing on disk — the server is the source of truth.
+- Cache nothing on disk: the server is the source of truth.
 
 ### 9. What this does NOT include (potential future extensions)
 
-- **Embedded terminal** (shell inside the TUI): Running a PTY within a Bubble Tea app is possible but complex. Users can use tmux panes or `wallfacer exec` for shell access. Deferred.
+- **Embedded terminal** (shell inside the TUI): Running a PTY within a Bubble Tea app is possible but complex. Users can use tmux panes or the web terminal for shell access. Deferred.
 - **Split-view multiple tasks**: Showing logs for two tasks side-by-side. Useful but adds significant layout complexity. Deferred.
-- **File explorer**: Browsing workspace files in the TUI. The web UI's file explorer is mouse-oriented and doesn't translate well to terminal. Users have `ls`, `tree`, and their editor. Deferred.
+- **File explorer**: Browsing workspace files in the TUI. The web UI's `ExplorerPanel.vue` is mouse-oriented and doesn't translate well to terminal. Users have `ls`, `tree`, and their editor. Deferred.
+- **Planning chat / spec tree**: The web UI's planning surfaces (`frontend/src/components/plan/`, `internal/planner/`) are out of scope for the first TUI release. Deferred.
 - **Drag-and-drop reordering**: Not possible in a terminal. Task ordering is managed via `s` (start) to promote, or PATCH with position field.
 
 ---
 
 ## Dependencies
 
-- **No new external Go dependencies beyond Bubble Tea ecosystem**: `github.com/charmbracelet/bubbletea`, `github.com/charmbracelet/lipgloss`, `github.com/charmbracelet/bubbles`. These are well-maintained, have no CGo, and compile on all platforms.
+- **No new external Go dependencies beyond the Bubble Tea ecosystem**: `github.com/charmbracelet/bubbletea`, `github.com/charmbracelet/lipgloss`, `github.com/charmbracelet/bubbles`. These are well-maintained, have no CGo, and compile on all platforms.
 - **No new server-side changes** for core functionality. The TUI is a pure API client.
-- **Existing SSE endpoints** must work with Go's `net/http` client (they do — SSE is just chunked HTTP responses).
+- **Existing SSE endpoints** must work with Go's `net/http` client (they do; SSE is just chunked HTTP responses).
 
 ---
 
 ## Migration & Backward Compatibility
 
-- **Additive only**: New `tui` subcommand. No changes to existing `run`, `status`, `exec`, `desktop` commands.
+- **Additive only**: New `tui` subcommand. No changes to existing `run`, `status`, `spec`, `doctor`, `auth`, `web` commands.
 - **No API changes**: The TUI consumes existing endpoints.
-- **No UI changes**: The web UI is unaffected.
+- **No web UI changes**: The Vue SPA is unaffected.
 - **Go module**: New dependencies (charmbracelet) are added to `go.mod`. These are pure Go, no CGo, no platform restrictions.
 
 ---
 
 ## Open Questions
 
-1. **Should `wallfacer tui` become the default when no subcommand is given?** Currently `wallfacer` with no args prints help. Making `tui` the default would give a zero-friction experience but changes existing behavior. Could be gated behind a config flag or introduced in a later release.
+1. **Should `wallfacer tui` become the default when no subcommand is given?** Currently `wallfacer` with no args prints usage and exits non-zero. Making `tui` the default would give a zero-friction experience but changes existing behavior. Could be gated behind a config flag or introduced in a later release.
 
 2. **Notification support?** When a task completes or needs feedback, the TUI could send a desktop notification (via `notify-send` on Linux, `osascript` on macOS, `toast` on Windows). Useful when the TUI is in a background tmux pane. Low effort but platform-specific.
 
 3. **Theme customization?** The Lip Gloss styles could be configurable via a `~/.wallfacer/tui-theme.toml` file. Power users expect this from terminal tools, but it adds scope. Could ship with a sensible default and add theming later.
 
-4. **Batch task creation?** The web UI supports batch task creation with dependency wiring. Replicating the full batch UI in a terminal is complex. Options: support a simpler single-task-at-a-time flow, or allow pasting/piping a JSON batch spec. The `$EDITOR` integration could open a YAML/JSON template for batch creation.
+4. **Batch task creation?** The web UI supports batch task creation with dependency wiring (`POST /api/tasks/batch`). Replicating the full batch UI in a terminal is complex. Options: support a simpler single-task-at-a-time flow, or allow pasting/piping a JSON batch spec. The `$EDITOR` integration could open a YAML/JSON template for batch creation.
 
-5. **Integration with `wallfacer status -watch`?** The existing watch mode is a simpler, non-interactive terminal view. Should it be deprecated in favor of `tui`, or kept as a lightweight alternative for monitoring without interactivity? Keeping both seems reasonable — `status -watch` for passive monitoring, `tui` for active management.
+5. **Integration with `wallfacer status -watch`?** The existing watch mode is a simpler, non-interactive terminal view. Should it be deprecated in favor of `tui`, or kept as a lightweight alternative for monitoring without interactivity? Keeping both seems reasonable: `status -watch` for passive monitoring, `tui` for active management.

@@ -6,13 +6,12 @@ depends_on:
   - specs/local/spec-coordination/spec-state-control-plane/lifecycle-testing-state.md
 affects:
   - internal/handler/specs_dispatch.go
-  - internal/runner/drift.go
   - internal/runner/oversight.go
   - internal/store/
   - internal/handler/specs.go
   - internal/spec/model.go
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 effort: large
@@ -24,8 +23,9 @@ The core of the control plane: when a dispatched task reaches `done`,
 run a tester, produce a drift verdict, and transition the spec
 accordingly. Also fans out staleness to impacted specs.
 
-`SpecCompletionHook` today writes `complete` unconditionally. This spec
-turns that unconditional write into a gated verdict.
+`SpecCompletionHook` (`internal/handler/specs_dispatch.go`) today writes
+`complete` unconditionally. This spec turns that unconditional write
+into a gated verdict.
 
 ---
 
@@ -33,7 +33,7 @@ turns that unconditional write into a gated verdict.
 
 ```mermaid
 flowchart TD
-  T[Task done<br/>store.OnDone fires] --> H[SpecCompletionHook]
+  T[Task done<br/>store.OnDone fires] --> H[SpecCompletionHook<br/>specs_dispatch.go]
   H --> W1[validated → testing<br/>record implementation_commit]
   W1 --> R[Launch tester agent<br/>internal/runner/oversight.go]
   R --> V[Drift verdict]
@@ -51,9 +51,12 @@ flowchart TD
 ## 1. Hold at `testing`
 
 Prereq: [lifecycle-testing-state.md](lifecycle-testing-state.md)
-adopts Option A (7th state).
+adopts Option A (7th state). The current state machine in
+`internal/spec/lifecycle.go` has six states only; `testing` does not
+exist yet.
 
-When `store.OnDone` fires:
+When `store.OnDone` fires (the `SpecCompletionHook` callback in
+`internal/handler/specs_dispatch.go`):
 1. Read the source spec (`SpecSourcePath` on the task).
 2. If spec status is `validated`, transition to `testing` via
    `UpdateFrontmatter`. Record the task's commit range in a new
@@ -66,7 +69,7 @@ When `store.OnDone` fires:
 3. Commit the status write (subject `<path>: enter testing`).
 
 If the spec is not at `validated` (e.g., `stale` because of an upstream
-change mid-implementation), skip the whole flow — log a warning, leave
+change mid-implementation), skip the whole flow - log a warning, leave
 the status alone, don't run the tester.
 
 ---
@@ -74,7 +77,8 @@ the status alone, don't run the tester.
 ## 2. Tester agent contract
 
 Reuse the existing test-verification agent (the one behind
-`POST /api/tasks/{id}/test`) rather than introducing a new agent.
+`POST /api/tasks/{id}/test`, launched through
+`internal/runner/oversight.go`) rather than introducing a new agent.
 
 **Input** (passed in the system prompt or a structured prelude):
 - Spec body (full markdown)
@@ -83,7 +87,7 @@ Reuse the existing test-verification agent (the one behind
 - Task's changed files list (`git diff --name-only`)
 - Acceptance criteria block, if the spec body has one
 
-**Output** (structured — the agent emits JSON in its final turn):
+**Output** (structured - the agent emits JSON in its final turn):
 
 ```json
 {
@@ -151,7 +155,7 @@ FanOutStale(tree, impacted)
 ```
 
 Channel 2 here uses the actual task diff (`AffectsImpactFromDiff`),
-not the source spec's declared affects — precise and catches files
+not the source spec's declared affects - precise and catches files
 the spec forgot to list.
 
 ---
@@ -160,9 +164,9 @@ the spec forgot to list.
 
 Two-part store:
 
-**Inline summary** — appended to the spec body as an `## Outcome`
-section (or replacing an existing one). Visible in the focused view.
-Example shape:
+**Inline summary** - appended to the spec body as an `## Outcome`
+section (or replacing an existing one). Visible in the focused view
+(`frontend/src/components/plan/SpecFocusedView.vue`). Example shape:
 
 ```markdown
 ## Outcome
@@ -178,7 +182,7 @@ Implementation matches intent; one extra file (board.go) needed to
 wire the flow.
 ```
 
-**Structured sidecar** — full JSON verdict persisted via
+**Structured sidecar** - full JSON verdict persisted via
 `store.SaveDriftReport(taskID, report)`. Retrieved by
 `GET /api/specs/{path}/drift` for the UI "Review Changes" action.
 
@@ -189,7 +193,7 @@ Inline outcome is for humans reading the spec; sidecar is for tooling.
 ## 6. Tester failure handling
 
 **Do not silently fall back to `complete`.** That erases the whole
-point of drift detection — every flaky agent run would produce a false
+point of drift detection - every flaky agent run would produce a false
 `complete` no one sees.
 
 Instead: on tester crash, timeout, or malformed output, write a new
@@ -203,11 +207,11 @@ The spec stays at `testing` with the `testing_pending` reason visible
 in the explorer as a distinct badge (e.g., "⏳ testing: retry needed").
 The user has three options:
 
-1. Click **Retry Test** — re-runs the tester on the same commit range.
-2. Click **Mark Complete Without Drift Check** — explicit override;
+1. Click **Retry Test** - re-runs the tester on the same commit range.
+2. Click **Mark Complete Without Drift Check** - explicit override;
    writes `testing → complete`, clears `testing_pending`, records
    `drift: skipped` in Outcome.
-3. Ignore — spec stays in `testing_pending` until someone deals with it.
+3. Ignore - spec stays in `testing_pending` until someone deals with it.
 
 Failure is surfaced, not hidden. Cost: a small UX addition; benefit:
 the drift verdict stays trustworthy.
@@ -225,11 +229,11 @@ workspace path, held from `git add` through `git commit`. Callers
 queue; worst case is serialized commits, which is what git already
 does internally but fails loudly without the mutex.
 
-Lives alongside the existing archive-commit helper in
+Lives alongside the existing spec-commit helper in
 `internal/handler/specs.go` so archive, unarchive, validate, and drift
 commits all share the same lock.
 
-**Batch writer alternative** — accumulate status writes for N seconds
+**Batch writer alternative** - accumulate status writes for N seconds
 then flush in one commit. Rejected: complicates ordering with task
 commit-and-push; mutex is simpler and enough at current scale.
 
@@ -248,8 +252,9 @@ Schema rules:
 - Populated by this hook on `validated → testing`.
 - Cleared on `testing → complete`, `testing → stale`, or any
   `→ drafted` transition (refine, unarchive).
-- Validator: no new rule — malformed values get caught by YAML parse.
-- Document in `spec-document-model.md` alongside `dispatched_task_id`.
+- Validator: no new rule - malformed values get caught by YAML parse.
+- Document in `spec-document-model.md` alongside `dispatched_task_id`,
+  and add the field to the spec model in `internal/spec/model.go`.
 
 Needs a schema-prep commit before this pipeline can land.
 
@@ -269,7 +274,8 @@ Needs a schema-prep commit before this pipeline can land.
 - Tester failure leaves the spec at `testing_pending` with a visible
   reason; Retry and Mark-Complete-Without-Drift-Check actions work.
 - Per-workspace commit mutex prevents concurrent-commit races.
-- `implementation_commit` is documented in the document-model spec.
+- `implementation_commit` is documented in the document-model spec and
+  added to `internal/spec/model.go`.
 - Unit tests cover all three drift levels + tester-failure path.
 - Integration test: full round-trip `store.OnDone` → tester →
   `complete` for a minimal-drift case.
@@ -285,13 +291,13 @@ Needs a schema-prep commit before this pipeline can land.
    - Require acceptance criteria on all dispatchable specs (new
      `has-criteria` validator error; bulk migration needed).
    - **Fall back to file-level drift when criteria are absent**
-     (drift_level based on unexpected/missing only). Tentative: this —
+     (drift_level based on unexpected/missing only). Tentative: this -
      pragmatic, matches reality.
-2. **Tester sandbox cost.** Running a tester agent on every task
-   completion is non-trivial token + container cost. Gate behind a
+2. **Tester run cost.** Running a tester agent on every task
+   completion is non-trivial token + execution cost. Gate behind a
    per-workspace toggle (`WALLFACER_DRIFT_TESTER`)? Tentative: yes,
-   default on once P3 is stable.
-3. **Who writes the `## Outcome` section — the tester or the hook?**
+   default on once the pipeline is stable.
+3. **Who writes the `## Outcome` section - the tester or the hook?**
    The hook has the structured data; the tester has better prose. If
    the hook writes the outcome, the tester's summary is formatted
    deterministically; if the tester writes it, prose is richer but

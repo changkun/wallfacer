@@ -5,9 +5,10 @@ depends_on: []
 affects:
   - internal/handler/tasks.go
   - internal/handler/explorer.go
-  - ui/js/spec-explorer.js
+  - frontend/src/components/plan/SpecTreePanel.vue
+  - frontend/src/components/plan/SpecFocusedView.vue
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 effort: small
@@ -19,16 +20,16 @@ Advisory background check that catches drift the event-driven hooks
 miss: code edits outside the spec-dispatch/chat-edit flow.
 
 Complementary to the three event hooks (chat, dispatch, task-done).
-Does **not** mutate spec status — only surfaces advisory badges.
+Does **not** mutate spec status - only surfaces advisory badges.
 
 ---
 
 ## Coverage Gap
 
 The event hooks cover:
-- Chat-edit fan-out ([chat-edit-fanout.md](chat-edit-fanout.md)) —
+- Chat-edit fan-out ([chat-edit-fanout.md](chat-edit-fanout.md)) -
   spec edits via planning chat.
-- Task-done drift pipeline ([drift-pipeline.md](drift-pipeline.md)) —
+- Task-done drift pipeline ([drift-pipeline.md](drift-pipeline.md)) -
   code edits via dispatched tasks.
 
 They miss:
@@ -47,16 +48,16 @@ The periodic scan plugs this hole.
 
 Three trigger paths, picked pragmatically:
 
-1. **Workspace load** — run once when the server opens a workspace (or
+1. **Workspace load** - run once when the server opens a workspace (or
    switches to a new group). Surfaces drift that accumulated while
    wallfacer was offline.
-2. **Manual refresh** — UI button in the explorer header
+2. **Manual refresh** - UI button in the explorer header
    ("Rescan staleness"). Triggered by humans on demand.
-3. **Periodic interval** — optional, gated behind a config flag
+3. **Periodic interval** - optional, gated behind a config flag
    (e.g., `WALLFACER_STALENESS_SCAN_INTERVAL=1h`). Off by default;
    workspace-load + manual covers most cases.
 
-Cron-style background scans are deferred — they add a moving part
+Cron-style background scans are deferred - they add a moving part
 (goroutine lifecycle, cancellation) that isn't needed at current scale.
 
 ---
@@ -74,11 +75,13 @@ For each non-archived `complete` spec in the tree:
    `stale_candidate: true` with a reason (e.g.,
    `"affects path internal/runner/execute.go changed in commit abc123"`).
 
-The explorer renders the flag as a subdued "⚠ stale candidate" badge
-distinct from the real `stale` status. Clicking opens the focused view
-with the reason inline and an "Accept → mark stale" action.
+The explorer (`frontend/src/components/plan/SpecTreePanel.vue`) renders
+the flag as a subdued "⚠ stale candidate" badge distinct from the real
+`stale` status. Clicking opens the focused view
+(`frontend/src/components/plan/SpecFocusedView.vue`) with the reason
+inline and an "Accept → mark stale" action.
 
-No status write happens automatically — a reviewer must accept or
+No status write happens automatically - a reviewer must accept or
 dismiss.
 
 ---
@@ -97,27 +100,27 @@ catches the straggler case and asks the human to judge.
 
 ### In scope
 - Detection: matching `affects` against `git log`.
-- Surfacing: advisory badge in explorer + focused view.
+- Surfacing: advisory badge in the spec tree + focused view.
 - Manual accept/dismiss actions.
 
 ### Out of scope
 - Automatic status mutation.
 - Git post-commit hooks (would require the user to install them).
 - Rewriting history detection (rebases show up as fresh commits
-  anyway — the `--since` query catches them).
-- Validity of archived specs' `affects` — archived specs are skipped.
+  anyway - the `--since` query catches them).
+- Validity of archived specs' `affects` - archived specs are skipped.
 
 ---
 
 ## UI
 
-Spec explorer tree:
+Spec tree (`SpecTreePanel.vue`):
 
 ```
 specs/
-  ✅ sandbox-backends.md          ⚠ stale candidate (2 files)
-  ✅ storage-backends.md
-  ✔ container-reuse.md           ⚠ upstream drift (sandbox-backends)
+  ✅ storage-backends.md          ⚠ stale candidate (2 files)
+  ✅ executor-backends.md
+  ✔ container-reuse.md           ⚠ upstream drift (storage-backends)
 ```
 
 The "upstream drift" badge comes from the drift pipeline; the
@@ -125,7 +128,7 @@ The "upstream drift" badge comes from the drift pipeline; the
 different reasons. Hovering shows which `affects` paths triggered the
 flag.
 
-Focused view banner for a flagged spec:
+Focused view (`SpecFocusedView.vue`) banner for a flagged spec:
 
 ```
 ⚠ Stale candidate. 3 files in this spec's `affects` changed since
@@ -135,9 +138,9 @@ Focused view banner for a flagged spec:
   [Review Changes]  [Mark Stale]  [Dismiss]
 ```
 
-"Mark Stale" writes `status: stale` via a new endpoint, committing the
-transition. "Dismiss" bumps `updated: now` so the next scan ignores the
-prior commits — essentially "I looked, it's fine."
+"Mark Stale" writes `status: stale` via the transition endpoint,
+committing the transition. "Dismiss" bumps `updated: now` so the next
+scan ignores the prior commits - essentially "I looked, it's fine."
 
 ---
 
