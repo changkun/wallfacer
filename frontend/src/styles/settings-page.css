@@ -81,6 +81,13 @@
   font-weight: 500;
   box-shadow: var(--shadow);
 }
+/* Soft, inset focus ring instead of the global bold accent outline, which
+   bulged out as a loud orange box on the selected tab. Keyboard focus stays
+   visible; the active tab already reads via its background. */
+.set-tab:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 38%, transparent);
+  outline-offset: -2px;
+}
 .set-tab-icon {
   color: var(--text-muted);
   display: inline-flex;
