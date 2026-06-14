@@ -45,8 +45,8 @@
   --h-row: 28px;
 
   /* Sidebar widths */
-  --sb-w: 208px;
-  --sb-w-icon: 48px;
+  --sb-w: 240px;
+  --sb-w-icon: 56px;
 
   /* Surfaces (paper-ink) */
   --bg: #f4f1ea; /* canvas */

@@ -105,7 +105,7 @@ async function saveGroups(next: WorkspaceGroup[], verb: string) {
   }
 }
 
-const props = defineProps<{ collapsed: boolean }>();
+defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; workspaces: []; palette: [] }>();
 
 const cloudMode = computed(() => store.config?.cloud_mode === true);
@@ -176,10 +176,6 @@ function onNavigate(item: { id: string }) {
   if (item.id === 'terminal') ui.toggleTerminal();
 }
 
-function onBrandClick() {
-  if (props.collapsed) emit('toggle');
-}
-
 onMounted(() => {
   if (cloudMode.value && !auth.loaded) void auth.fetchMe();
   if (route.path === '/') markBoardSeen();
@@ -207,53 +203,31 @@ watch(wsPopoverOpen, (open) => {
     :model="navModel"
     :active-key="activeNav"
     :collapsed="collapsed"
-    :collapsible="false"
     :router-link="RouterLink"
+    brand-name="Wallfacer"
+    brand-sub="Workspace"
+    expand-on-brand-click
+    search
+    search-label="Search or command"
     @navigate="onNavigate"
+    @search="emit('palette')"
+    @update:collapsed="emit('toggle')"
   >
-    <!-- Brand: clickable when collapsed to unfold -->
-    <template #brand>
-      <div
-        class="sb-brand"
-        :class="{ 'is-collapsed-toggle': collapsed }"
-        :title="collapsed ? 'Expand sidebar' : ''"
-        @click="onBrandClick"
-      >
-        <span class="sb-logo" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;image-rendering:pixelated">
-            <rect x="0" y="0" width="6" height="3" fill="var(--accent)" />
-            <rect x="7" y="0" width="9" height="3" fill="var(--accent-2)" />
-            <rect x="0" y="4" width="4" height="3" fill="#8a3e21" />
-            <rect x="5" y="4" width="6" height="3" fill="var(--accent)" />
-            <rect x="12" y="4" width="4" height="3" fill="var(--accent-2)" />
-            <rect x="0" y="8" width="7" height="3" fill="var(--accent-2)" />
-            <rect x="8" y="8" width="8" height="3" fill="#8a3e21" />
-            <rect x="0" y="12" width="3" height="4" fill="var(--accent)" />
-            <rect x="4" y="12" width="6" height="4" fill="#8a3e21" />
-            <rect x="11" y="12" width="5" height="4" fill="var(--accent)" />
-          </svg>
-        </span>
-        <a
-          v-if="!collapsed"
-          href="https://github.com/changkun/wallfacer"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="sb-brand-name"
-          @click.stop
-        >Wallfacer</a>
-        <button
-          v-if="!collapsed"
-          type="button"
-          class="sb-collapse"
-          title="Collapse sidebar"
-          @click.stop="emit('toggle')"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="9" y1="3" x2="9" y2="21"></line>
-          </svg>
-        </button>
-      </div>
+    <template #logo>
+      <span class="sb-logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;image-rendering:pixelated">
+          <rect x="0" y="0" width="6" height="3" fill="var(--accent)" />
+          <rect x="7" y="0" width="9" height="3" fill="var(--accent-2)" />
+          <rect x="0" y="4" width="4" height="3" fill="#8a3e21" />
+          <rect x="5" y="4" width="6" height="3" fill="var(--accent)" />
+          <rect x="12" y="4" width="4" height="3" fill="var(--accent-2)" />
+          <rect x="0" y="8" width="7" height="3" fill="var(--accent-2)" />
+          <rect x="8" y="8" width="8" height="3" fill="#8a3e21" />
+          <rect x="0" y="12" width="3" height="4" fill="var(--accent)" />
+          <rect x="4" y="12" width="6" height="4" fill="#8a3e21" />
+          <rect x="11" y="12" width="5" height="4" fill="var(--accent)" />
+        </svg>
+      </span>
     </template>
 
     <!-- Workspace switcher + command palette, above the nav -->
@@ -315,15 +289,6 @@ watch(wsPopoverOpen, (open) => {
             </button>
           </div>
         </div>
-
-        <button type="button" class="sb-search" title="Search (&#x2318;K)" @click="emit('palette')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="7"></circle>
-            <line x1="20" y1="20" x2="16.65" y2="16.65"></line>
-          </svg>
-          <span>Search or command</span>
-          <span class="kbd">&#x2318;K</span>
-        </button>
       </template>
     </template>
 
@@ -400,5 +365,16 @@ watch(wsPopoverOpen, (open) => {
 }
 .wf-cs.collapsed {
   width: var(--sb-w-icon) !important;
+}
+/* Match the workspace switcher to the search bar below it: full width + the
+ * same height/radius, so they read as one consistent stack. */
+.wf-cs :deep(.sb-ws-switch) {
+  width: 100%;
+  margin: 6px 0 0;
+  min-height: 38px;
+  border-radius: 9px;
+}
+.wf-cs :deep(.sb-ws-switch-wrap) {
+  width: 100%;
 }
 </style>
