@@ -41,6 +41,7 @@ const codexTestStatus = ref('');
 const codexTestReauth = ref(false);
 const cursorTestStatus = ref('');
 const piTestStatus = ref('');
+const opencodeTestStatus = ref('');
 const saveStatus = ref('');
 
 const claudeOauthStatus = ref('');
@@ -94,6 +95,7 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   codexTestReauth.value = false;
   cursorTestStatus.value = '';
   piTestStatus.value = '';
+  opencodeTestStatus.value = '';
 }
 
 watch(env, (cfg) => applyEnvToForm(cfg), { immediate: false });
@@ -182,9 +184,22 @@ interface PiTestPayload {
   sandbox_by_activity: Record<string, string>;
 }
 
-type TestPayload = ClaudeTestPayload | CodexTestPayload | CursorTestPayload | PiTestPayload;
+// OpenCode manages provider auth itself (opencode auth login), so the test
+// payload carries no credentials, only the routing context.
+interface OpenCodeTestPayload {
+  sandbox: 'opencode';
+  default_sandbox: string;
+  sandbox_by_activity: Record<string, string>;
+}
 
-function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi'): TestPayload {
+type TestPayload =
+  | ClaudeTestPayload
+  | CodexTestPayload
+  | CursorTestPayload
+  | PiTestPayload
+  | OpenCodeTestPayload;
+
+function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'): TestPayload {
   const raw = buildSavePayload();
   if (sandbox === 'claude') {
     const p: ClaudeTestPayload = {
@@ -216,6 +231,14 @@ function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi'): TestPa
     };
     return p;
   }
+  if (sandbox === 'opencode') {
+    const p: OpenCodeTestPayload = {
+      sandbox: 'opencode',
+      default_sandbox: raw.default_sandbox || '',
+      sandbox_by_activity: raw.sandbox_by_activity || {},
+    };
+    return p;
+  }
   const p: CodexTestPayload = {
     sandbox: 'codex',
     default_sandbox: raw.default_sandbox || '',
@@ -242,7 +265,7 @@ function summarizeTestResult(resp: SandboxTestResponse | null | undefined): stri
   return `status ${resp.status}`;
 }
 
-function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi', text: string, reauth: boolean): void {
+function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode', text: string, reauth: boolean): void {
   if (sandbox === 'claude') {
     claudeTestStatus.value = text;
     claudeTestReauth.value = reauth;
@@ -251,12 +274,14 @@ function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi', text: stri
     codexTestReauth.value = reauth;
   } else if (sandbox === 'pi') {
     piTestStatus.value = text;
+  } else if (sandbox === 'opencode') {
+    opencodeTestStatus.value = text;
   } else {
     cursorTestStatus.value = text;
   }
 }
 
-async function testSandbox(sandbox: 'claude' | 'codex' | 'cursor' | 'pi'): Promise<void> {
+async function testSandbox(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'): Promise<void> {
   setTestStatus(sandbox, 'Testing…', false);
   try {
     const resp = await api<SandboxTestResponse>('POST', '/api/env/test', buildTestPayload(sandbox));
@@ -783,6 +808,37 @@ function capitalize(s: string): string {
               </button>
               <span id="env-pi-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
                 {{ piTestStatus }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OpenCode block -->
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">OpenCode</label>
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="font-size: 11px; color: var(--text-muted)">
+              The
+              <code style="font-family: monospace">opencode</code>
+              CLI manages provider credentials itself. Run
+              <code style="font-family: monospace">opencode auth login</code>
+              once and pick a provider (Anthropic, OpenAI, OpenRouter, etc.);
+              the credential lives in OpenCode's own config, so
+              <strong>no API key is needed here</strong> in
+              <code style="font-family: monospace">~/.wallfacer/.env</code>.
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+              <button
+                type="button"
+                class="btn-icon"
+                style="font-size: 12px; padding: 4px 10px"
+                @click="testSandbox('opencode')"
+              >
+                Test
+              </button>
+              <span id="env-opencode-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
+                {{ opencodeTestStatus }}
               </span>
             </div>
           </div>

@@ -70,7 +70,7 @@ const model = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
-const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi'>('');
+const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'>('');
 const batchMode = ref(false);
 const scheduled = ref(false);
 const intervalMinutes = ref<number | null>(null);
@@ -391,6 +391,7 @@ function onInput(e: Event) {
           <option value="codex">Codex</option>
           <option value="cursor">Cursor</option>
           <option value="pi">Pi</option>
+          <option value="opencode">OpenCode</option>
         </select>
       </label>
     </div>
