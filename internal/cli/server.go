@@ -146,19 +146,20 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:          cfg.EnvFile,
-		DefaultEnvFile:   filepath.Join(configDir, ".env"),
-		Workspaces:       workspaces,
-		WorktreesDir:     worktreesDir,
-		TmpDir:           tmpDir,
-		InstructionsPath: snapshot.InstructionsPath,
-		CodexAuthPath:    codexAuthPath,
-		HostClaudeBinary: envCfg.HostClaudeBinary,
-		HostCodexBinary:  envCfg.HostCodexBinary,
-		HostCursorBinary: envCfg.HostCursorBinary,
-		Prompts:          prompts.NewManager(promptsDir),
-		WorkspaceManager: wsMgr,
-		Reg:              reg,
+		EnvFile:            cfg.EnvFile,
+		DefaultEnvFile:     filepath.Join(configDir, ".env"),
+		Workspaces:         workspaces,
+		WorktreesDir:       worktreesDir,
+		TmpDir:             tmpDir,
+		InstructionsPath:   snapshot.InstructionsPath,
+		CodexAuthPath:      codexAuthPath,
+		HostClaudeBinary:   envCfg.HostClaudeBinary,
+		HostCodexBinary:    envCfg.HostCodexBinary,
+		HostCursorBinary:   envCfg.HostCursorBinary,
+		HostOpenCodeBinary: envCfg.HostOpenCodeBinary,
+		Prompts:            prompts.NewManager(promptsDir),
+		WorkspaceManager:   wsMgr,
+		Reg:                reg,
 	})
 
 	r.PruneUnknownWorktrees()
