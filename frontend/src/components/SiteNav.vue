@@ -18,8 +18,8 @@ const accountExtras = computed<AccountMenuItem[]>(() => {
   const url = auth.me?.auth_url;
   if (!url) return [];
   return [
-    { label: t('nav.me'), href: `${url}/me` },
-    { label: t('nav.admin'), href: `${url}/admin` },
+    { label: t.value('nav.me'), href: `${url}/me` },
+    { label: t.value('nav.admin'), href: `${url}/admin` },
   ];
 });
 
