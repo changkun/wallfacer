@@ -8,7 +8,7 @@ affects:
   - internal/handler/
 effort: xlarge
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -18,7 +18,7 @@ dispatched_task_id: null
 ## Problem
 
 A locally-running wallfacer that has signed in to latere.ai is already
-**linked** to a user's account — the session cookie and the
+**linked** to a user's account. The session cookie and the
 `CreatedBy` / `OrgID` fields tie every local record to a latere.ai
 principal. That identity link is the foundation for remote control:
 the latere.ai web UI (or a mobile client) observing and operating a
@@ -68,7 +68,7 @@ Two obvious shapes; both solve the NAT traversal problem:
 
 Either path needs:
 
-- A latere.ai-side registry keyed by principal: `principal_id →
+- A latere.ai-side registry keyed by principal: `principal_id ->
   [instances]`, with each instance entry carrying hostname, OS,
   last-seen, wallfacer version, and a capability manifest (which API
   routes the instance actually exposes).
@@ -87,7 +87,8 @@ The only commitment Phase 2 had to make for this spec: when sign-in
 happens, wallfacer records enough identity info to register later.
 That is done:
 
-- `*jwtauth.Claims` on every authenticated request.
+- The platform `jwtauth.Claims` (re-exported as `auth.Claims`) on every
+  authenticated request.
 - `Task.CreatedBy` + `Task.OrgID` persisted.
 - `workspace.Group.CreatedBy` + `workspace.Group.OrgID` persisted.
 
@@ -104,7 +105,7 @@ an identity overhaul.
   laptop signs in on both. The UI must let the user pick which
   instance a remote action targets. How does that UI look?
 - **Offline instances.** A remote action against a laptop that's
-  closed — queue until it wakes, return 503, or surface
+  closed: queue until it wakes, return 503, or surface
   "instance offline"? Probably a bounded queue with a timeout.
 - **Security boundary.** Remote control widens the attack surface of a
   local machine. Which scopes (`scp`) gate what? `remote-control`
