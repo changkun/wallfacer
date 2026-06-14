@@ -1,8 +1,8 @@
 # Exploring Ideas
 
-Plan mode (formerly Specs) is where you explore ideas conversationally with an AI agent before committing to structured specs or tasks.
+Plan mode is where you explore ideas conversationally with an AI agent before committing to structured specs or tasks.
 
-The planning chat is a conversational interface for exploring ideas with an AI agent before committing to structured specs or tasks. It runs inside Plan mode and is backed by a planning sandbox that can read your codebase, create files, and execute commands.
+The planning chat lives inside Plan mode. It is backed by a planning agent that can read your codebase, create files, and run commands. The same planner also powers task-mode prompt refinement (see [Refinement & Ideation](refinement-and-ideation.md)).
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ sequenceDiagram
 
 ### Opening the Planning Chat
 
-Switch to Plan mode by pressing **P** (or clicking the mode toggle in the header). The chat pane appears on the right side of the layout. Press **C** to toggle it open or closed.
+Switch to Plan mode by pressing **P** (or click the mode toggle in the header). The chat pane appears on the right side of the layout. Press **C** to toggle it open or closed.
 
 ### Sending Messages
 
@@ -38,28 +38,28 @@ Type in the composer at the bottom of the chat pane. Press **Enter** to send (or
 
 ### Agent Responses
 
-Responses stream in real-time. Assistant text is rendered as markdown with syntax-highlighted code blocks. Tool activity (file reads, command execution, file writes) appears in a collapsible "Agent activity" section below each response.
+Responses stream in real time. Assistant text renders as markdown with syntax-highlighted code blocks. Tool activity (file reads, command execution, file writes) appears in a collapsible "Agent activity" section below each response.
 
 ### Drafting a Spec from Chat (`/spec-new`)
 
-When the planning agent wants to start a new spec, it emits a single `/spec-new <path> [title="..."] [status=...] [effort=...]` directive on its own line, followed by the spec body. The server recognises the directive **only when it is not inside a fenced code block** — the agent can quote the grammar in documentation or examples without triggering a scaffold.
+When the planning agent wants to start a new spec, it emits a single `/spec-new <path> [title="..."] [status=...] [effort=...]` directive on its own line, followed by the spec body. The server recognizes the directive **only when it is not inside a fenced code block**, so the agent can quote the grammar in documentation or examples without triggering a scaffold.
 
-On recognition, the server calls the shared spec scaffolder to create the file with valid YAML frontmatter, then appends the agent's body text after the frontmatter. The path must live under `specs/<track>/<slug>.md`; other locations are rejected with a `system` message in the chat. The agent's raw response (including the directive line itself) still streams to the chat unchanged — the directive is a parallel side-effect, not a stream rewrite.
+On recognition, the server calls the shared spec scaffolder to create the file with valid YAML frontmatter, then appends the agent's body text after it. The path must live under `specs/<track>/<slug>.md`; other locations are rejected with a `system` message in the chat. The agent's raw response (including the directive line) still streams to the chat unchanged. The directive is a parallel side-effect, not a stream rewrite.
 
-After each successful scaffold the server also ensures `specs/README.md` exists: if missing, it is created with a minimal template listing the new spec under the correct track heading; if present, a new row is appended to the track's table. User-authored prose outside the track tables is preserved byte-for-byte, and existing rows are never re-ordered. If the agent opened its body with a short summary sentence, that sentence is used as the "Delivers" cell; otherwise a placeholder invites a later manual fill.
+After each successful scaffold the server also ensures `specs/README.md` exists. If missing, it is created with a minimal template listing the new spec under the correct track heading; if present, a new row is appended to the track's table. User-authored prose outside the track tables is preserved byte-for-byte, and existing rows are never re-ordered. If the agent opened its body with a short summary sentence, that sentence becomes the "Delivers" cell; otherwise a placeholder invites a later manual fill.
 
-When `/spec-new` fires the very first spec in a previously empty workspace, a short bootstrap choreography stitches the moment together: about 130 ms after the spec-tree SSE arrives the focused view auto-opens onto the new spec, and around 160 ms a top-centre toast slides in reading "Your first spec was created at &lt;path&gt;. Rename or move it anytime." The toast auto-dismisses after six seconds (or on click). Reconnection-induced repeat snapshots never replay the choreography — it fires once per session. Under `prefers-reduced-motion: reduce` the toast still appears but without the slide-in animation.
+When `/spec-new` fires the very first spec in a previously empty workspace, a short bootstrap choreography stitches the moment together. About 130 ms after the spec-tree SSE arrives, the focused view auto-opens onto the new spec, and around 160 ms a top-center toast slides in reading "Your first spec was created at &lt;path&gt;. Rename or move it anytime." The toast auto-dismisses after six seconds (or on click). Reconnection-induced repeat snapshots never replay the choreography; it fires once per session. Under `prefers-reduced-motion: reduce` the toast still appears but without the slide-in animation.
 
-If the scaffold fails (name collision, invalid path, I/O error), a short "Couldn't create &lt;path&gt;: &lt;reason&gt;" message appears in the chat and the round continues normally. Archive an unwanted spec from the focused view if you want to drop one the agent created over-eagerly.
+If the scaffold fails (name collision, invalid path, I/O error), a short "Couldn't create &lt;path&gt;: &lt;reason&gt;" message appears in the chat and the round continues normally. Archive an unwanted spec from the focused view if the agent created one over-eagerly.
 
 ### Slash Commands
 
-Type `/` to see an autocomplete menu of built-in commands. Commands cover the full spec lifecycle:
+Type `/` to see an autocomplete menu of built-in commands. They cover the full spec lifecycle:
 
 | Command | Description |
 |---|---|
 | `/summarize [words]` | Summarize the focused spec, optionally limited to a word count |
-| `/create <title>` | Scaffold a new spec server-side (slug derived from the title) and hand the agent a first-draft instruction. Collisions are resolved with `-2`, `-3`, … suffixes; empty titles return a 400. |
+| `/create <title>` | Scaffold a new spec server-side (slug derived from the title) and hand the agent a first-draft instruction. Collisions resolve with `-2`, `-3`, … suffixes; empty titles return a 400. |
 | `/refine [feedback]` | Update the focused spec against the current codebase state |
 | `/validate` | Check the focused spec against document model rules |
 | `/impact` | Analyze which code and specs would be affected |
@@ -67,17 +67,17 @@ Type `/` to see an autocomplete menu of built-in commands. Commands cover the fu
 | `/break-down [design\|tasks]` | Decompose the focused spec into sub-specs or dispatchable tasks |
 | `/review-breakdown` | Validate a task breakdown for dependency ordering, sizing, and coverage |
 | `/dispatch` | Dispatch the focused spec to the task board |
-| `/review-impl [range]` | Review implementation against the spec's acceptance criteria |
-| `/diff [range]` | Compare completed implementation against spec (drift analysis) |
+| `/review-impl [commit-range]` | Review implementation against the spec's acceptance criteria |
+| `/diff [commit-range]` | Compare completed implementation against spec (drift analysis) |
 | `/wrapup` | Finalize a completed spec with outcome and status updates |
 
-### mentions
+### Mentions
 
 Type `@` in the composer to trigger file path autocomplete. In Plan mode, spec files are prioritized in the suggestion list. Mentioned files are included as context for the agent.
 
 ### Interrupting
 
-Click the stop button (which replaces the send button during streaming) to cancel the current response. The session context is preserved -- the agent remembers everything up to the interruption point.
+Click the stop button (which replaces the send button during streaming) to cancel the current response. The session context is preserved, so the agent remembers everything up to the interruption point.
 
 ### Message Queue
 
@@ -89,20 +89,20 @@ Click **Clear** in the chat header to discard all messages in the current thread
 
 ### Empty vs Non-empty Workspace
 
-The planning agent's system prompt has two variants. The **empty** variant kicks in when the workspace has zero non-archived specs and actively encourages `/spec-new` to bootstrap the first draft; the **nonempty** variant is the normal case and assumes you are iterating on an existing tree. Selection happens per-turn rather than being cached at session start, so archiving the last spec flips the agent's behaviour on the very next message — no restart or clear required.
+The planning agent's system prompt has two variants. The **empty** variant kicks in when the workspace has zero non-archived specs and actively encourages `/spec-new` to bootstrap the first draft; the **nonempty** variant is the normal case and assumes you are iterating on an existing tree. Selection happens per-turn rather than being cached at session start, so archiving the last spec flips the agent's behavior on the very next message, with no restart or clear required.
 
 ### Threads
 
 The chat supports multiple named threads per workspace group. Tabs sit above the message stream:
 
-- Click **+** to create a new thread (default name `Chat N`). Click the pencil icon (or double-click the tab) to rename inline — Enter commits, Escape cancels.
-- Click **×** on a tab to archive it (the in-flight thread cannot be archived; interrupt it first). Archived threads are hidden from the tab bar but files are retained; a **▾** menu next to **+** lists archived threads for restore.
-- Each thread keeps its own Claude Code session and history. Switching tabs does not abort an in-flight agent — its output continues to land in its own thread. When a background thread finishes, its tab shows a small unread dot.
-- Only one agent turn runs at a time across all threads, since they share the single planner. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the exec completes (global FIFO).
+- Click **+** to create a new thread (default name `Chat N`). Click the pencil icon (or double-click the tab) to rename inline: Enter commits, Escape cancels.
+- Click **×** on a tab to archive it (the in-flight thread cannot be archived; interrupt it first). Archived threads are hidden from the tab bar but their files are retained; a **▾** menu next to **+** lists archived threads for restore.
+- Each thread keeps its own agent session and history. Switching tabs does not abort an in-flight agent; its output continues to land in its own thread. When a background thread finishes, its tab shows a small unread dot.
+- Only one agent turn runs at a time across all threads, since they share the single planner. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the running turn completes (global FIFO).
 
 ### Undo
 
-Click the undo button on an assistant bubble to revert the planning round it produced. Undo works across threads: it targets the caller thread's most recent round even when a different thread committed afterwards. Internally this uses `git revert`, which creates a forward revert commit rather than rewriting history — both the original and the revert remain in `git log`.
+Click the undo button on an assistant bubble to revert the planning round it produced. Undo works across threads: it targets the caller thread's most recent round even when a different thread committed afterwards. Internally this uses `git revert`, which creates a forward revert commit rather than rewriting history, so both the original and the revert remain in `git log`.
 
 ---
 
@@ -110,26 +110,26 @@ Click the undo button on an assistant bubble to revert the planning round it pro
 
 ### Session Persistence
 
-Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace paths. Each thread lives under `threads/<thread-id>/` with its own `messages.jsonl` and `session.json`. Reopening the app or refreshing the page restores the full thread manifest and the last active tab for the same workspace group. Installations from before multi-thread support are migrated transparently on first run (existing conversation appears as `Chat 1`).
+Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace paths. Each thread lives under `threads/<thread-id>/` with its own `messages.jsonl` and `session.json`. Reopening the app or refreshing the page restores the full thread manifest and the last active tab for the same workspace group. Installations from before multi-thread support are migrated transparently on first run (the existing conversation appears as `Chat 1`).
 
 ### Session Recovery
 
 The agent process exits between turns, so its session is resumed on the next message. If the session cannot be resumed (it expired, or the server restarted), the system automatically replays the conversation history as context instead. You do not need to re-enter previous messages.
 
-### Planning Sandbox
+### Planning Agent
 
-The planner is a singleton, workspace-scoped sandbox keyed by a fingerprint of the active workspaces. It is the same harness as task sandboxes (Claude or Codex). Each message execs a fresh agent process; continuity comes from session resume (with history replay as a fallback), not a reused process. Nothing runs until you send the first message in a workspace group.
+The planner is a singleton, workspace-scoped agent keyed by a fingerprint of the active workspaces. It uses the same harness as task agents (Claude or Codex). Each message execs a fresh host process in the workspace; continuity comes from session resume (with history replay as a fallback), not a reused process. Nothing runs until you send the first message in a workspace group.
 
-Because threads share the single planner, only one agent turn runs at a time globally. Messages sent to background threads while another is in-flight are queued FIFO and fire automatically as the in-flight round completes. When the active workspace group changes, `UpdateWorkspaces` re-scopes the planner to the new workspace set; open threads keep their history intact.
+Because threads share the single planner, only one agent turn runs at a time globally. Messages sent to background threads while another is in flight are queued FIFO and fire automatically as the running round completes. When the active workspace group changes, `UpdateWorkspaces` re-scopes the planner to the new workspace set; open threads keep their history intact.
 
-Stopping the planner from **Settings → Planning** ends any in-flight turn but does not touch conversation history — the next message simply starts a fresh process.
+Stopping the planner from **Settings → Planning** ends any in-flight turn but does not touch conversation history; the next message simply starts a fresh process.
 
 ### Send Mode Toggle
 
 Click the dropdown arrow next to the send button to switch between two modes:
 
-- **Enter to send** -- pressing Enter sends the message, Shift+Enter inserts a newline
-- **Cmd+Enter to send** -- pressing Enter inserts a newline, Cmd+Enter sends
+- **Enter to send**: pressing Enter sends the message, Shift+Enter inserts a newline.
+- **Cmd+Enter to send**: pressing Enter inserts a newline, Cmd+Enter sends.
 
 The preference is persisted in localStorage and remembered across sessions.
 
@@ -145,3 +145,5 @@ When a spec is selected in the explorer (left pane), the agent automatically rec
 - [Designing Specs](designing-specs.md) -- structured design with specs
 - [Refinement & Ideation](refinement-and-ideation.md) -- AI-assisted prompt improvement for tasks
 - [Plan Mode Internals](../internals/plan-mode.md) -- packages, SSE protocol, and undo plumbing
+</content>
+</invoke>
