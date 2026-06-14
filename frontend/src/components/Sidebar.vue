@@ -179,9 +179,20 @@ function onNavigate(item: { id: string }) {
 }
 
 onMounted(() => {
-  if (authEnabled.value && !auth.loaded) void auth.fetchMe();
   if (route.path === '/') markBoardSeen();
 });
+
+// Resolve the session once auth is known to be enabled. /api/config loads
+// async, so authEnabled is usually false at mount; watching it (immediate)
+// fires fetchMe the moment the flag flips true, otherwise auth.loaded would
+// never be set and the sign-in chip below could never render.
+watch(
+  authEnabled,
+  (enabled) => {
+    if (enabled && !auth.loaded) void auth.fetchMe();
+  },
+  { immediate: true },
+);
 
 // Click outside the workspace popover closes it. Only attach the listener
 // while open so we're not doing global work for every click on the page.
