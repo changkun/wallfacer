@@ -38,6 +38,23 @@ spec:
                 secretKeyRef:
                   name: wallfacerd-cookie
                   key: AUTH_COOKIE_KEY
+            # Cloud coordination plane (presence, remote control, metadata
+            # projection, spec comments). REDIS is the shared latere-valkey for
+            # cross-replica ephemeral state; DATABASE_URL is the wallfacer
+            # Postgres for authoritative comments + projection rollups. Both are
+            # inert until the coordinator ships. Bumping `replicas` past 1 is
+            # gated on that code landing and on verifying the login/SSE paths are
+            # multi-replica-safe.
+            - name: WALLFACER_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wallfacerd-redis
+                  key: WALLFACER_REDIS_URL
+            - name: WALLFACER_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wallfacer-db
+                  key: WALLFACER_DATABASE_URL
           ports:
             - containerPort: 8080
           resources:
