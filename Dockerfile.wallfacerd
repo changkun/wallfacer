@@ -11,8 +11,12 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN rm -rf internal/webserver/spa/dist
+RUN rm -rf internal/webserver/spa/dist frontend/dist
+# Both embeds must be satisfied for `go build .`: webserver/spa/dist feeds the
+# `wallfacer web` server, and main.go's `//go:embed all:frontend/dist` feeds
+# `wallfacer run`. The latter is otherwise empty in a clean build context.
 COPY --from=frontend /src/dist internal/webserver/spa/dist/
+COPY --from=frontend /src/dist frontend/dist/
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /wallfacer .
 
