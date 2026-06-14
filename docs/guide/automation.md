@@ -3,7 +3,7 @@
 Wallfacer can operate anywhere on the spectrum from fully manual to fully
 hands-off. At one extreme, you drag individual cards between columns and
 review every result before committing. At the other, you load the
-backlog, enable every automation toggle, and let Wallfacer refine,
+backlog, enable every automation toggle, and let Wallfacer
 execute, test, submit, and push without intervention. The automation
 pipeline is the set of toggles and background watchers that make
 hands-off operation possible.
@@ -64,8 +64,11 @@ global and continues to persist via the env file.
 Autopilot (the **Implement** toggle) automatically promotes the
 highest-priority eligible backlog task to In Progress whenever there is
 available capacity. The number of tasks that can run simultaneously is
-controlled by `WALLFACER_MAX_PARALLEL` (default: 5). Enable it from the
-Automation menu or via `PUT /api/config` with `autopilot: true`.
+controlled by `WALLFACER_MAX_PARALLEL`. In host mode the default is 1;
+the claude/codex CLIs share state across concurrent runs, so raise the
+limit only after verifying your CLI tolerates parallel invocations.
+Enable it from the Automation menu or via `PUT /api/config` with
+`autopilot: true`.
 
 ### Enabling Auto-Test
 
@@ -96,7 +99,7 @@ off to the next when its work is complete:
 ```mermaid
 flowchart LR
     subgraph Backlog
-        Refine --> Implement
+        Implement
     end
     Implement -->|agent runs| Waiting
     subgraph Waiting
@@ -108,12 +111,11 @@ flowchart LR
     Failed -->|auto-retry| Implement
 ```
 
-1. 🔄 **Refine** -- sharpen prompts for unrefined backlog tasks.
-2. 🤖 **Implement** (Autopilot) -- promote backlog tasks to In Progress.
-3. 🔗 **Catch Up** -- rebase waiting tasks onto the latest branch to prevent merge conflicts.
-4. 🧪 **Test** -- run the verification agent on waiting tasks.
-5. ✅ **Submit** -- move verified, conflict-free tasks to Done.
-6. 📤 **Push** -- push committed changes to the remote repository.
+1. 🤖 **Implement** (Autopilot) -- promote backlog tasks to In Progress.
+2. 🔗 **Catch Up** -- rebase waiting tasks onto the latest branch to prevent merge conflicts.
+3. 🧪 **Test** -- run the verification agent on waiting tasks.
+4. ✅ **Submit** -- move verified, conflict-free tasks to Done.
+5. 📤 **Push** -- push committed changes to the remote repository.
 
 Auto-retry sits alongside the pipeline: when a task fails with a
 transient error, it is automatically returned to the backlog for another
@@ -131,9 +133,11 @@ When enabled, the auto-promoter watches for available capacity and
 promotes the highest-priority eligible backlog task to In Progress.
 
 **Concurrency limit.** The number of tasks that can run simultaneously
-is controlled by `WALLFACER_MAX_PARALLEL` (default: 5). The
-auto-promoter will not promote a new task if the current count of
-regular in-progress tasks meets or exceeds this limit.
+is controlled by `WALLFACER_MAX_PARALLEL`. In host mode the default is
+1, because the claude/codex CLIs share `~/.claude` and `~/.codex` state
+across concurrent invocations. The auto-promoter will not promote a new
+task if the current count of regular in-progress tasks meets or exceeds
+this limit.
 
 **Priority ordering.** Candidates are ranked by:
 
@@ -157,9 +161,10 @@ the test failure feedback so the agent can fix the issue. After 3
 consecutive test failures, auto-resume halts and the task stays in
 Waiting for manual intervention.
 
-**Container circuit breaker.** Promotion is suppressed when the
-container runtime circuit breaker is open, preventing cascading failures
-when Docker or Podman is temporarily unavailable.
+**Agent-launch breaker.** Promotion is suppressed when the agent-launch
+circuit breaker is open. After repeated launch failures the breaker
+trips, preventing cascading failures where every newly opened slot
+fires a promotion that immediately fails again.
 
 #### Catch Up (Auto-sync)
 
@@ -172,7 +177,7 @@ such task, it:
 3. Transitions the task to In Progress and triggers a rebase.
 
 Sync operations are lightweight host-side git rebases -- they do not
-launch sandbox containers and therefore bypass the regular task capacity
+launch an agent process and therefore bypass the regular task capacity
 check. This ensures waiting tasks stay current even when the board is at
 full capacity.
 
@@ -264,7 +269,7 @@ auto-retrier checks:
 2. Does the task still have budget remaining for that category?
 3. Has the task not exceeded the global retry cap (3 total retries
    across all categories)?
-4. For container crashes: is the container circuit breaker closed?
+4. For container crashes: is the agent-launch breaker closed?
 
 If all checks pass, the task is reset to Backlog and the retry count
 is incremented. The auto-promoter will then pick it up again in the
@@ -312,14 +317,14 @@ task-only DAG.
 Map navigation is tuned for exploring large graphs:
 
 - **Hover** a node to emphasise its 1-hop neighbourhood (non-neighbours dim).
-- **Click** to focus — the 1-hop lens becomes sticky and the mount scrolls
+- **Click** to focus -- the 1-hop lens becomes sticky and the mount scrolls
   the node into view. Click empty canvas to clear.
 - **Shift+click** opens the node (task modal or Plan-mode focus).
 - **Drag** a node to pin it; **double-click** a pinned node to unpin.
 - **Search** via the top-bar search (press <kbd>/</kbd> to focus) filters
   nodes by label or spec path substring; non-matching nodes dim alongside
   their incident edges. The same input filters tasks on the board and
-  specs in Plan mode — the active mode decides what the query targets.
+  specs in Plan mode -- the active mode decides what the query targets.
 - **Ctrl / ⌘ + scroll** zooms in or out around the cursor position.
   Plain scroll still pans as usual.
 - **Hold Space + drag** pans the whole canvas like Figma / Miro.
@@ -365,11 +370,10 @@ state.
 included in the `GET /api/config` response (`watcher_health` field) and
 displayed in the header when any breaker is tripped.
 
-**Container breaker.** A separate circuit breaker protects against the
-container runtime (Docker/Podman) being unavailable. It opens after 5
-consecutive runtime failures and uses a closed/open/half-open
-three-state model. See [Circuit Breakers](circuit-breakers.md) for full
-details.
+**Agent-launch breaker.** A separate circuit breaker protects against
+repeated agent-launch failures. It opens after 5 consecutive launch
+failures and uses a closed/open/half-open three-state model. See
+[Circuit Breakers](circuit-breakers.md) for full details.
 
 ### Configuration Reference
 
