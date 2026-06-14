@@ -3,6 +3,8 @@ package cli
 import (
 	"bufio"
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -187,36 +189,38 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		jwtValidator *auth.Validator
 		authClient   *auth.Client
 	)
-	if cloudMode {
-		authCfg := auth.Config{
-			AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
-			ClientID:     envconfig.Lookup(envFileKV, "AUTH_CLIENT_ID"),
-			ClientSecret: envconfig.Lookup(envFileKV, "AUTH_CLIENT_SECRET"),
-			RedirectURL:  envconfig.Lookup(envFileKV, "AUTH_REDIRECT_URL"),
-			CookieKey:    envconfig.Lookup(envFileKV, "AUTH_COOKIE_KEY"),
-		}
-		if authCfg.AuthURL == "" {
-			authCfg.AuthURL = "https://auth.latere.ai"
-		}
-		// oidc.New returns nil when required fields are missing — treat
-		// that as a misconfigured cloud deployment and refuse to start
-		// rather than silently running without sign-in.
-		authClient = auth.New(authCfg)
-		if authClient == nil {
-			logger.Fatal("WALLFACER_CLOUD=true requires AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, and AUTH_REDIRECT_URL (in shell env or ~/.wallfacer/.env)")
-		}
-		h.SetAuth(authClient)
-
-		// JWT validator for API requests that carry Authorization: Bearer
-		// <jwt>. Issuer and JWKS URL fall back to AuthURL derivatives when
-		// the deployment doesn't override them; audience is the OAuth
-		// client ID so tokens minted for other services are rejected.
-		jwtValidator = auth.BuildValidator(
-			authCfg,
-			envconfig.Lookup(envFileKV, "AUTH_JWKS_URL"),
-			envconfig.Lookup(envFileKV, "AUTH_ISSUER"),
-		)
+	// Sign-in is wired by default using the public (secret-less) "wallfacer"
+	// client, so a plain `wallfacer run` presents a login button with no
+	// env-var setup. Any AUTH_* value (shell or .env) overrides the defaults,
+	// and a confidential client (AUTH_CLIENT_SECRET set) works unchanged.
+	// WALLFACER_CLOUD only controls whether sign-in is *forced* (see ForceLogin),
+	// not whether it is available.
+	authCfg := auth.Config{
+		AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
+		ClientID:     envconfig.Lookup(envFileKV, "AUTH_CLIENT_ID"),
+		ClientSecret: envconfig.Lookup(envFileKV, "AUTH_CLIENT_SECRET"),
+		RedirectURL:  envconfig.Lookup(envFileKV, "AUTH_REDIRECT_URL"),
+		CookieKey:    envconfig.Lookup(envFileKV, "AUTH_COOKIE_KEY"),
 	}
+	authCfg, err = resolveAuthConfig(authCfg, cfg.Addr, configDir)
+	if err != nil {
+		logger.Fatal("auth: resolve configuration", "error", err)
+	}
+	authClient = auth.New(authCfg)
+	if authClient == nil {
+		logger.Fatal("auth: client construction failed; check AUTH_* configuration")
+	}
+	h.SetAuth(authClient)
+
+	// JWT validator for API requests that carry Authorization: Bearer
+	// <jwt>. Issuer and JWKS URL fall back to AuthURL derivatives when
+	// the deployment doesn't override them; audience is the OAuth
+	// client ID so tokens minted for other services are rejected.
+	jwtValidator = auth.BuildValidator(
+		authCfg,
+		envconfig.Lookup(envFileKV, "AUTH_JWKS_URL"),
+		envconfig.Lookup(envFileKV, "AUTH_ISSUER"),
+	)
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
 		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces)
@@ -383,7 +387,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// BearerAuth downstream bypasses its static-key check once an identity is
 	// populated so a cookie-only browser request succeeds even in a deployment
 	// that also sets WALLFACER_SERVER_API_KEY for scripts.
-	srvHandler := h.ForceLogin(mux)
+	// Sign-in is always available (the login button), but only *forced* in
+	// cloud/hosted mode. A local `wallfacer run` leaves the board reachable
+	// anonymously; the user signs in only if they choose to.
+	var srvHandler http.Handler = mux
+	if cloudMode {
+		srvHandler = h.ForceLogin(mux)
+	}
 	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
 	srvHandler = auth.CookieAuth(authClient, srvHandler)
@@ -405,6 +415,80 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		ActualPort:   actualPort,
 		ServerAPIKey: envCfg.ServerAPIKey,
 	}
+}
+
+// resolveAuthConfig fills the AUTH_* config with public-client defaults so a
+// plain `wallfacer run` signs in through the browser with no env setup. Any
+// field already set (shell env or .env) is preserved. The default is the
+// secret-less "wallfacer" public client; its session-cookie key is generated
+// once and persisted under configDir. A loopback HTTP callback serves cookies
+// insecurely (pkg/oidc then drops the __Host- prefix) since browsers reject
+// Secure cookies over plain HTTP.
+func resolveAuthConfig(cfg auth.Config, addr, configDir string) (auth.Config, error) {
+	if cfg.AuthURL == "" {
+		cfg.AuthURL = "https://auth.latere.ai"
+	}
+	if cfg.ClientID == "" {
+		cfg.ClientID = "wallfacer"
+	}
+	if cfg.RedirectURL == "" {
+		cfg.RedirectURL = defaultRedirectURL(addr)
+	}
+	if len(cfg.Scopes) == 0 {
+		cfg.Scopes = []string{"openid", "email", "profile", "offline_access"}
+	}
+	// A public client has no secret to derive the cookie key from, so generate
+	// and persist a local one. An explicit AUTH_COOKIE_KEY or AUTH_CLIENT_SECRET
+	// (confidential client) takes precedence and skips this.
+	if cfg.ClientSecret == "" && cfg.CookieKey == "" {
+		key, err := loadOrCreateCookieKey(configDir)
+		if err != nil {
+			return cfg, fmt.Errorf("cookie key: %w", err)
+		}
+		cfg.CookieKey = key
+	}
+	if strings.HasPrefix(cfg.RedirectURL, "http://") {
+		cfg.InsecureCookies = true
+	}
+	return cfg, nil
+}
+
+// defaultRedirectURL derives the OAuth callback URL from the listen address.
+// A loopback or empty host yields http://localhost:<port>/callback (matching
+// the redirect registered for the seeded "wallfacer" public client); any other
+// host is assumed to terminate TLS and uses https.
+func defaultRedirectURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		host, port = "localhost", "8080"
+	}
+	switch host {
+	case "", "0.0.0.0", "::", "[::]", "127.0.0.1", "::1", "localhost":
+		return fmt.Sprintf("http://localhost:%s/callback", port)
+	default:
+		return fmt.Sprintf("https://%s:%s/callback", host, port)
+	}
+}
+
+// loadOrCreateCookieKey returns a stable hex-encoded 32-byte key for encrypting
+// the session cookie of a public (secret-less) client, persisted at
+// <configDir>/cookie-key so sessions survive a restart. Generated on first use.
+func loadOrCreateCookieKey(configDir string) (string, error) {
+	path := filepath.Join(configDir, "cookie-key")
+	if b, err := os.ReadFile(path); err == nil {
+		if k := strings.TrimSpace(string(b)); len(k) >= 32 {
+			return k, nil
+		}
+	}
+	raw := make([]byte, 32)
+	if _, err := cryptorand.Read(raw); err != nil {
+		return "", err
+	}
+	key := hex.EncodeToString(raw)
+	if err := os.WriteFile(path, []byte(key), 0o600); err != nil {
+		return "", fmt.Errorf("persist cookie key: %w", err)
+	}
+	return key, nil
 }
 
 // requireClaudeOrExit fails fast when the claude CLI cannot be resolved, so

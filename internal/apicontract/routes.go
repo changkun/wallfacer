@@ -712,7 +712,7 @@ var Routes = []Route{
 		Tags:        []string{"login"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/auth/me", Name: "AuthMe",
+		Method: http.MethodGet, Pattern: "/api/me", Name: "AuthMe",
 		JSName:      "authMe",
 		Description: "Return the current signed-in user, or 204 when unauthenticated.",
 		Tags:        []string{"login"},

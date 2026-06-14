@@ -98,7 +98,7 @@ func TestForceLogin_AllowlistPaths(t *testing.T) {
 	mw := h.ForceLogin(ok204())
 
 	cases := []string{"/login", "/callback", "/logout", "/logout/notify",
-		"/api/config", "/api/auth/me", "/favicon.ico", "/css/app.css",
+		"/api/config", "/api/me", "/favicon.ico", "/css/app.css",
 		"/js/main.js", "/assets/logo.svg", "/static/foo.png"}
 	for _, path := range cases {
 		t.Run(path, func(t *testing.T) {

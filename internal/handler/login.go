@@ -101,10 +101,12 @@ func (h *Handler) AuthMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(struct {
 		Sub     string `json:"sub"`
 		Email   string `json:"email"`
 		Name    string `json:"name"`
 		Picture string `json:"picture"`
-	}{u.Sub, u.Email, u.Name, u.Picture})
+		AuthURL string `json:"auth_url,omitempty"`
+	}{u.Sub, u.Email, u.Name, u.Picture, h.authURL})
 }

@@ -58,7 +58,7 @@ func (f *fakeAuth) AuthURL() string {
 // session rather than surfacing a 5xx that the UI would have to special-case.
 func TestAuthMe_NilClient_Returns204(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 	w := httptest.NewRecorder()
 	h.AuthMe(w, req)
 	if w.Code != http.StatusNoContent {
@@ -72,7 +72,7 @@ func TestAuthMe_NoSession_Returns204(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	h.SetAuth(&fakeAuth{user: nil})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 	w := httptest.NewRecorder()
 	h.AuthMe(w, req)
 	if w.Code != http.StatusNoContent {
@@ -91,7 +91,7 @@ func TestAuthMe_WithSession_Returns200(t *testing.T) {
 		Picture: "https://cdn/a.png",
 	}})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 	w := httptest.NewRecorder()
 	h.AuthMe(w, req)
 	if w.Code != http.StatusOK {
@@ -189,8 +189,8 @@ func TestGetConfig_CloudFlagFalse(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got, _ := resp["cloud"].(bool); got {
-		t.Errorf("cloud = true; want false")
+	if got, _ := resp["auth_enabled"].(bool); got {
+		t.Errorf("auth_enabled = true; want false")
 	}
 	if _, present := resp["auth_url"]; present {
 		t.Errorf("auth_url present in local-mode response; want omitted")
@@ -211,8 +211,8 @@ func TestGetConfig_CloudFlagTrue(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got, _ := resp["cloud"].(bool); !got {
-		t.Errorf("cloud = false; want true")
+	if got, _ := resp["auth_enabled"].(bool); !got {
+		t.Errorf("auth_enabled = false; want true")
 	}
 	if got, _ := resp["auth_url"].(string); got != "https://auth.latere.ai" {
 		t.Errorf("auth_url = %q; want https://auth.latere.ai", got)

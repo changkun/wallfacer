@@ -974,7 +974,7 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/auth/me",
+      "pattern": "/api/me",
       "name": "AuthMe",
       "description": "Return the current signed-in user, or 204 when unauthenticated.",
       "tags": [
