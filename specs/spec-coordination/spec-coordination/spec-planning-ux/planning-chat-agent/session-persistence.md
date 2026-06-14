@@ -1,7 +1,6 @@
 ---
 title: Planning Session Persistence and Recovery
-status: stale
-track: local
+status: drafted
 depends_on: []
 affects:
   - internal/planner/planner.go

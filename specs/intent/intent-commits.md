@@ -6,7 +6,7 @@ affects:
   - internal/handler/explorer.go
   - internal/handler/planning_git.go
   - internal/handler/planning_undo.go
-effort: large
+effort: small
 created: 2026-04-03
 updated: 2026-06-14
 author: changkun
