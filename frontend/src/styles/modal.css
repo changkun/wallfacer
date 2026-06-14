@@ -186,13 +186,19 @@
   color: var(--text);
   font-size: 13px;
 }
+/* The Raw toggle needs to read as a distinct code view; a fully flat treatment
+   looked identical to the rendered prose for plain text (the toggle felt
+   dead). Give it a quiet bordered code box. */
 #modal pre.code-block:not(.logs-block) {
-  background: transparent;
-  border-radius: 0;
-  padding: 8px 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
   color: var(--text);
-  border-left: 2px solid var(--border);
-  padding-left: 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 #modal .usage-grid {
   background: transparent;
