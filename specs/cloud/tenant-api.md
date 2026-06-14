@@ -6,7 +6,7 @@ depends_on:
 affects: [internal/handler/tenantapi/]
 effort: large
 created: 2026-03-28
-updated: 2026-05-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -15,7 +15,7 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer's existing HTTP API is an internal transport layer between the browser UI and the Go server. It exposes everything — env vars, admin endpoints, server config — and authenticates with a single shared key. This API is not suitable for external programmatic access by tenants.
+Wallfacer's existing HTTP API is an internal transport layer between the browser UI and the Go server. It exposes everything (env vars, admin endpoints, server config) and authenticates with a single shared key. This API is not suitable for external programmatic access by tenants.
 
 Cloud tenants need a stable, scoped, versioned API to integrate wallfacer into their workflows: creating tasks from CI/CD pipelines, polling task status from scripts, receiving webhook notifications when tasks complete. The internal API should remain free to evolve with the UI; the tenant API is a product contract.
 
@@ -23,7 +23,7 @@ Cloud tenants need a stable, scoped, versioned API to integrate wallfacer into t
 
 1. **Separate surface, same server.** The tenant API is a distinct set of routes (`/api/v1/...`) served by the same wallfacer instance. No new service to deploy.
 2. **Read-heavy, write-light.** Tenants create tasks and submit feedback. Everything else is read-only inspection.
-3. **No admin exposure.** Env vars, server config, sandbox images, admin endpoints are never reachable through the tenant API.
+3. **No admin exposure.** Env vars, server config, executor selection, admin endpoints are never reachable through the tenant API.
 4. **Webhook-first for async.** Instead of requiring tenants to poll, push state changes via webhooks. Polling remains available as a fallback.
 5. **Stable contract.** Versioned (`/v1/`), with a deprecation policy. Internal API changes do not break tenant integrations.
 
@@ -38,13 +38,13 @@ All tenant API routes are prefixed with `/api/v1/`. Authentication is per-tenant
 | `POST` | `/api/v1/tasks` | Create a task |
 | `POST` | `/api/v1/tasks/batch` | Create multiple tasks with dependency wiring |
 | `GET` | `/api/v1/tasks` | List tasks (filterable by status, paginated) |
-| `GET` | `/api/v1/tasks/{id}` | Get task details (status, prompt, goal, timestamps, cost) |
+| `GET` | `/api/v1/tasks/{id}` | Get task details (status, prompt, timestamps, cost) |
 | `GET` | `/api/v1/tasks/{id}/events` | Task event timeline (cursor-paginated) |
 | `GET` | `/api/v1/tasks/{id}/diff` | Git diff for task worktrees vs default branch |
 | `GET` | `/api/v1/tasks/{id}/outputs/{filename}` | Raw agent output per turn |
 | `GET` | `/api/v1/tasks/{id}/oversight` | Oversight summary |
 | `GET` | `/api/v1/tasks/{id}/usage` | Per-turn token usage breakdown |
-| `PATCH` | `/api/v1/tasks/{id}` | Update task (status, prompt, goal, timeout, dependencies) |
+| `PATCH` | `/api/v1/tasks/{id}` | Update task (status, prompt, timeout, dependencies) |
 | `POST` | `/api/v1/tasks/{id}/feedback` | Submit feedback for waiting tasks |
 | `POST` | `/api/v1/tasks/{id}/done` | Mark waiting task as done |
 | `POST` | `/api/v1/tasks/{id}/cancel` | Cancel a task |
@@ -73,23 +73,20 @@ All tenant API routes are prefixed with `/api/v1/`. Authentication is per-tenant
 
 These internal API areas are explicitly excluded from the tenant API:
 
-- `GET/PUT /api/env` — Tenant cannot read or modify API keys / server env
-- `GET/PUT /api/config` — Server configuration (autopilot, sandbox routing)
-- `POST /api/env/test` — Credential validation
-- `GET/PUT/DELETE /api/system-prompts/*` — System prompt overrides
-- `GET/PUT /api/instructions` — Workspace AGENTS.md
-- `POST /api/admin/*` — Admin operations
-- `GET /api/debug/*` — Debug/monitoring endpoints
-- `GET /api/containers` — Running container list
-- `GET/POST/DELETE /api/images/*` — Sandbox image management
-- `PUT /api/workspaces` — Workspace switching
-- `GET/POST /api/git/*` — Direct git operations
-- `POST /api/ideate`, `GET/DELETE /api/ideate` — Ideation sessions
-- `POST /api/tasks/{id}/refine` — Refinement (internal workflow concern)
+- `GET/PUT /api/env`: Tenant cannot read or modify API keys / server env
+- `GET/PUT /api/config`: Server configuration (autopilot, executor routing)
+- `POST /api/env/test`: Credential validation
+- `GET/PUT/DELETE /api/system-prompts/*`: System prompt overrides
+- `GET/PUT /api/instructions`: Workspace AGENTS.md
+- `POST /api/admin/*`: Admin operations
+- `GET /api/debug/*`: Debug/monitoring endpoints
+- `PUT /api/workspaces`, `GET/POST /api/workspaces/*`: Workspace switching and browse/mkdir/rename
+- `GET/POST /api/git/*`: Direct git operations
+- `POST /api/ideate`, `GET/DELETE /api/ideate`: Ideation sessions
 
 ## Authentication
 
-The tenant API uses per-tenant API keys, distinct from the internal `WALLFACER_SERVER_API_KEY`.
+The tenant API uses per-tenant API keys, distinct from the internal `WALLFACER_SERVER_API_KEY`. The wallfacer instance validates the key itself and resolves it to an `auth.Identity` (the platform-canonical `store.Principal{Sub, OrgID}`), the same principal type produced by the JWT and session-cookie authenticators.
 
 ### API Key Model
 
@@ -97,12 +94,13 @@ The tenant API uses per-tenant API keys, distinct from the internal `WALLFACER_S
 Authorization: Bearer wf_live_<base64-encoded-key>
 ```
 
-Keys are scoped to a single tenant and managed by the control plane (multi-tenant):
+Each key belongs to a single principal (the `user_id`/`org_id` it was minted for):
 
 ```sql
 CREATE TABLE api_keys (
     id          UUID PRIMARY KEY,
-    user_id     UUID REFERENCES users(id),
+    user_id     UUID REFERENCES users(id),   -- maps to the Principal subject (Identity.Sub)
+    org_id      UUID,                         -- the Principal org (Identity.OrgID), for org-scoped keys
     key_hash    TEXT NOT NULL,          -- bcrypt/argon2 hash; plaintext never stored
     prefix      TEXT NOT NULL,          -- first 8 chars for identification (e.g., "wf_live_a3b2")
     name        TEXT,                   -- human-readable label
@@ -113,25 +111,25 @@ CREATE TABLE api_keys (
 );
 ```
 
-- Tenants create/revoke keys via the UI or a control plane API.
+- Tenants create/revoke keys via the UI or a management endpoint on the instance.
 - Keys are shown once on creation, then only the prefix is visible.
-- The control plane injects the valid key set into each wallfacer instance on provision/wake.
+- The instance owns the key set; there is no separate control plane to inject or sync keys (the multi-tenant control-plane spine was archived; wallfacer runs as a single shared instance fronting Latere Identity).
 
 ### Request Flow
 
 ```
-Client ──Bearer token──▶ Control Plane ──validates key──▶ routes to tenant instance
-                              │
-                         key_hash lookup
-                         rate limit check
-                         inject X-Tenant-ID header
-                              │
-                              ▼
-                      Wallfacer Instance
-                      (trusts X-Tenant-ID from control plane)
+Client ──Bearer wf_live_...──▶ Wallfacer Instance
+                                    │
+                              key_hash lookup
+                              rate limit check
+                              resolve → auth.Identity{Sub, OrgID}
+                                    │
+                                    ▼
+                              PrincipalFromContext
+                              (same path as JWT / session auth)
 ```
 
-The wallfacer instance itself does not validate API keys — the control plane is the auth boundary. The instance receives requests with a trusted `X-Tenant-ID` header (same pattern as the control plane's `X-Forwarded-User`).
+The instance is the auth boundary. A `wf_live_` Bearer key is authenticated by the same middleware chain that handles JWT and session-cookie auth: it is looked up by hash, resolved to an `auth.Identity`, and injected into the request context so every downstream handler reads it via `auth.PrincipalFromContext`. There is no trusted `X-Tenant-ID` header step and no upstream proxy that vouches for identity; key validation happens in-process.
 
 ## Webhooks
 
@@ -169,7 +167,6 @@ The `secret` is used to sign payloads so receivers can verify authenticity.
         "task_id": "<uuid>",
         "status": "done",
         "prompt": "Add rate limiting to the API",
-        "goal": "...",
         "cost_usd": 0.42,
         "duration_seconds": 180
     }
@@ -218,7 +215,7 @@ CREATE TABLE webhook_deliveries (
 
 ## Rate Limiting
 
-Per-tenant rate limits enforced at the control plane:
+Per-tenant rate limits enforced by the instance, keyed on the resolved `Identity` (subject/org):
 
 | Limit | Default | Configurable |
 |-------|---------|-------------|
@@ -294,22 +291,22 @@ func Register(mux *http.ServeMux, store *store.Store, runner *runner.Runner) {
 }
 ```
 
-The tenant API routes are registered on the same `http.ServeMux` as internal routes. The control plane routes tenant API requests (path prefix `/api/v1/`) to the instance; internal routes (`/api/tasks`, `/api/env`, etc.) are only reachable from the UI via the instance's internal network.
+The tenant API routes are registered on the same `http.ServeMux` as internal routes. Both sets of routes are served by the one instance; the `/api/v1/` prefix is gated by the Bearer-key authenticator, while internal routes (`/api/tasks`, `/api/env`, etc.) are reachable only via the UI's session/JWT auth path. There is no separate proxy splitting traffic between the two; the distinction is enforced by the middleware bound to each prefix.
 
 ### Webhook Dispatcher
 
-A background goroutine in the control plane consumes task state change events (via SSE from each instance or a shared event bus) and dispatches webhook payloads:
+A background goroutine in the instance consumes task state change events (it already emits these over SSE) and dispatches webhook payloads:
 
 ```
-Instance SSE ──▶ Control Plane Event Router ──▶ Webhook Dispatcher
-                                                      │
-                                               ┌──────┼──────┐
-                                               ▼      ▼      ▼
-                                           Tenant A  Tenant B  Tenant C
-                                           webhooks  webhooks  webhooks
+store.TaskEvent stream ──▶ Webhook Dispatcher (in-instance)
+                                  │
+                           ┌──────┼──────┐
+                           ▼      ▼      ▼
+                       Tenant A  Tenant B  Tenant C
+                       webhooks  webhooks  webhooks
 ```
 
-This keeps webhook delivery out of the wallfacer instance — the instance emits events (which it already does via SSE), and the control plane handles fan-out, retries, and delivery tracking.
+The dispatcher taps the same task event stream the SSE endpoint uses, then handles fan-out, payload signing, retries, and delivery tracking. It runs alongside the API handlers in the single shared instance; no external dispatcher is required.
 
 ## Integration Examples
 
@@ -323,7 +320,6 @@ This keeps webhook delivery out of the wallfacer instance — the instance emits
       -H "Content-Type: application/json" \
       -d '{
         "prompt": "Fix the bug described in issue #42",
-        "goal": "All tests pass, issue resolved",
         "timeout": 600
       }'
 ```
@@ -363,23 +359,23 @@ def handle_webhook():
 
 | Dependency | Why |
 |-----------|-----|
-| **Authentication** | Tenant identity required for API key scoping |
-| **Multi-Tenant** | Control plane required for key management, rate limiting, and webhook dispatch |
+| **Identity** (`specs/identity/authentication.md`, consumed via `internal/auth`) | Resolves a `wf_live_` key to a `store.Principal{Sub, OrgID}` and flows it through `PrincipalFromContext`, the same principal path JWT/session auth uses |
+| **Latere Integration** (`specs/cloud/latere-integration.md`) | Hosting premise (single shared instance fronting Latere services); demand-gated phasing decides when this surface is built |
 
-This spec is a branch from multi-tenant. It can be implemented incrementally after the control plane exists — start with API key auth + task CRUD, then add webhooks.
+The original multi-tenant control plane this spec branched from has been archived. The tenant API is now an in-instance surface: key auth, rate limiting, and webhook dispatch are all instance responsibilities. It can be implemented incrementally, starting with API key auth + task CRUD, then adding webhooks.
 
 ## Implementation Order
 
-1. **API key model** — Key creation/revocation in control plane, hash storage, prefix display
-2. **Tenant API routes** — `internal/handler/tenantapi/` with task CRUD, response envelope
-3. **Rate limiting** — Per-tenant request counting at the control plane
-4. **Webhook registration** — CRUD for webhook endpoints
-5. **Webhook dispatcher** — Event consumption, payload signing, delivery with retries
-6. **Delivery log & auto-disable** — Observability and failure handling
-7. **Client SDK / CLI integration** — Optional: `wallfacer api` subcommand for scripting
+1. **API key model**: Key creation/revocation, hash storage, prefix display; resolution to `auth.Identity` in the authenticator
+2. **Tenant API routes**: `internal/handler/tenantapi/` with task CRUD, response envelope
+3. **Rate limiting**: Per-tenant request counting in the instance, keyed on the resolved Identity
+4. **Webhook registration**: CRUD for webhook endpoints
+5. **Webhook dispatcher**: Event consumption from the task event stream, payload signing, delivery with retries
+6. **Delivery log & auto-disable**: Observability and failure handling
+7. **Client SDK / CLI integration**: Optional: `wallfacer api` subcommand for scripting
 
 ## Open Questions
 
-1. **SSE for tenants?** Should the tenant API expose an SSE endpoint (`GET /api/v1/tasks/stream`) as an alternative to webhooks? Simpler for scripts that want real-time updates without setting up a webhook receiver. Downside: long-lived connections through the control plane proxy.
+1. **SSE for tenants?** Should the tenant API expose an SSE endpoint (`GET /api/v1/tasks/stream`) as an alternative to webhooks? Simpler for scripts that want real-time updates without setting up a webhook receiver. Downside: long-lived connections held open by the instance.
 2. **Scoped API keys?** The `scopes` column is reserved but not used in v1. Future: read-only keys, task-create-only keys, workspace-scoped keys. Add when there's a concrete use case.
 3. **Batch feedback?** Should `POST /api/v1/tasks/{id}/feedback` support submitting feedback to multiple waiting tasks at once? Useful for pipeline orchestration.
