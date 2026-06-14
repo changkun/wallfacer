@@ -31,12 +31,24 @@ func main() {
 		}
 	}
 
+	enc := json.NewEncoder(os.Stdout)
+
+	// Schema-drift / unrecognized-output mode: emit only events the launcher
+	// does not recognise, so the synthesis must mark the result an error.
+	if os.Getenv("FAKEOPENCODE_GARBAGE") == "1" {
+		_ = enc.Encode(map[string]any{
+			"type":      "file_edited",
+			"sessionID": "fake-opencode-session",
+			"properties": map[string]any{"file": "x.go"},
+		})
+		return
+	}
+
 	text := prompt
 	if skip {
 		text = "[skip-permissions] " + prompt
 	}
 
-	enc := json.NewEncoder(os.Stdout)
 	_ = enc.Encode(map[string]any{
 		"type":      "step_start",
 		"sessionID": "fake-opencode-session",
