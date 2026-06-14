@@ -30,10 +30,6 @@ const SIDEBAR_KEY = 'wallfacer-sidebar-collapsed';
 const sidebarCollapsed = ref<boolean>(getStored(SIDEBAR_KEY) === '1');
 watch(sidebarCollapsed, (v) => setStored(SIDEBAR_KEY, v ? '1' : '0'));
 
-// Routes that render their own header (BoardPage) must not get a second one;
-// /agents renders none, so the layout supplies the global content-header there.
-const showGlobalHeader = computed(() => router.currentRoute.value.path === '/agents');
-
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   // First-run guard: when the server has no active workspace yet, open
@@ -141,12 +137,6 @@ useKeyboard({
         <span aria-hidden="true">⚠</span>
         Live updates paused — server unreachable. Reconnecting…
       </div>
-      <!-- /agents is the one local route that renders no header of its own
-           (BoardPage owns the board header). Restore the global content-header
-           shell there so the page isn't flush against the sidebar. -->
-      <header v-if="showGlobalHeader" class="app-header">
-        <div class="app-header__spacer"></div>
-      </header>
       <slot :connected="connected" :conn-state="connState" />
       <TerminalPanel />
       <StatusBar :connected="connected" :conn-state="connState" @shortcuts="ui.openShortcuts()" />
