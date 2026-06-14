@@ -1,6 +1,6 @@
 ---
 title: Move switch-org behind PATCH /api/auth/me
-status: drafted
+status: complete
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
   - specs/local/vue-frontend-migration.md
@@ -13,7 +13,7 @@ affects:
   - ui/js/
 effort: small
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---

@@ -1,6 +1,6 @@
 ---
 title: TaskUsage cache-token undercount fix
-status: drafted
+status: complete
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - internal/store/tasks_update.go
 effort: small
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
