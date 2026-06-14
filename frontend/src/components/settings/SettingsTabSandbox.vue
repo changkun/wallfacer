@@ -25,6 +25,7 @@ const apiKey = ref('');
 const claudeBaseUrl = ref('');
 const openaiApiKey = ref('');
 const openaiBaseUrl = ref('');
+const cursorApiKey = ref('');
 const defaultModel = ref('');
 const titleModel = ref('');
 const codexDefaultModel = ref('');
@@ -39,6 +40,7 @@ const claudeTestStatus = ref('');
 const claudeTestReauth = ref(false);
 const codexTestStatus = ref('');
 const codexTestReauth = ref(false);
+const cursorTestStatus = ref('');
 const saveStatus = ref('');
 
 const claudeOauthStatus = ref('');
@@ -50,6 +52,7 @@ const codexOauthBusy = ref(false);
 const oauthTokenPlaceholder = computed(() => env.value?.oauth_token || '(not set)');
 const apiKeyPlaceholder = computed(() => env.value?.api_key || '(not set)');
 const openaiApiKeyPlaceholder = computed(() => env.value?.openai_api_key || '(not set)');
+const cursorApiKeyPlaceholder = computed(() => env.value?.cursor_api_key || '(not set)');
 
 // First-launch hints — show when nothing is configured for that provider.
 const claudeHasCreds = computed(() => {
@@ -59,6 +62,10 @@ const claudeHasCreds = computed(() => {
 });
 const codexHasCreds = computed(() => {
   const k = env.value?.openai_api_key;
+  return !!(k && k !== '(not set)');
+});
+const cursorHasCreds = computed(() => {
+  const k = env.value?.cursor_api_key;
   return !!(k && k !== '(not set)');
 });
 // First-launch banner: no credentials for either provider. Mirrors the
@@ -73,6 +80,7 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   oauthToken.value = '';
   apiKey.value = '';
   openaiApiKey.value = '';
+  cursorApiKey.value = '';
   claudeBaseUrl.value = cfg?.base_url || '';
   openaiBaseUrl.value = cfg?.openai_base_url || '';
   defaultModel.value = cfg?.default_model || '';
@@ -85,6 +93,7 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   claudeTestReauth.value = false;
   codexTestStatus.value = '';
   codexTestReauth.value = false;
+  cursorTestStatus.value = '';
 }
 
 watch(env, (cfg) => applyEnvToForm(cfg), { immediate: false });
@@ -100,6 +109,8 @@ function buildSavePayload(): EnvUpdatePayload {
   body.base_url = claudeBaseUrl.value.trim();
   if (openaiRaw) body.openai_api_key = openaiRaw;
   body.openai_base_url = openaiBaseUrl.value.trim();
+  const cursorRaw = cursorApiKey.value.trim();
+  if (cursorRaw) body.cursor_api_key = cursorRaw;
   body.default_model = defaultModel.value.trim();
   body.title_model = titleModel.value.trim();
   body.codex_default_model = codexDefaultModel.value.trim();
@@ -121,6 +132,7 @@ async function saveConfig(): Promise<void> {
     oauthToken.value = '';
     apiKey.value = '';
     openaiApiKey.value = '';
+    cursorApiKey.value = '';
     window.setTimeout(() => {
       saveStatus.value = '';
     }, 2000);
@@ -158,7 +170,17 @@ interface CodexTestPayload {
   openai_api_key?: string;
 }
 
-function buildTestPayload(sandbox: 'claude' | 'codex'): ClaudeTestPayload | CodexTestPayload {
+interface CursorTestPayload {
+  sandbox: 'cursor';
+  default_sandbox: string;
+  sandbox_by_activity: Record<string, string>;
+  sandbox_fast: boolean;
+  cursor_api_key?: string;
+}
+
+type TestPayload = ClaudeTestPayload | CodexTestPayload | CursorTestPayload;
+
+function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor'): TestPayload {
   const raw = buildSavePayload();
   if (sandbox === 'claude') {
     const p: ClaudeTestPayload = {
@@ -172,6 +194,16 @@ function buildTestPayload(sandbox: 'claude' | 'codex'): ClaudeTestPayload | Code
     };
     if (raw.oauth_token) p.oauth_token = raw.oauth_token;
     if (raw.api_key) p.api_key = raw.api_key;
+    return p;
+  }
+  if (sandbox === 'cursor') {
+    const p: CursorTestPayload = {
+      sandbox: 'cursor',
+      default_sandbox: raw.default_sandbox || '',
+      sandbox_by_activity: raw.sandbox_by_activity || {},
+      sandbox_fast: raw.sandbox_fast !== false,
+    };
+    if (raw.cursor_api_key) p.cursor_api_key = raw.cursor_api_key;
     return p;
   }
   const p: CodexTestPayload = {
@@ -201,24 +233,24 @@ function summarizeTestResult(resp: SandboxTestResponse | null | undefined): stri
   return `status ${resp.status}`;
 }
 
-async function testSandbox(sandbox: 'claude' | 'codex'): Promise<void> {
+function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor', text: string, reauth: boolean): void {
   if (sandbox === 'claude') {
-    claudeTestStatus.value = 'Testing…';
-    claudeTestReauth.value = false;
+    claudeTestStatus.value = text;
+    claudeTestReauth.value = reauth;
+  } else if (sandbox === 'codex') {
+    codexTestStatus.value = text;
+    codexTestReauth.value = reauth;
   } else {
-    codexTestStatus.value = 'Testing…';
-    codexTestReauth.value = false;
+    cursorTestStatus.value = text;
   }
+}
+
+async function testSandbox(sandbox: 'claude' | 'codex' | 'cursor'): Promise<void> {
+  setTestStatus(sandbox, 'Testing…', false);
   try {
     const resp = await api<SandboxTestResponse>('POST', '/api/env/test', buildTestPayload(sandbox));
     const text = summarizeTestResult(resp);
-    if (sandbox === 'claude') {
-      claudeTestStatus.value = text;
-      claudeTestReauth.value = !!resp.reauth_available;
-    } else {
-      codexTestStatus.value = text;
-      codexTestReauth.value = !!resp.reauth_available;
-    }
+    setTestStatus(sandbox, text, !!resp.reauth_available);
     window.setTimeout(() => {
       const isFailish =
         text.includes('FAIL') ||
@@ -226,17 +258,12 @@ async function testSandbox(sandbox: 'claude' | 'codex'): Promise<void> {
         text.startsWith('No response') ||
         resp.reauth_available;
       if (isFailish) return;
-      if (sandbox === 'claude') claudeTestStatus.value = '';
-      else codexTestStatus.value = '';
+      setTestStatus(sandbox, '', false);
     }, 6000);
   } catch (e) {
     const msg = 'Error: ' + (e instanceof Error ? e.message : String(e));
-    if (sandbox === 'claude') claudeTestStatus.value = msg;
-    else codexTestStatus.value = msg;
-    window.setTimeout(() => {
-      if (sandbox === 'claude') claudeTestStatus.value = '';
-      else codexTestStatus.value = '';
-    }, 6000);
+    setTestStatus(sandbox, msg, false);
+    window.setTimeout(() => setTestStatus(sandbox, '', false), 6000);
   }
 }
 
@@ -663,6 +690,53 @@ function capitalize(s: string): string {
                   style="font-size: 11px; margin-left: 8px;"
                   @click="startOauthFlow('codex')"
                 >Sign in again</button>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cursor block -->
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Cursor</label>
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key (CURSOR_API_KEY)</label>
+              <input
+                id="env-cursor-api-key"
+                v-model="cursorApiKey"
+                type="password"
+                class="field"
+                style="font-family: monospace; font-size: 12px"
+                :placeholder="cursorApiKeyPlaceholder"
+                autocomplete="off"
+              />
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
+                Headless key for
+                <code style="font-family: monospace">cursor-agent</code>. Create
+                one in Cursor under Settings → API Keys, or run
+                <code style="font-family: monospace">cursor-agent login</code>
+                interactively. Leave blank to keep the current value.
+              </div>
+              <div
+                v-if="!cursorHasCreds"
+                id="cursor-no-creds-hint"
+                style="font-size: 11px; color: var(--accent); margin-top: 4px;"
+              >
+                No API key configured, add one to run Cursor tasks
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+              <button
+                type="button"
+                class="btn-icon"
+                style="font-size: 12px; padding: 4px 10px"
+                @click="testSandbox('cursor')"
+              >
+                Test
+              </button>
+              <span id="env-cursor-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
+                {{ cursorTestStatus }}
               </span>
             </div>
           </div>
