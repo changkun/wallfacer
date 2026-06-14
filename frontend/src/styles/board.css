@@ -83,15 +83,35 @@
 .card:hover .card-actions {
   opacity: 1;
 }
-.card-meta-right {
+/* Row 1 wraps as a whole: when the badge group + meta don't fit, the meta
+   drops to its own line (pushed right by margin-left:auto) instead of the two
+   groups overlapping. */
+.card-row1 {
   flex-wrap: wrap;
-  justify-content: flex-end;
+  row-gap: 2px;
+}
+/* The badge group is the variable-width part; it wraps its own badges and may
+   shrink, but its badges stay intact (each badge is nowrap via .badge). */
+.card-badge-row {
+  flex: 0 1 auto;
   min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+/* Meta (harness · timeout · age) hugs the right, never wraps mid-token, and
+   sits at the top so it can't land on the middle of a tall wrapped badge row. */
+.card-meta-right {
+  flex: 0 0 auto;
+  margin-left: auto;
+  align-self: flex-start;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   color: var(--ink-4);
   font-size: 10px;
 }
 .card-meta-right > span {
   color: var(--ink-4) !important;
+  white-space: nowrap;
 }
 .card-action-btn {
   padding: 2px 8px;

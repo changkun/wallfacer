@@ -453,8 +453,8 @@ function onCardKeydown(e: KeyboardEvent) {
     @keydown="onCardKeydown"
   >
     <!-- Row 1: status badge + meta-right (harness, timeout, time) -->
-    <div class="flex items-center justify-between mb-1">
-      <div class="flex items-center gap-1.5">
+    <div class="flex items-center mb-1 card-row1">
+      <div class="flex items-center gap-1.5 card-badge-row">
         <span v-if="props.rank" class="card-rank" title="Backlog position">#{{ props.rank }}</span>
         <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
         <span v-if="showSpinner(props.task)" class="spinner"></span>
@@ -462,7 +462,6 @@ function onCardKeydown(e: KeyboardEvent) {
           v-if="failureBadge"
           class="badge badge-failure-category"
           :title="'Failure reason: ' + props.task.failure_category"
-          style="font-family:monospace;font-size:9px;"
         >{{ failureBadge }}</span>
         <span
           v-if="depBadge"
