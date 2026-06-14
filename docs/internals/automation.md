@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer runs 7 background watchers that form an autonomous pipeline: **auto-promoter**, **auto-retrier**, **auto-tester**, **auto-submitter**, **auto-refiner**, **ideation watcher**, and **waiting-sync watcher**. Together with oversight generation and circuit breakers, these watchers allow the task board to operate hands-free — promoting backlog tasks, running tests, submitting results, retrying failures, refining prompts, syncing worktrees, and generating oversight summaries without manual intervention.
+Wallfacer runs six background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, and **AutoSubmitter**. Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests, submitting results, retrying failures, syncing worktrees, firing scheduled routines (including ideation), and generating oversight summaries without manual intervention.
 
 ## Background Goroutine Model
 
@@ -20,7 +20,7 @@ go func() {
 }()
 ```
 
-Tasks are long-running and IO-bound (container execution, git operations), so goroutines are appropriate — no CPU contention, and Go's scheduler handles the rest.
+Tasks are long-running and IO-bound (host-process agent runs, git operations), so goroutines are appropriate: no CPU contention, and Go's scheduler handles the rest.
 
 ## Watcher Initialization & Startup
 
@@ -45,7 +45,7 @@ flowchart TD
     subgraph "Handler Watchers"
         C1["h.StartAutoPromoter(ctx)"]
         C2["h.StartAutoRetrier(ctx)"]
-        C3["h.StartIdeationWatcher(ctx)"]
+        C3["h.StartRoutineEngine(ctx)"]
         C4["h.StartWaitingSyncWatcher(ctx)"]
         C5["h.StartAutoTester(ctx)"]
         C6["h.StartAutoSubmitter(ctx)"]
@@ -60,7 +60,7 @@ flowchart TD
 Before watchers begin, two recovery operations run synchronously:
 
 - **`PruneUnknownWorktrees()`**: Scans the `worktrees/` directory and removes any worktree directories that do not correspond to a known task. Also runs `git worktree prune` on each workspace repository to clean up stale Git worktree references.
-- **`RecoverOrphanedTasks()`**: Scans all tasks in `in_progress` or `committing` status. For each, it checks whether a corresponding container is still running. If so, it starts a monitoring goroutine. If not (container crashed while the server was down), it transitions the task to `failed`.
+- **`RecoverOrphanedTasks()`**: Reconciles tasks left in `in_progress` or `committing` after a server restart. See [RecoverOrphanedTasks](#recoverorphanedtasks) below for the per-branch behavior.
 
 ### Subscription Patterns
 
@@ -87,15 +87,27 @@ go func() {
 
 The supplementary ticker (60 seconds for the promoter) ensures scheduled tasks are promoted even when no other state change occurs.
 
-**Startup recovery scan**: The auto-retrier additionally performs a startup scan — immediately after subscribing, it lists all failed tasks and attempts to retry any that match the transient failure categories (`container_crash`, `worktree`, `sync_error`). This catches tasks that failed while the server was down.
+**Startup recovery scan**: The auto-retrier additionally performs a startup scan. Immediately after subscribing, it lists all failed tasks and attempts to retry any that match the transient failure categories (`container_crash`, `worktree`, `sync_error`). This catches tasks that failed while the server was down.
+
+### RecoverOrphanedTasks
+
+On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It queries the host process state (via `ContainerLister.ListContainers()`, legacy vocabulary for "what agent processes are still running") to learn which tasks still have a live agent process, then handles each interrupted task:
+
+| Status at restart | Process state | Outcome |
+|---|---|---|
+| `committing` | n/a | Inspect each worktree's branch tip. If a commit landed after the task's `UpdatedAt`, the commit pipeline finished just before the crash, so promote to `done`. Otherwise mark `failed`. |
+| `in_progress` | still running | Stay `in_progress`; a monitor goroutine watches the process and transitions to `waiting` once it stops. |
+| `in_progress` | already stopped | Transition to `waiting` so the user can review partial output and decide whether to continue or mark done. |
+
+If worktrees are missing during recovery, the task is marked `failed` with `FailureCategory = worktree_setup`. This matches the state machine in [Task Lifecycle](task-lifecycle.md#crash-recovery). A stopped `in_progress` task with its worktree intact goes to `waiting`, not `failed`.
 
 ### Circuit Breaker Initialization
 
-The container circuit breaker is initialized in `NewRunner()` with:
+The launch circuit breaker is initialized in `NewRunner()` with:
 - **Threshold**: `WALLFACER_CONTAINER_CB_THRESHOLD` (default: 5 consecutive failures).
 - **Open duration**: `WALLFACER_CONTAINER_CB_OPEN_SECONDS` (default: 30 seconds).
 
-After the threshold is exceeded, the circuit opens and rejects further launches. After the open duration, it enters half-open state and allows a single probe. A successful probe resets the breaker; a failed probe re-opens it.
+After the threshold is exceeded, the circuit opens and rejects further agent launches. After the open duration, it enters half-open state and allows a single probe. A successful probe resets the breaker; a failed probe re-opens it.
 
 ## Autopilot (Auto-Promotion)
 
@@ -130,7 +142,7 @@ Tasks whose `ScheduledAt` is in the future are also skipped.
 flowchart TD
     Click["User clicks Test<br/>on waiting task"] --> Setup["Set IsTestRun=true<br/>clear LastTestResult"]
     Setup --> Transition["waiting to in_progress"]
-    Transition --> Launch["Launch fresh container<br/>(no --resume, new session)<br/>with test prompt"]
+    Transition --> Launch["Run a fresh test agent<br/>(no --resume, new session)<br/>with test prompt"]
     Launch --> Loop["Runner loop<br/>(isTestRun=true)"]
     Loop --> StopReason{"stop_reason?"}
     StopReason -->|"max_tokens / pause_turn"| Loop
@@ -143,7 +155,7 @@ flowchart TD
 
 The UI splits the live output panel into "Implementation" and "Test" sections using `TestRunStartTurn` as the boundary.
 
-Once a task has reached `waiting` (Claude finished but the user hasn't committed yet), a test verification agent can be triggered to check whether the implementation meets acceptance criteria.
+Once a task has reached `waiting` (the agent finished but the user hasn't committed yet), a test verification agent can be triggered to check whether the implementation meets acceptance criteria.
 
 ```
 POST /api/tasks/{id}/test
@@ -151,10 +163,10 @@ POST /api/tasks/{id}/test
   ↓
   Sets IsTestRun = true, clears LastTestResult.
   Transitions waiting → in_progress.
-  Launches a fresh container (separate session, no --resume) with a test prompt.
+  Runs a fresh test agent as a host process (separate session, no --resume) with a test prompt.
 
 Test agent runs (IsTestRun = true):
-  Container executes: inspect code, run tests, verify requirements.
+  Host process executes: inspect code, run tests, verify requirements.
   Agent must end its response with **PASS** or **FAIL**.
 
 On end_turn:
@@ -195,7 +207,7 @@ Failure categories:
 | `timeout` | Per-turn timeout exceeded |
 | `budget_exceeded` | Cost or token budget limit reached |
 | `worktree_setup` | Git worktree creation failed |
-| `container_crash` | Container exited unexpectedly |
+| `container_crash` | Agent process exited unexpectedly |
 | `agent_error` | Agent reported an error in its output |
 | `sync_error` | Rebase/sync operation failed |
 | `unknown` | Unclassifiable failure |
@@ -216,9 +228,13 @@ Multiple workspace paths can be passed at startup or switched at runtime via `PU
 
 Non-git directories are supported as plain mount targets (no worktree, no commit pipeline for that workspace).
 
-## Task-Mode Planning (Replaces the Retired Refine Subsystem)
+## RoutineEngine
 
-Prompt iteration is now driven from Plan task-mode threads (pinned to a specific task via the **Send to Plan** card action or the explorer **Task Prompts** section). The planning agent edits the task's prompt through the `POST /api/planning/tool/update_task_prompt` tool endpoint; every call is a committed round that `POST /api/planning/undo` can rewind with `git revert`. There is no longer a `POST /api/tasks/{id}/refine*` family, no auto-refine watcher, and no `autorefine` config flag — see [Refinement & Ideation](../guide/refinement-and-ideation.md) for the user-facing surface.
+`StartRoutineEngine` (`internal/handler/routines_engine.go`) drives all scheduled, fire-and-forget routines on the board. It builds a single `routine.Engine` (`internal/routine`) and attaches it to the store change stream: every store change reconciles the engine against the current routine cards.
+
+Each routine card carries `RoutineEnabled` and `RoutineIntervalSeconds`. The reconciler maps an active, enabled card with a positive interval to a `routine.FixedInterval` schedule and registers it; cancelled, done, failed, archived, or disabled cards become `routine.Disabled()` and are dropped. When a routine's timer elapses, the engine invokes `h.fireRoutine`, which spawns a fresh task for that routine's flow.
+
+The `routine` package is stateless about tasks and stores: it owns one `time.AfterFunc` timer per registered UUID and calls back a `FireFunc`. The handler is the only consumer and reconciles the engine via `Register` / `Unregister`. Ideation is one instance of this primitive (see below).
 
 ## Oversight Generation
 
@@ -234,34 +250,34 @@ flowchart TD
     Read --> Send["Send to Claude with<br/>summarisation prompt"]
     Send --> Parse["Parse response into<br/>OversightPhase list"]
     Parse --> Status2["TaskOversight.Status<br/>= ready"]
-    Status2 --> Store["Store in<br/>oversights/id.json"]
+    Status2 --> Store["SaveOversight → SaveBlob<br/>oversight.json"]
 ```
 
 Served by:
-- `GET /api/tasks/{id}/oversight` — implementation run summary (default `?phase=impl`)
-- `GET /api/tasks/{id}/oversight?phase=test` — test-run summary (if a test was run)
+- `GET /api/tasks/{id}/oversight`, implementation run summary (default `?phase=impl`)
+- `GET /api/tasks/{id}/oversight?phase=test`, test-run summary (if a test was run)
 
 The UI renders phases in the Oversight tab and as an interactive flamegraph Timeline.
 
-The generator reads the task's trace events, passes them to the Claude API with a summarisation prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). The result is persisted in `data/<uuid>/oversights/<id>.json`.
+The generator reads the task's trace events, passes them to the Claude API with a summarisation prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob`: the implementation summary lands in `oversight.json` and the test-agent summary in `oversight-test.json`, both directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
 
 `POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
 
 ## Ideation / Brainstorm
 
-Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. It runs via the standard task-and-flow dispatch path rather than a special case. The system-ideation routine is a routine card tagged `system:ideation` with `spawn_flow: brainstorm`; each fire spawns a fresh task whose `FlowID` is `brainstorm`. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and resolve to `brainstorm` via the legacy-kind mapper.
+Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. It runs via the standard task-and-flow dispatch path rather than a special case, and its timer lives inside the [RoutineEngine](#routineengine). The system-ideation routine is a routine card tagged `system:ideation` with `spawn_flow: brainstorm`; each fire spawns a fresh task whose `FlowID` is `brainstorm`. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and resolve to `brainstorm` via the legacy-kind mapper.
 
 ```mermaid
 flowchart TD
     Trigger["POST /api/ideate"] --> Fire["Fire system:ideation routine"]
     Fire --> Create["Create task with<br/>FlowID = brainstorm"]
-    Create --> Launch["Launch ideate agent<br/>in sandbox container"]
+    Create --> Launch["Run ideate agent<br/>as a host process"]
     Launch --> Analyse["Read workspace contents<br/>analyse code structure"]
     Analyse --> Generate["Create backlog tasks<br/>via wallfacer API<br/>(each tagged)"]
-    Generate --> Done["Container completes<br/>tasks appear on board"]
+    Generate --> Done["Agent process completes<br/>tasks appear on board"]
 
     Status["GET /api/ideate<br/>returns session state"]
-    Cancel["DELETE /api/ideate<br/>kills container"]
+    Cancel["DELETE /api/ideate<br/>signals the agent process<br/>(SIGTERM → SIGKILL)"]
 ```
 
 - Each created task gets relevant `Tags` and an `ExecutionPrompt` (full instructions) separate from `Prompt` (the short card label).
@@ -290,11 +306,11 @@ Using the same session ID means the agent has full context of the original task 
 
 ## Circuit Breakers
 
-Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy.
+Agent launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when agent launches are persistently failing.
 
 The circuit breaker lifecycle:
 
-1. **Closed** (normal): All container launches proceed. Each failure increments a counter; each success resets it.
+1. **Closed** (normal): All agent launches proceed. Each failure increments a counter; each success resets it.
 2. **Open** (tripped): After the threshold is exceeded, all launches are rejected for the open duration (`WALLFACER_CONTAINER_CB_OPEN_SECONDS`, default: 30 seconds).
 3. **Half-open** (probing): After the open duration expires, a single probe launch is allowed. Success resets the breaker to closed; failure re-opens it.
 
@@ -302,7 +318,7 @@ See [Circuit Breakers](../guide/circuit-breakers.md) for full details.
 
 ## See Also
 
-- [Task Lifecycle](task-lifecycle.md) — State machine, turn loop, data models, auto-retry details
-- [API & Transport](api-and-transport.md) — HTTP API, SSE streams, container execution, environment configuration
-- [Git Worktrees](git-worktrees.md) — Per-task worktree isolation and commit pipeline
-- [Architecture](architecture.md) — High-level design decisions and persistence model
+- [Task Lifecycle](task-lifecycle.md), State machine, turn loop, data models, auto-retry details
+- [API & Transport](api-and-transport.md), HTTP API, SSE streams, host-process execution, environment configuration
+- [Git Worktrees](git-worktrees.md), Per-task worktree isolation and commit pipeline
+- [Architecture](architecture.md), High-level design decisions and persistence model
