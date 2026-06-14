@@ -97,6 +97,20 @@ func defaultSandbox(cfg envconfig.Config) harness.ID {
 	return harness.Claude
 }
 
+// workspaceVisible reports whether the active workspace set (by its group key)
+// is present in the principal-visible group list. Used to drop a cross-org
+// active workspace from the config so an org switch doesn't carry the previous
+// org's board over.
+func workspaceVisible(groups []workspace.Group, workspaces []string) bool {
+	key := workspace.GroupKey(workspaces)
+	for _, g := range groups {
+		if workspace.GroupKey(g.Workspaces) == key {
+			return true
+		}
+	}
+	return false
+}
+
 // buildConfigResponse assembles the full configuration payload returned by
 // GET /api/config and reused by UpdateWorkspaces after a workspace switch.
 // When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
@@ -138,6 +152,24 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()
 	instructionsPath := h.currentInstructionsPath()
+
+	groups, _ := workspace.LoadGroups(h.configDir)
+	// Org / personal filtering: cloud-mode callers see only groups their
+	// principal is allowed to see. Local mode (principal==nil) passes through
+	// unchanged. We resolve the principal directly from ctx since
+	// buildConfigResponse doesn't take *Request.
+	if c, ok := auth.PrincipalFromContext(ctx); ok && c != nil {
+		groups = workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+		// The active workspace is global server state. After an org switch it
+		// may still point at the previous org's group; if this principal can't
+		// see that group, don't present it as active. They get their org's
+		// groups (or the picker), a clean per-org view rather than the prior
+		// org's board carried across the switch.
+		if len(workspaces) > 0 && !workspaceVisible(groups, workspaces) {
+			workspaces = nil
+		}
+	}
+
 	workspaceBrowserPath := ""
 	if len(workspaces) > 0 {
 		workspaceBrowserPath = workspaces[0]
@@ -147,14 +179,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	payloadLimits := store.PayloadLimits{}
 	if s, ok := h.currentStore(); ok && s != nil {
 		payloadLimits = s.GetPayloadLimits()
-	}
-	groups, _ := workspace.LoadGroups(h.configDir)
-	// Org / personal filtering: cloud-mode callers see only groups
-	// their principal is allowed to see. Local mode (principal==nil)
-	// passes through unchanged. We resolve the principal directly
-	// from ctx here since buildConfigResponse doesn't take *Request.
-	if c, ok := auth.PrincipalFromContext(ctx); ok && c != nil {
-		groups = workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
 	}
 	if len(workspaces) > 0 {
 		key := workspace.GroupKey(workspaces)

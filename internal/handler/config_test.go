@@ -18,8 +18,37 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
+
+// TestBuildConfigResponse_HidesCrossOrgWorkspace guards the per-org active
+// workspace: the active set is global server state, so after an org switch it
+// can still point at the previous org's group. A principal that can't see that
+// group must not get it back as the active workspace (it would carry the prior
+// org's board across the switch).
+func TestBuildConfigResponse_HidesCrossOrgWorkspace(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
+		{Workspaces: []string{ws}, OrgID: "org-a"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Same org: the active workspace is presented.
+	ctxA := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
+	respA := h.buildConfigResponse(ctxA, nil)
+	if got, _ := respA["workspaces"].([]string); len(got) != 1 || got[0] != ws {
+		t.Errorf("org-a workspaces = %v, want [%s]", respA["workspaces"], ws)
+	}
+
+	// Different org: the cross-org active workspace is hidden.
+	ctxB := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-b"})
+	respB := h.buildConfigResponse(ctxB, nil)
+	if got, _ := respB["workspaces"].([]string); len(got) != 0 {
+		t.Errorf("org-b workspaces = %v, want empty (cross-org hidden)", respB["workspaces"])
+	}
+}
 
 // workspacesBody returns a JSON body for POST /api/workspaces containing the
 // provided paths. It uses json.Marshal so that path separators are escaped
