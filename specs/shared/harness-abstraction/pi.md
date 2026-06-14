@@ -138,8 +138,11 @@ Design evolution vs the draft, after checking the real installed `pi`
 - **Config/env surfacing was free.** A sibling change made `/api/config`
   enumerate `harness.All()` and the `/test` probe validate via
   `IsValid()`, so a registered harness reaches the UI automatically.
-- **Not verified live.** No provider credentials were configured locally,
-  so the real end-to-end run and the captured-fixture requirement could
-  not be satisfied; the fixture is built from pi's documented json /
-  session-format schema. A live integration test (build-tag gated) is a
-  follow-up.
+- **Live run not yet verified.** A build-tag-gated e2e test ships
+  (`pi_integration_test.go`, `-tags pi_integration`): it runs a real pi
+  one-shot and asserts the adapter parses the stream into a terminal
+  result, skipping when pi is absent or unauthenticated. It could not be
+  run to completion locally (no provider credentials), so the unit
+  fixture is built from pi's documented json / session-format schema
+  rather than a live capture. Run the e2e test with provider keys set to
+  confirm end-to-end.
