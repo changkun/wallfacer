@@ -174,6 +174,60 @@ func TestHostBackend_LaunchOpenCode_InstructionsContentPrepended(t *testing.T) {
 	}
 }
 
+// TestHostBackend_LaunchOpenCode_MissingInstructionsFileTolerated verifies the
+// launcher logs and proceeds (rather than failing) when WALLFACER_INSTRUCTIONS_PATH
+// points at an unreadable file: SystemPrompt stays empty and the run still
+// produces a result.
+func TestHostBackend_LaunchOpenCode_MissingInstructionsFileTolerated(t *testing.T) {
+	bin := buildFakeOpenCode(t)
+	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+
+	spec := ContainerSpec{
+		Name: "wallfacer-opencode-missinginstr",
+		Env: map[string]string{
+			"WALLFACER_AGENT":             "opencode",
+			"WALLFACER_INSTRUCTIONS_PATH": filepath.Join(t.TempDir(), "does-not-exist.md"),
+		},
+		Cmd:     []string{"-p", "the-task"},
+		WorkDir: t.TempDir(),
+	}
+	_, final := launchOpenCodeAndDrain(t, b, spec)
+	if final["type"] != "result" || final["is_error"] != false {
+		t.Errorf("expected a non-error result despite missing instructions file; got %v", final)
+	}
+	res, _ := final["result"].(string)
+	if !strings.Contains(res, "the-task") {
+		t.Errorf("prompt should still reach the agent; got %q", res)
+	}
+}
+
+// TestHostBackend_LaunchOpenCode_ToolsOnlySuccess verifies that a run which
+// does work via tools but emits no final text is a non-error success with
+// empty result text and the aggregated usage (the recognised-but-no-text path,
+// distinct from the unrecognised-output error path).
+func TestHostBackend_LaunchOpenCode_ToolsOnlySuccess(t *testing.T) {
+	bin := buildFakeOpenCode(t)
+	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+
+	spec := ContainerSpec{
+		Name:    "wallfacer-opencode-toolsonly",
+		Env:     map[string]string{"WALLFACER_AGENT": "opencode", "FAKEOPENCODE_TOOLS_ONLY": "1"},
+		Cmd:     []string{"-p", "x"},
+		WorkDir: t.TempDir(),
+	}
+	_, final := launchOpenCodeAndDrain(t, b, spec)
+	if final["is_error"] != false {
+		t.Errorf("is_error = %v; want false (recognised events, just no final text)", final["is_error"])
+	}
+	if res, _ := final["result"].(string); res != "" {
+		t.Errorf("result = %q; want empty (no text part emitted)", res)
+	}
+	usage, _ := final["usage"].(map[string]any)
+	if usage == nil || usage["input"].(float64) != 5 {
+		t.Errorf("usage not aggregated from step_finish: %v", usage)
+	}
+}
+
 func TestHostBackend_LaunchOpenCode_MissingPromptFails(t *testing.T) {
 	bin := buildFakeOpenCode(t)
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
