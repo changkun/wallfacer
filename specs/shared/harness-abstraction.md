@@ -1,6 +1,6 @@
 ---
 title: Harness Abstraction
-status: validated
+status: complete
 depends_on:
   - specs/shared/host-default.md
   - specs/shared/agent-abstraction.md
@@ -13,14 +13,14 @@ affects:
   - internal/store/
 effort: xlarge
 created: 2026-06-01
-updated: 2026-06-14
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
 
 # Harness Abstraction
 
-> Migration note: the `internal/sandbox/` -> `internal/executor/` rename plus the new `internal/harness/` package shipped for the core (Claude and Codex). The Design prose below is written in the present tense as the target architecture; read it as the shipped state for everything except the three drafted harnesses (Cursor, OpenCode, Pi). See [Outcome](#outcome).
+> Migration note: the `internal/sandbox/` -> `internal/executor/` rename plus the new `internal/harness/` package shipped, and all five Tier-A harnesses (Claude, Codex, Cursor, OpenCode, Pi) are registered and selectable. The Design prose below is written in the present tense as the target architecture; read it as the shipped state. See [Outcome](#outcome).
 
 ## Problem
 
@@ -192,9 +192,11 @@ The abstraction is sound when:
 
 ## Outcome
 
-Partially shipped. The abstraction and the two existing harnesses landed; the three new harnesses are designed but not built.
+Shipped. The abstraction and all five Tier-A harnesses landed; every leaf spec is complete.
 
-- **Done:** [interface](harness-abstraction/interface.md) - `internal/harness/` package with the `Harness` interface, value types, registry, and a fake harness for tests. [claude-and-codex-migration](harness-abstraction/claude-and-codex-migration.md) - Claude and Codex argv/parse logic moved into `claude.go`/`codex.go`, both `Register`ed at init; `sandbox.Type` became `harness.ID` and `internal/sandbox/` became `internal/executor/` (`executor.Backend` / `HostBackend`).
-- **Drafted, not implemented:** [cursor](harness-abstraction/cursor.md), [opencode](harness-abstraction/opencode.md), [pi](harness-abstraction/pi.md). Their IDs exist as constants in `harness.go` (`Cursor`, `OpenCode`, `Pi`) but no adapter is registered yet, so only Claude and Codex are selectable.
+- **Interface + migration:** [interface](harness-abstraction/interface.md) - `internal/harness/` package with the `Harness` interface, value types, registry, and a fake harness for tests. [claude-and-codex-migration](harness-abstraction/claude-and-codex-migration.md) - Claude and Codex argv/parse logic moved into `claude.go`/`codex.go`; `sandbox.Type` became `harness.ID` and `internal/sandbox/` became `internal/executor/` (`executor.Backend` / `HostBackend`).
+- **All five harnesses registered + selectable:** [cursor](harness-abstraction/cursor.md), [opencode](harness-abstraction/opencode.md), [pi](harness-abstraction/pi.md) each ship an adapter (`Register`ed at init), a host-mode launcher in `internal/executor/`, env/config/UI/doctor surfacing, docs, and build-tag-gated live e2e tests.
 
-Status is `validated` rather than `complete`: the design is locked and the core is built, but three leaf specs remain open. It flips to `complete` once Cursor/OpenCode/Pi ship (or are explicitly dropped).
+**Validation finding (the central question this epic posed).** The `Harness` *interface* held up: no harness required revising Request/Event/Capabilities/AuthEnv, and each adapter is a single ~150-250 line file. What the interface did **not** make automatic was *registration propagation* - the launch dispatch, binary resolution, `/api/config` sandbox list, and `doctor` all hardcoded the `{claude, codex}` pair, so each new harness had to touch those call sites. Cursor (the first validation case) generalized `config.go` to drive its list from `harness.All()`; OpenCode and Pi then dropped in without reopening it. The executor's per-harness `launch*` switch remains the one site that still grows by one case per harness (each has genuinely different stdout handling), which is acceptable.
+
+Status flipped from `validated` to `complete` on 2026-06-15 once all three leaf harnesses shipped.
