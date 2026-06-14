@@ -165,8 +165,8 @@
 .card-cancelled .card-title,
 .card-cancelled-done .card-title {
   text-decoration: line-through;
-  text-decoration-color: var(--ink-4);
-  text-decoration-thickness: 1px;
+  text-decoration-color: var(--ink-2);
+  text-decoration-thickness: 2px;
 }
 .card-failed {
   border-left: 3px solid var(--err);
