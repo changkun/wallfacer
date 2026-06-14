@@ -1,6 +1,6 @@
 ---
 title: wallfacer — Auth Unification Migration (cloud + local-mode device-code)
-status: complete
+status: archived
 depends_on:
   - "auth/specs/auth-unification.md"
   - "auth/specs/auth-unification/authkit-hybrid-identity.md"
@@ -25,7 +25,7 @@ affects:
 effort: large
 trigger: parent auth-unification spec; wallfacer ships the canonical org-switch pattern (cloud) and is the prime device-code consumer (local-mode Wails desktop)
 created: 2026-05-31
-updated: 2026-05-31
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -225,3 +225,30 @@ The SPA uses `latere-ui`'s vanilla `me()` and `switchOrg()` against the local HT
 - **Wallfacer SiteFooter regression**: `latere-ui` v1.2.3 → v1.8.0 is a big jump. Snapshot tests on SiteFooter before bumping; review release notes for v1.3..v1.7 changes.
 - **`Principal{Sub, OrgID}` scoping**: after migration, the principal identity comes from `authkit.IdentityFromContext`. Any downstream code that hard-coded `oidc.User.Sub` access needs grep + audit.
 - **Cloud + local mode share Wails binary**: ensure conditional logic (`cloudMode` branch) does not regress cloud users when local-mode code lands. Build matrix test in CI.
+
+## Outcome
+
+Archived (2026-06-14). Auth unification shipped, but not along the path this
+spec drafted, so it is archived (superseded) alongside the rest of the
+authentication epic rather than recorded as a clean completion.
+
+### What Shipped
+
+- **Shared identity**: the principal path now uses `authkit.Identity`
+  (`69c811fb`, which also deleted `cookie_principal`); `internal/auth/auth.go`
+  aliases `Identity = authkit.Identity`.
+- **Local-mode device code**: shipped as HTTP routes
+  `/api/auth/device/{start,poll,cancel}` (`internal/handler/device_auth.go`,
+  `5a4abcf0`), not the Wails bindings this spec proposed.
+
+### Design Evolution
+
+- **Wails local-mode mooted**: the native desktop/Wails app was removed
+  entirely (`85dbc728`, `035150fd`), so the spec's `main.go` Wails device-code
+  design no longer applies. Device code shipped over HTTP instead.
+- **Cloud-mode wrappers retained**: the `AuthProvider` / `sessionReader` /
+  `tokenRefresher` interfaces the spec proposed to delete still exist
+  (`internal/handler/handler.go`, `internal/handler/orgs.go`).
+
+This was the lone `complete` spec in an otherwise all-`archived`
+authentication family; archiving restores family consistency.
