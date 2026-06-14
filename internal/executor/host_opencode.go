@@ -144,6 +144,7 @@ func teeOpenCodeAndAppendResult(ocStdout io.Reader, out *io.PipeWriter) {
 	record := openCodeResultRecord{Type: "result", StopReason: "end_turn"}
 	hadStdout := false
 	sawError := false
+	sawRecognized := false
 
 	scanner := bufio.NewScanner(ocStdout)
 	// opencode events can be large (full assistant messages / tool output);
@@ -171,10 +172,12 @@ func teeOpenCodeAndAppendResult(ocStdout io.Reader, out *io.PipeWriter) {
 		}
 		switch evt.Type {
 		case "text":
+			sawRecognized = true
 			if evt.Part != nil {
 				record.Result = evt.Part.Text
 			}
 		case "step_finish":
+			sawRecognized = true
 			if evt.Part != nil {
 				record.Cost += evt.Part.Cost
 				if t := evt.Part.Tokens; t != nil {
@@ -185,7 +188,10 @@ func teeOpenCodeAndAppendResult(ocStdout io.Reader, out *io.PipeWriter) {
 					record.Usage.Cache.Write += t.Cache.Write
 				}
 			}
+		case "reasoning", "tool_use", "step_start":
+			sawRecognized = true
 		case "error":
+			sawRecognized = true
 			sawError = true
 		}
 	}
@@ -194,11 +200,16 @@ func teeOpenCodeAndAppendResult(ocStdout io.Reader, out *io.PipeWriter) {
 	}
 
 	// Treat a run that produced no final text as a failure when the stream was
-	// empty or carried a session error, so the runner does not record an empty
-	// result as success.
-	if record.Result == "" && (sawError || !hadStdout) {
+	// empty, carried a session error, or carried only events we did not
+	// recognise. The last case is the schema-drift signature: opencode emitted
+	// output but none of it matched the events we parse, so synthesizing a
+	// success with empty text + zero usage would hide a broken read path.
+	if record.Result == "" && (sawError || !hadStdout || !sawRecognized) {
 		record.IsError = true
 		record.StopReason = "error_during_execution"
+		if hadStdout && !sawRecognized {
+			logger.Runner.Warn("host backend: opencode produced output but no recognised events; result/usage may be missing (schema drift?)")
+		}
 	}
 
 	final, err := json.Marshal(record)

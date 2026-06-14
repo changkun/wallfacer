@@ -193,25 +193,51 @@ func TestHostBackend_LaunchOpenCode_MissingPromptFails(t *testing.T) {
 	}
 }
 
-// TestHostBackend_LaunchOpenCode_EmptyStreamIsError verifies that a run that
-// produces no output is synthesized as an error result, not a silent success.
-func TestHostBackend_LaunchOpenCode_EmptyStreamIsError(t *testing.T) {
+// TestHostBackend_LaunchOpenCode_UnrecognizedOutputIsError verifies the
+// schema-drift guard: when opencode emits output but none of it matches the
+// events the launcher parses, the synthesized result is an error rather than a
+// silent empty success. This is the failure mode a future opencode schema
+// change would trigger, and it must surface loudly.
+func TestHostBackend_LaunchOpenCode_UnrecognizedOutputIsError(t *testing.T) {
 	bin := buildFakeOpenCode(t)
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
 
 	spec := ContainerSpec{
-		Name:    "wallfacer-opencode-empty",
+		Name:    "wallfacer-opencode-garbage",
+		Env:     map[string]string{"WALLFACER_AGENT": "opencode", "FAKEOPENCODE_GARBAGE": "1"},
+		Cmd:     []string{"-p", "x"},
+		WorkDir: t.TempDir(),
+	}
+	_, final := launchOpenCodeAndDrain(t, b, spec)
+	if final["type"] != "result" {
+		t.Fatalf("final type = %v; want result", final["type"])
+	}
+	if final["is_error"] != true {
+		t.Errorf("is_error = %v; want true (no recognised events)", final["is_error"])
+	}
+	if final["stop_reason"] != "error_during_execution" {
+		t.Errorf("stop_reason = %v; want error_during_execution", final["stop_reason"])
+	}
+}
+
+// TestHostBackend_LaunchOpenCode_NonZeroExitWithResult verifies that a non-zero
+// process exit is still a success when the stream carried a final text (the
+// drain tolerates the exit code; correctness comes from the events).
+func TestHostBackend_LaunchOpenCode_NonZeroExitWithResult(t *testing.T) {
+	bin := buildFakeOpenCode(t)
+	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+
+	spec := ContainerSpec{
+		Name:    "wallfacer-opencode-exit1",
 		Env:     map[string]string{"WALLFACER_AGENT": "opencode", "FAKEOPENCODE_EXIT_1": "1"},
 		Cmd:     []string{"-p", "x"},
 		WorkDir: t.TempDir(),
 	}
-	// The fake still emits its events before exiting 1, so this asserts the
-	// happy path remains a non-error result even on a non-zero exit (the
-	// stream carried a final text). The empty-stream error path is covered by
-	// the harness/synthesis unit logic; here we just ensure Launch + drain
-	// tolerate a non-zero exit.
 	_, final := launchOpenCodeAndDrain(t, b, spec)
 	if final["type"] != "result" {
 		t.Errorf("final type = %v; want result", final["type"])
+	}
+	if final["is_error"] != false {
+		t.Errorf("is_error = %v; want false (stream carried final text)", final["is_error"])
 	}
 }
