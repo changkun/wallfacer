@@ -1455,11 +1455,15 @@ func TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError(t *testing.T) {
 // only a single best candidate, causing the promoter to advance one task per
 // 60-second tick even when multiple slots were available.
 func TestTryAutoPromote_PromotesMultipleTasks(t *testing.T) {
-	h := newTestHandler(t)
-	// Host backend caps default parallel to 1 to avoid claude/codex state
-	// races; swap in a non-host runner so this test exercises the
+	h, envPath := newTestHandlerWithEnv(t)
+	// The runner caps default parallel to 1 to avoid claude/codex state
+	// races; opt into a higher limit so this test exercises the
 	// promote-up-to-N path independently of that cap.
-	h.runner = &runner.MockRunner{Host: false}
+	limit := "5"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxParallel: &limit}); err != nil {
+		t.Fatalf("envconfig.Update: %v", err)
+	}
+	h.runner = &runner.MockRunner{}
 	h.cachedMaxParallel.Invalidate()
 	h.SetAutopilot(true)
 

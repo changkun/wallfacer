@@ -240,14 +240,14 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		if err == nil && cfg.MaxParallelTasks > 0 {
 			limit = cfg.MaxParallelTasks
 		}
-		// Host mode caps parallelism to 1 unless the user explicitly
-		// opted into more. The claude/codex CLIs share ~/.claude and
-		// ~/.codex state (session dir, settings cache) across concurrent
-		// invocations — running more than one at a time can race on the
-		// shared SQLite settings DB and statsig telemetry files. Users
-		// who have verified their CLI tolerates parallel runs can
-		// override via WALLFACER_MAX_PARALLEL=N.
-		if h.runner != nil && h.runner.HostMode() && cfg.MaxParallelTasks <= 0 {
+		// Parallelism caps to 1 unless the user explicitly opted into
+		// more. The claude/codex CLIs share ~/.claude and ~/.codex state
+		// (session dir, settings cache) across concurrent invocations —
+		// running more than one at a time can race on the shared SQLite
+		// settings DB and statsig telemetry files. Users who have verified
+		// their CLI tolerates parallel runs can override via
+		// WALLFACER_MAX_PARALLEL=N.
+		if h.runner != nil && cfg.MaxParallelTasks <= 0 {
 			return 1
 		}
 		return limit

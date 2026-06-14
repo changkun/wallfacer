@@ -76,7 +76,7 @@ pass "server reachable at $BASE_URL"
 
 # Preflight: tasks exec the agent CLIs directly, so they must be on $PATH (or
 # pointed at via WALLFACER_HOST_CLAUDE_BINARY / WALLFACER_HOST_CODEX_BINARY on
-# the server). /api/config exposes host_mode, reflecting the runner's state.
+# the server).
 if ! command -v claude >/dev/null 2>&1; then
     echo "ERROR: 'claude' must be on \$PATH (or WALLFACER_HOST_CLAUDE_BINARY set on the server)"
     exit 1
@@ -91,13 +91,6 @@ for sb in $SANDBOXES; do
         exit 1
     fi
 done
-server_host_mode=$(api GET "/api/config" | jq -r '.host_mode // false')
-if [ "$server_host_mode" != "true" ]; then
-    echo "ERROR: server is not running in host mode (host_mode=$server_host_mode)"
-    exit 1
-fi
-pass "server running in host mode"
-
 # Run the lifecycle test for a given sandbox type.
 #
 # The harness is no longer settable on POST /api/tasks. The new workflow

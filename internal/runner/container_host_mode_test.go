@@ -10,14 +10,12 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 )
 
-// newHostModeRunner creates a Runner with hostMode forced on for testing
-// buildContainerSpecForSandbox's host-mode branch without needing a real
-// HostBackend (which requires a resolvable claude/codex binary).
+// newHostModeRunner creates a Runner for testing buildContainerSpecForSandbox
+// without needing a real HostBackend (which requires a resolvable claude/codex
+// binary).
 func newHostModeRunner(t *testing.T, cfg RunnerConfig) *Runner {
 	t.Helper()
-	r := newRunnerForArgTest(t, cfg)
-	r.hostMode = true
-	return r
+	return newRunnerForArgTest(t, cfg)
 }
 
 func TestBuildContainerSpec_HostMode_WorkDirIsHostPath(t *testing.T) {
