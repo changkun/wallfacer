@@ -1,6 +1,6 @@
 # Data & Storage
 
-Wallfacer uses filesystem-first persistence with no external database. Every task is a directory containing JSON files, and the server maintains an in-memory mirror of all task state for fast reads. Mutations are atomic (temp file + `os.Rename`) and guarded by a `sync.RWMutex`.
+Wallfacer uses filesystem-first persistence with no external database. Every task is a directory containing JSON files, and the server maintains an in-memory mirror of all task state for fast reads. The `Store` delegates all persistence to a `StorageBackend` seam; the default `FilesystemBackend` writes via temp file + `os.Rename` for atomicity, and all in-memory state is guarded by a `sync.RWMutex`.
 
 The store implementation lives in `internal/store/`.
 
@@ -36,7 +36,7 @@ data/<workspace-key>/
 
 ## Task Data Model
 
-The `Task` struct (`internal/store/models.go`) is the core domain model. All fields are serialized to `task.json` via `json.MarshalIndent`.
+The `Task` struct (`internal/store/models.go`) is the core domain model. All fields are serialized to `task.json`.
 
 ### Identity and Display
 
@@ -45,8 +45,8 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
 | `Title` | `string` | `title` | Display title (auto-generated or user-set) |
-| `Kind` | `TaskKind` | `kind` | Legacy execution mode. `""` for a standard task, `"idea-agent"` for pre-flow ideation records, `"routine"` for routine cards, `"planning"` for the planning sandbox. Resolves to a flow slug via the legacy mapper when `FlowID` is empty. |
-| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. New tasks always set this; legacy records fall through to the `Kind` mapper. Built-in slugs: `implement`, `brainstorm`, `refine-only`, `test-only`. See [Agents & Flows](../guide/agents-and-flows.md). |
+| `Kind` | `TaskKind` | `kind` | Legacy execution mode. `""` for a standard task, `"idea-agent"` for pre-flow ideation records, `"routine"` for routine cards, `"planning"` for the planning task mode. Resolves to a flow slug via the legacy mapper when `FlowID` is empty. |
+| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. New tasks always set this; legacy records fall through to the `Kind` mapper. Built-in slugs: `implement`, `brainstorm`, `test-only`. See [Agents & Flows](../guide/agents-and-flows.md). |
 | `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"idea-agent"`) |
 
 ### State and Lifecycle
@@ -69,7 +69,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | Field | Type | JSON Key | Description |
 |---|---|---|---|
 | `Prompt` | `string` | `prompt` | Current task prompt |
-| `ExecutionPrompt` | `string` | `execution_prompt` | Override prompt sent to sandbox (when non-empty) |
+| `ExecutionPrompt` | `string` | `execution_prompt` | Override prompt sent to the agent (when non-empty) |
 | `PromptHistory` | `[]string` | `prompt_history` | Previous prompts (pruned to last 20) |
 | `RefineSessions` | `[]RefinementSession` | `refine_sessions` | Past refinement sessions (pruned to last 5) |
 | `CurrentRefinement` | `*RefinementJob` | `current_refinement` | Active refinement job state |
@@ -84,8 +84,8 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `StopReason` | `*string` | `stop_reason` | Why the agent stopped (`end_turn`, `max_tokens`, etc.) |
 | `Turns` | `int` | `turns` | Number of agent turns completed |
 | `Timeout` | `int` | `timeout` | Timeout in minutes (clamped to 1-1440, default 60) |
-| `Sandbox` | `sandbox.Type` | `sandbox` | Workspace-level sandbox hint (`"claude"`, `"codex"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's 4-tier resolver reads it below the agent's Harness pin. |
-| `SandboxByActivity` | `map[SandboxActivity]sandbox.Type` | `sandbox_by_activity` | **Deprecated.** Per-activity sandbox overrides. New tasks don't populate this; harness routing lives on the agent definition now. The runner still reads it if present for back-compat. |
+| `Sandbox` | `harness.ID` | `sandbox` | Workspace-level harness hint (e.g. `"claude"`, `"codex"`, `"cursor"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's resolver reads it below the agent's Harness pin. |
+| `SandboxByActivity` | `map[SandboxActivity]harness.ID` | `sandbox_by_activity` | **Deprecated.** Per-activity harness overrides. New tasks don't populate this; harness routing lives on the agent definition now. The runner still reads it if present for back-compat. |
 | `ModelOverride` | `*string` | `model_override` | Per-task model override; nil = global default |
 | `Environment` | `*ExecutionEnvironment` | `environment` | Runtime environment snapshot for reproducibility |
 
@@ -108,6 +108,17 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `UsageBreakdown` | `map[SandboxActivity]TaskUsage` | `usage_breakdown` | Per-sub-agent usage attribution |
 | `TruncatedTurns` | `[]int` | `truncated_turns` | Turns whose output was truncated by size budget |
 
+### Ownership and Tenancy
+
+Two principal fields scope a task to a user and an org in cloud deployments. Both are empty for anonymous tasks (local deployments, or requests without JWT claims in context). They are populated by the handler from the request principal; the store never resolves claims itself.
+
+| Field | Type | JSON Key | Description |
+|---|---|---|---|
+| `CreatedBy` | `string` | `created_by` | Principal ID (JWT `sub`) of the user who dispatched the task. Empty for anonymous tasks. |
+| `OrgID` | `string` | `org_id` | Organization (JWT `org_id`) that owns the task in multi-tenant deployments. Empty for anonymous tasks and users with no current org. Cloud queries filter on this field via `TasksForPrincipal`; local queries ignore it. |
+
+See [Tenant Filtering](#tenant-filtering) below for the visibility rules.
+
 ### Worktree Isolation
 
 | Field | Type | JSON Key | Description |
@@ -118,7 +129,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `BaseCommitHashes` | `map[string]string` | `base_commit_hashes` | Default branch HEAD before merge |
 | `SnapshotDiffs` | `map[string]string` | `snapshot_diffs` | Pre-computed diffs for non-git workspaces (repoPath → diff text) |
 | `CommitMessage` | `string` | `commit_message` | Generated commit message from commit pipeline |
-| `MountWorktrees` | `bool` | `mount_worktrees` | Whether worktrees are mounted into the container |
+| `MountWorktrees` | `bool` | `mount_worktrees` | Legacy flag retained for back-compat; execution is host-process with the worktree as CWD |
 
 ### Test Verification
 
@@ -148,7 +159,7 @@ type TaskUsage struct {
 }
 ```
 
-Values are accumulated directly from per-invocation reports (not session-cumulative), so each container run's output is added to the running total.
+Values are accumulated directly from per-invocation reports (not session-cumulative), so each host-process run's output is added to the running total.
 
 ### TurnUsageRecord
 
@@ -164,7 +175,7 @@ type TurnUsageRecord struct {
     CacheCreationTokens  int             `json:"cache_creation_tokens"`
     CostUSD              float64         `json:"cost_usd"`
     StopReason           string          `json:"stop_reason,omitempty"`
-    Sandbox              sandbox.Type    `json:"sandbox,omitempty"`
+    Sandbox              harness.ID      `json:"sandbox,omitempty"`
     SubAgent             SandboxActivity `json:"sub_agent,omitempty"`
 }
 ```
@@ -264,7 +275,7 @@ type RetryRecord struct {
 
 ### RefinementSession / RefinementJob
 
-`RefinementSession` records a completed sandbox-based refinement run:
+`RefinementSession` records a completed refinement run:
 
 ```go
 type RefinementSession struct {
@@ -296,15 +307,17 @@ Captured once at the start of `Run()` for reproducibility auditing:
 
 ```go
 type ExecutionEnvironment struct {
-    ContainerImage   string       `json:"container_image"`
-    ContainerDigest  string       `json:"container_digest"`
-    ModelName        string       `json:"model_name"`
-    APIBaseURL       string       `json:"api_base_url"`
-    InstructionsHash string       `json:"instructions_hash"`
-    Sandbox          sandbox.Type `json:"sandbox"`
-    RecordedAt       time.Time    `json:"recorded_at"`
+    ContainerImage   string     `json:"container_image"`
+    ContainerDigest  string     `json:"container_digest"`
+    ModelName        string     `json:"model_name"`
+    APIBaseURL       string     `json:"api_base_url"`
+    InstructionsHash string     `json:"instructions_hash"`
+    Sandbox          harness.ID `json:"sandbox"`
+    RecordedAt       time.Time  `json:"recorded_at"`
 }
 ```
+
+The `ContainerImage`/`ContainerDigest` field names are legacy vocabulary; execution is host-process, so they are typically empty in the shipping runtime.
 
 ### Tombstone
 
@@ -319,7 +332,7 @@ type Tombstone struct {
 
 ### SandboxActivity
 
-Identifies which phase of a task a container run belongs to. Primary use today is **usage attribution**: token and cost totals roll up per activity so the cost dashboard can break spend down by role. The legacy per-activity sandbox routing tier (env vars like `WALLFACER_SANDBOX_IMPLEMENTATION`) still keys off these values for back-compat, but new installs should pin harness on the agent definition instead. See [Agents & Flows](../guide/agents-and-flows.md).
+Identifies which phase of a task a host-process run belongs to. Primary use today is **usage attribution**: token and cost totals roll up per activity so the cost dashboard can break spend down by role. The legacy per-activity harness routing tier (env vars like `WALLFACER_SANDBOX_IMPLEMENTATION`) still keys off these values for back-compat, but new installs should pin harness on the agent definition instead. See [Agents & Flows](../guide/agents-and-flows.md).
 
 | Constant | Value | Usage |
 |---|---|---|
@@ -330,8 +343,8 @@ Identifies which phase of a task a container run belongs to. Primary use today i
 | `SandboxActivityOversight` | `"oversight"` | Oversight generation (routing + attribution) |
 | `SandboxActivityCommitMessage` | `"commit_message"` | Commit message generation (routing + attribution) |
 | `SandboxActivityIdeaAgent` | `"idea_agent"` | Brainstorm/ideation (routing + attribution) |
-| `SandboxActivityTest` | `"test"` | Attribution-only (not used for sandbox routing) |
-| `SandboxActivityOversightTest` | `"oversight-test"` | Attribution-only (not used for sandbox routing) |
+| `SandboxActivityTest` | `"test"` | Attribution-only (not used for harness routing) |
+| `SandboxActivityOversightTest` | `"oversight-test"` | Attribution-only (not used for harness routing) |
 
 ### FailureCategory
 
@@ -342,32 +355,58 @@ Machine-readable root cause classification for failed tasks:
 | `FailureCategoryTimeout` | `"timeout"` | Task exceeded its timeout |
 | `FailureCategoryBudget` | `"budget_exceeded"` | Cost or token budget exhausted |
 | `FailureCategoryWorktree` | `"worktree_setup"` | Git worktree setup failed |
-| `FailureCategoryContainerCrash` | `"container_crash"` | Container exited unexpectedly |
+| `FailureCategoryContainerCrash` | `"container_crash"` | Agent host process exited unexpectedly |
 | `FailureCategoryAgentError` | `"agent_error"` | Agent returned an error |
 | `FailureCategorySyncError` | `"sync_error"` | Rebase/sync operation failed |
 | `FailureCategoryUnknown` | `"unknown"` | Unclassified failure |
 
+The `FailureCategoryContainerCrash` symbol and its `"container_crash"` value are legacy vocabulary; the behavior they classify is a host-process exit.
+
 ### BoardManifest / BoardTask
 
-Defined in `internal/runner/board.go` (not in the store package). A sanitized view of the task board written to each task's container as `board.json`. See [task-lifecycle.md](task-lifecycle.md) for full field details.
+Defined in `internal/runner/board.go` (not in the store package). A sanitized view of the task board written to `board.json` in a temp directory and made available to the agent's host process. See [task-lifecycle.md](task-lifecycle.md) for full field details.
 
 ## Persistence Mechanics
 
-### Atomic Writes
+### Storage Backend Seam
 
-All JSON persistence uses the `atomicWriteJSON` helper:
+The `Store` does not touch the filesystem directly. It maps domain concepts onto a narrow `StorageBackend` interface (`internal/store/backend.go`) with three concerns:
+
+- **Tasks**: `Init`, `LoadAll`, `SaveTask`, `RemoveTask` (structured, indexed task metadata).
+- **Events**: `SaveEvent`, `LoadEvents`, `CompactEvents` (ordered, append-heavy audit trail per task).
+- **Blobs**: `SaveBlob`, `ReadBlob`, `DeleteBlob`, `ListBlobs`, `ListBlobOwners` (named byte payloads per task, e.g. `oversight.json`, `summary.json`, `outputs/`).
+
+The store maps higher-level operations onto these primitives (for example `SaveOversight` → `SaveBlob(id, "oversight.json", data)`, `SaveSummary` → `SaveBlob(id, "summary.json", data)`). The default and only shipping implementation is `FilesystemBackend`; the seam exists so the atomicity and layout guarantees below are a backend property, not a store-wide assumption.
+
+### Saving a Task
+
+Writes funnel through `Store.saveTask` (`internal/store/io.go`), which is called with `s.mu` held for writing:
 
 ```go
-func atomicWriteJSON(path string, v any) error {
-    raw, err := json.MarshalIndent(v, "", "  ")
-    // ...
-    tmp := path + ".tmp"
-    os.WriteFile(tmp, raw, 0644)
-    return os.Rename(tmp, path)  // atomic on POSIX
+func (s *Store) saveTask(id uuid.UUID, task *Task) error {
+    task.SchemaVersion = constants.CurrentTaskSchemaVersion
+    // Shallow copy so pruning bounds the disk copy while the in-memory
+    // task keeps its full-length slices.
+    pruned := *task
+    s.pruneTaskPayload(&pruned)
+    return s.backend.SaveTask(&pruned)
 }
 ```
 
-This guarantees that readers never see a partially written file. If the process crashes mid-write, only the `.tmp` file is left and the original remains intact.
+It stamps the schema version (`constants.CurrentTaskSchemaVersion`, see [Migration System](#migration-system)), prunes the unbounded slice fields on a shallow copy (see [Payload Pruning](#payload-pruning)), then delegates to the backend.
+
+### Atomic Writes (FilesystemBackend)
+
+`FilesystemBackend.SaveTask` and all blob/event writes go through `atomicfile.WriteJSON` (`internal/pkg/atomicfile`), which marshals with `json.MarshalIndent`, writes to a random `.tmp-*` file created in the destination directory, then `os.Rename`s it into place:
+
+```go
+func (b *FilesystemBackend) SaveTask(t *Task) error {
+    path := filepath.Join(b.dir, t.ID.String(), "task.json")
+    return atomicfile.WriteJSON(path, t, 0644)
+}
+```
+
+`os.Rename` within a single filesystem is atomic on POSIX, so readers never see a partially written file. If the process crashes mid-write, only the `.tmp-*` file is left and the original remains intact.
 
 ### Concurrency Model
 
@@ -392,8 +431,8 @@ flowchart LR
 ```
 
 - **Read path**: Acquires `s.mu.RLock()`, reads from in-memory maps, returns deep-cloned `Task` values so callers cannot mutate store state.
-- **Write path**: Acquires `s.mu.Lock()`, mutates the in-memory task, calls `saveTask()` (atomic write to disk), then calls `notify()` to push changes to SSE subscribers.
-- **Deep cloning**: All outward-facing reads go through `deepCloneTask()` (generated by `scripts/gen-clone.go`) which duplicates all slices, maps, and pointer fields.
+- **Write path**: Acquires `s.mu.Lock()`, mutates the in-memory task, calls `saveTask()` (which delegates the atomic write to the backend), then calls `notify()` to push changes to SSE subscribers.
+- **Deep cloning**: All outward-facing reads go through `cloneTask()` / `deepCloneTask()` (generated by `scripts/gen-clone.go`) which duplicates all slices, maps, and pointer fields.
 
 The `mutateTask` helper encapsulates the common write pattern:
 
@@ -401,10 +440,17 @@ The `mutateTask` helper encapsulates the common write pattern:
 func (s *Store) mutateTask(id uuid.UUID, fn func(t *Task) error) error {
     s.mu.Lock()
     defer s.mu.Unlock()
-    t := s.tasks[id]          // find task
-    fn(t)                      // mutate in-place
+    t, ok := s.tasks[id]       // find task
+    if !ok {
+        return fmt.Errorf("task not found: %s", id)
+    }
+    if err := fn(t); err != nil { // mutate in-place
+        return err
+    }
     t.UpdatedAt = time.Now()
-    s.saveTask(id, t)          // persist atomically
+    if err := s.saveTask(id, t); err != nil { // persist via backend
+        return err
+    }
     s.notify(t, false)         // push to SSE subscribers
     return nil
 }
@@ -417,6 +463,20 @@ After every write, `notify()` stamps a monotonically increasing sequence number 
 1. Appends to a bounded replay buffer (512 entries) so reconnecting SSE clients can catch up without a full snapshot.
 2. Non-blocking send to all active subscriber channels (capacity 256, `pubsub.DefaultChannelSize`). If a subscriber's buffer is full, the delta is dropped for that subscriber.
 3. Wake signal to lightweight wake-only subscribers (capacity 1, coalesces bursts).
+
+## Tenant Filtering
+
+In multi-tenant cloud deployments the store filters task reads by the calling principal. The `Principal` type (`internal/store/principal.go`) is the minimal identity surface the store needs; it carries only `Sub` (JWT `sub`, used for attribution) and `OrgID` (JWT `org_id`, used for tenant isolation). It is defined in the store package so the domain layer never imports the HTTP or JWT packages; handlers translate `auth.Claims` to `*store.Principal` at the request boundary.
+
+`TasksForPrincipal(ctx, p, includeArchived)` returns the tasks visible to a principal. Three task shapes get different visibility:
+
+| Task shape | Who sees it |
+|---|---|
+| `CreatedBy=""`, `OrgID=""` (legacy) | Any signed-in user plus local mode |
+| `CreatedBy=U`, `OrgID=""` (self) | Only user U |
+| `CreatedBy=*`, `OrgID=X` (org) | Anyone whose `claims.OrgID = X` |
+
+Legacy tasks (created before the cloud/org concept) have no recorded owner and are treated as deployment-shared, so single-user upgrades to cloud mode keep their history. A `nil` principal (local mode or anonymous call) bypasses filtering entirely and sees all tasks. Sort order matches `ListTasks` (position, then creation time).
 
 ## Event Sourcing
 
@@ -439,7 +499,7 @@ Each file is a single `TaskEvent` serialized as JSON. The filename sequence numb
 ```mermaid
 flowchart TD
     A["InsertEvent()"] --> B["Assign sequence number"]
-    B --> C["atomicWriteJSON to traces/NNNN.json"]
+    B --> C["backend.SaveEvent to traces/NNNN.json"]
     C --> D["Append to in-memory events slice"]
     D --> E["Increment nextSeq"]
     F["Task reaches done/failed/cancelled"] --> G["Capture maxSeq under lock"]
@@ -485,7 +545,7 @@ flowchart LR
 - **Retention**: `PurgeExpiredTombstones` runs periodically and removes task directories whose tombstone `DeletedAt` exceeds the retention window. Configured via `WALLFACER_TOMBSTONE_RETENTION_DAYS` (default 7).
 - **Listing deleted tasks**: `GET /api/tasks/deleted` returns all tombstoned tasks sorted by `UpdatedAt` descending.
 - **Restoring**: `PATCH /api/tasks/{id}` with `{"deleted": false}` removes the tombstone file and moves the task back into the active set.
-- **Purging**: After the retention window, `purgeTaskLocked` calls `os.RemoveAll` on the entire task directory and removes all in-memory state.
+- **Purging**: After the retention window, `purgeTaskLocked` calls `RemoveTask` on the backend (deleting the whole task directory) and removes all in-memory state.
 
 ## Task Summaries
 
@@ -545,9 +605,9 @@ The store uses a forward-only migration system in `internal/store/migrate.go`. E
 2. Canonicalize `DependsOn`: trim whitespace, validate UUIDs, deduplicate, sort.
 3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
 4. Backfill `AutoRetryBudget` for tasks created before schema version 2.
-5. Stamp `SchemaVersion = CurrentTaskSchemaVersion`.
+5. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
 
-If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant (currently `2`) is incremented whenever a new migration step is added.
+If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `2`) and is incremented whenever a new migration step is added.
 
 Migration also handles the deprecated `Model` field by moving its value to `ModelOverride`.
 
@@ -555,7 +615,7 @@ Migration also handles the deprecated `Model` field by moving its value to `Mode
 
 The `internal/spec/` package provides parsing, tree building, and validation for design spec documents stored in `specs/`. Each spec file has YAML frontmatter with fields like `title`, `status`, `depends_on`, `affects`, `effort`, `created`, `updated`, `author`, and `dispatched_task_id`. The package builds a dependency tree from these specs, computes progress metrics, and supports impact analysis (which specs are affected by changes to a given package).
 
-The spec types are separate from the task data model — specs describe planned work and its dependencies, while tasks represent execution units on the board. The full spec document model is defined in `specs/local/spec-coordination/spec-document-model.md`.
+The spec types are separate from the task data model. Specs describe planned work and its dependencies, while tasks represent execution units on the board. The full spec document model is defined in `specs/spec-coordination/spec-coordination/spec-document-model.md`.
 
 ## See Also
 
