@@ -286,6 +286,22 @@ is the first governed phone-home channel.
 - **CRDT / live cursors.** Presence is awareness, not co-editing (inherited
   non-goal).
 
+## Dispatch split
+
+This child is `xlarge`; it dispatches as two leaves, the second building on the
+first:
+
+- [connection.md](connection-and-presence/connection.md) (foundation, large): the
+  outbound WSS, opt-in gate, JWT auth, manifest (persisted instance id +
+  git-remote identity), heartbeat, reconnect, teardown, and the coordinator
+  registry with the narrow interface the capability leaves consume. No presence.
+- [presence.md](connection-and-presence/presence.md) (large): org-wide presence on
+  top of the registry, the coordinator-wire deltas, focus/typing relay, the
+  browser-SSE re-home (event shape unchanged), and the two-deployment merge.
+
+The acceptance criteria and open questions below are the umbrella view; each leaf
+carries its own slice.
+
 ## Acceptance criteria
 
 1. Two teammates, each on their own machine, each `wallfacer run` signed in and
