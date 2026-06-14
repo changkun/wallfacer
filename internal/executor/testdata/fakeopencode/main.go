@@ -44,6 +44,29 @@ func main() {
 		return
 	}
 
+	// Tools-only mode: a recognised run that does work via tools but emits no
+	// final text part. The synthesis must treat this as a (non-error) success
+	// with empty result text and the aggregated usage.
+	if os.Getenv("FAKEOPENCODE_TOOLS_ONLY") == "1" {
+		_ = enc.Encode(map[string]any{
+			"type":      "tool_use",
+			"sessionID": "fake-opencode-session",
+			"part": map[string]any{
+				"type": "tool", "callID": "c1", "tool": "edit",
+				"state": map[string]any{"status": "completed", "input": map[string]any{"file": "x.go"}, "output": "ok"},
+			},
+		})
+		_ = enc.Encode(map[string]any{
+			"type":      "step_finish",
+			"sessionID": "fake-opencode-session",
+			"part": map[string]any{
+				"type": "step-finish", "reason": "stop", "cost": 0.001,
+				"tokens": map[string]any{"input": 5, "output": 2, "reasoning": 0, "cache": map[string]any{"read": 0, "write": 0}},
+			},
+		})
+		return
+	}
+
 	text := prompt
 	if skip {
 		text = "[skip-permissions] " + prompt
