@@ -11,13 +11,18 @@ affects:
   - wails.json
 effort: large
 created: 2026-02-21
-updated: 2026-04-12
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
 
 
 # Native Desktop App
+
+> **Archived 2026-06-14.** The Wails desktop build, tray, and CI were removed
+> from the codebase (no capacity to support it for now). This spec is retained
+> as the design baseline for a future revisit, which should start from scratch
+> against the then-current server and frontend.
 
 ## Goal
 

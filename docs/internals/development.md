@@ -52,9 +52,6 @@ make test-frontend  # Frontend tests: cd frontend && bunx vitest run
 |---|---|
 | `make build` | Full gate: fmt + lint (Go + Vue typecheck) + frontend build + binary |
 | `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
-| `make build-desktop` | Build the native desktop app for the current platform (uses `go tool wails`) |
-| `make build-desktop-darwin` / `-windows` / `-linux` | Cross-platform desktop builds |
-| `make install-wails` | Install the Wails CLI tracked as a tool in go.mod |
 | `make server` | Build and run the server natively |
 | `make fmt` | Format Go in place |
 | `make lint` | Lint only (golangci-lint + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
@@ -85,12 +82,11 @@ rebuilding when backend code changes.
 
 ## Release Workflow
 
-Releases are triggered by pushing a version tag (`v*`). Two GitHub Actions workflows run in parallel in this repository:
+Releases are triggered by pushing a version tag (`v*`). A GitHub Actions workflow runs in this repository:
 
 | Workflow | Artifact |
 |---|---|
 | `release-binary.yml` | `wallfacer-{linux,darwin,windows}-{amd64,arm64}` binaries on the GitHub Release |
-| `release-desktop.yml` | Signed desktop apps (`Wallfacer-Desktop-*`) on the GitHub Release |
 
 **Version embedding.** Release binaries are built with `-ldflags "-X latere.ai/x/wallfacer/internal/cli.Version=X.Y.Z"`. This stamps the wallfacer version for `wallfacer doctor` and usage output.
 
