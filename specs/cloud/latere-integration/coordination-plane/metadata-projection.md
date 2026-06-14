@@ -172,16 +172,26 @@ every connected instance's pushes:
   when a laptop closes); it is refreshed on the next reconnect via the rebuild
   path.
 
-### Open question (surfaced)
+### Storage substrate (decided)
 
-**Where does the coordinator read-model persist, and is 90 days right?** Anchor
-open-question 2 verbatim: the substrate is undecided between (a) a thin
-coordinator-owned store on wf.latere.ai (likely; matches "a thin
-coordinator-owned store"), (b) Identity org metadata, or (c) FS. The retention
-*policy* above is decided; the *storage substrate* is the open question, and the
-90-day/13-month windows are the first proposal pending that choice (a durable
-store may keep more cheaply than an in-cluster volume). Resolve before
-implementation.
+**A thin coordinator-owned store on wf.latere.ai**, co-located with the
+wallfacerd coordinator. Rejected alternatives and why:
+
+- **Identity org metadata.** Consume-don't-absorb cuts the other way here:
+  stuffing wallfacer's derived task/usage read-model into the Identity service
+  would make Identity carry wallfacer-domain data it does not own. The
+  coordinator owns wallfacer's own concepts, so it owns their projection.
+- **FS (fs.latere.ai).** A file data plane, not a queryable store; dashboards
+  need aggregation queries (group-by member / model / status / time bucket) that
+  a blob plane does not serve.
+
+The store is whatever the coordinator process already has available
+(co-located embedded DB or a small managed instance); it holds only the
+projected read-model, never source or content, so its blast radius is the
+allow-listed metadata only. It is rebuildable from instance pushes, so it is a
+cache of record, not a system of record. Retention is the policy decided above
+(live index indefinitely, raw projected events 90 days, rollups 13 months); a
+durable store keeps the rollups cheaply, confirming those windows.
 
 ## 4. Dashboards on wf.latere.ai
 
