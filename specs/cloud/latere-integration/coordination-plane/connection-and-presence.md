@@ -92,7 +92,7 @@ First frame after the handshake is the **manifest** (instance to coordinator):
   "type": "manifest",
   "principal": "u_01J8B…",          // Identity.Sub
   "org": "org_01J…",                // Identity.OrgID
-  "instance_id": "inst_<random>",   // per-process, stable for the connection
+  "instance_id": "inst_<persisted>",// stable per data-dir, survives restart
   "host_label": "changkun-mbp",     // human label for the instance picker
   "version": "wallfacer/<semver>",
   "workspaces": [                    // cross-machine identities served now
@@ -309,13 +309,27 @@ is the first governed phone-home channel.
    viewer avatar within the existing rate-limit window, with the browser
    `event: presence` payload shape unchanged from multi-user.
 
+## Instance identity (decided)
+
+`instance_id` is a **persisted per-data-dir id**, not per-process, so a restart
+re-takes the same registry slot and does not cause a presence flap or a dangling
+remote-control target. It is generated once and stored at
+`<configDir>/instance-id`, the same load-or-create pattern as the public-client
+cookie key (`loadOrCreateCookieKey`, `internal/cli/server.go`). The `host_label`
+travels alongside for the picker UI but is not the identity.
+
+The coordinator keys the registry on `(principal, instance_id)`. On a new
+connection whose `instance_id` already has a (stale) socket registered, the
+coordinator **replaces** the old entry rather than adding a second, so a restart
+that reconnects before the 60 s liveness timeout does not briefly show two
+instances. Two instances on one machine with **different** `--data` dirs get
+different ids (each has its own `instance-id` file), which is the correct
+disambiguation; two instances sharing a data dir is unsupported (they would also
+race the store, already disallowed).
+
 ## Open questions
 
 1. **Opt-in surface.** Where the coordination switch lives (a settings toggle in
    `frontend/src/` plus a server-side default) and whether it is org-policy
    enforced or per-instance. Anchor open question 4 keeps it one switch; this
    spec needs the concrete UI affordance and the server default (off).
-2. **Instance identity stability across reconnects.** `instance_id` is
-   per-process; a process restart is a new instance and a presence flap. Confirm
-   that is acceptable, or derive a stable id from host + install so a restart
-   re-takes the same registry slot.
