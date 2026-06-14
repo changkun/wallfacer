@@ -59,6 +59,7 @@ func requestFromClaudeSpec(spec ContainerSpec, childEnv []string) harness.Reques
 type HostBackendConfig struct {
 	ClaudeBinary string // path to `claude` CLI; empty ⇒ exec.LookPath
 	CodexBinary  string // path to `codex` CLI;  empty ⇒ exec.LookPath
+	CursorBinary string // path to `cursor-agent` CLI; empty ⇒ exec.LookPath
 }
 
 // HostBackend runs the agent CLI directly as a host process — no container.
@@ -83,6 +84,7 @@ type HostBackend struct {
 	binaryMu     sync.RWMutex
 	claudeBinary string
 	codexBinary  string
+	cursorBinary string
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
@@ -99,6 +101,8 @@ func (b *HostBackend) SetBinaryForTest(t harness.ID, path string) {
 		b.claudeBinary = path
 	case harness.Codex:
 		b.codexBinary = path
+	case harness.Cursor:
+		b.cursorBinary = path
 	}
 }
 
@@ -111,9 +115,11 @@ func (b *HostBackend) SetBinaryForTest(t harness.ID, path string) {
 func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	claude, _ := resolveBinary(cfg.ClaudeBinary, "claude")
 	codex, _ := resolveBinary(cfg.CodexBinary, "codex")
+	cursor, _ := resolveBinary(cfg.CursorBinary, "cursor-agent")
 	return &HostBackend{
 		claudeBinary: claude,
 		codexBinary:  codex,
+		cursorBinary: cursor,
 		procs:        make(map[string]*hostHandle),
 	}, nil
 }
@@ -162,6 +168,11 @@ func (b *HostBackend) binaryFor(t harness.ID) (string, error) {
 			return "", fmt.Errorf("codex binary not resolved")
 		}
 		return b.codexBinary, nil
+	case harness.Cursor:
+		if b.cursorBinary == "" {
+			return "", fmt.Errorf("cursor-agent binary not resolved")
+		}
+		return b.cursorBinary, nil
 	default:
 		return "", fmt.Errorf("unknown sandbox type %q", t)
 	}
@@ -189,6 +200,8 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 		return b.launchClaude(ctx, spec)
 	case harness.Codex:
 		return b.launchCodex(ctx, spec)
+	case harness.Cursor:
+		return b.launchCursor(ctx, spec)
 	default:
 		return nil, fmt.Errorf("host backend: unsupported agent %q", agent)
 	}
