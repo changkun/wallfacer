@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { useHead } from '@unhead/vue';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
+import HarnessLogo from '../components/HarnessLogo.vue';
+import { harnessLabel } from '../lib/harness';
 import { useT } from '../i18n';
 import { useReveal } from '../composables/useReveal';
 
 const t = useT();
 useReveal();
+
+// Tier-A harnesses advertised on the landing page.
+const harnesses = ['claude', 'codex', 'cursor', 'opencode', 'pi'];
 useHead({ title: 'Wallfacer', meta: [{ name: 'description', content: 'Wallfacer is an autonomous engineering platform.' }] });
 
 function copyInstall() {
@@ -156,6 +161,20 @@ function copyInstall() {
 
       <section class="section">
         <div class="section-container">
+          <span class="section-label" v-html="t('wf.harness.label')"></span>
+          <h2 class="harness-heading" v-html="t('wf.harness.title')"></h2>
+          <p class="harness-sub" v-html="t('wf.harness.sub')"></p>
+          <div class="harness-row">
+            <div v-for="h in harnesses" :key="h" class="harness-card">
+              <HarnessLogo :harness="h" :size="34" />
+              <span class="harness-card__name">{{ harnessLabel(h) }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-container">
           <span class="section-label" v-html="t('wf.cap.label')"></span>
           <div class="cap-grid">
             <div class="cap-item">
@@ -188,3 +207,42 @@ function copyInstall() {
     </div>
   </DefaultLayout>
 </template>
+
+<style scoped>
+.harness-heading {
+  margin: 10px 0 6px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+}
+.harness-sub {
+  margin: 0 0 28px;
+  max-width: 52ch;
+  color: var(--text-secondary, #555);
+  line-height: 1.6;
+}
+.harness-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.harness-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 116px;
+  padding: 22px 18px;
+  border: 1px solid var(--border, #e3e3e3);
+  border-radius: 12px;
+  background: var(--bg-card, #fff);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.harness-card:hover {
+  border-color: var(--accent, #6b6b6b);
+  transform: translateY(-2px);
+}
+.harness-card__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+</style>
