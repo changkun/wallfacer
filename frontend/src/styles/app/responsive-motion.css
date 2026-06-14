@@ -187,6 +187,18 @@
     background: var(--accent);
 }
 
+/* Light/dark screenshot pairs — only the variant matching the active theme
+   shows. Mirrors the doc-shot pattern (see styles/docs.css). */
+.shot--dark {
+    display: none;
+}
+[data-theme="dark"] .shot--light {
+    display: none;
+}
+[data-theme="dark"] .shot--dark {
+    display: block;
+}
+
 /* Tour screenshot hover */
 .tour-screenshot img {
     transition: transform 0.3s, box-shadow 0.3s;

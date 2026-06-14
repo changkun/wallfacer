@@ -27,7 +27,8 @@ function copyInstall() {
             <h1 v-html="t('wf.hero.title')"></h1>
             <p v-html="t('wf.hero.sub')"></p>
           </div>
-          <img src="/static/overview-kanban.png" alt="Wallfacer task board" class="product-hero-img">
+          <img src="/static/overview-kanban.png" alt="Wallfacer task board" class="product-hero-img shot--light">
+          <img src="/static/overview-kanban-dark.png" alt="Wallfacer task board" class="product-hero-img shot--dark">
           <div class="download-row">
             <div class="download-icons">
               <a href="https://github.com/changkun/wallfacer/releases/latest" class="download-icon-btn" target="_blank" rel="noopener" title="macOS">
@@ -126,7 +127,8 @@ function copyInstall() {
               <p v-html="t('wf.tour.1.desc')"></p>
             </div>
             <div class="tour-screenshot">
-              <img src="/static/overview-kanban.png" alt="Wallfacer task board" loading="lazy">
+              <img src="/static/overview-kanban.png" alt="Wallfacer task board" class="shot--light" loading="lazy">
+              <img src="/static/overview-kanban-dark.png" alt="Wallfacer task board" class="shot--dark" loading="lazy">
             </div>
           </div>
           <div class="tour-item tour-item-reverse">
@@ -135,7 +137,8 @@ function copyInstall() {
               <p v-html="t('wf.tour.2.desc')"></p>
             </div>
             <div class="tour-screenshot">
-              <img src="/static/overview-spec.png" alt="Wallfacer spec mode" loading="lazy">
+              <img src="/static/overview-spec.png" alt="Wallfacer spec mode" class="shot--light" loading="lazy">
+              <img src="/static/overview-spec-dark.png" alt="Wallfacer spec mode" class="shot--dark" loading="lazy">
             </div>
           </div>
           <div class="tour-item">
@@ -144,7 +147,8 @@ function copyInstall() {
               <p v-html="t('wf.tour.3.desc')"></p>
             </div>
             <div class="tour-screenshot">
-              <img src="/static/oversight1.png" alt="Wallfacer oversight" loading="lazy">
+              <img src="/static/oversight1.png" alt="Wallfacer oversight" class="shot--light" loading="lazy">
+              <img src="/static/oversight1-dark.png" alt="Wallfacer oversight" class="shot--dark" loading="lazy">
             </div>
           </div>
           <div class="tour-item tour-item-reverse">
@@ -153,7 +157,8 @@ function copyInstall() {
               <p v-html="t('wf.tour.4.desc')"></p>
             </div>
             <div class="tour-screenshot">
-              <img src="/static/usage.png" alt="Wallfacer usage and cost" loading="lazy">
+              <img src="/static/usage.png" alt="Wallfacer usage and cost" class="shot--light" loading="lazy">
+              <img src="/static/usage-dark.png" alt="Wallfacer usage and cost" class="shot--dark" loading="lazy">
             </div>
           </div>
         </div>
