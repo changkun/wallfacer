@@ -203,17 +203,24 @@ describe('serialize / deserialize', () => {
 });
 
 describe('migrateLegacy', () => {
-  it('seeds a bottom-docked terminal at the legacy height', () => {
+  it('does not auto-dock the terminal (legacy default was closed)', () => {
     const l = migrateLegacy('340');
-    expect(findPanelRegion(l, 'terminal')).toBe('bottom');
+    expect(isPanelPresent(l, 'terminal')).toBe(false);
+  });
+  it('carries the legacy height forward as the bottom size preference', () => {
+    const l = migrateLegacy('340');
     expect(l.sizes.bottom).toBe(340);
+    // ...and the terminal adopts it the first time it docks to the bottom.
+    const docked = dockPanel(l, 'terminal', 'bottom');
+    expect(docked.sizes.bottom).toBe(340);
   });
-  it('falls back to the default size when no legacy height is stored', () => {
+  it('leaves no bottom size when no legacy height is stored', () => {
     const l = migrateLegacy(null);
-    expect(l.sizes.bottom).toBe(DEFAULT_REGION_SIZE.bottom);
+    expect(l.sizes.bottom).toBeUndefined();
+    expect(dockPanel(l, 'terminal', 'bottom').sizes.bottom).toBe(DEFAULT_REGION_SIZE.bottom);
   });
-  it('clamps a sub-minimum legacy height to the default (ignored)', () => {
+  it('ignores a sub-minimum legacy height', () => {
     const l = migrateLegacy('10');
-    expect(l.sizes.bottom).toBe(DEFAULT_REGION_SIZE.bottom);
+    expect(l.sizes.bottom).toBeUndefined();
   });
 });
