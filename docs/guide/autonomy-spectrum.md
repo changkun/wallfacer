@@ -11,7 +11,7 @@ graph LR
 
 <!-- In-app animated illustration: an indicator gliding along the autonomy spectrum.
      Renders in the in-app docs viewer; GitHub shows the diagram above. -->
-<svg viewBox="0 0 720 104" role="img" aria-label="An indicator gliding along the spectrum from Chat to Spec to Task to Code" style="display:block;width:100%;max-width:720px;margin:1rem auto;font-family:inherit">
+<svg viewBox="0 0 720 104" role="img" aria-label="An indicator gliding along the spectrum from Chat to Spec to Task to Code" style="display:block;width:100%;max-width:540px;height:auto;margin:1.25rem auto;font-family:inherit">
   <defs>
     <linearGradient id="wf-spectrum" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="var(--accent-soft,rgba(99,102,241,0.25))"/>

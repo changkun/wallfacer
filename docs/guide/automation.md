@@ -113,7 +113,7 @@ flowchart LR
 
 <!-- In-app animated illustration: a pulse flowing through the autopilot pipeline.
      Renders in the in-app docs viewer; GitHub shows the diagram above. -->
-<svg viewBox="0 0 720 96" role="img" aria-label="A pulse moving through the autopilot pipeline: Implement, Catch Up, Test, Submit, Push" style="display:block;width:100%;max-width:720px;margin:1rem auto;font-family:inherit">
+<svg viewBox="0 0 720 96" role="img" aria-label="A pulse moving through the autopilot pipeline: Implement, Catch Up, Test, Submit, Push" style="display:block;width:100%;max-width:520px;height:auto;margin:1.25rem auto;font-family:inherit">
   <line x1="72" y1="40" x2="648" y2="40" stroke="var(--border,#e2e4e8)" stroke-width="2"/>
   <g fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)" stroke-width="1.5">
     <circle cx="72"  cy="40" r="18"/>

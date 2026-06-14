@@ -19,7 +19,7 @@ Archived tasks (done or cancelled) are hidden from the Done column by default. T
 
 <!-- In-app animated illustration: a task card flowing across the board columns.
      Renders in the in-app docs viewer; GitHub shows the table and screenshot below. -->
-<svg viewBox="0 0 720 150" role="img" aria-label="A task card moving from Backlog to In Progress to Waiting to Done" style="display:block;width:100%;max-width:720px;margin:1rem auto;font-family:inherit">
+<svg viewBox="0 0 720 150" role="img" aria-label="A task card moving from Backlog to In Progress to Waiting to Done" style="display:block;width:100%;max-width:460px;height:auto;margin:1.25rem auto;font-family:inherit">
   <g>
     <rect x="16"  y="40" width="160" height="96" rx="10" fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)"/>
     <rect x="192" y="40" width="160" height="96" rx="10" fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)"/>
