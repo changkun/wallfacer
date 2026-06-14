@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pkg/sse"
-	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/sse"
+	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

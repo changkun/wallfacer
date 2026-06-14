@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/pkg/livelog"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 )
 
 // planningTaskID is a fixed synthetic task ID used as the worker key for

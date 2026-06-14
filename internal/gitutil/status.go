@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // HasChanges reports whether worktreePath has any staged, unstaged, or untracked

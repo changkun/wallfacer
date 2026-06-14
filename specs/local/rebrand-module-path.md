@@ -1,6 +1,6 @@
 ---
 title: Rebrand Module Path to latere.ai
-status: drafted
+status: in_progress
 depends_on: []
 affects:
   - go.mod
@@ -17,13 +17,15 @@ dispatched_task_id: null
 
 ## Goal
 
-Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere.ai/wallfacer`, aligning the product under the latere.ai brand.
+Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere.ai/x/wallfacer`, aligning the product under the latere.ai brand.
+
+The `/x/` segment mirrors the sibling latere Go modules (`latere.ai/x/agents`, `latere.ai/x/auth`, `latere.ai/x/fs`, `latere.ai/x/lux`, `latere.ai/x/pkg`, `latere.ai/x/sandbox`) and the old `changkun.de/x/wallfacer` structure.
 
 ## Scope
 
 | Area | Current | Target |
 |------|---------|--------|
-| Go module path | `changkun.de/x/wallfacer` | `latere.ai/wallfacer` |
+| Go module path | `changkun.de/x/wallfacer` | `latere.ai/x/wallfacer` |
 | Sandbox images | — | `ghcr.io/latere-ai/sandbox-agents` (done — moved to `github.com/latere-ai/images`) |
 | App image (`wallfacer web`/server) | `ghcr.io/changkun/wallfacerd` | `ghcr.io/latere-ai/wallfacerd` (still pending — referenced in `wallfacerd.yml`, `deploy-wallfacerd.yml`, `deploy/prod/deployment.yaml`) |
 | macOS bundle ID | `ai.latere.wallfacer` | Already correct (set in desktop-app task-08) |
@@ -33,8 +35,8 @@ Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere
 
 ## Approach
 
-1. `go mod edit -module latere.ai/wallfacer`
-2. Bulk find-replace `changkun.de/x/wallfacer` → `latere.ai/wallfacer` across all `.go` files
+1. `go mod edit -module latere.ai/x/wallfacer`
+2. Bulk find-replace `changkun.de/x/wallfacer` → `latere.ai/x/wallfacer` across all `.go` files
 3. Update Makefile ldflags, CI workflows, documentation
 4. Update container image base path if registry org changes
 5. Run `go build ./...` and `go test ./...` to verify
@@ -43,5 +45,5 @@ Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere
 ## Open Questions
 
 - ~~Target container registry org~~ — resolved: `ghcr.io/latere-ai`. Sandbox images already migrated (`sandbox-agents`); the `wallfacerd` app image still publishes under `ghcr.io/changkun` and is part of this rebrand.
-- Whether to set up a vanity import server at `latere.ai/wallfacer` (like `golang.org/x/` style)
+- Whether to set up a vanity import server at `latere.ai/x/wallfacer` (like `golang.org/x/` style)
 - Timing relative to other work (standalone migration or bundled with a release)

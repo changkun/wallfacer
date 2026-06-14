@@ -5,8 +5,8 @@ import (
 	"io"
 	"sync/atomic"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 )
 
 // BackendState represents the lifecycle state of a sandbox container.

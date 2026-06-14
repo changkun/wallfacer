@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // skipDirs lists directory names that should never be traversed during file listing.

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 // GetInstructions returns the current workspace AGENTS.md content.

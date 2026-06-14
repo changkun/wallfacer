@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // buildFakeAgentForTest compiles the sandbox package's fakeagent helper into

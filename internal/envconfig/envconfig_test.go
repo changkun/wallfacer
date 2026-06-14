@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/envconfig"
 )
 
 // writeEnvFile creates a temporary .env file with the given content and returns its path.

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

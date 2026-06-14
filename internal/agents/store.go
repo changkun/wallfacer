@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/pkg/slugutil"
-	"changkun.de/x/wallfacer/internal/pkg/yamldir"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/slugutil"
+	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 
 	"gopkg.in/yaml.v3"
 )

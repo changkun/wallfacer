@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/planner"
 	"github.com/google/uuid"
 )
 

@@ -6,10 +6,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/pkg/dircp"
+	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/dircp"
 )
 
 // setupNonGitSnapshot copies ws into snapshotPath and initialises a local git

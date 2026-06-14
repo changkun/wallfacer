@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/planner"
-	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 func TestGetPlanningStatus_NilPlanner(t *testing.T) {

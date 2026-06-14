@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // newRunnerForArgTest creates a Runner for testing arg-building functions.

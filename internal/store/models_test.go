@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 )
 
 // allStatuses lists every defined TaskStatus for exhaustive negative-case coverage.

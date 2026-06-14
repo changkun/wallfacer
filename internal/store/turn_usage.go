@@ -3,7 +3,7 @@ package store
 import (
 	"path/filepath"
 
-	"changkun.de/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 	"github.com/google/uuid"
 )
 

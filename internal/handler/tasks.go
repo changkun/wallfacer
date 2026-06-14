@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pkg/statemachine"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

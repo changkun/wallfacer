@@ -3,8 +3,8 @@ package handler
 import (
 	"time"
 
-	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/pkg/cache"
+	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/pkg/cache"
 )
 
 // commitsBehindResult stores a cached CommitsBehind outcome.

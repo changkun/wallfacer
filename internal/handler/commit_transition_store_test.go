@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestRunCommitTransition_UsesCapturedStoreAcrossSnapshotSwap verifies that the

@@ -2,7 +2,7 @@
 
 package cli
 
-import "changkun.de/x/wallfacer/internal/pkg/systray"
+import "latere.ai/x/wallfacer/internal/pkg/systray"
 
 // platformTraySetup performs Linux-specific tray initialization.
 // On Linux, left-click typically opens the menu (same as right-click),

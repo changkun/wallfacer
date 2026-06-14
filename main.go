@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"changkun.de/x/wallfacer/internal/cli"
+	"latere.ai/x/wallfacer/internal/cli"
 )
 
 //go:embed all:frontend/dist

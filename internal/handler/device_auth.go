@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/oidc"

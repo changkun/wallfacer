@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/prompts"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // registerTestBinding installs a binding under a test-only slug and

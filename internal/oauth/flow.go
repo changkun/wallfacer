@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // FlowState represents the state of an OAuth flow.

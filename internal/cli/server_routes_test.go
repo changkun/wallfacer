@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/apicontract"
-	"changkun.de/x/wallfacer/internal/handler"
-	"changkun.de/x/wallfacer/internal/metrics"
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/apicontract"
+	"latere.ai/x/wallfacer/internal/handler"
+	"latere.ai/x/wallfacer/internal/metrics"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

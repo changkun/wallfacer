@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestTryAutoPromote_SkipsRoutineCards verifies that a routine card in

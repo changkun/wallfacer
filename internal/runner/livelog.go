@@ -1,6 +1,6 @@
 package runner
 
-import "changkun.de/x/wallfacer/internal/pkg/livelog"
+import "latere.ai/x/wallfacer/internal/pkg/livelog"
 
 // liveLog wraps livelog.Log for backward compatibility within the runner package.
 type liveLog = livelog.Log

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // normalizeSandbox maps an arbitrary string to a canonical harness.ID,

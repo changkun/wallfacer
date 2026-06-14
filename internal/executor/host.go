@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // requestFromClaudeSpec translates a runner-built ContainerSpec (whose Cmd

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/uuidutil"
+	"latere.ai/x/wallfacer/internal/pkg/uuidutil"
 )
 
 // containerJSON is the union of fields emitted by `podman ps --format json`

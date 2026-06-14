@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // workspacesBody returns a JSON body for POST /api/workspaces containing the

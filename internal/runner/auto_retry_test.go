@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestTryAutoRetry_BudgetAllows verifies that the runner's tryAutoRetry returns

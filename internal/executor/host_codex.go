@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // launchCodex runs the codex CLI in host mode. The runner emits

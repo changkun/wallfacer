@@ -19,7 +19,7 @@ import (
 	"strings"
 	"sync"
 
-	"changkun.de/x/wallfacer/internal/pkg/sortedkeys"
+	"latere.ai/x/wallfacer/internal/pkg/sortedkeys"
 )
 
 // DefaultDurationBuckets are histogram upper bounds (in seconds) suited for

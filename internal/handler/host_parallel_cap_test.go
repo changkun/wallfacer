@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/runner"
 )
 
 // TestMaxConcurrentTasks_HostModeDefaultsToOne verifies that when the runner

@@ -19,8 +19,8 @@ import (
 	"slices"
 	"text/template"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
 //go:embed *.tmpl

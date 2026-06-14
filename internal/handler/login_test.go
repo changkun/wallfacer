@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // fakeAuth implements AuthProvider so tests can exercise the handler branches

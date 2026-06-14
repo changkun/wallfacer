@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/pkg/uuidutil"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/pkg/uuidutil"
 )
 
 // Package-level named loggers, populated by Init.

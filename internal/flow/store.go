@@ -7,10 +7,10 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/pkg/slugutil"
-	"changkun.de/x/wallfacer/internal/pkg/yamldir"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/slugutil"
+	"latere.ai/x/wallfacer/internal/pkg/yamldir"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // diskFlow is the on-disk YAML shape for a user-authored flow. It

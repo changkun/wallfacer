@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/envutil"
-	"changkun.de/x/wallfacer/internal/pkg/pubsub"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/envutil"
+	"latere.ai/x/wallfacer/internal/pkg/pubsub"
 	"github.com/google/uuid"
 )
 

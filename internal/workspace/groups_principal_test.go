@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestClaimGroup_StampsPrincipalOnce: the first ClaimGroup for a

@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // newStaleStoreHandler creates a handler where h.workspace (the workspace

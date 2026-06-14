@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // fileCacheEntry holds the file list for one workspace plus cache metadata.

@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspace"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
 )
 

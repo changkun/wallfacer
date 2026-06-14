@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // Engine walks a Flow's steps linearly, fanning out parallel-sibling

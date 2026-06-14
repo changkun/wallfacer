@@ -1,6 +1,6 @@
 package flow
 
-import "changkun.de/x/wallfacer/internal/store"
+import "latere.ai/x/wallfacer/internal/store"
 
 // Flow is an ordered composition of sub-agent roles that a task
 // executes against. v1 scope is linear with parallel-sibling steps; a

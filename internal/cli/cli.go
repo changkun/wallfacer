@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // Version is set at build time via -ldflags (e.g. -X cli.Version=1.2.3).

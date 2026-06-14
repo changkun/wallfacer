@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 // testSpecArchived mirrors testSpecValidated but with status=archived so

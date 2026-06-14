@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/sanitize"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 )
 
 // taskUsage mirrors the JSON shape of store.TaskUsage (cost field only).

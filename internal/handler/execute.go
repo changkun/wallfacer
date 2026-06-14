@@ -9,14 +9,14 @@ import (
 	"slices"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/prompts"
-	runnerpkg "changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/prompts"
+	runnerpkg "latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

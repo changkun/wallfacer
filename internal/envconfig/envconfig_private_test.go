@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestParseEnvLinePreservesHashesInsideQuotes verifies that # characters inside

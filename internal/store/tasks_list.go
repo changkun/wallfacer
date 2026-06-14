@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
 

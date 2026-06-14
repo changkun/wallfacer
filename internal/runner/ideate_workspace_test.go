@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 // commitFileInRepo creates a file at relPath inside repoDir and commits it.

@@ -3,8 +3,8 @@ package flow
 import (
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/agents"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestBuiltinRegistry_HasExpectedFlows locks in the v1 catalog: every

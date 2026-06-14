@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestSubmitAutoSubmitCandidate_SkipsStaleNonWaiting verifies that a candidate

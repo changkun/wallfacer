@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
 // Message is a single entry in the planning conversation log.

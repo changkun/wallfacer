@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/harness"
 )
 
 // buildContainerSpec creates a launch spec for the planning sandbox. The

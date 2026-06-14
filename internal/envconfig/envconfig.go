@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/harness"
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // Config holds the known configuration values from the .env file.

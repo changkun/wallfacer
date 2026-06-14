@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // RunAgent is the flow.AgentLauncher adapter around the unexported

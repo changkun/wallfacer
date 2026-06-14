@@ -1,6 +1,6 @@
 package runner
 
-import "changkun.de/x/wallfacer/internal/pkg/sanitize"
+import "latere.ai/x/wallfacer/internal/pkg/sanitize"
 
 // truncate is a package-level alias for sanitize.Truncate, kept to avoid
 // updating every call site in the runner package. It returns s truncated to

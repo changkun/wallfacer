@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // SnapshotDiff computes a unified diff of all changes in a snapshot repository

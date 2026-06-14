@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 // createTaskWithTitle is a helper that creates a task and sets its title.

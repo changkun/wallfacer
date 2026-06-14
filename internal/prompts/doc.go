@@ -18,8 +18,8 @@
 //
 // # Connected packages
 //
-// Depends on [changkun.de/x/wallfacer/internal/logger] for logging and
-// [changkun.de/x/wallfacer/internal/pkg/atomicfile] for writing override files.
+// Depends on [latere.ai/x/wallfacer/internal/logger] for logging and
+// [latere.ai/x/wallfacer/internal/pkg/atomicfile] for writing override files.
 // Consumed by [workspace] (derives the instructions file path during workspace
 // switching), [runner] (renders prompts for every agent invocation and mounts
 // the instructions file read-only into task containers), [handler] (system prompt

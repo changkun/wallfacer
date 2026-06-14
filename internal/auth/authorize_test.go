@@ -7,7 +7,7 @@ import (
 
 	"latere.ai/x/pkg/scopes"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // ok200 is a trivial terminal handler that records invocation and

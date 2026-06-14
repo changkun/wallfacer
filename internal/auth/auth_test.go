@@ -3,7 +3,7 @@ package auth_test
 import (
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // TestNew_EmptyConfigReturnsNil confirms the graceful-degrade contract we

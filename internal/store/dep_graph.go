@@ -1,7 +1,7 @@
 package store
 
 import (
-	"changkun.de/x/wallfacer/internal/pkg/dagscorer"
+	"latere.ai/x/wallfacer/internal/pkg/dagscorer"
 	"github.com/google/uuid"
 )
 

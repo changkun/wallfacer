@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/pkg/oidc"
 )
 

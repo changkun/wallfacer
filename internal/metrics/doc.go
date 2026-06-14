@@ -8,7 +8,7 @@
 //
 // # Connected packages
 //
-// Depends on [changkun.de/x/wallfacer/internal/pkg/sortedkeys] for deterministic
+// Depends on [latere.ai/x/wallfacer/internal/pkg/sortedkeys] for deterministic
 // label ordering in output. Consumed by [cli] (creates the registry), [handler]
 // (instruments HTTP requests and registers gauges), and [runner] (records task
 // execution metrics). When adding new metrics, define them where they are recorded

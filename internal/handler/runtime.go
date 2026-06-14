@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/executor"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // containerCircuitStatus is the JSON shape for the container circuit breaker

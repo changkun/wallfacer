@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 func newAuthTestServer(t *testing.T) *httptest.Server {

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // systemPromptResponse is the JSON shape for a single system prompt template.

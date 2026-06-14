@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestInsertEventOrLog_StampsActorFromClaims confirms the

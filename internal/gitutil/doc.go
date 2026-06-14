@@ -1,7 +1,7 @@
 // Package gitutil provides low-level git operations used for repository
 // management, worktree isolation, and rebase conflict handling.
 //
-// It wraps the git CLI via [changkun.de/x/wallfacer/internal/pkg/cmdexec] and
+// It wraps the git CLI via [latere.ai/x/wallfacer/internal/pkg/cmdexec] and
 // exposes structured results and error types. Operations include repository
 // validation, branch discovery, worktree creation and removal, rebase with
 // automatic conflict detection and recovery, stash management, and remote
@@ -10,7 +10,7 @@
 //
 // # Connected packages
 //
-// Depends on [changkun.de/x/wallfacer/internal/pkg/cmdexec] for command execution.
+// Depends on [latere.ai/x/wallfacer/internal/pkg/cmdexec] for command execution.
 // Consumed by [handler] (git status, push, sync, rebase UI actions) and [runner]
 // (worktree lifecycle, commit pipeline, rebase during execution). Changes to git
 // command behavior or error parsing affect both the execution engine and the UI

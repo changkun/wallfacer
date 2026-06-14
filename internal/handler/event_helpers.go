@@ -3,9 +3,9 @@ package handler
 import (
 	"context"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

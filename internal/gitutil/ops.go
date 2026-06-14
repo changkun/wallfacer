@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // GlobalIdentityOverrides returns git `-c user.name=... -c user.email=...`

@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	gentree "changkun.de/x/wallfacer/internal/pkg/tree"
+	gentree "latere.ai/x/wallfacer/internal/pkg/tree"
 )
 
 // Node is a spec document within the spec tree.

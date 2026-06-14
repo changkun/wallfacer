@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/runner"
 )
 
 // TestGetConfig_HostModeFlag verifies the host_mode field on /api/config

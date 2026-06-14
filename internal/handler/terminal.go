@@ -15,10 +15,10 @@ import (
 	"syscall"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pkg/pty"
+	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/pty"
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 )

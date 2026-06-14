@@ -9,7 +9,7 @@
 //
 // # Connected packages
 //
-// Depends on [changkun.de/x/wallfacer/internal/constants] for configuration.
+// Depends on [latere.ai/x/wallfacer/internal/constants] for configuration.
 // Consumed by virtually every internal package that produces log output:
 // [runner], [handler], [store], [cli], [envconfig], [prompts], and others.
 // Changing logger names or initialization affects all log consumers.

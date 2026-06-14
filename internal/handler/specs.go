@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
-	"changkun.de/x/wallfacer/internal/pkg/sse"
-	"changkun.de/x/wallfacer/internal/pkg/statemachine"
-	"changkun.de/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/sse"
+	"latere.ai/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // collectSpecTree merges the spec trees across all workspaces into a

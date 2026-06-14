@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/handler"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/handler"
 )
 
 // The three tests below cover the middleware-composition contract the

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/assets/icons"
-	"changkun.de/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/assets/icons"
+	"latere.ai/x/wallfacer/internal/logger"
 
-	"changkun.de/x/wallfacer/internal/pkg/systray"
+	"latere.ai/x/wallfacer/internal/pkg/systray"
 )
 
 const (

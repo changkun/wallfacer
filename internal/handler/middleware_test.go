@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/auth"
-	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // oversizedBody creates a JSON reader with a single field whose value is a

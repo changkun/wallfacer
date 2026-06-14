@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/watcher"
-	"changkun.de/x/wallfacer/internal/routine"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/watcher"
+	"latere.ai/x/wallfacer/internal/routine"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // routineReconcileSettle coalesces bursts of store-change notifications.

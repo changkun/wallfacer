@@ -6,11 +6,11 @@
 //
 // This package embeds the frontend UI assets and documentation filesystem into the
 // binary via go:embed, then dispatches to CLI subcommands (run, desktop, status,
-// doctor, exec) implemented in [changkun.de/x/wallfacer/internal/cli].
+// doctor, exec) implemented in [latere.ai/x/wallfacer/internal/cli].
 //
 // # Connected packages
 //
-// Depends on [changkun.de/x/wallfacer/internal/cli] for all subcommand logic.
+// Depends on [latere.ai/x/wallfacer/internal/cli] for all subcommand logic.
 // Changes to CLI subcommand signatures or the embedded filesystem layout require
 // updates here.
 //

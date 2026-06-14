@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // patchRoutine is a small test helper that fires PATCH

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // ---------------------------------------------------------------------------
