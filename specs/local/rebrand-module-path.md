@@ -47,3 +47,17 @@ The `/x/` segment mirrors the sibling latere Go modules (`latere.ai/x/agents`, `
 - ~~Target container registry org~~ — sandbox images already migrated (`ghcr.io/latere-ai/sandbox-agents`). The `wallfacerd` app image **stays at `ghcr.io/changkun/wallfacerd` for now**: the repo is `github.com/changkun/wallfacer` and CI pushes with the default `GITHUB_TOKEN` (`packages: write`), which can write to `ghcr.io/changkun/*` but not the `latere-ai` org. Renaming to `ghcr.io/latere-ai/wallfacerd` is blocked until the repo moves under the `latere-ai` org or an org PAT secret grants this repo GHCR package-write. Revisit then.
 - ~~Whether to set up a vanity import server at `latere.ai/x/wallfacer`~~ — resolved: the `latere-ai` site already serves `go-import` meta tags for `latere.ai/x/<repo>` (`internal/handler/handler.go`). Because that handler hardcodes the `latere-ai` GitHub org but wallfacer still lives at `github.com/changkun/wallfacer`, a `vanityOwners["wallfacer"] = "changkun"` override was added there so `go get latere.ai/x/wallfacer` and `git clone https://latere.ai/x/wallfacer` resolve correctly. Remove the override once wallfacer moves into the `latere-ai` org (same precondition as the `wallfacerd` image rename above).
 - Timing relative to other work (standalone migration or bundled with a release)
+
+## Outcome
+
+Shipped (2026-06-14):
+
+- **Module path migrated** to `latere.ai/x/wallfacer` (chose the `/x/` form to match sibling latere modules). Rewrote go.mod, all 267 importing `.go` files, Makefile ldflags, `release-binary.yml`/`release-desktop.yml`, dev docs, and stale spec references. Verified with `go build`, `go vet`, `make lint-go` (0 issues), and `go test ./...`. (`ffce4807`)
+- **Vanity import works** for `go get latere.ai/x/wallfacer`: added a `vanityOwners` override in the `latere-ai` site's `go-import` handler mapping wallfacer to the `changkun` GitHub owner, with tests for the meta tag and the `git clone` `info/refs` redirect. Released as `latere-ai` `v0.2.78`. (`latere-ai@7e21440`)
+
+Deferred (both blocked on the same precondition — wallfacer moving into the `latere-ai` GitHub org, or an org PAT granting this repo access):
+
+- `wallfacerd` app image stays at `ghcr.io/changkun/wallfacerd`; `deployment.yaml` and the wallfacerd workflows are unchanged.
+- The `vanityOwners["wallfacer"]` override remains until the repo migrates, after which it should be removed.
+
+Status stays `in_progress` until those two follow-ups land.
