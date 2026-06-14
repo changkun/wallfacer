@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useDockStore } from './dock';
 
 const SHOW_ARCHIVED_KEY = 'wallfacer-show-archived';
 
@@ -17,7 +18,9 @@ export const useUiStore = defineStore('ui', () => {
   const showInstructions = ref(false);
   const showSystemPrompts = ref(false);
   const showTemplates = ref(false);
-  const showTerminal = ref(false);
+  // Terminal visibility now lives in the dock store (the terminal is a dockable
+  // panel). These delegate so existing callers keep working unchanged.
+  const showTerminal = computed(() => useDockStore().terminalOpen);
   const showExplorer = ref(false);
   const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
@@ -59,9 +62,9 @@ export const useUiStore = defineStore('ui', () => {
   function closeSystemPrompts() { showSystemPrompts.value = false; }
   function openTemplates() { showSettings.value = false; showTemplates.value = true; }
   function closeTemplates() { showTemplates.value = false; }
-  function openTerminal() { showTerminal.value = true; }
-  function closeTerminal() { showTerminal.value = false; }
-  function toggleTerminal() { showTerminal.value = !showTerminal.value; }
+  function openTerminal() { useDockStore().openTerminal(); }
+  function closeTerminal() { useDockStore().closeTerminal(); }
+  function toggleTerminal() { useDockStore().toggleTerminal(); }
   function openExplorer() { showExplorer.value = true; }
   function closeExplorer() { showExplorer.value = false; }
   function toggleExplorer() { showExplorer.value = !showExplorer.value; }
