@@ -322,14 +322,15 @@ function onBodyClick(ev: MouseEvent) {
   emit('focusSibling', resolved);
 }
 
-// Re-run mermaid enhancement on every body change. enhanceMermaid is
+// Re-run mermaid enhancement on every body change, including the initial
+// mount (immediate) where renderedBody is already computed. enhanceMermaid is
 // idempotent — already-rendered blocks carry the .mermaid-rendered marker
 // and are skipped on subsequent passes.
 watch([renderedBody, renderedTaskPrompt], () => {
   void nextTick(() => {
     if (bodyRef.value) void enhanceMermaid(bodyRef.value);
   });
-});
+}, { immediate: true });
 
 onMounted(() => {
   bodyRef.value?.addEventListener('click', onBodyClick);
@@ -509,19 +510,35 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
 .sf-status,
 .sf-kind {
-  padding: 1px 6px;
+  padding: 2px 7px;
   border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
+  background: var(--bg-card);
+  color: var(--ink-2);
   font-weight: 500;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
+/* Subtle filled tint per semantic colour — readable, less flat than a bare
+   outline. */
 .sf-status--validated,
-.sf-status--complete { color: var(--ok); border-color: var(--ok); }
-.sf-status--drafted { color: var(--info); border-color: var(--info); }
-.sf-status--stale { color: var(--warn); border-color: var(--warn); }
+.sf-status--complete {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 40%, var(--rule));
+  background: color-mix(in oklab, var(--ok) 12%, var(--bg-card));
+}
+.sf-status--drafted {
+  color: var(--info);
+  border-color: color-mix(in oklab, var(--info) 40%, var(--rule));
+  background: color-mix(in oklab, var(--info) 12%, var(--bg-card));
+}
+.sf-status--stale {
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn) 40%, var(--rule));
+  background: color-mix(in oklab, var(--warn) 12%, var(--bg-card));
+}
 .sf-status--archived { color: var(--ink-4); border-color: var(--ink-4); }
 .sf-status--vague { color: var(--ink-3); border-color: var(--ink-3); }
 
@@ -535,10 +552,11 @@ defineExpose({ dispatchFocused, breakdownFocused });
 }
 
 .sf-action {
-  font-size: 11px;
-  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: var(--bg-card);
   color: var(--ink-2);
   cursor: pointer;
@@ -547,6 +565,12 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
 .sf-action:hover:not(:disabled) {
   background: var(--bg-hover);
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--rule));
+}
+
+.sf-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
 }
 
 .sf-action:disabled {
@@ -558,6 +582,12 @@ defineExpose({ dispatchFocused, breakdownFocused });
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+}
+
+.sf-dispatch:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(0.96);
 }
 
 .sf-chat-toggle--folded {
@@ -670,7 +700,9 @@ defineExpose({ dispatchFocused, breakdownFocused });
   color: var(--ink);
   margin: 22px 0 8px;
 }
-.sf-content--spec.prose-content :deep(p:first-of-type::first-letter) {
+/* Direct-child combinator so the drop cap only hits the lead paragraph, not
+   the first <p> nested inside every <li> of a loose list. */
+.sf-content--spec.prose-content :deep(> p:first-of-type::first-letter) {
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 3em;
@@ -679,7 +711,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
   padding: 4px 10px 0 0;
   color: var(--accent);
 }
-.sf-content--spec.prose-content :deep(p:first-of-type) {
+.sf-content--spec.prose-content :deep(> p:first-of-type) {
   font-size: 15px;
   line-height: 1.72;
 }
@@ -692,20 +724,23 @@ defineExpose({ dispatchFocused, breakdownFocused });
   font-family: var(--font-mono);
   font-size: 0.92em;
   background: var(--bg-sunk);
-  padding: 1px 4px;
-  border-radius: 3px;
+  border: 1px solid color-mix(in oklab, var(--rule) 60%, transparent);
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 .sf-content :deep(pre) {
   font-family: var(--font-mono);
   font-size: 12px;
   background: var(--bg-sunk);
-  padding: 12px;
-  border-radius: var(--r-sm);
+  border: 1px solid var(--rule);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
   overflow-x: auto;
   line-height: 1.5;
 }
 .sf-content :deep(pre code) {
   background: transparent;
+  border: none;
   padding: 0;
 }
 .sf-content :deep(a) {
