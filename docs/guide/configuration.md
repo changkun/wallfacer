@@ -4,7 +4,7 @@ Wallfacer is configured through the Settings UI, environment variables in `~/.wa
 
 ## How tasks run
 
-Wallfacer runs each task as a host process. The runner execs the selected CLI (`claude` or `codex`) directly on your machine, with the task's git worktree as the working directory. Isolation comes from the per-task worktree, so no container runtime is required to install or run. Tasks run with your user account's permissions and can read or write any file your account can. Run Wallfacer only on machines you trust.
+Wallfacer runs each task as a host process. The runner execs the selected CLI (`claude`, `codex`, `cursor-agent`, or `opencode`) directly on your machine, with the task's git worktree as the working directory. Isolation comes from the per-task worktree, so no container runtime is required to install or run. Tasks run with your user account's permissions and can read or write any file your account can. Run Wallfacer only on machines you trust.
 
 This is the current and default runtime. Throughout this document, "the agent" refers to the host CLI process Wallfacer launches for a given task.
 
@@ -36,19 +36,22 @@ At minimum, you need one of these credentials configured in **Settings > Harness
 
 **Cursor configuration:** paste a `CURSOR_API_KEY`, or run `cursor-agent login` once and the CLI reuses that session. Use the **Test** button to verify connectivity.
 
+**OpenCode configuration:** OpenCode manages provider credentials itself. Run `opencode auth login` once and select a provider (Anthropic, OpenAI, OpenRouter, etc.); the CLI stores that credential in its own config, so no API key is needed in `~/.wallfacer/.env`. Use the **Test** button to verify connectivity.
+
 The sign-in buttons are hidden when a custom base URL is configured (custom endpoints don't use standard OAuth). On first launch with no credentials for any provider, a prompt guides you to set up credentials.
 
 All changes are written to `~/.wallfacer/.env` and take effect on the next task run. Leave token fields blank to preserve the existing value.
 
 ### Verifying the CLIs
 
-Wallfacer launches the `claude`, `codex`, and `cursor-agent` CLIs from your `$PATH`. Install them with:
+Wallfacer launches the `claude`, `codex`, `cursor-agent`, and `opencode` CLIs from your `$PATH`. Install them with:
 
 - `npm i -g @anthropic-ai/claude-code` for Claude.
 - `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
 - `cursor-agent` from [cursor.com/docs/cli](https://cursor.com/docs/cli) for Cursor (optional).
+- `opencode` from [opencode.ai/docs/cli](https://opencode.ai/docs/cli) for OpenCode (optional); after install run `opencode auth login` to configure a provider.
 
-Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex or cursor-agent is a soft warning: tasks routed to that agent will fail, but claude-only workflows still work.
+Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex, cursor-agent, or opencode is a soft warning: tasks routed to that agent will fail, but claude-only workflows still work.
 
 ### Key Environment Variables
 
@@ -162,15 +165,22 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 - API Key (`CURSOR_API_KEY`) -- headless credential for `cursor-agent`; create one in Cursor under Settings > API Keys, or run `cursor-agent login` interactively
 - **Test** button -- runs a Cursor connectivity check
 
+### OpenCode Configuration
+
+**OpenCode configuration:**
+- Provider auth is managed by the `opencode` CLI itself. Run `opencode auth login` and pick a provider; no API key goes in `~/.wallfacer/.env`.
+- **Test** button -- runs an OpenCode connectivity check
+
 ### Agent Routing
 
-**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex, cursor) or "default".
+**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex, cursor, opencode) or "default".
 
-Wallfacer supports three agents, selected per activity. All run as host processes; the difference is which CLI the runner execs:
+Wallfacer supports four agents, selected per activity. All run as host processes; the difference is which CLI the runner execs:
 
 - **Claude** -- runs the Claude Code CLI (`WALLFACER_AGENT=claude`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
 - **Codex** -- runs the OpenAI Codex CLI (`WALLFACER_AGENT=codex`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 - **Cursor** -- runs the Cursor CLI (`WALLFACER_AGENT=cursor`). Requires `CURSOR_API_KEY` or an interactive `cursor-agent login`. Headless runs inject `--force` so edits are applied, not just proposed.
+- **OpenCode** -- runs the OpenCode CLI via `opencode run` (`WALLFACER_AGENT=opencode`). Provider auth is managed by `opencode auth login`, not by `~/.wallfacer/.env`. Headless runs inject `--dangerously-skip-permissions` so edits are applied without an interactive prompt.
 
 Each task can be assigned a specific agent when created or edited. The task-level selection overrides the global default for that task's implementation run.
 
@@ -248,6 +258,14 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 \* Alternatively, sign in once with an interactive `cursor-agent login`; the CLI then reuses that session.
 
+#### OpenCode
+
+OpenCode manages provider credentials itself (`opencode auth login`), so no provider key is read from `~/.wallfacer/.env`.
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENCODE_SERVER_PASSWORD` | no | Basic-auth password for `opencode serve` / `opencode run --attach`; reserved for a future warm-start path |
+
 #### Concurrency
 
 | Variable | Default | Description |
@@ -264,6 +282,7 @@ These variables are optional; the CLI binaries are resolved via `$PATH` by defau
 | `WALLFACER_HOST_CLAUDE_BINARY` | `exec.LookPath("claude")` | Explicit path to the Claude CLI binary |
 | `WALLFACER_HOST_CODEX_BINARY` | `exec.LookPath("codex")` | Explicit path to the Codex CLI binary (optional; codex-typed tasks require it) |
 | `WALLFACER_HOST_CURSOR_BINARY` | `exec.LookPath("cursor-agent")` | Explicit path to the Cursor CLI binary (optional; cursor-typed tasks require it) |
+| `WALLFACER_HOST_OPENCODE_BINARY` | `exec.LookPath("opencode")` | Explicit path to the OpenCode CLI binary (optional; opencode-typed tasks require it) |
 | `WALLFACER_AGENTS_DIR` | `~/.wallfacer/agents` | Directory scanned for user-authored agent descriptors (`*.yaml`). A missing directory is not an error: Wallfacer falls back to the built-in agent catalog. |
 | `WALLFACER_FLOWS_DIR` | `~/.wallfacer/flows` | Directory scanned for user-authored flow descriptors (`*.yaml`). Same fallback semantics as `WALLFACER_AGENTS_DIR`. |
 
