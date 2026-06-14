@@ -89,6 +89,7 @@ type RunnerConfig struct {
 	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
 	HostClaudeBinary string           // optional override for the `claude` binary path
 	HostCodexBinary  string           // optional override for the `codex` binary path
+	HostCursorBinary string           // optional override for the `cursor-agent` binary path
 	TmpDir           string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager *workspace.Manager
@@ -491,6 +492,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	hb, _ := executor.NewHostBackend(executor.HostBackendConfig{
 		ClaudeBinary: cfg.HostClaudeBinary,
 		CodexBinary:  cfg.HostCodexBinary,
+		CursorBinary: cfg.HostCursorBinary,
 	})
 	r.backend = hb
 	r.hostMode = true
