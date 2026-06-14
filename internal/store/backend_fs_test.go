@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,7 +10,32 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/logger"
 )
+
+// levelCaptureHandler records the levels and messages of emitted slog records
+// so tests can assert on log severity.
+type levelCaptureHandler struct {
+	records []slog.Record
+}
+
+func (h *levelCaptureHandler) Enabled(context.Context, slog.Level) bool { return true }
+func (h *levelCaptureHandler) Handle(_ context.Context, r slog.Record) error {
+	h.records = append(h.records, r)
+	return nil
+}
+func (h *levelCaptureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *levelCaptureHandler) WithGroup(string) slog.Handler      { return h }
+
+func (h *levelCaptureHandler) countAtLevel(level slog.Level) int {
+	n := 0
+	for _, r := range h.records {
+		if r.Level == level {
+			n++
+		}
+	}
+	return n
+}
 
 // newTestBackend creates a FilesystemBackend rooted in a fresh temporary directory.
 func newTestBackend(t *testing.T) *FilesystemBackend {
@@ -34,6 +61,66 @@ func TestFilesystemBackend_Init(t *testing.T) {
 		t.Fatalf("traces dir not created: %v", err)
 	} else if !fi.IsDir() {
 		t.Fatal("traces path is not a directory")
+	}
+}
+
+// TestFilesystemBackend_LoadAll_SkipsOrphanDirQuietly pins the fix for noisy
+// load warnings: a UUID directory without task.json (an incomplete task, e.g.
+// Init ran before SaveTask) must be skipped without a WARN, while a task.json
+// that exists but cannot be parsed still warns. Valid tasks load regardless.
+func TestFilesystemBackend_LoadAll_SkipsOrphanDirQuietly(t *testing.T) {
+	b := newTestBackend(t)
+
+	// Valid task.
+	valid := &Task{
+		ID:            uuid.New(),
+		Prompt:        "valid",
+		Status:        TaskStatusBacklog,
+		SchemaVersion: constants.CurrentTaskSchemaVersion,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	if err := b.Init(valid.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SaveTask(valid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Orphan: UUID dir with no task.json (mirrors the reported warnings).
+	orphan := uuid.New()
+	if err := b.Init(orphan); err != nil {
+		t.Fatal(err)
+	}
+
+	// Corrupt: UUID dir with an unparseable task.json.
+	corrupt := uuid.New()
+	if err := os.MkdirAll(filepath.Join(b.dir, corrupt.String()), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(b.dir, corrupt.String(), "task.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	capture := &levelCaptureHandler{}
+	orig := logger.Store
+	logger.Store = slog.New(capture)
+	t.Cleanup(func() { logger.Store = orig })
+
+	tasks, err := b.LoadAll()
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(tasks) != 1 || tasks[0].ID != valid.ID {
+		t.Fatalf("expected only the valid task, got %d tasks", len(tasks))
+	}
+
+	// The orphan must not warn; the corrupt task must.
+	if got := capture.countAtLevel(slog.LevelWarn); got != 1 {
+		t.Errorf("expected exactly 1 WARN (the corrupt task), got %d", got)
+	}
+	if got := capture.countAtLevel(slog.LevelDebug); got != 1 {
+		t.Errorf("expected exactly 1 DEBUG (the orphan dir), got %d", got)
 	}
 }
 
