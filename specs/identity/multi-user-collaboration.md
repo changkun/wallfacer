@@ -172,6 +172,20 @@ The existing workspace key is a SHA-256 of sorted workspace paths. Cloud mode in
 
 Four concerns, in order of complexity. All four are pending.
 
+**Topology note.** The presence and collaboration mechanisms below were
+originally designed process-local within a single hosted instance
+(instance-per-org). They are **re-homed** onto the [cloud coordination
+plane](../cloud/latere-integration/coordination-plane.md): signed-in local
+instances each hold one outbound connection to a coordinator on wallfacerd, so
+presence aggregates across instances and teammates on their own machines
+collaborate. Both deployment models are supported (local-first sync is primary;
+hosted-shared instance-per-org stays an alternative, just another client of the
+same coordinator). This spec's RBAC matrix, audit log, attribution, and
+optimistic-concurrency are valid under both and are **re-homed, not rewritten**;
+only the *source* of the presence/collaboration feed moves to the coordinator.
+The connection, presence, and spec-comment designs now live in the
+coordination-plane children; this spec keeps the RBAC/audit/attribution surface.
+
 ### 1. Presence (who is here)
 
 **Goal.** Every member opening the board sees a list of other members who are currently connected.

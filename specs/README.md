@@ -13,7 +13,7 @@ Foundations - 7/7 complete (see Archive)
 Identity - the live edge (auth + platform convergence)
   ✅ Authentication                ◐ Auth by Default + Console
   ○ Multi-User Collaboration       ○ Third-Party OIDC
-  ○ Remote Control                 ○ Agent Token Exchange
+  ◐ Remote Control (→ cloud plane) ○ Agent Token Exchange
 
 Spec Coordination - in progress (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
@@ -42,10 +42,15 @@ Shared Design - 3 complete
   ○ Token & Cost Optimization      ○ Extensible Prompts
   ⊘ Overlay Snapshots (obsolete under host exec)
 
-Cloud Platform - integration track (consume Latere services, don't absorb); demand-gated
-  ○ Latere Integration (umbrella)  ○ Runtime → Cella
-  ○ Tenant Filesystem → FS         ○ Cloud Infrastructure
-  ○ Tenant API                     ○ Data Boundary Enforcement
+Cloud Platform - two axes (consume Latere services, don't absorb)
+  Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
+    ○ Coordination Plane (anchor)  ○ Connection + Presence
+    ○ Metadata Projection          ○ Spec Comments
+    ○ Remote Control (re-homed)    ○ Data Boundary (widened)
+  Axis B: Remote execution (Cloud v2+, demand-gated, blocked on Executor seam)
+    ○ Latere Integration (umbrella)  ○ Runtime → Cella
+    ○ Tenant Filesystem → FS         ○ Cloud Infrastructure
+    ○ Tenant API
   archived: Multi-Tenant, Billing Idempotency (now owned by Cella / Identity)
 
 Intent - two shippable features + a residual
@@ -71,7 +76,7 @@ Everything about principals, sessions, delegation, and what data crosses the mac
 | [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Drafted | Umbrella: org-scoped collaboration on the shipped identity plumbing (actor fields, org scoping). Adds RBAC, presence/focus, optimistic concurrency, private planning threads. Steps 1-2 (actor fields, migration) already shipped; breakdown started. Gate for cloud team hosting. |
 | ↳ [rbac-matrix.md](identity/multi-user-collaboration/rbac-matrix.md) | Drafted | Lead child: the canonical scope-to-permission matrix (admin/editor/viewer mapped onto `Identity.Scopes`, since there is no role claim), wiring `RequireScope`/`RequireSuperadmin` onto mutating routes. Anonymous mode unchanged. |
 | [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Self-hosted non-latere.ai deployments log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. by configuring/extending the platform `pkg/oidc` RP rather than forking a local package. |
-| [remote-control.md](identity/remote-control.md) | Vague | Wire protocol + latere.ai-side registry so the latere.ai web UI or a mobile client can observe and operate signed-in local wallfacer instances. |
+| [remote-control.md](identity/remote-control.md) | Drafted | Re-homed onto the cloud coordination plane: now the command-router capability (control UI, instance picker, offline handling, per-action auth + audit, opt-out scope) riding the one coordination connection, not its own wire. Transport lives in [coordination-plane.md](cloud/latere-integration/coordination-plane.md). |
 | [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | RFC 8693 delegation so per-task agents call latere.ai services on behalf of the dispatching user. A server-side trust plane already shipped (`sandbox_proxy.go` act.sub delegation); the open decision is proxy-substitution vs short-lived-token env injection. |
 
 ### Identity dependencies
@@ -195,12 +200,18 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 ## Cloud Platform
 
-Integration track. Wallfacer is the autonomous-engineering control plane; in cloud mode it **consumes** Latere platform services rather than absorbing them (`latere.ai/specs/products/wallfacer.md`). Each integration is a thin client over a service boundary (Identity, Cella, FS), config-gated so local mode is unchanged. This track is drafted and demand-gated; the executor sub-cluster is blocked on the `Executor` seam from harness-abstraction landing first.
+Integration track. Wallfacer is the autonomous-engineering control plane; in cloud mode it **consumes** Latere platform services rather than absorbing them (`latere.ai/specs/products/wallfacer.md`). Each integration is a thin client over a service boundary (Identity, Cella, FS), config-gated so local mode is unchanged.
+
+The track now splits into **two axes** (see the umbrella): **Axis A, the coordination plane (Cloud v1, lead)** has signed-in local instances hold one outbound connection to a coordinator role on wallfacerd (wf.latere.ai) for presence, remote control, an allow-listed metadata projection, and spec-comment collaboration; local stays source of truth (relay + projection, never mirror). **Axis B, remote execution (Cloud v2+, demand-gated)** dispatches agent runs to Cella/Topos and is blocked on the `Executor` seam from harness-abstraction.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the integration seams (Identity ✅, Runtime→Cella, FS, deploy, Lux, MCP, metadata) and the consume-don't-absorb rules. Read it first. |
-| ↳ [latere-integration/cella-runtime.md](cloud/latere-integration/cella-runtime.md) | Drafted | `CellaBackend` implementing `executor.Backend`, a cloud runtime alongside Host, selected by `--executor cella`. Maps the task spec onto Cella's `/v1/sandboxes` API; worktree transport via FS. The lead example for the track. |
+| [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the two axes, the per-service seams, and the consume-don't-absorb rules. Read it first. |
+| ↳ [latere-integration/coordination-plane.md](cloud/latere-integration/coordination-plane.md) | Drafted | **Axis A anchor (Cloud v1).** One outbound connection per signed-in instance to a coordinator role on wallfacerd; relay + projection never mirror; git-remote workspace identity; spec comments cloud-now / git-export-later. |
+| ↳↳ [coordination-plane/connection-and-presence.md](cloud/latere-integration/coordination-plane/connection-and-presence.md) | Drafted | Phase 1 lead: the outbound WSS, ephemeral registry, heartbeat, and org-wide presence re-homed from process-local to coordinator-aggregated. |
+| ↳↳ [coordination-plane/metadata-projection.md](cloud/latere-integration/coordination-plane/metadata-projection.md) | Drafted | Phase 2: tap `store.TaskEvent`, redact to an enumerated allow-list, push a derived org read-model for history/usage/team dashboards. |
+| ↳↳ [coordination-plane/spec-comments.md](cloud/latere-integration/coordination-plane/spec-comments.md) | Drafted | Phase 4: cloud-resident inline spec comments relayed in real time, ActorSub attribution, content-hash anchoring, export-friendly schema. |
+| ↳ [latere-integration/cella-runtime.md](cloud/latere-integration/cella-runtime.md) | Drafted | **Axis B lead.** `CellaBackend` implementing `executor.Backend`, a cloud runtime alongside Host, selected by `--executor cella`. Maps the task spec onto Cella's `/v1/sandboxes` API; worktree transport via FS. |
 | ↳ [latere-integration/shared-cella-client.md](cloud/latere-integration/shared-cella-client.md) | Drafted | Extract Cella's wire client into a standalone `latere.ai/x/sandbox/client` package shared by `CellaBackend` and Topos. Mostly external (Cella repo); thin in-repo stake. |
 | ↳ [latere-integration/topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md) | Drafted | `TopozExecutor`: dispatch task runs to Latere Topos's `/v1/agents` control plane via `--executor topos`. Topos runs the harness remote-side; client streams canonical events back. |
 | [claude-managed-agents.md](cloud/claude-managed-agents.md) | Drafted | Third-party remote executor: dispatch to Anthropic's Managed Agents API (`POST /v1/sessions`) with a self-hosted sandbox mounting the worktree locally. Independent of Latere infra. |
@@ -208,7 +219,7 @@ Integration track. Wallfacer is the autonomous-engineering control plane; in clo
 | [tenant-filesystem.md](cloud/tenant-filesystem.md) | Drafted | fs.latere.ai integration (FSClient, RepoResolver, workspace cloud mapping). **Blocked on FS Workspace API (Phase 5).** |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Drafted | Thin deploy module into the existing DOKS `latere` namespace + `pkg/otel` OTLP emit. |
 | [tenant-api.md](cloud/tenant-api.md) | Drafted | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks. Rebased off the archived control plane onto Identity keys + single-instance; keep-vs-archive is demand-gated and open. |
-| [data-boundary-enforcement.md](cloud/data-boundary-enforcement.md) | Drafted | What metadata may leave the machine to wallfacer.cloud: a frontend scrubber + gate test at the platform telemetry-proxy boundary. Moved here from Identity (it is a telemetry/privacy concern). Narrow in-repo surface; archive-vs-keep is open. |
+| [data-boundary-enforcement.md](cloud/data-boundary-enforcement.md) | Drafted | What may leave the machine: the SPA telemetry scrubber **plus** the coordination-channel egress gate (opt-in, allow-listed) now that signed-in instances phone home. Owns the boundary rule and the gate; per-field allow-lists live in the projection/comments leaves. |
 
 ### Cloud platform dependencies
 
