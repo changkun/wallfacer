@@ -4,45 +4,31 @@ Start here for the full reading order.
 
 ## Reading Order
 
-<!-- NOTE: The server parses this section to build the docs sidebar.
-     Each markdown link under a heading becomes a sidebar entry.
-     To add a new guide: add a new ### heading with a link below. -->
+<!-- NOTE: The server parses this section to build the in-app docs sidebar.
+     Each "### " heading is a sidebar SECTION; every [Title](file.md) link
+     beneath it becomes an entry in that section, in order. To add a guide,
+     drop a link under the right section heading. -->
 
-### Getting Started
-[Getting Started](getting-started.md). Installation, credentials, first run.
+### Get Started
 
-### The Autonomy Spectrum
-[The Autonomy Spectrum](autonomy-spectrum.md). The mental model (chat, spec, task, code), how to move between levels and dial autonomy up or down.
+- [Getting Started](getting-started.md). Installation, credentials, first run.
+- [The Autonomy Spectrum](autonomy-spectrum.md). The mental model (chat, spec, task, code), how to move between levels and dial autonomy up or down.
 
-### Exploring Ideas
-[Exploring Ideas](exploring-ideas.md). Planning chat, slash commands, @mentions, threads, the planning sandbox.
+### Use Wallfacer
 
-### Designing Specs
-[Designing Specs](designing-specs.md). Plan mode layout, spec lifecycle (six states), dispatch workflow, archive/unarchive, dependency minimap.
+- [Exploring Ideas](exploring-ideas.md). Planning chat, slash commands, @mentions, threads, the planning agent.
+- [Designing Specs](designing-specs.md). Plan mode layout, spec lifecycle (six states), dispatch workflow, archive/unarchive, dependency minimap.
+- [Agents & Flows](agents-and-flows.md). The four primitives (agent, flow, task, routine), how they compose, how to clone and customize built-ins, harness pinning, recipes.
+- [Board & Tasks](board-and-tasks.md). Task board, lifecycle, dependencies, batch creation, search.
+- [Refinement & Ideation](refinement-and-ideation.md). Prompt refinement in the Plan task-mode chat and the brainstorm flow.
 
-### Agents & Flows
-[Agents & Flows](agents-and-flows.md). The four primitives (agent, flow, task, routine), how they compose, how to clone and customise built-ins, harness pinning, recipes for common customisations.
+### Operate
 
-### Executing Tasks
-[Board & Tasks](board-and-tasks.md). Task board, lifecycle, dependencies, batch creation, search.
-
-### Automation & Control
-[Automation](automation.md). Autopilot, auto-test, auto-submit, auto-retry, circuit breakers.
-
-### Oversight & Analytics
-[Oversight & Analytics](oversight-and-analytics.md). Oversight summaries, costs, timeline, logs.
-
-### Workspaces & Git
-[Workspaces](workspaces.md). Workspace management, git integration, branches, auto-push.
-
-### Refinement & Ideation
-[Refinement & Ideation](refinement-and-ideation.md). Prompt refinement in the Plan task-mode chat, the brainstorm flow, auto-refine.
-
-### Configuration
-[Configuration](configuration.md). Settings, env vars, harness selection, CLI, keyboard shortcuts.
-
-### Circuit Breakers
-[Circuit Breakers](circuit-breakers.md). Fault isolation, self-healing automation, launch protection.
+- [Automation](automation.md). Autopilot, auto-test, auto-submit, auto-retry, circuit breakers.
+- [Oversight & Analytics](oversight-and-analytics.md). Oversight summaries, costs, timeline, logs.
+- [Workspaces](workspaces.md). Workspace management, git integration, branches, auto-push.
+- [Configuration](configuration.md). Settings, env vars, harness selection, CLI, keyboard shortcuts.
+- [Circuit Breakers](circuit-breakers.md). Fault isolation, self-healing automation, launch protection.
 
 ## Common Workflows
 
