@@ -2,13 +2,19 @@
 
 Wallfacer is configured through the Settings UI, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompts and workspace instructions. The `.env` file is auto-generated on first run with commented-out defaults; edit it directly or use the Settings UI. Most settings take effect on the next task run without restarting the server.
 
+## How tasks run
+
+Wallfacer runs each task as a host process. The runner execs the selected CLI (`claude` or `codex`) directly on your machine, with the task's git worktree as the working directory. Isolation comes from the per-task worktree, so no container runtime is required to install or run. Tasks run with your user account's permissions and can read or write any file your account can. Run Wallfacer only on machines you trust.
+
+This is the current and default runtime. Throughout this document, "the agent" refers to the host CLI process Wallfacer launches for a given task.
+
 ---
 
 ## Essentials
 
 ### Opening Settings
 
-Open the Settings modal by clicking the gear icon in the top-right corner of the task board. The modal contains six tabs: Appearance, Execution, Sandbox, Workspace, Trash, and About.
+Open the Settings page by clicking the gear icon in the top-right corner of the task board, or press `Cmd+,` (`Ctrl+,`). The page has seven tabs: Appearance, Execution, Harness, Workspace, Prompts, Trash, and About.
 
 ### Appearance
 
@@ -16,15 +22,15 @@ Open the Settings modal by clicking the gear icon in the top-right corner of the
 
 **Done Column** -- Toggle "Show archived tasks" to display or hide archived completed tasks on the board.
 
-### Setting Up Sandbox Credentials
+### Setting Up Credentials
 
-At minimum, you need one of these credentials configured in **Settings > Sandbox**:
+At minimum, you need one of these credentials configured in **Settings > Harness**:
 
 **Claude configuration:**
 - **Sign in with Claude** button -- starts an OAuth flow: opens your browser to authenticate, then stores the token automatically. This is the easiest way to set up credentials.
 - OAuth Token (`CLAUDE_CODE_OAUTH_TOKEN`) -- alternatively, paste a token from `claude setup-token`; takes precedence when both credentials are set
 - API Key (`ANTHROPIC_API_KEY`) -- direct key from console.anthropic.com
-- **Test** button -- runs a quick sandbox connectivity check to verify your credentials work. If the test detects an invalid or expired token and OAuth is available, a **Sign in again** button appears inline.
+- **Test** button -- runs a quick connectivity check to verify your credentials work. If the test detects an invalid or expired token and OAuth is available, a **Sign in again** button appears inline.
 
 **Codex configuration:** similarly, use the **Sign in with OpenAI** button for OAuth or paste an API key manually.
 
@@ -32,25 +38,24 @@ The sign-in buttons are hidden when a custom base URL is configured (custom endp
 
 All changes are written to `~/.wallfacer/.env` and take effect on the next task run. Leave token fields blank to preserve the existing value.
 
-### Container Images
+### Verifying the CLIs
 
-The **Container Images** section at the top of **Settings > Sandbox** shows whether each sandbox image (Claude and Codex) is cached locally. Images are pulled automatically on first task run, but you can also manage them manually:
+Wallfacer launches the `claude` and `codex` CLIs from your `$PATH`. Install them with:
 
-- **Pull** -- Download a missing image from the registry (~1 GB).
-- **Re-pull** -- Update a cached image to the latest version.
-- Pull progress streams live in the settings panel with a phase summary (resolving, downloading layers, writing manifest) and a layer counter.
+- `npm i -g @anthropic-ai/claude-code` for Claude.
+- `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
 
-You can also check image status from the command line with `wallfacer doctor`.
+Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex is a soft warning: codex-routed tasks will fail, but claude-only workflows still work.
 
 ### Key Environment Variables
 
-All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
+All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each task run, so changes take effect on the next task without a server restart.
 
 | Variable | Required | Description |
 |---|---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | one of these two | OAuth token from `claude setup-token` (Claude Pro/Max subscription) |
 | `ANTHROPIC_API_KEY` | one of these two | API key from console.anthropic.com (starts with `sk-ant-...`) |
-| `WALLFACER_MAX_PARALLEL` | no (default: `5`) | Maximum concurrent tasks auto-promoted to In Progress |
+| `WALLFACER_MAX_PARALLEL` | no | Maximum concurrent tasks auto-promoted to In Progress. Default is `1` in the host runtime (see [Concurrency](#concurrency)). |
 
 ### CLI Basics
 
@@ -61,6 +66,8 @@ wallfacer status                        # Print board state to terminal
 wallfacer status -watch                 # Live-updating board state
 wallfacer doctor                        # Check prerequisites and config
 ```
+
+See the [CLI Reference](#cli-reference) for the full subcommand and flag list.
 
 ### Plan Mode
 
@@ -79,6 +86,8 @@ This is the canonical shortcut reference. Other guides link here instead of main
 | Key | Action |
 |---|---|
 | `?` | Show keyboard shortcuts help |
+| `Cmd+,` / `Ctrl+,` | Open Settings |
+| `Cmd+K` / `Ctrl+K` | Open command palette |
 | `E` | Toggle file explorer |
 | `P` | Toggle Board ↔ Plan mode |
 | `` Ctrl+` `` | Toggle terminal panel |
@@ -90,13 +99,20 @@ This is the canonical shortcut reference. Other guides link here instead of main
 |---|---|---|
 | `N` | Board | Open new task form |
 | `/` | Board | Focus the search bar |
-| `Cmd+K` / `Ctrl+K` | Board | Open command palette |
 | `Ctrl+Enter` / `Cmd+Enter` | New task form | Save task |
 | `Escape` | New task form | Cancel |
 | `Enter` / `Space` | Focused card | Open task detail |
 | `Arrow keys` | Focused card | Navigate between cards |
-| `s` | Focused backlog card | Start task |
-| `d` | Focused waiting card | Mark as done |
+
+**Focused card** (quick actions; each fires only when valid for the card's current status):
+
+| Key | Action |
+|---|---|
+| `s` | Start the task |
+| `d` | Mark a waiting task as done |
+| `r` | Resume a waiting task that has a session, otherwise retry (re-queue to backlog) |
+| `t` | Run the test-verification agent |
+| `p` | Open the task in Plan mode |
 
 **Plan mode:**
 
@@ -128,7 +144,7 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 
 **Trace Oversight** -- Select a batch limit and click "Generate Missing" to generate oversight summaries for tasks that lack them.
 
-### Codex Sandbox Configuration
+### Codex Configuration
 
 **Codex configuration:**
 - API Key (`OPENAI_API_KEY`) -- optional when host `~/.codex/auth.json` is available
@@ -137,52 +153,55 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 - Title Model (`CODEX_TITLE_MODEL`) -- falls back to the Codex default model
 - **Test** button -- runs a Codex connectivity check
 
-### Sandbox Routing
+### Agent Routing
 
-**Global Sandbox Routing** -- Select the default sandbox type and override the sandbox for individual activities: Implementation, Testing, Refinement, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available sandbox types (claude, codex) or "default".
+**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex) or "default".
 
-Wallfacer supports two sandbox types, both backed by the same unified container image (`sandbox-agents:latest`). The container's entrypoint dispatches to the right CLI based on the `WALLFACER_AGENT` env var the runner sets per task:
+Wallfacer supports two agents, selected per activity. Both run as host processes; the difference is which CLI the runner execs:
 
-- **Claude** -- runs Claude Code CLI (`WALLFACER_AGENT=claude`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **Codex** -- runs OpenAI Codex CLI (`WALLFACER_AGENT=codex`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
+- **Claude** -- runs the Claude Code CLI (`WALLFACER_AGENT=claude`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **Codex** -- runs the OpenAI Codex CLI (`WALLFACER_AGENT=codex`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 
-Each task can be assigned a specific sandbox type when created or edited. The task-level sandbox selection overrides the global default for that task's implementation run.
+Each task can be assigned a specific agent when created or edited. The task-level selection overrides the global default for that task's implementation run.
 
-Different agent activities can be routed to different sandbox types. For example, you could run implementation tasks on Claude but use Codex for title generation. Configure this in **Settings > Sandbox > Global Sandbox Routing** or via the `WALLFACER_SANDBOX_*` environment variables.
+Different activities can be routed to different agents. For example, you could run implementation tasks on Claude but use Codex for title generation. Configure this in **Settings > Harness > Global Agent Routing** or via the `WALLFACER_SANDBOX_*` environment variables.
 
-The seven configurable activities are:
+The six configurable activities are:
+
 1. **Implementation** -- the main task execution
-2. **Testing** -- test verification agent
-3. **Refinement** -- prompt refinement agent
-4. **Title generation** -- automatic task title generation
-5. **Oversight summary** -- trace oversight analysis
-6. **Commit message** -- commit message generation
-7. **Idea agent** -- brainstorm/ideation agent
+2. **Testing** -- the test-verification agent
+3. **Title generation** -- automatic task title generation
+4. **Oversight summary** -- trace oversight analysis
+5. **Commit message** -- commit message generation
+6. **Idea agent** -- brainstorm/ideation agent
 
-When an activity-specific override is not set, it falls back to `WALLFACER_DEFAULT_SANDBOX`. When that is also unset, the sandbox is determined by the task's own sandbox field or the server default (Claude).
+When an activity-specific override is not set, it falls back to `WALLFACER_DEFAULT_SANDBOX`. When that is also unset, the agent is determined by the task's own field or the server default (Claude).
 
-Route specific agent activities to different sandbox types (`claude` or `codex`):
+Prompt refinement is not an agent activity. It happens in the Plan task-mode chat via the `update_task_prompt` tool. See [Refinement & Ideation](refinement-and-ideation.md).
+
+Route specific activities to different agents (`claude` or `codex`):
 
 | Variable | Description |
 |---|---|
-| `WALLFACER_DEFAULT_SANDBOX` | Default sandbox for all activities |
+| `WALLFACER_DEFAULT_SANDBOX` | Default agent for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | Override for task implementation |
 | `WALLFACER_SANDBOX_TESTING` | Override for test verification |
-| `WALLFACER_SANDBOX_REFINEMENT` | Override for prompt refinement |
 | `WALLFACER_SANDBOX_TITLE` | Override for title generation |
 | `WALLFACER_SANDBOX_OVERSIGHT` | Override for oversight generation |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Override for commit message generation |
-| `WALLFACER_SANDBOX_IDEA_AGENT` | Override for ideation agent |
+| `WALLFACER_SANDBOX_IDEA_AGENT` | Override for the ideation agent |
+
+The `WALLFACER_SANDBOX_*` names are retained for backward compatibility; they select the agent, not a container.
 
 ### Fast Mode
 
-When `WALLFACER_SANDBOX_FAST` is `true` (the default), Wallfacer passes fast-mode hints to the sandbox agent. Set to `false` to disable.
+When `WALLFACER_SANDBOX_FAST` is `true` (the default), Wallfacer passes fast-mode hints to the agent. Set to `false` to disable.
 
-**Enable /fast** -- Toggle fast-mode sandbox hints (`WALLFACER_SANDBOX_FAST`).
+**Enable /fast** -- Toggle fast-mode hints (`WALLFACER_SANDBOX_FAST`).
 
 ### Full Environment Variables Reference
 
-All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
+All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each task run, so changes take effect on the next task without a server restart.
 
 #### Authentication
 
@@ -197,7 +216,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 | Variable | Default | Description |
 |---|---|---|
-| `CLAUDE_DEFAULT_MODEL` | (Claude Code default) | Default model passed to task containers |
+| `CLAUDE_DEFAULT_MODEL` | (Claude Code default) | Default model passed to task agents |
 | `CLAUDE_TITLE_MODEL` | (falls back to `CLAUDE_DEFAULT_MODEL`) | Model for background title generation |
 
 #### OpenAI Codex
@@ -215,23 +234,10 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_MAX_PARALLEL` | `5` | Maximum concurrent tasks auto-promoted to In Progress |
-| `WALLFACER_MAX_TEST_PARALLEL` | (inherits from `WALLFACER_MAX_PARALLEL`) | Maximum concurrent test runs |
+| `WALLFACER_MAX_PARALLEL` | `1` | Maximum concurrent tasks auto-promoted to In Progress. The host runtime caps this to `1` unless you set an explicit value, because the `claude` and `codex` CLIs share state under `~/.claude` and `~/.codex` and can race when run in parallel. Set `WALLFACER_MAX_PARALLEL=N` to opt into more. |
+| `WALLFACER_MAX_TEST_PARALLEL` | `2` | Maximum concurrent test runs. Fixed default constant; it does not inherit from `WALLFACER_MAX_PARALLEL`. |
 
-#### Sandbox backend
-
-Wallfacer runs each task as a host process, execing the `claude` (and optionally `codex`) CLI directly in the task's git worktree.
-
-> **Tasks run with your user's permissions.** A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. The Settings → Sandbox tab shows this warning while active. See [Host mode](#host-mode) below.
-
-#### Circuit Breaker
-
-| Variable | Default | Description |
-|---|---|---|
-| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive agent-process launch failures before the circuit breaker opens |
-| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
-
-#### Host mode
+#### Agent binaries
 
 These variables are optional; the CLI binaries are resolved via `$PATH` by default.
 
@@ -239,33 +245,24 @@ These variables are optional; the CLI binaries are resolved via `$PATH` by defau
 |---|---|---|
 | `WALLFACER_HOST_CLAUDE_BINARY` | `exec.LookPath("claude")` | Explicit path to the Claude CLI binary |
 | `WALLFACER_HOST_CODEX_BINARY` | `exec.LookPath("codex")` | Explicit path to the Codex CLI binary (optional; codex-typed tasks require it) |
+| `WALLFACER_AGENTS_DIR` | `~/.wallfacer/agents` | Directory scanned for user-authored agent descriptors (`*.yaml`). A missing directory is not an error: Wallfacer falls back to the built-in agent catalog. |
+| `WALLFACER_FLOWS_DIR` | `~/.wallfacer/flows` | Directory scanned for user-authored flow descriptors (`*.yaml`). Same fallback semantics as `WALLFACER_AGENTS_DIR`. |
 
-**Install requirements:**
-
-- `npm i -g @anthropic-ai/claude-code` for Claude.
-- `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
-
-**Build and run the server:**
-
-```bash
-make build   # fmt + lint + ts build + binary
-./wallfacer run
-```
-
-**Verify readiness:**
-
-```bash
-wallfacer doctor
-```
-
-Reports the resolved binary paths and `--version` output for each CLI. Missing codex is a soft warning (tasks routed to codex will fail; claude-only workflows still work).
+> **Tasks run with your user's permissions.** A task agent can read or write any file your account can, not just its worktree. Run Wallfacer only on machines you trust. The **Settings > Harness** tab shows this warning while active.
 
 **Known limitations:**
 
 - `--resume` is a no-op for codex (codex's `exec` subcommand has no stable resume flag).
-- Concurrent tasks default to `WALLFACER_MAX_PARALLEL=1` in host mode to avoid races on `~/.claude/__store.db` and `~/.codex/` shared state. Override with an explicit value to opt in.
-- Windows is not supported natively — use container mode with Docker/Podman Desktop, or run wallfacer inside WSL2.
+- Concurrent tasks default to `WALLFACER_MAX_PARALLEL=1` to avoid races on `~/.claude/__store.db` and `~/.codex/` shared state. Override with an explicit value to opt in.
+- Windows is not supported natively; run Wallfacer inside WSL2.
 - No write containment: an agent can touch any file your user account can.
+
+#### Circuit Breaker
+
+| Variable | Default | Description |
+|---|---|---|
+| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive agent-process launch failures before the circuit breaker opens |
+| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
 
 #### Automation
 
@@ -275,14 +272,14 @@ Reports the resolved binary paths and `--version` output for each CLI. Missing c
 | `WALLFACER_AUTO_PUSH` | `false` | Enable automatic `git push` after task completion |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push triggers |
 | `WALLFACER_PLANNING_WINDOW_DAYS` | `30` | Default window (in days) for the planning-cost analytics display. `0` means all time. Only affects the UI's default period selection; the server always returns the full record set until the UI requests a narrower window via `?days=N`. |
-| `WALLFACER_SANDBOX_FAST` | `true` | Enable fast-mode sandbox hints |
-| `WALLFACER_TERMINAL_ENABLED` | `true` | Enable the integrated host terminal panel. The Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. Supports multiple concurrent sessions with a tab bar — click "+" to add sessions, click tabs to switch, click x to close. Set to `false` to disable. |
+| `WALLFACER_SANDBOX_FAST` | `true` | Enable fast-mode hints |
+| `WALLFACER_TERMINAL_ENABLED` | `true` | Enable the integrated host terminal panel. The Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. Supports multiple concurrent sessions with a tab bar: click "+" to add sessions, click tabs to switch, click x to close. Set to `false` to disable. |
 
 #### Data & Pagination
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_WORKSPACES` | -- | Workspace paths (colon-separated on Unix, semicolon on Windows); alternative to CLI arguments. On Windows, host paths are automatically translated for container volume mounts (Docker Desktop uses `/c/` prefix, Podman Desktop uses `/mnt/c/`). |
+| `WALLFACER_WORKSPACES` | -- | Workspace paths (colon-separated on Unix, semicolon on Windows); alternative to CLI arguments. |
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
 | `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days to retain soft-deleted task data before permanent removal |
 
@@ -294,26 +291,26 @@ Reports the resolved binary paths and `--version` output for each CLI. Missing c
 
 #### Cloud mode
 
-Wallfacer can optionally sign the user in to [latere.ai](https://latere.ai) and display their avatar + username in the status bar. Cloud-mode documentation lives in [`docs/cloud/`](../cloud/) — start with [`docs/cloud/README.md`](../cloud/README.md) for the env-var reference, deployment constraints, and the cloud/local partition. The sign-in badge is hidden entirely when `WALLFACER_CLOUD` is unset, so local-only deployments are unchanged.
+Wallfacer can optionally sign the user in to [latere.ai](https://latere.ai) and display their avatar + username in the status bar. Cloud-mode documentation lives in [`docs/cloud/`](../cloud/) -- start with [`docs/cloud/README.md`](../cloud/README.md) for the env-var reference, deployment constraints, and the cloud/local partition. The sign-in badge is hidden entirely when `WALLFACER_CLOUD` is unset, so local-only deployments are unchanged.
 
 ### System Prompt Templates
 
-Wallfacer uses eight built-in Go template files to instruct agent activities:
+Wallfacer ships built-in Go template files that instruct its agent activities. The most commonly edited ones:
 
 | Template | Purpose |
 |---|---|
 | `title.tmpl` | Task title generation |
 | `commit.tmpl` | Commit message generation |
-| `test.tmpl` | Test verification agent |
-| `refinement.tmpl` | Prompt refinement agent |
+| `test.tmpl` | Test-verification agent |
 | `oversight.tmpl` | Oversight summary generation |
 | `ideation.tmpl` | Brainstorm/ideation agent |
 | `conflict.tmpl` | Merge conflict resolution |
 | `instructions.tmpl` | Workspace instructions (AGENTS.md) generation |
+| `task_prompt_refine.tmpl` | Plan task-mode prompt refinement (`update_task_prompt`) |
 
 #### Viewing and Editing
 
-Open **Settings > Workspace > System Prompt Templates > Manage** to view all templates. Each template shows whether a user override exists. Click a template name to view its content and edit it.
+Open **Settings > Prompts > System Prompt Templates > Manage** to view the templates. Each shows whether a user override exists. Click a template name to view its content and edit it.
 
 Overrides are validated as Go templates before saving. If the template is invalid, the save is rejected with a parse error message.
 
@@ -329,7 +326,7 @@ Delete a user override via the template editor or the API (`DELETE /api/system-p
 
 #### What AGENTS.md Is
 
-Each unique set of workspaces gets its own `AGENTS.md` file stored in `~/.wallfacer/instructions/`. This file is mounted read-only into every task container at `/workspace/AGENTS.md`, where the agent picks it up automatically as context.
+Each unique set of workspaces gets its own `AGENTS.md` file stored in `~/.wallfacer/instructions/`. Wallfacer supplies its path to the agent through the `WALLFACER_INSTRUCTIONS_PATH` environment variable: Claude appends the file as a system prompt, and Codex inlines its contents. The agent picks it up automatically as context.
 
 #### How Fingerprinting Works
 
@@ -344,7 +341,7 @@ On first run with a new workspace set, Wallfacer creates the `AGENTS.md` from:
 
 #### Editing
 
-Open **Settings > Workspace > AGENTS.md > Edit** to modify the instructions in the web UI. Changes are saved to the fingerprinted file in `~/.wallfacer/instructions/`.
+Open **Settings > Prompts > AGENTS.md > Edit** to modify the instructions in the web UI. Changes are saved to the fingerprinted file in `~/.wallfacer/instructions/`.
 
 #### Re-Initializing
 
@@ -356,7 +353,7 @@ Prompt templates are reusable named prompt fragments for common task patterns.
 
 #### Creating a Template
 
-Open **Settings > Workspace > Prompt Templates > Manage**. Enter a name and body, then save. Templates are stored in `~/.wallfacer/templates.json`.
+Open **Settings > Prompts > Prompt Templates > Manage**. Enter a name and body, then save. Templates are stored in `~/.wallfacer/templates.json`.
 
 #### Using Templates
 
@@ -377,7 +374,7 @@ wallfacer run [flags] [workspace...]
 ```
 
 **Positional arguments:**
-- `workspace` -- directories to mount in the sandbox (default: current directory)
+- `workspace` -- directories to expose to tasks (default: current directory)
 
 **Flags:**
 
@@ -414,14 +411,63 @@ wallfacer status -addr :9090      # Connect to a different server
 
 #### wallfacer doctor
 
-Check prerequisites and configuration. Displays config paths, then verifies credentials, the `claude` / `codex` binaries on `$PATH`, and Git.
+Check prerequisites and configuration. Displays config paths, then verifies credentials, the `claude` / `codex` binaries on `$PATH`, and Git. Reports the resolved binary paths and `--version` output for each CLI.
 
 ```
 wallfacer doctor
 ```
 
+`wallfacer env` is an alias for `wallfacer doctor`; both run the same check.
+
 Output uses `[ok]` for passing checks, `[!]` for issues that need fixing, and `[ ]` for optional items that are not configured. Credential values are masked.
 
+#### wallfacer auth
+
+Sign the CLI (and the local-mode web UI) in to `auth.latere.ai` using the RFC 8628 device-authorization flow. The token is stored at `<UserConfigDir>/latere/token.json`, shared with the `latere` CLI, so a single login carries over between both tools.
+
+```
+wallfacer auth login    # Sign in (opens a browser for confirmation)
+wallfacer auth logout   # Remove the locally stored token
+wallfacer auth whoami   # Print the saved token's expiry
+```
+
+**Flags (login):**
+
+| Flag | Default | Description |
+|---|---|---|
+| `-auth-url` | `https://auth.latere.ai` (or `AUTH_URL`) | Auth service base URL |
+| `-client-id` | `wallfacer-cli` (or `AUTH_CLIENT_ID`) | OAuth client id |
+| `-scopes` | `openid email profile offline_access` | Space-separated scope list |
+| `-org` | `""` | Scope the login to this `org_id` (empty string = personal context) |
+| `-personal` | `false` | Force personal context (equivalent to `-org=""`) |
+| `-no-browser` | `false` | Do not open the verification URL automatically |
+
+#### wallfacer web
+
+Start the OIDC-authenticated web frontend server (the cloud-mode entry point). Serves the SPA plus `/login`, `/callback`, `/logout`, `/api/me`, and `/healthz` / `/readyz` probes.
+
+```
+wallfacer web [flags]
+```
+
+| Flag | Env Var | Default | Description |
+|---|---|---|---|
+| `-addr` | `WALLFACERD_ADDR` | `:8080` | Listen address |
+
+Auth is configured through `AUTH_URL`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_REDIRECT_URL`, and `AUTH_COOKIE_KEY`. OIDC is disabled when `AUTH_CLIENT_ID` is unset.
+
+#### wallfacer spec
+
+Spec tooling for the Plan workflow.
+
+```
+wallfacer spec new [flags] <path>      # Scaffold a spec file with valid frontmatter
+wallfacer spec validate [flags] [paths...]   # Validate the specs/ tree
+```
+
+**`spec new` flags:** `-title`, `-status` (default `vague`), `-effort` (default `medium`), `-author`, `-force`. The path must be under a track directory, e.g. `specs/local/my-feature.md`.
+
+**`spec validate` flags:** `-specs-dir` (default `specs`), `-json`, `-warnings` (default `true`). With no positional paths it walks the whole `specs/` tree; cross-spec checks (cycle detection, unique dispatch) always run across the full graph. Exit code is `1` when any error is reported.
 
 ### Security
 
@@ -477,9 +523,11 @@ Access via **Settings > About**.
 
 ### Workspace Settings
 
-**Active Workspaces** -- Lists the directories currently mounted into task containers. Click **Change** to open the workspace picker and select different directories.
+**Active Workspaces** -- Lists the directories currently exposed to tasks as git worktrees. Click **Change** to open the workspace picker and select different directories.
 
-**Saved Workspace Groups** -- Previously used workspace combinations are saved automatically. Switch back to any saved group without rebuilding the folder set.
+**Saved Workspace Groups** -- Previously used workspace combinations are saved automatically. Switch back to any saved group without rebuilding the folder set. Each group can carry its own `WALLFACER_MAX_PARALLEL` and `WALLFACER_MAX_TEST_PARALLEL` overrides.
+
+Access via **Settings > Workspace**.
 
 ---
 
@@ -487,6 +535,6 @@ Access via **Settings > About**.
 
 - [Getting Started](getting-started.md) -- initial setup and first task
 - [Usage Guide](usage.md) -- task creation, feedback, autopilot, and results
-- [Circuit Breakers](circuit-breakers.md) -- container launch failure protection
+- [Circuit Breakers](circuit-breakers.md) -- agent launch failure protection
 - [Refinement & Ideation](refinement-and-ideation.md) -- prompt refinement and brainstorm agents
 - [Architecture](../internals/architecture.md) -- system design for contributors
