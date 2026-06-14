@@ -15,7 +15,6 @@ export const useUiStore = defineStore('ui', () => {
   const showSettings = ref(false);
   const showWorkspaces = ref(false);
   const showPalette = ref(false);
-  const showInstructions = ref(false);
   const showSystemPrompts = ref(false);
   const showTemplates = ref(false);
   // Terminal visibility now lives in the dock store (the terminal is a dockable
@@ -56,8 +55,6 @@ export const useUiStore = defineStore('ui', () => {
   function openPalette() { showPalette.value = true; }
   function openPaletteWith(seed: string) { paletteSeed.value = seed; showPalette.value = true; }
   function closePalette() { showPalette.value = false; }
-  function openInstructions() { showSettings.value = false; showInstructions.value = true; }
-  function closeInstructions() { showInstructions.value = false; }
   function openSystemPrompts() { showSettings.value = false; showSystemPrompts.value = true; }
   function closeSystemPrompts() { showSystemPrompts.value = false; }
   function openTemplates() { showSettings.value = false; showTemplates.value = true; }
@@ -73,7 +70,7 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     showSettings, showWorkspaces, showPalette,
-    showInstructions, showSystemPrompts, showTemplates, showTerminal,
+    showSystemPrompts, showTemplates, showTerminal,
     showExplorer, showShortcuts, showArchived, setShowArchived,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
@@ -81,7 +78,6 @@ export const useUiStore = defineStore('ui', () => {
     openWorkspaces, closeWorkspaces,
     openPalette, openPaletteWith, closePalette,
 
-    openInstructions, closeInstructions,
     openSystemPrompts, closeSystemPrompts,
     openTemplates, closeTemplates,
     openTerminal, closeTerminal, toggleTerminal,
