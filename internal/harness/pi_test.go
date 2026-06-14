@@ -200,6 +200,32 @@ func TestPi_ParseEvent_AgentEndResultWithUsage(t *testing.T) {
 	}
 }
 
+func TestPi_ParseEvent_AssistantStringContentIgnored(t *testing.T) {
+	// Some messages carry content as a bare string rather than a block array;
+	// piMessageText must tolerate that and yield no prose.
+	raw := []byte(`{"type":"message_end","message":{"role":"assistant","content":"plain string","stopReason":"stop"}}`)
+	evt, _ := piHarness{}.ParseEvent(raw)
+	if evt.Kind != KindAssistantText {
+		t.Errorf("Kind = %v, want KindAssistantText", evt.Kind)
+	}
+	if evt.Text != "" {
+		t.Errorf("string content should not yield prose; got %q", evt.Text)
+	}
+}
+
+func TestPi_ParseEvent_AgentEndNoAssistant(t *testing.T) {
+	// agent_end with no assistant message still terminates the run; it just
+	// carries no text or usage.
+	raw := []byte(`{"type":"agent_end","messages":[{"role":"user","content":"hi"}]}`)
+	evt, _ := piHarness{}.ParseEvent(raw)
+	if evt.Kind != KindResult {
+		t.Errorf("Kind = %v, want KindResult", evt.Kind)
+	}
+	if evt.Text != "" || evt.Usage != nil {
+		t.Errorf("no assistant message should mean no text/usage; got text=%q usage=%+v", evt.Text, evt.Usage)
+	}
+}
+
 func TestPi_ParseEvent_AgentEndError(t *testing.T) {
 	raw := []byte(`{"type":"agent_end","messages":[{"role":"assistant","content":[],"stopReason":"error"}]}`)
 	evt, _ := piHarness{}.ParseEvent(raw)
@@ -215,6 +241,21 @@ func TestPi_ParseEvent_Unknown(t *testing.T) {
 	}
 	if evt.Kind != KindUnknown {
 		t.Errorf("Kind = %v, want KindUnknown", evt.Kind)
+	}
+}
+
+func TestPi_ParseEvent_MalformedJSON(t *testing.T) {
+	// A non-JSON line is recorded as KindUnknown with Raw preserved, never an
+	// error, so the runner tolerates schema drift / stray stderr bleed.
+	evt, err := piHarness{}.ParseEvent([]byte(`not json at all`))
+	if err != nil {
+		t.Fatalf("ParseEvent: %v", err)
+	}
+	if evt.Kind != KindUnknown {
+		t.Errorf("Kind = %v, want KindUnknown", evt.Kind)
+	}
+	if len(evt.Raw) == 0 {
+		t.Error("Raw should be preserved even for unparseable lines")
 	}
 }
 
