@@ -136,11 +136,12 @@ Every task runs on an isolated git branch and worktree, so multiple tasks can wo
 
 #### How worktrees are created
 
-```
-main branch ─────────────────────────
-  ├── task-abc worktree (isolated)
-  ├── task-def worktree (isolated)
-  └── task-ghi worktree (isolated)
+```mermaid
+flowchart LR
+    main["main branch"]
+    main --> a["task-abc worktree (isolated)"]
+    main --> b["task-def worktree (isolated)"]
+    main --> c["task-ghi worktree (isolated)"]
 ```
 
 When a task moves to **In Progress**:
