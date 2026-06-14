@@ -145,46 +145,46 @@ type patchAuthMeResponse struct {
 	RedirectURL string `json:"redirect_url"`
 }
 
-// PatchAuthMe validates the caller is a member of the requested org,
-// clears the wallfacer session cookie, and returns a JSON body with
-// the /login URL the frontend should navigate to. The actual token
-// refresh happens as part of that redirect (auth service honors
-// org_id on /authorize and mints a new token).
-func (h *Handler) PatchAuthMe(w http.ResponseWriter, r *http.Request) {
+// doOrgSwitch validates the requested org switch, clears the local session
+// cookie, and returns the /login URL the browser should follow. On any failure
+// it has already written the error response and returns ok=false. Shared by the
+// canonical SwitchOrg (POST /api/me/switch-org) and the legacy PatchAuthMe.
+//
+// The actual token refresh happens as part of the redirect: the auth service
+// honors org_id on /authorize and mints a new token. /login?org_id=<uuid>
+// scopes to that org; /login?org_id= (explicit empty) resets the SSO session's
+// active_org to NULL (personal view). The explicit `?` matters: an absent
+// ?org_id is a no-op on the auth side and would keep the prior org.
+func (h *Handler) doOrgSwitch(w http.ResponseWriter, r *http.Request) (string, bool) {
 	if h.auth == nil {
 		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "auth not configured"})
-		return
+		return "", false
 	}
-
 	req, ok := httpjson.DecodeBody[patchAuthMeRequest](w, r)
 	if !ok {
-		return
+		return "", false
 	}
 	req.OrgID = strings.TrimSpace(req.OrgID)
-	// Empty org_id is a valid "switch to personal" request. Non-empty
-	// requires membership verification; empty skips straight to the
-	// redirect with an explicit empty org_id param that the auth
-	// service reads as "clear active_org on this SSO session."
 	client, ok := h.auth.(sessionReader)
 	if !ok {
 		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "auth not configured"})
-		return
+		return "", false
 	}
 	if refresher, ok := h.auth.(tokenRefresher); ok {
 		_ = refresher.UserFromRequest(w, r)
 	}
 	if req.OrgID != "" {
-		// Membership check: give a clean 403 rather than letting the
-		// auth service silently ignore the param.
+		// Membership check: give a clean 403 rather than letting the auth
+		// service silently ignore the param.
 		sess, err := client.GetSession(r)
 		if err != nil || sess == nil || sess.AccessToken == "" {
 			httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
-			return
+			return "", false
 		}
 		orgs, err := fetchOrgs(r.Context(), h.authURL, sess.AccessToken)
 		if err != nil {
 			httpjson.Write(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-			return
+			return "", false
 		}
 		isMember := false
 		for _, o := range orgs {
@@ -195,21 +195,27 @@ func (h *Handler) PatchAuthMe(w http.ResponseWriter, r *http.Request) {
 		}
 		if !isMember {
 			httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "not a member of target org"})
-			return
+			return "", false
 		}
 	}
-
-	// Clear our local cookie so the forthcoming /login → /callback
-	// lands a clean, newly-scoped session (org or personal).
 	auth.ClearSession(w)
+	return "/login?org_id=" + req.OrgID, true
+}
 
-	// /login?org_id=<uuid> scopes to that org; /login?org_id=
-	// (explicit empty) resets the SSO session's active_org back to
-	// NULL so the user returns to personal view. The explicit `?`
-	// in the URL matters — absent ?org_id is a no-op on the auth
-	// side, which would preserve the user's previously-chosen org.
-	redirect := "/login?org_id=" + req.OrgID
-	httpjson.Write(w, http.StatusOK, patchAuthMeResponse{RedirectURL: redirect})
+// SwitchOrg is the canonical active-org switch (POST /api/me/switch-org) the
+// latere-ui session store calls. Returns {redirect} for the SPA to follow.
+func (h *Handler) SwitchOrg(w http.ResponseWriter, r *http.Request) {
+	if redirect, ok := h.doOrgSwitch(w, r); ok {
+		httpjson.Write(w, http.StatusOK, map[string]string{"redirect": redirect})
+	}
+}
+
+// PatchAuthMe is the legacy org-switch endpoint (PATCH /api/auth/me), kept for
+// the generated client; identical logic, {redirect_url} body.
+func (h *Handler) PatchAuthMe(w http.ResponseWriter, r *http.Request) {
+	if redirect, ok := h.doOrgSwitch(w, r); ok {
+		httpjson.Write(w, http.StatusOK, patchAuthMeResponse{RedirectURL: redirect})
+	}
 }
 
 // fetchOrgs calls auth.latere.ai/me/orgs with the given access token
