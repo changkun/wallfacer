@@ -38,9 +38,9 @@ func newStoreForTest(t *testing.T) *store.Store {
 	return s
 }
 
-// TestRunner_HostMode_AlwaysOn verifies that NewRunner builds a HostBackend
-// and flips hostMode on.
-func TestRunner_HostMode_AlwaysOn(t *testing.T) {
+// TestRunner_BuildsHostBackend verifies that NewRunner wires up a host
+// backend from resolved binaries.
+func TestRunner_BuildsHostBackend(t *testing.T) {
 	bin := buildFakeAgentForTest(t)
 
 	s := newStoreForTest(t)
@@ -51,9 +51,6 @@ func TestRunner_HostMode_AlwaysOn(t *testing.T) {
 	})
 	t.Cleanup(func() { r.Shutdown() })
 
-	if !r.HostMode() {
-		t.Error("HostMode() = false; want true")
-	}
 	if r.SandboxBackend() == nil {
 		t.Error("SandboxBackend() returned nil")
 	}
@@ -81,19 +78,17 @@ func TestNewRunner_UnresolvableClaudeDoesNotExit(t *testing.T) {
 	}
 }
 
-// TestSandboxForTaskActivity_HostMode_PassesCodexThrough verifies that host
-// mode no longer coerces codex routing — the host backend supports codex
-// natively now, so explicit or env-routed codex choices pass through to the
-// backend's codex launcher.
-func TestSandboxForTaskActivity_HostMode_PassesCodexThrough(t *testing.T) {
+// TestSandboxForTaskActivity_PassesCodexThrough verifies that codex routing is
+// not coerced — the host backend supports codex natively, so explicit or
+// env-routed codex choices pass through to the backend's codex launcher.
+func TestSandboxForTaskActivity_PassesCodexThrough(t *testing.T) {
 	s := newStoreForTest(t)
 	r := NewRunner(s, RunnerConfig{Command: "echo"})
 	t.Cleanup(func() { r.Shutdown() })
-	r.hostMode = true
 
 	task := &store.Task{Sandbox: "codex"}
 	got := r.sandboxForTaskActivity(task, activityImplementation)
 	if string(got) != "codex" {
-		t.Errorf("host mode should pass codex through; got %q", got)
+		t.Errorf("codex should pass through; got %q", got)
 	}
 }

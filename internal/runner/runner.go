@@ -159,7 +159,6 @@ type Runner struct {
 	oversightMu            keyedmu.Map[string]              // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker          // circuit breaker for container launch operations
 	backend                executor.Backend                 // pluggable sandbox backend (local podman/docker, host, future: k8s)
-	hostMode               bool                             // true when backend is a HostBackend (no container, no /workspace/* paths)
 	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
@@ -497,7 +496,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		OpenCodeBinary: cfg.HostOpenCodeBinary,
 	})
 	r.backend = hb
-	r.hostMode = true
 	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {
@@ -728,14 +726,6 @@ func (r *Runner) Prompts() *prompts.Manager {
 // SandboxBackend returns the sandbox backend used for container operations.
 func (r *Runner) SandboxBackend() executor.Backend {
 	return r.backend
-}
-
-// HostMode reports whether the runner is running in host-process mode — i.e.
-// the sandbox backend is a HostBackend that execs claude/codex directly.
-// Callers use this to skip container-only setup (e.g. /workspace/* path
-// rewrites, named-volume mounts) that is meaningless in host mode.
-func (r *Runner) HostMode() bool {
-	return r.hostMode
 }
 
 // HasHostCodexAuth reports whether a usable host Codex auth cache exists.

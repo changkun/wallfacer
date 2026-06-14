@@ -74,7 +74,6 @@ type Interface interface {
 	// Configuration accessors.
 	Command() string
 	SandboxBackend() executor.Backend
-	HostMode() bool
 	WorktreesDir() string
 	TmpDir() string
 	EnvFile() string

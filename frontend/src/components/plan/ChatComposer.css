@@ -1,0 +1,182 @@
+.pcp-composer {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.pcp-composer-input {
+  position: relative;
+}
+
+.pcp-textarea {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--ink);
+  resize: none;
+  line-height: 1.4;
+  box-sizing: border-box;
+  max-height: 200px;
+}
+
+.pcp-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pcp-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 5;
+}
+
+.pcp-dropdown-item {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink);
+}
+
+.pcp-dropdown-item:hover,
+.pcp-dropdown-item--active {
+  background: var(--bg-hover);
+}
+
+.pcp-dropdown-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pcp-dropdown-desc {
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcp-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.pcp-composer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.pcp-composer-action {
+  font-size: 12px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.pcp-composer-action:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+
+.pcp-composer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pcp-send-hint {
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+.pcp-send-group {
+  display: inline-flex;
+}
+
+.pcp-send,
+.pcp-send-toggle {
+  font-size: 13px;
+  padding: 4px 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.pcp-send {
+  border-top-left-radius: var(--r-sm);
+  border-bottom-left-radius: var(--r-sm);
+}
+
+.pcp-send-toggle {
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 6px;
+  border-top-right-radius: var(--r-sm);
+  border-bottom-right-radius: var(--r-sm);
+}
+
+.pcp-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pcp-interrupt {
+  background: var(--warn, #c87b1c);
+}
+
+/* ── Variants ──────────────────────────────────────────────────────── */
+
+/* Hero (entry screen) and docked (conversation) share a generous, framed
+   composer that reads as the primary surface rather than a side panel. */
+.pcp-composer--hero,
+.pcp-composer--docked {
+  border-top: none;
+  padding: 12px 14px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg, 14px);
+  background: var(--bg-card);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+}
+
+.pcp-composer--hero .pcp-textarea,
+.pcp-composer--docked .pcp-textarea {
+  font-size: 14px;
+  border: none;
+  background: transparent;
+  padding: 6px 4px;
+}
+
+.pcp-composer--hero .pcp-textarea {
+  min-height: 56px;
+}
+
+.pcp-composer--hero .pcp-textarea:focus,
+.pcp-composer--docked .pcp-textarea:focus {
+  border: none;
+}
+
+.pcp-composer--compact {
+  padding: 6px 8px 8px;
+}

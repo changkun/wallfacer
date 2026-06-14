@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -1302,8 +1303,14 @@ func TestUpdateTask_SetDependsOn_AbsentFieldNoOp(t *testing.T) {
 // lowest-position backlog task when its dependencies are not satisfied, and
 // promotes the next eligible task instead.
 func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	h.runner = &runner.MockRunner{Host: false}
+	h, envPath := newTestHandlerWithEnv(t)
+	// The runner caps default parallel to 1; opt into more slots so the
+	// promoter has room beyond the already-in-progress dep task.
+	limit := "5"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxParallel: &limit}); err != nil {
+		t.Fatalf("envconfig.Update: %v", err)
+	}
+	h.runner = &runner.MockRunner{}
 	h.cachedMaxParallel.Invalidate()
 	h.autopilot.Store(true)
 
@@ -2132,13 +2139,8 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 	t.Cleanup(r.Shutdown)
 
 	h := NewHandler(s, r, t.TempDir(), []string{repo}, nil)
-	// Host backend caps default parallel to 1; swap in a non-host mock
-	// runner for the cap check so tryAutoPromote isn't artificially gated
-	// here. Production handler still talks to the real runner for the
-	// actual promote action because tryAutoPromote only uses h.runner for
-	// HostMode() via the cached limit.
-	h.runner = &runner.MockRunner{Host: false}
-	h.cachedMaxParallel.Invalidate()
+	// Only one task is promoted here and nothing else occupies a slot, so the
+	// default cap of 1 is enough — no parallelism override needed.
 	h.SetAutopilot(true)
 	ctx := context.Background()
 
