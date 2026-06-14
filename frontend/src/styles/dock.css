@@ -1,0 +1,127 @@
+/* Dockable panel workspace. The center editor (RouterView page) fills the
+   space; dockable panels occupy resizable regions on the four edges, or
+   eclipse everything when maximized. See DockWorkspace.vue. */
+
+.dock-ws {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* The middle row: left region | editor | right region. */
+.dock-mid {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+}
+
+/* Center editor: hosts the page (board / plan). Mirrors how .app-main used to
+   host the slot, one level deeper, so board-grid's flex:1 still fills. */
+.dock-editor {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dock-region {
+  flex-shrink: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--terminal-bg);
+}
+.dock-region--left,
+.dock-region--right {
+  height: 100%;
+}
+.dock-region__mount {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+/* Drag gutters between a region and the editor. */
+.dock-gutter {
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+}
+.dock-gutter--h {
+  height: 4px;
+  cursor: ns-resize;
+  border-block: 1px solid var(--rule);
+}
+.dock-gutter--v {
+  width: 4px;
+  cursor: ew-resize;
+  border-inline: 1px solid var(--rule);
+}
+.dock-gutter:hover {
+  background: var(--accent);
+}
+
+/* Maximized-panel overlay. */
+.dock-max {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  background: var(--terminal-bg);
+}
+
+/* A docked panel body fills its region/overlay (no fixed height like the old
+   bottom drawer). */
+.dock-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Dock controls cluster on the right of the panel's tab bar. */
+.dock-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+  padding-right: 4px;
+  flex-shrink: 0;
+}
+.dock-panel__btn {
+  background: none;
+  border: none;
+  color: var(--terminal-ink-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--r-sm);
+}
+.dock-panel__btn:hover {
+  color: var(--terminal-fg);
+  background: var(--terminal-tab-hover);
+}
+.dock-panel__btn--active {
+  color: var(--terminal-fg);
+  background: var(--terminal-tab-active);
+}
+.dock-panel__btn--close:hover {
+  color: var(--terminal-fg);
+  background: color-mix(in oklab, var(--danger, #c0392b) 60%, transparent);
+}

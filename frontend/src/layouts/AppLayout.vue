@@ -9,7 +9,7 @@ import WorkspacePicker from '../components/WorkspacePicker.vue';
 import InstructionsEditor from '../components/InstructionsEditor.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
 import TemplatesManager from '../components/TemplatesManager.vue';
-import TerminalPanel from '../components/TerminalPanel.vue';
+import DockWorkspace from '../components/DockWorkspace.vue';
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import Toaster from '../components/Toaster.vue';
@@ -137,8 +137,9 @@ useKeyboard({
         <span aria-hidden="true">⚠</span>
         Live updates paused — server unreachable. Reconnecting…
       </div>
-      <slot :connected="connected" :conn-state="connState" />
-      <TerminalPanel />
+      <DockWorkspace>
+        <slot :connected="connected" :conn-state="connState" />
+      </DockWorkspace>
       <StatusBar :connected="connected" :conn-state="connState" @shortcuts="ui.openShortcuts()" />
     </div>
     <CommandPalette v-model="ui.showPalette" />

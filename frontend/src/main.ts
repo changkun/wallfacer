@@ -8,6 +8,7 @@ import './styles/board-tokens.css';
 import './styles/base.css';
 import './styles/header.css';
 import './styles/status-bar.css';
+import './styles/dock.css';
 import './styles/badges.css';
 import './styles/forms.css';
 import './styles/buttons.css';
