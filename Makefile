@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once
 
 # Full build gate: fmt + lint + binary.
 build: fmt lint frontend-build build-binary
@@ -128,30 +128,7 @@ BRANCH ?= $(shell git branch --show-current)
 push-once:
 	./scripts/push-once.sh "$(REMOTE)" "$(BRANCH)"
 
-# Generate release notes via LLM and save to docs/releases/.
-# The script builds a prompt from the git diff, pipes it through claude,
-# and writes the result to docs/releases/<version>.md.
-# Usage:
-#   make release-notes RELEASE_VERSION=v0.0.6
-release-notes:
-ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required. Usage: make release-notes RELEASE_VERSION=v0.0.6)
-endif
-	@./scripts/release-notes.sh "$(RELEASE_VERSION)"
-
-# Create a GitHub release.
-# Expects docs/releases/<version>.md to exist (run make release-notes first).
-# Commits the notes, tags, pushes, and creates the GitHub release.
-# Usage:
-#   make release-notes RELEASE_VERSION=v0.0.6   # step 1: generate + review
-#   make release RELEASE_VERSION=v0.0.6          # step 2: publish
-release:
-ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required. Usage: make release RELEASE_VERSION=v0.0.6)
-endif
-	@test -f docs/releases/$(RELEASE_VERSION).md || (echo "Error: docs/releases/$(RELEASE_VERSION).md not found. Run 'make release-notes' first." >&2; exit 1)
-	git add docs/releases/$(RELEASE_VERSION).md
-	git commit -m "docs: add $(RELEASE_VERSION) release notes"
-	git tag -a "$(RELEASE_VERSION)" -m "$(RELEASE_VERSION)"
-	git push origin main "$(RELEASE_VERSION)"
-	gh release create "$(RELEASE_VERSION)" --title "$(RELEASE_VERSION)" --notes-file docs/releases/$(RELEASE_VERSION).md
+# Releases are automated. Push a version tag and the Release workflow
+# (.github/workflows/release.yml) builds the binaries, pushes the image,
+# deploys to k8s, and publishes the GitHub release with generated notes:
+#   git tag v0.0.7 && git push origin v0.0.7
