@@ -108,7 +108,9 @@ async function saveGroups(next: WorkspaceGroup[], verb: string) {
 defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ toggle: []; workspaces: []; palette: [] }>();
 
-const cloudMode = computed(() => store.config?.cloud_mode === true);
+// Sign-in is available whenever the server wired an OIDC client (the default
+// for `wallfacer run`). Drives the account chip / sign-in button below.
+const authEnabled = computed(() => store.config?.auth_enabled === true);
 
 const presence = computed(() => derivePresence(store.inProgress, auth.me));
 
@@ -177,7 +179,7 @@ function onNavigate(item: { id: string }) {
 }
 
 onMounted(() => {
-  if (cloudMode.value && !auth.loaded) void auth.fetchMe();
+  if (authEnabled.value && !auth.loaded) void auth.fetchMe();
   if (route.path === '/') markBoardSeen();
 });
 
@@ -326,7 +328,7 @@ watch(wsPopoverOpen, (open) => {
     <!-- Cloud-mode account chip (only when /api/me responds) -->
     <template #foot>
       <a
-        v-if="cloudMode && auth.me"
+        v-if="authEnabled && auth.me"
         class="sb-account"
         :href="auth.me.auth_url ? auth.me.auth_url + '/me' : '#'"
         target="_blank"
@@ -343,7 +345,7 @@ watch(wsPopoverOpen, (open) => {
         </span>
       </a>
       <a
-        v-else-if="cloudMode && auth.loaded && !auth.me && store.config?.workspaces"
+        v-else-if="authEnabled && auth.loaded && !auth.me && store.config?.workspaces"
         class="sb-account sb-account--signin"
         href="/login"
       >
