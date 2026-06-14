@@ -29,7 +29,7 @@ var unprotectedPaths = map[string]struct{}{
 	"/logout":        {},
 	"/logout/notify": {},
 	"/api/config":    {},
-	"/api/auth/me":   {},
+	"/api/me":        {},
 	"/favicon.ico":   {},
 }
 
