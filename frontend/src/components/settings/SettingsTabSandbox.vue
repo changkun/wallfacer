@@ -31,7 +31,6 @@ const titleModel = ref('');
 const codexDefaultModel = ref('');
 const codexTitleModel = ref('');
 const defaultSandbox = ref('');
-const sandboxFast = ref(true);
 
 const claudeModels = computed(() => claudeModelsFor(claudeBaseUrl.value));
 const codexModels = computed(() => codexModelsFor(openaiBaseUrl.value));
@@ -41,6 +40,7 @@ const claudeTestReauth = ref(false);
 const codexTestStatus = ref('');
 const codexTestReauth = ref(false);
 const cursorTestStatus = ref('');
+const piTestStatus = ref('');
 const saveStatus = ref('');
 
 const claudeOauthStatus = ref('');
@@ -88,12 +88,12 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   codexDefaultModel.value = cfg?.codex_default_model || '';
   codexTitleModel.value = cfg?.codex_title_model || '';
   defaultSandbox.value = cfg?.default_sandbox || '';
-  sandboxFast.value = cfg?.sandbox_fast !== false;
   claudeTestStatus.value = '';
   claudeTestReauth.value = false;
   codexTestStatus.value = '';
   codexTestReauth.value = false;
   cursorTestStatus.value = '';
+  piTestStatus.value = '';
 }
 
 watch(env, (cfg) => applyEnvToForm(cfg), { immediate: false });
@@ -119,7 +119,6 @@ function buildSavePayload(): EnvUpdatePayload {
   // Activity-specific routing is retired — send empty map so the server
   // clears any legacy WALLFACER_SANDBOX_* entries.
   body.sandbox_by_activity = {};
-  body.sandbox_fast = sandboxFast.value;
   return body;
 }
 
@@ -151,7 +150,6 @@ interface ClaudeTestPayload {
   sandbox: 'claude';
   default_sandbox: string;
   sandbox_by_activity: Record<string, string>;
-  sandbox_fast: boolean;
   base_url?: string;
   default_model?: string;
   title_model?: string;
@@ -163,7 +161,6 @@ interface CodexTestPayload {
   sandbox: 'codex';
   default_sandbox: string;
   sandbox_by_activity: Record<string, string>;
-  sandbox_fast: boolean;
   openai_base_url?: string;
   codex_default_model?: string;
   codex_title_model?: string;
@@ -174,20 +171,26 @@ interface CursorTestPayload {
   sandbox: 'cursor';
   default_sandbox: string;
   sandbox_by_activity: Record<string, string>;
-  sandbox_fast: boolean;
   cursor_api_key?: string;
 }
 
-type TestPayload = ClaudeTestPayload | CodexTestPayload | CursorTestPayload;
+// Pi has no dedicated credential in v1: it reads provider keys (Anthropic,
+// OpenAI, etc.) from the same env the Claude/Codex blocks configure.
+interface PiTestPayload {
+  sandbox: 'pi';
+  default_sandbox: string;
+  sandbox_by_activity: Record<string, string>;
+}
 
-function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor'): TestPayload {
+type TestPayload = ClaudeTestPayload | CodexTestPayload | CursorTestPayload | PiTestPayload;
+
+function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi'): TestPayload {
   const raw = buildSavePayload();
   if (sandbox === 'claude') {
     const p: ClaudeTestPayload = {
       sandbox: 'claude',
       default_sandbox: raw.default_sandbox || '',
       sandbox_by_activity: raw.sandbox_by_activity || {},
-      sandbox_fast: raw.sandbox_fast !== false,
       base_url: raw.base_url,
       default_model: raw.default_model,
       title_model: raw.title_model,
@@ -201,16 +204,22 @@ function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor'): TestPayload {
       sandbox: 'cursor',
       default_sandbox: raw.default_sandbox || '',
       sandbox_by_activity: raw.sandbox_by_activity || {},
-      sandbox_fast: raw.sandbox_fast !== false,
     };
     if (raw.cursor_api_key) p.cursor_api_key = raw.cursor_api_key;
+    return p;
+  }
+  if (sandbox === 'pi') {
+    const p: PiTestPayload = {
+      sandbox: 'pi',
+      default_sandbox: raw.default_sandbox || '',
+      sandbox_by_activity: raw.sandbox_by_activity || {},
+    };
     return p;
   }
   const p: CodexTestPayload = {
     sandbox: 'codex',
     default_sandbox: raw.default_sandbox || '',
     sandbox_by_activity: raw.sandbox_by_activity || {},
-    sandbox_fast: raw.sandbox_fast !== false,
     openai_base_url: raw.openai_base_url,
     codex_default_model: raw.codex_default_model,
     codex_title_model: raw.codex_title_model,
@@ -233,19 +242,21 @@ function summarizeTestResult(resp: SandboxTestResponse | null | undefined): stri
   return `status ${resp.status}`;
 }
 
-function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor', text: string, reauth: boolean): void {
+function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi', text: string, reauth: boolean): void {
   if (sandbox === 'claude') {
     claudeTestStatus.value = text;
     claudeTestReauth.value = reauth;
   } else if (sandbox === 'codex') {
     codexTestStatus.value = text;
     codexTestReauth.value = reauth;
+  } else if (sandbox === 'pi') {
+    piTestStatus.value = text;
   } else {
     cursorTestStatus.value = text;
   }
 }
 
-async function testSandbox(sandbox: 'claude' | 'codex' | 'cursor'): Promise<void> {
+async function testSandbox(sandbox: 'claude' | 'codex' | 'cursor' | 'pi'): Promise<void> {
   setTestStatus(sandbox, 'Testing…', false);
   try {
     const resp = await api<SandboxTestResponse>('POST', '/api/env/test', buildTestPayload(sandbox));
@@ -742,6 +753,41 @@ function capitalize(s: string): string {
           </div>
         </div>
 
+        <!-- Pi block -->
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Pi</label>
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="font-size: 11px; color: var(--text-muted)">
+              The
+              <code style="font-family: monospace">pi</code>
+              coding agent from earendil-works (Armin Ronacher's Pi). This is
+              <strong>not</strong> Inflection's Pi chatbot. Pi has no dedicated
+              key: it reads provider credentials (Anthropic, OpenAI, etc.) from
+              the keys configured in the Claude and Codex blocks above. Model
+              selection uses a two-flag form,
+              <code style="font-family: monospace">--provider</code>
+              plus
+              <code style="font-family: monospace">--model</code>; pass a
+              <code style="font-family: monospace">provider/model</code>
+              string as the task model.
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+              <button
+                type="button"
+                class="btn-icon"
+                style="font-size: 12px; padding: 4px 10px"
+                @click="testSandbox('pi')"
+              >
+                Test
+              </button>
+              <span id="env-pi-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
+                {{ piTestStatus }}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Global Harness Routing -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
           <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Global Harness Routing</label>
@@ -767,10 +813,6 @@ function capitalize(s: string): string {
               pin that step to Claude or Codex. Workspace-wide fallbacks still
               come from <code>WALLFACER_DEFAULT_SANDBOX</code> above.
             </p>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary);">
-              <input id="env-sandbox-fast" v-model="sandboxFast" type="checkbox" />
-              <span>Enable <code style="font-family: monospace">/fast</code> for harness runs</span>
-            </label>
           </div>
         </div>
       </div>
