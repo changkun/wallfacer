@@ -121,6 +121,7 @@ export interface EnvConfig {
   base_url: string;
   openai_api_key: string;
   openai_base_url: string;
+  cursor_api_key: string;
   default_model: string;
   title_model: string;
   codex_default_model: string;
@@ -142,6 +143,7 @@ export interface EnvUpdatePayload {
   base_url?: string;
   openai_api_key?: string;
   openai_base_url?: string;
+  cursor_api_key?: string;
   default_model?: string;
   title_model?: string;
   codex_default_model?: string;
