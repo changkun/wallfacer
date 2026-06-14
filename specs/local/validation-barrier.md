@@ -186,4 +186,4 @@ sections target the legacy vanilla-JS frontend (`ui/js/tasks.js`,
 need (user-defined test criteria fed to the auto-tester, which still exists
 via `buildTestPrompt` / `tryAutoTest`) is still valid; a fresh spec written
 against the current data model and Vue frontend supersedes this one:
-[[test-criteria]] (`specs/oversight/test-criteria.md`).
+[[test-criteria]] (`specs/local/test-criteria.md`).
