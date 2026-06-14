@@ -464,6 +464,9 @@ func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 	if !slices.Contains(sandboxes, "opencode") {
 		t.Fatalf("expected sandboxes to include opencode, got %v", sandboxes)
 	}
+	if !slices.Contains(sandboxes, "pi") {
+		t.Fatalf("expected sandboxes to include pi, got %v", sandboxes)
+	}
 }
 
 // TestAvailableSandboxes_IncludesRegisteredHarnesses asserts the built-in
@@ -471,7 +474,7 @@ func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 // (cursor) appears without being hardcoded.
 func TestAvailableSandboxes_IncludesRegisteredHarnesses(t *testing.T) {
 	got := availableSandboxes(envconfig.Config{})
-	for _, want := range []harness.ID{harness.Claude, harness.Codex, harness.Cursor, harness.OpenCode} {
+	for _, want := range []harness.ID{harness.Claude, harness.Codex, harness.Cursor, harness.OpenCode, harness.Pi} {
 		if !slices.Contains(got, want) {
 			t.Errorf("availableSandboxes missing %q: %v", want, got)
 		}
