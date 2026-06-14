@@ -7,14 +7,18 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
-import { AccountMenu, AccountPrefs, type LocaleOption } from 'latere-ui';
+import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem } from 'latere-ui';
 
 import { useAuthStore } from '../stores/auth';
 import { usePrefsStore, type Locale } from '../stores/prefs';
 
 withDefaults(
-  defineProps<{ placement?: 'top-end' | 'bottom-start' }>(),
-  { placement: 'bottom-start' },
+  defineProps<{
+    placement?: 'top-end' | 'bottom-start';
+    /** App-specific rows (e.g. Me / Admin) rendered inside the menu. */
+    extraItems?: AccountMenuItem[];
+  }>(),
+  { placement: 'bottom-start', extraItems: () => [] },
 );
 
 const auth = useAuthStore();
@@ -41,6 +45,7 @@ function onSetLocale(code: string) {
   <AccountMenu
     :principal="auth.me"
     :placement="placement"
+    :extra-items="extraItems"
     :switching-org-id="switching"
     @switch-org="onSwitch"
     @logout="auth.logout()"
