@@ -9,6 +9,7 @@
   font-weight: 500;
   letter-spacing: 0.01em;
   line-height: 1.6;
+  white-space: nowrap;
 }
 .badge-backlog {
   background: var(--tint-neutral);
