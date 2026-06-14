@@ -5,13 +5,15 @@
 // overlay. The live panel (terminal) is mounted once here and teleported into
 // its current region's mount point so its xterm + WebSocket survive moves
 // (see specs/local/dockable-panel-workspace.md).
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, provide } from 'vue';
 import TerminalPanel from './TerminalPanel.vue';
 import { useDockStore } from '../stores/dock';
 import { clampRegionSize } from '../lib/dock/layout';
-import type { DockRegion } from '../lib/dock/types';
+import { DOCK_DRAG_KEY, hitTestZone } from '../lib/dock/drag';
+import type { DockRegion, PanelId } from '../lib/dock/types';
 
 const dock = useDockStore();
+const wsEl = ref<HTMLElement | null>(null);
 
 // Mount points the panels teleport into. Each edge has one; `maxEl` hosts a
 // maximized panel. v-show (not v-if) keeps maxEl in the DOM so its ref is stable.
@@ -49,6 +51,39 @@ const terminalTarget = computed<HTMLElement | null>(() => {
   return r ? regionEl[r].value : null;
 });
 
+// --- Drag-to-dock ----------------------------------------------------------
+// A panel header starts a drag; an edge drop-zone overlay shows where it will
+// land. Dropping on a zone docks the panel there; dropping in the center is a
+// no-op. The pointer -> zone math lives in lib/dock/drag (unit-tested).
+const drag = reactive<{ panel: PanelId | null; zone: DockRegion | null }>({ panel: null, zone: null });
+
+function beginDrag(panel: PanelId, e: MouseEvent) {
+  e.preventDefault();
+  drag.panel = panel;
+  drag.zone = null;
+  function move(ev: MouseEvent) {
+    const el = wsEl.value;
+    if (!el) return;
+    drag.zone = hitTestZone(el.getBoundingClientRect(), ev.clientX, ev.clientY);
+  }
+  function up() {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    const target = drag.zone;
+    const p = drag.panel;
+    drag.panel = null;
+    drag.zone = null;
+    if (p && target) {
+      if (dock.maximized === p) dock.restore();
+      dock.dockTo(p, target);
+    }
+  }
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+}
+
+provide(DOCK_DRAG_KEY, { begin: beginDrag });
+
 function startResize(region: DockRegion, e: MouseEvent) {
   e.preventDefault();
   const horizontal = region === 'left' || region === 'right';
@@ -74,7 +109,7 @@ function startResize(region: DockRegion, e: MouseEvent) {
 </script>
 
 <template>
-  <div class="dock-ws">
+  <div ref="wsEl" class="dock-ws" :class="{ 'dock-ws--dragging': drag.panel }">
     <template v-if="occupied('top')">
       <div class="dock-region dock-region--top" :style="regionStyle('top')">
         <div ref="topEl" class="dock-region__mount" />
@@ -122,6 +157,16 @@ function startResize(region: DockRegion, e: MouseEvent) {
         <div ref="bottomEl" class="dock-region__mount" />
       </div>
     </template>
+
+    <!-- Drop-zone overlay shown while dragging a panel header. -->
+    <div v-if="drag.panel" class="dock-drop">
+      <div
+        v-for="z in (['left', 'right', 'top', 'bottom'] as const)"
+        :key="z"
+        class="dock-drop__zone"
+        :class="[`dock-drop__zone--${z}`, { 'dock-drop__zone--active': drag.zone === z }]"
+      />
+    </div>
 
     <!-- Maximized-panel overlay. Kept mounted (v-show) so its ref is stable. -->
     <div v-show="maximized" ref="maxEl" class="dock-max" />

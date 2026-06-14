@@ -70,6 +70,40 @@
   background: var(--accent);
 }
 
+/* Drag-to-dock drop-zone overlay. Edge bands light up as the pointer nears. */
+.dock-ws--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.dock-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.dock-drop__zone {
+  position: absolute;
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  border: 1px dashed color-mix(in oklab, var(--accent) 45%, transparent);
+  transition: background 0.1s;
+}
+.dock-drop__zone--active {
+  background: color-mix(in oklab, var(--accent) 34%, transparent);
+  border-style: solid;
+}
+.dock-drop__zone--left { left: 0; top: 0; bottom: 0; width: 30%; }
+.dock-drop__zone--right { right: 0; top: 0; bottom: 0; width: 30%; }
+.dock-drop__zone--top { left: 0; right: 0; top: 0; height: 30%; }
+.dock-drop__zone--bottom { left: 0; right: 0; bottom: 0; height: 30%; }
+
+/* The header drag handle. */
+.dock-panel__grip {
+  cursor: grab;
+}
+.dock-panel__grip:active {
+  cursor: grabbing;
+}
+
 /* Maximized-panel overlay. */
 .dock-max {
   position: absolute;
