@@ -60,7 +60,7 @@ export const zh: Record<string, string> = {
 
   // Download page
   'wf.dl.title': '<span class="wallfacer-brand">下载</span>',
-  'wf.dl.sub': '原生应用，支持 macOS、Windows 和 Linux。',
+  'wf.dl.sub': '命令行工具，支持 macOS、Windows 和 Linux。',
   'wf.dl.macos.arch': '通用版 (Apple Silicon &amp; Intel)',
   'wf.dl.windows.arch': 'x86_64',
   'wf.dl.linux.arch': 'x86_64',
