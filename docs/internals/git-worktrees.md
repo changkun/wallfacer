@@ -10,7 +10,7 @@ graph LR
         MB["branch: main<br/>working tree: clean"]
     end
     subgraph Worktree["Task worktree (~/.wallfacer/worktrees/uuid/myapp)"]
-        TB["branch: task/a1b2c3d4<br/>mounted into container"]
+        TB["branch: task/a1b2c3d4<br/>agent CWD (host process)"]
     end
     Main -.->|"git worktree add"| Worktree
 ```
@@ -54,21 +54,18 @@ When a workspace is not a git repository (or is an empty git repo with no commit
 
 ### Broken Worktree Detection
 
-When `ensureTaskWorktrees()` finds a directory that exists but is not a valid git repo (e.g. the `.git` link was deleted or corrupted by a container), it removes the directory entirely and recreates the worktree from scratch.
+When `ensureTaskWorktrees()` finds a directory that exists but is not a valid git repo (e.g. the `.git` link was deleted or corrupted), it removes the directory entirely and recreates the worktree from scratch.
 
-## Container Mounts
+## Workspace Access
 
-The sandbox container sees worktrees, not the live main working directory:
+The agent runs as a host process with the task's git worktree as its working directory. There are no bind-mounts and no path translation: the agent reads and writes the worktree files directly on the host filesystem. Every edit lands on `task/<uuid8>` and never touches `main`.
 
-```
-~/.wallfacer/worktrees/<uuid>/<repo>  ->  /workspace/<repo>:z   (read-write)
-AGENTS.md (or CLAUDE.md)               ->  /workspace/AGENTS.md  (read-only)
-claude-config (named volume)           ->  /home/agent/.claude
-```
+Supporting context is surfaced to the host process via environment variables rather than mounts:
 
-The `.env` file is passed via `--env-file`, not as a bind mount.
-
-The agent operates on the worktree directory -- the isolated worktree branch -- so all edits land on `task/<uuid8>` and never touch `main`.
+- `WALLFACER_INSTRUCTIONS_PATH` points at the composed `AGENTS.md` (or `CLAUDE.md`); the host backend reads it to choose between `--append-system-prompt` and a prompt-prepend fallback.
+- `WALLFACER_BOARD_JSON` points at the host path of the board manifest.
+- `WALLFACER_SIBLING_WORKTREES_JSON` points at the sibling worktree manifest (see [Sibling Worktree Access](#sibling-worktree-access)).
+- The `.env` file is passed to the backend as an env-file path.
 
 ### Git Directory
 
@@ -82,9 +79,9 @@ Each task process runs with its git worktree as the working directory, so the ag
 
 Triggered automatically after `end_turn`, or manually when a user marks a `waiting` task as done. Runs three sequential phases in `runner.go`.
 
-### Phase 1 -- Claude Commits (in container)
+### Phase 1 -- Host-Side Stage & Commit
 
-Staging and committing happen on the host. A container is launched only to generate the commit message, which is then used by the host-side `git commit`.
+Staging and committing happen on the host. A host-process agent run generates the commit message, which the host-side `git commit` then uses.
 
 ### Phase 2 -- Rebase & Merge (host-side, `internal/gitutil/ops.go`)
 
@@ -130,17 +127,17 @@ Cleanup is idempotent and safe to call multiple times (errors are logged, not fa
 
 > **AGENTS.md lifecycle** has moved. See [Workspaces & Configuration](workspaces-and-config.md) for AGENTS.md lifecycle.
 
-## Sibling Worktree Mounting
+## Sibling Worktree Access
 
-Tasks can optionally see the working directories of other active tasks via read-only bind-mounts.
+Tasks can optionally see the host worktree paths of other active tasks, surfaced as a read-only JSON manifest.
 
 ### MountWorktrees Flag
 
-The `MountWorktrees` boolean field on the `Task` model controls whether sibling worktrees are mounted into this task's container. It is set at task creation time (via `TaskCreateOptions.MountWorktrees`) and can be toggled on backlog tasks via `PATCH /api/tasks/{id}`.
+The `MountWorktrees` boolean field on the `Task` model controls whether sibling worktrees are exposed to this task. It is set at task creation time (via `TaskCreateOptions.MountWorktrees`) and can be toggled on backlog tasks via `PATCH /api/tasks/{id}`.
 
 ### Eligibility
 
-`canMountWorktree()` (`internal/runner/board.go`) determines which sibling tasks are eligible for mounting:
+`canMountWorktree()` (`internal/runner/board.go`) determines which sibling tasks are eligible to expose:
 
 | Sibling status | Eligible? | Reason |
 |---|---|---|
@@ -153,26 +150,23 @@ The `MountWorktrees` boolean field on the `Task` model controls whether sibling 
 
 Additionally, siblings must share at least one workspace with the requesting task (checked by `sharesWorkspace()`).
 
-### Path Structure Inside Container
+### Sibling Manifest
 
-Sibling worktrees are mounted read-only under `/workspace/.tasks/worktrees/<short-id>/<repo>/`:
+`generateBoardContextAndMounts()` (`internal/runner/board.go`) produces both the `board.json` content and the sibling map in a single `ListTasks` call. For each eligible sibling, it records that sibling's host `WorktreePaths` keyed by short ID (first 8 chars of UUID). Results are cached by `(boardChangeSeq, selfTaskID)` to avoid redundant computation across turns.
 
+`writeSiblingManifest()` (`internal/runner/container.go`) serializes that map to `sibling_worktrees.json` in the board directory and the host process receives its path via `WALLFACER_SIBLING_WORKTREES_JSON`. The manifest maps each sibling's short ID to a `{repoPath: hostWorktreePath}` object, so the agent reads the sibling's files directly on the host filesystem:
+
+```json
+{
+  "abcd1234": {
+    "/Users/me/projects/myapp": "/Users/me/.wallfacer/worktrees/<uuid>/myapp",
+    "/Users/me/projects/mylib": "/Users/me/.wallfacer/worktrees/<uuid>/mylib"
+  },
+  "ef567890": {
+    "/Users/me/projects/myapp": "/Users/me/.wallfacer/worktrees/<uuid2>/myapp"
+  }
+}
 ```
-/workspace/.tasks/
-    board.json                          # board manifest (read-only)
-    worktrees/
-        abcd1234/                       # sibling task short ID (first 8 chars of UUID)
-            myapp/                      # worktree for ~/projects/myapp
-            mylib/                      # worktree for ~/projects/mylib
-        ef567890/
-            myapp/
-```
-
-The mount options are `z,ro` (SELinux relabel + read-only).
-
-### Board Manifest Integration
-
-`generateBoardContextAndMounts()` produces both the `board.json` content and the sibling mount map in a single `ListTasks` call. Each eligible sibling's `BoardTask` entry includes a `worktree_mount` field pointing to the container path, so the agent knows where to find the sibling's files. Results are cached by `(boardChangeSeq, selfTaskID)` to avoid redundant computation across turns.
 
 ## Branch Management Internals
 
