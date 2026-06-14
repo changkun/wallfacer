@@ -81,13 +81,15 @@ watch(
   async (open) => {
     if (!open) return;
     workspaces.value = [...(store.config?.workspaces ?? [])];
-    browsePath.value = '/';
-    pathInput.value = '/';
+    browsePath.value = '';
+    pathInput.value = '';
     browseError.value = '';
     filter.value = '';
     applyStatus.value = '';
     step.value = 1;
-    await browse('/');
+    // Empty path: the backend resolves it to the user's home directory, a
+    // saner starting point than filesystem root for picking project folders.
+    await browse('');
     document.addEventListener('keydown', onKey);
   },
 );
@@ -198,7 +200,10 @@ function filteredEntries() {
   if (f) {
     entries = entries.filter((e) => e.name.toLowerCase().includes(f));
   }
-  return entries;
+  // Already-added folders sink to the bottom so the list stays a queue of
+  // things still left to add; relative order within each group is preserved.
+  const added = (e: BrowseEntry) => workspaces.value.includes(e.path);
+  return [...entries].sort((a, b) => Number(added(a)) - Number(added(b)));
 }
 
 // Collapse a home directory prefix to '~' for display (full path stays in title).
@@ -314,23 +319,25 @@ function breadcrumbSegments() {
               <input v-model="showHidden" type="checkbox" />
               Show hidden
             </label>
-            <button
-              type="button"
-              class="btn-ghost ws-picker__new-folder-btn"
-              :disabled="browsePath === '/'"
-              title="Create a new folder here"
-              @click="createFolder"
-            >
-              + New Folder
-            </button>
-            <button
-              type="button"
-              class="btn-ghost ws-picker__add-folder-btn"
-              :disabled="workspaces.includes(browsePath)"
-              @click="addWorkspace(browsePath)"
-            >
-              + Add current folder
-            </button>
+            <div class="ws-picker__toolbar-actions">
+              <button
+                type="button"
+                class="btn-ghost ws-picker__new-folder-btn"
+                :disabled="browsePath === '/'"
+                title="Create a new folder here"
+                @click="createFolder"
+              >
+                + New Folder
+              </button>
+              <button
+                type="button"
+                class="btn-ghost ws-picker__add-folder-btn"
+                :disabled="workspaces.includes(browsePath)"
+                @click="addWorkspace(browsePath)"
+              >
+                + Add current folder
+              </button>
+            </div>
           </div>
 
           <div class="ws-picker__status">
