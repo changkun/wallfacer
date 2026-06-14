@@ -1,6 +1,6 @@
 ---
 title: "Validation Barrier — User-Defined Test Criteria for Tasks"
-status: drafted
+status: archived
 depends_on: []
 affects:
   - internal/store/models.go
@@ -17,7 +17,7 @@ affects:
   - ui/partials/task-detail-modal.html
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -173,3 +173,17 @@ No schema migration needed. The field is persisted as part of the JSON task file
 - **Structured/programmatic criteria** (e.g., a list of assertions or test commands to run mechanically). The validation barrier is free-form text interpreted by the test agent, same as the task prompt is interpreted by the implementation agent.
 - **Blocking gate semantics** — This spec does not introduce a hard gate that prevents auto-submit on test failure. That behavior is already controlled by the auto-submit configuration. The validation barrier only affects what the test agent checks, not what happens after.
 - **Per-turn criteria** — The barrier applies to the test phase as a whole, not to individual implementation turns.
+
+## Outcome
+
+Archived (2026-06-14). Never implemented, and its design foundation was
+removed from the repo. The data model copies the task `Goal` field pattern,
+deleted in `ae57a04a` ("all: remove the Goal task field"); the Refinement
+Integration section targets `internal/runner/refine.go`, retired in
+`9e8f71aa` ("internal: retire refine subsystem server-side"); and the UI
+sections target the legacy vanilla-JS frontend (`ui/js/tasks.js`,
+`ui/js/render.js`, `ui/js/modal.js`), removed in `06c5517a`. The underlying
+need (user-defined test criteria fed to the auto-tester, which still exists
+via `buildTestPrompt` / `tryAutoTest`) is still valid; a fresh spec written
+against the current data model and Vue frontend supersedes this one:
+[[test-criteria]] (`specs/oversight/test-criteria.md`).

@@ -1,12 +1,12 @@
 ---
 title: Overlay Snapshots & CRIU Checkpoint/Restore
-status: drafted
+status: archived
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects: [internal/sandbox/]
 effort: xlarge
 created: 2026-03-28
-updated: 2026-03-30
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -244,3 +244,21 @@ Pruning uses `podman rmi` for snapshot images and `rm` for checkpoint archives.
 - **Live migration.** CRIU supports live migration but this spec only uses checkpoint/restore for local acceleration.
 - **Replacing named volume caches.** Snapshots and named volumes are complementary. Named volumes persist package manager caches across container restarts; snapshots preserve broader filesystem state (build artifacts, tool configs).
 - **Windows/macOS CRIU.** CRIU is Linux-only. The snapshot path (overlay) works everywhere podman/docker runs. CRIU is a Linux-only optimization.
+
+## Outcome
+
+Archived (2026-06-14). Never implemented, and the foundation it optimizes was
+deleted. The whole design extends the per-task container worker model
+(`taskWorker.ensureRunning`, `WorkerManager`, `LocalBackend`, `podman commit`
+/ `podman container checkpoint`), but that model was removed: `a745ce41`
+deleted `LocalBackend` / `worker.go` / `WorkerManager`, `7dfb628b` introduced
+container-free `HostBackend` execution (`StopTaskWorker` is now a no-op), and
+`cda7f974` renamed `internal/sandbox` to `internal/executor`. Its dependency
+`specs/foundations/sandbox-backends.md` is archived.
+
+Unlike the other specs archived in this pass, this one gets **no replacement
+spec**: the problem it solved (cold-start cost of warming a fresh container
+per task) no longer exists under host execution, which runs tasks directly in
+git worktrees with no container to snapshot. If container backends return via
+the cloud runtime track, a snapshot optimization would be specced fresh
+against that runtime, not revived from this podman/CRIU design.
