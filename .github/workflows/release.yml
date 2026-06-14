@@ -153,6 +153,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          # Only the binary artifacts. docker/build-push-action also uploads a
+          # `.dockerbuild` build-record artifact that fails to extract here.
+          pattern: wallfacer-*
           path: dist
           merge-multiple: true
       - name: Create GitHub release
