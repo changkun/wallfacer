@@ -1,6 +1,6 @@
 ---
 title: Add Pi harness
-status: drafted
+status: complete
 depends_on:
   - specs/shared/harness-abstraction/claude-and-codex-migration.md
 affects:
@@ -102,3 +102,44 @@ Capabilities{
 - Pi sessions auto-save to `~/.pi/agent/sessions/` keyed by cwd. Wallfacer's per-task worktree means each task gets its own session storage automatically; no cleanup required.
 - Pi's 4-tool minimal core (Read, Write, Edit, Bash) is intentional simplicity. `Permission = ReadOnly` mapping to `--tools Read` is the simplest correct interpretation.
 - Pi supports `--mode rpc` for embedded hosts (LF-JSONL stdin/stdout). If Pi's stability story matures, a follow-up spec switches to it; it gives the orchestrator finer control over turn boundaries.
+
+## Outcome
+
+Shipped. `harness.Pi` (`internal/harness/pi.go`) owns argv, event parsing,
+auth, and capabilities; wired into the host backend (`launchPi` in
+`internal/executor/host_pi.go`), the config API, the TaskComposer selector,
+the sandbox settings tab, and the docs.
+
+Design evolution vs the draft, after checking the real installed `pi`
+(v0.79.3) and its shipped docs:
+
+- **Event schema corrected.** The draft's event names (`session-start`,
+  a `result` event with `usage`/`stop_reason`) were guesses. Pi's real
+  `--mode json` stream is `session` / `agent_start` / `turn_start` /
+  `message_*` / `tool_execution_*` / `turn_end` / `agent_end`. Usage and
+  `stopReason` live on each assistant message, so the terminal result is
+  synthesized from the last assistant message in `agent_end`. `ParseEvent`
+  maps the real schema; message `content` is decoded lazily because user
+  content can be a bare string.
+- **`-p` is boolean, prompt is positional.** Unlike Claude/Cursor's
+  `-p <prompt>`, pi's prompt is the trailing positional arg.
+- **Model two-flag split** is `--provider`/`--model`, cut on the first `/`
+  of `Request.Model`; a bare value emits `--model` alone.
+- **Executor wiring was required and added.** The end-to-end criterion is
+  unreachable from the draft's `affects` list (the host backend hardcodes
+  per-harness launch). `launchPi` mirrors `launchCursor`: native JSON
+  stream (no last-message wrapping), Permission forced to Full so all four
+  tools are enabled, instructions file contents prepended.
+- **No new env vars.** Per the spec, `pi` is resolved from `$PATH`
+  (`HostBackendConfig.PiBinary` exists for an override but is not fed from
+  a `WALLFACER_HOST_PI_BINARY` key); provider keys are inherited from the
+  process env, so `AuthEnv` returns nothing and `AuthConfig.PiAPIKey`
+  stays reserved.
+- **Config/env surfacing was free.** A sibling change made `/api/config`
+  enumerate `harness.All()` and the `/test` probe validate via
+  `IsValid()`, so a registered harness reaches the UI automatically.
+- **Not verified live.** No provider credentials were configured locally,
+  so the real end-to-end run and the captured-fixture requirement could
+  not be satisfied; the fixture is built from pi's documented json /
+  session-format schema. A live integration test (build-tag gated) is a
+  follow-up.
