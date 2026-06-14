@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary install-wails build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once release-notes release
 
 # Full build gate: fmt + lint + binary.
 build: fmt lint frontend-build build-binary
@@ -19,28 +19,6 @@ endif
 
 build-binary:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .
-
-# Install the Wails CLI (tracked as a tool dependency in go.mod).
-install-wails:
-	go install github.com/wailsapp/wails/v2/cmd/wails
-
-# Build the native desktop app for the current platform (requires wails CLI).
-# -skipbindings: we use a reverse proxy, not Wails Go bindings
-# -s: frontend is embedded via go:embed, not built by Wails
-build-desktop:
-	go tool wails build -tags desktop -skipbindings -s
-
-# Build macOS universal .app bundle.
-build-desktop-darwin:
-	go tool wails build -tags desktop -skipbindings -s -platform darwin/universal
-
-# Build Windows .exe.
-build-desktop-windows:
-	go tool wails build -tags desktop -skipbindings -s -platform windows/amd64
-
-# Build Linux desktop binary.
-build-desktop-linux:
-	go tool wails build -tags desktop -skipbindings -s -platform linux/amd64
 
 # Build and run the Go server natively.
 server:

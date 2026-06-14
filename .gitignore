@@ -7,9 +7,6 @@ coverage_handler.out
 ui/node_modules/
 ui/js/build/
 .vite/
-ui/wailsjs/
-build/bin/
-build/appicon.png
 wallfacerd
 internal/webserver/spa/dist/
 frontend/node_modules/
