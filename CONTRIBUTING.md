@@ -5,12 +5,12 @@ you only want to *use* Wallfacer, start with the [User Manual](docs/guide/usage.
 
 ## Orientation
 
-- **[CLAUDE.md](CLAUDE.md)** is the canonical map of the codebase: package
-  layout, API routes, task lifecycle, build commands, and the conventions every
-  change must follow. Read it first.
-- **[Technical Internals](docs/internals/internals.md)** is the deep reference
-  for how the system works inside. The docs below are written for maintainers,
+- **[Technical Internals](docs/internals/internals.md)** is the canonical map of
+  the codebase: architecture, package layout, API routes, task lifecycle, and
+  storage model. Read it first. The references below are written for maintainers,
   not end users.
+- **[AGENTS.md](AGENTS.md)** (symlinked as `CLAUDE.md`) holds the project's
+  commit and workflow conventions for both humans and coding agents.
 - **[Specs & Roadmap](specs/README.md)** tracks design work in progress and the
   dependency graph between tracks.
 
@@ -21,13 +21,13 @@ implementation detail, architecture, and the APIs that connect everything.
 
 | # | Reference | Topics |
 |---|-----------|--------|
-| 1 | [Architecture](docs/internals/architecture.md) | System design, package map, handler organisation, end-to-end walkthrough |
+| 1 | [Architecture](docs/internals/architecture.md) | System design, package map, handler organization, end-to-end walkthrough |
 | 2 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, spec document model |
 | 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | 4 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
 | 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, ideation |
-| 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
+| 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | 8 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 
 ## Build & test
@@ -57,5 +57,5 @@ E2E scripts, and the release workflow.
   data model field, or user-visible behavior. User docs live in
   [`docs/guide/`](docs/guide/); internals in [`docs/internals/`](docs/internals/).
 
-The full implementation checklist (tests, docs, codebase health) is in
-[CLAUDE.md](CLAUDE.md).
+The commit and workflow conventions every change must follow are in
+[AGENTS.md](AGENTS.md) (symlinked as `CLAUDE.md`).
