@@ -146,6 +146,26 @@ func TestHostBackend_Launch_Argv(t *testing.T) {
 	}
 }
 
+// TestHostBackend_Launch_NoFastPrompt locks the WALLFACER_SANDBOX_FAST removal
+// at the executor altitude: a plain claude launch (no instructions path) must
+// pass no --append-system-prompt at all, so the retired /fast hint cannot leak
+// back through requestFromClaudeSpec / BuildArgv.
+func TestHostBackend_Launch_NoFastPrompt(t *testing.T) {
+	bin := buildFakeAgent(t, "fakeagent")
+	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+
+	spec := ContainerSpec{
+		Name:    "wallfacer-test-nofast",
+		Env:     map[string]string{"WALLFACER_AGENT": "claude"},
+		Cmd:     []string{"-p", "hi"},
+		WorkDir: t.TempDir(),
+	}
+	got := launchAndDrain(t, b, spec)
+	if got["append"] != "" {
+		t.Errorf("plain launch must not append a system prompt; got append=%q", got["append"])
+	}
+}
+
 func TestHostBackend_Launch_ResumeFlag(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
