@@ -366,26 +366,6 @@ var Routes = []Route{
 		Description: "Test sandbox configuration by running a lightweight probe task.",
 		Tags:        []string{"env"},
 	},
-	// --- Workspace instructions ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/instructions", Name: "GetInstructions",
-		JSName:      "get",
-		Description: "Get the workspace CLAUDE.md content.",
-		Tags:        []string{"instructions"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/instructions", Name: "UpdateInstructions",
-		JSName:      "update",
-		Description: "Save the workspace CLAUDE.md.",
-		Tags:        []string{"instructions"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/instructions/reinit", Name: "ReinitInstructions",
-		Description: "Rebuild workspace CLAUDE.md from default template and repo files.",
-		Tags:        []string{"instructions"},
-	},
-
 	// --- System prompt templates (user-overridable built-in prompts) ---
 
 	{

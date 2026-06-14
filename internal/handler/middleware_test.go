@@ -205,17 +205,6 @@ func TestBearerAuthMiddleware_ClaimsBypass(t *testing.T) {
 	}
 }
 
-func TestUpdateInstructions_BodyTooLarge(t *testing.T) {
-	h, _ := newTestHandlerWithInstructions(t)
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPut, "/api/instructions", oversizedBody("content", 6<<20))
-	r.Body = http.MaxBytesReader(w, r.Body, BodyLimitInstructions)
-
-	h.UpdateInstructions(w, r)
-
-	assertBodyTooLarge(t, w)
-}
-
 func TestSubmitFeedback_BodyTooLarge(t *testing.T) {
 	h := newTestHandler(t)
 	taskID := createWaitingTask(t, h, "test prompt")

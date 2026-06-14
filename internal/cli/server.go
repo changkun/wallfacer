@@ -1013,11 +1013,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateEnvConfig": h.UpdateEnvConfig,
 		"TestSandbox":     h.TestSandbox,
 
-		// Workspace instructions.
-		"GetInstructions":    h.GetInstructions,
-		"UpdateInstructions": h.UpdateInstructions,
-		"ReinitInstructions": h.ReinitInstructions,
-
 		// Prompt templates.
 		"ListSystemPrompts":  h.ListSystemPrompts,
 		"GetSystemPrompt":    h.GetSystemPrompt,
@@ -1146,10 +1141,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,
 		"TestSandbox":     handler.BodyLimitDefault,
-
-		// Workspace instructions.
-		"UpdateInstructions": handler.BodyLimitInstructions,
-		"ReinitInstructions": handler.BodyLimitDefault,
 
 		// System prompt templates.
 		"UpdateSystemPrompt": handler.BodyLimitDefault,
