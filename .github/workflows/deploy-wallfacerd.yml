@@ -5,11 +5,10 @@ name: Deploy wallfacerd
 # surface, and creates/edits the GitHub release with the auto-generated
 # changelog plus a smoke evidence block.
 #
-# release-binary.yml + release-desktop.yml ALSO run on the same v* tag
-# and use softprops/action-gh-release to attach their CLI and Wails
-# desktop artifacts to the same release — they tolerate an existing
-# release, so whichever workflow's publish step lands first creates it
-# and the others attach.
+# release-binary.yml ALSO runs on the same v* tag and uses
+# softprops/action-gh-release to attach the CLI artifacts to the same
+# release — it tolerates an existing release, so whichever workflow's
+# publish step lands first creates it and the other attaches.
 
 on:
   workflow_run:
