@@ -148,7 +148,7 @@ Development is organized into three parallel tracks with shared foundations. See
 
 **Foundations** (complete): Sandbox backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
 
-**Local Product**: Desktop experience and developer workflow. Spec coordination (document model, planning UX, drift detection), agents & flows (composable sub-agent pipelines), routine tasks (scheduled spawns), desktop app, file/image attachments, host mounts, oversight risk scoring, visual verification, live serve.
+**Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection), agents & flows (composable sub-agent pipelines), routine tasks (scheduled spawns), file/image attachments, host mounts, oversight risk scoring, visual verification, live serve.
 
 **Cloud Platform**: Multi-tenant hosted service. Tenant filesystem, K8s sandbox backend, cloud infrastructure, multi-tenant control plane, tenant API.
 

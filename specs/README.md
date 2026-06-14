@@ -5,13 +5,13 @@ Completed specs live in the [Archive](#archive) section at the bottom.
 
 ## Status Quo
 
-What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started.
+What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started, ⊘ = archived.
 
 ```
 Foundations — 7/7 complete (see Archive)
 
-Local Product — 8 done, 1 in progress, 13 pending
-  ✅ Desktop App                   ✅ Terminal Sessions
+Local Product — 7 done, 1 in progress, 13 pending
+  ⊘ Desktop App (code removed)     ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ◐ Spec Coordination
   ✅ Routine Tasks                 ✅ Agents & Flows
@@ -88,7 +88,7 @@ graph LR
   FE --> HM[Host Mounts]
   FE --> FPV[File Panel Viewer]
   HT[Host Terminal ✅] --> TS[Terminal Sessions ✅] --> CE[Container Exec ✅]
-  FE --> DA[Desktop App ✅]
+  FE --> DA[Desktop App ⊘ archived]
   HT --> DA
 
   EW[Excalidraw Whiteboard]
@@ -302,7 +302,7 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 
 | Spec | Delivers |
 |------|----------|
-| [desktop-app.md](local/desktop-app.md) | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
+| [desktop-app.md](local/desktop-app.md) | Wails native wrapper (macOS .app, Windows .exe, Linux binary) — archived, code removed 2026-06-14 |
 | [terminal-sessions.md](local/terminal-sessions.md) | Multiple concurrent terminal sessions with tab bar |
 | [terminal-container-exec.md](local/terminal-container-exec.md) | Attach to running task containers from the terminal panel |
 | [oauth-token-setup.md](local/oauth-token-setup.md) | Browser-based OAuth sign-in for Claude and Codex credentials |
