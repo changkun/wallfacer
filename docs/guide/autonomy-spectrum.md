@@ -1,6 +1,6 @@
 # The Autonomy Spectrum
 
-Every AI coding tool pins you to one interaction mode. Some are chatbots that require constant hand-holding. Others are fire-and-forget agents that disappear into a container and surface hours later with unpredictable results. Wallfacer gives you a continuous spectrum between these extremes, and lets you move freely along it depending on what the work demands.
+Every AI coding tool pins you to one interaction mode. Some are chatbots that require constant hand-holding. Others are fire-and-forget agents that run off on their own and surface hours later with unpredictable results. Wallfacer gives you a continuous spectrum between these extremes, and lets you move freely along it depending on what the work demands.
 
 ```mermaid
 graph LR
@@ -19,17 +19,17 @@ Wallfacer organizes work into four levels, from highest autonomy to most direct 
 
 You describe what you want in natural language. The agent shapes ideas, explores trade-offs, and proposes directions. This is the entry point for greenfield work -- when you do not yet know what to build.
 
-The planning chat (accessible in Plan mode) is a persistent conversation backed by a sandbox container. It can read your codebase, create files, and execute commands while you steer the direction.
+The planning chat (accessible in Plan mode) is a persistent conversation that runs as a host process in the task's git worktree. It can read your codebase, create files, and execute commands while you steer the direction. The worktree is what isolates the work, so changes stay contained in their own branch until you accept them.
 
 ### Spec (Structured Design)
 
-Ideas crystallize into structured documents with lifecycle states, dependencies, and acceptance criteria. Specs track progress through a six-state lifecycle: the main axis runs vague → drafted → validated → complete, with `stale` and `archived` as off-axis states for designs that have drifted from reality or been set aside. Transitions are not free-form — they are enforced by a server-side state machine (`internal/spec/lifecycle.go`) that rejects illegal jumps and keeps dispatched work consistent with the underlying spec.
+Ideas crystallize into structured documents with lifecycle states, dependencies, and acceptance criteria. Specs track progress through a six-state lifecycle: the main axis runs vague → drafted → validated → complete, with `stale` and `archived` as off-axis states for designs that have drifted from reality or been set aside. Transitions are not free-form, they are enforced by a server-side state machine (`internal/spec/lifecycle.go`) that rejects illegal jumps and keeps dispatched work consistent with the underlying spec.
 
 At this level, agents iterate on design rather than code. They break large specs into sub-specs, validate consistency across the dependency graph, and analyze cross-impacts with existing plans. The output is a blueprint, not a pull request.
 
 ### Task (Managed Execution)
 
-Specs break into executable tasks on a task board. Each task picks a **flow**, an ordered chain of sub-agents the runner walks through (refine, implement, test, commit, and so on). Each step in a flow is an agent that can be cloned or replaced, optionally pinned to a specific coding harness (Claude or Codex), and given a custom system prompt. You review diffs, oversight summaries, and test verdicts before accepting the work.
+Specs break into executable tasks on a task board. Each task picks a **flow**, an ordered chain of sub-agents the runner walks through. The default `implement` flow runs impl, then test, then a parallel finishing step (commit-msg, title, oversight) that writes the commit message, names the change, and produces a review summary. Each step in a flow is an agent that can be cloned or replaced, optionally pinned to a specific coding harness (Claude or Codex), and given a custom system prompt. You review diffs, oversight summaries, and test verdicts before accepting the work.
 
 This is where most day-to-day work happens. Tasks are concrete, trackable, and independently testable. For how to change what runs inside a task (the flow picker, cloning agents, building custom pipelines), see [Agents & Flows](agents-and-flows.md).
 
