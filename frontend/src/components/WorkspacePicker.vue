@@ -63,6 +63,19 @@ const showHidden = ref(false);
 const saving = ref(false);
 const applyStatus = ref('');
 
+// Two step wizard: 1 = choose folders, 2 = review and activate.
+const step = ref(1);
+const canProceed = computed(() => workspaces.value.length > 0);
+
+function goNext() {
+  if (!canProceed.value) return;
+  step.value = 2;
+}
+
+function goBack() {
+  step.value = 1;
+}
+
 watch(
   () => props.modelValue,
   async (open) => {
@@ -73,6 +86,7 @@ watch(
     browseError.value = '';
     filter.value = '';
     applyStatus.value = '';
+    step.value = 1;
     await browse('/');
     document.addEventListener('keydown', onKey);
   },
@@ -216,9 +230,6 @@ function breadcrumbSegments() {
       <div class="ws-picker__header">
         <div style="flex: 1; min-width: 0">
           <h3 class="ws-picker__title">Select Workspaces</h3>
-          <p class="ws-picker__subtitle">
-            Choose directories to activate a task board.
-          </p>
         </div>
         <button
           v-if="dismissable"
@@ -231,7 +242,34 @@ function breadcrumbSegments() {
         </button>
       </div>
 
-      <div class="ws-picker__body">
+      <div class="ws-stepper" role="tablist" aria-label="Workspace setup steps">
+        <button
+          type="button"
+          class="ws-step"
+          :class="{ 'ws-step--active': step === 1, 'ws-step--done': step > 1 }"
+          @click="goBack"
+        >
+          <span class="ws-step__circle">1</span>
+          <span class="ws-step__label">Choose folders</span>
+        </button>
+        <span class="ws-step__connector" :class="{ 'ws-step__connector--done': step > 1 }"></span>
+        <button
+          type="button"
+          class="ws-step"
+          :class="{ 'ws-step--active': step === 2, 'ws-step--upcoming': step < 2 }"
+          :disabled="!canProceed"
+          @click="goNext"
+        >
+          <span class="ws-step__circle">2</span>
+          <span class="ws-step__label">Review &amp; activate</span>
+        </button>
+      </div>
+
+      <div v-show="step === 1" class="ws-picker__body ws-picker__body--step">
+        <p class="ws-step__instruction">
+          Browse to your project directories and click + Add. Git repos are marked.
+          Add as many as you want.
+        </p>
         <div class="ws-picker__browser">
           <div class="ws-picker__path-row">
             <input
@@ -359,7 +397,26 @@ function breadcrumbSegments() {
           </div>
         </div>
 
-        <div class="ws-picker__selection">
+        <div class="ws-step__footer">
+          <span class="ws-step__count">
+            {{ workspaces.length }} {{ workspaces.length === 1 ? 'folder' : 'folders' }} added
+          </span>
+          <button
+            type="button"
+            class="btn btn-accent"
+            :disabled="!canProceed"
+            @click="goNext"
+          >
+            Next: Review &rarr;
+          </button>
+        </div>
+      </div>
+
+      <div v-show="step === 2" class="ws-picker__body ws-picker__body--step">
+        <p class="ws-step__instruction">
+          These folders become task boards. Remove any you do not want, then activate.
+        </p>
+        <div class="ws-picker__selection ws-picker__selection--review">
           <div class="ws-picker__selection-header">
             <span class="ws-picker__selection-label">Selected</span>
             <button
@@ -368,7 +425,7 @@ function breadcrumbSegments() {
               :disabled="workspaces.length === 0"
               @click="clearSelection"
             >
-              Clear
+              Clear all
             </button>
           </div>
           <div class="ws-picker__selection-list">
@@ -376,7 +433,7 @@ function breadcrumbSegments() {
               v-if="workspaces.length === 0"
               style="font-size: 11px; color: var(--text-muted); padding: 4px 2px"
             >
-              No folders selected.
+              No folders selected. Go back to step 1 to add some.
             </div>
             <div
               v-for="(ws, i) in workspaces"
@@ -393,16 +450,21 @@ function breadcrumbSegments() {
               </button>
             </div>
           </div>
-          <div class="ws-picker__selection-footer">
-            <button
-              type="button"
-              class="btn btn-accent"
-              :disabled="saving"
-              @click="save"
-            >
-              {{ saving ? 'Applying...' : 'Apply' }}
+          <div class="ws-picker__selection-footer ws-picker__selection-footer--review">
+            <button type="button" class="btn btn-ghost" @click="goBack">
+              &larr; Back
             </button>
-            <span class="ws-picker__apply-status">{{ applyStatus }}</span>
+            <div class="ws-step__footer-right">
+              <span class="ws-picker__apply-status">{{ applyStatus }}</span>
+              <button
+                type="button"
+                class="btn btn-accent"
+                :disabled="saving"
+                @click="save"
+              >
+                {{ saving ? 'Applying...' : 'Activate' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
