@@ -31,9 +31,10 @@
 //
 // Usage:
 //   node seed.mjs [--data /tmp/wf-demo-data] [--home /tmp/wf-demo-home] [--ws /tmp/wf-demo-ws]
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, cpSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -46,6 +47,12 @@ function arg(name, fallback) {
 const dataDir = arg('data', '/tmp/wf-demo-data');
 const homeDir = arg('home', '/tmp/wf-demo-home');
 const wsDir = arg('ws', '/tmp/wf-demo-ws');
+
+// The repo's own specs/ folder becomes the demo workspace's spec tree, so the
+// Plan view renders real wallfacer specs (not a fixture). Resolved from this
+// script's location: <repo>/frontend/scripts/ui-shots/seed.mjs.
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const specsSrc = arg('specs', join(repoRoot, 'specs'));
 
 // Group key: sha256 of sorted, colon-joined workspace paths, first 8 bytes hex.
 // Mirrors prompts.InstructionsKey in the Go server.
@@ -82,15 +89,134 @@ const ID = {
   back2: '77777777-7777-4777-8777-777777777777',
 };
 
+// Rich content for the OAuth task — drives the task-detail Prompt tab and the
+// Patch panel in the oversight screenshot. Kept realistic so the shot reads as
+// a genuine engineering task, not a fixture.
+const OAUTH_PROMPT = `Implement RFC 8628 device authorization for \`wallfacer auth login\` so
+headless and remote installs can authenticate without a browser callback URL.
+
+## Goal
+
+Let a user run \`wallfacer auth login\` on a box with no loopback browser, read a
+short code, and approve it from any other device.
+
+## Requirements
+
+- **Device authorization request.** POST to the authorization server's
+  device endpoint; parse \`device_code\`, \`user_code\`, \`verification_uri\`,
+  \`expires_in\`, and \`interval\`.
+- **User prompt.** Print the \`user_code\` and \`verification_uri\` clearly, and
+  open the URL when a browser is available (best-effort, never required).
+- **Token polling.** Poll the token endpoint every \`interval\` seconds; honor
+  \`authorization_pending\` and \`slow_down\` per spec, and stop at \`expires_in\`.
+- **Persistence.** Store the resulting token via the existing credential store;
+  never log the token or device code.
+
+## Acceptance
+
+1. \`wallfacer auth login\` completes end to end against the staging IdP.
+2. \`slow_down\` backs the poll interval off by 5s and does not busy-loop.
+3. Unit tests cover the pending / slow_down / expired transitions.`;
+
+const OAUTH_RESULT = `Implemented the device-code flow end to end.
+
+- Added \`internal/oauth/devicecode.go\` with the request + poll loop.
+- Wired \`wallfacer auth login\` to the new flow with a browser-optional prompt.
+- Covered pending / slow_down / expired transitions in \`devicecode_test.go\`.
+- Documented the headless login path in the auth guide.
+
+Verified against the staging IdP; \`slow_down\` correctly backs off by 5s.`;
+
+const OAUTH_DIFF = `diff --git a/internal/oauth/devicecode.go b/internal/oauth/devicecode.go
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/internal/oauth/devicecode.go
+@@ -0,0 +1,68 @@
++package oauth
++
++import (
++\t"context"
++\t"errors"
++\t"net/url"
++\t"time"
++)
++
++// DeviceAuth holds the authorization-server response for a device-code grant
++// (RFC 8628 section 3.2).
++type DeviceAuth struct {
++\tDeviceCode      string
++\tUserCode        string
++\tVerificationURI string
++\tInterval        time.Duration
++\tExpiresAt       time.Time
++}
++
++// ErrAuthExpired is returned when the user_code lapses before approval.
++var ErrAuthExpired = errors.New("oauth: device code expired")
++
++// PollToken polls the token endpoint until the user approves the request,
++// honoring authorization_pending and slow_down per RFC 8628 section 3.5.
++func (c *Client) PollToken(ctx context.Context, da DeviceAuth) (*Token, error) {
++\tinterval := da.Interval
++\tfor {
++\t\tif time.Now().After(da.ExpiresAt) {
++\t\t\treturn nil, ErrAuthExpired
++\t\t}
++\t\ttok, err := c.requestToken(ctx, url.Values{
++\t\t\t"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
++\t\t\t"device_code": {da.DeviceCode},
++\t\t})
++\t\tswitch {
++\t\tcase err == nil:
++\t\t\treturn tok, nil
++\t\tcase errors.Is(err, errAuthorizationPending):
++\t\t\t// keep waiting at the current interval
++\t\tcase errors.Is(err, errSlowDown):
++\t\t\tinterval += 5 * time.Second
++\t\tdefault:
++\t\t\treturn nil, err
++\t\t}
++\t\tselect {
++\t\tcase <-ctx.Done():
++\t\t\treturn nil, ctx.Err()
++\t\tcase <-time.After(interval):
++\t\t}
++\t}
++}
+diff --git a/internal/cli/auth.go b/internal/cli/auth.go
+index 7f8e9d0..3c4b5a6 100644
+--- a/internal/cli/auth.go
++++ b/internal/cli/auth.go
+@@ -18,9 +18,21 @@ func runAuthLogin(ctx context.Context, c *oauth.Client) error {
+-\ttok, err := c.AuthorizeCodeFlow(ctx)
+-\tif err != nil {
+-\t\treturn err
+-\t}
++\tda, err := c.RequestDeviceAuth(ctx)
++\tif err != nil {
++\t\treturn fmt.Errorf("request device code: %w", err)
++\t}
++\tfmt.Printf("\\nTo continue, open %s\\n", da.VerificationURI)
++\tfmt.Printf("and enter code: %s\\n\\n", da.UserCode)
++\tbrowser.TryOpen(da.VerificationURI) // best-effort; never required
++\ttok, err := c.PollToken(ctx, da)
++\tif err != nil {
++\t\treturn err
++\t}
+ \treturn creds.Save(tok)
+ }
+`;
+
 const tasks = [
   {
     schema_version: 2,
     id: ID.done1,
     title: 'Add OAuth device-code flow to local CLI',
-    prompt: 'Implement RFC 8628 device authorization for `wallfacer auth login`.',
+    prompt: OAUTH_PROMPT,
     status: 'done',
     session_id: 'sess-done-1',
-    result: 'Implemented device-code flow, added tests, updated docs.',
+    result: OAUTH_RESULT,
     stop_reason: 'end_turn',
     turns: 7,
     timeout: 900,
@@ -106,6 +232,10 @@ const tasks = [
     position: 0,
     branch_name: 'task/11111111',
     commit_message: 'internal/oauth: add device-code flow',
+    // Non-git demo workspace: a stored snapshot diff drives the detail Patch
+    // panel without a real worktree (see handler.TaskDiff non-git branch).
+    worktree_paths: { [wsDir]: join(wsDir, '.worktrees', ID.done1) },
+    snapshot_diffs: { [wsDir]: OAUTH_DIFF },
     created_at: iso(180),
     started_at: iso(178),
     updated_at: iso(120),
@@ -283,6 +413,13 @@ const tracesFor = (t) => {
 
 // Demo workspace dir (must exist so the saved group passes startup validation).
 mkdirSync(wsDir, { recursive: true });
+
+// Mirror the repo's real specs/ into the workspace so the Plan view renders the
+// actual wallfacer spec tree. Wiped + recopied each run to stay in sync.
+if (existsSync(specsSrc)) {
+  rmSync(join(wsDir, 'specs'), { recursive: true, force: true });
+  cpSync(specsSrc, join(wsDir, 'specs'), { recursive: true });
+}
 
 // Wipe and rewrite the group dir so state is idempotent/regenerable.
 rmSync(groupDir, { recursive: true, force: true });
