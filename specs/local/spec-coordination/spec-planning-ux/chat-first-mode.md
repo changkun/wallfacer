@@ -1,6 +1,6 @@
 ---
 title: Chat-First Mode (rename "Spec" to "Plan", collapse layout when no specs)
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux.md
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
@@ -19,7 +19,7 @@ affects:
   - docs/guide/designing-specs.md
 effort: medium
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -683,3 +683,12 @@ graph LR
 - O (bootstrap choreography) joins E + H + I — the final convergence point for the chat-first flow.
 
 **Critical path:** A/G → H → O (roughly: scaffold library → directive parser → bootstrap choreography), approximately 4 serial steps. Everything else fans out around it.
+
+## Outcome
+
+Complete (2026-06-14). All 14 leaf tasks landed and the chat-first flow
+shipped: the sidebar entry now reads "Plan" (live at
+`frontend/src/components/Sidebar.vue`), the layout collapses when no specs
+exist, and the `/create` directive parser plus bootstrap choreography are in
+place. The parent frontmatter had lagged at `validated` behind its
+all-complete subtree; this rolls it up to match.
