@@ -106,7 +106,7 @@ func defaultPayload(expAt time.Time) map[string]any {
 // claimsCapture is a tiny HandlerFunc that records whether claims were in
 // the context and exposes them for assertions.
 type claimsCapture struct {
-	seen *auth.Claims
+	seen *auth.Identity
 	ok   bool
 }
 

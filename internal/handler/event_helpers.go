@@ -3,10 +3,10 @@ package handler
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // insertEventOrLog calls InsertEvent and logs any error via the structured
@@ -48,7 +48,7 @@ func (h *Handler) insertEventOrLogTo(ctx context.Context, s *store.Store, taskID
 // stampEventActor decorates ctx with actor info for downstream event
 // writes. Priority:
 //  1. A user/service principal already validated by the auth
-//     middleware (OptionalAuth / CookiePrincipal).
+//     middleware (OptionalAuth / CookieAuth).
 //  2. Local anonymous ("") fallback.
 //
 // The API-key branch is not detected here because the static-key
@@ -69,7 +69,7 @@ func stampEventActor(ctx context.Context) context.Context {
 // agent) maps to "user", since agents acting on behalf of a user are
 // attributionally indistinguishable from the user at the audit log
 // level (the agent-token-exchange spec handles deeper attribution).
-func actorTypeFor(c *auth.Claims) store.ActorType {
+func actorTypeFor(c *auth.Identity) store.ActorType {
 	if c.PrincipalType == "service" {
 		return store.ActorService
 	}

@@ -193,7 +193,7 @@ func TestBearerAuthMiddleware_ClaimsBypass(t *testing.T) {
 
 	// No Authorization header, but claims are already in context — should pass.
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	req = req.WithContext(auth.WithClaims(req.Context(), &auth.Claims{Sub: "user-xyz"}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "user-xyz"}))
 	w := httptest.NewRecorder()
 	next.ServeHTTP(w, req)
 

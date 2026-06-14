@@ -11,11 +11,11 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// withClaims returns a request whose context carries the given claims,
+// withIdentity returns a request whose context carries the given identity,
 // as if cloud-mode JWT middleware had already validated the caller.
 // Used in place of signing a real JWT for handler-level tests.
-func withClaims(r *http.Request, c *auth.Claims) *http.Request {
-	return r.WithContext(auth.WithClaims(r.Context(), c))
+func withIdentity(r *http.Request, c *auth.Identity) *http.Request {
+	return r.WithContext(auth.WithIdentity(r.Context(), c))
 }
 
 // TestCreateTask_PopulatesPrincipalFields confirms that when the
@@ -27,7 +27,7 @@ func TestCreateTask_PopulatesPrincipalFields(t *testing.T) {
 
 	body := bytes.NewBufferString(`{"prompt":"hello","timeout":60}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", body)
-	req = withClaims(req, &auth.Claims{Sub: "user-abc", OrgID: "org-42"})
+	req = withIdentity(req, &auth.Identity{Sub: "user-abc", OrgID: "org-42"})
 	w := httptest.NewRecorder()
 	h.CreateTask(w, req)
 
@@ -89,7 +89,7 @@ func TestListTasks_OrgScopedFiltering(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
-	req = withClaims(req, &auth.Claims{Sub: "alice", OrgID: "org-a"})
+	req = withIdentity(req, &auth.Identity{Sub: "alice", OrgID: "org-a"})
 	w := httptest.NewRecorder()
 	h.ListTasks(w, req)
 

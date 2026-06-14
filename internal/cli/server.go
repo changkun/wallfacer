@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -30,7 +31,6 @@ import (
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
-	"github.com/google/uuid"
 )
 
 // IndexViewData carries server-injected runtime config for the Vue SPA's
@@ -375,18 +375,18 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist, cloudMode)
 
-	// Middleware stack (outermost first): logging → CSRF → CookiePrincipal
+	// Middleware stack (outermost first): logging → CSRF → CookieAuth
 	//   → JWT OptionalAuth → bearer auth → mux.
-	// Both identity paths converge on the same *Claims context key: JWT wins
+	// Both identity paths converge on the same *Identity context key: JWT wins
 	// when a Bearer header is present (OptionalAuth runs first, downstream
-	// from the cookie bridge), the cookie bridge fills in when no Bearer
-	// was sent. BearerAuth downstream bypasses its static-key check once
-	// claims are populated so a cookie-only browser request succeeds even
-	// in a deployment that also sets WALLFACER_SERVER_API_KEY for scripts.
+	// from the cookie path), CookieAuth fills in when no Bearer was sent.
+	// BearerAuth downstream bypasses its static-key check once an identity is
+	// populated so a cookie-only browser request succeeds even in a deployment
+	// that also sets WALLFACER_SERVER_API_KEY for scripts.
 	srvHandler := h.ForceLogin(mux)
 	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
-	srvHandler = auth.CookiePrincipal(authClient, jwtValidator, srvHandler)
+	srvHandler = auth.CookieAuth(authClient, srvHandler)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	srv := &http.Server{
 		Handler:     loggingMiddleware(srvHandler, reg),

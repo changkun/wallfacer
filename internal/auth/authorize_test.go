@@ -28,7 +28,7 @@ func TestRequireSuperadmin_SuperadminClaim_Passes(t *testing.T) {
 	h := auth.RequireSuperadmin(inner)
 
 	r := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	r = r.WithContext(auth.WithClaims(r.Context(), &auth.Claims{Sub: "root", IsSuperadmin: true}))
+	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{Sub: "root", IsSuperadmin: true}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -45,7 +45,7 @@ func TestRequireSuperadmin_RegularUser_Forbidden(t *testing.T) {
 	h := auth.RequireSuperadmin(inner)
 
 	r := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	r = r.WithContext(auth.WithClaims(r.Context(), &auth.Claims{Sub: "alice", IsSuperadmin: false}))
+	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{Sub: "alice", IsSuperadmin: false}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -80,7 +80,7 @@ func TestRequireScope_WithScope_Passes(t *testing.T) {
 	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
-	r = r.WithContext(auth.WithClaims(r.Context(), &auth.Claims{
+	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{
 		Sub:    "alice",
 		Scopes: []string{scopes.ProjectsRead.Name, scopes.TasksAdmin.Name},
 	}))
@@ -100,7 +100,7 @@ func TestRequireScope_WithoutScope_Forbidden(t *testing.T) {
 	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
-	r = r.WithContext(auth.WithClaims(r.Context(), &auth.Claims{
+	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{
 		Sub:    "alice",
 		Scopes: []string{scopes.ProjectsRead.Name},
 	}))

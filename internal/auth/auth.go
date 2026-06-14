@@ -5,6 +5,7 @@
 package auth
 
 import (
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/jwtauth"
 	"latere.ai/x/pkg/oidc"
 )
@@ -21,10 +22,16 @@ type User = oidc.User
 // Session holds the tokens stored in the encrypted session cookie.
 type Session = oidc.Session
 
-// Claims is a verified JWT claim set surfaced to handlers via
-// PrincipalFromContext. The full claim struct is defined by the platform
-// package; wallfacer code should read it through this alias so future
-// switches (e.g. a richer principal type) land in one place.
+// Identity is the platform-canonical principal surfaced to handlers via
+// PrincipalFromContext, resolved from either a Bearer JWT or the session
+// cookie. It is the shared authkit.Identity so wallfacer composes the same
+// authenticators (NewJWT, SessionAuthenticator) as every other consumer.
+type Identity = authkit.Identity
+
+// Claims is a verified JWT claim set used by the sandbox LLM proxy, which needs
+// JWT-level fields (aud, the RFC 8693 act claim) that the handler-facing
+// Identity projection intentionally omits. Most handlers should read Identity
+// via PrincipalFromContext, not Claims.
 type Claims = jwtauth.Claims
 
 // Validator validates RS256 JWTs issued by the auth service.

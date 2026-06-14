@@ -40,7 +40,6 @@ func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 	}
 	t.Cleanup(s.Close)
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      workdir + "/.env",
 		WorktreesDir: workdir + "/worktrees",
 		Workspaces:   []string{workdir},
@@ -59,7 +58,7 @@ func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 func TestAdminRebuildIndex_CloudSuperadmin200(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, true)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	req = req.WithContext(auth.WithClaims(req.Context(), &auth.Claims{Sub: "root", IsSuperadmin: true}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "root", IsSuperadmin: true}))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -74,7 +73,7 @@ func TestAdminRebuildIndex_CloudSuperadmin200(t *testing.T) {
 func TestAdminRebuildIndex_CloudRegular403(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, true)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	req = req.WithContext(auth.WithClaims(req.Context(), &auth.Claims{Sub: "alice", IsSuperadmin: false}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "alice", IsSuperadmin: false}))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 

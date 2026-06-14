@@ -29,7 +29,7 @@ import (
 // when WALLFACER_CLOUD is on: BearerAuth wraps next, OptionalAuth wraps
 // BearerAuth. apiKey="" disables the static-key check (local cloud
 // deployment without a key).
-func stackWithValidator(t *testing.T, v *auth.Validator, apiKey string, captured **auth.Claims) http.Handler {
+func stackWithValidator(t *testing.T, v *auth.Validator, apiKey string, captured **auth.Identity) http.Handler {
 	t.Helper()
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, _ := auth.PrincipalFromContext(r.Context())
@@ -103,7 +103,7 @@ func TestAPIRoutes_ClaimsContext_InCloudMode(t *testing.T) {
 		"https://auth.latere.ai",
 	)
 
-	var captured *auth.Claims
+	var captured *auth.Identity
 	stack := stackWithValidator(t, v, "", &captured)
 
 	tok := signJWT(t, key, "user-abc", time.Now().Add(time.Hour))
@@ -131,7 +131,7 @@ func TestAPIRoutes_JWTWithStaticKeySet_BypassesKeyCheck(t *testing.T) {
 		"https://auth.latere.ai",
 	)
 
-	var captured *auth.Claims
+	var captured *auth.Identity
 	stack := stackWithValidator(t, v, "server-api-key-value", &captured)
 
 	tok := signJWT(t, key, "user-abc", time.Now().Add(time.Hour))
@@ -154,7 +154,7 @@ func TestAPIRoutes_JWTWithStaticKeySet_BypassesKeyCheck(t *testing.T) {
 // and requests behave exactly as today (no claims, BearerAuth gate
 // unchanged).
 func TestAPIRoutes_NoValidator_InLocalMode(t *testing.T) {
-	var captured *auth.Claims
+	var captured *auth.Identity
 	stack := stackWithValidator(t, nil, "", &captured)
 
 	// Stray Bearer header. No validator -> no validation attempted.
