@@ -119,9 +119,8 @@ const DefaultCBThreshold = 5
 
 // Request body size limits.
 const (
-	BodyLimitDefault      int64 = 1 << 20   // 1 MiB
-	BodyLimitInstructions int64 = 5 << 20   // 5 MiB
-	BodyLimitFeedback     int64 = 512 << 10 // 512 KiB
+	BodyLimitDefault  int64 = 1 << 20   // 1 MiB
+	BodyLimitFeedback int64 = 512 << 10 // 512 KiB
 )
 
 // ExplorerMaxFileSize is the maximum file size the explorer will read (2 MiB).

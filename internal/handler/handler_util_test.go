@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/metrics"
@@ -229,54 +228,6 @@ func TestBrowseWorkspaces_EmptyDirReturnsEmptyEntries(t *testing.T) {
 
 	if resp["path"] != dir {
 		t.Errorf("expected path=%q in response, got %q", dir, resp["path"])
-	}
-}
-
-// --- instructions endpoints with no workspace manager ---
-
-// TestGetInstructions_WorkspaceManagerNil verifies GetInstructions returns 503
-// when h.workspace is nil (no workspace configured).
-func TestGetInstructions_WorkspaceManagerNil(t *testing.T) {
-	h := newTestHandler(t)
-	h.workspace = nil
-
-	req := httptest.NewRequest(http.MethodGet, "/api/instructions", nil)
-	w := httptest.NewRecorder()
-	h.GetInstructions(w, req)
-
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503 when no workspace, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateInstructions_WorkspaceManagerNil verifies UpdateInstructions returns 503
-// when h.workspace is nil.
-func TestUpdateInstructions_WorkspaceManagerNil(t *testing.T) {
-	h := newTestHandler(t)
-	h.workspace = nil
-
-	body := `{"content":"hello"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/instructions", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateInstructions(w, req)
-
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503 when no workspace, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestReinitInstructions_WorkspaceManagerNil verifies ReinitInstructions returns 503
-// when h.workspace is nil.
-func TestReinitInstructions_WorkspaceManagerNil(t *testing.T) {
-	h := newTestHandler(t)
-	h.workspace = nil
-
-	req := httptest.NewRequest(http.MethodPost, "/api/instructions/reinit", nil)
-	w := httptest.NewRecorder()
-	h.ReinitInstructions(w, req)
-
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503 when no workspace, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
