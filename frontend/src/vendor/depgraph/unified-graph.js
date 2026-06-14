@@ -262,8 +262,22 @@
   // NODE_H is a floor only; labels that wrap to multiple lines grow the
   // node vertically via _computeNodeHeight.
   var NODE_H = 52;
-  var H_GAP = 80;
-  var V_GAP = 18;
+  // H_GAP is the empty horizontal corridor between adjacent layers. At
+  // ~0.55*NODE_W it leaves clear room for arrowheads and the slight
+  // diagonal of edges that change row between columns, so a node's label
+  // never sits flush against the incoming edge of the next column.
+  var H_GAP = 120;
+  // V_GAP is a loose ordering gap used only while seeding/sweeping a
+  // column. It keeps barycenter math stable but is intentionally smaller
+  // than MIN_NODE_GAP: the final rendered vertical spacing is owned by
+  // the overlap-resolution pass, not the sweep.
+  var V_GAP = 8;
+  // MIN_NODE_GAP is the rendered minimum empty space between any two node
+  // rectangles, enforced by _resolveColumnOverlaps after the sweeps. At
+  // ~2x LABEL_LINE_H (15) two stacked nodes read as separate cards, not
+  // one block of wrapped text. This is the single source of truth for
+  // within-column and cross-component breathing room.
+  var MIN_NODE_GAP = 32;
 
   // Label wrap tuning. Characters per line at 12px system fonts inside a
   // 220px-wide node leaves room for the 8px inset and the right-side
@@ -992,7 +1006,6 @@
 
     var allPositions = new Map();
     var allEdgeChains = [];
-    var yCursor = PAD;
     var maxCompW = 0;
     var layouts = [];
     components.forEach(function (comp) {
@@ -1000,11 +1013,19 @@
       layouts.push(L);
       if (L.width > maxCompW) maxCompW = L.width;
     });
-    layouts.forEach(function (L) {
-      var xOffset = Math.max(PAD, PAD + (maxCompW - L.width) / 2);
+
+    // Shelf bin-pack the components into a grid instead of stacking them
+    // all vertically, so disconnected clusters fill the canvas width
+    // rather than forming one tall sparse column. Returns a per-component
+    // {x, y} translation; boxes are disjoint by construction so no two
+    // components can overlap.
+    var placements = _packComponents(layouts, maxCompW);
+    var yCursor = PAD;
+    layouts.forEach(function (L, ci) {
+      var place = placements[ci];
       L.positions.forEach(function (p, id) {
-        p.x += xOffset;
-        p.y += yCursor;
+        p.x += place.x;
+        p.y += place.y;
         allPositions.set(id, p);
       });
       // Component edge chains use node ids which are already globally
@@ -1013,9 +1034,9 @@
       for (var i = 0; i < L.edgeChains.length; i++) {
         allEdgeChains.push(L.edgeChains[i]);
       }
-      yCursor += L.height + COMPONENT_GAP;
+      var bottom = place.y + L.height;
+      if (bottom > yCursor) yCursor = bottom;
     });
-    yCursor -= COMPONENT_GAP;
 
     if (pinnedPositions) {
       pinnedPositions.forEach(function (pos, id) {
@@ -1078,6 +1099,50 @@
         return L.hasCycles;
       }),
     };
+  }
+
+  // _packComponents lays out component bounding boxes into a shelf grid.
+  // Components arrive largest-first (see _connectedComponents). We fill
+  // rows ("shelves") left-to-right, wrapping to a new shelf once a row's
+  // width would exceed a target. The target is the larger of the widest
+  // single component and a square-ish budget (sqrt(totalArea)*1.6) so the
+  // canvas trends toward a balanced rectangle instead of a tall column.
+  //
+  // Boxes are separated by COMPONENT_GAP on both axes. Because each box
+  // occupies a disjoint cell, the packing alone guarantees no two
+  // components overlap. Returns Array<{x, y}> aligned with `layouts`.
+  function _packComponents(layouts, maxCompW) {
+    var placements = [];
+    if (layouts.length === 0) return placements;
+    if (layouts.length === 1) {
+      placements.push({ x: PAD, y: PAD });
+      return placements;
+    }
+
+    var totalArea = 0;
+    for (var a = 0; a < layouts.length; a++) {
+      totalArea += layouts[a].width * layouts[a].height;
+    }
+    // Aim for a roughly square canvas; never narrower than the widest box.
+    var targetW = Math.max(maxCompW, Math.sqrt(totalArea) * 1.6);
+
+    var x = PAD;
+    var y = PAD;
+    var shelfH = 0; // tallest box on the current shelf
+    for (var i = 0; i < layouts.length; i++) {
+      var L = layouts[i];
+      // Wrap to a new shelf when this box would overflow the target and
+      // the current shelf already holds at least one box.
+      if (x > PAD && x + L.width > PAD + targetW) {
+        x = PAD;
+        y += shelfH + COMPONENT_GAP;
+        shelfH = 0;
+      }
+      placements.push({ x: x, y: y });
+      x += L.width + COMPONENT_GAP;
+      if (L.height > shelfH) shelfH = L.height;
+    }
+    return placements;
   }
 
   // _connectedComponents returns an Array<{nodes, edges}> where each
@@ -1494,7 +1559,37 @@
       for (var M = layers.length - 2; M >= 0; M--) sweep(M, M + 1, adjDown);
     }
 
+    // Final overlap-resolution pass. The sweeps keep a monotonic cursor so
+    // a single column normally can't overlap, but dummy waypoints (height
+    // 0) and the desired-y nudges can leave real nodes closer than
+    // MIN_NODE_GAP. Walk each column top-to-bottom and push any real node
+    // down so its top clears the previous real node's bottom by at least
+    // MIN_NODE_GAP. Pushing only downward preserves the left→right column
+    // grid (x is untouched) and keeps the layout deterministic.
+    _resolveColumnOverlaps(layers, positions);
+
     return positions;
+  }
+
+  // _resolveColumnOverlaps guarantees that within each layer no two real
+  // node rectangles are closer than MIN_NODE_GAP, accounting for each
+  // node's actual computed height. Dummies (height 0) are skipped as
+  // separators. Mutates positions in place, only ever moving nodes down.
+  function _resolveColumnOverlaps(layers, positions) {
+    layers.forEach(function (layer) {
+      var prevBottom = -Infinity;
+      for (var i = 0; i < layer.length; i++) {
+        var item = layer[i];
+        if (item.kind === "dummy") continue;
+        var p = positions.get(item.id);
+        if (!p) continue;
+        var h = p.height || NODE_H;
+        if (p.y < prevBottom + MIN_NODE_GAP) {
+          p.y = prevBottom + MIN_NODE_GAP;
+        }
+        prevBottom = p.y + h;
+      }
+    });
   }
 
   function _layoutHeight(layers) {
@@ -2414,6 +2509,11 @@
     module.exports = {
       buildUnifiedGraph: buildUnifiedGraph,
       renderUnifiedGraph: renderUnifiedGraph,
+      // Layout internals exported for unit tests (no browser behaviour
+      // depends on these being present).
+      layoutSugiyama: layoutSugiyama,
+      NODE_W: NODE_W,
+      MIN_NODE_GAP: MIN_NODE_GAP,
     };
   }
 })();
