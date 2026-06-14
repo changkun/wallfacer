@@ -37,6 +37,20 @@ NOT cloud/hosted multi-user execution (that stays demand-gated under
 multi-user-collaboration and the cloud track); it is the local-first product
 defaulting into the Latere account experience.
 
+This is an **adoption** spec: the shared building blocks are specified upstream
+in `latere-ui` and `auth`, and those specs are the source of truth. wallfacer
+does not redefine the console shell or the auth client; it pins them and wires
+them in. Read alongside:
+
+- `../latere-ui/specs/console-shell-v1.9.md` (complete): the shared console
+  chrome (`AccountMenu`, `AccountPrefs`, `OrgSwitcher`, `ConsoleSidebar`,
+  `brandTheme` includes `'wallfacer'`). Canonical for the UI surface.
+- `../latere-ui/specs/auth-client-v1.8.md` (complete): the shared session client
+  (`createSessionStore`, `me`/`orgs`/`switchOrg`, front-channel logout).
+  Canonical for the client-side session contract.
+
+This spec enumerates only wallfacer's delta on top of those.
+
 ## Goal
 
 A plain `wallfacer run` offers browser sign-in against `auth.latere.ai` with
@@ -66,25 +80,36 @@ Precision: auth-by-default means sign-in is *available and ambient*, not
 - **Headless device-code** (`internal/cli/auth.go`): RFC 8628 device flow
   against `auth.latere.ai` for non-browser sign-in, plus the HTTP routes
   `/api/auth/device/{start,poll,cancel}`.
-- **Console shell adoption**: `frontend/` pins latere-ui v1.9.11 and adopts the
+- **Console shell adoption**: `frontend/` pins `latere-ui v1.9.12` and adopts the
   shared `AccountMenu` (org switcher, theme, sign out) and `ConsoleSidebar` via
-  `AccountControl.vue` / `Sidebar.vue`; `stores/auth.ts` fetches the session
-  reactively so the chip renders (`2ac545b0`, `1fe19ea8`, the `console:` series).
+  thin wrappers `AccountControl.vue` / `Sidebar.vue`; `stores/auth.ts` is the
+  shared `createSessionStore` factory in `expiredSessionMode: 'graceful'` so an
+  absent/expired session never bounces an anonymous local user to `/login`
+  (`2ac545b0`, `1fe19ea8`, the `console:` series).
 
-## Remaining / Open
+## Target End-State (decisions)
 
-- **Coherence pass**: the console adoption landed as a long series of polish
-  commits. Capture the intended end-state (which latere-ui components are
-  canonical, what wallfacer overrides) so further UI work has a target instead of
-  reacting commit-by-commit.
-- **Sign-in UX in local mode**: define the first-run experience (prompt vs
-  silent-available), and what signed-in adds locally today (account linkage,
-  org context) versus later (cloud metadata coordination).
-- **Org context in local mode**: `/api/auth/orgs` + org switching exist; specify
-  what an org selection actually scopes locally (board grouping? nothing yet?).
-- **Config surface**: document the `AUTH_*` precedence and the public-vs-
-  confidential-client story in user docs, since `resolveAuthConfig` now makes
-  defaults implicit.
+The shipped pieces above land the mechanism; these decisions pin the intended
+shape so further UI work has a target.
+
+- **Canonical components**: the latere-ui console shell is canonical. wallfacer
+  owns only thin wrappers (`AccountControl.vue`, `Sidebar.vue`) that feed
+  wallfacer's session/prefs stores into the shared `AccountMenu` / `AccountPrefs`
+  / `ConsoleSidebar`; it uses `brandTheme: 'wallfacer'`. No bespoke account or
+  sidebar chrome. Visual deltas are CSS overrides on the shared components, not
+  forks. Bumping the `latere-ui` pin is the adoption path; do not vendor.
+- **First-run UX: silent-available**. A plain `wallfacer run` does not prompt or
+  redirect to sign-in. The sidebar shows a sign-in chip; sign-in is opt-in. This
+  follows from `expiredSessionMode: 'graceful'` and keeps anonymous local use
+  first-class. Forced login stays cloud-gated (`force_login.go`).
+- **What signing in adds locally (today)**: account linkage and the populated
+  account menu (identity, theme, sign out). Org selection in local mode is
+  display-only and scopes nothing yet; what an org actually scopes (shared
+  boards, RBAC) is owned by multi-user-collaboration, not here.
+- **Config surface (docs)**: user docs explain that `resolveAuthConfig` makes the
+  public "wallfacer" client the implicit default, the `AUTH_*` precedence
+  (explicit env / confidential client wins), and how to point at a different auth
+  service. This is the one concrete doc deliverable remaining.
 
 ## Non-Goals
 
@@ -96,9 +121,11 @@ Precision: auth-by-default means sign-in is *available and ambient*, not
 ## Acceptance Criteria
 
 - `wallfacer run` with no env offers working browser sign-in against
-  auth.latere.ai and remains fully usable signed-out.
+  auth.latere.ai, does not prompt or redirect on first run, and remains fully
+  usable signed-out.
 - The web UI renders the shared latere-ui console chrome (account menu, org
-  switcher, theme, sign out) consistent with other Latere surfaces.
-- User docs explain the `AUTH_*` defaults, the public client, and how to point at
-  a different auth service or use a confidential client.
-- The intended console end-state is documented so UI work targets it.
+  switcher, theme, sign out) via thin wrappers over latere-ui, with no bespoke
+  account/sidebar chrome.
+- User docs explain the `AUTH_*` defaults, the public client, the precedence
+  rules, and how to point at a different auth service or use a confidential
+  client.
