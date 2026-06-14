@@ -1,0 +1,4 @@
+{"type":"step_start","timestamp":1717000000000,"sessionID":"ses_abc123","part":{"id":"prt_1","sessionID":"ses_abc123","messageID":"msg_1","type":"step-start"}}
+{"type":"text","timestamp":1717000000100,"sessionID":"ses_abc123","part":{"id":"prt_2","sessionID":"ses_abc123","messageID":"msg_1","type":"text","text":"Hello! Done."}}
+{"type":"step_finish","timestamp":1717000000200,"sessionID":"ses_abc123","part":{"id":"prt_3","sessionID":"ses_abc123","messageID":"msg_1","type":"step-finish","reason":"stop","cost":0.0042,"tokens":{"input":1200,"output":85,"reasoning":0,"cache":{"read":900,"write":300}}}}
+{"type":"result","sessionID":"ses_abc123","result":"Hello! Done.","is_error":false,"stop_reason":"end_turn","usage":{"input":1200,"output":85,"reasoning":0,"cache":{"read":900,"write":300}},"cost":0.0042}

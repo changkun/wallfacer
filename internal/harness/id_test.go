@@ -30,9 +30,10 @@ func TestParseID(t *testing.T) {
 	if id, ok := ParseID(" CODEX "); !ok || id != Codex {
 		t.Errorf("ParseID(CODEX) = %q,%v", id, ok)
 	}
-	// Unregistered harness ID: zero value, not ok.
-	if id, ok := ParseID("opencode"); ok || id != "" {
-		t.Errorf("ParseID(opencode) = %q,%v; want \"\",false (not registered)", id, ok)
+	// Unregistered harness ID: zero value, not ok. Use a literal that no
+	// harness registers, so this stays correct as new harnesses land.
+	if id, ok := ParseID("ghost"); ok || id != "" {
+		t.Errorf("ParseID(ghost) = %q,%v; want \"\",false (not registered)", id, ok)
 	}
 }
 
@@ -49,11 +50,12 @@ func TestIDIsValidOrDefault(t *testing.T) {
 	if !Claude.IsValid() {
 		t.Error("Claude should be valid (registered)")
 	}
-	if OpenCode.IsValid() {
-		t.Error("OpenCode not implemented yet, should be invalid")
+	ghost := ID("ghost")
+	if ghost.IsValid() {
+		t.Error("ghost is not registered, should be invalid")
 	}
-	if got := OpenCode.OrDefault(); got != Default() {
-		t.Errorf("OpenCode.OrDefault() = %q, want %q", got, Default())
+	if got := ghost.OrDefault(); got != Default() {
+		t.Errorf("ghost.OrDefault() = %q, want %q", got, Default())
 	}
 	if got := Codex.OrDefault(); got != Codex {
 		t.Errorf("Codex.OrDefault() = %q", got)

@@ -40,6 +40,11 @@ type Config struct {
 	// Cursor sandbox fields.
 	CursorAPIKey string // CURSOR_API_KEY
 
+	// OpenCode sandbox fields. Provider auth is managed by the opencode CLI
+	// itself (`opencode auth login`); only the server-mode password is read
+	// here, for the future `opencode run --attach` warm-start path.
+	OpenCodeServerPassword string // OPENCODE_SERVER_PASSWORD
+
 	DefaultSandbox        harness.ID // WALLFACER_DEFAULT_SANDBOX
 	ImplementationSandbox harness.ID // WALLFACER_SANDBOX_IMPLEMENTATION
 	TestingSandbox        harness.ID // WALLFACER_SANDBOX_TESTING
@@ -49,9 +54,10 @@ type Config struct {
 	IdeaAgentSandbox      harness.ID // WALLFACER_SANDBOX_IDEA_AGENT
 	SandboxFast           bool       // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
-	HostClaudeBinary string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
-	HostCodexBinary  string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
-	HostCursorBinary string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
+	HostClaudeBinary   string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
+	HostCodexBinary    string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
+	HostCursorBinary   string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
+	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
 	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
@@ -79,6 +85,7 @@ var knownKeys = []string{
 	"CODEX_DEFAULT_MODEL",
 	"CODEX_TITLE_MODEL",
 	"CURSOR_API_KEY",
+	"OPENCODE_SERVER_PASSWORD",
 	"WALLFACER_MAX_PARALLEL",
 	"WALLFACER_MAX_TEST_PARALLEL",
 	"WALLFACER_OVERSIGHT_INTERVAL",
@@ -97,6 +104,7 @@ var knownKeys = []string{
 	"WALLFACER_HOST_CLAUDE_BINARY",
 	"WALLFACER_HOST_CODEX_BINARY",
 	"WALLFACER_HOST_CURSOR_BINARY",
+	"WALLFACER_HOST_OPENCODE_BINARY",
 	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
 	"WALLFACER_CLOUD",
@@ -179,6 +187,8 @@ func Parse(path string) (Config, error) {
 			cfg.CodexTitleModel = v
 		case "CURSOR_API_KEY":
 			cfg.CursorAPIKey = v
+		case "OPENCODE_SERVER_PASSWORD":
+			cfg.OpenCodeServerPassword = v
 		case "WALLFACER_DEFAULT_SANDBOX":
 			cfg.DefaultSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_IMPLEMENTATION":
@@ -201,6 +211,8 @@ func Parse(path string) (Config, error) {
 			cfg.HostCodexBinary = v
 		case "WALLFACER_HOST_CURSOR_BINARY":
 			cfg.HostCursorBinary = v
+		case "WALLFACER_HOST_OPENCODE_BINARY":
+			cfg.HostOpenCodeBinary = v
 		case "WALLFACER_TERMINAL_ENABLED":
 			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":
