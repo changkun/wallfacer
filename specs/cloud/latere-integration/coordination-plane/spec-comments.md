@@ -275,9 +275,21 @@ All UI lives in `frontend/src/components/plan/` (the spec view), built on
 - `frontend/src/components/plan/`: markers, popover, avatars, the "Show resolved"
   toggle, and the selection-to-comment affordance on `SpecFocusedView.vue`.
 
-The coordinator-side authoritative store (where threads persist, retention) is a
-coordinator concern shared with `metadata-projection.md`'s read-model store decision;
-it is referenced here, not specified.
+### Durable store (Postgres, new infra dependency)
+
+Comments are cloud-**authoritative** (the one relay-not-mirror exception), so their
+system of record must be **durable**, not the shared Valkey cache: a cache evicts
+under memory pressure and would silently drop system-of-record data. Authoritative
+threads therefore persist in **Postgres** (`latere-pg`). Valkey is used only for the
+real-time relay (pub/sub fan-out, presence-aware delivery), never as the store.
+
+This is a **new infra dependency**: wallfacer is filesystem-storage today and has no
+database on `latere-pg` (unlike auth/cella/fs/lux/web). Standing up authoritative
+comments requires provisioning a `wallfacer` database on `latere-pg` plus the
+`kubernetes_secret` wiring, the same pattern every other service uses. Until that
+decision lands, this leaf is blocked at the storage line; the schema, anchoring,
+relay, and UI above are storage-agnostic and can be designed ahead. The provisioning
+decision is shared with [metadata-projection](metadata-projection.md)'s rollup tier.
 
 ## Future: git-export (separate leaf)
 

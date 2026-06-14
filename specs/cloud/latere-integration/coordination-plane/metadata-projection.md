@@ -185,13 +185,28 @@ wallfacerd coordinator. Rejected alternatives and why:
   need aggregation queries (group-by member / model / status / time bucket) that
   a blob plane does not serve.
 
-The store is whatever the coordinator process already has available
-(co-located embedded DB or a small managed instance); it holds only the
-projected read-model, never source or content, so its blast radius is the
-allow-listed metadata only. It is rebuildable from instance pushes, so it is a
-cache of record, not a system of record. Retention is the policy decided above
-(live index indefinitely, raw projected events 90 days, rollups 13 months); a
-durable store keeps the rollups cheaply, confirming those windows.
+The substrate is **tiered**, because wallfacerd runs multiple replicas (see
+[connection](connection-and-presence/connection.md) horizontal scaling) and the
+read-model must be shared, not per-replica:
+
+- **Live read-model in Valkey** (`latere-valkey`, the shared cache): the current
+  `ProjectedTask` index and the running usage aggregates. It is a **cache of
+  record**, regenerable by replay from any instance, so eviction is recoverable
+  and the cache tier is acceptable. All replicas read/write the same keys
+  (namespaced `wf:coord:proj:*`).
+- **Long-retention rollups in Postgres** (`latere-pg`): the daily/weekly usage
+  buckets and the >90-day history that instances may no longer be able to replay.
+  These are durable and want a real query store, not an eviction-unsafe cache.
+  wallfacer has no database on `latere-pg` today, so the rollup tier shares the
+  **same provisioning decision** as authoritative spec comments (see
+  [spec-comments](spec-comments.md)); until then, projection is live-only (Valkey)
+  and history is bounded to what replay reconstructs.
+
+Rejected for the durable tier: Identity org metadata (would absorb
+wallfacer-domain data) and FS (a blob plane, not queryable). It holds only the
+allow-listed metadata, never source or content, so its blast radius is the
+projection only. Retention is the policy decided above (live index indefinitely,
+raw projected events 90 days, rollups 13 months).
 
 ## 4. Dashboards on wf.latere.ai
 
