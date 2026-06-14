@@ -138,6 +138,25 @@ func TestHostBackend_LaunchPi_InstructionsContentPrepended(t *testing.T) {
 	}
 }
 
+// TestHostBackend_LaunchPi_RequiresPrompt verifies launchPi rejects a spec
+// whose Cmd has no -p <prompt> rather than execing pi with an empty prompt.
+func TestHostBackend_LaunchPi_RequiresPrompt(t *testing.T) {
+	bin := buildFakePi(t)
+	b, err := NewHostBackend(HostBackendConfig{PiBinary: bin})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	_, lerr := b.Launch(context.Background(), ContainerSpec{
+		Name:    "wallfacer-pi-noprompt",
+		Env:     map[string]string{"WALLFACER_AGENT": "pi"},
+		Cmd:     []string{"--verbose", "--output-format", "stream-json"},
+		WorkDir: t.TempDir(),
+	})
+	if lerr == nil || !strings.Contains(lerr.Error(), "requires a -p") {
+		t.Errorf("expected a missing-prompt error, got: %v", lerr)
+	}
+}
+
 // TestHostBackend_LaunchPi_UnresolvedBinary verifies a clear error when the
 // pi binary is unresolved.
 func TestHostBackend_LaunchPi_UnresolvedBinary(t *testing.T) {
