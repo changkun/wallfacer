@@ -27,10 +27,12 @@ func TestRunDoctor_BinariesPresent(t *testing.T) {
 	configDir := t.TempDir()
 	claudePath := writeFakeCLI(t, t.TempDir(), "claude", "claude/1.2.3")
 	codexPath := writeFakeCLI(t, t.TempDir(), "codex", "codex-0.99")
+	cursorPath := writeFakeCLI(t, t.TempDir(), "cursor-agent", "cursor-2026.06")
 	envFile := filepath.Join(configDir, ".env")
 	content := "ANTHROPIC_API_KEY=sk-ant-test1234\n" +
 		"WALLFACER_HOST_CLAUDE_BINARY=" + claudePath + "\n" +
-		"WALLFACER_HOST_CODEX_BINARY=" + codexPath + "\n"
+		"WALLFACER_HOST_CODEX_BINARY=" + codexPath + "\n" +
+		"WALLFACER_HOST_CURSOR_BINARY=" + cursorPath + "\n"
 	if err := os.WriteFile(envFile, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -44,6 +46,9 @@ func TestRunDoctor_BinariesPresent(t *testing.T) {
 	}
 	if !strings.Contains(out, "[ok] Codex binary: "+codexPath) {
 		t.Errorf("missing codex binary line:\n%s", out)
+	}
+	if !strings.Contains(out, "[ok] Cursor binary: "+cursorPath) {
+		t.Errorf("missing cursor binary line:\n%s", out)
 	}
 	// Don't assert the specific version string: the `--version` probe runs
 	// with a 2s timeout so a loaded test machine (parallel `go test ./...`)
