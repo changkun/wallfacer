@@ -101,6 +101,7 @@ type envConfigResponse struct {
 	BaseURL              string                               `json:"base_url"`
 	OpenAIAPIKey         string                               `json:"openai_api_key"` // masked
 	OpenAIBaseURL        string                               `json:"openai_base_url"`
+	CursorAPIKey         string                               `json:"cursor_api_key"` // masked
 	DefaultModel         string                               `json:"default_model"`
 	TitleModel           string                               `json:"title_model"`
 	CodexDefaultModel    string                               `json:"codex_default_model"`
@@ -139,6 +140,7 @@ type sandboxTestRequest struct {
 	BaseURL           *string                              `json:"base_url"`
 	OpenAIAPIKey      *string                              `json:"openai_api_key"`
 	OpenAIBaseURL     *string                              `json:"openai_base_url"`
+	CursorAPIKey      *string                              `json:"cursor_api_key"`
 	DefaultModel      *string                              `json:"default_model"`
 	TitleModel        *string                              `json:"title_model"`
 	CodexDefaultModel *string                              `json:"codex_default_model"`
@@ -177,6 +179,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		BaseURL:              cfg.BaseURL,
 		OpenAIAPIKey:         envconfig.MaskToken(cfg.OpenAIAPIKey),
 		OpenAIBaseURL:        cfg.OpenAIBaseURL,
+		CursorAPIKey:         envconfig.MaskToken(cfg.CursorAPIKey),
 		DefaultModel:         cfg.DefaultModel,
 		TitleModel:           cfg.TitleModel,
 		CodexDefaultModel:    cfg.CodexDefaultModel,
@@ -221,6 +224,9 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.OpenAIAPIKey != nil && *req.OpenAIAPIKey == "" {
 		req.OpenAIAPIKey = nil
+	}
+	if req.CursorAPIKey != nil && *req.CursorAPIKey == "" {
+		req.CursorAPIKey = nil
 	}
 
 	// Validate base URLs (same checks as regular env updates).
@@ -367,6 +373,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		BaseURL:           req.BaseURL,
 		OpenAIAPIKey:      req.OpenAIAPIKey,
 		OpenAIBaseURL:     req.OpenAIBaseURL,
+		CursorAPIKey:      req.CursorAPIKey,
 		DefaultModel:      req.DefaultModel,
 		TitleModel:        req.TitleModel,
 		CodexDefaultModel: req.CodexDefaultModel,
@@ -402,6 +409,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		BaseURL              *string                              `json:"base_url"`
 		OpenAIAPIKey         *string                              `json:"openai_api_key"`
 		OpenAIBaseURL        *string                              `json:"openai_base_url"`
+		CursorAPIKey         *string                              `json:"cursor_api_key"`
 		DefaultModel         *string                              `json:"default_model"`
 		TitleModel           *string                              `json:"title_model"`
 		CodexDefaultModel    *string                              `json:"codex_default_model"`
@@ -430,6 +438,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.OpenAIAPIKey != nil && *req.OpenAIAPIKey == "" {
 		req.OpenAIAPIKey = nil
+	}
+	if req.CursorAPIKey != nil && *req.CursorAPIKey == "" {
+		req.CursorAPIKey = nil
 	}
 	// Convert max_parallel_tasks int to string for the env file.
 	var maxParallel *string
@@ -540,6 +551,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		BaseURL:              req.BaseURL,
 		OpenAIAPIKey:         req.OpenAIAPIKey,
 		OpenAIBaseURL:        req.OpenAIBaseURL,
+		CursorAPIKey:         req.CursorAPIKey,
 		DefaultModel:         req.DefaultModel,
 		TitleModel:           req.TitleModel,
 		CodexDefaultModel:    req.CodexDefaultModel,

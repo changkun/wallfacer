@@ -320,6 +320,66 @@ func TestUpdateEnvConfig_CodexModelRoundTrip(t *testing.T) {
 	}
 }
 
+// TestUpdateEnvConfig_CursorAPIKeyRoundTrip verifies CURSOR_API_KEY is
+// persisted by UpdateEnvConfig and returned masked by GetEnvConfig.
+func TestUpdateEnvConfig_CursorAPIKeyRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := `{"cursor_api_key":"curs-secret-wxyz"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w2 := httptest.NewRecorder()
+	h.GetEnvConfig(w2, req2)
+
+	var resp envConfigResponse
+	if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.CursorAPIKey == "" || resp.CursorAPIKey == "curs-secret-wxyz" {
+		t.Errorf("CursorAPIKey = %q; want a masked value", resp.CursorAPIKey)
+	}
+	if !strings.Contains(resp.CursorAPIKey, "...") {
+		t.Errorf("CursorAPIKey = %q; want masked (contains ...)", resp.CursorAPIKey)
+	}
+}
+
+// TestUpdateEnvConfig_EmptyCursorAPIKeyTreatedAsNoChange verifies an empty
+// cursor_api_key does not clear a previously stored key.
+func TestUpdateEnvConfig_EmptyCursorAPIKeyTreatedAsNoChange(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	first := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"cursor_api_key":"curs-keep-1234"}`))
+	fw := httptest.NewRecorder()
+	h.UpdateEnvConfig(fw, first)
+	if fw.Code != http.StatusNoContent {
+		t.Fatalf("seed: expected 204, got %d: %s", fw.Code, fw.Body.String())
+	}
+
+	clear := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"cursor_api_key":""}`))
+	cw := httptest.NewRecorder()
+	h.UpdateEnvConfig(cw, clear)
+	if cw.Code != http.StatusNoContent {
+		t.Fatalf("clear: expected 204, got %d: %s", cw.Code, cw.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w := httptest.NewRecorder()
+	h.GetEnvConfig(w, req)
+	var resp envConfigResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.CursorAPIKey == "" {
+		t.Error("empty cursor_api_key should be a no-op, but the stored key was cleared")
+	}
+}
+
 // TestUpdateEnvConfig_OversightIntervalClamped verifies that values outside
 // [0, 120] are clamped before writing to the env file.
 func TestUpdateEnvConfig_OversightIntervalClamped(t *testing.T) {
