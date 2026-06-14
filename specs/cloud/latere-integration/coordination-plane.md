@@ -119,15 +119,18 @@ instance's presence is cleared. This generalizes remote-control's "outbound
 connection" design shape so it is built **once** and shared by all four
 capabilities, rather than per-feature.
 
-### Cross-machine workspace identity
+### Workspace and repo identity
 
-The existing per-machine workspace key is a SHA-256 of sorted **local** paths,
-which differs across machines for the same repo and therefore cannot mean "the
-same workspace" to two teammates. Cross-machine identity uses the **canonical
-git remote URL** (normalized `origin`) as the shared key, registered with the
-org in the coordinator. The local-path fingerprint stays the *local* key; the
-git-remote identity is the *cross-machine* key the coordinator joins on. A
-workspace with no remote is local-only and never appears in org collaboration.
+A wallfacer workspace is a `Group` of local folder paths, possibly several repos,
+so "the workspace" is not one git remote. The collaboration unit is the **repo**
+(canonical `host/owner/repo`), the only identity stable across machines and clones.
+The folder-to-repo resolution stays on the client; the server stores repo
+**identities**, never folder paths. Repo claims are **verified** within the org by
+a layered model (default: local credential proof using the user's own git creds;
+fallback: org-admin-registered repos + membership; upgrade: per-user GitHub OAuth),
+with the **org boundary as the security perimeter** (cross-tenant access is
+structurally impossible). The full data model, storage tiers, and verification
+flow are in [repo-identity](latere-integration/coordination-plane/repo-identity.md).
 
 ### Multiple replicas
 
@@ -247,16 +250,21 @@ governed coordination channel," with:
 
 ## Phasing
 
+0. **Repo identity** (foundation): the per-repo, verified workspace-identity model
+   every capability keys on. Spec ready; underpins the connection manifest.
 1. **The connection** + presence (lead): one outbound WSS, registry, heartbeat,
    org-wide presence list. Delivers visible value first.
 2. **Metadata projection**: allow-listed push + org dashboards.
 3. **Remote control**: command router + instance picker UI (absorbs
    remote-control).
-4. **Spec comments**: git-resident store + coordinator relay + the comment UI.
+4. **Spec comments**: cloud-resident (Postgres) store + coordinator relay + the
+   comment UI; git-export is a later leaf.
 5. **Data-boundary widening**: opt-in gate + allow-list test (lands alongside 1).
 
 ## Child breakdown
 
+- `coordination-plane/repo-identity.md` (foundation: per-repo, verified workspace
+  identity, storage tiers, the org-boundary perimeter)
 - `coordination-plane/connection-and-presence.md` (phase 1 transport + registry
   + heartbeat + org-wide presence; the lead child)
 - `coordination-plane/metadata-projection.md` (phase 2 allow-listed push + org
