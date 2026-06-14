@@ -121,44 +121,124 @@ capability frame types reserved by later leaves: `presence`, `projection`,
 `internal/coordinator`. Unknown `type` is ignored with a logged warning so a
 newer peer does not break an older one (forward-compatible).
 
-## The registry
+## Two registry roles (the seam that survives multiple replicas)
 
-In-memory, ephemeral, rebuilt from reconnects, never persisted. One mutex guards
-three indices, all derived from the validated principal:
+wallfacerd runs **more than one replica**. A local instance's WSS load-balances
+to **one** replica (its home replica) and stays there for the connection's life
+(a single long-lived socket needs no session affinity); only that replica can
+`Send` down that socket. So the registry splits into two roles that must not be
+conflated, or every cross-replica query returns a partial view:
 
-- `principal -> []instance` : every live connection for a `Sub` (one person, many
-  machines). Each entry holds the manifest plus the live socket handle, so the
-  capability leaves (presence, projection, remote control, comments) reuse the
-  same connection without their own plumbing.
-- `org -> set<principal>` : present principals per org, recomputed on join/leave.
-- `remote-url -> set<instance>` : instances serving a given cross-machine
-  workspace, for collaboration fan-out (comments leaf). Built here so the registry
-  shape is settled even though presence aggregates per org.
-
-### Interface (the contract the capability leaves consume)
+1. **Local socket table (per replica, in-memory).** Answers only "is this
+   `instance_id` terminated **here**, and give me its `Sender`." Used for
+   delivery. Each replica has its own; it knows nothing about sockets on other
+   replicas. This is `internal/coordinator`'s in-memory table.
+2. **Directory (cross-replica query + fan-out).** Answers "who is in this org",
+   "which instances serve this `remote`", and routes a frame to an instance whose
+   home replica may be a different pod. This is an **interface** with two impls:
 
 ```go
-type Registry interface {
-    Join(p Principal, inst Instance) // on manifest
-    Leave(instanceID string)         // on close/timeout
+type Directory interface {
+    Join(p Principal, m Manifest, replicaID string) // register (own replica)
+    Leave(instanceID string)
     UpdateManifest(instanceID string, m Manifest)
-    Snapshot(org string) []Instance  // current instances in an org
-    InstancesForRemote(remote string) []Instance
-    Subscribe() (<-chan RegistryEvent, func()) // join/leave/manifest deltas
+    Snapshot(org string) []InstanceMeta          // ALL replicas
+    InstancesForRemote(remote string) []InstanceMeta
+    Publish(target Route, frame []byte)          // cross-replica fan-out
+    Subscribe(replicaID string) (<-chan Inbound, func())
 }
 ```
 
-`Subscribe` is how presence and remote-control learn of membership changes
-without touching socket code. The registry carries only registration metadata
-(principal, org, instance id, host label, version, workspace remotes,
-capabilities), never task or content data.
+- **`memDirectory`** (single replica / local dev / `replicas: 1`): backed by the
+  local table; `Snapshot` is just the local instances. Selected when no Redis is
+  configured.
+- **`redisDirectory`** (multiple replicas): backed by Valkey (below). `Snapshot`
+  reads the shared index; `Publish` fans out cross-replica.
+
+The capability leaves (presence, projection, remote control, comments) consume
+`Directory` for queries/fan-out and the local table only for "deliver to a socket
+I terminate." The directory carries only registration metadata (principal, org,
+instance id, host label, version, workspace remotes, capabilities), never task or
+content data.
+
+## Horizontal scaling (multiple replicas)
+
+Cross-replica state reuses the **shared managed Valkey** (`latere-valkey`,
+Redis-compatible, TLS `rediss://`), the same cluster lux and sandboxd already
+co-tenant; wallfacer adds its own `kubernetes_secret` and namespaces every key
+under `wf:coord:*`. Config-gated by `WALLFACER_REDIS_URL`: **absent** selects
+`memDirectory` (local dev, current `replicas: 1`, byte-identical to single
+process); **present** selects `redisDirectory`. Parsed with `redis.ParseURL`
+(TLS auto), matching lux/sandboxd.
+
+### Shared index (Valkey)
+
+Each replica writes the instances **it terminates** into Valkey and refreshes
+them by heartbeat; it never writes another replica's instances.
+
+- `wf:coord:inst:<instance_id>` -> hash {principal, org, host_label, version,
+  remotes, capabilities, **home_replica**}, `EXPIRE 90s`.
+- `wf:coord:org:<org_id>` -> set of `instance_id`, members `EXPIRE`-aligned.
+- `wf:coord:ws:<remote>` -> set of `instance_id` serving that workspace.
+
+TTL is the crash-safety net: 60 s liveness, ~90 s key TTL, refreshed on the 20 s
+heartbeat; a clean disconnect deletes the keys immediately. A replica that dies
+lets its entries expire, so the org view self-corrects within the TTL window
+without any cleanup job.
+
+### Cross-replica fan-out (Valkey pub/sub)
+
+A frame whose target socket lives on another replica is published, not sent
+directly:
+
+- `wf:coord:ch:org:<org_id>` : presence updates for an org. Each replica
+  subscribes for the orgs it serves and re-emits to its local sockets.
+- `wf:coord:ch:replica:<replica_id>` : directed messages (remote-control routes a
+  command to the replica that owns the target `instance_id`, looked up in the
+  index).
+- `wf:coord:ch:ws:<remote>` : comment fan-out to instances serving a workspace.
+
+`replica_id` is a per-process random id (Deployment, not StatefulSet); a stale
+channel after a pod dies is harmless (no subscribers). Pub/sub is at-most-once,
+which is fine: presence carries the full org snapshot (self-healing on the next
+update), projection is idempotent on `(instance_id, task_id, seq)`, comments are
+ULID-keyed. The message body is the snapshot itself (simplest at dozens per org),
+with the Valkey index as the source of truth on reconnect.
+
+### Storage tiering (cache vs system of record)
+
+Valkey is a **cache**, eviction-unsafe under memory pressure, so it holds only
+**ephemeral** state: the live index, presence, routing, and pub/sub. **Durable,
+authoritative** data does **not** live in Valkey:
+
+- **Spec comments** are cloud-authoritative (the one relay-not-mirror exception),
+  so their system of record is **Postgres** (`latere-pg`), not the cache. wallfacer
+  has no database on `latere-pg` today (it is filesystem-storage), so this is a
+  new infra dependency tracked in [spec-comments](../spec-comments.md) and gated
+  on a provisioning decision. It does **not** block this phase: connection and
+  presence are Valkey-only.
+- **Metadata projection** live read-model may sit in Valkey (it is a cache of
+  record, regenerable by replay); only its long-retention rollups want Postgres
+  (see [metadata-projection](../metadata-projection.md)).
+
+### Redis-outage degradation
+
+Extending the relay-not-mirror ethos: if Valkey is unreachable, cross-replica
+coordination degrades (presence falls back to each replica's local sockets,
+fan-out stops) but **every local board keeps working** and each replica still
+serves its own connected instances. Coordination is best-effort infrastructure,
+never on the critical path of a local task.
 
 ## Non-goals
 
 - Presence aggregation, focus/typing, the browser-SSE re-home: leaf 2
   ([presence](presence.md)).
 - Projection, remote control, comments: later capability leaves.
-- Durable registry or any database. Ephemeral by decision.
+- A durable system of record in this leaf. The Valkey index is ephemeral and
+  TTL-expiring (a cache, not a database); authoritative durable data (spec
+  comments, projection rollups) lives in Postgres, owned by those leaves.
+- Session affinity / sticky load balancing. A single long-lived socket stays on
+  its home replica naturally; no LB stickiness config is required.
 
 ## Acceptance criteria
 
@@ -176,6 +256,13 @@ capabilities), never task or content data.
    different `GroupKey`) register the same `remote` and both appear under that
    `remote-url` index; an instance on a remote-less workspace registers no remote.
 6. The wire codec ignores an unknown frame `type` without dropping the connection.
+7. **Multi-replica.** Two instances connected to **different** replicas appear in
+   each other's org `Snapshot` (via the Valkey index), and a frame targeting an
+   instance whose home replica differs is delivered via pub/sub. With no
+   `WALLFACER_REDIS_URL`, the same scenario falls back to single-replica
+   (`memDirectory`) and a single process behaves identically.
+8. **Replica crash.** When a replica dies, its instances' Valkey keys expire
+   within the TTL window and drop out of the org `Snapshot` with no cleanup job.
 
 ## Test plan
 
@@ -183,8 +270,13 @@ capabilities), never task or content data.
 - Unit: instance-id load-or-create is stable across simulated restart.
 - Unit: git-remote normalize maps `git@github.com:Org/Repo.git`,
   `https://github.com/Org/Repo`, and `https://github.com/Org/Repo.git` to one key.
+- Unit: `memDirectory` and `redisDirectory` pass the same `Directory` contract
+  test (table-driven against both impls).
 - Integration: connect, manifest, heartbeat, idle-timeout eviction, graceful
   close, reconnect-resumes-same-slot, against an in-process coordinator.
+- Integration (multi-replica): two coordinator instances sharing one Valkey (a
+  test container or miniredis) see each other's instances in `Snapshot`; a
+  pub/sub frame routes to the instance on the other replica.
 - Boundary: opted-out and anonymous emit zero frames (mirrors the RUM gate test).
 
 ## Open questions

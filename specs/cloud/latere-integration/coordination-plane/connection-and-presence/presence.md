@@ -27,7 +27,14 @@ only the **source** of the list moves to the coordinator.
 ## What leaf 1 provides
 
 - The live WSS per instance and the `presence` frame type reserved on it.
-- `Registry.Snapshot(org)` and `Registry.Subscribe()` for membership.
+- The **`Directory`** seam: `Snapshot(org)` / `InstancesForRemote(remote)` (which
+  read across **all replicas**, via Valkey under multi-replica) and the local
+  socket table (deliver to a socket this replica terminates). Presence MUST query
+  the `Directory`, never the local table, or each replica shows a partial org
+  list.
+- Cross-replica fan-out: `Directory.Publish` to the org channel and
+  `Subscribe(replicaID)` for inbound, so a focus hint reaches peers whose home
+  replica differs.
 - The validated `(Sub, OrgID)` per connection and each instance's served
   `remote` workspaces.
 

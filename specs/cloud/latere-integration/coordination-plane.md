@@ -129,6 +129,20 @@ org in the coordinator. The local-path fingerprint stays the *local* key; the
 git-remote identity is the *cross-machine* key the coordinator joins on. A
 workspace with no remote is local-only and never appears in org collaboration.
 
+### Multiple replicas
+
+wallfacerd runs more than one replica, so an instance's WSS lands on one replica
+(its home) while presence and routing must span all of them. Cross-replica state
+reuses the shared managed **Valkey** (`latere-valkey`, the cache lux/sandboxd
+already co-tenant): a TTL-refreshed instance index plus pub/sub fan-out, namespaced
+`wf:coord:*`, config-gated by `WALLFACER_REDIS_URL` with an in-memory
+single-replica fallback for local dev. Valkey is a cache and holds only ephemeral
+coordination state; **durable, authoritative** data (spec comments, the projection
+long-tail rollups) lives in **Postgres** (`latere-pg`), a new infra dependency
+since wallfacer is filesystem-storage today. The full design is in
+[connection](latere-integration/coordination-plane/connection-and-presence/connection.md);
+the durable-tier provisioning is an open decision (see Open questions).
+
 ## Capabilities riding the plane
 
 Each is a thin feature on the one connection; each becomes a child spec.
@@ -259,10 +273,14 @@ governed coordination channel," with:
 1. **Connection shape.** Long-lived WSS (real-time, server cost scales with live
    instances) vs heartbeat-poll (cheap, latency floor). Remote-control's design
    space already framed this; WSS is the lead because presence needs push.
-2. **Coordinator state durability for the projection.** The projection is a
-   read-model: where does wf.latere.ai persist it (its own store, FS, Identity
-   org metadata) and what is its retention? Likely a thin coordinator-owned
-   store, decided in `metadata-projection.md`.
+2. **Durable store for authoritative data (blocks comments + projection
+   rollups).** Ephemeral coordination lives in Valkey, decided. But spec comments
+   are cloud-authoritative and the projection long-tail wants durability, and a
+   cache is eviction-unsafe for a system of record. wallfacer has **no database on
+   `latere-pg`** today (it is filesystem-storage). The open decision: provision a
+   `wallfacer` Postgres database on `latere-pg` (the pattern every other service
+   uses), or revisit the cloud-now comment-storage choice. Does **not** block
+   phase-1 connection + presence, which are Valkey-only.
 3. **Comment anchoring across spec edits.** A comment pins to a spec
    line/section; the underlying spec changes in git. Anchor on content hash +
    fuzzy reposition, or section id? Decided in `spec-comments.md`.
