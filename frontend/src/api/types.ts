@@ -70,7 +70,6 @@ export interface ExecutionEnvironment {
   container_digest?: string;
   model_name?: string;
   api_base_url?: string;
-  instructions_hash?: string;
   sandbox?: string;
   recorded_at?: string;
 }
@@ -98,7 +97,6 @@ export interface ServerConfig {
   workspaces: string[];
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
-  instructions_path?: string;
   prompts_dir?: string;
   autopilot: boolean;
   autotest: boolean;

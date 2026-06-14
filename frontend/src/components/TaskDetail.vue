@@ -45,17 +45,14 @@ const blockedBy = computed<DepRow[]>(() => {
 });
 const blockedByUnmet = computed(() => blockedBy.value.filter((d) => !d.satisfied).length);
 
-// Execution-environment provenance rows (harness, model, instructions hash,
-// API endpoint, recorded time).
+// Execution-environment provenance rows (harness, model, API endpoint,
+// recorded time).
 const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() => {
   const e = props.task.environment;
   if (!e) return [];
   const rows: { label: string; value: string; mono?: boolean }[] = [];
   rows.push({ label: 'Harness', value: e.sandbox || '(default)' });
   rows.push({ label: 'Model', value: e.model_name || '(unknown)' });
-  if (e.instructions_hash) {
-    rows.push({ label: 'Instructions SHA-256', value: e.instructions_hash.slice(0, 12), mono: true });
-  }
   rows.push({ label: 'API endpoint', value: e.api_base_url || '(default)' });
   if (e.recorded_at) rows.push({ label: 'Recorded', value: relativeTime(e.recorded_at) });
   return rows;
