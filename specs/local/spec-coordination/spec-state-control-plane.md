@@ -13,15 +13,13 @@ affects:
   - internal/handler/explorer.go
   - internal/apicontract/routes.go
   - internal/cli/server.go
-  - internal/runner/drift.go
   - internal/runner/oversight.go
   - internal/store/
-  - ui/js/spec-explorer.js
-  - ui/js/spec-mode.js
-  - ui/partials/spec-mode.html
+  - frontend/src/components/plan/SpecTreePanel.vue
+  - frontend/src/components/plan/SpecFocusedView.vue
   - .claude/skills/wf-spec-breakdown/skill.md
 created: 2026-03-29
-updated: 2026-04-12
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 effort: large
@@ -33,11 +31,13 @@ The wallfacer server owns every state transition a spec goes through.
 The lifecycle state machine lives in `internal/spec/lifecycle.go`, but
 today only two classes of transitions are automated:
 
-- **To `archived` and back to `drafted`** (archival endpoints in
-  `internal/handler/specs.go` — shipped by
-  [spec-archival.md](spec-archival.md)).
-- **To `complete` on task done** — `SpecCompletionHook` writes
-  `complete` **unconditionally**, no tester verdict, no drift check.
+- **To `archived` and back to `drafted`** (archival actions on the
+  `POST /api/specs/transition` endpoint in
+  `internal/handler/specs_dispatch.go` / `internal/handler/specs.go` -
+  shipped by [spec-archival.md](spec-archival.md)).
+- **To `complete` on task done** - `SpecCompletionHook`
+  (`internal/handler/specs_dispatch.go`) writes `complete`
+  **unconditionally**, no tester verdict, no drift check.
 
 Every other transition is manual: the user edits YAML by hand or an
 agent writes `status: validated` during `/wf-spec-refine`. Downstream
@@ -55,21 +55,24 @@ lands.
 
 Already in place:
 
-- **`internal/spec/lifecycle.go`** — six-state machine
+- **`internal/spec/lifecycle.go`** - six-state machine
   (`vague / drafted / validated / complete / stale / archived`) with
-  every legal edge. See
+  every legal edge. No `testing` state exists yet (the drift pipeline
+  proposes adding it). See
   [spec-document-model.md](spec-document-model.md) and
   [spec-archival/core-model.md](spec-archival/core-model.md).
-- **`internal/spec/write.go` `UpdateFrontmatter`** — atomic YAML-field
+- **`internal/spec/write.go` `UpdateFrontmatter`** - atomic YAML-field
   write, used by dispatch, archive, undispatch, and the completion hook.
-- **`SpecCompletionHook`** (`internal/handler/specs_dispatch.go`) —
+- **`SpecCompletionHook`** (`internal/handler/specs_dispatch.go`) -
   wired to `store.OnDone` in `internal/cli/server.go`; writes
-  `status: complete` unconditionally on task done.
-- **Archive / unarchive endpoints** — archived specs are exempt from
-  every propagation rule in this spec.
+  `status: complete` unconditionally on task done. The drift gate this
+  spec adds does not exist yet.
+- **`POST /api/specs/transition`** - single endpoint with an `action`
+  discriminator (`dispatch` / `undispatch` / `archive` / `unarchive`).
+  Archived specs are exempt from every propagation rule in this spec.
 - **Undispatch** writes `status: validated` when clearing the task link.
 - **Task test action** (`POST /api/tasks/{id}/test`, `TestTask`
-  handler) — the infrastructure the drift pipeline reuses for the
+  handler) - the infrastructure the drift pipeline reuses for the
   tester verdict.
 
 Gaps this spec closes, in priority order:
@@ -92,17 +95,19 @@ event, reads the spec tree, and writes one or more frontmatter
 mutations. Every hook follows the same shape:
 
 1. Triggered by an existing server event (task state change, planning
-   commit, dispatch call).
+   commit, transition call).
 2. Reads the spec tree via `spec.BuildTree` / `spec.Adjacency`. Skips
-   archived specs everywhere — `Adjacency` already prunes them.
+   archived specs everywhere - `Adjacency` already prunes them.
 3. Validates each proposed transition via
    `spec.StatusMachine.Validate`. Illegal transitions are logged and
    skipped, never applied.
-4. Writes via `spec.UpdateFrontmatter` — one spec at a time, no
+4. Writes via `spec.UpdateFrontmatter` - one spec at a time, no
    transaction. Idempotent.
-5. Commits via `commitSpecChanges` (in `specs.go`) so the transition
-   is visible in git and reversible with `git revert`. Per-workspace
-   commit mutex prevents concurrent-commit races.
+5. Commits via the shared spec-commit helper in
+   `internal/handler/specs.go` (`commitSpecChanges` /
+   `commitSpecTransition`) so the transition is visible in git and
+   reversible with `git revert`. A per-workspace commit mutex prevents
+   concurrent-commit races.
 
 All child specs obey these rules.
 
@@ -120,7 +125,7 @@ independently:
 | [drift-pipeline.md](spec-state-control-plane/drift-pipeline.md) | Task-done flow: `validated → testing`, tester agent + verdict schema, branch to `complete`/`stale`, fan-out, tester failure handling, `implementation_commit` frontmatter, commit concurrency. | large | drafted |
 | [chat-edit-fanout.md](spec-state-control-plane/chat-edit-fanout.md) | Chat rounds that modify specs fan out staleness to dependents using the propagation algorithm. `updated`-only bumps skipped. | small | drafted |
 | [dispatch-validated.md](spec-state-control-plane/dispatch-validated.md) | Dispatch writes `status: validated`; folder dispatch accepts non-leaf paths and marks the subtree validated. | medium | drafted |
-| [explicit-validate.md](spec-state-control-plane/explicit-validate.md) | User-facing `drafted → validated` action: toolbar button + endpoint + breakdown tasks-mode auto-validate. | small | drafted |
+| [explicit-validate.md](spec-state-control-plane/explicit-validate.md) | User-facing `drafted → validated` action: toolbar button + transition action + breakdown tasks-mode auto-validate. | small | drafted |
 | [periodic-scan.md](spec-state-control-plane/periodic-scan.md) | Advisory scan catching drift from code changes outside the spec flow (manual edits, refactors). No auto-mutation. | small | drafted |
 
 ### Dependencies
@@ -141,7 +146,7 @@ graph LR
 ```
 
 - `propagation-algorithm` and `lifecycle-testing-state` must settle
-  first — they're load-bearing for the drift pipeline.
+  first - they're load-bearing for the drift pipeline.
 - `chat-edit-fanout` also depends on `propagation-algorithm`.
 - `dispatch-validated`, `explicit-validate`, `periodic-scan` are
   independent and can run in parallel.
@@ -151,20 +156,20 @@ graph LR
 
 ### Suggested execution order
 
-1. Settle `lifecycle-testing-state` decision — a paragraph-level call,
+1. Settle `lifecycle-testing-state` decision - a paragraph-level call,
    no code yet.
-2. Implement `propagation-algorithm` — helpers, reverse index,
+2. Implement `propagation-algorithm` - helpers, reverse index,
    `FanOutStale`.
 3. Ship `chat-edit-fanout`, `dispatch-validated`, `explicit-validate`,
-   `periodic-scan` in parallel — each is small and independent.
-4. Implement `drift-pipeline` last — biggest chunk, depends on the
+   `periodic-scan` in parallel - each is small and independent.
+4. Implement `drift-pipeline` last - biggest chunk, depends on the
    shared infrastructure and the testing-state decision.
 
 ---
 
 ## Archived Specs Are Fully Excluded
 
-Archived specs are invisible to every channel in this spec — same
+Archived specs are invisible to every channel in this spec - same
 invariant `internal/spec/impact.go`, `progress.go`, and `validate.go`
 enforce. Each child spec documents how it honors the exclusion (usually
 by calling through `Adjacency`, which prunes archived specs as both
