@@ -28,13 +28,109 @@
   font-size: 12px;
   height: 520px;
 }
+/* Single pane per wizard step: instruction, the pane, then a step footer. */
+.ws-picker__body--step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  height: 520px;
+}
 .ws-picker__browser {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
-  border-right: 1px solid var(--border);
   min-height: 0;
+  flex: 1;
+}
+
+/* --- Wizard stepper --- */
+.ws-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ws-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.ws-step:disabled {
+  cursor: default;
+}
+.ws-step__circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.ws-step__label {
+  white-space: nowrap;
+}
+.ws-step--active .ws-step__circle,
+.ws-step--done .ws-step__circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.ws-step--active .ws-step__label {
+  color: var(--text);
+  font-weight: 700;
+}
+.ws-step--done .ws-step__label {
+  color: var(--text);
+}
+.ws-step--upcoming .ws-step__circle {
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.ws-step__connector {
+  flex: 1;
+  height: 1px;
+  max-width: 120px;
+  background: var(--border);
+}
+.ws-step__connector--done {
+  background: var(--accent);
+}
+.ws-step__instruction {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.ws-step__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.ws-step__count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.ws-step__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .ws-picker__path-row {
   display: flex;
@@ -117,6 +213,16 @@
   gap: 8px;
   padding: 14px 16px;
   min-height: 0;
+}
+/* Review step: selection pane fills the single-pane body, no extra padding. */
+.ws-picker__selection--review {
+  flex: 1;
+  padding: 0;
+}
+.ws-picker__selection-footer--review {
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
 }
 .ws-picker__selection-header {
   display: flex;
