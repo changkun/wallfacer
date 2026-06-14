@@ -41,6 +41,22 @@ const SURFACES = {
   },
   settings: { route: '/settings', steps: [{ wait: 600 }] },
   analytics: { route: '/analytics', steps: [{ wait: 900 }] },
+  // Landing-page surfaces (richer framing than the docs equivalents).
+  // overview-spec focuses a real spec so the three-pane Plan view is populated;
+  // oversight opens the rich OAuth task on its diff (Changes) tab.
+  'overview-spec': {
+    route: '/plan?spec=specs/spec-coordination/spec-coordination.md',
+    steps: [{ wait: 1200 }],
+  },
+  oversight: {
+    route: '/',
+    steps: [
+      { click: '.card[aria-label*="OAuth"]' },
+      { wait: 700 },
+      { click: '.main-tab:has-text("Changes")' },
+      { wait: 1000 },
+    ],
+  },
   plan: { route: '/plan', steps: [{ wait: 800 }] },
   routines: { route: '/routines', steps: [{ wait: 800 }] },
   agents: { route: '/agents', steps: [{ wait: 800 }] },
