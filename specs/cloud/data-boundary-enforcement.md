@@ -1,12 +1,13 @@
 ---
 title: Data Boundary Enforcement
 status: drafted
-depends_on: []
+depends_on:
+  - specs/cloud/latere-integration/coordination-plane.md
 affects:
   - frontend/src/telemetry.ts
   - frontend/src/main.ts
   - internal/cli/web.go
-effort: small
+effort: medium
 created: 2026-04-12
 updated: 2026-06-14
 author: changkun
@@ -20,9 +21,10 @@ dispatched_task_id: null
 When wallfacer runs in cloud-hosted mode, the browser SPA emits OpenTelemetry
 RUM (real user monitoring) spans. Those spans leave the user's machine: the SPA
 exporter posts OTLP/HTTP batches to a same-origin route (`POST /v1/telemetry/`)
-which the backend forwards to an in-cluster collector. This is the only data
-path in the current architecture that carries SPA-originated data off the
-machine.
+which the backend forwards to an in-cluster collector. This is the SPA-originated
+data path off the machine. A second path now exists: the opt-in coordination
+channel from a signed-in local instance to wf.latere.ai (see "Coordination
+channel egress"). The data boundary governs both.
 
 The data boundary defines what is allowed to ride that path: span timings,
 service name, HTTP method, and same-origin request URLs (which embed task IDs
@@ -38,8 +40,13 @@ product, an unreviewed span attribute is a silent, hard-to-detect leak.
 Two corrections to the prior framing of this spec:
 
 1. There is no in-house `internal/cloud/` telemetry subsystem and no structured
-   `TelemetryEvent` Go type. Local instances do not phone home. The egress is
-   browser OTel RUM only.
+   `TelemetryEvent` Go type. Local instances DO phone home, but only over one
+   path: the governed, opt-in coordination channel to wf.latere.ai (see
+   "Coordination channel egress" below and
+   [coordination-plane](latere-integration/coordination-plane.md)). That channel
+   is itself allow-list-gated. A local-anonymous instance, and a signed-in
+   instance that has not opted in to coordination, phone home NOTHING. The other
+   egress, browser OTel RUM, is cloud-mode SPA only and is unchanged.
 2. Telemetry is gated to cloud mode. `frontend/src/main.ts` calls
    `initTelemetry` only when `import.meta.env.PROD` and
    `window.__WALLFACER__?.mode === 'cloud'`. In local and local-first mode no
@@ -52,14 +59,16 @@ Pin down and review what the SPA exports in cloud mode, and keep it reviewable
 over time.
 
 In scope:
-- Inventory the single egress path: the SPA exporter
+- Inventory the SPA egress path: the SPA exporter
   (`frontend/src/telemetry.ts`), its cloud-mode gate
   (`frontend/src/main.ts`), and the proxy mount
   (`internal/cli/web.go`, `POST /v1/telemetry/`).
 - Scrub identifiers from span attributes the browser exports, primarily
   `http.url`, so task IDs and thread IDs do not ride RUM spans.
-- A frontend test that asserts the gate and the scrubbing hold, so a regression
-  is caught in CI.
+- Govern the coordination channel egress: the opt-in gate (no opt-in, no
+  connection, zero bytes) and the allow-list as the only thing that crosses.
+- Frontend and coordination-channel tests that assert the gates, the scrubbing,
+  and the allow-list hold, so a regression is caught in CI.
 
 Out of scope:
 - The proxy itself (`otel.TelemetryProxy` in `latere.ai/x/pkg/otel`) is a
@@ -113,6 +122,49 @@ bodies, which OTel does not capture). The boundary control:
 3. Never enable `propagateTraceHeaderCorsUrls`, so `traceparent` is not sent to
    third-party hosts. This is already the case; the test pins it.
 
+### Coordination channel egress
+
+The second egress path is the phone-home channel: a signed-in, opted-in local
+instance holds one outbound connection to wf.latere.ai (the coordinator role of
+wallfacerd) carrying presence, an allow-listed metadata projection, and
+spec-comment events. The data boundary governs this channel too. Three controls:
+
+1. Opt-in gate. The connection opens only when the instance is signed in AND has
+   explicitly opted in to coordination. Otherwise the instance dials nothing and
+   emits zero bytes to wf.latere.ai. A local-anonymous instance, and a signed-in
+   instance that has not opted in, are byte-identical to today (no connection, no
+   manifest, no projection push). The opt-in switch is the first boundary control
+   on this path, the same role cloud-mode plays for RUM.
+2. Allow-list as the boundary control. Only three payload classes cross:
+   presence hints (which principal is online on which instance, focus), the
+   enumerated metadata-projection fields (task counts, titles, statuses, actor
+   subs, timestamps, usage totals), and spec-comment anchors and bodies. Source
+   code, diffs, agent output, secrets, env vars, and repo paths NEVER cross. The
+   projection is derived from the local `store.TaskEvent` stream, redacted to the
+   allow-list before it leaves the process; nothing outside the allow-list is
+   pushed.
+3. Ownership of the lists. This spec owns the boundary RULE (only the three
+   allow-listed classes cross) and the opt-in gate. The precise projection field
+   list is owned by the metadata-projection leaf
+   (`coordination-plane/metadata-projection.md`); the comment payload schema is
+   owned by the spec-comments leaf (`coordination-plane/spec-comments.md`). This
+   spec enforces that whatever those leaves enumerate is the only thing that
+   crosses, and that an unlisted field is dropped before export.
+
+### Coordination channel regression test
+
+A test mirroring the RUM scrubber test, asserting the two invariants:
+
+- Opted out (anonymous, or signed-in-but-not-opted-in): the channel sends
+  nothing. No connection is opened and no payload is emitted, byte-identical to
+  local-anonymous today.
+- Opted in: the payload the channel does send is a subset of the allow-list.
+  Feed a representative `store.TaskEvent` (and a spec comment) through the
+  projection/redaction step and assert the emitted field set is a subset of the
+  enumerated allow-list, and that source, diffs, agent output, secrets, env vars,
+  and repo paths are absent. A regression is caught in CI if the gate is removed
+  or an unlisted field starts crossing.
+
 ### Regression test
 
 A frontend test (`frontend/src/telemetry.test.ts`) that:
@@ -148,8 +200,15 @@ A frontend test (`frontend/src/telemetry.test.ts`) that:
   nothing.
 - Span attributes that leave the machine are a reviewed, scrubbed set with no
   raw identifiers or content.
-- A CI test fails if the gate is removed or the scrubber stops covering
-  identifier-bearing URLs.
+- The coordination channel opens only on sign-in plus explicit opt-in; a
+  local-anonymous or opted-out instance emits zero bytes to wf.latere.ai. What an
+  opted-in instance sends is a subset of the allow-list, with no source, diffs,
+  agent output, secrets, env vars, or repo paths.
+- A CI test fails if either gate is removed, if the scrubber stops covering
+  identifier-bearing URLs, or if an unlisted field starts crossing the
+  coordination channel.
 - Changkun can point to this spec when users ask "what leaves my machine?" and
-  answer: in cloud mode only, browser RUM spans over one same-origin proxy
-  route, with identifiers scrubbed in `telemetry.ts`.
+  answer: in cloud mode, browser RUM spans over one same-origin proxy route with
+  identifiers scrubbed in `telemetry.ts`; and, only if signed in and opted in,
+  presence plus an allow-listed metadata projection plus spec comments over the
+  coordination channel. Opted out or anonymous, nothing leaves.
