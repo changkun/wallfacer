@@ -1,6 +1,6 @@
 ---
 title: Add OpenCode harness
-status: drafted
+status: complete
 depends_on:
   - specs/shared/harness-abstraction/claude-and-codex-migration.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - docs/guide/configuration.md
 effort: medium
 created: 2026-06-01
-updated: 2026-06-14
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
@@ -100,3 +100,20 @@ Capabilities{
 
 - `opencode serve` warm-start (`--attach`). Significant speedup for short tasks but adds a daemon lifecycle. Deferred to a follow-up spec.
 - Per-task MCP config injection. Defer until users ask; OpenCode reads project-level config from `AGENTS.md` and `~/.config/opencode/` which is good enough for v1.
+
+## Outcome
+
+Shipped (validated against the installed `opencode` v1.17.7 and a live one-shot e2e):
+
+- **Harness** (`internal/harness/opencode.go`). `BuildArgv` emits `opencode run --format json [--dir] [--model] [--session]` plus the permission mapping; `ParseEvent` maps opencode's NDJSON `emit()` events (`text` / `reasoning` / `tool_use` / `step_start` / `error`) to canonical events and the launcher-synthesized `result` line to `KindResult`; `AuthEnv` surfaces only `OPENCODE_SERVER_PASSWORD`. Fixtures under `testdata/opencode/`.
+- **Executor** (`internal/executor/host_opencode.go`). opencode emits **no terminal result event** (the run loop just breaks on idle), so `launchOpenCode` tees stdout, aggregates the final text + token usage from `text`/`step_finish`, and appends a synthesized `{"type":"result"}` line — mirroring the codex `--output-last-message` path. A schema-drift guard marks the result an error if bytes flowed but no recognized event parsed.
+- **Wiring.** `WALLFACER_HOST_OPENCODE_BINARY` and `OPENCODE_SERVER_PASSWORD` read in envconfig; binary threaded through `RunnerConfig` and the server; host backend dispatch/binary cases added.
+- **Surfacing.** `config.go` is registry-driven (landed by the cursor sibling), so registering the harness surfaced it in `/api/config` automatically; added `config_test.go` assertions. Frontend: OpenCode option in `TaskComposer.vue` and an OpenCode block in `SettingsTabSandbox.vue` ("auth handled by the CLI; no key in `.env`").
+- **Docs** in `configuration.md`. Gated live e2e (`opencode_integration` tag) plus an `opencode` lane in `scripts/e2e-lifecycle.sh`.
+
+Divergences from the spec as written:
+
+- **Permission mapping.** The spec's `--mode build|plan` does not exist in opencode 1.17. Actual: `--agent plan` for `ReadOnly`, `--dangerously-skip-permissions` for `Edit`/`Full` (default build agent). The launcher forces `Full` so headless edits apply.
+- **`config.go` change was unnecessary.** The cursor migration already made the sandbox list registry-driven, so item 4 was satisfied by registration alone.
+- **`env.go` `/test` probe unchanged.** Rather than a separate `opencode --version` + `opencode auth list` probe, the existing smoke-task `/test` path is reused (consistent with claude/codex/cursor); opencode validates as a registered harness and launches through the executor.
+- **Executor wiring added** (`host_opencode.go` + host backend), which the original `affects` list omitted but acceptance criterion 2 (end-to-end) required.
