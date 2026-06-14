@@ -173,62 +173,6 @@ func TestHostBackend_LaunchCodex_InstructionsContentPrepended(t *testing.T) {
 	}
 }
 
-// TestHostBackend_LaunchCodex_FastModeFromEnvFile is the codex mirror of the
-// FastMode seam regression test: WALLFACER_SANDBOX_FAST=false in the per-task
-// env file must suppress the model_reasoning_effort=low --config flag.
-func TestHostBackend_LaunchCodex_FastModeFromEnvFile(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, []byte("WALLFACER_SANDBOX_FAST=false\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-codex-fastoff",
-		Env:     map[string]string{"WALLFACER_AGENT": "codex"},
-		EnvFile: envFile,
-		Cmd:     []string{"-p", "hi"},
-		WorkDir: t.TempDir(),
-	}
-	lines, _ := launchCodexAndDrain(t, b, spec)
-	if len(lines) == 0 {
-		t.Fatal("no codex events captured")
-	}
-	// The first event (item.completed) echoes the --config value.
-	if cfg, _ := lines[0]["config"].(string); cfg != "" {
-		t.Errorf("WALLFACER_SANDBOX_FAST=false should suppress --config; got %q", cfg)
-	}
-}
-
-// TestHostBackend_LaunchCodex_FastModeDefaultOn is the positive control:
-// default (no env file override) sets model_reasoning_effort=low.
-func TestHostBackend_LaunchCodex_FastModeDefaultOn(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-codex-faston",
-		Env:     map[string]string{"WALLFACER_AGENT": "codex"},
-		Cmd:     []string{"-p", "hi"},
-		WorkDir: t.TempDir(),
-	}
-	lines, _ := launchCodexAndDrain(t, b, spec)
-	if len(lines) == 0 {
-		t.Fatal("no codex events captured")
-	}
-	if cfg, _ := lines[0]["config"].(string); !strings.Contains(cfg, "model_reasoning_effort") {
-		t.Errorf("fast mode should default on; got config=%q", cfg)
-	}
-}
-
 func TestHostBackend_LaunchCodex_MissingPromptFails(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
@@ -278,24 +222,3 @@ func TestHostBackend_LaunchCodex_InstructionsPrepended(t *testing.T) {
 	}
 }
 
-func TestSandboxFast(t *testing.T) {
-	cases := []struct {
-		name     string
-		specEnv  map[string]string
-		childEnv []string
-		want     bool
-	}{
-		{"default-true", nil, nil, true},
-		{"spec-false", map[string]string{"WALLFACER_SANDBOX_FAST": "false"}, nil, false},
-		{"spec-true", map[string]string{"WALLFACER_SANDBOX_FAST": "true"}, nil, true},
-		{"child-false", nil, []string{"WALLFACER_SANDBOX_FAST=false"}, false},
-		{"spec-overrides-child", map[string]string{"WALLFACER_SANDBOX_FAST": "true"}, []string{"WALLFACER_SANDBOX_FAST=false"}, true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := sandboxFast(tc.specEnv, tc.childEnv); got != tc.want {
-				t.Errorf("got %v; want %v", got, tc.want)
-			}
-		})
-	}
-}

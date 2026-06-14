@@ -17,20 +17,16 @@ func (claudeHarness) ID() ID { return Claude }
 
 // BuildArgv assembles the claude argv for a Request. The argv shape is:
 //
-//	claude --dangerously-skip-permissions [--append-system-prompt /fast]
+//	claude --dangerously-skip-permissions
 //	       -p <prompt> --verbose --output-format stream-json
 //	       [--model <model>] [--resume <session>]
 //	       [--append-system-prompt <system-prompt>]
 //
 // The `--dangerously-skip-permissions` flag is required when claude runs in a
 // piped non-TTY context: without it claude waits for interactive permission
-// prompts and buffers all stream-json output until the task ends. `/fast`
-// activates Claude Code's fast mode when req.FastMode is set.
+// prompts and buffers all stream-json output until the task ends.
 func (claudeHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	argv := []string{"--dangerously-skip-permissions"}
-	if req.FastMode {
-		argv = append(argv, "--append-system-prompt", "/fast")
-	}
 	argv = append(argv, "-p", req.Prompt, "--verbose", "--output-format", "stream-json")
 	if req.Model != "" {
 		argv = append(argv, "--model", req.Model)

@@ -21,7 +21,6 @@ func (codexHarness) ID() ID { return Codex }
 //
 //	codex exec --full-auto --sandbox workspace-write --skip-git-repo-check
 //	           --json --color never
-//	           [--config model_reasoning_effort="low"]
 //	           [--model <model>]
 //	           <prompt>
 //
@@ -36,9 +35,6 @@ func (codexHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 		"--skip-git-repo-check",
 		"--json",
 		"--color", "never",
-	}
-	if req.FastMode {
-		argv = append(argv, "--config", `model_reasoning_effort="low"`)
 	}
 	if req.Model != "" {
 		argv = append(argv, "--model", req.Model)

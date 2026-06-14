@@ -26,19 +26,6 @@ func TestClaude_BuildArgv_Basic(t *testing.T) {
 			t.Errorf("argv missing %q: %v", want, argv)
 		}
 	}
-	if strings.Contains(joined, "/fast") {
-		t.Errorf("argv contains /fast despite FastMode=false: %v", argv)
-	}
-}
-
-func TestClaude_BuildArgv_FastMode(t *testing.T) {
-	h := claudeHarness{}
-	argv, _, _ := h.BuildArgv(Request{Prompt: "hi", FastMode: true})
-
-	joined := strings.Join(argv, " ")
-	if !strings.Contains(joined, "--append-system-prompt /fast") {
-		t.Errorf("FastMode should add /fast: %v", argv)
-	}
 }
 
 func TestClaude_BuildArgv_ModelResumeSystemPrompt(t *testing.T) {

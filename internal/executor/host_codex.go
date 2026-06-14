@@ -24,7 +24,6 @@ import (
 //
 //	codex exec --full-auto --sandbox workspace-write --skip-git-repo-check
 //	     --json --output-last-message <tmp> --color never
-//	     [--config model_reasoning_effort="low"]   (when WALLFACER_SANDBOX_FAST != "false")
 //	     [--model <m>]
 //	     <prompt>
 //
@@ -47,7 +46,7 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 
 	env := b.buildChildEnv(spec)
 
-	req := requestFromClaudeSpec(spec, env)
+	req := requestFromClaudeSpec(spec)
 	if req.Prompt == "" {
 		return nil, fmt.Errorf("host backend: codex launch requires a -p <prompt> argument in spec.Cmd")
 	}
@@ -137,20 +136,6 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 	go teeCodexAndAppendResult(codexStdout, pipeW, lastMsgFile, tmpDir)
 
 	return h, nil
-}
-
-// sandboxFast reports whether WALLFACER_SANDBOX_FAST is effectively true.
-// Defaults to true when unset — matching the container-side default.
-func sandboxFast(specEnv map[string]string, childEnv []string) bool {
-	if v, ok := specEnv["WALLFACER_SANDBOX_FAST"]; ok {
-		return v != "false"
-	}
-	for _, kv := range childEnv {
-		if strings.HasPrefix(kv, "WALLFACER_SANDBOX_FAST=") {
-			return strings.TrimPrefix(kv, "WALLFACER_SANDBOX_FAST=") != "false"
-		}
-	}
-	return true
 }
 
 // codexResultRecord is the Claude-compatible envelope the runner expects as

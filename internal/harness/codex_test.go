@@ -37,21 +37,6 @@ func TestCodex_BuildArgv_Basic(t *testing.T) {
 	}
 }
 
-func TestCodex_BuildArgv_FastMode(t *testing.T) {
-	argv, _, _ := codexHarness{}.BuildArgv(Request{Prompt: "x", FastMode: true})
-	joined := strings.Join(argv, " ")
-	if !strings.Contains(joined, `model_reasoning_effort="low"`) {
-		t.Errorf("FastMode should set reasoning_effort=low: %v", argv)
-	}
-}
-
-func TestCodex_BuildArgv_NoFastMode(t *testing.T) {
-	argv, _, _ := codexHarness{}.BuildArgv(Request{Prompt: "x"})
-	joined := strings.Join(argv, " ")
-	if strings.Contains(joined, "model_reasoning_effort") {
-		t.Errorf("FastMode off should not set reasoning_effort: %v", argv)
-	}
-}
 
 func TestCodex_BuildArgv_ModelAndSystemPrompt(t *testing.T) {
 	argv, _, _ := codexHarness{}.BuildArgv(Request{
