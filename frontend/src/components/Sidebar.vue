@@ -149,8 +149,9 @@ const activeWorkspaceLabel = computed(() => {
 const navModel = computed<ConsoleNavModel>(() => ({
   groups: [
     { label: 'Workspace', items: [
-      { id: 'board', label: 'Board', to: '/', icon: 'board', dot: boardUnread.value && route.path !== '/' },
+      { id: 'chat', label: 'Chat', to: '/chat', icon: 'chat' },
       { id: 'plan', label: 'Plan', to: '/plan', icon: 'plan' },
+      { id: 'board', label: 'Board', to: '/', icon: 'board', dot: boardUnread.value && route.path !== '/' },
       { id: 'agents', label: 'Agents', to: '/agents', icon: 'agents' },
       { id: 'flows', label: 'Flows', to: '/flows', icon: 'flows' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
@@ -308,7 +309,8 @@ watch(wsPopoverOpen, (open) => {
 
     <!-- Per-item icons -->
     <template #icon="{ item }">
-      <svg v-if="item.icon === 'board'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>
+      <svg v-if="item.icon === 'chat'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+      <svg v-else-if="item.icon === 'board'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>
       <svg v-else-if="item.icon === 'plan'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
       <svg v-else-if="item.icon === 'agents'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-7 8-7s8 3 8 7"></path></svg>
       <svg v-else-if="item.icon === 'flows'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"></circle><circle cx="5" cy="18" r="2"></circle><circle cx="19" cy="12" r="2"></circle><path d="M7 6h6a4 4 0 0 1 4 4v2"></path><path d="M7 18h6a4 4 0 0 0 4-4v-2"></path></svg>
