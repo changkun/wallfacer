@@ -378,7 +378,7 @@ onUnmounted(() => {
           @keydown.enter.prevent="toggleTaskPromptsExpanded"
           @keydown.space.prevent="toggleTaskPromptsExpanded"
         >
-          <span class="stp-chev" :class="{ open: taskPromptsExpanded }">▸</span>
+          <span class="stp-chev" :class="{ open: taskPromptsExpanded }" />
           <span class="stp-task-prompts-label">Task Prompts</span>
           <button
             type="button"
@@ -425,7 +425,7 @@ onUnmounted(() => {
 
         <div v-for="track in renderedTracks" :key="track.name" class="stp-track">
           <div class="stp-track-header" @click="toggleTrack(track.name)">
-            <span class="stp-chev" :class="{ open: track.expanded }">▸</span>
+            <span class="stp-chev" :class="{ open: track.expanded }" />
             <span class="stp-track-name">{{ track.name }}</span>
           </div>
           <template v-if="track.expanded">
@@ -446,7 +446,7 @@ onUnmounted(() => {
                 class="stp-chev"
                 :class="{ open: rn.expanded }"
                 @click.stop="toggleNode(rn.node.path)"
-              >▸</span>
+              />
               <span v-else class="stp-chev-spacer" />
               <input
                 v-if="isCheckable(rn.node)"
@@ -619,18 +619,28 @@ onUnmounted(() => {
 
 .stp-chev,
 .stp-chev-spacer {
-  display: inline-block;
-  width: 14px;
-  text-align: center;
-  font-size: 10px;
-  color: var(--ink-3);
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  transition: transform 0.15s;
+}
+
+/* Crisp chevron drawn via an SVG mask in currentColor. The old unicode glyph
+   (▸ at 10px) rasterised blurry and read as low quality at any colour. */
+.stp-chev {
+  background-color: var(--ink-3);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.stp-chev:hover {
+  background-color: var(--ink);
 }
 
 .stp-chev.open {
   transform: rotate(90deg);
-  color: var(--ink-2);
+  background-color: var(--ink-2);
 }
 
 .stp-checkbox {
