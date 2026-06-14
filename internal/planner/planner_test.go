@@ -121,7 +121,7 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 		Command:    "/usr/bin/podman",
 		Workspaces: []string{tmpDir},
 	})
-	spec := p.buildContainerSpec("wallfacer-plan-test", harness.Claude)
+	spec := p.buildSpec("wallfacer-plan-test", harness.Claude)
 
 	if spec.WorkDir != tmpDir {
 		t.Errorf("host mode WorkDir = %q, want host path %q", spec.WorkDir, tmpDir)
@@ -153,7 +153,7 @@ func TestBuildContainerSpec(t *testing.T) {
 		InstructionsPath: instrFile,
 	})
 
-	spec := p.buildContainerSpec("wallfacer-plan-test", harness.Claude)
+	spec := p.buildSpec("wallfacer-plan-test", harness.Claude)
 
 	// Basic fields.
 	if spec.Name != "wallfacer-plan-test" {
@@ -333,7 +333,7 @@ func TestPlannerExec_BackendError(t *testing.T) {
 	}
 }
 
-// --- buildContainerSpec workspace selection, empty workspace, no env file ---
+// --- buildSpec workspace selection, empty workspace, no env file ---
 
 // TestBuildContainerSpec_MultiWorkspaceUsesFirst documents that the host
 // planner runs in the first configured workspace; subsequent workspaces are
@@ -347,7 +347,7 @@ func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
 		Fingerprint: "multi",
 	})
 
-	spec := p.buildContainerSpec("wallfacer-plan-multi", harness.Claude)
+	spec := p.buildSpec("wallfacer-plan-multi", harness.Claude)
 	if spec.WorkDir != first {
 		t.Errorf("WorkDir = %q, want first workspace %q", spec.WorkDir, first)
 	}
@@ -360,7 +360,7 @@ func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 		Fingerprint: "fp",
 	})
 
-	spec := p.buildContainerSpec("test", harness.Claude)
+	spec := p.buildSpec("test", harness.Claude)
 	// Empty workspaces should be skipped, so WorkDir should be empty.
 	if spec.WorkDir != "" {
 		t.Errorf("WorkDir = %q, want empty for all-blank workspaces", spec.WorkDir)
@@ -374,7 +374,7 @@ func TestBuildContainerSpec_NoEnvFile(t *testing.T) {
 		Fingerprint: "fp",
 	})
 
-	spec := p.buildContainerSpec("test", harness.Claude)
+	spec := p.buildSpec("test", harness.Claude)
 	if spec.EnvFile != "" {
 		t.Errorf("EnvFile = %q, want empty when not configured", spec.EnvFile)
 	}
