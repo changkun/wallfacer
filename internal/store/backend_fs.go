@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,6 +64,15 @@ func (b *FilesystemBackend) LoadAll() ([]*Task, error) {
 		taskPath := filepath.Join(b.dir, entry.Name(), "task.json")
 		raw, err := os.ReadFile(taskPath)
 		if err != nil {
+			// A UUID directory without task.json is an incomplete task, not
+			// corruption: Init creates the dir (and traces/) before SaveTask
+			// writes task.json, and a partially-removed task can leave the
+			// dir behind. Skip these quietly so a normal load doesn't spam
+			// warnings; only genuine read failures warrant a warning.
+			if errors.Is(err, os.ErrNotExist) {
+				logger.Store.Debug("skipping task dir without task.json", "name", entry.Name())
+				continue
+			}
 			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
