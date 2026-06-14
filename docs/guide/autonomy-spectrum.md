@@ -9,6 +9,42 @@ graph LR
   Task --> Code["🔧 Code\nDirect control"]
 ```
 
+<!-- In-app animated illustration: an indicator gliding along the autonomy spectrum.
+     Renders in the in-app docs viewer; GitHub shows the diagram above. -->
+<svg viewBox="0 0 720 104" role="img" aria-label="An indicator gliding along the spectrum from Chat to Spec to Task to Code" style="display:block;width:100%;max-width:720px;margin:1rem auto;font-family:inherit">
+  <defs>
+    <linearGradient id="wf-spectrum" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="var(--accent-soft,rgba(99,102,241,0.25))"/>
+      <stop offset="1" stop-color="var(--accent,#6366f1)"/>
+    </linearGradient>
+  </defs>
+  <rect x="60" y="40" width="600" height="8" rx="4" fill="url(#wf-spectrum)"/>
+  <g fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)" stroke-width="1.5">
+    <circle cx="60"  cy="44" r="6"/>
+    <circle cx="260" cy="44" r="6"/>
+    <circle cx="460" cy="44" r="6"/>
+    <circle cx="660" cy="44" r="6"/>
+  </g>
+  <g font-size="13" text-anchor="middle" fill="var(--text,#1d1f23)">
+    <text x="60"  y="74">Chat</text>
+    <text x="260" y="74">Spec</text>
+    <text x="460" y="74">Task</text>
+    <text x="660" y="74">Code</text>
+  </g>
+  <g font-size="11" fill="var(--text-muted,#8a8f98)">
+    <text x="60"  y="94" text-anchor="start">more freedom</text>
+    <text x="660" y="94" text-anchor="end">more precision</text>
+  </g>
+  <g>
+    <animateTransform attributeName="transform" type="translate"
+      values="0,0; 0,0; 200,0; 400,0; 600,0; 600,0; 400,0; 200,0; 0,0"
+      keyTimes="0; 0.05; 0.21; 0.37; 0.5; 0.55; 0.71; 0.87; 1"
+      dur="13s" repeatCount="indefinite"/>
+    <circle cx="60" cy="44" r="14" fill="var(--accent,#6366f1)" opacity="0.2"/>
+    <circle cx="60" cy="44" r="8"  fill="var(--accent,#6366f1)"/>
+  </g>
+</svg>
+
 ---
 
 ## The Four Levels
