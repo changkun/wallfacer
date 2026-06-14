@@ -107,8 +107,17 @@ export const usePlanningStore = defineStore('planning', () => {
   // workspace transition reads as a single fluid event.
   // Idempotent per session — reconnect-induced re-snapshots are ignored.
   let bootstrapFired = false;
+  // The initial load (first applyTree) only establishes the baseline —
+  // whether the workspace already has specs or none. It must never be
+  // mistaken for the user creating their very first spec, or every fresh
+  // page load on a populated workspace would fire the bootstrap toast.
+  let initialLoadDone = false;
 
   function maybeFireBootstrap(nextNodes: SpecNode[]) {
+    if (!initialLoadDone) {
+      initialLoadDone = true;
+      return;
+    }
     if (bootstrapFired) return;
     if (tree.value.length > 0 || nextNodes.length === 0) return;
     bootstrapFired = true;
