@@ -322,6 +322,34 @@ CODEX_TITLE_MODEL=codex-mini-latest
 	}
 }
 
+// TestParseCursorFields verifies parsing of the Cursor credential key.
+func TestParseCursorFields(t *testing.T) {
+	path := writeEnvFile(t, "CURSOR_API_KEY=cur-secret-123\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.CursorAPIKey != "cur-secret-123" {
+		t.Errorf("CursorAPIKey = %q; want cur-secret-123", cfg.CursorAPIKey)
+	}
+}
+
+// TestUpdateCursorAPIKey verifies CURSOR_API_KEY round-trips through Update.
+func TestUpdateCursorAPIKey(t *testing.T) {
+	path := writeEnvFile(t, "")
+	key := "cur-written"
+	if err := envconfig.Update(path, envconfig.Updates{CursorAPIKey: &key}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.CursorAPIKey != key {
+		t.Errorf("CursorAPIKey = %q; want %q", cfg.CursorAPIKey, key)
+	}
+}
+
 // TestParseCodexFieldsAbsent verifies that Codex fields default to empty when not in the file.
 func TestParseCodexFieldsAbsent(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
