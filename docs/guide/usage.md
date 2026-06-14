@@ -5,9 +5,10 @@ Start here for the full reading order.
 ## Reading Order
 
 <!-- NOTE: The server parses this section to build the in-app docs sidebar.
-     Each "### " heading is a sidebar SECTION; every [Title](file.md) link
+     Each "### " heading is a sidebar SECTION; every same-dir markdown link
      beneath it becomes an entry in that section, in order. To add a guide,
-     drop a link under the right section heading. -->
+     drop a link under the right section heading. Keep example link syntax
+     out of this comment: the parser scrapes any link it sees here. -->
 
 ### Get Started
 
