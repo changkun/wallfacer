@@ -1,29 +1,26 @@
 # Cloud Mode
 
-Wallfacer is built to run locally by default. Cloud mode is an opt-in feature flag that unlocks integrations with the [latere.ai](https://latere.ai) platform — starting with identity (sign-in, avatar, username) and expanding in later phases to tenant filesystem, K8s-backed sandboxes, and multi-tenant deployment.
+Wallfacer is built to run locally by default. Cloud mode is an opt-in feature flag that unlocks integrations with the [latere.ai](https://latere.ai) platform, starting with identity (sign-in, avatar, username, organizations) and expanding in later phases to metadata sync, tenant filesystem, cloud execution, and multi-tenant deployment.
 
-This directory documents every cloud surface. Local deployments do not need to read any of it.
+This directory documents every cloud surface. Local deployments do not need to read any of it. For the gap analysis that reconciles these surfaces against the latere.ai components that already exist, see [`integration-plan.md`](integration-plan.md).
 
-## Status: Phase 1 — Sign-in badge
+## Status: Identity Phase 1+2 shipped
 
-The only shipping cloud feature today is a latere.ai sign-in badge in the status bar. It does **not** gate any existing functionality. Anonymous usage remains fully supported; the cloud flag only adds identity rendering and the routes needed to support it.
+Identity is fully landed. Sign-in, JWT validation, the principal/org model, superadmin gating, and forced login are all in the shipping runtime. Anonymous usage remains fully supported in local mode; the cloud flag only forces sign-in and adds the tenant-aware surfaces.
 
-What Phase 1 ships:
+What is shipped:
 
 - `WALLFACER_CLOUD` feature flag with fail-fast startup validation.
-- `/login`, `/callback`, `/logout`, `/logout/notify`, `/api/auth/me` HTTP routes (mounted unconditionally; handlers self-gate to 503/204 when the OIDC client is nil).
-- Status-bar badge: avatar + username when signed in, "Sign in" link otherwise. Hidden entirely in local mode.
-- Front-channel logout iframe so signing out at `auth.latere.ai` clears the wallfacer session cookie cross-tab.
+- **Sign-in badge** in the status bar: avatar + username when signed in, "Sign in" link otherwise. Hidden entirely in local mode.
+- **OIDC sign-in routes:** `/login`, `/callback`, `/logout`, `/logout/notify` (mounted unconditionally; handlers self-gate to 503/204 when the OIDC client is nil).
+- **Principal endpoints:** `GET /api/me` returns the current signed-in user, or 204 when unauthenticated.
+- **Org-switch routes:** `GET /api/auth/orgs` lists the user's organizations (204 when single-org or unauthenticated); `PATCH /api/auth/me` and `POST /api/me/switch-org` both validate membership, clear the session, and return a redirect to `/login?org_id=<target>`.
+- **JWT validation on `/api/*`** via `OptionalAuth`. When `WALLFACER_CLOUD=true`, requests carrying `Authorization: Bearer <jwt>` have the token validated against the auth service's JWKS; valid tokens surface as `*auth.Claims` in handler context. Claims also flow in from the session cookie via `CookieAuth`, so browser callers present the same shape as Bearer callers. Both middlewares are nil-safe in local mode (`internal/cli/server.go:399-400`).
+- **Principal/org model:** `store.Principal{Sub, OrgID}`, `Task.CreatedBy` (JWT `sub`) and `Task.OrgID` (JWT `org_id`) on records (`internal/store/models.go:293-304`), and `TasksForPrincipal` org-scoped filtering (`internal/store/principal.go`).
+- **Superadmin gating** via `RequireSuperadmin`. In cloud mode, `POST /api/admin/rebuild-index` requires a JWT (or cookie session) whose `is_superadmin` claim is `true`; regular users get `403`, anonymous requests get `401`. Local mode reaches the handler with no claim, unchanged (`internal/cli/server.go:917-923`).
+- **Forced login** via `ForceLogin` (`internal/cli/server.go:395-397`). In cloud mode, an anonymous browser GET for any HTML route is redirected to `/login?next=<original-path>`. `/login`, `/callback`, `/logout`, `/logout/notify`, `/api/config`, `/api/me`, `/favicon.ico`, and static asset paths (`/css/*`, `/js/*`, `/assets/*`, `/static/*`) pass through so the bootstrap works. API calls with `Accept: application/json` are not redirected; they still get a clean `401` from upstream. The `next=` target is validated to be path-only to close the open-redirect class of bug.
 
-What Phase 1 explicitly does **not** ship:
-
-- No JWT middleware on API routes.
-- No `org_id` / `principal_id` on workspace or task records.
-- No authorization checks; nothing becomes sign-in-required.
-- No agent token exchange.
-- No forced login redirect for unauthenticated browsers.
-
-The full long-range design lives in [`specs/shared/authentication.md`](../../specs/shared/authentication.md); later phases are tracked there.
+The authentication design that drove this work is archived/complete; see [`specs/shared/authentication.md`](../../specs/shared/authentication.md) for the historical record.
 
 ## Enabling cloud mode
 
@@ -39,13 +36,13 @@ wallfacer run
 
 When `WALLFACER_CLOUD=true` but any of `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, or `AUTH_REDIRECT_URL` is missing, the server logs a fatal error and exits. Misconfigured cloud deployments fail loudly instead of silently running without sign-in.
 
-`WALLFACER_CLOUD` accepts `true`, `1`, `yes` (case-insensitive); everything else — including `false`, `0`, `no`, empty, and typos like `tru` — is false. Cloud mode fails closed on ambiguous values.
+`WALLFACER_CLOUD` accepts `true`, `1`, `yes` (case-insensitive); everything else, including `false`, `0`, `no`, empty, and typos like `tru`, is false. Cloud mode fails closed on ambiguous values.
 
 ## Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_CLOUD` | `false` | Enable cloud-gated UI surfaces and the sign-in routes. |
+| `WALLFACER_CLOUD` | `false` | Enable cloud-gated UI surfaces, forced sign-in, and the tenant-aware routes. |
 | `AUTH_URL` | `https://auth.latere.ai` | Auth service base URL |
 | `AUTH_CLIENT_ID` | (required when cloud is on) | OAuth client ID registered with the auth service |
 | `AUTH_CLIENT_SECRET` | (required when cloud is on) | OAuth client secret |
@@ -60,10 +57,10 @@ Client registration with the auth service is a prerequisite. Wallfacer must be r
 
 `WALLFACER_CLOUD` is the single gate that separates local-only functionality from cloud surfaces. Two invariants hold regardless of cloud state:
 
-1. **Task execution is identical.** Container launch, worktree management, commit pipelines, automation, oversight — none of this changes in cloud mode. Cloud adds identity only.
+1. **Task execution is identical.** Host-process agent execution, worktree management, commit pipelines, automation, oversight: none of this changes in cloud mode. The runner execs the selected CLI as a host process with the task's git worktree as CWD; cloud mode adds identity and tenancy only, not a different execution path.
 2. **No feature regression in local mode.** If cloud mode is off, the UI renders exactly what it did before cloud support landed. No placeholders, no stub affordances, no disabled buttons.
 
-`WALLFACER_CLOUD` and `WALLFACER_SERVER_API_KEY` are orthogonal: the API key remains the auth mechanism for programmatic CLI/script access; browser sign-in via OIDC is added on top when cloud mode is on. Both can coexist.
+`WALLFACER_CLOUD` and `WALLFACER_SERVER_API_KEY` are orthogonal: the API key remains the auth mechanism for programmatic CLI/script access; browser sign-in via OIDC is added on top when cloud mode is on. Both can coexist. The bearer middleware bypasses its static-key check once a JWT or cookie identity is populated, so a cookie-only browser request succeeds even in a deployment that also sets `WALLFACER_SERVER_API_KEY` for scripts.
 
 ## OIDC specifics
 
@@ -83,16 +80,14 @@ The endpoint is safe to load unauthenticated: it only clears a cookie and return
 
 ## Roadmap
 
-Later cloud phases (design-level today, no ETA):
+Later cloud work is design-level today, no ETA. It is reconciled against existing latere.ai components in [`integration-plan.md`](integration-plan.md); the headline is that wallfacer **consumes** platform services in cloud mode rather than rebuilding them.
 
-- **JWT middleware on `/api/*`** (shipped in Phase 2's first child spec). When `WALLFACER_CLOUD=true`, requests carrying `Authorization: Bearer <jwt>` have the token validated against the auth service's JWKS; valid tokens surface as `*auth.Claims` in handler context via `auth.PrincipalFromContext(r.Context())`. Claims also flow in from the session cookie via `CookiePrincipal`, so browser callers present the same shape as Bearer callers.
-- **Superadmin gating on `/api/admin/*`** (Phase 2). In cloud mode, `POST /api/admin/rebuild-index` requires a JWT (or cookie session) whose `is_superadmin` claim is `true`. Regular users get `403 forbidden`; anonymous requests get `401`. Local mode continues to reach the handler without any claim, unchanged.
-- **Forced login on HTML navigation** (Phase 2). In cloud mode, an anonymous browser GET for any HTML route is redirected to `/login?next=<original-path>` instead of seeing an empty board. `/login`, `/callback`, `/logout`, `/logout/notify`, `/api/config`, `/api/auth/me`, `/favicon.ico`, and static asset paths (`/css/*`, `/js/*`, `/assets/*`, `/static/*`) pass through untouched so the bootstrap works. API calls with `Accept: application/json` are not redirected; they still get a clean `401` from upstream. The `next=` target is validated to be path-only to close the open-redirect class of bug.
-- `auth.RequireScope(name)` wrapper is scaffolded for other routes to opt into as scopes are assigned; no route applies it today.
-- **Authorization primitives.** `org_id` routing for multi-tenant, superadmin gating, scope-based route guards.
-- **Tenant filesystem** — fs.latere.ai integration for cloud-hosted workspace storage.
-- **K8s sandbox** — dispatch task containers as K8s Jobs instead of local podman/docker.
-- **Multi-user collaboration** — presence, audit log, RBAC.
-- **Remote control** — latere.ai web UI can reach a user's locally-running wallfacer instance without requiring inbound network.
+- **Metadata-sync adapter (Cloud v1, proposed, NOT built).** The one genuinely new piece: a `MetadataSink` seam (proposed at `internal/cloudsync`, which does not exist yet) that replicates allowlisted, redacted task/spec metadata to a cloud metadata service over an authenticated HTTPS transport, with a bounded offline queue so a cloud outage never blocks local execution. Code never leaves the machine. See `integration-plan.md` Part 3 and the phasing in Part 5.
+- `auth.RequireScope(name)` is scaffolded for routes to opt into as scopes are assigned; no route applies it today.
+- **Tenant filesystem.** A thin `FSClient` over the fs.latere.ai Workspace API for cloud-hosted workspace storage. Blocked externally on FS Phase 5 (not built, not ours to unblock).
+- **Cloud execution backend.** A future `executor.Backend` implementation (e.g. a Cella/K8s backend over `/v1/sandboxes`) selectable by config, replacing the host-process `HostBackend` only in cloud-execution deployments. Gated by demand; do not build wallfacer-owned K8s logic.
+- **Agent token exchange.** RFC 8693 token minting so agents call FS/telemetry from cloud sandboxes. Needed only at the cloud-execution phase; the endpoint already exists in auth.
+- **Multi-user collaboration.** Presence, audit log, RBAC. Team feature, post-v1.
+- **Remote control.** latere.ai web UI reaching a user's locally-running wallfacer instance without inbound network. Exploratory.
 
-See the [cloud track in `specs/README.md`](../../specs/README.md#cloud-platform) for the dependency graph and status.
+See the [cloud track in `specs/README.md`](../../specs/README.md#cloud-platform) for the dependency graph and status, and [`integration-plan.md`](integration-plan.md) for the spec-by-spec verdicts.
