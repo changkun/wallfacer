@@ -1,6 +1,6 @@
 ---
 title: Vue Frontend Migration
-status: done
+status: complete
 depends_on: []
 affects:
   - frontend/
@@ -11,7 +11,7 @@ affects:
   - .github/workflows/
 effort: xlarge
 created: 2026-04-12
-updated: 2026-06-01
+updated: 2026-06-14
 author: changkun
 dispatched_task_id: null
 ---
@@ -400,3 +400,32 @@ to point at the Vue dist.
 - **`specs/local/typed-dom-hooks.md`** — archived. The DOM hook safety
   problem (renaming `id`/`data-js-*` breaks selectors) disappears under
   Vue's template compiler, which catches invalid refs at build time.
+
+## Outcome
+
+Complete (2026-06-14). The two frontends converged onto the single Vue 3 +
+TypeScript SPA in `frontend/`.
+
+### What Shipped
+
+- **Legacy frontend removed**: the vanilla-JS `ui/` directory and its Go
+  serving path are gone (`06c5517a` "ui: remove the legacy vanilla-JS
+  frontend", `5d41d4d3` "internal/cli: drop legacy vanilla-JS UI serving
+  path").
+- **Single embedded SPA**: the Go server serves one Vue build via
+  `internal/webserver/spa/embed.go` (`//go:embed all:dist`). `make build`
+  runs only `frontend-build` and copies `frontend/dist` into the embed tree.
+- **Runtime mode switching (AD-1)**: `window.__WALLFACER__` injection wired
+  through `internal/cli/server.go` and `frontend/src/stores/boot.ts`; the
+  router and components branch on `boot.mode` for local vs cloud.
+- **Old toolchain retired**: `ui-ts`, `ui-css`, `typecheck-js`, and the JS
+  codegen plus their CI steps were dropped (`e2736af5`, `1ad67470`).
+- **Superseded specs archived**: `typescript-migration.md` and
+  `typed-dom-hooks.md` both carry `status: archived`.
+
+### Design Evolution
+
+The "desktop app embeds Vue dist" acceptance line was overtaken rather than
+met: the desktop build briefly pointed at `frontend/dist` (`09b29a1d`), then
+the native Wails app was removed entirely (`85dbc728` "remove native desktop
+app and tray"), so the criterion no longer applies.
