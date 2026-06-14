@@ -1,6 +1,6 @@
 # Board & Tasks
 
-Wallfacer organizes work on a four-column task board. You create tasks as cards in the Backlog, move them to In Progress to trigger agent execution inside an isolated sandbox container, review results when the agent pauses or finishes, and accept completed work into your repository. This guide covers every aspect of the task board, from creating and configuring tasks to inspecting results and managing the full task lifecycle.
+Wallfacer organizes work on a four-column task board. You create tasks as cards in the Backlog, move them to In Progress to trigger agent execution, review results when the agent pauses or finishes, and accept completed work into your repository. Each running task executes as a host process in its own git worktree, so the agent works on an isolated copy of your code without touching your main branch. This guide covers every aspect of the task board, from creating and configuring tasks to inspecting results and managing the full task lifecycle.
 
 ---
 
@@ -11,8 +11,8 @@ Wallfacer organizes work on a four-column task board. You create tasks as cards 
 | Column | Status shown | What it means |
 |---|---|---|
 | **📌 Backlog** | `backlog` | Queued tasks waiting to be started. You can edit their prompt, settings, and dependencies here. |
-| **🔄 In Progress** | `in_progress` / `committing` | A sandbox container is running the agent. Live logs stream in the detail panel. |
-| **⏸️ Waiting** | `waiting` | The agent has paused and needs your input -- feedback, approval, or a test run. |
+| **🔄 In Progress** | `in_progress` / `committing` | The agent is running as a host process in the task's worktree. Live logs stream in the detail panel. |
+| **⏸️ Waiting** | `waiting` | The agent has paused and needs your input: feedback, approval, or a test run. |
 | **✅ Done** | `done` / `failed` / `cancelled` | Terminal states. Done tasks have their changes committed. Failed and cancelled tasks retain their history for retry. |
 
 Archived tasks (done or cancelled) are hidden from the Done column by default. Toggle "Show archived tasks" in Settings to reveal them.
@@ -57,7 +57,7 @@ Allowed transitions:
 
 Click **+ New Task** in the Backlog column header to expand the creation form. The basic fields are:
 
-1. **Flow picker** lets you choose which sub-agent pipeline runs for this task. The dropdown is populated from `GET /api/flows` (built-ins plus any user-authored flows you've created). The default is **Implement**. **Brainstorm** accepts an empty prompt; the other built-ins (**Refine only**, **Test only**) each run a single agent.
+1. **Flow picker** lets you choose which sub-agent pipeline runs for this task. The dropdown is populated from `GET /api/flows` (built-ins plus any user-authored flows you've created). The default is **Implement**. **Brainstorm** accepts an empty prompt; **Test only** runs a single agent.
 
    See [Agents & Flows](agents-and-flows.md) for the full model: how to clone a built-in, pin a harness per agent, or compose a custom pipeline. This guide only covers the composer UI.
 
@@ -65,7 +65,7 @@ Click **+ New Task** in the Backlog column header to expand the creation form. T
 
 3. **🏷️ Tags**: type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
 
-4. **⏱️ Timeout**: how long the container is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
+4. **⏱️ Timeout**: how long the agent process is allowed to run before being stopped. Options: 5 min, 15 min, 30 min, 1 hour (default), 2 hours, 6 hours, 12 hours, 24 hours.
 
 Click **Add** to create the task. It appears in the Backlog column with an auto-generated title.
 
@@ -79,7 +79,7 @@ When a task moves from Backlog to In Progress (by dragging the card, clicking "S
 
 1. Creates an isolated git branch (`task/<uuid-prefix>`) for each workspace
 2. Sets up git worktrees so the agent works on a copy, not your main branch
-3. Launches an ephemeral sandbox container with the agent
+3. Launches the selected coding CLI (Claude or Codex) as a host process, with the task's worktree as its working directory
 4. Begins streaming live output via Server-Sent Events
 
 Each round-trip with the agent (one prompt, one response) is a "turn". The turn count is displayed on the task card and in the detail modal. Token usage and cost are tracked per turn, and the full per-turn breakdown is available in the detail modal under Usage.
@@ -100,7 +100,7 @@ If a rebase conflict occurs, the agent is invoked again (same session) to resolv
 
 If the agent reaches a point where it needs user input (empty stop reason), the task transitions to Waiting.
 
-A task fails when the container crashes, the timeout expires, a budget limit is exceeded, or the agent encounters an unrecoverable error. See [Task Budgets](#task-budgets) for budget-related failures.
+A task fails when the agent process exits unexpectedly, the timeout expires, a budget limit is exceeded, or the agent encounters an unrecoverable error. See [Task Budgets](#task-budgets) for budget-related failures.
 
 ### Reviewing Results
 
@@ -135,7 +135,7 @@ When a task is in the Waiting state, open its detail modal to see the agent's la
 | **Submit Feedback** | Type a message in the feedback textarea and click Submit. The agent resumes from where it paused with your message as the next input. |
 | **✅ Mark as Done** | Skip remaining agent turns and trigger the commit pipeline to merge changes as-is. |
 | **🧪 Test** | Expand the test section, optionally enter acceptance criteria, and click "Run Test Agent" to launch a verification agent on the current code state. |
-| **❌ Cancel** | Discard all prepared changes, clean up the container and worktrees, and move the task to Cancelled. History and logs are preserved. |
+| **❌ Cancel** | Discard all prepared changes, clean up the worktrees, and move the task to Cancelled. History and logs are preserved. |
 
 ### Test Verification
 
@@ -148,14 +148,14 @@ Test verification lets you check whether a task's changes actually work before c
 3. Optionally enter acceptance criteria -- specific requirements the agent should verify beyond running the project's existing test suite.
 4. Click **Run Test Agent**.
 
-While the test runs, the task moves back to **In Progress** (the card shows a test indicator to distinguish it from normal execution). A separate verification agent launches in its own container, inspects the task's code changes, runs relevant tests, and reports a **Pass** or **Fail** verdict. When the test finishes, the task returns to **Waiting** with the verdict displayed as a badge on the card.
+While the test runs, the task moves back to **In Progress** (the card shows a test indicator to distinguish it from normal execution). A separate verification agent runs as a host process against the task's worktree, inspects the code changes, runs relevant tests, and reports a **Pass** or **Fail** verdict. When the test finishes, the task returns to **Waiting** with the verdict displayed as a badge on the card.
 
 **After reviewing the verdict:**
 
 - **Pass** -- click **Mark Done** to commit the changes.
 - **Fail** -- send feedback to the agent describing what went wrong, let it fix the issues, then re-test.
 
-You can run tests multiple times; each run overwrites the previous verdict. Test logs are visible in the **Testing** tab of the right panel. The test agent uses a customizable system prompt (`test.tmpl`) and can run on a different sandbox than the implementation agent (see [Configuration](configuration.md)).
+You can run tests multiple times; each run overwrites the previous verdict. Test logs are visible in the **Testing** tab of the right panel. The test agent uses a customizable system prompt (`test.tmpl`) and can be pinned to a different harness than the implementation agent (see [Configuration](configuration.md) and [Agents & Flows](agents-and-flows.md)).
 
 For automated testing, see [Auto-Test](automation.md).
 
@@ -189,7 +189,7 @@ Wallfacer ships with an integrated terminal panel so you can run shell commands 
 
 **Opening the terminal:** Press `` Ctrl+` `` to toggle the terminal panel, or click the terminal icon in the status bar. The panel opens at the bottom of the window and supports multiple tabbed sessions.
 
-**Session types:** A new session defaults to a host shell rooted at your current workspace. From the **+** menu you can also exec into any running task container -- handy for inspecting state inside a sandbox while the task is active.
+**Session types:** A new session opens a host shell rooted at your current workspace. From the **+** menu you can also open a shell rooted at a running task's worktree, handy for inspecting state while the task is active. Every session is a PTY-backed host shell; its working directory is validated against your active workspaces.
 
 **Disabling the terminal:** Set `WALLFACER_TERMINAL_ENABLED=false` in `~/.wallfacer/.env` (or via the Settings UI) to hide the terminal panel entirely. This is primarily useful for shared or kiosk deployments.
 
@@ -201,7 +201,7 @@ The transport is a WebSocket at `GET /api/terminal/ws` authenticated via `?token
 
 ### Routine Tasks
 
-Routine tasks are board cards that run on a schedule. The card itself never executes — when its interval elapses the server spawns a fresh **instance task** with the routine's prompt, and the routine card stays on the board waiting for the next cycle.
+Routine tasks are board cards that run on a schedule. The card itself never executes. When its interval elapses the server spawns a fresh **instance task** with the routine's prompt, and the routine card stays on the board waiting for the next cycle.
 
 A routine card carries:
 
@@ -217,11 +217,11 @@ The interactive controls live on the routine card. Programmatic access is expose
 - `PATCH /api/routines/{id}/schedule`, update interval and/or enabled flag; fields omitted from the body are left unchanged.
 - `POST /api/routines/{id}/trigger`, fire immediately; the scheduled cycle continues unchanged afterwards.
 
-Routine cards are filtered out of auto-promote, auto-refine, and the dependency graph — they stay pinned in backlog regardless of capacity. To remove a routine, delete its card with `DELETE /api/tasks/{id}` (or the UI's delete action); its pending fires are dropped atomically.
+Routine cards are filtered out of auto-promote, auto-refine, and the dependency graph; they stay pinned in backlog regardless of capacity. To remove a routine, delete its card with `DELETE /api/tasks/{id}` (or the UI's delete action); its pending fires are dropped atomically.
 
 **Cascading cancel on routine cleanup.** Cancelling or archiving a routine card cascades to its spawned instance tasks: any still-live children (backlog, in_progress, waiting) are cancelled automatically so they don't linger on the board. Terminal children (done, failed, cancelled) are left alone so you can review their results and archive them yourself. Instance tasks are identified by the `spawned-by:<routine-id>` tag the runner writes on spawn.
 
-Cancelling or archiving a routine card also **clears its enabled flag** and drops its scheduler timer, so the card's enabled state stays consistent with its status — a cancelled routine no longer shows as enabled in the routines list, and cannot silently resume firing if its status is later moved back to an active lane (you would re-enable it deliberately). This differs from a routine that merely *lands* in Done/Failed: those keep their enabled flag so moving the card back to Backlog re-arms the schedule.
+Cancelling or archiving a routine card also **clears its enabled flag** and drops its scheduler timer, so the card's enabled state stays consistent with its status: a cancelled routine no longer shows as enabled in the routines list, and cannot silently resume firing if its status is later moved back to an active lane (you would re-enable it deliberately). This differs from a routine that merely *lands* in Done/Failed: those keep their enabled flag so moving the card back to Backlog re-arms the schedule.
 
 ### Prompt Templates
 
@@ -298,13 +298,15 @@ Failure categories related to budgets:
 
 | Category | Meaning |
 |---|---|
-| `timeout` | Container ran past its timeout |
+| `timeout` | Agent ran past its timeout |
 | `budget_exceeded` | Cost or token limit reached |
 | `worktree_setup` | Git worktree creation failed |
-| `container_crash` | Container exited unexpectedly |
+| `container_crash` | Agent process exited unexpectedly |
 | `agent_error` | Agent reported an error |
 | `sync_error` | Rebase or merge conflict unresolvable |
 | `unknown` | Uncategorized failure |
+
+The category keys above are the machine-readable values the API stores; `container_crash` is the legacy identifier for an unexpected agent-process exit.
 
 ### Fresh Start Flag
 
@@ -357,7 +359,7 @@ Launches a separate verification agent that inspects the code changes and runs t
 
 Available on: `backlog`, `in_progress`, `waiting`, `failed`, `done`
 
-Kills the container (if running), discards worktrees, and moves the task to Cancelled. All history, logs, and events are preserved so the task can be retried later.
+Stops the agent process (if running), discards worktrees, and moves the task to Cancelled. All history, logs, and events are preserved so the task can be retried later.
 
 ### Task Detail Modal (Full Reference)
 
@@ -373,13 +375,13 @@ The left panel is always visible and contains:
 - **Prompt History** -- collapsible section showing previous prompt versions (visible when the prompt has been edited)
 - **Retry History** -- collapsible section listing previous execution attempts with their status, cost, and truncated results
 - **Dependencies** -- "Blocked by" section with live status badges and links to prerequisite tasks
-- **Settings** (backlog only) -- editable sandbox, timeout, model override, scheduled start, share-code toggle, budget limits, and dependency picker. Changes auto-save with a 500ms debounce. Per-activity sandbox routing now lives on the agent definition (Agents tab → Harness); this panel exposes only the task-level default.
+- **Settings** (backlog only) -- editable sandbox, timeout, model override, scheduled start, share-code toggle, budget limits, and dependency picker. Changes auto-save with a 500ms debounce. Per-activity harness routing now lives on the agent definition (Agents tab → Harness); this panel exposes only the task-level default.
 - **Edit Prompt** (backlog only) -- editable textarea for the task prompt with tag input
 - **Start Task** button (backlog only)
 - **Resume Session** section (failed tasks with an existing session) -- resume button with timeout selector
 - **Implementation / Testing tabs** -- summary of agent outputs organized by activity phase
 - **Usage** -- token counts (input, output, cache read, cache creation), total cost, budget indicator, and per-activity breakdown (implementation, testing, refinement, title, oversight, commit message, idea agent)
-- **Environment** -- collapsible provenance section showing container image, model, API base URL, instructions hash, and sandbox type
+- **Environment** -- collapsible provenance section showing the harness, model, API base URL, instructions hash, and sandbox type
 - **Feedback form** (waiting tasks) -- textarea and buttons for Submit Feedback, Mark as Done, and Test
 - **Retry section** (done/failed/cancelled) -- editable prompt and Move to Backlog button
 - **Events timeline** -- chronological audit trail of state changes, outputs, feedback, errors, and system events
@@ -397,7 +399,7 @@ A horizontal tab bar across the top of the modal switches what the main pane sho
 | **Refine** | AI refinement interface for backlog tasks (replaces Spec's edit affordance while refining). |
 | **Activity** | Live agent logs. Implementation and, when test verification has run, Testing sub-tabs, each with Oversight (high-level summary), Pretty (formatted output), and Raw (unprocessed NDJSON) viewing modes plus a log search/filter bar. |
 | **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. Visible once the task has produced changes. |
-| **Flamegraph** | Execution spans (worktree setup, agent turns, container runs, commits) rendered as a flamegraph. Visible when the task has completed at least one turn. |
+| **Flamegraph** | Execution spans (worktree setup, agent turns, host-process runs, commits) rendered as a flamegraph. Visible when the task has completed at least one turn. |
 | **Timeline** | The same span data rendered as an interactive timeline chart. |
 | **Events** | Chronological audit trail of state changes, outputs, feedback, errors, and system events. Always visible. |
 
@@ -405,9 +407,9 @@ A horizontal tab bar across the top of the modal switches what the main pane sho
 
 For backlog tasks, the Refine tab hosts the AI refinement interface:
 
-- **Refine with AI** -- launch a sandbox agent to analyze the codebase and produce a detailed implementation spec
+- **Refine with AI** -- launch a refinement agent that analyzes the codebase and produces a detailed implementation spec
 - **Focus or context** -- optional textarea to guide the refinement agent
-- **Running state** -- live logs from the refinement container with pretty/raw toggle
+- **Running state** -- live logs from the refinement run with pretty/raw toggle
 - **Result state** -- editable spec with Apply (replace task prompt) and Dismiss buttons
 - **Refinement history** -- previous refinement sessions
 
@@ -463,23 +465,42 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 
 ## Agents Tab
 
-The **Agents** entry in the left sidebar opens a read-only catalogue of
-the built-in sub-agent roles that power wallfacer: Title, Oversight,
-Commit message, Refinement, Brainstorm (ideation), Implementation, and
-Testing. Each row shows the agent's **capabilities** (what it needs
-from its environment: `workspace.read`, `workspace.write`,
-`board.context`) and whether it is single-turn or multi-turn. Clicking
-a row expands an inline panel with the prompt template and a disabled
-**Clone** button — editable and user-authored agents will ship in a
-follow-up.
+The **Agents** entry in the left sidebar opens the catalog of sub-agent roles that power wallfacer. The board ships with six built-ins, each a descriptor naming the role's prompt template, capabilities, and turn behavior:
 
-Backing APIs: `GET /api/agents` and `GET /api/agents/{slug}`. Response
-fields are intentionally neutral (slug, title, description,
-capabilities, multiturn, prompt_template_name) — runner-side dispatch
-plumbing (container mount profiles, sandbox-routing activity buckets,
-parse functions) lives behind a private binding table in
-`internal/runner` so a future Flow composer can compose agents without
-pulling in container-orchestration knowledge.
+| Agent (UI title) | Slug | Capabilities | Turns |
+|---|---|---|---|
+| **Title** | `title` | none | single-turn |
+| **Oversight** | `oversight` | none | single-turn |
+| **Commit message** | `commit-msg` | none | single-turn |
+| **Brainstorm** | `ideate` | `workspace.read` | single-turn |
+| **Implementation** | `impl` | `workspace.write`, `board.context` | multi-turn |
+| **Testing** | `test` | `workspace.write`, `board.context` | multi-turn |
+
+Capabilities declare what the agent needs from its environment: `workspace.read` to inspect files, `workspace.write` to modify them, `board.context` to read task and board state. The title, oversight, and commit-message agents are headless single-pass roles with no workspace access; only `impl` and `test` run multiple turns and write to the worktree.
+
+Click a row to expand an inline panel showing the agent's prompt template and its full descriptor.
+
+### Cloning and authoring
+
+Agents support full CRUD. Built-ins are read-only on purpose, so the way to customize one is to **clone** it:
+
+1. Select a built-in and click **Clone** in the detail pane.
+2. Edit the copy: change the slug, pin a **Harness** (`Default`, `Claude`, or `Codex`), adjust capabilities, or rewrite the system prompt.
+3. **Save**. The clone is written to `~/.wallfacer/agents/<slug>.yaml` and becomes immediately available to reference from flows.
+
+You can also click **+ New Agent** to author one from scratch, edit your own agents in place, and delete them. A user agent cannot shadow a built-in slug; rename the file if the slug collides.
+
+For the full model (harness resolution order, how flows reference agents by slug, the system-prompt preamble, and worked examples), see [Agents & Flows](agents-and-flows.md).
+
+Backing APIs:
+
+- `GET /api/agents` -- list the merged catalog (built-ins plus user agents)
+- `GET /api/agents/{slug}` -- fetch one agent's descriptor
+- `POST /api/agents` -- create a user agent (this is how Clone persists its copy)
+- `PUT /api/agents/{slug}` -- update a user agent; built-ins return 409 (clone first)
+- `DELETE /api/agents/{slug}` -- delete a user agent
+
+Response fields are neutral by design (slug, title, description, capabilities, multiturn, prompt_template_name) so flows can compose agents by slug without depending on runner internals.
 
 ---
 
