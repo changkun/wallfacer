@@ -12,11 +12,6 @@
   overflow-x: auto;
   cursor: pointer;
 }
-.mermaid-diagram:hover {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-  border-radius: 4px;
-}
 .mermaid-diagram svg {
   max-width: 100%;
   height: auto;
@@ -28,6 +23,13 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+/* Subtle, neutral hover affordance (the diagram is click-to-expand). Replaces
+   the previous bold accent outline. */
+.mermaid-rendered:hover {
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--border));
+  box-shadow: 0 2px 12px -8px rgba(0, 0, 0, 0.3);
 }
 .mermaid-rendered svg {
   max-width: 100%;
