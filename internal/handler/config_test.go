@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -456,6 +456,46 @@ func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 	}
 	if !slices.Contains(sandboxes, "codex") {
 		t.Fatalf("expected sandboxes to include codex, got %v", sandboxes)
+	}
+	// Every registered harness reaches the UI; cursor is registered.
+	if !slices.Contains(sandboxes, "cursor") {
+		t.Fatalf("expected sandboxes to include cursor, got %v", sandboxes)
+	}
+}
+
+// TestAvailableSandboxes_IncludesRegisteredHarnesses asserts the built-in
+// sandbox list is driven by the harness registry, so a registered harness
+// (cursor) appears without being hardcoded.
+func TestAvailableSandboxes_IncludesRegisteredHarnesses(t *testing.T) {
+	got := availableSandboxes(envconfig.Config{})
+	for _, want := range []harness.ID{harness.Claude, harness.Codex, harness.Cursor} {
+		if !slices.Contains(got, want) {
+			t.Errorf("availableSandboxes missing %q: %v", want, got)
+		}
+	}
+}
+
+// TestGetConfig_CursorUsableByDefault asserts cursor is reported usable in
+// the GetConfig response (it has no codex-style key gate in v1).
+func TestGetConfig_CursorUsableByDefault(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	usable, ok := resp["sandbox_usable"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sandbox_usable object, got %T (%v)", resp["sandbox_usable"], resp["sandbox_usable"])
+	}
+	if usable["cursor"] != true {
+		t.Fatalf("expected sandbox_usable.cursor=true, got %v", usable["cursor"])
 	}
 }
 
