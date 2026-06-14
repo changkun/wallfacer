@@ -4,7 +4,7 @@ Wallfacer is configured through the Settings UI, environment variables in `~/.wa
 
 ## How tasks run
 
-Wallfacer runs each task as a host process. The runner execs the selected CLI (`claude`, `codex`, `cursor-agent`, or `opencode`) directly on your machine, with the task's git worktree as the working directory. Isolation comes from the per-task worktree, so no container runtime is required to install or run. Tasks run with your user account's permissions and can read or write any file your account can. Run Wallfacer only on machines you trust.
+Wallfacer runs each task as a host process. The runner execs the selected CLI (`claude`, `codex`, `cursor-agent`, `opencode`, or `pi`) directly on your machine, with the task's git worktree as the working directory. Isolation comes from the per-task worktree, so no container runtime is required to install or run. Tasks run with your user account's permissions and can read or write any file your account can. Run Wallfacer only on machines you trust.
 
 This is the current and default runtime. Throughout this document, "the agent" refers to the host CLI process Wallfacer launches for a given task.
 
@@ -38,20 +38,23 @@ At minimum, you need one of these credentials configured in **Settings > Harness
 
 **OpenCode configuration:** OpenCode manages provider credentials itself. Run `opencode auth login` once and select a provider (Anthropic, OpenAI, OpenRouter, etc.); the CLI stores that credential in its own config, so no API key is needed in `~/.wallfacer/.env`. Use the **Test** button to verify connectivity.
 
+**Pi configuration:** Pi is Armin Ronacher's `pi` coding agent ([pi.dev](https://pi.dev), [earendil-works/pi](https://github.com/earendil-works/pi)), **not** Inflection's Pi chatbot. It has no dedicated key: it reads provider credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) from the same environment the Claude and Codex blocks configure. Select its model with the two-flag form `--provider <name> --model <id>`; pass a `provider/model` string (e.g. `anthropic/claude-sonnet-4-6`) as the task model and Wallfacer splits it on the first `/`. Use the **Test** button to verify connectivity.
+
 The sign-in buttons are hidden when a custom base URL is configured (custom endpoints don't use standard OAuth). On first launch with no credentials for any provider, a prompt guides you to set up credentials.
 
 All changes are written to `~/.wallfacer/.env` and take effect on the next task run. Leave token fields blank to preserve the existing value.
 
 ### Verifying the CLIs
 
-Wallfacer launches the `claude`, `codex`, `cursor-agent`, and `opencode` CLIs from your `$PATH`. Install them with:
+Wallfacer launches the `claude`, `codex`, `cursor-agent`, `opencode`, and `pi` CLIs from your `$PATH`. Install them with:
 
 - `npm i -g @anthropic-ai/claude-code` for Claude.
 - `npm i -g @openai/codex` for Codex (optional; skip if you only run Claude tasks).
 - `cursor-agent` from [cursor.com/docs/cli](https://cursor.com/docs/cli) for Cursor (optional).
 - `opencode` from [opencode.ai/docs/cli](https://opencode.ai/docs/cli) for OpenCode (optional); after install run `opencode auth login` to configure a provider.
+- `pi` from [pi.dev](https://pi.dev) for Pi (optional); it reads provider keys from the environment, so no separate login is required.
 
-Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex, cursor-agent, or opencode is a soft warning: tasks routed to that agent will fail, but claude-only workflows still work.
+Run `wallfacer doctor` to confirm the binaries are resolvable and to print their `--version` output. Missing codex, cursor-agent, opencode, or pi is a soft warning: tasks routed to that agent will fail, but claude-only workflows still work.
 
 ### Key Environment Variables
 
@@ -171,16 +174,24 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 - Provider auth is managed by the `opencode` CLI itself. Run `opencode auth login` and pick a provider; no API key goes in `~/.wallfacer/.env`.
 - **Test** button -- runs an OpenCode connectivity check
 
+### Pi Configuration
+
+**Pi configuration:** Pi is the `pi` coding agent from earendil-works (Armin Ronacher's Pi), **not** Inflection's Pi chatbot.
+- No dedicated key: `pi` reads provider credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) from the same environment the Claude and Codex blocks configure.
+- Model selection uses the two-flag form `--provider <name> --model <id>`. Pass a `provider/model` task model (e.g. `anthropic/claude-sonnet-4-6`); Wallfacer splits it on the first `/`. A bare model with no `/` is sent as `--model` alone, letting `pi` pick its default provider.
+- **Test** button -- runs a Pi connectivity check
+
 ### Agent Routing
 
-**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex, cursor, opencode) or "default".
+**Global Agent Routing** -- Select the default agent and override it for individual activities: Implementation, Testing, Title generation, Oversight summary, Commit message, and Idea agent. Each dropdown offers the available agents (claude, codex, cursor, opencode, pi) or "default".
 
-Wallfacer supports four agents, selected per activity. All run as host processes; the difference is which CLI the runner execs:
+Wallfacer supports five agents, selected per activity. All run as host processes; the difference is which CLI the runner execs:
 
 - **Claude** -- runs the Claude Code CLI (`WALLFACER_AGENT=claude`). Requires either `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
 - **Codex** -- runs the OpenAI Codex CLI (`WALLFACER_AGENT=codex`). Requires `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 - **Cursor** -- runs the Cursor CLI (`WALLFACER_AGENT=cursor`). Requires `CURSOR_API_KEY` or an interactive `cursor-agent login`. Headless runs inject `--force` so edits are applied, not just proposed.
 - **OpenCode** -- runs the OpenCode CLI via `opencode run` (`WALLFACER_AGENT=opencode`). Provider auth is managed by `opencode auth login`, not by `~/.wallfacer/.env`. Headless runs inject `--dangerously-skip-permissions` so edits are applied without an interactive prompt.
+- **Pi** -- runs the `pi` CLI under `-p --mode json` (`WALLFACER_AGENT=pi`). Reads provider keys from the environment. Headless runs force full tool access (Read, Write, Edit, Bash) so edits are applied. Resolved from `$PATH`.
 
 Each task can be assigned a specific agent when created or edited. The task-level selection overrides the global default for that task's implementation run.
 
@@ -212,12 +223,6 @@ Route specific activities to different agents (`claude` or `codex`):
 | `WALLFACER_SANDBOX_IDEA_AGENT` | Override for the ideation agent |
 
 The `WALLFACER_SANDBOX_*` names are retained for backward compatibility; they select the agent, not a container.
-
-### Fast Mode
-
-When `WALLFACER_SANDBOX_FAST` is `true` (the default), Wallfacer passes fast-mode hints to the agent. Set to `false` to disable.
-
-**Enable /fast** -- Toggle fast-mode hints (`WALLFACER_SANDBOX_FAST`).
 
 ### Full Environment Variables Reference
 
@@ -310,7 +315,6 @@ These variables are optional; the CLI binaries are resolved via `$PATH` by defau
 | `WALLFACER_AUTO_PUSH` | `false` | Enable automatic `git push` after task completion |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push triggers |
 | `WALLFACER_PLANNING_WINDOW_DAYS` | `30` | Default window (in days) for the planning-cost analytics display. `0` means all time. Only affects the UI's default period selection; the server always returns the full record set until the UI requests a narrower window via `?days=N`. |
-| `WALLFACER_SANDBOX_FAST` | `true` | Enable fast-mode hints |
 | `WALLFACER_TERMINAL_ENABLED` | `true` | Enable the integrated host terminal panel. The Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. Supports multiple concurrent sessions with a tab bar: click "+" to add sessions, click tabs to switch, click x to close. Set to `false` to disable. |
 
 #### Data & Pagination
