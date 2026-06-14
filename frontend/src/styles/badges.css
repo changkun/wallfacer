@@ -67,6 +67,14 @@
   background: var(--tint-red);
   color: var(--tint-red-ink);
 }
+/* Failure category (Agent Error / Timeout / Budget). Neutral pill so it reads
+   as a secondary detail next to the red `failed` status badge. */
+.badge-failure-category {
+  background: var(--tint-neutral);
+  color: var(--tint-neutral-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-9);
+}
 .badge-test-none {
   background: var(--tint-neutral);
   color: var(--tint-neutral-ink);
