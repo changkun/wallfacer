@@ -32,7 +32,7 @@ dispatched_task_id: null
 
 Tier B child of [[local-build-deploy]]. Moves `wallfacerd` (the web/server image) build + push + k8s deploy from GH Actions to local `make release` + `make deploy`. The two non-server release flows in this repo (`release-binary.yml` and `release-desktop.yml`) are explicitly out of scope - Wails desktop signing/notarization needs Apple/Windows keys that aren't worth relocating.
 
-This spec lives in the `local` track (`specs/local/`) so it appears in the spec tree (it is archived, shown when "Show archived" is on). The cross-repo umbrella ([[local-build-deploy]] in `terraform/specs/`) remains the overall index for the multi-repo migration; the former `depends_on` edges to the sibling `auth/` and `terraform/` repos were dropped from the frontmatter because the wallfacer validator cannot resolve cross-repo paths.
+This spec lives as a loose file at the top level of `specs/` (no track folder), because it is a one-off devops migration rather than a product feature. The spec tree supports freeform placement, so it still appears (grouped under "other"; it is archived, shown when "Show archived" is on). The cross-repo umbrella ([[local-build-deploy]] in `terraform/specs/`) remains the overall index for the multi-repo migration; the former `depends_on` edges to the sibling `auth/` and `terraform/` repos were dropped from the frontmatter because the wallfacer validator cannot resolve cross-repo paths.
 
 ## Current state
 
