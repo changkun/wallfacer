@@ -70,7 +70,8 @@ First frame after the handshake (instance to coordinator):
   "host_label": "changkun-mbp",
   "version": "wallfacer/<semver>",
   "workspaces": [
-    {"remote": "github.com/latere-ai/wallfacer", "local_key": "<GroupKey>"}
+    {"remote": "github.com/latere-ai/wallfacer", "verified": "local-proof",
+     "local_key": "<GroupKey>"}
   ],
   "capabilities": ["presence", "focus", "projection", "remote-control", "comments"]
 }
@@ -89,16 +90,20 @@ survives restart, so a reconnect re-takes the same registry slot. Two instances
 with different `--data` dirs get different ids (correct disambiguation); two
 sharing a data dir is unsupported (already disallowed by the store).
 
-### Git-remote workspace identity
+### Repo identity (per repo, verified)
 
-`workspaces[].remote` is the **canonical git remote URL**, the cross-machine join
-key. A new normalize function (strip scheme/credentials/`.git`, lowercase host,
-canonical `host/owner/repo`) derives it from `git remote get-url origin` (git
-helpers in `internal/handler/git.go`). `local_key` is the per-machine `GroupKey`
-(`internal/workspace/groups.go`), an opaque hash sent for the instance's own
-routing only; the coordinator never joins on it and it is the one local-derived
-value on the wire (a hash, not a path). A workspace with no remote registers no
-remote URL and never joins org collaboration.
+The collaboration unit is the **repo**, not the folder-group, and each
+`workspaces[]` entry is a repo claim with a verification tier. `remote` is the
+canonical `host/owner/repo` (`NormalizeRemoteURL`, `internal/coordinator`,
+derived client-side from each folder's `git remote origin`); `verified` is the
+tier the instance attests (`local-proof` by default) and the coordinator
+re-checks per [repo-identity](../repo-identity.md). `local_key` is the per-machine
+`GroupKey` (`internal/workspace/groups.go`), an opaque hash for the instance's own
+routing only; the coordinator never joins on it, and it is the one local-derived
+value on the wire (a hash, not a path). A folder with no remote, or an
+`unverified` repo, registers nothing and never joins org collaboration. The full
+identity, storage, and verification model is [repo-identity](../repo-identity.md);
+this leaf just carries the claims and enforces the org boundary.
 
 ## Heartbeat, reconnect, teardown
 
