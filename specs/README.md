@@ -32,6 +32,7 @@ Local Product - 10 shipped, rest pending
   ○ Visual Verification            ○ Scoped Command Registry
   ○ Host Path References           ○ Live Serve
   ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
+  ○ Dockable Panel Workspace
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback, Spatial Canvas
 
@@ -118,6 +119,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. |
 | [inline-file-panel.md](local/inline-file-panel.md) | Drafted | Inline tabbed file panel with multi-modal preview (image/video/audio/PDF/hex) over `ExplorerPanel.vue` + a raw-content endpoint. Supersedes the archived file-panel-viewer. |
 | [diff-review-comments.md](local/diff-review-comments.md) | Drafted | Code-review-style inline comments anchored to diff lines, batched into the existing feedback channel. Supersedes the archived inline-diff-feedback. |
+| [dockable-panel-workspace.md](local/dockable-panel-workspace.md) | Drafted | VS Code-style dockable panel workspace: terminal (later explorer/file panel) docks to any edge, maximizes to fullscreen, and splits via drag-and-drop, persisted to localStorage. Editor-center model wrapping the RouterView in `AppLayout`; custom split-tree (no docking library). |
 | [test-criteria.md](local/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task (`Task.Criteria`) so the auto-tester checks them, threaded into the existing `buildTestPrompt` / `tryAutoTest` path. Closes a live hole: autopilot test runs currently pass empty criteria. Supersedes the archived validation-barrier. |
 | [visual-verification.md](local/visual-verification.md) | Drafted | Post-execution visual regression check for UI changes, built on the existing `frontend/scripts/ui-shots` screenshot harness. Test/CI tooling, not a hard gate. |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the flat planning-only slash registry (`internal/planner/commands.go`, no scope field today) to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting) so the board and other Vue surfaces get their own `/` commands. |
