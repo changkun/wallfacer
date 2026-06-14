@@ -1,16 +1,19 @@
 #!/bin/bash
 #
-# End-to-end integration test for task lifecycle with host-exec'd claude/codex.
+# End-to-end integration test for task lifecycle with host-exec'd agents.
 #
 # Requires:
 #   - A running wallfacer server (default: http://localhost:8080)
 #   - Valid credentials configured in the server (.env)
-#   - claude (and optionally codex) on $PATH
+#   - claude (and optionally codex / opencode) on $PATH; opencode also needs a
+#     provider configured via `opencode auth login`
 #
 # Usage:
-#   sh scripts/e2e-lifecycle.sh                              # test both sandboxes
+#   sh scripts/e2e-lifecycle.sh                              # test both default sandboxes
 #   sh scripts/e2e-lifecycle.sh claude                       # test claude only
 #   sh scripts/e2e-lifecycle.sh codex                        # test codex only
+#   sh scripts/e2e-lifecycle.sh opencode                     # test opencode only
+#   sh scripts/e2e-lifecycle.sh "claude opencode"            # test multiple
 #   WALLFACER_URL=http://localhost:9090 sh scripts/e2e-lifecycle.sh
 #
 set -euo pipefail
@@ -83,6 +86,10 @@ for sb in $SANDBOXES; do
         echo "ERROR: codex tests require 'codex' on \$PATH"
         exit 1
     fi
+    if [ "$sb" = "opencode" ] && ! command -v opencode >/dev/null 2>&1; then
+        echo "ERROR: opencode tests require 'opencode' on \$PATH (and 'opencode auth login')"
+        exit 1
+    fi
 done
 server_host_mode=$(api GET "/api/config" | jq -r '.host_mode // false')
 if [ "$server_host_mode" != "true" ]; then
@@ -93,11 +100,12 @@ pass "server running in host mode"
 
 # Run the lifecycle test for a given sandbox type.
 #
-# Harness (claude vs codex) is no longer settable on POST /api/tasks.
-# The new workflow creates the task, then PATCHes the per-task
-# sandbox hint before moving it to in_progress. The PATCH path still
-# honours the codex readiness gate, so unverified codex yields 400
-# the same way the old POST did.
+# The harness is no longer settable on POST /api/tasks. The new workflow
+# creates the task, then PATCHes the per-task sandbox hint before moving it
+# to in_progress. The PATCH path still honours the codex readiness gate, so
+# unverified codex yields 400 the same way the old POST did. claude, cursor,
+# and opencode have no key gate (opencode manages provider auth itself), so
+# their PATCH is accepted directly.
 test_sandbox() {
     local sb="$1"
     section "lifecycle: $sb sandbox"
