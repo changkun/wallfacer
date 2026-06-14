@@ -322,13 +322,13 @@ Specs that were never implemented and whose designs target architecture since re
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Built on `ui/js/explorer.js` (removed). Replaced by [inline-file-panel.md](local/inline-file-panel.md). |
 | [inline-diff-feedback.md](local/inline-diff-feedback.md) | Built on `ui/js/modal-diff.js` (removed). Replaced by [diff-review-comments.md](local/diff-review-comments.md). |
 | [spatial-canvas.md](local/spatial-canvas.md) | Exploratory infinite-canvas view targeting `ui/js/` (removed). No replacement specced. |
-| [local-build-deploy.md](local-build-deploy.md) | Local `make release` / `make deploy` for wallfacerd. Implemented then deliberately reverted in favor of GitHub Actions (`0ba7b225`). |
 
-### Cloud - Archived (superseded by the Latere platform boundary)
+### Cloud - Archived
 
-Specs proposing wallfacer build infrastructure that Latere services now own. Replaced by the integration track ([latere-integration.md](cloud/latere-integration.md)). Retained for context.
+Wallfacer build/deploy and infrastructure specs that are no longer active. Most propose infrastructure that Latere services now own (replaced by the integration track, [latere-integration.md](cloud/latere-integration.md)); one is a dropped deploy migration. Retained for context.
 
 | Spec | Why archived |
 |------|--------------|
 | [multi-tenant.md](cloud/multi-tenant.md) | Control plane, per-user instance provisioning, routing, and hibernation are owned by **Cella** (runtime) and **terraform** (infra); org/team scoping is Identity's. Wallfacer consumes, not builds. |
 | [billing-idempotency.md](cloud/billing-idempotency.md) | Stripe charge mechanics and idempotency are owned by **Identity** (`latere.ai/x/auth`). Wallfacer's only billing surface is an optional read-only subscription UX, to be specced if/when payment is introduced. |
+| [local-build-deploy.md](cloud/local-build-deploy.md) | Local `make release` / `make deploy` for the wallfacerd server image. Implemented then deliberately reverted in favor of GitHub Actions (`0ba7b225`). |
