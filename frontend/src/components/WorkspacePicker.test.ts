@@ -9,10 +9,24 @@
 // not fire browse(), meaning no api call runs on mount. We drive the gate via
 // "+ Add current folder", which adds browsePath ('/') without any network.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createApp, nextTick, type App } from 'vue';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createApp, h, nextTick, ref, type App } from 'vue';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import WorkspacePicker from './WorkspacePicker.vue';
+
+// Capture browse calls and feed canned directory listings so the picker can be
+// driven without a real backend.
+const apiCalls: { method: string; path: string }[] = [];
+let browseEntries: { name: string; path: string; is_git_repo: boolean }[] = [];
+vi.mock('../api/client', () => ({
+  api: vi.fn((method: string, path: string) => {
+    apiCalls.push({ method, path });
+    if (path.startsWith('/api/workspaces/browse')) {
+      return Promise.resolve({ path: '/home/u', entries: browseEntries });
+    }
+    return Promise.resolve({});
+  }),
+}));
 
 let activePinia: Pinia;
 
@@ -31,6 +45,25 @@ async function mount(): Promise<{ app: App; host: HTMLElement }> {
   return { app, host };
 }
 
+// mountOpen mounts via a parent that flips modelValue false->true after mount,
+// so the open watcher fires and browse() runs against the mocked api.
+async function mountOpen(): Promise<{ app: App; host: HTMLElement }> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const open = ref(false);
+  const app = createApp({
+    setup: () => () => h(WorkspacePicker, { modelValue: open.value }),
+  });
+  app.use(activePinia);
+  app.mount(host);
+  open.value = true;
+  await nextTick();
+  await nextTick();
+  await Promise.resolve();
+  await nextTick();
+  return { app, host };
+}
+
 function findByText(host: HTMLElement, selector: string, text: string): HTMLElement | null {
   return Array.from(host.querySelectorAll<HTMLElement>(selector)).find(
     (el) => el.textContent?.trim().includes(text),
@@ -41,11 +74,47 @@ describe('WorkspacePicker wizard', () => {
   let app: App | null = null;
   let host: HTMLElement | null = null;
 
+  beforeEach(() => {
+    apiCalls.length = 0;
+    browseEntries = [];
+  });
+
   afterEach(() => {
     app?.unmount();
     host?.remove();
     app = null;
     host = null;
+  });
+
+  it('opens the browser at the home directory (empty path), not filesystem root', async () => {
+    ({ app, host } = await mountOpen());
+    const browse = apiCalls.find((c) => c.path.startsWith('/api/workspaces/browse'));
+    expect(browse).toBeDefined();
+    // Empty path makes the backend resolve to the user's home directory.
+    expect(browse!.path).toBe('/api/workspaces/browse?path=');
+  });
+
+  it('sinks already-added folders to the bottom of the browse list', async () => {
+    browseEntries = [
+      { name: 'alpha', path: '/home/u/alpha', is_git_repo: false },
+      { name: 'beta', path: '/home/u/beta', is_git_repo: false },
+      { name: 'gamma', path: '/home/u/gamma', is_git_repo: false },
+    ];
+    ({ app, host } = await mountOpen());
+
+    // Add the middle entry; it should move to the end of the list.
+    const addButtons = Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry__add'));
+    const betaRow = Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry')).find((r) =>
+      r.textContent?.includes('beta'),
+    );
+    (betaRow!.querySelector('.ws-entry__add') as HTMLButtonElement).click();
+    await nextTick();
+    expect(addButtons.length).toBe(3);
+
+    const order = Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry__name')).map(
+      (el) => el.textContent?.trim().replace(/git$/, '') ?? '',
+    );
+    expect(order).toEqual(['alpha', 'gamma', 'beta']);
   });
 
   it('disables Next until a folder is added, then advances to review', async () => {

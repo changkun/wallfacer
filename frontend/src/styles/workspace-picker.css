@@ -203,6 +203,12 @@
   accent-color: var(--accent);
   cursor: pointer;
 }
+.ws-picker__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ws-picker__new-folder-btn,
 .ws-picker__add-folder-btn {
   font-size: 11px;
   padding: 2px 6px;
