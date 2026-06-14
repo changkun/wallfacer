@@ -292,61 +292,87 @@
     var nodes = graph && Array.isArray(graph.nodes) ? graph.nodes : [];
     var edges = graph && Array.isArray(graph.edges) ? graph.edges : [];
 
-    // Union-find over node ids so connected nodes share a representative.
-    var parent = Object.create(null);
-    function find(x) {
-      while (parent[x] !== x) {
-        parent[x] = parent[parent[x]];
-        x = parent[x];
-      }
-      return x;
-    }
-    function union(a, b) {
-      var ra = find(a);
-      var rb = find(b);
-      if (ra === rb) return;
-      // Deterministic merge: keep the lexicographically smaller root so the
-      // representative for a set never depends on edge iteration order.
-      if (ra < rb) parent[rb] = ra;
-      else parent[ra] = rb;
-    }
-
     var present = Object.create(null);
+    var byNode = Object.create(null);
     for (var i = 0; i < nodes.length; i++) {
-      var id = nodes[i].id;
-      parent[id] = id;
-      present[id] = true;
-    }
-    for (var e = 0; e < edges.length; e++) {
-      var ed = edges[e];
-      if (!present[ed.from] || !present[ed.to]) continue;
-      union(ed.from, ed.to);
+      present[nodes[i].id] = true;
     }
 
-    // Pick a community label per union-find set. A set's label is the
-    // alphabetically-first spec track among its members; sets with no spec
-    // member fall back to "unconnected".
-    var setTrack = Object.create(null);
+    // 1. Specs are anchored DIRECTLY to their track (the first path
+    //    segment). We deliberately do NOT merge specs across tracks here:
+    //    cross-track depends_on edges are common (foundations is depended
+    //    on widely), so a connected-component grouping would collapse every
+    //    track into one community and defeat the whole point. Each track
+    //    stays its own community regardless of how many cross-track edges
+    //    connect them.
+    var seeds = []; // spec ids that anchor a track, for the task BFS
     for (var j = 0; j < nodes.length; j++) {
       var n = nodes[j];
       if (n.kind !== "spec") continue;
       var track = _specTrack(n);
-      if (!track) continue;
-      var root = find(n.id);
-      if (setTrack[root] === undefined || track < setTrack[root]) {
-        setTrack[root] = track;
+      if (track) {
+        byNode[n.id] = track;
+        seeds.push(n.id);
       }
     }
 
-    var byNode = Object.create(null);
+    // 2. Tasks (and any spec with no path) inherit a track by propagating
+    //    over the undirected edge set to the nearest anchored spec. We BFS
+    //    outward from all seeds simultaneously; when two tracks reach a
+    //    node at the same distance, the alphabetically-smaller track wins.
+    //    This is deterministic and independent of node/edge iteration order
+    //    because the tie-break is purely on the track string.
+    var adj = Object.create(null);
+    for (var a = 0; a < nodes.length; a++) adj[nodes[a].id] = [];
+    for (var e = 0; e < edges.length; e++) {
+      var ed = edges[e];
+      if (!present[ed.from] || !present[ed.to]) continue;
+      adj[ed.from].push(ed.to);
+      adj[ed.to].push(ed.from);
+    }
+    // Distance + best-track per node, seeded from the anchored specs.
+    var dist = Object.create(null);
+    var frontier = [];
+    for (var s = 0; s < seeds.length; s++) {
+      dist[seeds[s]] = 0;
+      frontier.push(seeds[s]);
+    }
+    while (frontier.length > 0) {
+      var next = [];
+      for (var f = 0; f < frontier.length; f++) {
+        var cur = frontier[f];
+        var curTrack = byNode[cur];
+        var nd = dist[cur] + 1;
+        var neigh = adj[cur] || [];
+        for (var g = 0; g < neigh.length; g++) {
+          var nb = neigh[g];
+          if (byNode[nb] !== undefined && nodeIsSpec(nb)) continue; // anchored
+          if (dist[nb] === undefined || nd < dist[nb]) {
+            dist[nb] = nd;
+            byNode[nb] = curTrack;
+            next.push(nb);
+          } else if (nd === dist[nb] && curTrack < byNode[nb]) {
+            // Same distance, smaller track wins. Re-enqueue so this better
+            // label can propagate further.
+            byNode[nb] = curTrack;
+            next.push(nb);
+          }
+        }
+      }
+      frontier = next;
+    }
+    function nodeIsSpec(id) {
+      return id.indexOf("spec:") === 0;
+    }
+
+    // 3. Anything still unlabelled has no spec anchor reachable → the
+    //    "unconnected" shelf.
     var seen = Object.create(null);
     var order = [];
     for (var k = 0; k < nodes.length; k++) {
       var nid = nodes[k].id;
-      var r = find(nid);
-      var community =
-        setTrack[r] !== undefined ? setTrack[r] : UNCONNECTED_COMMUNITY;
-      byNode[nid] = community;
+      if (byNode[nid] === undefined) byNode[nid] = UNCONNECTED_COMMUNITY;
+      var community = byNode[nid];
       if (!seen[community]) {
         seen[community] = true;
         order.push(community);
@@ -392,13 +418,17 @@
   // clean and relations dominate. Breaks on a word boundary when one falls
   // inside the budget; otherwise hard-truncates with an ellipsis.
   var COMPACT_LABEL_MAX = 20;
-  function _truncateLabel(label) {
+  // Specs that carry a +/- toggle on the right reserve room for it, so
+  // their label budget is a few chars shorter to avoid colliding.
+  var COMPACT_LABEL_MAX_WITH_TOGGLE = 16;
+  function _truncateLabel(label, maxChars) {
+    var max = typeof maxChars === "number" ? maxChars : COMPACT_LABEL_MAX;
     var s = String(label == null ? "" : label).trim();
-    if (s.length <= COMPACT_LABEL_MAX) return s;
-    var slice = s.slice(0, COMPACT_LABEL_MAX);
+    if (s.length <= max) return s;
+    var slice = s.slice(0, max);
     var sp = slice.lastIndexOf(" ");
     // Prefer a word break if it keeps at least ~60% of the budget.
-    if (sp >= COMPACT_LABEL_MAX * 0.6) slice = slice.slice(0, sp);
+    if (sp >= max * 0.6) slice = slice.slice(0, sp);
     return slice.replace(/[\s.,;:-]+$/, "") + "…";
   }
 
@@ -428,68 +458,15 @@
   // the overlap-resolution pass, not the sweep.
   var V_GAP = 8;
   // MIN_NODE_GAP is the rendered minimum empty space between any two node
-  // rectangles, enforced by _resolveColumnOverlaps after the sweeps. At
-  // ~2x LABEL_LINE_H (15) two stacked nodes read as separate cards, not
-  // one block of wrapped text. This is the single source of truth for
-  // within-column and cross-component breathing room.
-  var MIN_NODE_GAP = 32;
-
-  // Label wrap tuning. Characters per line at 12px system fonts inside a
-  // 220px-wide node leaves room for the 8px inset and the right-side
-  // toggle chip on specs with children. Each line past the first adds
-  // LABEL_LINE_H to the node height.
-  var LABEL_CHARS_PER_LINE = 26;
-  var LABEL_CHARS_PER_LINE_WITH_TOGGLE = 22;
-  var LABEL_LINE_H = 15;
-  var LABEL_TOP_PAD = 24; // vertical space reserved above the label
-  var LABEL_BOTTOM_PAD = 12;
+  // rectangles, enforced by _resolveColumnOverlaps after the sweeps. Two
+  // stacked compact cards read as separate at this gap. Single source of
+  // truth for within-column and cross-component breathing room.
+  var MIN_NODE_GAP = 26;
 
   // Dummy-node rail: intermediate waypoints for long edges take up far less
   // vertical space than full nodes so the resulting polyline reads as a
   // smooth curve rather than as discrete stepped segments.
   var DUMMY_H = 0;
-
-  // _wrapLabel splits a label into lines of at most `maxChars` characters,
-  // breaking on whitespace where possible and hard-wrapping runs that
-  // exceed the limit (e.g. a long spec path). Returns an array of strings.
-  function _wrapLabel(label, maxChars) {
-    if (!label) return [""];
-    var lines = [];
-    var words = String(label).split(/\s+/);
-    var current = "";
-    for (var i = 0; i < words.length; i++) {
-      var w = words[i];
-      if (w.length === 0) continue;
-      // Hard-break runs longer than the line length (URLs, long paths).
-      while (w.length > maxChars) {
-        if (current) {
-          lines.push(current);
-          current = "";
-        }
-        lines.push(w.slice(0, maxChars));
-        w = w.slice(maxChars);
-      }
-      if (!current) {
-        current = w;
-      } else if (current.length + 1 + w.length <= maxChars) {
-        current += " " + w;
-      } else {
-        lines.push(current);
-        current = w;
-      }
-    }
-    if (current) lines.push(current);
-    if (lines.length === 0) lines.push("");
-    return lines;
-  }
-
-  function _nodeLabelLines(node) {
-    var hasToggle = node && node.extra && node.extra.hasChildren;
-    var maxChars = hasToggle
-      ? LABEL_CHARS_PER_LINE_WITH_TOGGLE
-      : LABEL_CHARS_PER_LINE;
-    return _wrapLabel(node.label || "", maxChars);
-  }
 
   // _computeNodeHeight returns the pixel height for a node. Compact nodes
   // are a single fixed-height card (the full title is in the tooltip, not
@@ -2136,7 +2113,7 @@
         : null;
 
     // Community assignment drives the per-node accent dot and the faint
-    // background hulls. Render-time only — it never feeds the layout, so
+    // background hulls. Render-time only (it never feeds the layout), so
     // the layout cache fingerprint stays valid.
     var communities = assignCommunities(graph);
 
@@ -2214,9 +2191,35 @@
       if (pos.y + h > box.maxY) box.maxY = pos.y + h;
       box.count++;
     });
+    // Hulls are clean ONLY when communities are spatially separated. Specs
+    // across tracks share one Sugiyama component (cross-track depends_on),
+    // so their bounding boxes can interleave. If any two community boxes
+    // overlap, suppress all hulls. The per-node community dots still carry
+    // the grouping signal, and overlapping hulls would be net-negative.
+    var drawableBoxes = [];
+    for (var bc = 0; bc < communities.order.length; bc++) {
+      var bcCom = communities.order[bc];
+      var bcBox = communityBoxes[bcCom];
+      if (bcBox && bcBox.count >= 2) drawableBoxes.push(bcBox);
+    }
+    var hullsOverlap = false;
+    for (var bi = 0; bi < drawableBoxes.length && !hullsOverlap; bi++) {
+      for (var bj = bi + 1; bj < drawableBoxes.length; bj++) {
+        var ba = drawableBoxes[bi];
+        var bb = drawableBoxes[bj];
+        var sepX = ba.maxX <= bb.minX || bb.maxX <= ba.minX;
+        var sepY = ba.maxY <= bb.minY || bb.maxY <= ba.minY;
+        if (!sepX && !sepY) {
+          hullsOverlap = true;
+          break;
+        }
+      }
+    }
+
     var hullLayer = svgNs("g");
     hullLayer.setAttribute("data-role", "community-hulls");
-    communities.order.forEach(function (community) {
+    var hullCommunities = hullsOverlap ? [] : communities.order;
+    hullCommunities.forEach(function (community) {
       var box = communityBoxes[community];
       if (!box || box.count < 2) return; // skip lone-node communities
       var color = _communityColor(community, communities.order);
@@ -2397,26 +2400,43 @@
       var y = pos.y;
       var h = pos.height || NODE_H;
 
+      var community = communities.byNode[n.id] || UNCONNECTED_COMMUNITY;
+      var communityColor = _communityColor(community, communities.order);
+
       var g = svgNs("g");
       g.setAttribute("data-kind", n.kind);
       g.setAttribute("data-id", n.id);
+      g.setAttribute("data-community", community);
       if (anyDim && !inFocus(n.id)) {
         g.setAttribute("opacity", "0.28");
       }
+
+      // Hover tooltip: the full title (no truncation), kind, status, and
+      // path. The user asked to "only show tooltip what's the spec" so the
+      // canvas body stays compact while the detail lives here. A <title>
+      // child of the node group surfaces natively on hover with no
+      // pan/zoom coordinate math.
+      var tip = svgNs("title");
+      var tipKind = n.kind === "spec" ? "Spec" : "Task";
+      var tipText = tipKind + ": " + (n.label || "");
+      if (n.status) tipText += "\nStatus: " + n.status;
+      if (n.extra && n.extra.path) tipText += "\nPath: " + n.extra.path;
+      tipText += "\nCommunity: " + community;
+      tip.textContent = tipText;
+      g.appendChild(tip);
 
       var body = svgNs("g");
       body.style.cursor = "grab";
 
       var ns = _nodeStyle(readVar, n.kind, n.status);
       var inkColor = readVar("--text") || "#1b1916";
-      var mutedColor = readVar("--text-muted") || "#7a766e";
 
       var rect = svgNs("rect");
       rect.setAttribute("x", String(x));
       rect.setAttribute("y", String(y));
       rect.setAttribute("width", String(NODE_W));
       rect.setAttribute("height", String(h));
-      rect.setAttribute("rx", n.kind === "spec" ? "10" : "6");
+      rect.setAttribute("rx", n.kind === "spec" ? "9" : "5");
       rect.setAttribute("fill", ns.fill);
       rect.setAttribute("stroke", ns.stroke);
       rect.setAttribute("stroke-width", "1.25");
@@ -2429,50 +2449,53 @@
       }
       body.appendChild(rect);
 
+      var hasToggle = n.kind === "spec" && n.extra && n.extra.hasChildren;
+      // Compact single-row body: community dot, kind chip, truncated label.
+      var textX = x + 22;
+
+      // Community accent dot at the left edge. Status stays on the rect
+      // border/fill (so the MapPage legend keeps reading true); the dot is
+      // the separate channel that signals which sub-community a node lives
+      // in.
+      var dot = svgNs("circle");
+      dot.setAttribute("cx", String(x + 11));
+      dot.setAttribute("cy", String(y + h / 2));
+      dot.setAttribute("r", "4");
+      dot.setAttribute("fill", communityColor);
+      body.appendChild(dot);
+
       var chip = svgNs("text");
-      chip.setAttribute("x", String(x + 10));
-      chip.setAttribute("y", String(y + 15));
-      chip.setAttribute("font-size", "9");
+      chip.setAttribute("x", String(textX));
+      chip.setAttribute("y", String(y + 16));
+      chip.setAttribute("font-size", "8");
       chip.setAttribute("font-family", "system-ui, sans-serif");
       chip.setAttribute("font-weight", "600");
-      chip.setAttribute("letter-spacing", "0.08em");
+      chip.setAttribute("letter-spacing", "0.1em");
       chip.setAttribute("fill", ns.stroke);
       chip.textContent = n.kind === "spec" ? "SPEC" : "TASK";
       body.appendChild(chip);
 
-      // Label wraps to multiple lines — no truncation. Each line is a
-      // <tspan> with dy stepping by LABEL_LINE_H. The label block is
-      // vertically centred within the node's content area (below the
-      // type chip).
-      var hasToggle = n.kind === "spec" && n.extra && n.extra.hasChildren;
-      var lines = _nodeLabelLines(n);
-      var labelCenterX = hasToggle ? x + (NODE_W - 28) / 2 : x + NODE_W / 2;
-      var totalLabelH = lines.length * LABEL_LINE_H;
-      var labelStartY =
-        y +
-        LABEL_TOP_PAD +
-        Math.max(0, (h - LABEL_TOP_PAD - LABEL_BOTTOM_PAD - totalLabelH) / 2);
+      // Truncated single-line label. The full title is in the tooltip.
       var label = svgNs("text");
-      label.setAttribute("x", String(labelCenterX));
-      label.setAttribute("y", String(labelStartY));
-      label.setAttribute("text-anchor", "middle");
-      label.setAttribute("font-size", "12");
+      label.setAttribute("x", String(textX));
+      label.setAttribute("y", String(y + 30));
+      label.setAttribute("font-size", "11");
       label.setAttribute("font-family", "system-ui, sans-serif");
       label.setAttribute("fill", inkColor);
-      for (var li = 0; li < lines.length; li++) {
-        var tspan = svgNs("tspan");
-        tspan.setAttribute("x", String(labelCenterX));
-        tspan.setAttribute("dy", li === 0 ? "0" : String(LABEL_LINE_H));
-        tspan.textContent = lines[li];
-        label.appendChild(tspan);
-      }
+      label.textContent = _truncateLabel(
+        n.label || "",
+        hasToggle ? COMPACT_LABEL_MAX_WITH_TOGGLE : COMPACT_LABEL_MAX,
+      );
       body.appendChild(label);
 
-      // Pin marker on the top-left corner for user-pinned nodes.
+      // Pin marker on the top-right corner (left is now the community dot).
       if (pinnedIds && pinnedIds.has(n.id)) {
         var pin = svgNs("circle");
-        pin.setAttribute("cx", String(x + 6));
-        pin.setAttribute("cy", String(y + 6));
+        pin.setAttribute(
+          "cx",
+          String(x + NODE_W - (hasToggle ? 30 : 8)),
+        );
+        pin.setAttribute("cy", String(y + 7));
         pin.setAttribute("r", "3");
         pin.setAttribute("fill", readVar("--accent") || "#c45a33");
         body.appendChild(pin);
@@ -2753,7 +2776,9 @@
       // Layout internals exported for unit tests (no browser behaviour
       // depends on these being present).
       layoutSugiyama: layoutSugiyama,
+      assignCommunities: assignCommunities,
       NODE_W: NODE_W,
+      NODE_H: NODE_H,
       MIN_NODE_GAP: MIN_NODE_GAP,
     };
   }

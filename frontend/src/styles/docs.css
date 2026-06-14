@@ -490,7 +490,17 @@
   transition: opacity 160ms ease;
 }
 #depgraph-svg path[data-kind] {
-  transition: opacity 160ms ease;
+  /* Edges rest quiet (low stroke-opacity, set inline) and the hover
+     highlight dims/un-dims via the `opacity` attribute. Transition both
+     so neighbourhood focus fades in calmly. */
+  transition:
+    opacity 160ms ease,
+    stroke-opacity 160ms ease;
+}
+/* Community hulls are faint background regions; keep them behind all
+   interaction and let pointer events fall through to nodes/edges. */
+#depgraph-svg g[data-role="community-hulls"] {
+  pointer-events: none;
 }
 
 .depgraph-mode__empty {

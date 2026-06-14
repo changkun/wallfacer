@@ -5,13 +5,22 @@ import { describe, it, expect } from 'vitest';
 import * as graphMod from './unified-graph.js';
 
 const layoutSugiyama = (graphMod as any).layoutSugiyama;
+const assignCommunities = (graphMod as any).assignCommunities;
 const NODE_W: number = (graphMod as any).NODE_W;
 const MIN_NODE_GAP: number = (graphMod as any).MIN_NODE_GAP;
 
-// node helper. Varies label length so node heights differ (label wrap
-// grows height), which is what the overlap pass must account for.
-function node(id: string, label: string, kind: 'spec' | 'task' = 'task') {
-  return { id, kind, label, status: kind === 'spec' ? 'drafted' : 'backlog', extra: {} };
+// node helper. `extra.path` drives spec community assignment (first path
+// segment), so spec nodes accept an optional path.
+function node(
+  id: string,
+  label: string,
+  kind: 'spec' | 'task' = 'task',
+  extra: Record<string, unknown> = {},
+) {
+  return { id, kind, label, status: kind === 'spec' ? 'drafted' : 'backlog', extra };
+}
+function specNode(id: string, label: string, path: string) {
+  return node(id, label, 'spec', { path });
 }
 function edge(from: string, to: string, kind = 'task_dep') {
   return { from, to, kind };
@@ -143,5 +152,132 @@ describe('unified-graph layout', () => {
     // Multiple rows too.
     const ys = new Set(boxes.map((b) => b.y));
     expect(ys.size).toBeGreaterThan(1);
+  });
+});
+
+describe('community assignment', () => {
+  // A mixed graph: two spec tracks (cloud, foundations), tasks dispatched
+  // off leaf specs, a chain of task deps, and a free-floating task.
+  const nodes = [
+    specNode('spec:cloud/multi-tenant', 'Multi tenant', 'cloud/multi-tenant'),
+    specNode('spec:cloud/tenant-api', 'Tenant API', 'cloud/tenant-api'),
+    specNode('spec:foundations/runner', 'Runner', 'foundations/runner'),
+    specNode('spec:foundations/board', 'Board', 'foundations/board'),
+    node('task:t1', 'dispatched task one'),
+    node('task:t2', 'downstream task two'),
+    node('task:free', 'unconnected task'),
+  ];
+  const edges = [
+    edge('spec:cloud/multi-tenant', 'spec:cloud/tenant-api', 'containment'),
+    edge('spec:cloud/tenant-api', 'task:t1', 'dispatch'),
+    edge('task:t1', 'task:t2', 'task_dep'),
+    edge('spec:foundations/runner', 'spec:foundations/board', 'containment'),
+  ];
+
+  it('exports assignCommunities', () => {
+    expect(typeof assignCommunities).toBe('function');
+  });
+
+  it('partitions every node into exactly one community', () => {
+    const { byNode, order } = assignCommunities({ nodes, edges });
+    // Every node id is present.
+    for (const n of nodes) {
+      expect(byNode[n.id], `${n.id} missing a community`).toBeTruthy();
+    }
+    // No extra ids.
+    expect(Object.keys(byNode).length).toBe(nodes.length);
+    // Communities in `order` cover exactly the distinct assigned values.
+    const distinct = new Set(Object.values(byNode));
+    expect(new Set(order)).toEqual(distinct);
+    // order has no duplicates.
+    expect(order.length).toBe(new Set(order).size);
+  });
+
+  it('groups specs by top-level track and propagates to connected tasks', () => {
+    const { byNode } = assignCommunities({ nodes, edges });
+    // Spec tracks come from the first path segment.
+    expect(byNode['spec:cloud/multi-tenant']).toBe('cloud');
+    expect(byNode['spec:cloud/tenant-api']).toBe('cloud');
+    expect(byNode['spec:foundations/runner']).toBe('foundations');
+    expect(byNode['spec:foundations/board']).toBe('foundations');
+    // The dispatched task and its downstream join the cloud community.
+    expect(byNode['task:t1']).toBe('cloud');
+    expect(byNode['task:t2']).toBe('cloud');
+    // The free-floating task has no spec anchor → unconnected shelf.
+    expect(byNode['task:free']).toBe('unconnected');
+  });
+
+  it('is deterministic: identical input yields identical output', () => {
+    const a = assignCommunities({ nodes, edges });
+    const b = assignCommunities({ nodes, edges });
+    expect(a.byNode).toEqual(b.byNode);
+    expect(a.order).toEqual(b.order);
+    // Edge order must not change the assignment.
+    const shuffled = { nodes: nodes.slice().reverse(), edges: edges.slice().reverse() };
+    const c = assignCommunities(shuffled);
+    expect(c.byNode).toEqual(a.byNode);
+  });
+
+  it('places unconnected last in the community order', () => {
+    const { order } = assignCommunities({ nodes, edges });
+    expect(order[order.length - 1]).toBe('unconnected');
+  });
+
+  it('keeps cross-track-linked specs in SEPARATE communities', () => {
+    // Two specs in different tracks joined by a single spec_dep edge.
+    // A connected-component grouping would merge them into one community,
+    // collapsing the track structure. Path-prefix grouping must keep them
+    // distinct so the sub-communities remain visible.
+    const xNodes = [
+      specNode('spec:cloud/x', 'Cloud X', 'cloud/x'),
+      specNode('spec:foundations/y', 'Foundations Y', 'foundations/y'),
+    ];
+    const xEdges = [
+      // cloud/x depends on foundations/y → foundations/y → cloud/x
+      edge('spec:foundations/y', 'spec:cloud/x', 'spec_dep'),
+    ];
+    const { byNode } = assignCommunities({ nodes: xNodes, edges: xEdges });
+    expect(byNode['spec:cloud/x']).toBe('cloud');
+    expect(byNode['spec:foundations/y']).toBe('foundations');
+    expect(byNode['spec:cloud/x']).not.toBe(byNode['spec:foundations/y']);
+  });
+
+  it('a task equidistant from two tracks takes the alphabetically-smaller', () => {
+    // Task wired to both a cloud spec and a foundations spec at distance 1.
+    // Deterministic tie-break: "cloud" < "foundations".
+    const tNodes = [
+      specNode('spec:cloud/c', 'Cloud C', 'cloud/c'),
+      specNode('spec:foundations/f', 'Foundations F', 'foundations/f'),
+      node('task:mid', 'middle task'),
+    ];
+    const tEdges = [
+      edge('spec:cloud/c', 'task:mid', 'dispatch'),
+      edge('spec:foundations/f', 'task:mid', 'dispatch'),
+    ];
+    const r1 = assignCommunities({ nodes: tNodes, edges: tEdges });
+    expect(r1.byNode['task:mid']).toBe('cloud');
+    // Order-independent: reversing inputs gives the same tie-break.
+    const r2 = assignCommunities({
+      nodes: tNodes.slice().reverse(),
+      edges: tEdges.slice().reverse(),
+    });
+    expect(r2.byNode['task:mid']).toBe('cloud');
+  });
+
+  it('keeps compact node dimensions non-overlapping in the layout', () => {
+    // Sanity check that the new compact NODE_H still produces a clean,
+    // overlap-free layout for a graph that mixes communities.
+    const layout = layoutSugiyama({ nodes, edges }, {});
+    const boxes: { id: string; x: number; y: number; w: number; h: number }[] = [];
+    layout.positions.forEach((p: any, id: string) => {
+      if (!p.node || p.kind === 'dummy') return;
+      boxes.push({ id, x: p.x, y: p.y, w: NODE_W, h: p.height });
+    });
+    expect(boxes.length).toBe(nodes.length);
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        expect(tooClose(boxes[i], boxes[j], 0)).toBe(false);
+      }
+    }
   });
 });
