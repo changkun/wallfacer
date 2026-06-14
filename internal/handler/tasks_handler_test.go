@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestListSummaries_Empty verifies that ListSummaries returns an empty JSON

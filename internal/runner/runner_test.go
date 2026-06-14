@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
-	"github.com/google/uuid"
 )
 
 // gitRun executes a git command in dir and returns trimmed stdout.

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 // TestPruneTaskPayload verifies the full pruning contract:

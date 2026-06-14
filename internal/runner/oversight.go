@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // GenerateOversight produces a high-level aggregated summary of a task's agent

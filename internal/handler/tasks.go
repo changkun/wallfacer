@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // SearchTasks handles GET /api/tasks/search?q=<text>.

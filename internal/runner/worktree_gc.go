@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/pkg/envutil"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // ScanMissingTaskWorktrees iterates over all tasks in in_progress, waiting,

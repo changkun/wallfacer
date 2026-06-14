@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/coder/websocket"
 )
 
 // newTerminalTestServer creates a handler with terminal enabled and returns

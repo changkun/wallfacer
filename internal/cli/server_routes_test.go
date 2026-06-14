@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // TestContractRoutes_AllRegisteredInMux verifies that every route declared in

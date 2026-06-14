@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
-	"github.com/google/uuid"
 )
 
 // defaultAutoRetryBudget defines the per-category retry allowances granted to

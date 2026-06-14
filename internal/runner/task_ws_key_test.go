@@ -3,9 +3,9 @@ package runner
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
-	"github.com/google/uuid"
 )
 
 // TestCurrentWSKey verifies that currentWSKey returns the key from the

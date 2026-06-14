@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -19,7 +20,6 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // ErrCommitMessageGeneration marks failures that occur while generating the

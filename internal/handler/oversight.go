@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // oversightResponse wraps TaskOversight with a precomputed phase_count field

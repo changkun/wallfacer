@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // setupRunnerWithCmd creates a Store and Runner for testing with a custom

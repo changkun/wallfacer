@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // createWaitingTask creates a task in the store and moves it to waiting status.

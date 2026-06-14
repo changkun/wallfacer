@@ -8,11 +8,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/set"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // normalizeIdeationPriority maps various priority labels (P1, critical, etc.)

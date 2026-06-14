@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 type watcherMockStore struct {

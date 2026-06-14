@@ -15,12 +15,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/pty"
-	"github.com/coder/websocket"
-	"github.com/google/uuid"
 )
 
 // terminalSession holds the state for a single PTY-backed shell session.

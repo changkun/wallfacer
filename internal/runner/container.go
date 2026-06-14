@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // agentUsage mirrors the token-usage JSON object emitted by the

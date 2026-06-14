@@ -3,9 +3,9 @@ package runner
 import (
 	"io"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/pkg/syncmap"
-	"github.com/google/uuid"
 )
 
 // singletonKey is the fixed key used by SetSingleton/GetSingleton/DeleteSingleton

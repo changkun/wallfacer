@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
-	"github.com/google/uuid"
 )
 
 // TaskUsage tracks token consumption and cost for a task across all turns.

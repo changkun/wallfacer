@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 // ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a

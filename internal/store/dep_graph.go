@@ -1,8 +1,8 @@
 package store
 
 import (
-	"latere.ai/x/wallfacer/internal/pkg/dagscorer"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/pkg/dagscorer"
 )
 
 // CriticalPathScore returns the length of the longest downstream dependency chain

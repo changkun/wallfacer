@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // noSummary is a loadSummary stub that always returns (nil, nil), simulating

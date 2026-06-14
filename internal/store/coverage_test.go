@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
-	"github.com/google/uuid"
 )
 
 func TestParseFailureCategory_KnownValues(t *testing.T) {

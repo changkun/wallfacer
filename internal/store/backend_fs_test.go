@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 // newTestBackend creates a FilesystemBackend rooted in a fresh temporary directory.

@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/logger"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // cmpTaskPositionCreatedAt orders tasks by Position ascending, then CreatedAt ascending.

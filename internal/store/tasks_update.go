@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
-	"github.com/google/uuid"
 )
 
 // UpdateTaskStatus transitions the task identified by id to the given status.

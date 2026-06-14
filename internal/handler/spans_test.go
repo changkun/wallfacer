@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // spansEnvelope mirrors the {"spans": [...]} response shape.

@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // logCaptureHandler is a minimal slog.Handler that records every log record

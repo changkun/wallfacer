@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // newTestHandlerWithEnv creates a Handler backed by a temp-dir store and a

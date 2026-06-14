@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"github.com/google/uuid"
 )
 
 // PromptTemplate is a named reusable prompt fragment that users can save and
