@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import { useEnvConfig } from '../../composables/useEnvConfig';
 import { claudeModelsFor, codexModelsFor } from '../../lib/knownModels';
+import HarnessBadge from '../HarnessBadge.vue';
 import type {
   EnvConfig,
   EnvUpdatePayload,
@@ -12,9 +13,6 @@ import type {
 
 const taskStore = useTaskStore();
 const { env, fetchEnv, updateEnv } = useEnvConfig();
-
-// --- Host-mode banner ---
-const hostMode = computed(() => taskStore.config?.host_mode === true);
 
 // --- Sandbox list ---
 const sandboxes = computed<string[]>(() => taskStore.config?.sandboxes ?? []);
@@ -423,22 +421,6 @@ function capitalize(s: string): string {
       OpenAI key for Codex) to start running tasks.
     </div>
 
-    <!-- Host-mode banner -->
-    <div
-      v-if="hostMode"
-      class="settings-card"
-      style="margin-bottom: 12px; border-left: 3px solid var(--warn, #a56a12); background: var(--tint-amber, #f1e7cf); color: var(--tint-amber-ink, #7a5418);"
-    >
-      <div class="settings-card-head">
-        <h4 style="margin: 0">Host mode active</h4>
-        <p style="margin: 4px 0 0 0">
-          Tasks run directly on your machine with your user's permissions.
-          Wallfacer cannot prevent an agent from writing outside the worktree.
-          Recommended only on trusted machines.
-        </p>
-      </div>
-    </div>
-
     <!-- Harness Configuration -->
     <div class="settings-card">
       <div class="settings-card-head">
@@ -454,7 +436,7 @@ function capitalize(s: string): string {
       <div style="display: flex; flex-direction: column; gap: 12px">
         <!-- Claude block -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Claude</label>
+          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="claude" :size="18" /></div>
 
           <div style="display: flex; flex-direction: column; gap: 12px">
             <div>
@@ -603,7 +585,7 @@ function capitalize(s: string): string {
 
         <!-- Codex block -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Codex</label>
+          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="codex" :size="18" /></div>
           <div style="display: flex; flex-direction: column; gap: 12px">
             <div>
               <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key (OPENAI_API_KEY)</label>
@@ -733,7 +715,7 @@ function capitalize(s: string): string {
 
         <!-- Cursor block -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Cursor</label>
+          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="cursor" :size="18" /></div>
           <div style="display: flex; flex-direction: column; gap: 12px">
             <div>
               <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key (CURSOR_API_KEY)</label>
@@ -780,7 +762,7 @@ function capitalize(s: string): string {
 
         <!-- Pi block -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Pi</label>
+          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="pi" :size="18" /></div>
           <div style="display: flex; flex-direction: column; gap: 12px">
             <div style="font-size: 11px; color: var(--text-muted)">
               The
@@ -815,7 +797,7 @@ function capitalize(s: string): string {
 
         <!-- OpenCode block -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">OpenCode</label>
+          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="opencode" :size="18" /></div>
           <div style="display: flex; flex-direction: column; gap: 12px">
             <div style="font-size: 11px; color: var(--text-muted)">
               The
