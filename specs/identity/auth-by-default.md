@@ -106,10 +106,11 @@ shape so further UI work has a target.
   account menu (identity, theme, sign out). Org selection in local mode is
   display-only and scopes nothing yet; what an org actually scopes (shared
   boards, RBAC) is owned by multi-user-collaboration, not here.
-- **Config surface (docs)**: user docs explain that `resolveAuthConfig` makes the
-  public "wallfacer" client the implicit default, the `AUTH_*` precedence
-  (explicit env / confidential client wins), and how to point at a different auth
-  service. This is the one concrete doc deliverable remaining.
+- **Config surface (docs)**: done. `docs/guide/configuration.md` "Account
+  Sign-In" documents the public "wallfacer" client default, the `AUTH_*` table
+  and precedence (explicit env / confidential client wins), and how to point at a
+  different auth service. `docs/cloud/README.md` was corrected to stop claiming
+  the sign-in surface is hidden in local mode.
 
 ## Non-Goals
 
