@@ -82,18 +82,19 @@ type RunnerConfig struct {
 	// mktemp path under /var/folders that macOS's tmp-reaper purges after a few
 	// idle days, which otherwise kills long-idle scheduled tasks with an opaque
 	// podman "--env-file ... no such file" exit 125. Empty disables the fallback.
-	DefaultEnvFile   string
-	Workspaces       []string // workspace directory paths
-	WorktreesDir     string
-	InstructionsPath string
-	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
-	HostClaudeBinary string           // optional override for the `claude` binary path
-	HostCodexBinary  string           // optional override for the `codex` binary path
-	HostCursorBinary string           // optional override for the `cursor-agent` binary path
-	TmpDir           string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
-	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
-	WorkspaceManager *workspace.Manager
-	Reg              *metrics.Registry // optional metrics registry; nil disables metric collection
+	DefaultEnvFile     string
+	Workspaces         []string // workspace directory paths
+	WorktreesDir       string
+	InstructionsPath   string
+	CodexAuthPath      string           // host path to codex auth cache directory (default: ~/.codex)
+	HostClaudeBinary   string           // optional override for the `claude` binary path
+	HostCodexBinary    string           // optional override for the `codex` binary path
+	HostCursorBinary   string           // optional override for the `cursor-agent` binary path
+	HostOpenCodeBinary string           // optional override for the `opencode` binary path
+	TmpDir             string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
+	Prompts            *prompts.Manager // prompt template manager; nil = use prompts.Default
+	WorkspaceManager   *workspace.Manager
+	Reg                *metrics.Registry // optional metrics registry; nil disables metric collection
 	// AgentsDir is the filesystem directory scanned for user-authored
 	// agent descriptors (*.yaml). Empty falls back to the default
 	// (~/.wallfacer/agents/). Missing dir is not an error — the
@@ -490,9 +491,10 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	// The run command fails fast separately via executor.RequireClaude, so the
 	// constructor stays usable for tests and env-config probing.
 	hb, _ := executor.NewHostBackend(executor.HostBackendConfig{
-		ClaudeBinary: cfg.HostClaudeBinary,
-		CodexBinary:  cfg.HostCodexBinary,
-		CursorBinary: cfg.HostCursorBinary,
+		ClaudeBinary:   cfg.HostClaudeBinary,
+		CodexBinary:    cfg.HostCodexBinary,
+		CursorBinary:   cfg.HostCursorBinary,
+		OpenCodeBinary: cfg.HostOpenCodeBinary,
 	})
 	r.backend = hb
 	r.hostMode = true
