@@ -361,9 +361,9 @@ func TestUpdateEnvConfig_EmptyCursorAPIKeyTreatedAsNoChange(t *testing.T) {
 		t.Fatalf("seed: expected 204, got %d: %s", fw.Code, fw.Body.String())
 	}
 
-	clear := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"cursor_api_key":""}`))
+	clearReq := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"cursor_api_key":""}`))
 	cw := httptest.NewRecorder()
-	h.UpdateEnvConfig(cw, clear)
+	h.UpdateEnvConfig(cw, clearReq)
 	if cw.Code != http.StatusNoContent {
 		t.Fatalf("clear: expected 204, got %d: %s", cw.Code, cw.Body.String())
 	}
