@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
-	"github.com/google/uuid"
 )
 
 // MockRunner is a lightweight test double that implements Interface. It records

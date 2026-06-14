@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // ---------------------------------------------------------------------------

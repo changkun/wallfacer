@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 const testSpecValidated = `---

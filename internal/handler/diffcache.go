@@ -4,9 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/pkg/cache"
-	"github.com/google/uuid"
 )
 
 // diffCacheEntry holds a pre-serialized diff response with cache metadata.

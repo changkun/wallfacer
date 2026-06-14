@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 	"latere.ai/x/wallfacer/internal/pkg/watcher"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // maxConcurrentTasks returns the configured parallel task limit. Per-group

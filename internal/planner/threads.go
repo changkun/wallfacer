@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
 // ThreadMeta describes a single planning chat thread.

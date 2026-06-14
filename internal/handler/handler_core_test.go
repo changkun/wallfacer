@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // TestSetAutopilot verifies that autopilot state can be toggled.

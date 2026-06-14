@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // containerSummary is a compact representation of a running container for the

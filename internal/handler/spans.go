@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // GetTaskSpans reads all events for a task, pairs span_start/span_end events

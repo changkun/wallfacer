@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestWorktreeConcurrency verifies that concurrent calls to setupWorktrees,

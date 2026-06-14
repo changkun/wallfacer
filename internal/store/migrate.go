@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
-	"github.com/google/uuid"
 )
 
 // migrateTaskJSON deserializes raw JSON into a Task and applies any

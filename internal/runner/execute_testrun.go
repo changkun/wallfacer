@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // finalizeTestRun handles the common path for a completed test-run agent turn:

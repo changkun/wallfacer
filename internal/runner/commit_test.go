@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // resolveTestCmd maps a non-absolute cmd (e.g. "echo") to its $PATH location

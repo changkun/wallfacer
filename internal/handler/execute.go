@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
@@ -17,7 +18,6 @@ import (
 	"latere.ai/x/wallfacer/internal/prompts"
 	runnerpkg "latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // closeFeedbackWaitingSpan emits a span_end event to close the feedback_waiting

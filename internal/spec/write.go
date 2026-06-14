@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"gopkg.in/yaml.v3"
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
 // UpdateFrontmatter updates specific fields in a spec file's YAML frontmatter

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/pkg/cache"
-	"github.com/google/uuid"
 )
 
 // TestNewDiffCache verifies that the constructor returns a non-nil cache.

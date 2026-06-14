@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
-	"github.com/google/uuid"
 )
 
 // TestStoreAccessorsRaceWithSnapshot exercises the worktree/board store

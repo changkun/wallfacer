@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/store"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestMockRunner_RunBackground_RecordsCalls verifies that RunBackground records

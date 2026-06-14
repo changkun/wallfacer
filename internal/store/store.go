@@ -8,11 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/envutil"
 	"latere.ai/x/wallfacer/internal/pkg/pubsub"
-	"github.com/google/uuid"
 )
 
 // indexedTaskText holds pre-lowercased searchable text for a single task.

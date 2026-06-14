@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/executor"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/executor"
 )
 
 func TestContainerRegistry_SetGetDelete(t *testing.T) {

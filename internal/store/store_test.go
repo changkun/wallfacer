@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 func TestNewStore_EmptyDir(t *testing.T) {

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/planner"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // seedPlanningCommit stages all changes under specs/ and creates a

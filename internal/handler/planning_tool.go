@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 // UpdateTaskPromptTool handles POST /api/planning/tool/update_task_prompt.

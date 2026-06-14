@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/planner"
-	"github.com/google/uuid"
 )
 
 // isTaskLockedByPlanner reports whether any task-mode planning thread currently

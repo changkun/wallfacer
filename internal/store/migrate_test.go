@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
-	"github.com/google/uuid"
 )
 
 // buildMinimalTaskJSON creates a minimal valid task JSON for migration testing.
