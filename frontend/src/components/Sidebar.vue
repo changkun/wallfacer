@@ -345,7 +345,7 @@ watch(wsPopoverOpen, (open) => {
         </span>
       </a>
       <a
-        v-else-if="authEnabled && auth.loaded && !auth.me && store.config?.workspaces"
+        v-else-if="authEnabled && auth.loaded && !auth.me"
         class="sb-account sb-account--signin"
         href="/login"
       >
