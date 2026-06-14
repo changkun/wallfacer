@@ -49,12 +49,12 @@ stateDiagram-v2
 | State | Description |
 |---|---|
 | `backlog` | Queued, not yet started |
-| `in_progress` | Container running, agent executing |
+| `in_progress` | Host process running, agent executing |
 | `waiting` | Claude paused mid-task, awaiting user feedback |
 | `committing` | Transient: commit pipeline running after mark-done |
 | `done` | Completed; changes committed and merged |
-| `failed` | Container error, Claude error, timeout, or budget exceeded |
-| `cancelled` | Explicitly cancelled; sandbox cleaned up, history preserved |
+| `failed` | Process error, Claude error, timeout, or budget exceeded |
+| `cancelled` | Explicitly cancelled; worktree cleaned up, history preserved |
 
 **Note:** `archived` is a boolean flag (`Archived bool`) on the task, not a separate state. Tasks in `done` or `cancelled` state can have `Archived = true`, which moves them to the Archived column in the UI. The state machine has exactly 7 states (`backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`).
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 Each pass through the loop in `runner.go` `Run()`:
 
 1. Increment turn counter
-2. Run container with current prompt and session ID
+2. Exec the selected CLI as a host process with the current prompt and session ID, using the task's git worktree as CWD
 3. Save raw stdout to `data/<uuid>/outputs/turn-NNNN.json`; stderr (if any) to `turn-NNNN.stderr.txt`
 4. Parse `stop_reason` from agent JSON output:
 
@@ -89,7 +89,7 @@ Setting `FreshStart = true` on a task skips `--resume`, starting a brand-new ses
 
 When `stop_reason` is empty, Claude has asked a question or is blocked. The task enters `waiting`:
 
-- Worktrees are **not** cleaned up — the git branch is preserved
+- Worktrees are **not** cleaned up, the git branch is preserved
 - User submits feedback via `POST /api/tasks/{id}/feedback`
 - Handler writes a `feedback` event to the trace log, then launches a new `runner.Run` goroutine using the existing session ID
 - The task resumes from exactly where it paused, with the feedback message as the next prompt
@@ -100,10 +100,10 @@ Alternatively, the user can mark the task done from `waiting`, which skips furth
 
 Any task in `backlog`, `in_progress`, `waiting`, or `failed` can be cancelled via `PATCH /api/tasks/{id}` with `{"status": "cancelled"}`. The handler:
 
-1. **Kills the container** (if `in_progress`) — sends `<runtime> kill wallfacer-<uuid>`. The running goroutine detects the cancelled status and exits without overwriting it to `failed`.
-2. **Cleans up worktrees** — removes the git worktree and deletes the task branch, discarding all prepared changes.
+1. **Kills the host process** (if `in_progress`). Sends `SIGTERM`, escalating to `SIGKILL` after 5 s if the process is still running (`internal/executor/host.go`). The running goroutine detects the cancelled status and exits without overwriting it to `failed`.
+2. **Cleans up worktrees**, removes the git worktree and deletes the task branch, discarding all prepared changes.
 3. **Sets status to `cancelled`** and appends a `state_change` event.
-4. **Preserves history** — `data/<uuid>/traces/` and `data/<uuid>/outputs/` are left intact so execution logs, token usage, and the event timeline remain visible.
+4. **Preserves history**, `data/<uuid>/traces/` and `data/<uuid>/outputs/` are left intact so execution logs, token usage, and the event timeline remain visible.
 
 From `cancelled`, the user can retry the task (moves it back to `backlog`) to restart from scratch.
 
@@ -116,7 +116,7 @@ When a task transitions to `failed`, the runner classifies the failure into one 
 | `timeout` | Per-turn timeout exceeded |
 | `budget_exceeded` | Cost or token budget limit reached |
 | `worktree_setup` | Git worktree creation failed |
-| `container_crash` | Container exited unexpectedly |
+| `container_crash` | Host process exited unexpectedly (legacy category name) |
 | `agent_error` | Agent reported an error in its output |
 | `sync_error` | Rebase/sync operation failed |
 | `unknown` | Unclassifiable failure |
@@ -155,53 +155,11 @@ The list is capped at `DefaultRetryHistoryLimit` (10) entries. This allows opera
 
 ## Title Generation
 
-When a task is created, a background goroutine (`runner.GenerateTitle`) launches a lightweight container to generate a short title from the prompt. Titles are stored on the task and displayed on the board cards instead of the full prompt text. `POST /api/tasks/generate-titles` can retroactively generate titles for older untitled tasks.
+When a task is created, a background goroutine (`runner.GenerateTitle`) runs a lightweight host process to generate a short title from the prompt. Titles are stored on the task and displayed on the board cards instead of the full prompt text. `POST /api/tasks/generate-titles` can retroactively generate titles for older untitled tasks.
 
 ## Prompt Refinement
 
-Before running a task, users can have an AI agent analyse the codebase and produce a detailed implementation spec (the refined prompt). Only `backlog` tasks can be refined.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Handler
-    participant Runner
-    participant Container
-
-    User->>Handler: POST /api/tasks/{id}/refine
-    Handler->>Runner: RunRefinementBackground()
-    Handler-->>User: 202 Accepted
-
-    User->>Handler: GET /api/tasks/{id}/refine/logs (SSE)
-    Runner->>Container: Launch sandbox
-    Container-->>Handler: Stream output
-    Handler-->>User: SSE events
-
-    alt Container succeeds
-        Container-->>Runner: Result = spec
-        Runner->>Runner: Status = "done"
-    else Container fails
-        Container-->>Runner: Error
-        Runner->>Runner: Status = "failed"
-    end
-
-    alt User applies
-        User->>Handler: POST /api/tasks/{id}/refine/apply
-        Handler->>Handler: Save RefinementSession
-        Handler->>Handler: Move Prompt to PromptHistory
-        Handler->>Handler: Set Prompt = spec
-        Handler->>Runner: Trigger title regeneration
-    else User dismisses
-        User->>Handler: POST /api/tasks/{id}/refine/dismiss
-        Handler->>Handler: Clear CurrentRefinement
-    else User cancels
-        User->>Handler: DELETE /api/tasks/{id}/refine
-        Handler->>Container: Kill container
-        Handler->>Handler: Status = "failed"
-    end
-```
-
-Both `RefineSessions []RefinementSession` (past history) and `CurrentRefinement *RefinementJob` (present job) live on the Task struct. `RefineSessions` grows over time as each refinement is applied (capped at `DefaultRefineSessionsLimit` = 5); `CurrentRefinement` is replaced on each new run and cleared on dismiss.
+Prompt refinement is the Plan task-mode chat. There are no dedicated refine routes or background refinement jobs. The Plan agent converses with the user about the task, and when both agree on an improved prompt the agent calls the `update_task_prompt` tool, which the console forwards as `POST /api/planning/tool/update_task_prompt` (`internal/handler/planning_tool.go`). The handler moves the prior prompt into history and sets the task's prompt to the new text. See [Plan Mode](plan-mode.md) for the task-mode chat flow.
 
 ## Test Verification
 
@@ -213,10 +171,10 @@ POST /api/tasks/{id}/test
   ↓
   Sets IsTestRun = true, clears LastTestResult.
   Transitions waiting → in_progress.
-  Launches a fresh container (separate session, no --resume) with a test prompt.
+  Launches a fresh host process (separate session, no --resume) with a test prompt.
 
 Test agent runs (IsTestRun = true):
-  Container executes: inspect code, run tests, verify requirements.
+  Process executes: inspect code, run tests, verify requirements.
   Agent must end its response with **PASS** or **FAIL**.
 
 On end_turn:
@@ -239,9 +197,9 @@ See [Automation](automation.md).
 
 ## Board Context
 
-Each container receives a read-only `board.json` at `/workspace/.tasks/board.json` containing a manifest of all non-archived tasks. The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn.
+Before each turn the runner writes a `board.json` manifest of all non-archived tasks to a host directory (the BoardDir) and passes its path to the agent via the `WALLFACER_BOARD_JSON` environment variable (`internal/runner/{container.go,execute.go}` `writeBoardDir`). The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn.
 
-When `MountWorktrees` is enabled on a task, eligible sibling worktrees are also mounted read-only at `/workspace/.tasks/worktrees/<short-id>/<repo>/`.
+When `MountWorktrees` is enabled on a task, eligible sibling worktree paths are written to a sibling manifest in the same BoardDir and surfaced to the agent via `WALLFACER_SIBLING_WORKTREES_JSON`.
 
 ## Data Models
 
@@ -253,21 +211,21 @@ See [Data & Storage](data-and-storage.md).
 
 ## Crash Recovery
 
-On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It first queries the container runtime to determine which containers are still running, then handles each interrupted task as follows:
+On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It first calls the backend's `ListContainers` through the `ContainerLister` interface to determine which task processes are still running (for HostBackend this enumerates host processes, not `podman/docker ps`), then handles each interrupted task as follows:
 
-| Previous status | Container state | Recovery action |
+| Previous status | Process state | Recovery action |
 |---|---|---|
 | `committing` | any | Inspect worktree: if commit landed after `UpdatedAt` → `done`; otherwise → `failed` |
-| `in_progress` | still running | Stay `in_progress`; a monitor goroutine watches the container and transitions to `waiting` once it stops |
-| `in_progress` | already stopped | → `waiting` — user can review partial output, provide feedback, or mark as done |
+| `in_progress` | still running | Stay `in_progress`; a monitor goroutine watches the process and transitions to `waiting` once it stops |
+| `in_progress` | already stopped | → `waiting`, user can review partial output, provide feedback, or mark as done |
 
 If worktrees are missing during recovery, the task is marked `failed` with `FailureCategory = worktree_setup`.
 
-**Why `waiting` instead of `failed` for stopped containers?**
+**Why `waiting` instead of `failed` for stopped processes?**
 The task may have produced useful partial output. Moving to `waiting` lets the user inspect results and choose the next action (resume with feedback, mark as done, or cancel) rather than forcing a retry from scratch.
 
 **Monitor goroutine** (`monitorContainerUntilStopped`):
-When a container is found still running after a restart, a background goroutine polls `podman/docker ps` every 5 seconds. Once the container stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.
+When a task process is found still running after a restart, a background goroutine polls the backend's `ListContainers` (host-process enumeration under HostBackend) every 5 seconds. Once the process stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.
 
 ## Oversight Generation
 
@@ -307,7 +265,7 @@ Tasks can declare dependencies on other tasks via `DependsOn []string` (a list o
 
 ### DAG Validation in Batch Create
 
-`POST /api/tasks/batch` (`Handler.BatchCreateTasks` in `internal/handler/tasks.go`) performs comprehensive DAG validation before creating any tasks. The entire validation phase has zero side effects — if any check fails, no tasks are created.
+`POST /api/tasks/batch` (`Handler.BatchCreateTasks` in `internal/handler/tasks.go`) performs comprehensive DAG validation before creating any tasks. The entire validation phase has zero side effects, if any check fails, no tasks are created.
 
 #### Step-by-Step Validation
 
@@ -358,7 +316,7 @@ Tasks are created in topological order (from the Kahn's sort output), so each ta
 
 ### Single-Task Dependency Update
 
-`PATCH /api/tasks/{id}` with a `depends_on` field calls `UpdateTaskDependsOn`, which stores the list via `mutateTask`. No cycle detection is performed on single-task updates — the caller is responsible for ensuring validity.
+`PATCH /api/tasks/{id}` with a `depends_on` field calls `UpdateTaskDependsOn`, which stores the list via `mutateTask`. No cycle detection is performed on single-task updates, the caller is responsible for ensuring validity.
 
 ### Dependency Satisfaction Check
 
@@ -382,8 +340,8 @@ Conservative semantics: a malformed UUID or a deleted dependency is treated as u
 The auto-promoter (`tryAutoPromote` in `internal/handler/tasks_autopilot.go`) checks dependencies as part of candidate selection:
 
 1. Lists all backlog tasks sorted by position.
-2. For each candidate, calls `AreDependenciesSatisfied` — skips if any dependency is not `done`.
-3. Also checks `ScheduledAt` — skips if the scheduled time is in the future.
+2. For each candidate, calls `AreDependenciesSatisfied`, skips if any dependency is not `done`.
+3. Also checks `ScheduledAt`, skips if the scheduled time is in the future.
 4. Promotes the highest-priority eligible candidate.
 
 ---
@@ -394,7 +352,7 @@ Board context gives each running agent visibility into sibling tasks on the boar
 
 ### What Board Context Contains
 
-The board context is a `BoardManifest` JSON file written to `/workspace/.tasks/board.json` inside each task container:
+The board context is a `BoardManifest` JSON file written to a host BoardDir and handed to the agent by path via `WALLFACER_BOARD_JSON` (see [Board Context](#board-context) above):
 
 ```go
 type BoardManifest struct {
@@ -419,7 +377,7 @@ Each `BoardTask` entry includes:
 | `stop_reason` | Last stop reason |
 | `usage` | Token/cost usage |
 | `branch_name` | Git branch name |
-| `worktree_mount` | Container-side mount path (if eligible) |
+| `worktree_mount` | Sibling worktree path exposed to the agent (if eligible) |
 | `created_at` / `updated_at` | Timestamps |
 
 `SessionID` is deliberately excluded from `BoardTask` to prevent session hijacking between tasks.
@@ -442,7 +400,7 @@ Results are cached by `(boardChangeSeq, selfTaskID)`. The cache is invalidated w
 
 ### Worktree Mounts
 
-When `MountWorktrees` is enabled, eligible sibling worktrees are mounted read-only inside the container at `/workspace/.tasks/worktrees/<short-id>/<repo-basename>/`. Mount eligibility is determined by `canMountWorktree`:
+When `MountWorktrees` is enabled, eligible sibling worktree paths are written to a sibling manifest in the BoardDir and surfaced to the agent via `WALLFACER_SIBLING_WORKTREES_JSON`. Eligibility is determined by `canMountWorktree`:
 
 - `waiting` or `failed` tasks: always eligible.
 - `done` tasks: eligible only if at least one worktree directory still exists on disk.
@@ -450,8 +408,8 @@ When `MountWorktrees` is enabled, eligible sibling worktrees are mounted read-on
 
 ### API Endpoints
 
-- `GET /api/tasks/{id}/board` — Returns the `BoardManifest` as it appears to a specific task (with that task marked `is_self: true`).
-- `GET /api/debug/board` — Returns the `BoardManifest` as seen by a hypothetical new task (no task marked as self, `selfTaskID` = `uuid.Nil`).
+- `GET /api/tasks/{id}/board`, Returns the `BoardManifest` as it appears to a specific task (with that task marked `is_self: true`).
+- `GET /api/debug/board`, Returns the `BoardManifest` as seen by a hypothetical new task (no task marked as self, `selfTaskID` = `uuid.Nil`).
 
 ---
 
@@ -463,9 +421,9 @@ See [Data & Storage](data-and-storage.md).
 
 ## See Also
 
-- [Internals Index](internals.md) — Overview and reading order for all internals docs
-- [Architecture](architecture.md) — System design, component overview, and design decisions
-- [Data & Storage](data-and-storage.md) — Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
-- [Automation](automation.md) — Autopilot, oversight generation, ideation agent
-- [Git Worktrees](git-worktrees.md) — Worktree lifecycle, branch naming, cleanup
-- [API & Transport](api-and-transport.md) — HTTP routes, SSE, metrics, middleware
+- [Internals Index](internals.md), Overview and reading order for all internals docs
+- [Architecture](architecture.md), System design, component overview, and design decisions
+- [Data & Storage](data-and-storage.md), Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
+- [Automation](automation.md), Autopilot, oversight generation, ideation agent
+- [Git Worktrees](git-worktrees.md), Worktree lifecycle, branch naming, cleanup
+- [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware
