@@ -39,14 +39,13 @@ type IndexViewData struct {
 	ServerAPIKey string
 }
 
-// ServerConfig holds the parsed flag values shared by RunServer and RunDesktop.
+// ServerConfig holds the parsed flag values for RunServer.
 // Each field corresponds to a CLI flag or environment variable override.
 type ServerConfig struct {
 	LogFormat string
 	Addr      string
 	DataDir   string
 	EnvFile   string
-	SkipCSRF  bool // Desktop mode: requests come from the local WebView, not a browser.
 }
 
 // ServerComponents holds the initialized server components returned by initServer.
@@ -376,20 +375,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist, cloudMode)
 
-	if cfg.SkipCSRF {
-		// Desktop mode: the Wails asset server reverse-proxies HTTP requests
-		// but cannot forward WebSocket upgrades. Expose the real server port
-		// so the frontend JS can open WebSocket connections directly.
-		portStr := strconv.Itoa(actualPort)
-		mux.HandleFunc("GET /api/desktop-port", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "text/plain")
-			_, _ = w.Write([]byte(portStr))
-		})
-	}
-
 	// Middleware stack (outermost first): logging → CSRF → CookiePrincipal
 	//   → JWT OptionalAuth → bearer auth → mux.
-	// Desktop mode skips CSRF because requests originate from the local WebView.
 	// Both identity paths converge on the same *Claims context key: JWT wins
 	// when a Bearer header is present (OptionalAuth runs first, downstream
 	// from the cookie bridge), the cookie bridge fills in when no Bearer
@@ -400,9 +387,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
 	srvHandler = auth.CookiePrincipal(authClient, jwtValidator, srvHandler)
-	if !cfg.SkipCSRF {
-		srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
-	}
+	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	srv := &http.Server{
 		Handler:     loggingMiddleware(srvHandler, reg),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },

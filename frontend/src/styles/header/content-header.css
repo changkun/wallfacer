@@ -6,17 +6,8 @@
   padding: 6px 16px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
-  --wails-draggable: drag;
 }
 
-/* Interactive elements must not be draggable. */
-.app-header button,
-.app-header input,
-.app-header a,
-.app-header select,
-.app-header [role="button"] {
-  --wails-draggable: no-drag;
-}
 /* Spacer takes the place of the old workspace-group-tabs div so the search
    and action buttons stay right-aligned. */
 .app-header__spacer {

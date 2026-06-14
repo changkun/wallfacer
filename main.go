@@ -18,24 +18,15 @@ var docsFiles embed.FS // docsFiles holds the user-facing documentation served a
 func main() {
 	configDir := cli.ConfigDir()
 
-	// Determine the subcommand. When no arguments are given (e.g., launched
-	// from Finder/desktop), default to "desktop" if the desktop build tag is
-	// active, otherwise print usage.
-	subcmd := ""
-	if len(os.Args) >= 2 {
-		subcmd = os.Args[1]
+	// Determine the subcommand. When no arguments are given, print usage.
+	if len(os.Args) < 2 {
+		cli.PrintUsage()
+		os.Exit(1)
 	}
-	// macOS passes -psn_<pid> (process serial number) when launching a .app
-	// bundle from Finder. Strip any dash-prefixed arg that isn't a help flag
-	// so the app falls through to the default subcommand (desktop mode).
-	if len(subcmd) > 0 && subcmd[0] == '-' && subcmd != "-help" && subcmd != "--help" && subcmd != "-h" {
-		subcmd = ""
-	}
-	// Remaining args after the subcommand (empty when launched without args).
+	subcmd := os.Args[1]
+	// Remaining args after the subcommand.
 	var args []string
-	if subcmd == "" {
-		subcmd = cli.DefaultSubcommand()
-	} else if len(os.Args) > 2 {
+	if len(os.Args) > 2 {
 		args = os.Args[2:]
 	}
 
@@ -46,11 +37,6 @@ func main() {
 		cli.RunDoctor(configDir, args)
 	case "run":
 		cli.RunServer(configDir, args, vueDist, docsFiles)
-	case "desktop":
-		if err := cli.RunDesktop(configDir, args, vueDist, docsFiles); err != nil {
-			fmt.Fprintln(os.Stderr, "wallfacer:", err)
-			os.Exit(1)
-		}
 	case "status":
 		cli.RunStatus(configDir, args)
 	case "spec":

@@ -833,45 +833,6 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 	sc.Shutdown()
 }
 
-// TestInitServer_SkipCSRF verifies that initServer with SkipCSRF registers
-// the desktop-port endpoint and serves the actual port number.
-func TestInitServer_SkipCSRF(t *testing.T) {
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	sc := initServer(configDir, ServerConfig{
-		LogFormat: "text",
-		Addr:      ":0",
-		DataDir:   filepath.Join(configDir, "data"),
-		EnvFile:   envFile,
-		SkipCSRF:  true,
-	}, testFS(t), testFS(t))
-	defer sc.Shutdown()
-
-	if sc.ActualPort == 0 {
-		t.Fatal("expected non-zero port")
-	}
-
-	// Start the server and verify the desktop-port endpoint responds.
-	go func() { _ = sc.Srv.Serve(sc.Ln) }()
-
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/desktop-port", sc.ActualPort))
-	if err != nil {
-		t.Fatalf("GET /api/desktop-port: %v", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/desktop-port: status %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), fmt.Sprintf("%d", sc.ActualPort)) {
-		t.Fatalf("expected port number in response, got %q", string(body))
-	}
-}
-
 // TestGauge_TasksTotal validates the Prometheus gauge that counts tasks by
 // status and archived flag.
 func TestGauge_TasksTotal(t *testing.T) {
