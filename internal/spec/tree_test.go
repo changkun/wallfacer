@@ -25,6 +25,45 @@ func writeTestSpec(t *testing.T, specsDir, relPath, content string) {
 	}
 }
 
+func TestBuildTree_TopLevelLooseSpec(t *testing.T) {
+	specsDir := filepath.Join(t.TempDir(), "specs")
+	// A loose spec directly under specs/, not inside any track folder.
+	writeTestSpec(t, specsDir, "loose.md", makeSpec("Loose", ""))
+	// A normal spec inside a track folder still works.
+	writeTestSpec(t, specsDir, "local/foo.md", makeSpec("Foo", "local"))
+	// A top-level README.md must be ignored, not parsed as a spec.
+	writeTestSpec(t, specsDir, "README.md", "# Specs\n\nnot a spec\n")
+
+	tree, err := BuildTree(specsDir)
+	if err != nil {
+		t.Fatalf("BuildTree: %v", err)
+	}
+	if len(tree.Errs) != 0 {
+		t.Fatalf("unexpected errors: %v", tree.Errs)
+	}
+
+	loose, ok := tree.NodeAt("specs/loose.md")
+	if !ok {
+		t.Fatal("loose top-level spec is missing from the tree")
+	}
+	if loose.Value.Track != "" {
+		t.Errorf("loose spec Track = %q, want empty (no track)", loose.Value.Track)
+	}
+	if !loose.IsLeaf {
+		t.Error("loose spec should be a leaf root")
+	}
+
+	if foo, ok := tree.NodeAt("specs/local/foo.md"); !ok {
+		t.Error("track spec specs/local/foo.md is missing")
+	} else if foo.Value.Track != "local" {
+		t.Errorf("foo Track = %q, want local", foo.Value.Track)
+	}
+
+	if _, ok := tree.NodeAt("specs/README.md"); ok {
+		t.Error("README.md must not be added to the tree")
+	}
+}
+
 func TestBuildTree_SingleSpec(t *testing.T) {
 	specsDir := filepath.Join(t.TempDir(), "specs")
 	writeTestSpec(t, specsDir, "local/solo.md", makeSpec("Solo", "local"))

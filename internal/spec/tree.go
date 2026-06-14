@@ -34,25 +34,23 @@ func (t *Tree) ByTrack(track string) []*Node {
 // BuildTree walks the specs directory and assembles the spec tree.
 // The specsDir should be the path to the top-level specs/ directory.
 // Parse errors are collected in Tree.Errs rather than aborting the build.
+//
+// Specs are freeform: a spec may live as a loose .md file directly under
+// specs/ (no track) or inside a (possibly nested) track folder. Both appear
+// in the tree; the only top-level file excluded is README.md (the index).
 func BuildTree(specsDir string) (*Tree, error) {
 	tree := &Tree{Tree: gentree.New[string, *Spec]()}
 
-	entries, err := os.ReadDir(specsDir)
-	if err != nil {
+	if _, err := os.ReadDir(specsDir); err != nil {
 		if os.IsNotExist(err) {
 			return tree, nil
 		}
 		return nil, fmt.Errorf("read specs dir: %w", err)
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		trackDir := filepath.Join(specsDir, entry.Name())
-		errs := scanDir(tree, trackDir, specsDir, nil)
-		tree.Errs = append(tree.Errs, errs...)
-	}
+	// Scan specs/ as a single directory: scanDir handles loose .md files,
+	// matching child folders, and orphan track folders uniformly.
+	tree.Errs = append(tree.Errs, scanDir(tree, specsDir, specsDir, nil)...)
 
 	return tree, nil
 }
@@ -72,6 +70,9 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
+		}
+		if e.Name() == "README.md" {
+			continue // index/readme, not a spec
 		}
 		base := strings.TrimSuffix(e.Name(), ".md")
 		mdFiles[base] = filepath.Join(dir, e.Name())

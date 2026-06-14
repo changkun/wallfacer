@@ -158,7 +158,9 @@ const renderedTracks = computed<RenderedTrack[]>(() => {
   const groups: Record<string, SpecNode[]> = {};
   for (const node of tree.value) {
     if (node.depth !== 0) continue;
-    const track = node.spec?.track ?? 'other';
+    // Loose top-level specs (no folder) carry an empty track; group them
+    // under "other" so they still render rather than under a blank header.
+    const track = node.spec?.track || 'other';
     if (!groups[track]) {
       groups[track] = [];
       trackOrder.push(track);
