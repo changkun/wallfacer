@@ -27,8 +27,8 @@ var skipDirs = map[string]bool{
 // Paths are prefixed with the workspace base name (matching the /workspace/<name>/
 // mount path inside containers), making them directly usable in task prompts.
 // Results are served from a per-workspace cache; see fileIndex for invalidation policy.
-func (h *Handler) GetFiles(w http.ResponseWriter, _ *http.Request) {
-	workspaces := h.currentWorkspaces()
+func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
+	workspaces := h.visibleWorkspaces(r.Context())
 	files := make([]string, 0, 256)
 
 	for _, ws := range workspaces {

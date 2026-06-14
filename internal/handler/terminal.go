@@ -235,7 +235,7 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	cols := parseIntParam(r, "cols", 80)
 	rows := parseIntParam(r, "rows", 24)
 	cwd := r.URL.Query().Get("cwd")
-	cwd = h.resolveTerminalCwd(cwd)
+	cwd = h.resolveTerminalCwd(r.Context(), cwd)
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true, // Origin check not needed; same-host dev tool.
@@ -478,8 +478,8 @@ func (s *terminalSession) cleanup() {
 
 // resolveTerminalCwd validates the requested cwd against active workspaces.
 // Falls back to the first workspace, or os.TempDir() if none configured.
-func (h *Handler) resolveTerminalCwd(cwd string) string {
-	workspaces := h.currentWorkspaces()
+func (h *Handler) resolveTerminalCwd(ctx context.Context, cwd string) string {
+	workspaces := h.visibleWorkspaces(ctx)
 
 	if cwd != "" {
 		abs, err := filepath.Abs(cwd)

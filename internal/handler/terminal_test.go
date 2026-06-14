@@ -872,7 +872,7 @@ func TestTerminalWS_CwdValidation(t *testing.T) {
 
 	// The cwd query param was invalid, so the shell should start in the
 	// first workspace. Verify by checking resolveTerminalCwd directly.
-	resolved := h.resolveTerminalCwd("/nonexistent/path")
+	resolved := h.resolveTerminalCwd(context.Background(), "/nonexistent/path")
 	if resolved != workspaces[0] {
 		t.Errorf("resolveTerminalCwd returned %q; want %q", resolved, workspaces[0])
 	}
