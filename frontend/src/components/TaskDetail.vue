@@ -189,6 +189,14 @@ async function fetchResults() {
   }
 }
 
+// A turn entry needs the collapsible <details> chrome only when its summary
+// would show something: a Plan badge, or a "Turn N" label (multi-turn). A
+// single, non-plan turn has an empty summary, so we render its content flat
+// (no clickable empty box + stray triangle).
+function isCollapsible(entry: ResultEntry, list: ResultEntry[]): boolean {
+  return entry.type === 'plan' || list.length > 1;
+}
+
 function copyResult(entry: ResultEntry) {
   void navigator.clipboard.writeText(entry.text);
   toast.push('Copied to clipboard', { kind: 'success', timeout: 2000 });
@@ -1016,66 +1024,72 @@ const isArchived = computed(() => !!props.task.archived);
                 </div>
 
                 <!-- EVENTS tab -->
-                <div data-main-tab-section="events">
-                  <h3 class="section-title">Events</h3>
-                  <div v-if="eventsLoading" class="text-xs text-v-muted mb-4">Loading events…</div>
-                  <div v-else-if="!visibleEvents.length" class="text-xs text-v-muted mb-4">No events recorded.</div>
-                  <ul v-else class="event-list mb-4">
-                    <li
-                      v-for="e in visibleEvents"
-                      :key="e.id"
-                      class="event-row"
-                      :data-event-type="e.event_type"
-                    >
-                      <span class="event-row__type">{{ e.event_type }}</span>
-                      <span class="event-row__summary">{{ eventSummary(e) }}</span>
-                      <span class="event-row__time">{{ timeStr(e.created_at) }}</span>
-                    </li>
-                  </ul>
+                <div data-main-tab-section="events" class="ta-events">
+                  <section class="ta-events__sec">
+                    <h3 class="ta-events__h">Events</h3>
+                    <div v-if="eventsLoading" class="text-xs text-v-muted">Loading events…</div>
+                    <div v-else-if="!visibleEvents.length" class="text-xs text-v-muted">No events recorded.</div>
+                    <ul v-else class="event-list">
+                      <li
+                        v-for="e in visibleEvents"
+                        :key="e.id"
+                        class="event-row"
+                        :data-event-type="e.event_type"
+                      >
+                        <span class="event-row__type">{{ e.event_type }}</span>
+                        <span class="event-row__summary">{{ eventSummary(e) }}</span>
+                        <span class="event-row__time">{{ timeStr(e.created_at) }}</span>
+                      </li>
+                    </ul>
+                  </section>
 
-                  <h3 class="section-title">Usage</h3>
-                  <div class="usage-grid mb-4">
-                    <div class="flex justify-between">
-                      <span class="usage-label">Input tokens</span>
-                      <span class="usage-value">{{ tokenCount(task.usage?.input_tokens) }}</span>
+                  <section class="ta-events__sec">
+                    <h3 class="ta-events__h">Usage</h3>
+                    <div class="ta-stat-grid">
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Input tokens</span>
+                        <span class="ta-stat__value">{{ tokenCount(task.usage?.input_tokens) }}</span>
+                      </div>
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Output tokens</span>
+                        <span class="ta-stat__value">{{ tokenCount(task.usage?.output_tokens) }}</span>
+                      </div>
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Cache read</span>
+                        <span class="ta-stat__value">{{ tokenCount(task.usage?.cache_read_input_tokens) }}</span>
+                      </div>
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Cache creation</span>
+                        <span class="ta-stat__value">{{ tokenCount(task.usage?.cache_creation_input_tokens) }}</span>
+                      </div>
+                      <div class="ta-stat ta-stat--total">
+                        <span class="ta-stat__label">Total cost</span>
+                        <span class="ta-stat__value">{{ costDisplay }}</span>
+                      </div>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="usage-label">Output tokens</span>
-                      <span class="usage-value">{{ tokenCount(task.usage?.output_tokens) }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="usage-label">Cache read</span>
-                      <span class="usage-value">{{ tokenCount(task.usage?.cache_read_input_tokens) }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="usage-label">Cache creation</span>
-                      <span class="usage-value">{{ tokenCount(task.usage?.cache_creation_input_tokens) }}</span>
-                    </div>
-                    <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;">
-                      <span class="usage-label">Total cost</span>
-                      <span class="usage-value">{{ costDisplay }}</span>
-                    </div>
-                  </div>
+                  </section>
 
-                  <h3 class="section-title">Timeline</h3>
-                  <div class="usage-grid">
-                    <div class="flex justify-between">
-                      <span class="usage-label">Created</span>
-                      <span class="usage-value">{{ timeStr(task.created_at) }}</span>
+                  <section class="ta-events__sec">
+                    <h3 class="ta-events__h">Timeline</h3>
+                    <div class="ta-stat-grid">
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Created</span>
+                        <span class="ta-stat__value">{{ timeStr(task.created_at) }}</span>
+                      </div>
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Updated</span>
+                        <span class="ta-stat__value">{{ timeStr(task.updated_at) }}</span>
+                      </div>
+                      <div class="ta-stat">
+                        <span class="ta-stat__label">Turns</span>
+                        <span class="ta-stat__value">{{ task.turns ?? 0 }}</span>
+                      </div>
                     </div>
-                    <div class="flex justify-between">
-                      <span class="usage-label">Updated</span>
-                      <span class="usage-value">{{ timeStr(task.updated_at) }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="usage-label">Turns</span>
-                      <span class="usage-value">{{ task.turns ?? 0 }}</span>
-                    </div>
-                  </div>
+                  </section>
 
                   <!-- Per-sub-agent usage breakdown -->
-                  <template v-if="usageBreakdown.length">
-                    <h3 class="section-title" style="margin-top: 16px;">Usage by agent</h3>
+                  <section v-if="usageBreakdown.length" class="ta-events__sec">
+                    <h3 class="ta-events__h">Usage by agent</h3>
                     <table class="usage-breakdown">
                       <thead>
                         <tr><th>Agent</th><th>In</th><th>Out</th><th>Cost</th></tr>
@@ -1089,11 +1103,11 @@ const isArchived = computed(() => !!props.task.archived);
                         </tr>
                       </tbody>
                     </table>
-                  </template>
+                  </section>
 
                   <!-- Retry history (past retired attempts) -->
-                  <template v-if="retryHistory.length">
-                    <h3 class="section-title" style="margin-top: 16px;">Retry history</h3>
+                  <section v-if="retryHistory.length" class="ta-events__sec">
+                    <h3 class="ta-events__h">Retry history</h3>
                     <div v-for="(r, i) in retryHistory" :key="i" class="retry-record">
                       <div class="retry-record__head">
                         <span class="badge" :class="badgeClassFor(r.status)">{{ r.status }}</span>
@@ -1105,16 +1119,16 @@ const isArchived = computed(() => !!props.task.archived);
                         <pre>{{ r.result }}</pre>
                       </details>
                     </div>
-                  </template>
+                  </section>
 
                   <!-- Prompt history (prior iterations) -->
-                  <template v-if="promptHistory.length">
-                    <h3 class="section-title" style="margin-top: 16px;">Prompt history</h3>
+                  <section v-if="promptHistory.length" class="ta-events__sec">
+                    <h3 class="ta-events__h">Prompt history</h3>
                     <details v-for="(p, i) in promptHistory" :key="i" class="prompt-record">
                       <summary>#{{ i + 1 }}</summary>
                       <pre>{{ p }}</pre>
                     </details>
-                  </template>
+                  </section>
                 </div>
 
                 <!-- RESULTS tab (multi-turn) -->
@@ -1126,30 +1140,43 @@ const isArchived = computed(() => !!props.task.archived);
                     <template v-if="implResults.length">
                       <h3 class="section-title">Implementation</h3>
                       <!-- Newest turn expanded; older turns collapse into
-                           <details> (mirrors ui/js/modal-results.js). -->
-                      <details
-                        v-for="(entry, idx) in implResults"
-                        :key="`impl-${entry.turn}`"
-                        class="result-entry"
-                        :open="idx === 0"
-                      >
-                        <summary class="result-entry-summary">
-                          <div class="result-entry-labels">
-                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
-                            <span v-if="implResults.length > 1" class="result-turn-label">Turn {{ entry.turn }}</span>
+                           <details> (mirrors ui/js/modal-results.js). A single
+                           non-plan turn has no labels, so it renders flat -->
+                      <template v-for="(entry, idx) in implResults" :key="`impl-${entry.turn}`">
+                        <details
+                          v-if="isCollapsible(entry, implResults)"
+                          class="result-entry"
+                          :open="idx === 0"
+                        >
+                          <summary class="result-entry-summary">
+                            <div class="result-entry-labels">
+                              <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
+                              <span v-if="implResults.length > 1" class="result-turn-label">Turn {{ entry.turn }}</span>
+                            </div>
+                          </summary>
+                          <div class="result-entry-actions flex items-center gap-1.5">
+                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
                           </div>
-                        </summary>
-                        <div class="result-entry-actions flex items-center gap-1.5">
-                          <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                          <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
+                          <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
+                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                          <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
+                        </details>
+                        <div v-else class="result-entry">
+                          <div class="result-entry-actions flex items-center gap-1.5">
+                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
+                          </div>
+                          <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
+                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                          <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
                         </div>
-                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                      </details>
+                      </template>
                     </template>
                     <template v-if="testResults.length">
                       <h3 class="section-title" style="margin-top: 16px;">Testing</h3>
+                      <!-- Test-side always shows a Turn label, so its summary is
+                           never empty; keep the original collapsible layout. -->
                       <details
                         v-for="(entry, idx) in testResults"
                         :key="`test-${entry.turn}`"
@@ -1626,13 +1653,33 @@ const isArchived = computed(() => !!props.task.archived);
   margin: 4px 0 6px;
 }
 .ta-activity-search__input {
+  box-sizing: border-box;
   flex: 1;
+  width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
+  border-radius: var(--r-md, 6px);
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+.ta-activity-search__input::placeholder {
+  color: var(--text-muted);
+}
+.ta-activity-search__input:hover {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+}
+.ta-activity-search__input:focus,
+.ta-activity-search__input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
 }
 .ta-activity-search__count {
   font-size: 11px;
@@ -1786,14 +1833,18 @@ const isArchived = computed(() => !!props.task.archived);
 .dep-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 
 /* Usage-by-agent breakdown table. */
-.usage-breakdown { width: 100%; border-collapse: collapse; font-size: 11px; }
+.usage-breakdown { width: 100%; border-collapse: collapse; font-size: 12px; }
 .usage-breakdown th {
-  text-align: right; padding: 3px 8px; color: var(--text-muted);
+  text-align: right; padding: 5px 10px; color: var(--text-muted);
   font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px;
   border-bottom: 1px solid var(--border);
 }
 .usage-breakdown th:first-child, .usage-breakdown td:first-child { text-align: left; }
-.usage-breakdown td { padding: 3px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+.usage-breakdown td {
+  padding: 5px 10px; text-align: right; font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+}
+.usage-breakdown tbody tr:last-child td { border-bottom: none; }
 
 /* Retry + prompt history records in the Events tab. */
 .retry-record { border-top: 1px solid var(--border); padding: 6px 0; }
@@ -1807,27 +1858,55 @@ const isArchived = computed(() => !!props.task.archived);
 .prompt-record { border-top: 1px solid var(--border); padding: 6px 0; font-size: 11px; }
 .prompt-record summary, .retry-record__detail summary { cursor: pointer; color: var(--text-muted); }
 
-/* Event timeline rows in the Events tab. */
-.event-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+/* --- Events tab: readable sectioned layout --- */
+/* Each section is separated by a hairline rule for clear visual grouping. */
+.ta-events__sec { padding: 14px 0; border-top: 1px solid var(--border); }
+.ta-events__sec:first-child { padding-top: 0; border-top: none; }
+.ta-events__h {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+
+/* Event timeline rows: taller rows + a colour-coded type pill. */
+.event-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 .event-row {
   display: grid;
-  grid-template-columns: 92px 1fr auto;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 6px;
-  font-size: 11px;
-  border-radius: 4px;
+  grid-template-columns: 116px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: var(--r-md, 6px);
 }
 .event-row:hover { background: var(--bg-hover); }
 .event-row__type {
+  justify-self: start;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  white-space: nowrap;
 }
-.event-row[data-event-type="error"] .event-row__type { color: var(--err, #c0392b); }
-.event-row[data-event-type="state_change"] .event-row__type { color: var(--accent); }
+.event-row[data-event-type="error"] .event-row__type {
+  color: var(--err, #c0392b);
+  border-color: color-mix(in oklab, var(--err, #c0392b) 40%, var(--border));
+  background: color-mix(in oklab, var(--err, #c0392b) 8%, transparent);
+}
+.event-row[data-event-type="state_change"] .event-row__type {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+}
 .event-row__summary {
   min-width: 0;
   overflow: hidden;
@@ -1835,7 +1914,42 @@ const isArchived = computed(() => !!props.task.archived);
   white-space: nowrap;
   color: var(--text);
 }
-.event-row__time { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.event-row__time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Usage / Timeline stat grids: roomy two-column key/value rows. */
+.ta-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 28px;
+}
+.ta-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+  padding: 2px 0;
+}
+.ta-stat__label { color: var(--text-muted); }
+.ta-stat__value {
+  color: var(--text);
+  font-family: var(--font-mono, "SF Mono", monospace);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ta-stat--total {
+  grid-column: span 2;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+.ta-stat--total .ta-stat__label { color: var(--text); font-weight: 600; }
 
 /* Pretty agent-activity rows (mirrors the planning chat's pcp-activity). */
 .ta-activity-log {
