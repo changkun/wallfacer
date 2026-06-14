@@ -70,11 +70,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* A <button> shrink-to-fits by default; span the sidebar (minus the 10px
-     side insets from the margin) like the nav items below. */
-  width: calc(100% - 20px);
+  /* A <button> shrink-to-fits by default; span the full wrap width so the
+     trigger and its inline dropdown (left/right: 0) share the same edges. */
+  width: 100%;
   box-sizing: border-box;
-  margin: 0 10px 6px;
+  margin: 0 0 6px;
   padding: 6px 8px;
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
@@ -141,8 +141,10 @@
 .sb-ws-popover.sb-ws-popover--inline {
   position: absolute;
   top: calc(100% + 4px);
-  left: 10px;
-  right: 10px;
+  /* Pin to the wrap's content edges so the dropdown lines up exactly with the
+     trigger, which also spans the full wrap width (no horizontal margin). */
+  left: 0;
+  right: 0;
   z-index: 65;
 }
 .sb-ws-popover__row-actions {
@@ -261,7 +263,7 @@
   align-items: center;
   gap: 8px;
   margin: 0 10px var(--sp-3);
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-radius: var(--r-md);
   background: var(--bg-sunk);
   border: 1px solid var(--rule);
@@ -270,11 +272,13 @@
   text-align: left;
   white-space: nowrap;
   transition:
+    border-color 0.12s,
     background 0.12s,
     color 0.12s;
 }
 .sb-search:hover {
-  background: var(--bg-hover);
+  background: var(--bg-card);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
   color: var(--ink-2);
 }
 .sb-search > span:nth-of-type(1) {
@@ -290,7 +294,7 @@
   font-size: 10px;
   color: var(--ink-4);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border-radius: 4px;
   padding: 1px 5px;
   background: var(--bg-card);
 }
