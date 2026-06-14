@@ -5,7 +5,7 @@ Wallfacer provides a suite of monitoring and analytics tools that help you under
 ## Key Concepts
 
 - **Oversight** -- An AI-generated high-level summary of an agent's activity during a task, organized into logical phases (e.g., "Reading codebase", "Implementing feature", "Running tests"). Each phase lists the tools used, commands run, and key actions taken.
-- **Spans** -- Timed intervals recorded during task execution. Each span captures a discrete phase of work such as a single agent turn, container startup, worktree setup, or commit pipeline. Spans power both the flamegraph visualization and the span statistics table.
+- **Spans** -- Timed intervals recorded during task execution. Each span captures a discrete phase of work such as a single agent turn, harness run, worktree setup, or commit pipeline. Spans power both the flamegraph visualization and the span statistics table.
 - **Turns** -- Individual execution cycles of the agent. Each turn corresponds to one prompt-response round trip. Per-turn usage records track token consumption and cost for every turn.
 - **Usage** -- Token and cost accounting broken down by sub-agent activity (implementation, testing, refinement, title generation, oversight, commit message, ideation).
 
@@ -29,7 +29,7 @@ Each phase in an oversight summary includes:
 - A short summary of what happened
 - Timestamp information for timeline placement
 
-Oversight summaries are generated automatically when a task reaches the waiting, done, or failed state. The server launches a lightweight agent container that reads the task's activity log and produces a structured summary.
+Oversight summaries are generated automatically when a task reaches the waiting, done, or failed state. The server runs a lightweight oversight agent as a host process that reads the task's activity log and produces a structured summary.
 
 Test verification runs also produce their own separate oversight summary, covering only the test agent's activity.
 
@@ -52,13 +52,13 @@ The oversight summary has one of four statuses:
 | Status | Meaning |
 |---|---|
 | **pending** | Not yet generated |
-| **generating** | Agent container is running to produce the summary |
+| **generating** | The oversight agent is running to produce the summary |
 | **ready** | Summary is available and displayed |
 | **failed** | Generation failed (hover for error details) |
 
 ### Live Log Monitoring
 
-While a task is running, the detail modal streams live container output in real time. The log viewer connects via a streaming HTTP response and updates incrementally as new output arrives.
+While a task is running, the detail modal streams live agent output in real time. The log viewer connects via a streaming HTTP response and updates incrementally as new output arrives.
 
 For completed tasks, saved turn output files are served from disk instead of a live stream.
 
@@ -131,18 +131,18 @@ The search bar is hidden in Oversight mode since the structured view is not line
 
 Large outputs are capped at 10,000 lines in the browser to prevent memory issues. When this limit is reached, a notice appears with a link to download the full log. The server also enforces an 8 MB per-turn output limit; a banner warns when server-side truncation has occurred.
 
-### Container Monitor
+### Process Monitor
 
-Click the sandbox monitor button in the header to open the Container Monitor modal. This shows all running Wallfacer containers with:
+Click the monitor button in the header to open the monitor modal. Tasks run as host processes in their git worktrees, so this lists the agent processes Wallfacer is currently tracking, with:
 
-- Container ID (short form)
+- Short identifier
 - Associated task (with title and status badge)
-- Container name
-- State (running, exited, paused, created, dead) with a color indicator
-- Detailed status
+- Process name
+- State (running) with a color indicator
+- Detailed status, including the host PID
 - Creation time (relative)
 
-The list auto-refreshes every 5 seconds while the modal is open. Click the refresh button for an immediate update.
+The list auto-refreshes every 5 seconds while the modal is open. Click the refresh button for an immediate update. When no tasks are running, the list is empty.
 
 ### Flamegraph Tab
 
@@ -152,7 +152,7 @@ The Flamegraph tab renders an interactive flamegraph-style visualization of exec
 
 - **Time axis** -- Horizontal axis showing elapsed time from task start, with tick marks at 0%, 25%, 50%, 75%, and 100% of the execution duration.
 - **Oversight phase band** -- When an oversight summary is available, a row of colored blocks shows the high-level phases across the timeline. Hover over a phase block to see its title and description.
-- **Span blocks** -- Each span (agent turn, container run, worktree setup, commit pipeline) is rendered as a colored block positioned on the timeline. Blocks are packed into lanes to avoid overlap. Hover over a span to see its label, raw identifier, start offset, duration, and associated oversight phase.
+- **Span blocks** -- Each span (agent turn, harness run, worktree setup, commit pipeline) is rendered as a colored block positioned on the timeline. Blocks are packed into lanes to avoid overlap. Hover over a span to see its label, raw identifier, start offset, duration, and associated oversight phase.
 - **Cumulative cost chart** -- Below the flamegraph, an SVG line chart shows how cost accumulated over time, with colored dots indicating which sub-agent activity incurred each cost increment.
 - **Detail table** -- Below the chart, a table lists all spans sorted by duration (longest first) with columns for span name, activity type, oversight phase, start offset, duration, and percentage of total time.
 
@@ -168,7 +168,7 @@ Click the span statistics button in the header to open the Span Stats modal. Thi
 
 - **Throughput summary tiles** -- Completed tasks, failed tasks, success rate, median execution time, and P95 execution time.
 - **Daily completions chart** -- A mini bar chart showing task completions per day over the last 30 days.
-- **Phase statistics table** -- For each execution phase (worktree setup, agent turn, container run, commit pipeline), the table shows:
+- **Phase statistics table** -- For each execution phase (worktree setup, agent turn, harness run, commit pipeline), the table shows:
   - Number of occurrences (runs)
   - Minimum duration
   - Median (P50) with a proportional bar
@@ -187,7 +187,7 @@ Usage is further broken down by the type of agent activity that incurred it:
 |---|---|
 | implementation | Main task execution agent |
 | test | Test verification agent |
-| refinement | Prompt refinement agent |
+| refinement | Plan-chat prompt refinement |
 | title | Automatic title generation |
 | oversight | Oversight summary generation |
 | oversight-test | Test oversight summary generation |
@@ -264,7 +264,7 @@ For the full HTTP API reference, see [API & Transport](../internals/api-and-tran
 | Variable | Default | Description |
 |---|---|---|
 | `WALLFACER_OVERSIGHT_INTERVAL` | `0` | Minutes between periodic oversight generation while a task runs. `0` = generate only at completion. |
-| `WALLFACER_MAX_PARALLEL` | `5` | Maximum concurrent tasks (affects throughput metrics) |
+| `WALLFACER_MAX_PARALLEL` | `1` | Maximum concurrent tasks (affects throughput metrics). Host-process execution caps this to `1` by default; set a higher value to raise it once you have verified your CLI tolerates parallel runs. |
 
 ### Keyboard Shortcuts
 
