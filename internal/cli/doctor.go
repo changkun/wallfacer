@@ -176,6 +176,19 @@ func checkHostBackend(vals map[string]string) int {
 		}
 	}
 
+	cursor, cursorErr := resolveHostBinary(vals["WALLFACER_HOST_CURSOR_BINARY"], "cursor-agent")
+	if cursorErr != nil {
+		fmt.Printf("[ ] cursor-agent binary not found (optional; cursor-typed tasks will fail)\n")
+		fmt.Printf("    Install from: https://cursor.com/docs/cli\n")
+	} else {
+		fmt.Printf("[ok] Cursor binary: %s\n", cursor)
+		if ver, err := cliVersion(cursor); err == nil {
+			fmt.Printf("     %s\n", strings.TrimSpace(ver))
+		} else {
+			fmt.Printf("[ ] cursor-agent --version failed: %v\n", err)
+		}
+	}
+
 	return issues
 }
 
