@@ -9,6 +9,7 @@ interface DocEntry {
   slug: string;
   title: string;
   category: string;
+  section?: string;
   order: number;
 }
 
@@ -43,19 +44,18 @@ function isIndexSlug(slug: string) {
   return INDEX_SLUGS.has(slug);
 }
 
-// Group entries by category preserving server order. Labels match the golden
-// docs-mode vocabulary ('User Guide' / 'Technical Reference').
+// Group entries into sidebar sections preserving server order. Guide entries
+// carry a `section` (Get Started / Use Wallfacer / Operate) derived from the
+// reading-order headings; entries without one fall back to a category label.
 const groups = computed(() => {
   const map = new Map<string, DocEntry[]>();
   for (const e of entries.value) {
-    if (!map.has(e.category)) map.set(e.category, []);
-    map.get(e.category)!.push(e);
+    const label = e.section
+      || (e.category === 'guide' ? 'User Guide' : e.category === 'internals' ? 'Technical Reference' : e.category);
+    if (!map.has(label)) map.set(label, []);
+    map.get(label)!.push(e);
   }
-  return Array.from(map.entries()).map(([category, items]) => ({
-    category,
-    label: category === 'guide' ? 'User Guide' : category === 'internals' ? 'Technical Reference' : category,
-    items,
-  }));
+  return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
 });
 
 // Prev/next within the active doc's category, ordered by entry.order and
@@ -214,7 +214,7 @@ onUnmounted(() => teardownToc());
         <div v-if="loading" class="local-docs-state">Loading…</div>
         <div v-else-if="error" class="local-docs-state local-docs-error">{{ error }}</div>
         <nav v-else>
-          <div v-for="g in groups" :key="g.category" class="local-docs-group">
+          <div v-for="g in groups" :key="g.label" class="local-docs-group">
             <div class="local-docs-group-h">{{ g.label }}</div>
             <ul class="local-docs-list">
               <li v-for="e in g.items" :key="e.slug">

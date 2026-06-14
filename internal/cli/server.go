@@ -715,13 +715,18 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// the "## Reading Order" section of an index document. Each link of
 	// the form [Title](file.md) under a numbered ### heading is collected
 	// in order. This is used for both guide and internals indexes.
-	parseReadingOrder := func(path string) []string {
-		var order []string
+	type readingEntry struct {
+		name    string
+		section string // nearest preceding "### " heading; "" if none
+	}
+	parseReadingOrder := func(path string) []readingEntry {
+		var order []readingEntry
 		indexData, err := fs.ReadFile(docsFS, path)
 		if err != nil {
 			return order
 		}
 		inReadingOrder := false
+		section := ""
 		for line := range strings.SplitSeq(string(indexData), "\n") {
 			trimmed := strings.TrimSpace(line)
 			// Enter the reading order section.
@@ -736,13 +741,18 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			if !inReadingOrder {
 				continue
 			}
-			// Match markdown links like [Title](file.md).
+			// A "### " heading opens a sidebar section.
+			if s, ok := strings.CutPrefix(trimmed, "### "); ok {
+				section = strings.TrimSpace(s)
+				continue
+			}
+			// Match markdown links like [Title](file.md), optionally a "- " bullet.
 			if _, after, ok := strings.Cut(trimmed, "]("); ok {
 				if target, _, ok := strings.Cut(after, ")"); ok {
 					// Only .md files in the same directory (no path separators).
 					if strings.HasSuffix(target, ".md") && !strings.Contains(target, "/") {
 						name := strings.TrimSuffix(target, ".md")
-						order = append(order, name)
+						order = append(order, readingEntry{name: name, section: section})
 					}
 				}
 			}
@@ -756,7 +766,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			Slug     string `json:"slug"`
 			Title    string `json:"title"`
 			Category string `json:"category"`
-			Order    int    `json:"order"` // 1-based reading order; 0 = unordered
+			Section  string `json:"section,omitempty"` // sidebar sub-group within a category
+			Order    int    `json:"order"`             // 1-based reading order; 0 = unordered
 		}
 
 		// Helper: read title from first "# " line in a markdown file.
@@ -774,22 +785,26 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Guide: emit usage.md (the index page) first, then the
 		// defined reading order, then any remaining guide files.
+		firstSection := ""
+		if len(guideOrder) > 0 {
+			firstSection = guideOrder[0].section
+		}
 		if title := readTitle("docs/guide/usage.md", "User Manual"); true {
-			entries = append(entries, docEntry{Slug: "guide/usage", Title: title, Category: "guide"})
+			entries = append(entries, docEntry{Slug: "guide/usage", Title: title, Category: "guide", Section: firstSection})
 		}
 		ordered := make(map[string]bool, len(guideOrder)+1)
 		ordered["usage"] = true
 		seq := 0
-		for _, name := range guideOrder {
-			ordered[name] = true
-			path := "docs/guide/" + name + ".md"
+		for _, e := range guideOrder {
+			ordered[e.name] = true
+			path := "docs/guide/" + e.name + ".md"
 			if _, err := fs.ReadFile(docsFS, path); err != nil {
 				continue
 			}
 			seq++
-			slug := "guide/" + name
-			title := readTitle(path, name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: seq})
+			slug := "guide/" + e.name
+			title := readTitle(path, e.name)
+			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Section: e.section, Order: seq})
 		}
 		// Append any guide docs not in the explicit order.
 		if dir, err := fs.ReadDir(docsFS, "docs/guide"); err == nil {
@@ -815,15 +830,15 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		intOrdered := make(map[string]bool, len(internalsOrder)+1)
 		intOrdered["internals"] = true
 		intSeq := 0
-		for _, name := range internalsOrder {
-			intOrdered[name] = true
-			path := "docs/internals/" + name + ".md"
+		for _, e := range internalsOrder {
+			intOrdered[e.name] = true
+			path := "docs/internals/" + e.name + ".md"
 			if _, err := fs.ReadFile(docsFS, path); err != nil {
 				continue
 			}
 			intSeq++
-			slug := "internals/" + name
-			title := readTitle(path, name)
+			slug := "internals/" + e.name
+			title := readTitle(path, e.name)
 			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: intSeq})
 		}
 		// Append any internals docs not in the explicit order.
