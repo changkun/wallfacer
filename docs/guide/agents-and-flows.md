@@ -1,8 +1,10 @@
 # Agents & Flows
 
-Wallfacer's execution model builds on four primitives: **agents**, **flows**, **tasks**, and **routines**. Understanding how they compose is the single biggest lever for customising what Wallfacer does on your behalf, picking a different coding harness per step, tightening an agent's system prompt, adding a security-review pass to every implementation, or scheduling a nightly brainstorm.
+Wallfacer's execution model builds on four primitives: **agents**, **flows**, **tasks**, and **routines**. Understanding how they compose is the single biggest lever for customising what Wallfacer does on your behalf: picking a different coding harness per step, tightening an agent's system prompt, adding a security-review pass to every implementation, or scheduling a nightly brainstorm.
 
 This guide explains each primitive, how they plug into each other, and works through common recipes.
+
+> Prompt refinement is not an agent or a flow. It happens in the Plan task-mode chat through the `update_task_prompt` tool. See [Refinement & Ideation](refinement-and-ideation.md) for where and how to refine a task before you run it.
 
 ---
 
@@ -14,27 +16,29 @@ This guide explains each primitive, how they plug into each other, and works thr
 │    prompt + metadata + a flow slug                              │
 │       │                                                          │
 │       ▼                                                          │
-│  Flow          (implement | brainstorm | refine-only | custom)   │
+│  Flow          (implement | brainstorm | test-only | custom)     │
 │    ordered chain of agent slugs                                  │
 │       │                                                          │
 │       ▼                                                          │
-│  Agent         (impl | test | refine | title | …)                │
+│  Agent         (impl | test | title | oversight | …)             │
 │    title, system prompt, harness, capabilities                   │
 │       │                                                          │
 │       ▼                                                          │
-│  Sandbox       (Claude | Codex)                                  │
-│    a CLI running in an ephemeral container                       │
+│  Harness       (Claude | Codex)                                  │
+│    the selected CLI run as a host process in the task's worktree │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 The four primitives, bottom up:
 
 - **Agent**, the smallest unit. A descriptor saying "this is the role of the impl step, it runs on Claude, it has workspace-write capability, its system prompt starts with these instructions."
-- **Flow**, an ordered chain of agents. Some steps can run in parallel; some can be optional. A flow says "run refine, then impl, then test, then commit-msg, title, and oversight in parallel."
+- **Flow**, an ordered chain of agents. Some steps can run in parallel; some can be optional. The built-in `implement` flow says "run impl, then test, then commit-msg, title, and oversight in parallel."
 - **Task**, the unit of work shown on the board. Every task references a flow by slug.
 - **Routine**, a board card with a schedule. When its timer fires it spawns a fresh task against the flow you picked.
 
-All four are backed by a merged registry: **built-in** definitions shipped with the binary plus **user-authored** YAML files under `~/.wallfacer/agents/` and `~/.wallfacer/flows/`.
+Each agent runs the selected CLI (Claude or Codex) directly as a host process, with the task's git worktree as its working directory. Isolation comes from the per-task worktree, not from a container.
+
+All four primitives are backed by a merged registry: **built-in** definitions shipped with the binary plus **user-authored** YAML files under `~/.wallfacer/agents/` and `~/.wallfacer/flows/`.
 
 ---
 
@@ -56,13 +60,12 @@ An agent is a descriptor, not a running process. It tells the runner how a parti
 
 ### The built-in catalog
 
-Seven agents ship with Wallfacer, each mapped to a specific sub-agent role the runner knows how to dispatch:
+Six agents ship with Wallfacer, each mapped to a specific sub-agent role the runner knows how to dispatch:
 
 | Slug | Purpose |
 |------|---------|
 | `impl` | Main implementation turn loop. Writes code, runs tests, iterates until end_turn. |
 | `test` | Verification agent. Runs the task's tests and reports pass/fail. |
-| `refine` | Prompt refinement. Expands a thin prompt into a detailed implementation spec. |
 | `title` | Generates a 2-5 word title for a task card. |
 | `oversight` | Produces a high-level summary of what the task did. |
 | `commit-msg` | Drafts a commit message from the worktree diff. |
@@ -71,6 +74,8 @@ Seven agents ship with Wallfacer, each mapped to a specific sub-agent role the r
 Browse them in the sidebar **Agents** tab. Clicking a row shows its full descriptor, including the rendered prompt template.
 
 ![Agents tab listing built-in agents with the selected agent's descriptor in the detail pane](images/agents.png)
+
+> Looking for a "refine" agent? There isn't one. Prompt refinement lives in the Plan task-mode chat, not in the agent catalog. See [Refinement & Ideation](refinement-and-ideation.md).
 
 ### Cloning a built-in
 
@@ -151,9 +156,8 @@ A flow is an ordered list of steps, where each step references an agent by slug.
 
 | Slug | Chain | What it's for |
 |------|-------|---------------|
-| `implement` | refine? → impl → test → (commit-msg ‖ title ‖ oversight) | The standard task pipeline. Refine is optional; the three terminal steps run in parallel. |
+| `implement` | impl → test → (commit-msg ‖ title ‖ oversight) | The standard task pipeline. The three terminal steps run in parallel. |
 | `brainstorm` | ideate | Workspace scan that proposes new tasks. Used by the ideation routine. |
-| `refine-only` | refine | Expand a prompt into a detailed spec, without implementing it. |
 | `test-only` | test | Run the test agent against the current worktree state. |
 
 ### Reading a flow row
@@ -161,7 +165,7 @@ A flow is an ordered list of steps, where each step references an agent by slug.
 In the **Flows** tab, each built-in row renders its step chain as pills separated by `→`. Parallel groups appear inside a dashed blue box:
 
 ```
-refine?  →  impl  →  test  →  ┌ commit-msg ‖ title ‖ oversight ┐
+impl  →  test  →  ┌ commit-msg ‖ title ‖ oversight ┐
 ```
 
 - A trailing `?` on a chip marks an optional step (flow skips it on failure).
@@ -196,8 +200,6 @@ Each step row:
 
 ```yaml
 steps:
-  - agent_slug: refine
-    optional: true
   - agent_slug: impl
   - agent_slug: test
   - agent_slug: commit-msg
@@ -210,24 +212,24 @@ steps:
 
 Each step in the parallel group lists the other members. The runner closes the group via transitive closure, so you don't need a dedicated group ID.
 
-### input_from` for chained prompts
+### `input_from` for chained prompts
 
-A step with `input_from: <earlier-slug>` receives that earlier step's parsed output as its prompt. Example: refine-only-then-impl:
+A step with `input_from: <earlier-slug>` receives that earlier step's parsed output as its prompt. Example, feed the test output into a second implementation pass:
 
 ```yaml
 steps:
-  - agent_slug: refine
+  - agent_slug: test
   - agent_slug: impl
-    input_from: refine
+    input_from: test
 ```
 
-Step `impl` runs with the text `refine` produced. If `input_from` is omitted, the step receives the task's original prompt.
+Step `impl` runs with the text `test` produced. If `input_from` is omitted, the step receives the task's original prompt.
 
 ### How flows route tasks
 
 The runner's `Run` method resolves the task's flow slug, then:
 
-- **`implement`** → the legacy turn loop in `execute.go`. This path is kept because the implement pipeline has multi-turn / session-recovery semantics the linear engine does not express.
+- **`implement`** → the turn loop in `execute.go`. This path is kept because the implement pipeline has multi-turn / session-recovery semantics the linear engine does not express.
 - **`brainstorm`** (or legacy `Kind=idea-agent`) → the ideation fast path (`runIdeationTask`), which knows how to parse idea-agent output and create backlog tasks.
 - **anything else** → the flow engine in `internal/flow/engine.go`. The engine walks steps, fans out parallel groups through an errgroup, and drives each step via `Runner.RunAgent(slug, task, prompt)`.
 
@@ -284,8 +286,8 @@ A **routine** is a board card (`Kind=routine`) with a schedule. When its timer f
 
 ```
 ┌─────────────────────────────────────────┐
-│  Routine: daily dependency check        │
-│  every 24h   •   flow: refine-only      │
+│  Routine: nightly idea scan             │
+│  every 24h   •   flow: brainstorm       │
 │  next fire: tomorrow 09:00              │
 └─────────────────────────────────────────┘
 ```
@@ -339,6 +341,17 @@ You want the `test` step to run on Codex for every task while everything else st
 3. Add a new step after `impl` and before `test`: select `security-review` in the dropdown.
 4. Save. Your security reviewer runs between implementation and verification on every task using the new flow.
 
+### Run a custom reviewer agent in a flow
+
+Custom agents you author are first-class flow steps. Suppose you want a documentation pass after implementation.
+
+1. Agents tab → **+ New Agent** with slug `doc-pass`, a description, and a system prompt like "Update README and docs to reflect the change; do not touch code." Leave harness empty to inherit the workspace default, or pin it.
+2. Flows tab → clone `implement` to `implement-with-docs`.
+3. Add a `doc-pass` step after `impl`. Save.
+4. New tasks that pick `implement-with-docs` run your authored agent in the chain.
+
+This is the general pattern: author the agent, then reference its slug from a cloned or new flow. The dropdown only lists slugs that exist in the merged registry, so a typo or a missing agent surfaces as "agent X is not registered" at save time.
+
 ### Make a TDD flow
 
 1. Flows tab → **+ New Flow** with slug `tdd`.
@@ -383,3 +396,5 @@ For contributors:
 - `frontend/src/views/AgentsPage.vue` + `FlowsPage.vue`, the management tabs.
 
 The design spec and breakdown live at [`specs/local/agents-and-flows.md`](../../specs/local/agents-and-flows.md). The post-completion refinements section records every follow-up made after the initial ship.
+</content>
+</invoke>
