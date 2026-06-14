@@ -2,6 +2,10 @@
 
 These documents are for maintainers and contributors who need to understand how the system works internally. They cover architecture decisions, data models, execution flows, and the APIs that connect everything together.
 
+Agents run as host processes: the runner execs the selected CLI directly with the task's git worktree as the working directory (`internal/executor/host.go`). There is no container daemon, image pull, or bind-mount at runtime.
+
+For the cloud control plane (identity, tenancy, deployment topology), see [Cloud Mode](../cloud/README.md).
+
 ## Reading Order
 
 ### 1. Architecture
@@ -24,9 +28,9 @@ Data models (Task, TaskEvent, TaskUsage, TaskSummary), per-task directory persis
 
 The task state machine, turn loop, dependency resolution, auto-retry, failure categorization, and board context manifests.
 
-### 4. Git Operations
+### 4. Git Operations & Worktree Lifecycle
 
-[Git Operations](git-worktrees.md)
+[Git Operations & Worktree Lifecycle](git-worktrees.md)
 
 Worktree management, the commit pipeline, branch operations, conflict resolution, stash handling, and worktree health restoration.
 
@@ -52,7 +56,7 @@ Spec document model, spec tree building, planning sandbox, slash commands, dispa
 
 [Workspaces & Configuration](workspaces-and-config.md)
 
-Workspace manager, sandbox routing, system prompt templates, environment configuration, runtime workspace switching, and AGENTS.md instructions.
+Workspace manager, harness routing, system prompt templates, environment configuration, runtime workspace switching, and AGENTS.md instructions.
 
 ### 9. Development Setup
 
