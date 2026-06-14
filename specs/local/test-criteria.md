@@ -22,7 +22,7 @@ dispatched_task_id: null
 
 # Task Test Criteria for Post-Run Verification
 
-Supersedes the archived [[validation-barrier]] (specs/oversight/validation-barrier.md), which was written against the deleted vanilla-JS frontend and the removed `Goal` / refine subsystem. This spec is rewritten against the current Task data model and Vue frontend.
+Supersedes the archived [[validation-barrier]] (specs/local/validation-barrier.md), which was written against the deleted vanilla-JS frontend and the removed `Goal` / refine subsystem. This spec is rewritten against the current Task data model and Vue frontend.
 
 ## Problem
 

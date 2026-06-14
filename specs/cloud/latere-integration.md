@@ -89,7 +89,7 @@ seam is inert and local behavior is byte-identical to today.
    (`sandbox.Backend`, `store.StorageBackend`, `handler.AuthProvider`) over
    inventing a new one. Extract a new seam only where none fits.
 4. **Data boundary holds.** Anything leaving the machine obeys
-   [identity/data-boundary-enforcement.md](../identity/data-boundary-enforcement.md):
+   [data-boundary-enforcement.md](data-boundary-enforcement.md):
    metadata may leave; source, diffs, secrets, and repo paths may not. Cloud
    *execution* (Cella) deliberately crosses this boundary and is therefore a
    later, explicitly opt-in phase — not part of metadata coordination.

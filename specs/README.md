@@ -200,7 +200,7 @@ Everything about principals, sessions, delegation, and what data crosses the mac
 | [remote-control.md](identity/remote-control.md) | Vague | Wire protocol + latere.ai-side registry that lets the latere.ai web UI or a mobile client observe and operate signed-in local wallfacer instances. Depends on authentication Phase 2. |
 | [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | RFC 8693 delegation — mint short-lived agent tokens per task so sandbox agents can call latere.ai backend services (fs, telemetry) on behalf of the dispatching user. Orthogonal to user login. |
 | [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Drafted | Reframes tenant as org (not user), adds actor fields across the store, RBAC role matrix, presence/focus, optimistic concurrency, private planning threads. Blocker for cloud hosting. |
-| [data-boundary-enforcement.md](identity/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets. |
+| [data-boundary-enforcement.md](cloud/data-boundary-enforcement.md) | Drafted | Enforce what metadata can leave the user's machine to wallfacer.cloud — explicit allow-list, redaction at the boundary, CI lint against leaked code/paths/secrets. (Moved to Cloud Platform; see below.) |
 
 ### Identity dependencies
 
@@ -249,8 +249,8 @@ Task-level verification gates wallfacer runs around its own agent execution.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [test-criteria.md](oversight/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task so the auto-tester checks them after the implementation phase (`Task.Criteria` into the existing `buildTestPrompt` / `tryAutoTest` path). Supersedes the archived validation-barrier (which was built on the removed Goal field and vanilla-JS UI). |
-| [visual-verification.md](oversight/visual-verification.md) | Drafted | Post-execution visual check for UI changes — Playwright-based screenshot diffs. |
+| [test-criteria.md](local/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task so the auto-tester checks them after the implementation phase (`Task.Criteria` into the existing `buildTestPrompt` / `tryAutoTest` path). Supersedes the archived validation-barrier (which was built on the removed Goal field and vanilla-JS UI). |
+| [visual-verification.md](local/visual-verification.md) | Drafted | Post-execution visual check for UI changes — Playwright-based screenshot diffs. |
 
 Both are independent, task-scoped, and depend only on the shipped agent abstraction.
 
