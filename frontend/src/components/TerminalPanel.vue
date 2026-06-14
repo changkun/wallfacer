@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick, computed, inject } from 'vue';
 import { withAuthToken } from '../api/client';
 import { useDockStore } from '../stores/dock';
+import { DOCK_DRAG_KEY } from '../lib/dock/drag';
 import type { DockRegion } from '../lib/dock/types';
 
 // The terminal is a dockable panel. DockWorkspace mounts this component once and
@@ -308,6 +309,14 @@ function dockTo(region: DockRegion) { dock.dockTo('terminal', region); }
 function toggleMaximize() { dock.toggleMaximize('terminal'); }
 function closePanel() { dock.closeTerminal(); }
 
+// Drag the header to dock the terminal onto an edge (DockWorkspace draws the
+// drop zones). Ignore drags that start on an interactive control.
+const dockDrag = inject(DOCK_DRAG_KEY, null);
+function onGripDown(e: MouseEvent) {
+  if ((e.target as HTMLElement).closest('button, .terminal-tab')) return;
+  dockDrag?.begin('terminal', e);
+}
+
 watch(open, async (isOpen) => {
   if (!isOpen) return;
   await nextTick();
@@ -355,7 +364,7 @@ onUnmounted(() => {
       role="region"
       aria-label="Terminal panel"
     >
-      <div class="terminal-tab-bar">
+      <div class="terminal-tab-bar dock-panel__grip" @mousedown="onGripDown">
         <div id="terminal-tab-list">
           <div
             v-for="tab in tabs"
