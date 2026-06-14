@@ -19,10 +19,6 @@ spec:
         - name: wallfacerd
           image: ghcr.io/changkun/wallfacerd:main
           imagePullPolicy: Always
-          envFrom:
-            - secretRef:
-                name: wallfacerd-auth
-                optional: true
           env:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel-collector.observability.svc:4318
@@ -30,6 +26,18 @@ spec:
               value: https://auth.latere.ai
             - name: AUTH_REDIRECT_URL
               value: https://wf.latere.ai/callback
+            # wf.latere.ai signs in through the public, bootstrap-managed
+            # `wallfacer` OAuth client (PKCE, no client secret) — the same
+            # client the local `wallfacer run` uses. A public browser client
+            # has no secret to derive a cookie key from, so AUTH_COOKIE_KEY is
+            # required and lives in its own minimal secret.
+            - name: AUTH_CLIENT_ID
+              value: wallfacer
+            - name: AUTH_COOKIE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wallfacerd-cookie
+                  key: AUTH_COOKIE_KEY
           ports:
             - containerPort: 8080
           resources:
