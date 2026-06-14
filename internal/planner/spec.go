@@ -8,13 +8,13 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 )
 
-// buildContainerSpec creates a launch spec for the planning sandbox. The
+// buildSpec creates a launch spec for the planning agent process. The
 // planner runs the agent CLI as a host process in the first configured
 // workspace; specs/ is a normal writable subdirectory of that cwd, and the
 // workspace instructions file is surfaced via WALLFACER_INSTRUCTIONS_PATH.
-func (p *Planner) buildContainerSpec(containerName string, sb harness.ID) executor.ContainerSpec {
+func (p *Planner) buildSpec(name string, sb harness.ID) executor.ContainerSpec {
 	spec := executor.ContainerSpec{
-		Name: containerName,
+		Name: name,
 		Labels: map[string]string{
 			"wallfacer.task.id":       planningTaskID,
 			"wallfacer.task.activity": "planning",

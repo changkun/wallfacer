@@ -1,8 +1,8 @@
-// Package planner manages the planning sandbox container lifecycle.
-// The planning sandbox is a long-lived workspace-scoped container that
-// lets the chat agent read the full workspace and write to specs/.
-// It delegates to a [executor.Backend] for container operations so that
-// any backend (local, K8s) can serve the planning container.
+// Package planner manages the planning agent lifecycle. The planner runs
+// the chat agent as a host process scoped to the workspace, letting it
+// read the full workspace and write to specs/. It delegates launches to
+// an [executor.Backend] so the same code serves the host backend today
+// and cloud backends later.
 package planner
 
 import (
@@ -16,24 +16,23 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 )
 
-// planningTaskID is a fixed synthetic task ID used as the worker key for
-// the planning container. The LocalBackend's worker container logic keys
-// on the "wallfacer.task.id" label — using a stable ID means the backend
-// reuses the same worker container across Launch calls.
+// planningTaskID is a fixed synthetic task ID stamped onto every planning
+// launch via the "wallfacer.task.id" label, so the process monitor and
+// usage attribution can tell planning runs apart from task runs.
 const planningTaskID = "planning-sandbox"
 
 // Config holds the configuration for a Planner.
 type Config struct {
 	Backend          executor.Backend // execution backend (host; cloud later)
-	Command          string           // container runtime binary path (retained for backend config)
+	Command          string           // legacy runtime binary path; unused on the host backend
 	Workspaces       []string         // workspace directory paths
-	EnvFile          string           // path to .env file for container
-	Fingerprint      string           // workspace fingerprint for keying the container
+	EnvFile          string           // path to .env file for the agent process
+	Fingerprint      string           // workspace fingerprint for keying the planning workspace
 	InstructionsPath string           // path to AGENTS.md / CLAUDE.md instructions file
 	ConfigDir        string           // base config directory (~/.wallfacer/) for conversation persistence
 }
 
-// Planner manages a singleton long-lived planning container for a workspace.
+// Planner manages the singleton planning agent process for a workspace.
 type Planner struct {
 	mu               sync.Mutex
 	backend          executor.Backend
@@ -110,8 +109,8 @@ func (p *Planner) Conversation() *ConversationStore {
 	return p.ActiveConversation()
 }
 
-// Start marks the planner as active. The actual container is created lazily
-// on the first Exec call via the backend's worker container mechanism.
+// Start marks the planner as active. The agent process is spawned lazily
+// on the first Exec call.
 func (p *Planner) Start(_ context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -119,7 +118,7 @@ func (p *Planner) Start(_ context.Context) error {
 	return nil
 }
 
-// Stop stops the planning container and marks the planner as inactive.
+// Stop kills the planning agent process and marks the planner as inactive.
 func (p *Planner) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -138,9 +137,9 @@ func (p *Planner) IsRunning() bool {
 	return p.active
 }
 
-// Exec launches a command inside the planning container via the sandbox
-// backend. The backend's worker container mechanism (when available)
-// reuses the same container across calls using the stable planningTaskID.
+// Exec launches a command as a planning agent process via the execution
+// backend. Each call spawns a fresh process tagged with the stable
+// planningTaskID for monitor and usage attribution.
 func (p *Planner) Exec(ctx context.Context, cmd []string) (executor.Handle, error) {
 	p.mu.Lock()
 	if !p.active {
@@ -153,8 +152,8 @@ func (p *Planner) Exec(ctx context.Context, cmd []string) (executor.Handle, erro
 	}
 	p.mu.Unlock()
 
-	containerName := "wallfacer-plan-" + truncFingerprint(p.fingerprint)
-	spec := p.buildContainerSpec(containerName, harness.Claude)
+	name := "wallfacer-plan-" + truncFingerprint(p.fingerprint)
+	spec := p.buildSpec(name, harness.Claude)
 	spec.Cmd = cmd
 
 	h, err := p.backend.Launch(ctx, spec)
@@ -288,11 +287,11 @@ func (p *Planner) Interrupt() error {
 	return nil
 }
 
-// UpdateWorkspaces destroys the current planning container (if any),
+// UpdateWorkspaces stops the current planning agent process (if any),
 // stores new workspace configuration, and re-opens the thread manager
 // rooted at the new fingerprint's planning directory so thread CRUD,
 // messages, and undo target the right workspace group after a switch.
-// A subsequent Start+Exec will create a container with the updated mounts.
+// A subsequent Start+Exec spawns a fresh process in the updated workspace.
 func (p *Planner) UpdateWorkspaces(workspaces []string, fingerprint string) {
 	p.Stop()
 
