@@ -503,9 +503,11 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
           @click="entry.is_dir ? toggleDir(entry) : selectFile(entry)"
           @keydown="(e) => onTreeKeydown(e, entry)"
         >
-          <span class="explorer-node__toggle">
-            <template v-if="entry.is_dir">{{ expanded.has(entry.path) ? '▼' : '▶' }}</template>
-          </span>
+          <span
+            class="explorer-node__toggle"
+            :class="{ 'is-dir': entry.is_dir, 'is-open': entry.is_dir && expanded.has(entry.path) }"
+            aria-hidden="true"
+          ></span>
           <span class="explorer-node__icon" aria-hidden="true">
             <svg
               width="14"
