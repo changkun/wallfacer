@@ -84,11 +84,11 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 		},
 	}
 	task.Environment = &ExecutionEnvironment{
-		ContainerImage:   "image:latest",
-		ContainerDigest:  "sha256:digest",
-		ModelName:        "model-1",
-		APIBaseURL:       "https://example.invalid",
-		RecordedAt:       time.Unix(1_700_000_050, 0).UTC(),
+		ContainerImage:  "image:latest",
+		ContainerDigest: "sha256:digest",
+		ModelName:       "model-1",
+		APIBaseURL:      "https://example.invalid",
+		RecordedAt:      time.Unix(1_700_000_050, 0).UTC(),
 	}
 	task.WorktreePaths = map[string]string{"/repo": "/worktree"}
 	task.CommitHashes = map[string]string{"/repo": "commit-1"}

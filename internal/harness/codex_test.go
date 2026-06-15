@@ -37,7 +37,6 @@ func TestCodex_BuildArgv_Basic(t *testing.T) {
 	}
 }
 
-
 func TestCodex_BuildArgv_ModelAndSystemPrompt(t *testing.T) {
 	argv, _, _ := codexHarness{}.BuildArgv(Request{
 		Prompt:       "task",

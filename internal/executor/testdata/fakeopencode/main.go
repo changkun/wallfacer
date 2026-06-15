@@ -37,8 +37,8 @@ func main() {
 	// does not recognise, so the synthesis must mark the result an error.
 	if os.Getenv("FAKEOPENCODE_GARBAGE") == "1" {
 		_ = enc.Encode(map[string]any{
-			"type":      "file_edited",
-			"sessionID": "fake-opencode-session",
+			"type":       "file_edited",
+			"sessionID":  "fake-opencode-session",
 			"properties": map[string]any{"file": "x.go"},
 		})
 		return
