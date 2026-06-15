@@ -261,8 +261,8 @@ async function saveEdit() {
 
 async function deleteFlow(slug: string) {
   const ok = await dialog.confirm({
-    title: 'Delete flow',
-    message: `Delete flow ${slug}?`,
+    title: 'Delete workflow',
+    message: `Delete workflow ${slug}?`,
     confirmLabel: 'Delete',
     danger: true,
   });
@@ -315,11 +315,6 @@ function groupParallel(steps: FlowStep[]): FlowStep[][] {
   return groups;
 }
 
-function chipLabel(step: FlowStep): string {
-  const base = step.agent_name || step.agent_slug;
-  return step.optional ? base + '?' : base;
-}
-
 const router = useRouter();
 const dialog = useDialogStore();
 function gotoAgents() {
@@ -369,10 +364,10 @@ onMounted(async () => {
             />
           </div>
           <div class="flows-mode__rail-list">
-            <p v-if="loading" class="flows-mode__empty">Loading flows...</p>
+            <p v-if="loading" class="flows-mode__empty">Loading workflows...</p>
             <template v-else>
               <p v-if="filtered.length === 0 && !draft" class="flows-mode__empty">
-                {{ search ? 'No matches.' : 'No flows registered.' }}
+                {{ search ? 'No matches.' : 'No workflows registered.' }}
               </p>
 
               <button
@@ -423,7 +418,7 @@ onMounted(async () => {
 
         <section class="flows-mode__detail">
           <div v-if="!draft && !selectedFlow" class="flows-mode__empty-detail">
-            <p>Pick a flow on the left, or click <strong>+ New Flow</strong> above.</p>
+            <p>Pick a workflow on the left, or click <strong>+ New Workflow</strong> above.</p>
           </div>
 
           <!-- Draft (new flow) -->
@@ -613,37 +608,37 @@ onMounted(async () => {
               </div>
             </form>
 
-            <!-- Read-only chain -->
+            <!-- Read-only pipeline canvas: each stage is a column of agent
+                 nodes; parallel agents stack within a stage; an arrow edge
+                 connects stages left-to-right. -->
             <div v-else class="flows-detail__body">
               <p v-if="selectedDetail?.description" class="flows-detail__desc">
                 {{ selectedDetail.description }}
               </p>
-              <div v-if="(selectedDetail?.steps || []).length" class="flows-detail__chain">
+              <div v-if="(selectedDetail?.steps || []).length" class="wf-canvas">
+                <div class="wf-canvas__start" title="The task prompt enters here">Task</div>
                 <template v-for="(group, gi) in chainGroups" :key="gi">
-                  <span v-if="gi > 0" class="flows-chain__sep">→</span>
-                  <template v-if="group.length === 1">
+                  <span class="wf-canvas__edge" aria-hidden="true"></span>
+                  <div
+                    class="wf-stage"
+                    :class="{ 'wf-stage--parallel': group.length > 1 }"
+                  >
+                    <span v-if="group.length > 1" class="wf-stage__tag">parallel</span>
                     <button
+                      v-for="(step, si) in group"
+                      :key="step.agent_slug + ':' + si"
                       type="button"
-                      class="flows-chip"
-                      :title="group[0].input_from
-                        ? `Prompted by the output of step \&quot;${group[0].input_from}\&quot;`
-                        : 'Receives the task prompt'"
+                      class="wf-node"
+                      :class="{ 'wf-node--optional': step.optional }"
+                      :title="step.input_from
+                        ? `Prompted by the output of \&quot;${step.input_from}\&quot; — click to edit the agent`
+                        : 'Receives the task prompt — click to edit the agent'"
                       @click="gotoAgents"
-                    >{{ chipLabel(group[0]) }}</button>
-                  </template>
-                  <span v-else class="flows-detail__parallel">
-                    <template v-for="(step, si) in group" :key="step.agent_slug + ':' + si">
-                      <span v-if="si > 0" class="flows-chain__sep">‖</span>
-                      <button
-                        type="button"
-                        class="flows-chip"
-                        :title="step.input_from
-                          ? `Prompted by the output of step \&quot;${step.input_from}\&quot;`
-                          : 'Receives the task prompt'"
-                        @click="gotoAgents"
-                      >{{ chipLabel(step) }}</button>
-                    </template>
-                  </span>
+                    >
+                      <span class="wf-node__name">{{ step.agent_name || step.agent_slug }}</span>
+                      <span v-if="step.optional" class="wf-node__tag">optional</span>
+                    </button>
+                  </div>
                 </template>
               </div>
             </div>
