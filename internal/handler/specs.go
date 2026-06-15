@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
@@ -155,7 +156,7 @@ func commitSpecTransition(
 	}
 	subject := fmt.Sprintf("%s: mark %s", relPath, toStatus)
 	args := []string{"-C", ws}
-	args = append(args, hostGitIdentityOverrides(ctx)...)
+	args = append(args, gitutil.GlobalIdentityOverrides(ctx)...)
 	args = append(args, "commit", "-m", subject)
 	if err := cmdexec.New("git", args...).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("git commit: %w", err)
@@ -468,7 +469,7 @@ func commitSpecChanges(
 		return nil
 	}
 	args := []string{"-C", ws}
-	args = append(args, hostGitIdentityOverrides(ctx)...)
+	args = append(args, gitutil.GlobalIdentityOverrides(ctx)...)
 	args = append(args, "commit", "-m", subject)
 	if err := cmdexec.New("git", args...).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("git commit: %w", err)
@@ -515,7 +516,7 @@ func regexpQuote(s string) string {
 // error so the caller can fall back to single-spec unarchive.
 func revertArchiveCommit(ctx context.Context, ws, sha string) error {
 	args := []string{"-C", ws}
-	args = append(args, hostGitIdentityOverrides(ctx)...)
+	args = append(args, gitutil.GlobalIdentityOverrides(ctx)...)
 	args = append(args, "revert", "--no-edit", sha)
 	if err := cmdexec.New("git", args...).WithContext(ctx).Run(); err != nil {
 		// Best-effort cleanup so the working tree isn't left in a half-reverted state.
