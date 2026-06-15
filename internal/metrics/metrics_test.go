@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -509,4 +510,41 @@ func TestRegistry_ConcurrentObserve(t *testing.T) {
 	if !strings.Contains(body, want) {
 		t.Errorf("expected %q; got:\n%s", want, body)
 	}
+}
+
+// TestRegistry_ScrapeConcurrentWithWrites exercises WritePrometheus running
+// concurrently with Add/Observe — the real /metrics scrape condition. Run with
+// -race: writeTo previously snapshotted cell pointers and read value/counts/sum
+// outside the lock, racing the concurrent mutators.
+func TestRegistry_ScrapeConcurrentWithWrites(_ *testing.T) {
+	reg := NewRegistry()
+	c := reg.Counter("scrape_race_counter", "help")
+	h := reg.Histogram("scrape_race_hist", "help", DefaultDurationBuckets)
+	labels := map[string]string{"k": "v"}
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				c.Add(labels, 1)
+				h.Observe(labels, 0.01)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		var sb strings.Builder
+		for range 200 {
+			sb.Reset()
+			reg.WritePrometheus(&sb)
+		}
+		close(done)
+	}()
+	wg.Wait()
 }

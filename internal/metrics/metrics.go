@@ -194,10 +194,13 @@ func (c *Counter) writeTo(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "# HELP %s %s\n", c.name, c.help)
 	_, _ = fmt.Fprintf(w, "# TYPE %s counter\n", c.name)
 
+	// Snapshot values (not cell pointers) under the lock: labels are immutable
+	// after cell creation, but value is mutated by Add under c.mu and must be
+	// read here while the lock is held, not after unlocking.
 	c.mu.Lock()
-	snapshot := make(map[string]*counterCell, len(c.obs))
+	snapshot := make(map[string]counterCell, len(c.obs))
 	for k, cell := range c.obs {
-		snapshot[k] = cell
+		snapshot[k] = counterCell{labels: cell.labels, value: cell.value}
 	}
 	c.mu.Unlock()
 
@@ -278,10 +281,18 @@ func (h *Histogram) writeTo(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "# HELP %s %s\n", h.name, h.help)
 	_, _ = fmt.Fprintf(w, "# TYPE %s histogram\n", h.name)
 
+	// Snapshot values under the lock: labels are immutable after cell creation,
+	// but counts/sum/count are mutated by Observe under h.mu. Clone counts and
+	// copy sum/count here, not after unlocking, to avoid racing Observe.
 	h.mu.Lock()
-	snapshot := make(map[string]*histogramCell, len(h.obs))
+	snapshot := make(map[string]histogramCell, len(h.obs))
 	for k, cell := range h.obs {
-		snapshot[k] = cell
+		snapshot[k] = histogramCell{
+			labels: cell.labels,
+			counts: slices.Clone(cell.counts),
+			sum:    cell.sum,
+			count:  cell.count,
+		}
 	}
 	h.mu.Unlock()
 
