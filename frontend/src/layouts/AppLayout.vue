@@ -164,7 +164,12 @@ useKeyboard({
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow: hidden;
+  /* Scroll overflowing page content instead of clipping it. Height-constrained
+   * pages (flex:1 + min-height:0 chains down to their own overflow-y:auto body)
+   * don't overflow this column, so they get no second scrollbar; a page that
+   * spills past the viewport becomes reachable instead of being clipped. */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .app-disconnected-banner {
   display: flex;
