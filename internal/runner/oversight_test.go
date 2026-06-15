@@ -1032,6 +1032,33 @@ func TestPeriodicOversightWorkerDisabledExitsImmediately(t *testing.T) {
 	}
 }
 
+// TestRunKeepsOversightMutexStable verifies that completing Run does not delete
+// the per-task oversight mutex. Deleting it would let a later oversightLock for
+// the same task hand out a fresh mutex, so a background oversight generation that
+// outlives Run could run concurrently with a new one and clobber oversight.json.
+func TestRunKeepsOversightMutexStable(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeCmdScript(t, endTurnOutput, 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "stable mutex", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	before := r.oversightLock(task.ID)
+	r.Run(task.ID, "do the task", "", false)
+	after := r.oversightLock(task.ID)
+
+	if before != after {
+		t.Fatal("oversight mutex was replaced across Run; concurrent oversight generations would no longer serialize")
+	}
+}
+
 // TestPeriodicOversightWorkerSkipsWhenLocked verifies that periodicOversightWorker
 // skips a tick when the per-task oversight mutex is already held (TryLock fails),
 // without blocking or panicking.
