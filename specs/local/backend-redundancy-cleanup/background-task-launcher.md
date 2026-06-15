@@ -1,16 +1,17 @@
 ---
 title: Generic background task launcher in runner
-status: complete
+status: archived
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
 affects:
   - internal/runner/runner.go
 effort: small
 created: 2026-06-01
-updated: 2026-06-14
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Generic background task launcher in runner
 

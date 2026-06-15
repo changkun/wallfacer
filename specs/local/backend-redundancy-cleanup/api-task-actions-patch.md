@@ -1,6 +1,6 @@
 ---
 title: Collapse pure state-transition task actions into PATCH
-status: complete
+status: archived
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
   - specs/local/vue-frontend-migration.md
@@ -14,10 +14,11 @@ affects:
   - ui/js/
 effort: medium
 created: 2026-06-01
-updated: 2026-06-14
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Collapse pure state-transition task actions into PATCH
 

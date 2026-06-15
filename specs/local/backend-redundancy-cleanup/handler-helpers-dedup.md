@@ -1,6 +1,6 @@
 ---
 title: Handler helper deduplication (bearer / slices / PathUUID / orgs decode)
-status: complete
+status: archived
 depends_on:
   - specs/local/backend-redundancy-cleanup.md
 affects:
@@ -11,10 +11,11 @@ affects:
   - internal/pkg/httpjson/
 effort: small
 created: 2026-06-01
-updated: 2026-06-14
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Handler helper deduplication
 

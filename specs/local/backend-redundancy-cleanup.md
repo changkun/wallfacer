@@ -1,16 +1,17 @@
 ---
 title: Backend Redundancy Cleanup
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/
   - specs/local/backend-redundancy-cleanup/
 effort: large
 created: 2026-06-01
-updated: 2026-06-05
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Backend Redundancy Cleanup
 
