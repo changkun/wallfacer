@@ -124,6 +124,23 @@ This spec reframes the surface around that model:
 
 ## Open Questions
 
-- Rename route to `/workflows` (with redirect) or keep `/flows`?
 - Should the Agents tab fold into Workflows as a node inspector, or stay a
   separate tab? (Out of scope here; note for a follow-up.)
+
+## Outcome (2026-06-15)
+
+Shipped in `feat(workflows): rename Flows to Workflows and render flows as a
+pipeline`:
+
+- Renamed the surface to **Workflows** — nav label, page title/copy, and the
+  route `/workflows` with `/flows` redirecting to it.
+- The read-only view is now a left-to-right **pipeline canvas**: a `Task`
+  start marker, agent **nodes** connected by arrow edges, and parallel stages
+  drawn as dashed groups of stacked nodes (verified visually on the built-in
+  `Implement` flow). Optional nodes get a dashed border + tag.
+- Backend flow model, `/api/flows`, and the step editor are unchanged.
+
+Deferred (enhancements, not blocking the user's "understand the UI" need):
+on-canvas editing (drag nodes to reorder/group directly on the graph) and a
+per-node harness badge. The step editor remains a list with drag-reorder,
+optional, and parallel grouping.
