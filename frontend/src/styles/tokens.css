@@ -65,8 +65,12 @@
   /* Ink */
   --ink: #1b1916;
   --ink-2: #4c4842;
-  --ink-3: #7a766e;
-  --ink-4: #a8a399;
+  /* --ink-3 is the "muted" role used for labels, metadata and secondary
+     content. Kept dark enough to clear WCAG AA (~5:1) on both the paper
+     canvas (--bg) and white cards; the previous #7a766e dipped to ~4:1
+     on the paper surface. */
+  --ink-3: #6b6760;
+  --ink-4: #97928a;
 
   /* Rules */
   --rule: #d9d3c5;
