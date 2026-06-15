@@ -17,6 +17,22 @@
   background: var(--accent-tint, var(--bg-hover));
 }
 
+/* Automation button: a clay dot marks that at least one watcher is armed. */
+.automation-btn {
+  position: relative;
+}
+.automation-btn--on::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
 .command-palette-trigger-btn {
   border: 1px solid var(--border);
   background: var(--bg-input);
