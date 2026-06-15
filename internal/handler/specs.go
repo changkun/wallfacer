@@ -185,6 +185,9 @@ func findWorkspaceRoot(workspaces []string, absPath string) string {
 // descendants so the subtree moves as a unit. All status changes land in a
 // single commit; unarchive reverses the cascade by reverting that commit.
 func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -273,6 +276,9 @@ func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
 // back to a single-spec `archived → drafted` transition when no matching archive
 // commit can be found (spec was archived by hand, outside the UI).
 func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return

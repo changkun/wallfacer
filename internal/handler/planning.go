@@ -190,6 +190,9 @@ func (h *Handler) GetPlanningStatus(w http.ResponseWriter, _ *http.Request) {
 // StartPlanning starts the planning sandbox container.
 // If already running, returns 200 with running=true (idempotent).
 func (h *Handler) StartPlanning(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	if h.planner == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
 		return
@@ -218,6 +221,11 @@ func (h *Handler) StopPlanning(w http.ResponseWriter, _ *http.Request) {
 // query parameter selects which thread's history is returned; when
 // omitted, the currently active thread is used.
 func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
+	// Hidden workspace: present an empty history, matching /api/config.
+	if h.workspaceHiddenFromRequest(r) {
+		httpjson.Write(w, http.StatusOK, []any{})
+		return
+	}
 	cs := h.lookupThreadStore(h.threadIDFromRequest(r))
 	if cs == nil {
 		httpjson.Write(w, http.StatusOK, []any{})
@@ -258,6 +266,9 @@ func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
 // parameter (or body field) selects which thread receives the message;
 // when omitted, the active thread is used.
 func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	if h.planner == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
 		return
@@ -632,7 +643,8 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 // Returns 204 No Content if no exec is in flight, or if the `?thread=<id>`
 // query parameter does not match the thread that owns the exec.
 func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request) {
-	if h.planner == nil {
+	// Hidden workspace: nothing to stream, matching /api/config.
+	if h.planner == nil || h.workspaceHiddenFromRequest(r) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -682,6 +694,9 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 // session. The `?thread=<id>` query parameter selects which thread;
 // when omitted the active thread is used.
 func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	cs := h.lookupThreadStore(h.threadIDFromRequest(r))
 	if cs == nil {
 		httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
@@ -699,6 +714,9 @@ func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, r *http.Request) 
 // otherwise the request is rejected (409). Returns 409 if no exec is
 // in flight.
 func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	if h.planner == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
 		return
