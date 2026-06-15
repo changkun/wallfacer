@@ -93,6 +93,9 @@ type resolvedSpec struct {
 // YAML frontmatter. Both task creation and frontmatter update succeed or
 // both are rolled back.
 func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	req, ok := httpjson.DecodeBody[dispatchRequest](w, r)
 	if !ok {
 		return
@@ -300,6 +303,9 @@ type undispatchResult struct {
 // UndispatchSpecs cancels the board tasks linked to dispatched specs and
 // clears each spec's dispatched_task_id, returning the spec to validated status.
 func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	req, ok := httpjson.DecodeBody[undispatchRequest](w, r)
 	if !ok {
 		return

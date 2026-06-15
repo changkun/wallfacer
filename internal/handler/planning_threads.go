@@ -147,7 +147,9 @@ func writeThreadErr(w http.ResponseWriter, err error) {
 // archived threads in the result.
 func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
 	tm := h.threadsManager()
-	if tm == nil {
+	// Hidden workspace (org-scoped, not visible to this principal): present no
+	// threads, matching /api/config's "no workspace" state.
+	if tm == nil || h.workspaceHiddenFromRequest(r) {
 		httpjson.Write(w, http.StatusOK, map[string]any{"threads": []threadSummary{}, "active_id": ""})
 		return
 	}
@@ -169,6 +171,9 @@ func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
 // optional; when `name` is empty, a default "Chat N" name is used.
 // When `focused_task` is set, the thread is pinned to task-mode immediately.
 func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	tm := h.threadsManager()
 	if tm == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
@@ -228,6 +233,9 @@ func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
 //
 // All variants return the refreshed threadSummary.
 func (h *Handler) PatchPlanningThread(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	tm := h.threadsManager()
 	if tm == nil {
 		http.Error(w, "planning not configured", http.StatusServiceUnavailable)

@@ -337,7 +337,7 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 			since = time.Now().UTC().AddDate(0, 0, -n)
 		}
 	}
-	resp.Planning = aggregatePlanningStats(h.configDir, h.currentWorkspaces(), since)
+	resp.Planning = aggregatePlanningStats(h.configDir, h.visibleWorkspaces(r.Context()), since)
 
 	httpjson.Write(w, http.StatusOK, resp)
 }

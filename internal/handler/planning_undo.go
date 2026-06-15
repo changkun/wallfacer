@@ -67,6 +67,9 @@ var addedDispatchLine = regexp.MustCompile(
 // revert produces a merge conflict. In the conflict case the revert is
 // aborted so the working tree is left clean.
 func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
 	ctx := r.Context()
 	threadID := h.threadIDFromRequest(r)
 
