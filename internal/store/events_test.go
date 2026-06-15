@@ -323,6 +323,35 @@ func TestCompactTaskEvents_Basic(t *testing.T) {
 	}
 }
 
+// TestForceUpdateTaskStatus_CompactsOnTerminal verifies that reaching a terminal
+// state via ForceUpdateTaskStatus (the path CancelTask and recovery use) triggers
+// background trace compaction, just like UpdateTaskStatus. Without it, cancelled
+// and force-completed tasks leaked uncompacted numbered trace files forever.
+func TestForceUpdateTaskStatus_CompactsOnTerminal(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
+	insertOutputEvents(t, s, task.ID, 10)
+
+	if err := s.ForceUpdateTaskStatus(context.Background(), task.ID, TaskStatusCancelled); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	s.WaitCompaction()
+
+	tracesDir := filepath.Join(s.dir, task.ID.String(), "traces")
+	if _, err := os.Stat(filepath.Join(tracesDir, "compact.ndjson")); err != nil {
+		t.Fatalf("compact.ndjson not written after force-cancel: %v", err)
+	}
+	entries, err := os.ReadDir(tracesDir)
+	if err != nil {
+		t.Fatalf("ReadDir(traces): %v", err)
+	}
+	for _, entry := range entries {
+		if _, ok := parseNumberedTraceFile(entry.Name()); ok {
+			t.Fatalf("numbered trace file still exists after force-cancel compaction: %s", entry.Name())
+		}
+	}
+}
+
 func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 	dir := t.TempDir()
 	s, err := NewFileStore(dir)
