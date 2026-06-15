@@ -11,7 +11,7 @@
 [data-theme="light"] {
   /* Typography */
   --font-sans:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Hanken Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, monospace;
 
