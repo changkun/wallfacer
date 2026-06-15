@@ -153,7 +153,7 @@ const navModel = computed<ConsoleNavModel>(() => ({
       { id: 'plan', label: 'Plan', to: '/plan', icon: 'plan' },
       { id: 'board', label: 'Board', to: '/', icon: 'board', dot: boardUnread.value && route.path !== '/' },
       { id: 'agents', label: 'Agents', to: '/agents', icon: 'agents' },
-      { id: 'flows', label: 'Flows', to: '/flows', icon: 'flows' },
+      { id: 'flows', label: 'Workflows', to: '/workflows', icon: 'flows' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
       { id: 'map', label: 'Map', to: '/map', icon: 'map' },
     ] },

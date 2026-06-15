@@ -162,12 +162,12 @@ flowchart LR
     test --> oversight
 ```
 
-In the UI this chain renders as pills: `impl → test → [ commit-msg ‖ title ‖ oversight ]`, with the parallel group boxed.
+In the UI this renders on the Workflows tab as a left-to-right pipeline of agent nodes connected by arrow edges, starting from a **Task** marker: `Task → Implementation → Testing → [ Commit message · Title · Oversight ]`. A stage that fans out to several agents is drawn as a dashed **parallel** group containing the stacked nodes.
 
-- A trailing `?` on a chip marks an optional step (flow skips it on failure).
-- `‖` between chips inside a box means they run concurrently via an errgroup.
+- An **optional** tag (and a dashed node border) marks a step the flow skips on failure.
+- Nodes inside a parallel group run concurrently via an errgroup.
 
-![Flows tab rendering each flow's step chain as pills with parallel groups boxed](images/flows.png)
+![Workflows tab rendering a flow as a left-to-right pipeline of agent nodes with a parallel stage grouped](images/flows.png)
 
 ### Cloning a built-in flow
 
@@ -180,7 +180,7 @@ Same pattern as agents:
 
 ### Creating from scratch
 
-Click **+ New Flow**. A blank editor appears with a single empty step; fill in the agent dropdown (populated from the merged Agents catalog), add more steps as needed, save.
+Click **+ New Workflow**. A blank editor appears with a single empty step; fill in the agent dropdown (populated from the merged Agents catalog), add more steps as needed, save.
 
 ### The step editor
 
@@ -306,14 +306,14 @@ You want the `test` step to run on Codex for every task while everything else st
 
 1. Agents tab → select `test` → Clone.
 2. Set **Harness = Codex**, slug to something like `test-codex`.
-3. Flows tab → select `implement` → Clone to `implement-codex-test`.
+3. Workflows tab → select `implement` → Clone to `implement-codex-test`.
 4. In the step editor, the second `test` step stays but swap the agent dropdown to `test-codex`.
 5. Save. New tasks that pick `implement-codex-test` from the composer dropdown run test on Codex; everything else on Claude.
 
 ### Add a security-review step to every implement
 
 1. Agents tab → **+ New Agent** with slug `security-review`, harness empty (inherit), a description, and a system prompt like "Review the diff for injection / auth / secrets issues and flag anything risky."
-2. Flows tab → clone `implement` to `implement-with-security`.
+2. Workflows tab → clone `implement` to `implement-with-security`.
 3. Add a new step after `impl` and before `test`: select `security-review` in the dropdown.
 4. Save. Your security reviewer runs between implementation and verification on every task using the new flow.
 
@@ -322,7 +322,7 @@ You want the `test` step to run on Codex for every task while everything else st
 Custom agents you author are first-class flow steps. Suppose you want a documentation pass after implementation.
 
 1. Agents tab → **+ New Agent** with slug `doc-pass`, a description, and a system prompt like "Update README and docs to reflect the change; do not touch code." Leave harness empty to inherit the workspace default, or pin it.
-2. Flows tab → clone `implement` to `implement-with-docs`.
+2. Workflows tab → clone `implement` to `implement-with-docs`.
 3. Add a `doc-pass` step after `impl`. Save.
 4. New tasks that pick `implement-with-docs` run your authored agent in the chain.
 
@@ -330,7 +330,7 @@ This is the general pattern: author the agent, then reference its slug from a cl
 
 ### Make a TDD flow
 
-1. Flows tab → **+ New Flow** with slug `tdd`.
+1. Workflows tab → **+ New Workflow** with slug `tdd`.
 2. Add step `test` first (implicitly fails because the feature doesn't exist yet, that's the point).
 3. Add step `impl` with `input_from: test` so the implementer gets the failing test output as context.
 4. Add step `test` again as a second verification pass.

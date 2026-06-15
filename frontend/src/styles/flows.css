@@ -321,48 +321,98 @@
   line-height: 1.55;
 }
 
-.flows-detail__chain {
+/* Pipeline canvas: stages flow left-to-right, connected by arrow edges;
+   parallel agents stack vertically within a stage. */
+.wf-canvas {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-4);
+  gap: var(--sp-2);
+  padding: var(--sp-5) var(--sp-4);
   background: var(--bg-sunk);
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
+  overflow-x: auto;
 }
-.flows-detail__parallel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
+.wf-canvas__start {
+  flex-shrink: 0;
+  align-self: center;
+  font-size: var(--fs-9);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-3);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px dashed var(--accent);
+  background: var(--bg-card);
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-sm);
+}
+/* Arrow edge between stages: a line + chevron head in currentColor. */
+.wf-canvas__edge {
+  flex-shrink: 0;
+  width: 26px;
+  height: 9px;
+  background-color: var(--ink-4);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 9'%3E%3Cpath d='M0 4.5h22M18 1l4 3.5-4 3.5' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 9'%3E%3Cpath d='M0 4.5h22M18 1l4 3.5-4 3.5' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.wf-stage {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: stretch;
+}
+.wf-stage--parallel {
+  position: relative;
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  border: 1px dashed color-mix(in oklab, var(--accent) 50%, var(--rule-2));
   border-radius: var(--r-md);
   background: var(--accent-tint);
 }
-
-.flows-chip {
+.wf-stage__tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--accent-2);
+  font-weight: 600;
+}
+/* Node card: an agent in the pipeline. */
+.wf-node {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 120px;
+  justify-content: space-between;
   font-family: inherit;
-  font-size: var(--fs-base);
-  padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--rule);
+  font-size: var(--fs-md);
+  padding: var(--sp-3) var(--sp-3);
+  border: 1px solid var(--rule-2);
   background: var(--bg-card);
-  border-radius: 999px;
+  border-radius: var(--r-md);
   color: var(--ink);
   cursor: pointer;
-  transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+  box-shadow: var(--sh-1);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.flows-chip:hover {
+.wf-node:hover {
   border-color: var(--accent);
-  background: var(--bg-elevated);
-  color: var(--accent);
+  box-shadow: var(--sh-2);
 }
-.flows-chain__sep {
-  font-size: var(--fs-base);
+.wf-node__name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.wf-node__tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--ink-3);
-  font-family: var(--font-mono);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  padding: 0 4px;
+}
+.wf-node--optional {
+  border-style: dashed;
 }
 
 /* Editor */
