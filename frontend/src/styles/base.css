@@ -40,33 +40,11 @@
   color: inherit;
 }
 
-/* --- Custom scrollbars --- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.3s;
-}
-
-*:hover {
-  scrollbar-color: var(--border) transparent;
-}
+/* --- Scrollbars ---
+ * Left to the OS default on purpose. Styling ::-webkit-scrollbar (or setting
+ * scrollbar-width) switches the browser out of auto-hiding overlay scrollbars
+ * into classic always-visible ones, so the thumb never disappears. The native
+ * overlay scrollbar fades out on its own. */
 
 body {
   margin: 0;
