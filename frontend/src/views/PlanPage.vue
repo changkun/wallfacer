@@ -42,6 +42,12 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
 // page only needs a ref to toggle it (C shortcut, focused-view chat button) and
 // to forward Break Down sends. In chat-first mode the popup isn't mounted; the
 // full-width PlanningChatPanel covers the empty-workspace case.
+//
+// Planning chat is currently deactivated in the three-pane view: the popup,
+// its toggle button, and the C shortcut are all gated off. Flip this flag back
+// to true to restore it. The chat-first empty-workspace onboarding is
+// unaffected (it's the only content when there are no specs).
+const PLANNING_CHAT_ENABLED = false;
 
 const popupRef = ref<{ toggle: () => void; open: () => void; isOpen: boolean; send: (t: string) => void } | null>(null);
 
@@ -202,7 +208,7 @@ function onKeydown(ev: KeyboardEvent) {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   // c = toggle chat, d = dispatch focused spec, b = break it down (spec mode).
   if (ev.key === 'c' || ev.key === 'C') {
-    if (layout.value === 'chat-first') return;
+    if (!PLANNING_CHAT_ENABLED || layout.value === 'chat-first') return;
     ev.preventDefault();
     toggleChat();
   } else if (ev.key === 'd' || ev.key === 'D') {
@@ -235,15 +241,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
       v-if="layout === 'three-pane'"
       ref="focusedViewRef"
       :chat-visible="chatVisible"
+      :chat-enabled="PLANNING_CHAT_ENABLED"
       @toggle-chat="toggleChat"
       @focus-sibling="focusSibling"
       @send-chat="sendChatFromHeader"
     />
-    <!-- Three-pane: chat floats over the focused view. -->
-    <SpecChatPopup v-if="layout === 'three-pane'" ref="popupRef" />
-    <!-- Chat-first: no specs yet, the full-width panel covers the workspace. -->
+    <!-- Three-pane: chat floats over the focused view (deactivated). -->
+    <SpecChatPopup v-if="layout === 'three-pane' && PLANNING_CHAT_ENABLED" ref="popupRef" />
+    <!-- Chat-first: no specs yet, the full-width panel covers the workspace.
+         Gated on the layout directly (not v-else) so deactivating the
+         three-pane popup above doesn't pull this panel into the spec view. -->
     <PlanningChatPanel
-      v-else
+      v-if="layout === 'chat-first'"
       :visible="true"
       class="chat-first"
     />

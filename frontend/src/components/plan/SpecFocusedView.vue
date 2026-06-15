@@ -11,7 +11,9 @@ import { useTaskStore } from '../../stores/tasks';
 import { useToastStore } from '../../stores/toast';
 import FloatingToc from './FloatingToc.vue';
 
-defineProps<{ chatVisible: boolean }>();
+withDefaults(defineProps<{ chatVisible: boolean; chatEnabled?: boolean }>(), {
+  chatEnabled: true,
+});
 const emit = defineEmits<{ toggleChat: []; focusSibling: [path: string]; sendChat: [text: string] }>();
 
 const planning = usePlanningStore();
@@ -397,6 +399,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
           @click="onBreakdown"
         >Break Down</button>
         <button
+          v-if="chatEnabled"
           type="button"
           class="sf-action sf-chat-toggle"
           :class="{ 'sf-chat-toggle--folded': !chatVisible }"
