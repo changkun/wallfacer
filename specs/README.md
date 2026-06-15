@@ -32,7 +32,7 @@ Local Product - 10 shipped, rest pending
   ○ Visual Verification            ○ Scoped Command Registry
   ○ Host Path References           ○ Live Serve
   ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
-  ○ Dockable Panel Workspace
+  ○ Dockable Panel Workspace       ○ Workflows Graph UX
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback, Spatial Canvas
 
