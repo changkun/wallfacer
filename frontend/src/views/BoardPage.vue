@@ -11,6 +11,7 @@ import TaskDetail from '../components/TaskDetail.vue';
 import SearchBar from '../components/SearchBar.vue';
 import ExplorerPanel from '../components/ExplorerPanel.vue';
 import AutomationMenu from '../components/AutomationMenu.vue';
+import TrashModal from '../components/TrashModal.vue';
 import { useAutomationToggles } from '../composables/useAutomationToggles';
 import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
@@ -277,11 +278,31 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
         </button>
+        <button
+          type="button"
+          class="settings-btn"
+          title="Trash"
+          @click="ui.openTrash()"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+          </svg>
+        </button>
       </div>
     </div>
   </header>
 
   <AutomationMenu v-model="automationOpen" :anchor="automationAnchor" />
+  <TrashModal v-model="ui.showTrash" />
 
   <div class="board-with-explorer">
     <!-- Left side panel; only renders once a workspace exists (nothing to

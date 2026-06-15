@@ -6,11 +6,10 @@ import SettingsTabExecution from '../components/settings/SettingsTabExecution.vu
 import SettingsTabSandbox from '../components/settings/SettingsTabSandbox.vue';
 import SettingsTabWorkspace from '../components/settings/SettingsTabWorkspace.vue';
 import SettingsTabPrompts from '../components/settings/SettingsTabPrompts.vue';
-import SettingsTabTrash from '../components/settings/SettingsTabTrash.vue';
 import SettingsTabAbout from '../components/settings/SettingsTabAbout.vue';
 import { useUiStore } from '../stores/ui';
 
-type TabKey = 'appearance' | 'execution' | 'sandbox' | 'workspace' | 'prompts' | 'trash' | 'about';
+type TabKey = 'appearance' | 'execution' | 'sandbox' | 'workspace' | 'prompts' | 'about';
 
 const route = useRoute();
 const router = useRouter();
@@ -22,7 +21,6 @@ const tabs: { key: TabKey; label: string; icon: string }[] = [
   { key: 'sandbox', label: 'Harness', icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' },
   { key: 'workspace', label: 'Workspace', icon: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' },
   { key: 'prompts', label: 'Prompts', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
-  { key: 'trash', label: 'Trash', icon: 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6' },
   { key: 'about', label: 'About', icon: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zM12 16v-4M12 8h.01' },
 ];
 
@@ -79,7 +77,6 @@ onMounted(() => {
           <SettingsTabSandbox v-else-if="activeTab === 'sandbox'" />
           <SettingsTabWorkspace v-else-if="activeTab === 'workspace'" @workspaces="openWorkspacePicker" />
           <SettingsTabPrompts v-else-if="activeTab === 'prompts'" />
-          <SettingsTabTrash v-else-if="activeTab === 'trash'" />
           <SettingsTabAbout v-else-if="activeTab === 'about'" />
         </div>
       </div>
