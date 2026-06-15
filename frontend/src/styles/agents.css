@@ -115,7 +115,7 @@
   border-radius: var(--r-sm);
   color: var(--ink);
 }
-.agents-mode__default-select {
+.agents-mode__default-select .app-select__trigger {
   font-family: inherit;
   font-size: var(--fs-base);
   padding: 3px var(--sp-3);
@@ -125,7 +125,7 @@
   color: var(--ink);
   cursor: pointer;
 }
-.agents-mode__default-select:disabled {
+.agents-mode__default-select .app-select__trigger:disabled {
   opacity: 0.6;
   cursor: progress;
 }
