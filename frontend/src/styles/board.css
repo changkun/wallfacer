@@ -231,7 +231,7 @@
   gap: 4px;
   color: var(--ink-3);
 }
-.routine-interval-select {
+.routine-interval-select .app-select__trigger {
   font-size: var(--fs-10);
   padding: 1px 4px;
   background: var(--bg-card);

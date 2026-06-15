@@ -104,7 +104,7 @@
   font-size: 11px;
   color: var(--text-muted);
 }
-.routine-create__select {
+.routine-create__select .app-select__trigger {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
