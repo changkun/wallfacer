@@ -9,6 +9,7 @@ import { renderMarkdown } from '../lib/markdown';
 import { highlightMatch } from '../lib/highlight';
 import { classifyTag, type RenderedTag } from '../lib/tagBadge';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
+import AppSelect from './AppSelect.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { toRef } from 'vue';
@@ -36,6 +37,9 @@ const routineIntervalChoices = computed(() => {
   if (routineMinutes.value > 0) set.add(routineMinutes.value);
   return Array.from(set).sort((a, b) => a - b);
 });
+const routineIntervalOptions = computed(() =>
+  routineIntervalChoices.value.map((m) => ({ value: m, label: `${m} min` })),
+);
 
 const now = ref(Date.now());
 let tickerHandle: ReturnType<typeof setInterval> | null = null;
@@ -97,9 +101,7 @@ const routineLastFired = computed(() => {
   return `fired ${Math.floor(hr / 24)}d ago`;
 });
 
-async function onRoutineIntervalChange(e: Event) {
-  const target = e.target as HTMLSelectElement;
-  const minutes = parseInt(target.value, 10);
+async function onRoutineIntervalChange(minutes: number) {
   if (!Number.isFinite(minutes) || minutes < 1) return;
   try {
     await api('PATCH', `/api/routines/${props.task.id}/schedule`, { interval_minutes: minutes });
@@ -407,9 +409,10 @@ function focusSibling(direction: 'next' | 'prev' | 'left' | 'right') {
 }
 
 function onCardKeydown(e: KeyboardEvent) {
-  // Don't hijack typing inside the routine footer's <select> + spawn icon.
+  // Don't hijack typing inside the routine footer's interval picker + spawn icon.
   const target = e.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+  if (target.closest('.app-select')) return;
 
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
@@ -580,14 +583,13 @@ function onCardKeydown(e: KeyboardEvent) {
       <div class="routine-footer-row">
         <label class="routine-interval-label">
           Every
-          <select
+          <AppSelect
             class="routine-interval-select"
-            :value="routineMinutes"
+            :model-value="routineMinutes"
+            :options="routineIntervalOptions"
             aria-label="Routine interval"
-            @change="onRoutineIntervalChange"
-          >
-            <option v-for="m in routineIntervalChoices" :key="m" :value="m">{{ m }} min</option>
-          </select>
+            @update:model-value="onRoutineIntervalChange"
+          />
         </label>
         <label class="routine-enabled-label">
           <input

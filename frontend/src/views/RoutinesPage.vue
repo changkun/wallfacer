@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { api } from '../api/client';
 import TaskCard from '../components/TaskCard.vue';
+import AppSelect from '../components/AppSelect.vue';
 import { useDialogStore } from '../stores/dialog';
 import type { Task } from '../api/types';
 import '../styles/routines.css';
@@ -20,6 +21,8 @@ const spawnFlow = ref('brainstorm');
 const creating = ref(false);
 
 const INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
+const intervalOptions = INTERVAL_OPTIONS.map((m) => ({ value: m, label: `${m} min` }));
+const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
 
 const promptEl = ref<HTMLTextAreaElement | null>(null);
 
@@ -121,15 +124,11 @@ onMounted(() => { loadRoutines(); loadFlows(); });
           <div class="routine-create__row">
             <label class="routine-create__opt">
               <span>Every</span>
-              <select v-model.number="intervalMin" class="routine-create__select">
-                <option v-for="m in INTERVAL_OPTIONS" :key="m" :value="m">{{ m }} min</option>
-              </select>
+              <AppSelect v-model="intervalMin" :options="intervalOptions" class="routine-create__select" aria-label="Interval" />
             </label>
             <label class="routine-create__opt">
               <span>Flow</span>
-              <select v-model="spawnFlow" class="routine-create__select">
-                <option v-for="f in flows" :key="f.slug" :value="f.slug">{{ f.name }}</option>
-              </select>
+              <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Flow" />
             </label>
             <button type="submit" class="btn btn-accent routine-create__btn" :disabled="!prompt.trim() || creating">
               {{ creating ? 'Creating…' : 'Create routine' }}
@@ -160,15 +159,11 @@ onMounted(() => { loadRoutines(); loadFlows(); });
         <div class="routine-create__row">
           <label class="routine-create__opt">
             <span>Every</span>
-            <select v-model.number="intervalMin" class="routine-create__select">
-              <option v-for="m in INTERVAL_OPTIONS" :key="m" :value="m">{{ m }} min</option>
-            </select>
+            <AppSelect v-model="intervalMin" :options="intervalOptions" class="routine-create__select" aria-label="Interval" />
           </label>
           <label class="routine-create__opt">
             <span>Flow</span>
-            <select v-model="spawnFlow" class="routine-create__select">
-              <option v-for="f in flows" :key="f.slug" :value="f.slug">{{ f.name }}</option>
-            </select>
+            <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Flow" />
           </label>
           <button type="submit" class="btn btn-accent routine-create__btn" :disabled="!prompt.trim() || creating">
             {{ creating ? 'Creating…' : 'Create routine' }}
