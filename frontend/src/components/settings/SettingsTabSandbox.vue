@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import { useEnvConfig } from '../../composables/useEnvConfig';
 import { claudeModelsFor, codexModelsFor } from '../../lib/knownModels';
+import { supportedHarnesses } from '../../lib/harness';
 import HarnessBadge from '../HarnessBadge.vue';
 import type {
   EnvConfig,
@@ -15,7 +16,9 @@ const taskStore = useTaskStore();
 const { env, fetchEnv, updateEnv } = useEnvConfig();
 
 // --- Sandbox list ---
-const sandboxes = computed<string[]>(() => taskStore.config?.sandboxes ?? []);
+// Fall back to the full harness registry so the default-harness select is
+// never empty before /api/config loads its authoritative `sandboxes` list.
+const sandboxes = computed<string[]>(() => supportedHarnesses(taskStore.config?.sandboxes));
 
 // --- Form state (local refs bound to inputs) ---
 const oauthToken = ref('');
