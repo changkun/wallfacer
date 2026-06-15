@@ -33,6 +33,12 @@ func New() *Log {
 // for the next wait cycle. This avoids maintaining a subscriber list.
 func (l *Log) Write(p []byte) (int, error) {
 	l.mu.Lock()
+	if l.done {
+		// Sealed: drop the write rather than double-close the notify
+		// channel (Close already closed it without replacement).
+		l.mu.Unlock()
+		return len(p), nil
+	}
 	l.buf = append(l.buf, p...)
 	ch := l.notify
 	l.notify = make(chan struct{})
