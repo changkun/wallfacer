@@ -43,11 +43,12 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
 // to forward Break Down sends. In chat-first mode the popup isn't mounted; the
 // full-width PlanningChatPanel covers the empty-workspace case.
 //
-// Planning chat is currently deactivated in the three-pane view: the popup,
-// its toggle button, and the C shortcut are all gated off. Flip this flag back
-// to true to restore it. The chat-first empty-workspace onboarding is
-// unaffected (it's the only content when there are no specs).
-const PLANNING_CHAT_ENABLED = false;
+// Gates the three-pane planning chat: the floating popup, its focused-view
+// toggle button, and the C shortcut. Set false to hide chat in Plan mode
+// (the dedicated /chat surface is unaffected); true shows the popup launcher
+// in the bottom-right. The chat-first empty-workspace onboarding is unaffected
+// either way (it's the only content when there are no specs).
+const PLANNING_CHAT_ENABLED = true;
 
 const popupRef = ref<{ toggle: () => void; open: () => void; isOpen: boolean; send: (t: string) => void } | null>(null);
 
