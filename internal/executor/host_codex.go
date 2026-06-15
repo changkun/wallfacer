@@ -61,20 +61,6 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 		}
 	}
 
-	// Codex has no --append-system-prompt equivalent; the harness prepends
-	// SystemPrompt into the prompt body. requestFromClaudeSpec set SystemPrompt
-	// to the instructions file *path*; replace it with the file *contents* so
-	// the harness's prepend produces the same wire bytes as the legacy path.
-	// Always overwrite: if the file is empty or unreadable the result is "",
-	// otherwise the literal path would be glued to the top of the user prompt.
-	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
-		data, rErr := os.ReadFile(instrPath)
-		if rErr != nil {
-			logger.Runner.Warn("host backend: read instructions file", "path", instrPath, "error", rErr)
-		}
-		req.SystemPrompt = string(data)
-	}
-
 	codexH, _ := harness.Lookup(harness.Codex)
 	argv, _, argvErr := codexH.BuildArgv(req)
 	if argvErr != nil {

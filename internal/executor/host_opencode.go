@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 
 	"latere.ai/x/wallfacer/internal/harness"
@@ -22,15 +21,11 @@ import (
 // line that harness.OpenCode.ParseEvent maps to KindResult. This mirrors the
 // codex output-last-message path.
 //
-// Two opencode-specific adjustments to the shared Request:
+// One opencode-specific adjustment to the shared Request:
 //
 //   - Permission is forced to Full so opencode runs with
 //     --dangerously-skip-permissions; without it opencode blocks on an
 //     interactive approval prompt and the task never produces a commit.
-//   - SystemPrompt carries the instructions file *contents*, not its path.
-//     requestFromClaudeSpec sets the path; opencode has no append-system-prompt
-//     flag (Capabilities.SupportsSystemPrompt == false) so the harness prepends
-//     SystemPrompt into the prompt. This mirrors launchCodex / launchCursor.
 func (b *HostBackend) launchOpenCode(ctx context.Context, spec ContainerSpec) (Handle, error) {
 	bin, err := b.binaryFor(harness.OpenCode)
 	if err != nil {
@@ -44,14 +39,6 @@ func (b *HostBackend) launchOpenCode(ctx context.Context, spec ContainerSpec) (H
 	}
 	req.Permission = harness.PermissionFull
 	req.Cwd = spec.WorkDir
-
-	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
-		data, rErr := os.ReadFile(instrPath)
-		if rErr != nil {
-			logger.Runner.Warn("host backend: read instructions file", "path", instrPath, "error", rErr)
-		}
-		req.SystemPrompt = string(data)
-	}
 
 	openCodeH, _ := harness.Lookup(harness.OpenCode)
 	argv, _, argvErr := openCodeH.BuildArgv(req)

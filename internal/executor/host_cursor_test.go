@@ -105,39 +105,6 @@ func TestHostBackend_LaunchCursor_ForcesWritePermission(t *testing.T) {
 	}
 }
 
-// TestHostBackend_LaunchCursor_InstructionsContentPrepended verifies the
-// instructions file CONTENTS (not its path) are prepended into the prompt.
-// Cursor has no append-system-prompt flag, so the harness prepends
-// SystemPrompt into -p; requestFromClaudeSpec seeds SystemPrompt with the
-// path, and launchCursor must swap in the contents (mirrors launchCodex).
-func TestHostBackend_LaunchCursor_InstructionsContentPrepended(t *testing.T) {
-	bin := buildFakeCursor(t)
-	b, err := NewHostBackend(HostBackendConfig{CursorBinary: bin})
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-
-	instr := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instr, []byte("REPO-GUIDELINES-MARKER"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-cursor-instr",
-		Env:     map[string]string{"WALLFACER_AGENT": "cursor", "WALLFACER_INSTRUCTIONS_PATH": instr},
-		Cmd:     []string{"-p", "hello cursor", "--output-format", "stream-json"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchCursorAndDrain(t, b, spec)
-	res, _ := final["result"].(string)
-	if !strings.Contains(res, "REPO-GUIDELINES-MARKER") {
-		t.Errorf("instructions content not prepended into prompt: %q", res)
-	}
-	if strings.Contains(res, instr) {
-		t.Errorf("instructions file path should not appear, only its contents: %q", res)
-	}
-}
-
 // TestHostBackend_LaunchCursor_UnresolvedBinary verifies a clear error when
 // the cursor-agent binary is unresolved.
 func TestHostBackend_LaunchCursor_UnresolvedBinary(t *testing.T) {

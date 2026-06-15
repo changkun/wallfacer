@@ -141,66 +141,6 @@ func TestHostBackend_LaunchOpenCode_SynthesizesResult(t *testing.T) {
 	}
 }
 
-// TestHostBackend_LaunchOpenCode_InstructionsContentPrepended verifies the
-// instructions file *contents* (not its path) are prepended into the prompt.
-func TestHostBackend_LaunchOpenCode_InstructionsContentPrepended(t *testing.T) {
-	bin := buildFakeOpenCode(t)
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
-
-	instr := filepath.Join(t.TempDir(), "AGENTS.md")
-	if err := os.WriteFile(instr, []byte("REPO-GUIDELINES-MARKER"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name: "wallfacer-opencode-instr",
-		Env: map[string]string{
-			"WALLFACER_AGENT":             "opencode",
-			"WALLFACER_INSTRUCTIONS_PATH": instr,
-		},
-		Cmd:     []string{"-p", "the-task"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchOpenCodeAndDrain(t, b, spec)
-	res, _ := final["result"].(string)
-	if !strings.Contains(res, "REPO-GUIDELINES-MARKER") {
-		t.Errorf("instructions content not prepended into prompt: %q", res)
-	}
-	if !strings.Contains(res, "the-task") {
-		t.Errorf("original task should still appear in prompt: %q", res)
-	}
-	if strings.Contains(res, instr) {
-		t.Errorf("instructions file path should not leak, only its contents: %q", res)
-	}
-}
-
-// TestHostBackend_LaunchOpenCode_MissingInstructionsFileTolerated verifies the
-// launcher logs and proceeds (rather than failing) when WALLFACER_INSTRUCTIONS_PATH
-// points at an unreadable file: SystemPrompt stays empty and the run still
-// produces a result.
-func TestHostBackend_LaunchOpenCode_MissingInstructionsFileTolerated(t *testing.T) {
-	bin := buildFakeOpenCode(t)
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
-
-	spec := ContainerSpec{
-		Name: "wallfacer-opencode-missinginstr",
-		Env: map[string]string{
-			"WALLFACER_AGENT":             "opencode",
-			"WALLFACER_INSTRUCTIONS_PATH": filepath.Join(t.TempDir(), "does-not-exist.md"),
-		},
-		Cmd:     []string{"-p", "the-task"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchOpenCodeAndDrain(t, b, spec)
-	if final["type"] != "result" || final["is_error"] != false {
-		t.Errorf("expected a non-error result despite missing instructions file; got %v", final)
-	}
-	res, _ := final["result"].(string)
-	if !strings.Contains(res, "the-task") {
-		t.Errorf("prompt should still reach the agent; got %q", res)
-	}
-}
-
 // TestHostBackend_LaunchOpenCode_ToolsOnlySuccess verifies that a run which
 // does work via tools but emits no final text is a non-error success with
 // empty result text and the aggregated usage (the recognised-but-no-text path,
