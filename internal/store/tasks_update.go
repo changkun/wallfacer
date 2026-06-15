@@ -44,23 +44,27 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	// Search index not updated: status is not a search-indexed field
 	// (title, prompt, tags, oversight).
 	s.notify(t, false)
-	if status == TaskStatusDone || status == TaskStatusFailed || status == TaskStatusCancelled {
-		// Terminal state reached: compact event trace files in the background.
-		// Capture the highest sequence number from in-memory state while we
-		// still hold the store lock, so the goroutine only compacts events
-		// that belong to the session that just finished. This bounded
-		// compaction prevents a race where an immediate retry would have
-		// new-session events bundled into the previous session's compact file.
-		maxSeq := int64(s.nextSeq[id] - 1)
-		s.compactWg.Add(1)
-		go func(taskID uuid.UUID, maxSeq int64) {
-			defer s.compactWg.Done()
-			if err := s.compactTaskEvents(taskID, maxSeq); err != nil {
-				logger.Store.Error("failed to compact task traces", "task", taskID, "error", err)
-			}
-		}(id, maxSeq)
+	if isTerminalStatus(status) {
+		s.scheduleTerminalCompaction(id)
 	}
 	return nil
+}
+
+// scheduleTerminalCompaction compacts the task's event trace files in the
+// background after a terminal-state transition. It captures the highest
+// sequence number from in-memory state while the caller still holds s.mu, so
+// the goroutine only compacts events that belong to the session that just
+// finished — an immediate retry would otherwise bundle new-session events into
+// the previous session's compact file. The caller must hold s.mu.
+func (s *Store) scheduleTerminalCompaction(id uuid.UUID) {
+	maxSeq := int64(s.nextSeq[id] - 1)
+	s.compactWg.Add(1)
+	go func(taskID uuid.UUID, maxSeq int64) {
+		defer s.compactWg.Done()
+		if err := s.compactTaskEvents(taskID, maxSeq); err != nil {
+			logger.Store.Error("failed to compact task traces", "task", taskID, "error", err)
+		}
+	}(id, maxSeq)
 }
 
 // buildAndSaveSummary constructs a TaskSummary from the in-memory task and
@@ -141,6 +145,9 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	// Search index not updated: status is not a search-indexed field
 	// (title, prompt, tags, oversight).
 	s.notify(t, false)
+	if isTerminalStatus(status) {
+		s.scheduleTerminalCompaction(id)
+	}
 	return nil
 }
 
