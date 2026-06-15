@@ -66,7 +66,7 @@ func (h *Handler) ExplorerTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(workspace) {
+	if !h.isAllowedWorkspace(r.Context(), workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -216,7 +216,7 @@ func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(workspace) {
+	if !h.isAllowedWorkspace(r.Context(), workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
@@ -321,7 +321,7 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.isAllowedWorkspace(req.Workspace) {
+	if !h.isAllowedWorkspace(r.Context(), req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
