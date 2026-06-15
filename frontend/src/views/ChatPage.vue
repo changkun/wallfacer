@@ -39,7 +39,20 @@ function applyQuick(insert: string) {
         <div v-if="showEntry" key="entry" class="chat-entry">
           <div class="chat-entry-inner">
             <h1 class="chat-entry-greeting">
-              <span class="chat-entry-mark" aria-hidden="true">✳</span>
+              <span class="chat-entry-mark" aria-hidden="true">
+                <svg width="26" height="26" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;image-rendering:pixelated">
+                  <rect x="0" y="0" width="6" height="3" fill="var(--accent)" />
+                  <rect x="7" y="0" width="9" height="3" fill="var(--accent-2)" />
+                  <rect x="0" y="4" width="4" height="3" fill="#8a3e21" />
+                  <rect x="5" y="4" width="6" height="3" fill="var(--accent)" />
+                  <rect x="12" y="4" width="4" height="3" fill="var(--accent-2)" />
+                  <rect x="0" y="8" width="7" height="3" fill="var(--accent-2)" />
+                  <rect x="8" y="8" width="8" height="3" fill="#8a3e21" />
+                  <rect x="0" y="12" width="3" height="4" fill="var(--accent)" />
+                  <rect x="4" y="12" width="6" height="4" fill="#8a3e21" />
+                  <rect x="11" y="12" width="5" height="4" fill="var(--accent)" />
+                </svg>
+              </span>
               What should we plan?
             </h1>
             <ChatComposer
@@ -124,6 +137,10 @@ function applyQuick(insert: string) {
 }
 
 .chat-entry-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   text-align: center;
   font-size: 30px;
   font-weight: 500;
@@ -133,8 +150,7 @@ function applyQuick(insert: string) {
 }
 
 .chat-entry-mark {
-  color: var(--accent);
-  margin-right: 6px;
+  display: inline-flex;
 }
 
 .chat-entry-quick {
