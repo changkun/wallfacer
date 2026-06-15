@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: cd frontend && bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
       - run: cd frontend && bunx --bun vue-tsc --noEmit
       - run: cd frontend && bunx --bun vite-ssg build
       - uses: actions/upload-artifact@v4
