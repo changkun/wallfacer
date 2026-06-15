@@ -30,6 +30,18 @@ const inputRef = ref<HTMLInputElement | null>(null);
 type SearchTask = Task & { matched_field?: string; snippet?: string };
 const remoteResults = ref<SearchTask[]>([]);
 
+// Server-side docs content search (GET /api/docs-search). Unlike the static
+// docIndex title/slug ranking, this matches the markdown body so the palette
+// can find docs by content. Rows carry a context snippet.
+interface DocRow {
+  slug: string;
+  title: string;
+  snippet?: string;
+}
+const docContentResults = ref<DocRow[]>([]);
+let docSeq = 0;
+let docTimer: ReturnType<typeof setTimeout> | null = null;
+
 let serverSeq = 0;
 let serverTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -168,11 +180,15 @@ function tabJumps(task: Task): { tab: string; label: string }[] {
 // docMatches must be declared BEFORE flatRows references it — the
 // `<script setup>` compiler keeps the top-level order, so a forward
 // reference produces a TDZ ReferenceError on first eval.
-const docMatches = computed(() => {
+const docMatches = computed<DocRow[]>(() => {
   const q = query.value.trim();
   // On empty query, dump all docs (matches OLD's open-state Docs group).
   if (!q) return docIndex.slice(0, 20);
-  // Title-prefix > title-substring > slug, alphabetical tie-break (see lib/docSearch).
+  // Once the server content search returns, prefer it — it matches the doc
+  // body, not just the title/slug, and carries snippets.
+  if (docContentResults.value.length) return docContentResults.value;
+  // Instant fallback before the debounced server call resolves:
+  // title-prefix > title-substring > slug (see lib/docSearch).
   return rankDocs(docIndex, q, 6);
 });
 
@@ -258,11 +274,20 @@ watch(
         serverTimer = null;
       }
       serverSeq++;
+      if (docTimer) {
+        clearTimeout(docTimer);
+        docTimer = null;
+      }
+      docSeq++;
+      docContentResults.value = [];
     }
   },
 );
 
 watch(query, (q) => {
+  // Docs content search runs on every query (independent of task matches) so
+  // the palette can surface docs by body text, debounced like task search.
+  scheduleDocSearch(q);
   // Reset remote when query empties or changes to short.
   if (!q || q.trim().length < 2) {
     remoteResults.value = [];
@@ -295,6 +320,26 @@ watch(query, (q) => {
     }
   }, 200);
 });
+
+function scheduleDocSearch(q: string) {
+  const trimmed = (q || '').trim();
+  if (docTimer) clearTimeout(docTimer);
+  if (trimmed.length < 2) {
+    docContentResults.value = [];
+    return;
+  }
+  const seq = ++docSeq;
+  docTimer = setTimeout(async () => {
+    try {
+      const res = await api<DocRow[]>('GET', `/api/docs-search?q=${encodeURIComponent(trimmed)}`);
+      if (seq !== docSeq) return;
+      docContentResults.value = Array.isArray(res) ? res : [];
+    } catch {
+      if (seq !== docSeq) return;
+      docContentResults.value = [];
+    }
+  }, 200);
+}
 
 function close() {
   emit('update:modelValue', false);
@@ -536,6 +581,7 @@ onUnmounted(() => {
               @mouseenter="activeIndex = docRowIndex(d.slug)"
             >
               <div class="command-palette-row-title">{{ d.title }}</div>
+              <div v-if="d.snippet" class="command-palette-doc-snippet">{{ d.snippet }}</div>
               <div class="command-palette-row-meta">
                 <span class="command-palette-task-id">{{ d.slug }}</span>
               </div>

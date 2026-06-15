@@ -468,6 +468,8 @@ Press **Cmd+K** (or Ctrl+K) to open the command palette. It provides:
 
 - **Fuzzy task search** -- type to filter tasks by title, prompt, or short ID
 - **Server search** -- prefix with `@` for server-side search (same as the header bar)
+- **Spec search** -- matches spec titles and paths from the plan tree
+- **Docs search** -- matches documentation by title **and body content** (via `GET /api/docs-search`), showing a context snippet; selecting a result opens the doc
 - **Context actions** -- when a task is selected, the palette shows available actions based on the task's current state:
   - Backlog: Start
   - Waiting: Run test, Mark done
