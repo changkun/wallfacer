@@ -41,7 +41,7 @@ After tasks complete and changes are pushed, the user must manually create a Git
 
 ### Prerequisites
 
-- The workspace must be a git repo with a remote.
+- The workspace must be a git repo with a remote. Its canonical GitHub coordinates (`host/owner/repo`) come from [repo-identity](../cloud/latere-integration/coordination-plane/repo-identity.md) (`NormalizeRemoteURL`, `internal/coordinator/identity.go`); reuse that normalization rather than re-parsing the remote.
 - The current branch must differ from the remote default branch (i.e., `AheadCount > 0` or the branch is not the default branch with commits ahead of `origin/<default>`).
 - The branch must be pushed to the remote (`git push -u origin <branch>` if needed).
 - `gh` CLI must be installed and authenticated. The server checks this at startup (like the existing `wallfacer doctor` checks) and exposes the status via `/api/config`.
