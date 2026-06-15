@@ -43,23 +43,23 @@ This is overwhelmingly a **UI re-layout**, not new backend state. The "sessions"
 - **One composer, two mounts.** The composer + autocomplete + streaming + bubble rendering currently live inside `PlanningChatPanel.vue`. Extract the reusable core into shared pieces and mount them in both the Chat view (full surface) and the Spec-mode popup. Do **not** fork the chat logic into two divergent implementations.
 - **Threads are the sessions — reuse them.** The session sub-sidebar is a re-render of the existing thread list, not a new model. Creating, switching, renaming, and archiving sessions route through the existing thread store actions.
 - **Replace chat-first, don't duplicate it.** The new centered entry screen becomes the single empty/start state for the Chat surface, superseding the `chat-first-mode` empty composer. Ship one empty state, not two.
-- **Non-destructive IA.** The Workspace nav group leads with Chat, Spec, Board; the remaining items (Agents, Flows, Routines, Map) stay below. The old `/plan` route redirects to `/spec`. No nav items are removed.
+- **Non-destructive IA.** The Workspace nav group leads with Chat, Plan, Board; the remaining items (Agents, Flows, Routines, Map) stay below. The spec page keeps its `/plan` route and the "Plan" label (see the decision note below). No nav items are removed, no routes renamed. (References to a `/spec` route elsewhere in this doc predate that decision; read them as `/plan`.)
 - **Respect `prefers-reduced-motion`.** All new motion (drag, popup open, entry-to-conversation transition) collapses duration to 0 while preserving final state, matching the existing animation discipline in `chat-first-mode`.
 
 ## Design
 
 ### Information architecture
 
-The Workspace nav group is reordered and extended. `Chat`, `Spec`, and `Board` lead; everything else keeps its current position below.
+The Workspace nav group is reordered and extended. `Chat`, `Plan`, and `Board` lead; everything else keeps its current position below.
 
 | Order | Label | Route | Notes |
 |---|---|---|---|
 | 1 | Chat | `/chat` | New. Dedicated Claude-style chat surface with session sub-sidebar. |
-| 2 | Spec | `/spec` | The former `/plan` page (spec tree + focused view), with chat as a floating popup instead of a docked column. |
+| 2 | Plan | `/plan` | The spec page (spec tree + focused view), with chat as a floating popup instead of a docked column. |
 | 3 | Board | `/` | Unchanged. |
 | 4+ | Agents, Flows, Routines, Map | unchanged | Stay below the lead trio. |
 
-`/plan` redirects to `/spec` (back-compat for bookmarks, the Map view's shift-click round-trip, and `?spec=`/`?task=` deep links, which carry over to `/spec`). The icon set adds a `chat` glyph (speech bubble) and a `spec` glyph (reuse the existing `plan` document icon); `Spec` keeps the document icon.
+> **Decision (during implementation):** the spec page keeps the **`/plan`** route and the **"Plan"** label. Although we call it spec mode internally, "Plan" reads as friendlier to non-technical users than "Spec". This avoids a route rename + redirect entirely — `?spec=`/`?task=` deep links and the legacy `#plan/`/`#spec/` hashes already target `/plan`. The icon set adds a `chat` glyph (speech bubble); `Plan` keeps the existing document icon.
 
 Both Chat and Spec operate on the **same workspace-group thread set**. Switching workspace groups swaps the thread list in both surfaces (the backend already re-roots its `ThreadManager` on `UpdateWorkspaces`). The frontend currently does **not** reload threads on workspace switch while a chat surface is mounted — this spec adds a watch on the active workspace key that calls `loadThreads()` so the session sub-sidebar stays correct without a page reload.
 
@@ -175,8 +175,8 @@ The current chat is wired as a docked pane inside `PlanPage.vue`. Each coupling 
 
 ## Acceptance Criteria
 
-- [ ] The Workspace nav group leads with `Chat` (`/chat`), `Spec` (`/spec`), `Board` (`/`), in that order; Agents/Flows/Routines/Map remain below, unremoved.
-- [ ] `/plan` redirects to `/spec`, preserving `?spec=` and `?task=` query params. Legacy `#plan/<path>` and `#spec/<path>` hashes still focus the right spec under `/spec`.
+- [x] The Workspace nav group leads with `Chat` (`/chat`), `Plan` (`/plan`), `Board` (`/`), in that order; Agents/Flows/Routines/Map remain below, unremoved.
+- [x] The spec page keeps its `/plan` route and "Plan" label. `?spec=`/`?task=` deep links and legacy `#plan/<path>`/`#spec/<path>` hashes still focus the right spec under `/plan`. (No `/spec` rename or redirect was introduced.)
 - [ ] The Chat surface (`/chat`) renders a session sub-sidebar (vertical list of the workspace group's non-archived threads, active highlight, unread dot, `+ New chat`, rename, archive) — not a horizontal tab bar.
 - [ ] With no active session or an empty session, the Chat surface shows a centered greeting + a large `hero` composer + wallfacer-relevant quick-action chips. Clicking a chip pre-fills the composer with the matching slash command.
 - [ ] Sending the first message transitions the entry screen into the conversation view within one fluid animation (composer morphs centered→docked, greeting fades, stream fades in); no full-page swap or flash.
@@ -240,12 +240,12 @@ The current chat is wired as a docked pane inside `PlanPage.vue`. Each coupling 
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| Nav IA + routes (chat/spec/board, `/plan`→`/spec` redirect) | — | small | drafted |
-| Extract reusable chat core (`ChatMessageList`, `ChatComposer`, `SessionList`, `useChatSession`) | — | large | drafted |
-| Chat view + session sub-sidebar (`/chat`) | extract-chat-core, nav-ia | medium | drafted |
-| Entry screen + entry→conversation transition (replaces chat-first) | chat-view | medium | drafted |
-| Spec-mode floating draggable popup | extract-chat-core, nav-ia | large | drafted |
-| Rewire docked-pane assumptions (shortcuts, deep links, focused-view bridge, workspace-switch reload) | spec-popup, chat-view | medium | drafted |
+| Nav IA + routes (chat/plan/board, add `/chat`, keep `/plan`) | — | small | **complete** |
+| Extract reusable chat core (`ChatMessageList`, `ChatComposer`, `SessionList`, `useChatSession`) | — | large | **complete** |
+| Chat view + session sub-sidebar (`/chat`) | extract-chat-core, nav-ia | medium | **complete** |
+| Entry screen + entry→conversation transition (replaces chat-first) | chat-view | medium | **complete** |
+| Spec-mode floating draggable popup | extract-chat-core, nav-ia | large | **complete** (shipped, then gated off — see Outcome) |
+| Rewire docked-pane assumptions (shortcuts, focused-view bridge, workspace-switch reload) | spec-popup, chat-view | medium | **complete** |
 
 ```mermaid
 graph LR
@@ -259,3 +259,36 @@ graph LR
 ```
 
 **Recommended iteration order:** Start `Nav IA` and `Extract chat core` in parallel — they're independent foundations. `Chat view` and `Spec-mode popup` both join once the core is extracted. `Entry screen` builds on the Chat view; `Rewire docked-pane assumptions` is the convergence point once both surfaces exist.
+
+## Outcome
+
+Shipped frontend-only, reusing the existing per-workspace thread model as the
+"sessions" — no backend change. What landed:
+
+- **Chat core** (`useChatSession`, `ChatMessageList.vue`, `ChatComposer.vue`,
+  `SessionList.vue`): one implementation of the conversation lifecycle and
+  composer, mounted by every surface. `PlanningChatPanel.vue` was reduced to its
+  panel chrome over this core.
+- **Nav + routes**: Workspace nav leads with **Chat / Plan / Board**; new
+  `/chat` route. The spec page keeps `/plan`.
+- **Chat view** (`/chat`, `ChatPage.vue`): session sub-sidebar + a centered
+  entry screen (greeting, hero composer, `/create`·`/break-down`·`/dispatch`
+  quick chips) that morphs into the conversation on first send, superseding the
+  chat-first empty composer as the single empty state.
+- **Floating popup** (`SpecChatPopup.vue`): draggable, resizable, viewport-
+  clamped, geometry + open-state persisted to `localStorage`, with a compact
+  session switcher. Mounts the shared core.
+- **Workspace-switch reload**: `useChatSession` watches the active workspace key
+  and reloads the thread list so the session list never goes stale.
+
+### Design Evolution
+
+1. **"Plan", not "Spec".** The nav label and route stayed `Plan` / `/plan` for
+   non-technical friendliness, dropping the planned `/spec` rename + redirect
+   and all its deep-link churn. References to `/spec` above predate this.
+2. **Popup deactivated in Plan mode (for now).** `SpecChatPopup` is built and
+   tested, but `PlanPage` gates it behind `PLANNING_CHAT_ENABLED = false` — the
+   popup, its focused-view toggle button, and the `C` shortcut are off in the
+   three-pane view pending a product decision on whether chat belongs there or
+   only in the dedicated `/chat` surface. Flip the flag to restore it. The
+   chat-first empty-workspace onboarding is unaffected.
