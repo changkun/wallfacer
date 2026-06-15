@@ -10,6 +10,8 @@ import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import SearchBar from '../components/SearchBar.vue';
 import ExplorerPanel from '../components/ExplorerPanel.vue';
+import AutomationMenu from '../components/AutomationMenu.vue';
+import { useAutomationToggles } from '../composables/useAutomationToggles';
 import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
 
@@ -31,6 +33,23 @@ const store = useTaskStore();
 const ui = useUiStore();
 const route = useRoute();
 const router = useRouter();
+
+// Board automation popover (restores the legacy on-board toggle menu).
+const { anyOn: automationAnyOn } = useAutomationToggles();
+const automationOpen = ref(false);
+const automationAnchor = ref<{ top: number; right: number } | null>(null);
+function toggleAutomationMenu(e: MouseEvent) {
+  if (automationOpen.value) {
+    automationOpen.value = false;
+    return;
+  }
+  const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  automationAnchor.value = {
+    top: btn.bottom + 6,
+    right: Math.max(8, window.innerWidth - btn.right),
+  };
+  automationOpen.value = true;
+}
 const selectedTask = ref<Task | null>(null);
 // Optional tab to open the detail modal on, carried via ?tab= (command-palette
 // tab-switch jumps). Read once when the task opens.
@@ -237,10 +256,13 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
             <line x1="9" y1="9" x2="9" y2="21"></line>
           </svg>
         </button>
-        <router-link
-          to="/settings?tab=execution"
-          class="settings-btn"
+        <button
+          type="button"
+          class="settings-btn automation-btn"
+          :class="{ 'settings-btn--active': automationOpen, 'automation-btn--on': automationAnyOn() }"
           title="Automation"
+          :aria-pressed="automationOpen"
+          @click="toggleAutomationMenu"
         >
           <svg
             width="18"
@@ -254,10 +276,12 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
           >
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
-        </router-link>
+        </button>
       </div>
     </div>
   </header>
+
+  <AutomationMenu v-model="automationOpen" :anchor="automationAnchor" />
 
   <div class="board-with-explorer">
     <!-- Left side panel; only renders once a workspace exists (nothing to
