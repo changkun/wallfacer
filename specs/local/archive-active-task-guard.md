@@ -1,6 +1,6 @@
 ---
 title: Archive Guard Only Blocks Active Dispatched Tasks
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/handler/specs.go
@@ -142,3 +142,14 @@ second `GetTask`.
   for lossless unarchive; only the guard's interpretation of it changes.
 - Frontend changes. The plain-text error surfacing already shipped.
 - Bulk "cancel all active tasks then archive" affordance.
+
+## Outcome
+
+Implemented as designed. `ArchiveSpec` now calls a new
+`Handler.activeDispatchedTask` helper that resolves the `dispatched_task_id` via
+`h.store.GetTask` and blocks only on non-terminal status; the 409 body names the
+live status. The `failed` judgment call landed in the terminal/allow set as
+specced. Tests in `specs_test.go` cover all table rows (active states block via a
+subtest matrix, terminal states archive, stale link archives) and were verified to
+fail without the guard change. The earlier frontend fix (`f0a76e5c`) already
+surfaces the plain-text body so the message reaches the UI verbatim.
