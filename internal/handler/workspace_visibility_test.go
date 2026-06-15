@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 // rather than mutating a workspace /api/config reports as absent.
 func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	h.SetCloudMode(true) // org isolation only applies to cloud deployments
 	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
 		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
@@ -42,5 +44,38 @@ func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 	h.ArchiveSpec(ow, owner)
 	if ow.Code == http.StatusForbidden {
 		t.Fatalf("owning org caller should pass the visibility guard, got 403: %s", ow.Body.String())
+	}
+}
+
+// TestVisibleWorkspaces_LocalModeShowsOrgStampedWorkspace is the regression
+// guard for the org-switch lockout: on a local single-user run (cloudMode
+// false, the default), an org-stamped workspace stays visible to every
+// principal — personal or any org — so switching org labels never hides the
+// user's own workspace. Only a cloud deployment isolates.
+func TestVisibleWorkspaces_LocalModeShowsOrgStampedWorkspace(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	// cloudMode left at its default (false) — this is a local run.
+	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
+		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Personal caller and a different org both still see the workspace locally.
+	for _, id := range []*auth.Identity{
+		{Sub: "u", OrgID: ""},      // personal
+		{Sub: "u", OrgID: "org-b"}, // different org
+	} {
+		ctx := auth.WithIdentity(context.Background(), id)
+		if got := h.visibleWorkspaces(ctx); len(got) != 1 || got[0] != ws {
+			t.Errorf("local mode, principal %+v: visibleWorkspaces = %v, want [%s]", id, got, ws)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/specs/archive", bytes.NewReader([]byte("{}")))
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		h.ArchiveSpec(w, req)
+		if w.Code == http.StatusForbidden {
+			t.Errorf("local mode, principal %+v: mutation forbidden, want allowed", id)
+		}
 	}
 }
