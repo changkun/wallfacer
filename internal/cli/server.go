@@ -906,6 +906,19 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		}
 	})
 
+	// Docs full-text search — scans the embedded markdown body (not just
+	// titles) so the command palette can find docs by content.
+	mux.HandleFunc("GET /api/docs-search", func(w http.ResponseWriter, r *http.Request) {
+		hits := searchDocs(docsFS, r.URL.Query().Get("q"), 20)
+		if hits == nil {
+			hits = []DocSearchHit{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(hits); err != nil {
+			logger.Main.Debug("docs search response write failed", "error", err)
+		}
+	})
+
 	// withID wraps a handler that needs a parsed task UUID from the {id} path
 	// segment, converting the UUID-accepting signature to http.HandlerFunc.
 	// Delegates parsing + error response to internal/pkg/httpjson.PathUUID so
