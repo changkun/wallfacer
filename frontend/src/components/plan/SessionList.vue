@@ -16,17 +16,18 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
 
 <template>
   <aside class="chat-sessions">
-    <div class="chat-sessions-head">
-      <span class="chat-sessions-title">Sessions</span>
-    </div>
-
     <button
       type="button"
       class="chat-session-new"
       @click="s.createThread"
     >
-      <span class="chat-session-new-icon">+</span> New chat
+      <span class="chat-session-new-icon" aria-hidden="true">+</span>
+      <span>New chat</span>
     </button>
+
+    <div class="chat-sessions-head">
+      <span class="chat-sessions-title">Sessions</span>
+    </div>
 
     <div class="chat-session-scroll">
       <div
@@ -93,70 +94,74 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
 
 <style scoped>
 .chat-sessions {
-  width: 240px;
+  width: 248px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--rule);
   background: var(--bg-card);
+  padding: 8px;
 }
 
-.chat-sessions-head {
-  padding: 12px 14px 6px;
-}
-
-.chat-sessions-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-}
-
+/* New chat — a clean, borderless row aligned with the session list, with a
+   muted leading +; matches the row geometry below rather than a boxed button. */
 .chat-session-new {
-  margin: 0 10px 8px;
-  padding: 8px 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 9px;
+  padding: 8px 10px;
   font-size: 13px;
+  font-weight: 500;
   background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--ink-2);
+  border: none;
+  border-radius: var(--r-md);
+  color: var(--ink);
   cursor: pointer;
   text-align: left;
 }
 
 .chat-session-new:hover {
   background: var(--bg-hover);
-  color: var(--ink);
-  border-color: var(--accent);
 }
 
 .chat-session-new-icon {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
+  color: var(--ink-3);
+  width: 16px;
+  text-align: center;
+}
+
+.chat-sessions-head {
+  padding: 12px 10px 4px;
+}
+
+.chat-sessions-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-4);
 }
 
 .chat-session-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 0 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .chat-session-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
-  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  border-radius: var(--r-md);
   font-size: 13px;
   color: var(--ink-2);
   cursor: pointer;
+  transition: background 0.1s, color 0.1s;
 }
 
 .chat-session-row:hover {
@@ -166,6 +171,7 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
 .chat-session-row--active {
   background: var(--bg-active);
   color: var(--ink);
+  font-weight: 500;
 }
 
 .chat-session-name {
@@ -218,7 +224,8 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
 
 .chat-sessions-archived {
   border-top: 1px solid var(--rule);
-  padding: 6px 8px;
+  margin: 6px -8px 0;
+  padding: 8px 8px 0;
 }
 
 .chat-sessions-archived-trigger {
