@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../../api/client';
+import AppSelect from '../AppSelect.vue';
+
+const PERIOD_OPTIONS = [
+  { value: '7', label: 'Last 7 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' },
+  { value: '0', label: 'All time' },
+];
 
 interface UsageBucket {
   input_tokens?: number;
@@ -126,16 +134,12 @@ watch(period, () => fetchStats());
       <div style="display: flex; align-items: center; gap: 12px">
         <label style="font-size: 12px; color: var(--text-muted)">
           Period:
-          <select
+          <AppSelect
             v-model="period"
-            class="select"
-            style="margin-left: 6px; font-size: 12px; padding: 2px 6px"
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="0">All time</option>
-          </select>
+            :options="PERIOD_OPTIONS"
+            aria-label="Period"
+            style="margin-left: 6px"
+          />
         </label>
       </div>
     </div>

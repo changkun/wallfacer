@@ -4,6 +4,15 @@ import { api } from '../../api/client';
 import { useEnvConfig } from '../../composables/useEnvConfig';
 import { useTaskStore } from '../../stores/tasks';
 import { useAutomationToggles } from '../../composables/useAutomationToggles';
+import AppSelect from '../AppSelect.vue';
+
+const LIMIT_OPTIONS = [
+  { value: '5', label: '5 tasks' },
+  { value: '10', label: '10 tasks' },
+  { value: '25', label: '25 tasks' },
+  { value: '50', label: '50 tasks' },
+  { value: '0', label: 'All' },
+];
 
 const taskStore = useTaskStore();
 
@@ -361,19 +370,12 @@ async function generateMissingOversight() {
         Task Titles
       </div>
       <div style="display: flex; gap: 6px; align-items: center">
-        <select
-          id="generate-titles-limit"
+        <AppSelect
           v-model="titlesLimit"
-          class="select"
-          style="font-size: 12px; padding: 3px 6px; height: auto"
+          :options="LIMIT_OPTIONS"
+          aria-label="Max tasks to generate titles for"
           title="Max tasks to generate titles for"
-        >
-          <option value="5">5 tasks</option>
-          <option value="10">10 tasks</option>
-          <option value="25">25 tasks</option>
-          <option value="50">50 tasks</option>
-          <option value="0">All</option>
-        </select>
+        />
         <button
           type="button"
           class="btn-icon"
@@ -399,19 +401,12 @@ async function generateMissingOversight() {
         Trace Oversight
       </div>
       <div style="display: flex; gap: 6px; align-items: center">
-        <select
-          id="generate-oversight-limit"
+        <AppSelect
           v-model="oversightLimit"
-          class="select"
-          style="font-size: 12px; padding: 3px 6px; height: auto"
+          :options="LIMIT_OPTIONS"
+          aria-label="Max tasks to generate oversight for"
           title="Max tasks to generate oversight for"
-        >
-          <option value="5">5 tasks</option>
-          <option value="10">10 tasks</option>
-          <option value="25">25 tasks</option>
-          <option value="50">50 tasks</option>
-          <option value="0">All</option>
-        </select>
+        />
         <button
           type="button"
           class="btn-icon"
