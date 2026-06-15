@@ -62,9 +62,14 @@ export async function api<T = unknown>(
   }
   if (!res.ok) {
     let msg = res.statusText;
-    if (data && typeof data === 'object' && 'message' in data) {
-      const m = (data as { message: unknown }).message;
-      if (typeof m === 'string' && m) msg = m;
+    // Prefer a server-provided message. Handlers report errors two ways: a JSON
+    // body with a `message`/`error` field, or a plain-text body via http.Error.
+    if (data && typeof data === 'object') {
+      const obj = data as Record<string, unknown>;
+      const m = obj.message ?? obj.error;
+      if (typeof m === 'string' && m.trim()) msg = m.trim();
+    } else if (typeof data === 'string' && data.trim()) {
+      msg = data.trim();
     }
     throw new ApiError(res.status, data, msg);
   }
