@@ -6,6 +6,7 @@
 // state. All conversation behaviour comes from the shared chat core.
 import { ref, computed } from 'vue';
 import { useChatSession } from '../composables/useChatSession';
+import BrandMark from '../components/BrandMark.vue';
 import SessionList from '../components/plan/SessionList.vue';
 import ChatMessageList from '../components/plan/ChatMessageList.vue';
 import ChatComposer from '../components/plan/ChatComposer.vue';
@@ -38,23 +39,10 @@ function applyQuick(insert: string) {
         <!-- Entry screen -->
         <div v-if="showEntry" key="entry" class="chat-entry">
           <div class="chat-entry-inner">
-            <h1 class="chat-entry-greeting">
-              <span class="chat-entry-mark" aria-hidden="true">
-                <svg width="26" height="26" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;image-rendering:pixelated">
-                  <rect x="0" y="0" width="6" height="3" fill="var(--accent)" />
-                  <rect x="7" y="0" width="9" height="3" fill="var(--accent-2)" />
-                  <rect x="0" y="4" width="4" height="3" fill="#8a3e21" />
-                  <rect x="5" y="4" width="6" height="3" fill="var(--accent)" />
-                  <rect x="12" y="4" width="4" height="3" fill="var(--accent-2)" />
-                  <rect x="0" y="8" width="7" height="3" fill="var(--accent-2)" />
-                  <rect x="8" y="8" width="8" height="3" fill="#8a3e21" />
-                  <rect x="0" y="12" width="3" height="4" fill="var(--accent)" />
-                  <rect x="4" y="12" width="6" height="4" fill="#8a3e21" />
-                  <rect x="11" y="12" width="5" height="4" fill="var(--accent)" />
-                </svg>
-              </span>
-              What should we plan?
-            </h1>
+            <div class="chat-entry-mark" aria-hidden="true">
+              <BrandMark :size="34" />
+            </div>
+            <h1 class="chat-entry-greeting">What should we plan?</h1>
             <ChatComposer
               ref="heroComposer"
               :streaming="chat.streaming.value"
@@ -136,24 +124,58 @@ function applyQuick(insert: string) {
   max-width: 680px;
 }
 
-.chat-entry-greeting {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-  font-size: 30px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  margin: 0 0 24px;
+.chat-entry-inner {
+  position: relative;
+}
+
+/* Soft ember glow behind the entry, the signature "shine". */
+.chat-entry-inner::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -40px;
+  width: 460px;
+  height: 320px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in oklab, var(--accent) 16%, transparent),
+    transparent 70%
+  );
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .chat-entry-mark {
-  display: inline-flex;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 12px color-mix(in oklab, var(--accent) 35%, transparent));
+}
+
+.chat-entry-greeting {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 42px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  margin: 0 0 26px;
+}
+
+.chat-entry-inner :deep(.pcp-composer) {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-entry-quick {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

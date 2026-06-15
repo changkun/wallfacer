@@ -158,6 +158,15 @@
   border-radius: var(--r-lg, 14px);
   background: var(--bg-card);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* Ember focus ring — the composer lights up warm when active. */
+.pcp-composer--hero:focus-within,
+.pcp-composer--docked:focus-within {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--rule));
+  box-shadow: 0 4px 22px color-mix(in oklab, var(--accent) 16%, transparent),
+              0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 
 .pcp-composer--hero .pcp-textarea,

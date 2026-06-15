@@ -209,7 +209,7 @@ While a task is in the **Waiting** or **Failed** state, you can sync its worktre
 
 Syncing runs `git rebase` on the task's worktree against the default branch. If conflicts are encountered, the same agent-driven conflict resolution described above is used (up to 3 attempts).
 
-The **Catch Up** automation toggle (in the Automation menu) can automatically rebase waiting tasks onto the latest branch whenever it advances, preventing merge conflicts.
+The **Catch up** automation toggle (in Settings > Execution) can automatically rebase waiting tasks onto the latest branch whenever it advances, preventing merge conflicts.
 
 ### Auto-Push
 

@@ -50,12 +50,10 @@ Each ideation run is a one-shot `Kind = "idea-agent"` task. `POST /api/ideate` c
 
 #### Enabling Ideation
 
-Ideation is **disabled by default**. To enable it:
-
-1. Click the **Automation** menu (lightning bolt icon) in the header bar.
-2. Toggle the **Brainstorm** checkbox on.
-
-Or edit the `system:ideation` routine card directly on the board.
+Ideation is **disabled by default**. To enable it, toggle the **enabled**
+switch on the `system:ideation` routine card in the backlog column. The
+card's inline controls (interval picker, Run now, countdown) configure how
+it runs.
 
 Once enabled, you can trigger runs manually or configure an automatic interval.
 
@@ -154,7 +152,7 @@ When ideation is enabled, you can set an automatic repeat interval so brainstorm
 | 15 min | Schedule the next run 15 minutes after the previous one finishes |
 | 30 min, 1h, 2h, 4h, 8h, 24h | Correspondingly longer intervals |
 
-Configure the interval from the Automation menu or Settings > Execution.
+Configure the interval from the routine card's interval picker on the board.
 
 ### Configuration Variables
 

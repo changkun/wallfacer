@@ -152,7 +152,7 @@ Click any task card to open its detail modal. The layout adapts based on the tas
 | Tab | Content |
 |---|---|
 | **Spec** | The task's prompt / spec, rendered as Markdown with an Edit/Preview toggle. |
-| **Activity** | Live agent logs (Implementation and, when present, Testing sub-tabs), each with Oversight / Pretty / Raw viewing modes. |
+| **Activity** | Live agent logs (Implementation and, when present, Testing sub-tabs): an oversight summary plus parsed activity rows (thinking, tool calls, results) with a filter box. |
 | **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. |
 
 For the full reference, including the **Results**, **Timeline**, and **Events** main tabs, see [Task Detail Modal (Full Reference)](#task-detail-modal-full-reference).
@@ -427,7 +427,7 @@ A horizontal tab bar across the top of the modal switches what the main pane sho
 | Tab | Content |
 |---|---|
 | **Spec** | The task's prompt / spec, rendered as Markdown with an Edit/Preview toggle. Always visible. |
-| **Activity** | Live agent logs. Implementation and, when test verification has run, Testing sub-tabs, each with Oversight (high-level summary), Pretty (formatted output), and Raw (unprocessed NDJSON) viewing modes plus a log search/filter bar. |
+| **Activity** | Live agent logs. Implementation and, when test verification has run, Testing sub-tabs. Each shows an oversight summary (when generated) followed by parsed activity rows (thinking, tool calls, results, text) with a **Filter activity...** box; tasks with no parsed rows fall back to raw ANSI output. |
 | **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. Visible once the task has produced changes. |
 | **Results** | Per-turn agent result entries (Implementation and, when present, Testing), each rendered as Markdown with Copy and Raw toggles. |
 | **Events** | Chronological audit trail of state changes, outputs, feedback, errors, and system events. |
