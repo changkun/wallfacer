@@ -311,7 +311,6 @@ type ExecutionEnvironment struct {
     ContainerDigest  string     `json:"container_digest"`
     ModelName        string     `json:"model_name"`
     APIBaseURL       string     `json:"api_base_url"`
-    InstructionsHash string     `json:"instructions_hash"`
     Sandbox          harness.ID `json:"sandbox"`
     RecordedAt       time.Time  `json:"recorded_at"`
 }

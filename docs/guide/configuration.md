@@ -1,6 +1,6 @@
 # Configuration & Customization
 
-Wallfacer is configured through the Settings UI, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompts and workspace instructions. The `.env` file is auto-generated on first run with commented-out defaults; edit it directly or use the Settings UI. Most settings take effect on the next task run without restarting the server.
+Wallfacer is configured through the Settings UI, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompts. The `.env` file is auto-generated on first run with commented-out defaults; edit it directly or use the Settings UI. Most settings take effect on the next task run without restarting the server.
 
 ## How tasks run
 
@@ -367,7 +367,6 @@ Wallfacer ships built-in Go template files that instruct its agent activities. T
 | `oversight.tmpl` | Oversight summary generation |
 | `ideation.tmpl` | Brainstorm/ideation agent |
 | `conflict.tmpl` | Merge conflict resolution |
-| `instructions.tmpl` | Workspace instructions (AGENTS.md) generation |
 | `task_prompt_refine.tmpl` | Plan task-mode prompt refinement (`update_task_prompt`) |
 
 #### Viewing and Editing
@@ -384,30 +383,9 @@ User overrides are stored as `.tmpl` files in `~/.wallfacer/prompts/`. For examp
 
 Delete a user override via the template editor or the API (`DELETE /api/system-prompts/{name}`) to restore the embedded default.
 
-### Workspace Instructions (AGENTS.md)
+### Repository Instructions (AGENTS.md / CLAUDE.md)
 
-#### What AGENTS.md Is
-
-Each unique set of workspaces gets its own `AGENTS.md` file stored in `~/.wallfacer/instructions/`. Wallfacer supplies its path to the agent through the `WALLFACER_INSTRUCTIONS_PATH` environment variable: Claude appends the file as a system prompt, and Codex inlines its contents. The agent picks it up automatically as context.
-
-#### How Fingerprinting Works
-
-The instructions file is identified by a SHA-256 hash of the sorted, absolute workspace paths. This means switching to workspaces `~/a` and `~/b` (in any order) shares the same instructions file, while `~/a`, `~/b`, and `~/c` together gets a separate one.
-
-#### Initial Generation
-
-On first run with a new workspace set, Wallfacer creates the `AGENTS.md` from:
-
-1. A built-in default template with general agent guidance.
-2. A reference list of per-repository `AGENTS.md` (or legacy `CLAUDE.md`) file paths so agents can read them on demand.
-
-#### Editing
-
-Open **Settings > Prompts > AGENTS.md > Edit** to modify the instructions in the web UI. Changes are saved to the fingerprinted file in `~/.wallfacer/instructions/`.
-
-#### Re-Initializing
-
-Click **Re-init** (or call `POST /api/instructions/reinit`) to regenerate the instructions from the default template and current repository files, discarding any manual edits.
+Each task runs with its git worktree as the working directory, so agents read each repository's own `AGENTS.md` or `CLAUDE.md` natively. Add those files to your repos for per-repo guidance; Wallfacer does not generate or inject a separate workspace-level instructions file.
 
 ### Prompt Templates
 

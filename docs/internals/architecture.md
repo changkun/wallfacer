@@ -389,7 +389,7 @@ Top-level packages:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `prompts` | System prompt templates (title, commit, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management (`~/.wallfacer/instructions/`) | `Manager`, `NewManager()`, `InstructionsKey()`, `EnsureInstructions()`, `BuildInstructionsContent()`, `InstructionsData` |
+| `prompts` | System prompt templates (title, commit, oversight, test, ideation, conflict) and the workspace key helper used to scope the per-workspace data directory | `Manager`, `NewManager()`, `InstructionsKey()` |
 
 Shared utility packages under `internal/pkg/`:
 

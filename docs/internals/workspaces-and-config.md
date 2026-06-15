@@ -1,6 +1,6 @@
 # Workspaces & Configuration
 
-This document consolidates workspace management, instructions lifecycle, activity routing, and configuration systems. These components control how Wallfacer scopes task data, selects the host CLI for each agent, and propagates user settings.
+This document consolidates workspace management, activity routing, and configuration systems. These components control how Wallfacer scopes task data, selects the host CLI for each agent, and propagates user settings.
 
 ## Workspace Manager
 
@@ -12,7 +12,6 @@ The workspace manager (`internal/workspace/manager.go`) coordinates workspace sw
 type Snapshot struct {
     Workspaces       []string       // sorted, deduplicated absolute paths
     Store            *store.Store   // scoped store for this workspace set
-    InstructionsPath string         // path to merged AGENTS.md
     ScopedDataDir    string         // data/<workspace-key>/
     Key              string         // 16-char hex SHA-256 fingerprint
     Generation       uint64         // monotonically increasing version
@@ -32,7 +31,7 @@ func InstructionsKey(workspaces []string) string {
 }
 ```
 
-Because paths are sorted before hashing, switching to workspaces `~/a` and `~/b` (in any order) produces the same key and shares the same data directory and instructions file.
+Because paths are sorted before hashing, switching to workspaces `~/a` and `~/b` (in any order) produces the same key and shares the same data directory.
 
 ### Workspace Groups
 
@@ -60,15 +59,14 @@ flowchart TD
     Same -->|yes| NoOp["Return current snapshot"]
     Same -->|no| Build["Build candidate snapshot"]
     Build --> OpenStore["Open new scoped store<br/>(data/<key>/)"]
-    OpenStore --> Instructions["Ensure AGENTS.md exists<br/>(prompts.EnsureInstructions)"]
-    Instructions --> Groups["Upsert workspace group<br/>(workspace-groups.json)"]
+    OpenStore --> Groups["Upsert workspace group<br/>(workspace-groups.json)"]
     Groups --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
     Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
     Swap --> Publish["Notify subscribers via channels"]
     Publish --> Close["Close previous store"]
 ```
 
-All external side effects (store creation, instructions file, workspace groups, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate.
+All external side effects (store creation, workspace groups, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate.
 
 #### Multi-store lifecycle
 
@@ -89,35 +87,9 @@ Each task is associated with a workspace group key at dispatch time (captured in
 
 Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner, autopilot watchers) to react to workspace switches.
 
-## AGENTS.md Lifecycle
+## Repository Instructions
 
-### Storage Location
-
-Workspace instruction files live in `~/.wallfacer/instructions/`. Each unique workspace combination gets its own file, named by the 16-char hex workspace key: `~/.wallfacer/instructions/<key>.md`.
-
-### Fingerprinting
-
-The filename is derived from the same SHA-256 fingerprint used for workspace scoping (see Workspace Key Hashing above). This means switching to workspaces `~/a` and `~/b` (in any order) shares the same instructions file.
-
-### Default Template Generation
-
-When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInstructionsContent()` (`internal/prompts/instructions.go`) assembles the initial content from:
-
-1. **Default template** -- general guidance for agents (complete tasks as described, make focused changes, run tests, write clear commit messages, etc.). It also documents a read-only board-context path (`.tasks/board.json`) and sibling worktree paths the agent can read for cross-task awareness.
-
-2. **Workspace layout section** -- lists each active workspace by basename and instructs agents to keep all file operations within those directories.
-
-3. **Repo-specific instruction references** -- scans each workspace for `AGENTS.md` or legacy `CLAUDE.md` files and appends a "Repo-Specific Instructions" section with the per-repo paths so the agent can read them on demand.
-
-The embedded `instructions.tmpl` still phrases these path references with a `/workspace/` prefix (`internal/prompts/instructions.tmpl`). Under host-process execution the agent runs with its git worktree as CWD, so treat the `/workspace/` strings as legacy path framing: the meaningful unit is the workspace basename and the per-repo instruction filename, not a literal mount root.
-
-### Re-init Logic
-
-`prompts.ReinitInstructions()` regenerates the file from scratch using `BuildInstructionsContent()`, overwriting any user edits. This is triggered by **Settings > AGENTS.md > Re-init** in the UI, which calls `POST /api/instructions/reinit`. The re-init picks up any new `AGENTS.md` / `CLAUDE.md` files that may have appeared in the workspaces since the last generation.
-
-### Instructions Delivery
-
-The workspace instructions file is delivered to the agent process via `--append-system-prompt` when the CLI supports it, falling back to prepending it to the `-p` prompt. The runner passes its path to the host backend as `WALLFACER_INSTRUCTIONS_PATH` (see `internal/runner/container.go` and `internal/executor/host.go`). Each task runs with its git worktree as the working directory, so the agent also picks up any per-repo `AGENTS.md` / `CLAUDE.md` natively.
+Wallfacer does not generate or inject a workspace-level instructions file. Each task runs with its git worktree as the working directory (see Harness Routing below), so the agent reads each repository's own `AGENTS.md` or `CLAUDE.md` natively from the worktree CWD. The constants `prompts.CodexInstructionsFilename` (`AGENTS.md`) and `prompts.ClaudeInstructionsFilename` (`CLAUDE.md`) name those files.
 
 ## Harness Routing
 
@@ -229,7 +201,7 @@ Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env fi
 
 ### Embedded Templates
 
-Eight prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`):
+Prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`):
 
 | Embedded file | API name | Used for |
 |---|---|---|
@@ -240,7 +212,6 @@ Eight prompt templates are embedded into the binary at compile time via `go:embe
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
 | `ideation.tmpl` | `ideation` | Brainstorm/ideation agent |
 | `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
-| `instructions.tmpl` | `instructions` | Workspace instructions (AGENTS.md) generation |
 
 ### Override Storage
 

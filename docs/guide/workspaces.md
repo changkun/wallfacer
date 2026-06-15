@@ -34,7 +34,7 @@ Features:
 - **Add button** -- click **+ Add** next to any directory to add it to the selection, or click **Add current folder** to add the directory you are currently browsing
 - **Selection summary** -- the left panel shows all selected directories with remove buttons
 
-Click **Apply** to switch to the selected workspaces. The server validates every path and creates the necessary data directories and instructions file.
+Click **Apply** to switch to the selected workspaces. The server validates every path and creates the necessary data directories.
 
 ### Git Status and Basic Operations
 
@@ -218,29 +218,9 @@ The **Catch Up** automation toggle (in the Automation menu) can automatically re
 
 After the commit pipeline completes, Wallfacer can optionally push each workspace to its remote. Auto-push is controlled by the `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD` environment variables; see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference) for defaults. It can also be toggled from the **Automation** menu in the header.
 
-### Workspace Instructions (AGENTS.md)
+### Repository Instructions (AGENTS.md / CLAUDE.md)
 
-Each workspace group has its own `AGENTS.md` file that provides instructions to every agent running in that group. The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so switching to workspaces `~/a` and `~/b` (in any order) shares the same instructions file.
-
-#### Where instructions are stored
-
-Instructions files live in `~/.wallfacer/instructions/<fingerprint>.md`. The file is not copied into your worktree. Wallfacer delivers its contents to every task agent as a system prompt (via `--append-system-prompt` for Claude, prepended to the prompt for Codex), so the guidance applies without touching your repository.
-
-#### Default content
-
-When a workspace group is activated for the first time, an `AGENTS.md` is created automatically with:
-
-1. A default template with general coding guidance
-2. A workspace layout section listing the active workspace directories
-3. References to any per-repository `AGENTS.md` or `CLAUDE.md` files found in the workspace directories
-
-#### Editing from the UI
-
-Open **Settings > Workspace Instructions** to view and edit the current instructions. Changes are saved immediately and take effect for the next task that starts.
-
-#### Re-initialising
-
-Click **Re-init** to rebuild the instructions file from scratch using the default template and the current per-repo instruction files. This overwrites any manual edits.
+Each task runs with its git worktree as the working directory, so agents read each repository's own `AGENTS.md` or `CLAUDE.md` natively. Add those files to your repos to give agents per-repo guidance; Wallfacer does not generate or inject a separate workspace-level instructions file.
 
 ### Environment Variable
 
@@ -252,7 +232,7 @@ WALLFACER_WORKSPACES=/Users/you/project-a:/Users/you/project-b
 
 When you switch workspaces in the UI, this variable is updated automatically.
 
-For the full HTTP API reference (workspace, git, and instruction endpoints), see [API & Transport](../internals/api-and-transport.md). For the `WALLFACER_WORKSPACES`, `WALLFACER_AUTO_PUSH`, and `WALLFACER_AUTO_PUSH_THRESHOLD` env vars, see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
+For the full HTTP API reference (workspace and git endpoints), see [API & Transport](../internals/api-and-transport.md). For the `WALLFACER_WORKSPACES`, `WALLFACER_AUTO_PUSH`, and `WALLFACER_AUTO_PUSH_THRESHOLD` env vars, see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
 
 ---
 
