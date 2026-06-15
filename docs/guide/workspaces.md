@@ -11,7 +11,7 @@ Workspaces are the directories containing your source code that Wallfacer runs t
 | Concept | Description |
 |---|---|
 | **Workspace** | An absolute host directory a task runs against. Each task gets its own git worktree of the workspace as its working directory. Can be a git repository or a plain directory. |
-| **Workspace group** | A saved combination of one or more workspaces. Groups appear as tabs in the header bar, similar to VS Code workspace tabs. Switching groups switches the entire task board. |
+| **Workspace group** | A saved combination of one or more workspaces. Groups are listed in the sidebar workspace switcher (the **W** button near the top of the left sidebar). Switching groups switches the entire task board. |
 | **Default branch** | The branch currently checked out in a workspace (e.g. `main`, `develop`). Task branches are created from the default branch HEAD and merged back into it when the task completes. |
 
 ### Setting Up Workspaces
@@ -79,38 +79,35 @@ Each task works on an isolated branch named `task/<id>`, created from the defaul
 
 Workspace groups let you save and switch between different combinations of workspaces without restarting the server.
 
-#### Header tabs
+#### Workspace switcher
 
-Each saved group appears as a tab in the header bar. The currently active group is highlighted. Click a different tab to switch to that group. Wallfacer stops any active SSE streams, resets the board, loads the new group's task store, and reconnects the streams -- all within a few seconds.
-
-When the window is too narrow to fit all tabs, overflow tabs are automatically hidden and accessible via the **+** menu. The active tab is never auto-hidden.
+The **W** button near the top of the left sidebar opens the workspace switcher popover, which lists every saved group. The active group is marked with a check. Click a group to switch to it. Wallfacer stops any active SSE streams, resets the board, loads the new group's task store, and reconnects the streams -- all within a few seconds.
 
 #### Naming groups
 
-By default, tabs show the basename(s) of the workspace directories (e.g. `repo-a + repo-b`). You can assign a short, readable name to any group:
+By default, the switcher shows the basename(s) of the workspace directories (e.g. `repo-a + repo-b`). You can assign a short, readable name to any group:
 
-- **Double-click** the active tab in the header to rename it inline. Press Enter to confirm or Escape to cancel.
-- Open **Settings > Workspace** and click **Rename** next to a group to set a name via a dialog.
+- Open the sidebar workspace switcher and click the **pencil** (rename) button on a group row to set a name in the prompt dialog.
 
-Named groups display the custom name on the tab. Hover over a tab to see the full workspace paths. To clear a custom name, rename it to an empty string -- the tab reverts to the basename fallback.
+Named groups display the custom name in the switcher. Hover over a group row to see the full workspace paths. To clear a custom name, rename it to an empty string -- the row reverts to the basename fallback.
 
-#### Managing tabs
+#### Managing groups
+
+All group actions live in the sidebar workspace switcher popover (the **W** button), except where Settings is noted.
 
 | Action | How |
 |---|---|
-| Switch to a group | Click its tab in the header |
-| Rename a group | Double-click the active tab, or click **Rename** in Settings |
-| Hide a tab | Click the X on an inactive tab |
-| Restore a hidden tab | Click the **+** button and select from the list |
-| Add a new group | Click **+** and choose "New workspace group..." to open the workspace picker |
-| Edit a group | Open **Settings > Workspace** and click **Edit** next to the group |
-| Remove a group | Open **Settings > Workspace** and click **Remove** |
+| Switch to a group | Open the switcher and click the group row |
+| Rename a group | Click the **pencil** button on the group row |
+| Delete a group | Click the **×** button on the group row and confirm. Tasks under it stay on disk but are unreachable until the group is recreated |
+| Add a new group | Click **Add workspace…** to open the workspace picker, choose directories, and **Activate** |
+| Set per-group parallel limits | Open **Settings > Workspace** and edit the group's parallel fields |
 
 Groups are saved automatically to `~/.wallfacer/workspace-groups.json` whenever a group becomes active. The most recently used group is promoted to the front of the list.
 
 #### Concurrent workspace groups
 
-You can switch workspace groups at any time, even while tasks are running. Tasks in the previous group continue executing in the background -- their stores and worktrees are kept alive until all tasks complete. The header tabs show per-group task count badges (**N running**, **N waiting**) so you can see at a glance which groups have active work.
+You can switch workspace groups at any time, even while tasks are running. Tasks in the previous group continue executing in the background -- their stores and worktrees are kept alive until all tasks complete. The switcher popover shows per-group task count badges (**N running**, **N waiting**) so you can see at a glance which groups have active work.
 
 ### Branch Management
 

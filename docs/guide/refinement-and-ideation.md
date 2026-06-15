@@ -44,12 +44,9 @@ The ideation agent analyzes your workspace, reading source files, project manife
 
 #### How it works
 
-Ideation is one instance of the generic **routine task** primitive. The server materializes a `system:ideation`-tagged routine card on first boot; its schedule and enabled flag live on the card itself, and the scheduler engine fires it to spawn instance tasks against the built-in `brainstorm` flow. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and dispatch identically via the legacy-kind mapper.
+Each ideation run is a one-shot `Kind = "idea-agent"` task. `POST /api/ideate` creates the task directly via `CreateTaskWithOptions` and kicks off its runner; the card goes through the regular execute path. There is no hidden always-on routine: the earlier `system:ideation`-tagged routine card has been retired, and `cleanupLegacyIdeationRoutine` deletes any such card left by an older build on startup. To repeat ideation on a schedule, create an idea-agent task from the composer with the recurring option ticked, producing a normal user-owned routine card.
 
-Two control surfaces exist, and both edit the same underlying routine:
-
-- **Settings, Automation**: the legacy Brainstorm toggle and interval selector still work. Writes land on the system routine.
-- **Board**: the routine card appears in the backlog column with inline controls (interval picker, enabled toggle, Run now, countdown). See the *Routine tasks* section in *Board and Tasks* for the full UI.
+- **Board**: a recurring idea-agent routine card appears in the backlog column with inline controls (interval picker, enabled toggle, Run now, countdown). See the *Routine tasks* section in *Board and Tasks* for the full UI.
 
 #### Enabling Ideation
 
@@ -157,7 +154,7 @@ When ideation is enabled, you can set an automatic repeat interval so brainstorm
 | 15 min | Schedule the next run 15 minutes after the previous one finishes |
 | 30 min, 1h, 2h, 4h, 8h, 24h | Correspondingly longer intervals |
 
-Configure the interval from the Automation menu or Settings > Execution. When an interval is set and a brainstorm is not currently running, the header displays a countdown showing when the next run is scheduled (for example, "Next brainstorm in 23m").
+Configure the interval from the Automation menu or Settings > Execution.
 
 ### Configuration Variables
 
@@ -167,8 +164,8 @@ Automation toggles (set via `PUT /api/config`):
 
 | Config Field | Description |
 |---|---|
-| `ideation` | Enable periodic brainstorm runs |
-| `ideation_interval` | Minutes between brainstorm runs (0 = run immediately on completion) |
+| `ideation` | Retained no-op shim. `PUT /api/config` still parses it, but `SetIdeation` does nothing and `IdeationEnabled` always returns `false`; periodic ideation is now a user-created routine. |
+| `ideation_interval` | Retained no-op shim. Parsed but discarded; `IdeationInterval` always returns 0. |
 
 There is no `autorefine` config field: task-mode planning is user-driven and does not have an auto-promoted refine step.
 

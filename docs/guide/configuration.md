@@ -543,7 +543,6 @@ Request bodies are limited to prevent abuse:
 | Endpoint Category | Limit |
 |---|---|
 | Default | 1 MiB |
-| Instructions (AGENTS.md) | 5 MiB |
 | Feedback | 512 KiB |
 
 ### Trash Management
