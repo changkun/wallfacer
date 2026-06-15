@@ -402,6 +402,14 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-name">Done</span>
         <span class="col-count">{{ store.done.length }}</span>
         <span v-if="doneStats" class="col-stats">{{ doneStats }}</span>
+        <button
+          type="button"
+          class="col-btn"
+          :class="{ 'col-btn--on': ui.showArchived }"
+          :aria-pressed="ui.showArchived"
+          :title="ui.showArchived ? 'Hide archived tasks' : 'Show archived tasks'"
+          @click="ui.setShowArchived(!ui.showArchived)"
+        >{{ ui.showArchived ? 'Hide archived' : 'Show archived' }}</button>
         <button v-if="store.done.length > 0" class="col-btn" @click="archiveAllDone">Archive all</button>
       </div>
       <div class="column col-bg">

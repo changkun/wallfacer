@@ -14,13 +14,14 @@ This is the current and default runtime. Throughout this document, "the agent" r
 
 ### Opening Settings
 
-Open the Settings page by clicking the gear icon in the top-right corner of the task board, or press `Cmd+,` (`Ctrl+,`). The page has six tabs: Appearance, Execution, Harness, Workspace, Prompts, and About. (Trash moved to the board header; see [Trash Management](#trash-management).)
+Open the Settings page by clicking the gear icon in the top-right corner of the task board, or press `Cmd+,` (`Ctrl+,`). The page has five tabs: Execution, Harness, Workspace, Prompts, and About.
 
-### Appearance
+Some controls that used to live in Settings are now on the surfaces they act on:
 
-**Theme** -- Choose between Light, Dark, or Auto (follows the operating system preference). The theme applies to the current browser session.
-
-**Done Column** -- Toggle "Show archived tasks" to display or hide archived completed tasks on the board.
+- **Theme** (Light/Dark/Auto) -- in the account menu (top-right avatar).
+- **Show archived tasks** -- a toggle in the board's Done column header.
+- **Trash** -- the trash-can icon in the board header (see [Trash Management](#trash-management)).
+- **Automation toggles** -- the lightning-bolt popover in the board header (see [Automation](automation.md)).
 
 ### Setting Up Credentials
 
