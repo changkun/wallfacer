@@ -6,6 +6,7 @@ import { useEnvConfig } from '../../composables/useEnvConfig';
 import { claudeModelsFor, codexModelsFor } from '../../lib/knownModels';
 import { supportedHarnesses } from '../../lib/harness';
 import HarnessBadge from '../HarnessBadge.vue';
+import AppSelect from '../AppSelect.vue';
 import type {
   EnvConfig,
   EnvUpdatePayload,
@@ -409,6 +410,11 @@ onUnmounted(() => {
 function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
+
+const defaultSandboxOptions = computed(() => [
+  { value: '', label: 'Auto (model defaults)' },
+  ...sandboxes.value.map((sb) => ({ value: sb, label: capitalize(sb) })),
+]);
 </script>
 
 <template>
@@ -835,17 +841,11 @@ function capitalize(s: string): string {
           <div style="display: flex; flex-direction: column; gap: 10px">
             <div>
               <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Default Harness (WALLFACER_DEFAULT_SANDBOX)</label>
-              <select
-                id="env-default-sandbox"
+              <AppSelect
                 v-model="defaultSandbox"
-                class="select"
-                style="font-size: 12px"
-                data-sandbox-select="true"
-                data-default-text="Auto (model defaults)"
-              >
-                <option value="">Auto (model defaults)</option>
-                <option v-for="sb in sandboxes" :key="sb" :value="sb">{{ capitalize(sb) }}</option>
-              </select>
+                :options="defaultSandboxOptions"
+                aria-label="Default Harness"
+              />
             </div>
             <p style="font-size: 11px; color: var(--text-muted); line-height: 1.5; margin: 0 0 4px;">
               Activity-specific harness routing (Implementation, Testing, etc.) now

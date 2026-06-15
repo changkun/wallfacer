@@ -13,6 +13,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import DependencyPicker from './DependencyPicker.vue';
+import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
 // Re-imported as a local binding so the template can call renderMarkdown()
@@ -608,6 +609,11 @@ const editPromptPreview = ref(false);
 const editTimeout = ref<number | null>(null);
 const editModel = ref('');
 const editSandbox = ref('');
+const EDIT_SANDBOX_OPTIONS = [
+  { value: '', label: 'Default (agent)' },
+  { value: 'claude', label: 'Claude' },
+  { value: 'codex', label: 'Codex' },
+];
 const editTags = ref('');
 const editDeps = ref<string[]>([]);
 const editScheduledAt = ref('');
@@ -1294,11 +1300,7 @@ const isArchived = computed(() => !!props.task.archived);
                     </label>
                     <label class="backlog-edit__field">
                       <span>Harness</span>
-                      <select v-model="editSandbox">
-                        <option value="">Default (agent)</option>
-                        <option value="claude">Claude</option>
-                        <option value="codex">Codex</option>
-                      </select>
+                      <AppSelect v-model="editSandbox" :options="EDIT_SANDBOX_OPTIONS" aria-label="Harness" block />
                     </label>
                     <div class="backlog-edit__field">
                       <span>Depends on</span>
@@ -1785,7 +1787,7 @@ const isArchived = computed(() => !!props.task.archived);
   color: var(--text-muted);
 }
 .backlog-edit__field input,
-.backlog-edit__field select,
+.backlog-edit__field :deep(.app-select__trigger),
 .backlog-edit__prompt {
   background: var(--bg-input);
   border: 1px solid var(--border);
