@@ -22,10 +22,13 @@ on the spectrum from fully manual to fully hands-off.
 
 ### The Automation Toggles
 
-Open Settings via the lightning bolt icon in the header bar (a
-`router-link` to `/settings?tab=execution`), which lands on the
-Execution tab. The Automation section there renders a vertical column of
-checkboxes:
+Click the lightning bolt icon in the header bar to open the **Automation**
+menu, a popover that lists the toggles inline so they are one click away
+from the board. A clay dot on the icon marks that at least one watcher is
+armed. The same switches, plus the numeric execution knobs (parallelism,
+oversight interval, auto-push threshold), also live on the Execution
+settings page, reachable from the popover's "All execution settings" link
+or directly at `/settings?tab=execution`. The toggles are:
 
 | Toggle | Label in menu | What it controls |
 |--------|---------------|------------------|
