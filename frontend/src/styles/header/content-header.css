@@ -356,6 +356,13 @@
   background: var(--bg-hover);
   color: var(--ink);
 }
+.col-btn--on {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+.col-btn--on:hover {
+  color: var(--accent);
+}
 .col-icon-btn {
   margin-left: auto;
   border: none;

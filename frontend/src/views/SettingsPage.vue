@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import SettingsTabAppearance from '../components/settings/SettingsTabAppearance.vue';
 import SettingsTabExecution from '../components/settings/SettingsTabExecution.vue';
 import SettingsTabSandbox from '../components/settings/SettingsTabSandbox.vue';
 import SettingsTabWorkspace from '../components/settings/SettingsTabWorkspace.vue';
@@ -9,14 +8,13 @@ import SettingsTabPrompts from '../components/settings/SettingsTabPrompts.vue';
 import SettingsTabAbout from '../components/settings/SettingsTabAbout.vue';
 import { useUiStore } from '../stores/ui';
 
-type TabKey = 'appearance' | 'execution' | 'sandbox' | 'workspace' | 'prompts' | 'about';
+type TabKey = 'execution' | 'sandbox' | 'workspace' | 'prompts' | 'about';
 
 const route = useRoute();
 const router = useRouter();
 const ui = useUiStore();
 
 const tabs: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'appearance', label: 'Appearance', icon: 'M12 3v2M12 19v2M5 12H3M21 12h-2M7 7l-1.5-1.5M18.5 18.5L17 17M7 17l-1.5 1.5M18.5 5.5L17 7M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z' },
   { key: 'execution', label: 'Execution', icon: 'M13 2L3 14h9l-1 8 10-12h-9z' },
   { key: 'sandbox', label: 'Harness', icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' },
   { key: 'workspace', label: 'Workspace', icon: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' },
@@ -25,8 +23,8 @@ const tabs: { key: TabKey; label: string; icon: string }[] = [
 ];
 
 const activeTab = computed<TabKey>(() => {
-  const t = (route.query.tab as TabKey) || 'appearance';
-  return tabs.some(x => x.key === t) ? t : 'appearance';
+  const t = (route.query.tab as TabKey) || 'execution';
+  return tabs.some(x => x.key === t) ? t : 'execution';
 });
 
 function selectTab(key: TabKey) {
@@ -38,7 +36,7 @@ function openWorkspacePicker() {
 }
 
 onMounted(() => {
-  if (!route.query.tab) selectTab('appearance');
+  if (!route.query.tab) selectTab('execution');
 });
 </script>
 
@@ -72,8 +70,7 @@ onMounted(() => {
         </div>
 
         <div class="set-body">
-          <SettingsTabAppearance v-if="activeTab === 'appearance'" />
-          <SettingsTabExecution v-else-if="activeTab === 'execution'" />
+          <SettingsTabExecution v-if="activeTab === 'execution'" />
           <SettingsTabSandbox v-else-if="activeTab === 'sandbox'" />
           <SettingsTabWorkspace v-else-if="activeTab === 'workspace'" @workspaces="openWorkspacePicker" />
           <SettingsTabPrompts v-else-if="activeTab === 'prompts'" />
