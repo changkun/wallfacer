@@ -255,7 +255,7 @@ Why no wallfacer-owned K8s control plane? Cella already owns sandbox runtime, li
 
 ## Git Workflow
 
-Git and GitHub workflow as a product surface: revert, PR creation, and attribution over the commit graph. Pull-request is the GitHub-integration member (collects `git log`/`git diff` host-side, shells `gh pr create`); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec.
+Git and GitHub workflow as a product surface: revert, PR creation, and attribution over the commit graph. Pull-request is the GitHub-integration member (collects `git log`/`git diff` host-side, shells `gh pr create`); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec. GitHub *identity* (canonical `host/owner/repo`) is owned by the cloud coordination plane ([repo-identity](cloud/latere-integration/coordination-plane/repo-identity.md)); the PR feature consumes it rather than redefining it.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
