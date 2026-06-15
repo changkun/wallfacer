@@ -73,10 +73,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.4;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
@@ -111,25 +111,28 @@
   opacity: 0.55;
 }
 
-/* Disclosure triangle */
+/* Disclosure chevron — SVG mask in currentColor, matching the spec tree's
+   .stp-chev so the two trees read as one component. Files render an empty
+   box of the same size for alignment. */
 .explorer-node__toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  font-size: 8px;
-  color: var(--text-muted);
 }
-.explorer-node__toggle svg {
-  display: block;
-  width: 10px;
-  height: 10px;
+.explorer-node__toggle.is-dir {
+  background-color: var(--ink-3);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+  transition: transform 0.15s ease, background-color 0.15s ease;
 }
-.explorer-node--loading .explorer-node__toggle,
-.explorer-node__toggle.explorer-node--loading {
-  font-size: 10px;
+.explorer-node:hover .explorer-node__toggle.is-dir {
+  background-color: var(--ink);
+}
+.explorer-node__toggle.is-open {
+  transform: rotate(90deg);
+  background-color: var(--ink-2);
+}
+.explorer-node--loading .explorer-node__toggle {
   animation: explorer-pulse 1s infinite;
 }
 @keyframes explorer-pulse {
