@@ -18,6 +18,7 @@ import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFe
 import { hasActivity, parseActivity } from '../lib/prettyNdjson';
 import { enhanceMermaid } from '../lib/mermaidRender';
 import { usePlanningStore } from '../stores/planning';
+import { useTaskStore } from '../stores/tasks';
 import type { PlanningMessage, PlanningThread } from '../stores/planning';
 import {
   type RenderedBubble,
@@ -71,6 +72,7 @@ export interface ChatSession {
 
 export function useChatSession(): ChatSession {
   const planning = usePlanningStore();
+  const tasks = useTaskStore();
   const {
     threads, threadOrder, activeThreadId,
     streaming, streamingThreadId, focusedSpecPath,
@@ -598,6 +600,21 @@ export function useChatSession(): ChatSession {
       el.addEventListener('scroll', onScroll);
     }
   });
+
+  // Threads are scoped per workspace group on the server (the ThreadManager is
+  // re-rooted on workspace switch). When the active workspace changes under a
+  // mounted chat surface, reload so the session list reflects the new group
+  // without a page refresh. Fires on change only — the initial load is handled
+  // by onMounted below.
+  watch(
+    () => JSON.stringify(tasks.config?.workspaces ?? []),
+    () => {
+      void (async () => {
+        await planning.loadThreads();
+        await loadHistory();
+      })();
+    },
+  );
 
   onMounted(async () => {
     await planning.loadThreads();
