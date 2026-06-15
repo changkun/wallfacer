@@ -19,6 +19,7 @@ import { hasActivity, parseActivity } from '../lib/prettyNdjson';
 import { enhanceMermaid } from '../lib/mermaidRender';
 import { usePlanningStore } from '../stores/planning';
 import { useTaskStore } from '../stores/tasks';
+import { useDialogStore } from '../stores/dialog';
 import type { PlanningMessage, PlanningThread } from '../stores/planning';
 import {
   type RenderedBubble,
@@ -73,6 +74,7 @@ export interface ChatSession {
 export function useChatSession(): ChatSession {
   const planning = usePlanningStore();
   const tasks = useTaskStore();
+  const dialog = useDialogStore();
   const {
     threads, threadOrder, activeThreadId,
     streaming, streamingThreadId, focusedSpecPath,
@@ -488,7 +490,12 @@ export function useChatSession(): ChatSession {
   }
 
   async function archiveThread(id: string) {
-    if (typeof confirm === 'function' && !confirm('Archive this thread? You can restore it later.')) return;
+    const ok = await dialog.confirm({
+      title: 'Archive thread',
+      message: 'Archive this thread? You can restore it later.',
+      confirmLabel: 'Archive',
+    });
+    if (!ok) return;
     try {
       const res = await fetch('/api/planning/threads/' + encodeURIComponent(id), {
         method: 'PATCH',

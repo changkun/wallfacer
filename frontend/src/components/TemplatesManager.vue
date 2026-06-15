@@ -4,12 +4,15 @@ import { api } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import type { PromptTemplate } from '../api/types';
 import { useEscapeToClose } from '../composables/useEscapeToClose';
+import { useDialogStore } from '../stores/dialog';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   changed: [];
 }>();
+
+const dialog = useDialogStore();
 
 useEscapeToClose(() => props.modelValue, () => close());
 
@@ -77,13 +80,19 @@ async function saveNewTemplate() {
 }
 
 async function deleteTemplate(id: string) {
-  if (!window.confirm('Delete this template?')) return;
+  const ok = await dialog.confirm({
+    title: 'Delete template',
+    message: 'Delete this template?',
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api('DELETE', `/api/templates/${id}`);
     await refresh();
     emit('changed');
   } catch (e) {
-    window.alert('Error deleting template: ' + (e instanceof Error ? e.message : 'unknown'));
+    await dialog.alert('Error deleting template: ' + (e instanceof Error ? e.message : 'unknown'));
   }
 }
 
