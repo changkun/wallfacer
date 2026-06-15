@@ -46,6 +46,7 @@ function onSetLocale(code: string) {
     :principal="auth.me"
     :placement="placement"
     :extra-items="extraItems"
+    :labels="{ signIn: 'Sign in via latere.ai' }"
     :switching-org-id="switching"
     @switch-org="onSwitch"
     @logout="auth.logout()"
