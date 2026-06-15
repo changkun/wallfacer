@@ -333,15 +333,6 @@ func (h *Handler) CurrentWorkspaces() []string {
 	return h.currentWorkspaces()
 }
 
-// currentInstructionsPath returns the filesystem path to the active
-// workspace AGENTS.md, or "" if no workspace manager is available.
-func (h *Handler) currentInstructionsPath() string {
-	if h.workspace != nil {
-		return h.workspace.InstructionsPath()
-	}
-	return ""
-}
-
 // applySnapshot updates all handler fields that mirror the active workspace
 // snapshot. It is the single place where snapshot-derived state is written
 // into the handler, called both at construction time and from the workspace

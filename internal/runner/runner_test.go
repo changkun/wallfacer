@@ -112,9 +112,8 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	}
 }
 
-// newTestRunnerWithInstructions creates a Runner whose instructionsPath points
-// to the given path (may or may not exist on disk).
-func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runner {
+// newTestRunner creates a Runner backed by a fresh temporary file store.
+func newTestRunner(t *testing.T) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
 	s, err := store.NewFileStore(dataDir)
@@ -123,8 +122,7 @@ func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runne
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
-		Command:          "podman",
-		InstructionsPath: instructionsPath,
+		Command: "podman",
 	})
 	t.Cleanup(func() { r.Shutdown() })
 	return r
@@ -140,29 +138,6 @@ func containsConsecutive(slice []string, needle1, needle2 string) bool {
 	}
 	return false
 }
-
-// ---------------------------------------------------------------------------
-// Runner.buildContainerArgs — CLAUDE.md mount
-// ---------------------------------------------------------------------------
-
-// TestContainerArgsMountsCLAUDEMD verifies that when instructionsPath is set
-// and the file exists, buildContainerArgs includes a read-only volume mount
-// that places it at /workspace/CLAUDE.md inside the container.
-
-// TestContainerArgsCLAUDEMDMountIsReadOnly verifies the mount is marked :ro
-// so the container cannot accidentally modify the shared instructions file.
-
-// TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo verifies that when
-// there is exactly one workspace, CLAUDE.md is mounted inside the repo directory
-// (/workspace/<repo>/CLAUDE.md) so the agent stays anchored to the repo root
-// rather than treating /workspace/ as the project root.
-
-// TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace verifies that when
-// there are multiple workspaces, CLAUDE.md is mounted at /workspace/CLAUDE.md
-// (the CWD for multi-workspace mode).
-
-// TestContainerArgsCodexMountsAGENTSMD verifies that codex sandbox mounts
-// workspace instructions at /workspace/AGENTS.md.
 
 func TestHostCodexAuthStatus_Valid(t *testing.T) {
 	codexAuthDir := t.TempDir()

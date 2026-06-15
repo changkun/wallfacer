@@ -277,13 +277,12 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	probeRunner := runner.NewRunner(h.store, runner.RunnerConfig{
-		Command:          h.runner.Command(),
-		EnvFile:          tempEnvFile,
-		Workspaces:       h.currentWorkspaces(),
-		WorktreesDir:     h.runner.WorktreesDir(),
-		TmpDir:           h.runner.TmpDir(),
-		InstructionsPath: h.currentInstructionsPath(),
-		CodexAuthPath:    h.runner.CodexAuthPath(),
+		Command:       h.runner.Command(),
+		EnvFile:       tempEnvFile,
+		Workspaces:    h.currentWorkspaces(),
+		WorktreesDir:  h.runner.WorktreesDir(),
+		TmpDir:        h.runner.TmpDir(),
+		CodexAuthPath: h.runner.CodexAuthPath(),
 	})
 	probeRunner.Run(task.ID, prompt, "", false)
 

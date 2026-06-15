@@ -42,29 +42,6 @@ func TestBuildContainerSpec_HostMode_WorkDirIsHostPath(t *testing.T) {
 	}
 }
 
-func TestBuildContainerSpec_HostMode_InstructionsEnv(t *testing.T) {
-	workspace := t.TempDir()
-	instr := filepath.Join(t.TempDir(), "AGENTS.md")
-	if err := os.WriteFile(instr, []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	r := newHostModeRunner(t, RunnerConfig{
-		Command:          "echo",
-		Workspaces:       []string{workspace},
-		WorktreesDir:     t.TempDir(),
-		InstructionsPath: instr,
-	})
-
-	spec := r.buildContainerSpecForSandbox(
-		"wallfacer-host", "task-1", "do work", "",
-		nil, "", nil, "", harness.Claude,
-	)
-
-	if spec.Env["WALLFACER_INSTRUCTIONS_PATH"] != instr {
-		t.Errorf("WALLFACER_INSTRUCTIONS_PATH = %q; want %q", spec.Env["WALLFACER_INSTRUCTIONS_PATH"], instr)
-	}
-}
-
 func TestBuildContainerSpec_HostMode_BoardAndSiblingsViaEnv(t *testing.T) {
 	workspace := t.TempDir()
 	boardDir := t.TempDir()

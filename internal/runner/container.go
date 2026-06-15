@@ -124,14 +124,7 @@ func (r *Runner) buildHostSpec(
 	}
 	spec.WorkDir = workDir
 
-	// Surface instructions / board / siblings via env vars. HostBackend reads
-	// WALLFACER_INSTRUCTIONS_PATH to decide between --append-system-prompt
-	// and prompt-prepend fallback.
-	if instr := r.currentInstructionsPath(); instr != "" {
-		if _, err := os.Stat(instr); err == nil {
-			spec.Env["WALLFACER_INSTRUCTIONS_PATH"] = instr
-		}
-	}
+	// Surface board / siblings via env vars.
 	if boardDir != "" {
 		boardPath := filepath.Join(boardDir, "board.json")
 		if _, err := os.Stat(boardPath); err == nil {

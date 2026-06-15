@@ -499,8 +499,7 @@ func (r *Runner) buildInspectorSpec(
 	}
 
 	// Host backend runs in a real workspace directory; cwd is the first
-	// configured workspace. Instructions reach the agent via the
-	// WALLFACER_INSTRUCTIONS_PATH env the heavyweight path also uses.
+	// configured workspace.
 	for _, ws := range r.currentWorkspaces() {
 		ws = strings.TrimSpace(ws)
 		if ws != "" {

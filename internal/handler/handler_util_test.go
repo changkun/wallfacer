@@ -44,18 +44,6 @@ func TestCurrentWorkspaces_WorkspaceManagerNil_WithWorkspaces(t *testing.T) {
 	}
 }
 
-// TestCurrentInstructionsPath_WorkspaceManagerNil exercises the
-// h.workspace == nil branch that returns "".
-func TestCurrentInstructionsPath_WorkspaceManagerNil(t *testing.T) {
-	h := newTestHandler(t)
-	h.workspace = nil
-
-	path := h.currentInstructionsPath()
-	if path != "" {
-		t.Errorf("expected empty string when h.workspace==nil, got %q", path)
-	}
-}
-
 // --- incAutopilotPhase2Miss ---
 
 // TestIncAutopilotPhase2Miss_NilRegistry verifies that incAutopilotPhase2Miss

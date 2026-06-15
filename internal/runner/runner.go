@@ -85,7 +85,6 @@ type RunnerConfig struct {
 	DefaultEnvFile     string
 	Workspaces         []string // workspace directory paths
 	WorktreesDir       string
-	InstructionsPath   string
 	CodexAuthPath      string           // host path to codex auth cache directory (default: ~/.codex)
 	HostClaudeBinary   string           // optional override for the `claude` binary path
 	HostCodexBinary    string           // optional override for the `codex` binary path
@@ -147,7 +146,6 @@ type Runner struct {
 	workspaces             []string
 	worktreesDir           string
 	tmpDir                 string
-	instructionsPath       string
 	workspaceManager       *workspace.Manager
 	codexAuthPath          string
 	promptsMgr             *prompts.Manager                 // prompt template manager
@@ -426,7 +424,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		workspaces:       cfg.Workspaces,
 		worktreesDir:     cfg.WorktreesDir,
 		tmpDir:           cfg.TmpDir,
-		instructionsPath: cfg.InstructionsPath,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
 		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
@@ -581,7 +578,6 @@ func (r *Runner) applyWorkspaceSnapshot(s workspace.Snapshot) {
 	r.store = s.Store
 	r.wsKey = s.Key
 	r.workspaces = s.Workspaces
-	r.instructionsPath = s.InstructionsPath
 	r.storeMu.Unlock()
 }
 
@@ -608,15 +604,6 @@ func (r *Runner) currentWorkspaces() []string {
 	r.storeMu.RLock()
 	defer r.storeMu.RUnlock()
 	return r.workspaces
-}
-
-// currentInstructionsPath returns the runner's instructions file path under
-// a read lock. Like currentWorkspaces, this is updated by
-// applyWorkspaceSnapshot and must not be read without the lock.
-func (r *Runner) currentInstructionsPath() string {
-	r.storeMu.RLock()
-	defer r.storeMu.RUnlock()
-	return r.instructionsPath
 }
 
 // taskStore returns the store for the workspace group that owns the given task.
@@ -708,14 +695,6 @@ func (r *Runner) WorktreesDir() string {
 // TmpDir returns the base directory for ephemeral files bind-mounted into containers.
 func (r *Runner) TmpDir() string {
 	return r.tmpDir
-}
-
-// InstructionsPath returns the host path mounted as /workspace/AGENTS.md.
-func (r *Runner) InstructionsPath() string {
-	if r.workspaceManager != nil {
-		return r.workspaceManager.InstructionsPath()
-	}
-	return r.currentInstructionsPath()
 }
 
 // Prompts returns the prompt template Manager used by this runner.

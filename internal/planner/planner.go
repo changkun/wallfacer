@@ -23,24 +23,22 @@ const planningTaskID = "planning-sandbox"
 
 // Config holds the configuration for a Planner.
 type Config struct {
-	Backend          executor.Backend // execution backend (host; cloud later)
-	Command          string           // legacy runtime binary path; unused on the host backend
-	Workspaces       []string         // workspace directory paths
-	EnvFile          string           // path to .env file for the agent process
-	Fingerprint      string           // workspace fingerprint for keying the planning workspace
-	InstructionsPath string           // path to AGENTS.md / CLAUDE.md instructions file
-	ConfigDir        string           // base config directory (~/.wallfacer/) for conversation persistence
+	Backend     executor.Backend // execution backend (host; cloud later)
+	Command     string           // legacy runtime binary path; unused on the host backend
+	Workspaces  []string         // workspace directory paths
+	EnvFile     string           // path to .env file for the agent process
+	Fingerprint string           // workspace fingerprint for keying the planning workspace
+	ConfigDir   string           // base config directory (~/.wallfacer/) for conversation persistence
 }
 
 // Planner manages the singleton planning agent process for a workspace.
 type Planner struct {
-	mu               sync.Mutex
-	backend          executor.Backend
-	command          string
-	workspaces       []string
-	envFile          string
-	fingerprint      string
-	instructionsPath string
+	mu          sync.Mutex
+	backend     executor.Backend
+	command     string
+	workspaces  []string
+	envFile     string
+	fingerprint string
 
 	handle       executor.Handle // non-nil when a planning invocation is active
 	active       bool            // true after Start, false after Stop
@@ -58,13 +56,12 @@ type Planner struct {
 // migrated to "Chat 1".
 func New(cfg Config) *Planner {
 	p := &Planner{
-		backend:          cfg.Backend,
-		command:          cfg.Command,
-		workspaces:       cfg.Workspaces,
-		envFile:          cfg.EnvFile,
-		fingerprint:      cfg.Fingerprint,
-		instructionsPath: cfg.InstructionsPath,
-		configDir:        cfg.ConfigDir,
+		backend:     cfg.Backend,
+		command:     cfg.Command,
+		workspaces:  cfg.Workspaces,
+		envFile:     cfg.EnvFile,
+		fingerprint: cfg.Fingerprint,
+		configDir:   cfg.ConfigDir,
 	}
 	if cfg.ConfigDir != "" && cfg.Fingerprint != "" {
 		tm, err := NewThreadManager(filepath.Join(cfg.ConfigDir, "planning", cfg.Fingerprint))

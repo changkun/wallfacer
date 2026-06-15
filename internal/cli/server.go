@@ -128,10 +128,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		logger.Fatal("create tmp dir", "error", err)
 	}
 
-	if snapshot.InstructionsPath != "" {
-		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
-	}
-
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
@@ -151,7 +147,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		Workspaces:         workspaces,
 		WorktreesDir:       worktreesDir,
 		TmpDir:             tmpDir,
-		InstructionsPath:   snapshot.InstructionsPath,
 		CodexAuthPath:      codexAuthPath,
 		HostClaudeBinary:   envCfg.HostClaudeBinary,
 		HostCodexBinary:    envCfg.HostCodexBinary,
@@ -240,12 +235,11 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	// Create and wire the planning sandbox manager.
 	p := planner.New(planner.Config{
-		Backend:          r.SandboxBackend(),
-		Workspaces:       snapshot.Workspaces,
-		EnvFile:          cfg.EnvFile,
-		Fingerprint:      snapshot.Key,
-		InstructionsPath: snapshot.InstructionsPath,
-		ConfigDir:        configDir,
+		Backend:     r.SandboxBackend(),
+		Workspaces:  snapshot.Workspaces,
+		EnvFile:     cfg.EnvFile,
+		Fingerprint: snapshot.Key,
+		ConfigDir:   configDir,
 	})
 	h.SetPlanner(p)
 	r.SetPlanner(p)

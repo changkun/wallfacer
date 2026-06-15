@@ -139,18 +139,11 @@ func TestBuildContainerSpec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a temp instructions file.
-	instrFile := filepath.Join(t.TempDir(), "CLAUDE.md")
-	if err := os.WriteFile(instrFile, []byte("# instructions"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
 	p := New(Config{
-		Command:          "/usr/bin/podman",
-		Workspaces:       []string{tmpDir},
-		EnvFile:          "/tmp/test.env",
-		Fingerprint:      "abc123",
-		InstructionsPath: instrFile,
+		Command:     "/usr/bin/podman",
+		Workspaces:  []string{tmpDir},
+		EnvFile:     "/tmp/test.env",
+		Fingerprint: "abc123",
 	})
 
 	spec := p.buildSpec("wallfacer-plan-test", harness.Claude)
@@ -168,11 +161,6 @@ func TestBuildContainerSpec(t *testing.T) {
 	}
 	if spec.EnvFile != "/tmp/test.env" {
 		t.Errorf("EnvFile = %q, want %q", spec.EnvFile, "/tmp/test.env")
-	}
-	// The instructions file is surfaced to the host process via an env var,
-	// not a container mount.
-	if got := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; got != instrFile {
-		t.Errorf("spec.Env[WALLFACER_INSTRUCTIONS_PATH] = %q, want %q", got, instrFile)
 	}
 
 	// Check labels for backend worker routing.
