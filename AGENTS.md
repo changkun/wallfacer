@@ -2,7 +2,7 @@
 - Write commit message based on historical commit message style
 - Write commit body to describe concisely about the change
 - When work on large task, commit step by step with well scoped changes
-- Commit often and one intended diff at a time
+- Commit frequent and one scoped diff at a time
 - Work on main branch directly
 - When working on a big feature, create specs first then start implement
 - Relevant latere projects and shared components and packages can be found in ../
