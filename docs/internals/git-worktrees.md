@@ -62,7 +62,6 @@ The agent runs as a host process with the task's git worktree as its working dir
 
 Supporting context is surfaced to the host process via environment variables rather than mounts:
 
-- `WALLFACER_INSTRUCTIONS_PATH` points at the composed `AGENTS.md` (or `CLAUDE.md`); the host backend reads it to choose between `--append-system-prompt` and a prompt-prepend fallback.
 - `WALLFACER_BOARD_JSON` points at the host path of the board manifest.
 - `WALLFACER_SIBLING_WORKTREES_JSON` points at the sibling worktree manifest (see [Sibling Worktree Access](#sibling-worktree-access)).
 - The `.env` file is passed to the backend as an env-file path.

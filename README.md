@@ -135,7 +135,7 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 - **Chat.** Planning chat with slash commands and file-explorer context, the brainstorm and ideation agents, conversational drift away from or back into specs.
 - **Spec.** Six-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
 - **Task.** Host-process execution, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
-- **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, workspace-level AGENTS.md instructions.
+- **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
 Six composable sub-agent roles (each pinned to any installed harness) arrange into flows (`implement`, `brainstorm`, `test-only`, plus user-authored clones) that you can inspect or rewrite from the sidebar.
 
