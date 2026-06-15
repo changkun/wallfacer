@@ -62,4 +62,4 @@ Workspace manager, harness routing, system prompt templates, environment configu
 
 [Development Setup](development.md)
 
-Building from source, running tests, make targets, sandbox images, and the release workflow.
+Building from source, running tests, make targets, the release image, and the release workflow.

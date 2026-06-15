@@ -20,10 +20,12 @@ out of the backlog, through testing and submission, to pushing changes
 upstream. You can enable any combination to match your workflow, anywhere
 on the spectrum from fully manual to fully hands-off.
 
-### The Automation Menu
+### The Automation Toggles
 
-Open the Automation menu by clicking the lightning bolt icon in the
-header bar. The menu contains a horizontal strip of toggle switches:
+Open Settings via the lightning bolt icon in the header bar (a
+`router-link` to `/settings?tab=execution`), which lands on the
+Execution tab. The Automation section there renders a vertical column of
+checkboxes:
 
 | Toggle | Label in menu | What it controls |
 |--------|---------------|------------------|
@@ -34,8 +36,7 @@ header bar. The menu contains a horizontal strip of toggle switches:
 | Auto-submit | **Submit** | Automatic completion of verified waiting tasks |
 | Auto-push | **Push** | Automatic git push after task completion |
 
-A badge on the lightning bolt icon shows how many toggles are currently
-active. Toggles (except Auto-push) are **persisted per workspace group**
+Toggles (except Auto-push) are **persisted per workspace group**
 in `workspace-groups.json`: enabling Autopilot in group A does not
 follow you to group B, and switching back to A restores A's choices.
 A freshly created group starts with every toggle off. Auto-push stays
@@ -53,11 +54,12 @@ global and continues to persist via the env file.
 > **Per-group override.** Each workspace group can set its own
 > `max_parallel` (and `max_test_parallel`) that overrides
 > `WALLFACER_MAX_PARALLEL` / `WALLFACER_MAX_TEST_PARALLEL` for that
-> group only. Click the `max N` badge at the top of the In-Progress
-> column to edit the current group's limit: enter a positive integer
-> to cap, `0` for unlimited, or leave the field empty to clear the
-> override and fall back to the server default. Values persist in
-> `workspace-groups.json`.
+> group only. Edit a group's limit in Settings -> Workspace via the
+> per-group **Max parallel** and **Max test parallel** number inputs:
+> enter a positive integer to cap, or leave the field empty (or `0`) to
+> clear the override and fall back to the server default. The In-Progress
+> column shows the active limit as a read-only `max N` tag. Values
+> persist in `workspace-groups.json`.
 
 ### Enabling Autopilot
 
@@ -67,7 +69,7 @@ available capacity. The number of tasks that can run simultaneously is
 controlled by `WALLFACER_MAX_PARALLEL`. In host mode the default is 1;
 the claude/codex CLIs share state across concurrent runs, so raise the
 limit only after verifying your CLI tolerates parallel invocations.
-Enable it from the Automation menu or via `PUT /api/config` with
+Enable it from Settings -> Execution or via `PUT /api/config` with
 `autopilot: true`.
 
 ### Enabling Auto-Test
@@ -75,7 +77,7 @@ Enable it from the Automation menu or via `PUT /api/config` with
 Auto-test (the **Test** toggle) automatically launches the test
 verification agent on waiting tasks that have no test result yet and
 whose worktrees are up to date with the default branch. Enable it from
-the Automation menu or via `PUT /api/config` with `autotest: true`.
+Settings -> Execution or via `PUT /api/config` with `autotest: true`.
 
 ### Enabling Auto-Submit
 
@@ -87,7 +89,7 @@ Done when they meet all of the following criteria:
 - **Up to date:** no worktree is behind the default branch.
 - **Conflict-free:** no worktree has unresolved merge conflicts.
 
-Enable it from the Automation menu or via `PUT /api/config` with
+Enable it from Settings -> Execution or via `PUT /api/config` with
 `autosubmit: true`. Use it together with Auto-test for a fully automated
 test-and-submit cycle.
 

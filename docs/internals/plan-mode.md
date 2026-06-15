@@ -7,10 +7,10 @@ Plan Mode is the specification-coordination subsystem that turns free-form desig
 ```mermaid
 flowchart TB
   subgraph UI["Browser UI"]
-    ModePlan["spec-mode.js"]
-    Explorer["spec-explorer.js"]
-    Minimap["spec-minimap.js"]
-    Chat["planning-chat.js"]
+    ModePlan["PlanPage.vue"]
+    Explorer["SpecTreePanel.vue"]
+    Minimap["MapPage.vue"]
+    Chat["PlanningChatPanel.vue"]
   end
   subgraph Server
     SpecsH["handler/specs.go<br/>handler/specs_dispatch.go"]
@@ -349,7 +349,7 @@ After the revert commits, `extractDispatchedTaskIDs(diff)` greps the reverted di
 
 The Plan Mode UI lives in the Vue SPA under `frontend/src/`:
 
-- `views/PlanPage.vue` + `components/plan/SpecFocusedView.vue`, layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; handles the `/plan/<path>` route so refresh preserves the focused spec.
+- `views/PlanPage.vue` + `components/plan/SpecFocusedView.vue`, layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; preserves the focused spec across refresh via the `?spec=<path>` query string on the `/plan` route.
 - `components/plan/SpecTreePanel.vue`, tree rendering. Groups roots by track, pins the roadmap entry when `TreeResponse.Index` is present, and draws status badges and per-spec progress indicators using `TreeResponse.Progress`.
 - `views/MapPage.vue`, dependency DAG map. Renders the `depends_on` graph using the adjacency data from `TreeResponse`.
 - `components/plan/PlanningChatPanel.vue`, chat pane. Streams `GET /api/planning/messages/stream` responses, handles slash-command autocomplete against `GET /api/planning/commands`, renders the thread tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.

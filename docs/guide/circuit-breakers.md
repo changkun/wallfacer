@@ -16,14 +16,12 @@ running.
 
 ### What you see
 
-The header shows a **Circuit Breakers** section. When all watchers are
-healthy, it displays a green dot with "All healthy." When a breaker
-trips, a red indicator appears showing:
-
-- The affected watcher name (e.g. "Promote", "Retry")
-- How many consecutive failures occurred
-- A countdown until the next retry attempt
-- The error reason (hover for details)
+Watcher breaker state is not surfaced in the UI. The backend assembles
+per-watcher health (the `watcher_health` field in the config response),
+but no frontend view consumes it, so there is no rendered indicator,
+failure count, or retry countdown. The effects of an open watcher
+breaker are visible only as automation pausing (see [What still
+works](#what-still-works) below).
 
 ### What triggers a watcher breaker
 
@@ -96,8 +94,13 @@ The agent-launch breaker uses a three-state model:
 
 ### What you see
 
-The agent-launch breaker is not directly shown in the UI. Its effects
-are visible as:
+The agent-launch breaker state is shown in **Settings > About**, which
+renders a "Circuit breaker:" line with the current state (closed, open,
+half-open) and the failure count when failures are nonzero. The data
+comes from `GET /api/debug/runtime` (the `container_circuit` field),
+polled live by that tab.
+
+Its effects are also visible as:
 
 - Auto-promote stops picking up new tasks
 - Auto-retry stops retrying tasks that failed to launch
@@ -105,9 +108,6 @@ are visible as:
 
 Once the agent CLI can be launched again, the next probe succeeds and
 everything resumes automatically.
-
-The breaker state is available via `GET /api/debug/runtime` (the
-`container_circuit` field) for monitoring.
 
 ## Configuration
 

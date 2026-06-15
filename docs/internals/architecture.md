@@ -365,7 +365,7 @@ Every `internal/` package and its role in the system:
 | `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload | `Registry`, `Role`, `BuiltinAgents`, `NewRegistry()`, `Load()` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |
-| `cli` | CLI subcommand implementations (run, exec, status, doctor, spec) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
+| `cli` | CLI subcommand implementations (run, status, doctor/env, spec, auth, web) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `RunAuth()`, `RunWeb()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `eval` | Offline evaluation trajectories for planning/agent regression checks | `Trajectory`, `Run()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |

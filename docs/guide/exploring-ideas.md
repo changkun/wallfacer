@@ -30,7 +30,7 @@ sequenceDiagram
 
 ### Opening the Planning Chat
 
-Switch to Plan mode by pressing **P** (or click the mode toggle in the header). The chat pane appears on the right side of the layout. Press **C** to toggle it open or closed.
+Switch to Plan mode by pressing **P** (or click **Plan** in the left sidebar nav). In the three-pane layout (workspace with specs), the chat is a floating, draggable, resizable popup that hovers over the focused spec view. Press **C**, or click the chat toggle in the focused-view header, to open or close it; its position and size persist across sessions. When the workspace has no specs yet, the layout switches to chat-first and the chat fills the workspace as a docked panel (the **C** shortcut is inactive there).
 
 ### Sending Messages
 

@@ -155,7 +155,7 @@ Click any task card to open its detail modal. The layout adapts based on the tas
 | **Activity** | Live agent logs (Implementation and, when present, Testing sub-tabs), each with Oversight / Pretty / Raw viewing modes. |
 | **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. |
 
-For the full reference, including the **Refine**, **Flamegraph**, **Timeline**, and **Events** main tabs and the backlog refinement interface, see [Task Detail Modal (Full Reference)](#task-detail-modal-full-reference).
+For the full reference, including the **Results**, **Timeline**, and **Events** main tabs, see [Task Detail Modal (Full Reference)](#task-detail-modal-full-reference).
 
 ### Handling Waiting Tasks
 
@@ -427,22 +427,11 @@ A horizontal tab bar across the top of the modal switches what the main pane sho
 | Tab | Content |
 |---|---|
 | **Spec** | The task's prompt / spec, rendered as Markdown with an Edit/Preview toggle. Always visible. |
-| **Refine** | AI refinement interface for backlog tasks (replaces Spec's edit affordance while refining). |
 | **Activity** | Live agent logs. Implementation and, when test verification has run, Testing sub-tabs, each with Oversight (high-level summary), Pretty (formatted output), and Raw (unprocessed NDJSON) viewing modes plus a log search/filter bar. |
 | **Changes** | Git diff of the task's worktree vs the default branch, with per-file diffs, a commit-message section, and a "behind" indicator. Visible once the task has produced changes. |
-| **Flamegraph** | Execution spans (worktree setup, agent turns, host-process runs, commits) rendered as a flamegraph. Visible when the task has completed at least one turn. |
-| **Timeline** | The same span data rendered as an interactive timeline chart. |
-| **Events** | Chronological audit trail of state changes, outputs, feedback, errors, and system events. Always visible. |
-
-#### Backlog Refine Tab
-
-For backlog tasks, the Refine tab hosts the AI refinement interface:
-
-- **Refine with AI** -- launch a refinement agent that analyzes the codebase and produces a detailed implementation spec
-- **Focus or context** -- optional textarea to guide the refinement agent
-- **Running state** -- live logs from the refinement run with pretty/raw toggle
-- **Result state** -- editable spec with Apply (replace task prompt) and Dismiss buttons
-- **Refinement history** -- previous refinement sessions
+| **Results** | Per-turn agent result entries (Implementation and, when present, Testing), each rendered as Markdown with Copy and Raw toggles. |
+| **Events** | Chronological audit trail of state changes, outputs, feedback, errors, and system events. |
+| **Timeline** | Execution spans (worktree setup, agent turns, host-process runs, commits) rendered as a flamegraph. |
 
 ### Task Card Anatomy
 
@@ -486,7 +475,7 @@ Press **Cmd+K** (or Ctrl+K) to open the command palette. It provides:
   - Done/Failed/Waiting/Cancelled: Retry
   - Done/Cancelled (not archived): Archive
   - Waiting/Failed: Sync with default
-  - Any non-backlog: Open task, Open testing, Open changes, Open flamegraph, Open timeline
+  - Any non-backlog: Open changes; plus Open results and Open timeline once the task has run at least one turn
 
 Navigate with arrow keys, press Enter to execute, and Escape to close.
 

@@ -35,15 +35,15 @@ Test verification runs also produce their own separate oversight summary, coveri
 
 ### Viewing Oversight
 
-Open a task by clicking its card, then look at the **Implementation** tab on the left side of the detail modal. The log viewer has three modes, selectable via tabs at the top:
+Open a task by clicking its card, then select the **Activity** tab in the detail modal. The Activity tab renders, top to bottom:
 
-- **Oversight** -- The structured phase-by-phase summary. This is the default view when a ready summary exists.
-- **Pretty** -- Parsed and syntax-highlighted agent output.
-- **Raw** -- Unprocessed agent output with ANSI codes stripped.
+- **Oversight summary** -- The structured phase-by-phase summary, shown when a ready summary exists.
+- **Parsed activity rows** -- Agent output parsed into thinking, tool calls, results, and text rows, with a "Filter activity..." search box above them.
+- **Raw output** -- ANSI-coloured raw agent output, shown as a fallback when nothing parses into activity rows.
 
-![Task detail modal showing the oversight summary in the Implementation tab](images/task-detail.png)
+![Task detail modal showing the oversight summary in the Activity tab](images/task-detail.png)
 
-If the task has a test run, the **Testing** tab provides the same three modes for the test agent's output and oversight.
+If the task has a test run, a **Testing oversight** block appears in the same Activity tab for the test agent's summary.
 
 ### Oversight Statuses
 
@@ -144,11 +144,9 @@ Click the monitor button in the header to open the monitor modal. Tasks run as h
 
 The list auto-refreshes every 5 seconds while the modal is open. Click the refresh button for an immediate update. When no tasks are running, the list is empty.
 
-### Flamegraph Tab
+### Timeline Tab
 
-The task detail modal has two visualization main tabs: **Flamegraph** and **Timeline**.
-
-The Flamegraph tab renders an interactive flamegraph-style visualization of execution timing. It displays:
+The task detail modal has one visualization main tab, **Timeline**, which renders an interactive flamegraph-style visualization of execution timing (the `SpanFlamegraph` component). It updates in real time for running tasks and displays:
 
 - **Time axis** -- Horizontal axis showing elapsed time from task start, with tick marks at 0%, 25%, 50%, 75%, and 100% of the execution duration.
 - **Oversight phase band** -- When an oversight summary is available, a row of colored blocks shows the high-level phases across the timeline. Hover over a phase block to see its title and description.
@@ -157,10 +155,6 @@ The Flamegraph tab renders an interactive flamegraph-style visualization of exec
 - **Detail table** -- Below the chart, a table lists all spans sorted by duration (longest first) with columns for span name, activity type, oversight phase, start offset, duration, and percentage of total time.
 
 Idle gaps between activity are compressed in the visualization so that long waits (e.g., for user feedback) do not distort the timeline. Compressed gaps are indicated by hatched regions with the idle duration labeled.
-
-### Timeline Tab
-
-The Timeline tab shows a chronological execution chart that updates in real time for running tasks. It provides a different perspective from the flamegraph, focusing on the sequential flow of execution phases.
 
 ### Span Statistics (Global)
 
