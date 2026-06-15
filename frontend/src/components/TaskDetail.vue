@@ -1999,17 +1999,25 @@ const isArchived = computed(() => !!props.task.archived);
   grid-template-columns: 16px auto 1fr;
   align-items: baseline;
   gap: 6px;
-  padding: 2px 4px;
-  border-radius: 4px;
+  padding: 2px 4px 2px 8px;
+  /* A kind-colored left rail gives the otherwise-flat monospace stream a
+     scannable structure: tool calls, results and thinking each read as their
+     own track down the left edge. */
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
 }
 .ta-activity-row:hover { background: var(--bg-hover); }
 .ta-activity-icon { text-align: center; opacity: 0.8; }
 .ta-activity-label { font-weight: 600; color: var(--text); }
+.ta-activity-row--tool { border-left-color: color-mix(in oklab, var(--accent) 55%, transparent); }
 .ta-activity-row--tool .ta-activity-label { color: var(--accent); }
+.ta-activity-row--tool_result { border-left-color: color-mix(in oklab, var(--ok) 45%, transparent); }
 .ta-activity-row--tool_result .ta-activity-label { color: var(--ok); }
+.ta-activity-row--thinking { border-left-color: color-mix(in oklab, var(--warn) 45%, transparent); }
 .ta-activity-row--thinking .ta-activity-label { color: var(--warn); font-style: italic; }
 .ta-activity-summary {
   color: var(--text-muted);
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
