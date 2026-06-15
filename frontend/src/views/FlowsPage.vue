@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import draggable from 'vuedraggable';
 import { api, ApiError } from '../api/client';
 import { useDialogStore } from '../stores/dialog';
+import AppSelect from '../components/AppSelect.vue';
 
 interface FlowStep {
   agent_slug: string;
@@ -57,6 +58,10 @@ const filtered = computed(() => {
     );
   });
 });
+const agentStepOptions = computed(() => [
+  { value: '', label: '(pick an agent)' },
+  ...agentsCache.value.map((a) => ({ value: a.slug, label: `${a.title} (${a.slug})` })),
+]);
 const builtins = computed(() => filtered.value.filter((f) => f.builtin));
 const userFlows = computed(() => filtered.value.filter((f) => !f.builtin));
 
@@ -337,16 +342,16 @@ onMounted(async () => {
       <header class="flows-mode__header">
         <div class="flows-mode__header-row">
           <div>
-            <h2 class="flows-mode__title">Flows</h2>
+            <h2 class="flows-mode__title">Workflows</h2>
             <p class="flows-mode__subtitle">
-              A flow is an ordered chain of sub-agents a task runs against. Clone
-              a built-in or start from scratch; reorder steps by drag, mark any
-              step optional, or group steps to run in parallel.
+              A workflow connects a set of agents into a pipeline a task runs
+              against. Clone a built-in or start from scratch; reorder nodes by
+              drag, mark any node optional, or group nodes to run in parallel.
             </p>
           </div>
           <div class="flows-mode__header-actions">
             <button type="button" class="flows-mode__new" @click="openNewEditor">
-              + New Flow
+              + New Workflow
             </button>
           </div>
         </div>
@@ -358,8 +363,8 @@ onMounted(async () => {
             <input
               v-model="search"
               type="search"
-              placeholder="Search flows..."
-              aria-label="Search flows"
+              placeholder="Search workflows..."
+              aria-label="Search workflows"
               autocomplete="off"
             />
           </div>
@@ -461,12 +466,13 @@ onMounted(async () => {
                     <div class="flows-detail__step">
                       <span class="flows-detail__step-drag" title="Drag to reorder">⋮⋮</span>
                       <span class="flows-detail__step-idx">{{ i + 1 }}.</span>
-                      <select v-model="step.agent_slug" class="flows-detail__step-agent">
-                        <option value="">(pick an agent)</option>
-                        <option v-for="a in agentsCache" :key="a.slug" :value="a.slug">
-                          {{ a.title }} ({{ a.slug }})
-                        </option>
-                      </select>
+                      <AppSelect
+                        v-model="step.agent_slug"
+                        :options="agentStepOptions"
+                        class="flows-detail__step-agent"
+                        aria-label="Step agent"
+                        placeholder="(pick an agent)"
+                      />
                       <label class="flows-detail__step-check">
                         <input v-model="step.optional" type="checkbox" />
                         <span>optional</span>
@@ -569,12 +575,13 @@ onMounted(async () => {
                     <div class="flows-detail__step">
                       <span class="flows-detail__step-drag" title="Drag to reorder">⋮⋮</span>
                       <span class="flows-detail__step-idx">{{ i + 1 }}.</span>
-                      <select v-model="step.agent_slug" class="flows-detail__step-agent">
-                        <option value="">(pick an agent)</option>
-                        <option v-for="a in agentsCache" :key="a.slug" :value="a.slug">
-                          {{ a.title }} ({{ a.slug }})
-                        </option>
-                      </select>
+                      <AppSelect
+                        v-model="step.agent_slug"
+                        :options="agentStepOptions"
+                        class="flows-detail__step-agent"
+                        aria-label="Step agent"
+                        placeholder="(pick an agent)"
+                      />
                       <label class="flows-detail__step-check">
                         <input v-model="step.optional" type="checkbox" />
                         <span>optional</span>

@@ -6,6 +6,7 @@ import { useUiStore } from '../stores/ui';
 import { useEnvConfig } from '../composables/useEnvConfig';
 import { supportedHarnesses, harnessLabel } from '../lib/harness';
 import { useDialogStore } from '../stores/dialog';
+import AppSelect from '../components/AppSelect.vue';
 
 interface Agent {
   slug: string;
@@ -51,9 +52,12 @@ const defaultHarness = computed(() => store.config?.default_sandbox || 'claude')
 // registry before config loads), used to populate every harness picker.
 const harnessChoices = computed(() => supportedHarnesses(store.config?.sandboxes));
 
+const harnessSelectOptions = computed(() =>
+  harnessChoices.value.map((id) => ({ value: id, label: harnessLabel(id) })),
+);
+
 const savingDefault = ref(false);
-async function setDefaultHarness(e: Event) {
-  const value = (e.target as HTMLSelectElement).value;
+async function setDefaultHarness(value: string) {
   if (value === defaultHarness.value) return;
   savingDefault.value = true;
   try {
@@ -331,17 +335,15 @@ onMounted(async () => {
         </div>
         <div class="agents-mode__default-row">
           <span class="agents-mode__default-label">Workspace default harness</span>
-          <select
+          <AppSelect
             class="agents-mode__default-select"
-            :value="defaultHarness"
+            :model-value="defaultHarness"
+            :options="harnessSelectOptions"
             :disabled="savingDefault"
+            aria-label="Workspace default harness"
             title="Pick the harness new tasks use by default"
-            @change="setDefaultHarness"
-          >
-            <option v-for="id in harnessChoices" :key="id" :value="id">
-              {{ harnessLabel(id) }}
-            </option>
-          </select>
+            @update:model-value="setDefaultHarness"
+          />
           <button
             type="button"
             class="agents-mode__default-edit"
