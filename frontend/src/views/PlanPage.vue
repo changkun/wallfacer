@@ -10,6 +10,7 @@ import { watchThemeReinit } from '../lib/mermaidRender';
 import SpecTreePanel from '../components/plan/SpecTreePanel.vue';
 import SpecFocusedView from '../components/plan/SpecFocusedView.vue';
 import PlanningChatPanel from '../components/plan/PlanningChatPanel.vue';
+import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -34,48 +35,21 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
   return hasSpecs || hasIndex ? 'three-pane' : 'chat-first';
 });
 
-// ── Chat pane visibility (persisted) ──────────────────────────────
+// ── Floating chat popup (three-pane) ──────────────────────────────
+//
+// In three-pane mode the chat is a floating, draggable popup that overlays the
+// focused view (SpecChatPopup owns its own open/position/size persistence). The
+// page only needs a ref to toggle it (C shortcut, focused-view chat button) and
+// to forward Break Down sends. In chat-first mode the popup isn't mounted; the
+// full-width PlanningChatPanel covers the empty-workspace case.
 
-const CHAT_OPEN_KEY = 'wallfacer-spec-chat-open';
-const chatOpen = ref<boolean>(localStorage.getItem(CHAT_OPEN_KEY) !== '0');
+const popupRef = ref<{ toggle: () => void; open: () => void; isOpen: boolean; send: (t: string) => void } | null>(null);
 
 function toggleChat() {
-  chatOpen.value = !chatOpen.value;
-  localStorage.setItem(CHAT_OPEN_KEY, chatOpen.value ? '1' : '0');
+  popupRef.value?.toggle();
 }
 
-// In chat-first layout we force the chat to visible.
-const effectiveChatOpen = computed(() => layout.value === 'chat-first' || chatOpen.value);
-
-// ── Chat pane resize (persisted) ──────────────────────────────────
-
-const CHAT_WIDTH_KEY = 'wallfacer-spec-chat-width';
-const CHAT_MIN = 280;
-const CHAT_MAX_FRAC = 0.5;
-
-const chatWidth = ref<number>(parseInt(localStorage.getItem(CHAT_WIDTH_KEY) || '360', 10));
-
-function startChatResize(ev: MouseEvent) {
-  ev.preventDefault();
-  const startX = ev.clientX;
-  const startW = chatWidth.value;
-  document.body.style.userSelect = 'none';
-  document.body.style.cursor = 'col-resize';
-  function onMove(mv: MouseEvent) {
-    const delta = startX - mv.clientX;
-    const maxW = Math.floor(window.innerWidth * CHAT_MAX_FRAC);
-    chatWidth.value = Math.min(maxW, Math.max(CHAT_MIN, startW + delta));
-  }
-  function onUp() {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-    document.body.style.userSelect = '';
-    document.body.style.cursor = '';
-    localStorage.setItem(CHAT_WIDTH_KEY, String(chatWidth.value));
-  }
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
-}
+const chatVisible = computed(() => !!popupRef.value?.isOpen);
 
 // ── Spec tree sidebar resize (persisted) ──────────────────────────
 
@@ -144,12 +118,12 @@ function focusSibling(path: string) {
   }
 }
 
-// ── Forward Break Down chat send via the chat panel's expose ──────
-
-const chatPanelRef = ref<{ send: (text: string) => void } | null>(null);
+// ── Forward Break Down chat send into the floating popup ──────────
+// SpecFocusedView (three-pane only) emits @send-chat for its Break Down
+// button; route it into the popup, opening it if collapsed.
 
 function sendChatFromHeader(text: string) {
-  chatPanelRef.value?.send(text);
+  popupRef.value?.send(text);
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────
@@ -260,24 +234,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
     <SpecFocusedView
       v-if="layout === 'three-pane'"
       ref="focusedViewRef"
-      :chat-visible="effectiveChatOpen"
+      :chat-visible="chatVisible"
       @toggle-chat="toggleChat"
       @focus-sibling="focusSibling"
       @send-chat="sendChatFromHeader"
     />
-    <div
-      v-if="layout === 'three-pane' && effectiveChatOpen"
-      class="plan-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      @mousedown="startChatResize"
-    />
+    <!-- Three-pane: chat floats over the focused view. -->
+    <SpecChatPopup v-if="layout === 'three-pane'" ref="popupRef" />
+    <!-- Chat-first: no specs yet, the full-width panel covers the workspace. -->
     <PlanningChatPanel
-      ref="chatPanelRef"
-      :visible="effectiveChatOpen"
-      :style="layout === 'three-pane' ? { width: chatWidth + 'px' } : undefined"
-      :class="{ 'chat-first': layout === 'chat-first' }"
-      @toggle="toggleChat"
+      v-else
+      :visible="true"
+      class="chat-first"
     />
   </div>
 </template>

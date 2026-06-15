@@ -35,6 +35,9 @@ vi.mock('../components/plan/SpecFocusedView.vue', () => ({
 vi.mock('../components/plan/PlanningChatPanel.vue', () => ({
   default: { name: 'PlanningChatPanel', template: '<div></div>' },
 }));
+vi.mock('../components/plan/SpecChatPopup.vue', () => ({
+  default: { name: 'SpecChatPopup', template: '<div></div>' },
+}));
 
 // happy-dom ships only a partial localStorage stub here, so install a small
 // in-memory implementation the page and assertions can rely on.
