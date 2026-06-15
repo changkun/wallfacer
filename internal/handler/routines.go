@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -268,7 +269,9 @@ func (h *Handler) TriggerRoutine(w http.ResponseWriter, r *http.Request) {
 	if eng == nil {
 		// Engine not yet initialized (pre-boot, or test that opted out).
 		// Spawn inline so the caller still sees an instance task created.
-		go h.fireRoutine(r.Context(), id)
+		// Detached context: the instance task outlives this request (the
+		// engine's own dispatch uses its long-lived context).
+		go h.fireRoutine(context.Background(), id)
 	} else {
 		eng.Trigger(id)
 	}

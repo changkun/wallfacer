@@ -2113,3 +2113,50 @@ func TestConfigResponse_PlanningWindowDaysDefault(t *testing.T) {
 		t.Errorf("planning_window_days = %v, want 30 (default)", got)
 	}
 }
+
+// TestApplyBoolToggle verifies the toggle helper: it invokes onEnable with the
+// caller-supplied (detached) context when the feature becomes enabled, forwards
+// that context unchanged, skips onEnable when disabled, and is a no-op for a nil
+// request value. The detached context must outlive the request, so a context
+// the caller later cancels (as the HTTP server cancels r.Context()) must not be
+// what onEnable receives.
+func TestApplyBoolToggle(t *testing.T) {
+	t.Run("enabled forwards detached context", func(t *testing.T) {
+		enable := true
+		got := make(chan context.Context, 1)
+		applyBoolToggle(context.Background(), &enable,
+			func(bool) {}, func() bool { return true },
+			func(c context.Context) { got <- c })
+		select {
+		case c := <-got:
+			if c.Err() != nil {
+				t.Fatalf("onEnable received a cancelled context: %v", c.Err())
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("onEnable was not invoked when enabled")
+		}
+	})
+
+	t.Run("disabled does not invoke onEnable", func(t *testing.T) {
+		enable := false
+		called := make(chan struct{}, 1)
+		applyBoolToggle(context.Background(), &enable,
+			func(bool) {}, func() bool { return false },
+			func(context.Context) { called <- struct{}{} })
+		select {
+		case <-called:
+			t.Fatal("onEnable was invoked while disabled")
+		case <-time.After(200 * time.Millisecond):
+		}
+	})
+
+	t.Run("nil request value is a no-op", func(t *testing.T) {
+		setCalled := false
+		applyBoolToggle(context.Background(), nil,
+			func(bool) { setCalled = true }, func() bool { return true },
+			func(context.Context) { t.Fatal("onEnable invoked for nil reqVal") })
+		if setCalled {
+			t.Fatal("set invoked for nil reqVal")
+		}
+	})
+}

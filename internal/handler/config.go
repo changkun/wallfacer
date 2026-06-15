@@ -398,19 +398,13 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		h.reloadGroupLimits()
 	}
-	applyBoolToggle := func(reqVal *bool, set func(bool), enabled func() bool, onEnable func(context.Context)) {
-		if reqVal == nil {
-			return
-		}
-		set(*reqVal)
-		if enabled() {
-			go onEnable(r.Context())
-		}
-	}
-	applyBoolToggle(req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
-	applyBoolToggle(req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
-	applyBoolToggle(req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
-	applyBoolToggle(req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
+	// Background passes outlive the HTTP request, so they must run on a
+	// detached context: r.Context() is cancelled the moment UpdateConfig
+	// returns (mirrors the planning exec goroutine).
+	applyBoolToggle(context.Background(), req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
+	applyBoolToggle(context.Background(), req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
+	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
+	applyBoolToggle(context.Background(), req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
 	// Persist any toggle changes to the viewed group so switching away
 	// and back does not reset the user's automation choices, and a
 	// different group on this server stays manual unless the user turns
@@ -464,4 +458,19 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		resp["ideation_next_run"] = nextRun
 	}
 	httpjson.Write(w, http.StatusOK, resp)
+}
+
+// applyBoolToggle applies a tri-state bool field from a config update: when
+// reqVal is non-nil it stores the value, and if the feature is then enabled it
+// kicks an immediate background pass via onEnable. ctx must be detached from
+// the HTTP request because the pass outlives the request; callers pass
+// context.Background().
+func applyBoolToggle(ctx context.Context, reqVal *bool, set func(bool), enabled func() bool, onEnable func(context.Context)) {
+	if reqVal == nil {
+		return
+	}
+	set(*reqVal)
+	if enabled() {
+		go onEnable(ctx)
+	}
 }
