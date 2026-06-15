@@ -687,12 +687,21 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px;
+  padding: 12px;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-md);
+  border-radius: var(--r-xl);
   font-size: var(--fs-10);
   color: var(--ink-2);
+  box-shadow: var(--sh-2);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+/* Ember focus ring — the composer lights up warm when active, matching the
+   chat composer so the two surfaces read as one product. */
+.composer:focus-within {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--rule));
+  box-shadow: 0 4px 22px color-mix(in oklab, var(--accent) 14%, transparent),
+              0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 /* .composer sets display:flex which comes later in the cascade than
    tailwind.css's .hidden { display: none }, so without this specific
@@ -716,11 +725,11 @@
 .composer__type {
   flex: 0 0 auto;
   font-size: var(--fs-10);
-  padding: 3px 22px 3px 8px;
+  padding: 4px 22px 4px 8px;
   background: var(--bg-card);
   color: var(--ink);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   font-weight: 500;
   cursor: pointer;
   appearance: none;
@@ -755,19 +764,20 @@
   width: 100%;
   resize: vertical;
   min-height: 72px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   background: var(--bg-card);
   color: var(--ink);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   font-size: var(--fs-md);
   line-height: 1.45;
   font-family: inherit;
 }
 .composer__prompt:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 20%, transparent);
+  /* The card's :focus-within ring carries the glow; the field itself just
+     warms its border so we don't stack two rings. */
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--rule));
 }
 .composer__prompt::placeholder {
   color: var(--ink-4);
@@ -817,8 +827,8 @@
   color: var(--ink);
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  padding: 3px 6px;
+  border-radius: var(--r-md);
+  padding: 4px 8px;
   min-width: 0;
   width: 100%;
   font-family: inherit;
@@ -913,8 +923,8 @@ select.composer__input {
 .composer__btn {
   font-size: var(--fs-10);
   font-weight: 500;
-  padding: 4px 12px;
-  border-radius: var(--r-sm);
+  padding: 5px 14px;
+  border-radius: var(--r-md);
   border: 1px solid transparent;
   cursor: pointer;
   line-height: 1.4;
