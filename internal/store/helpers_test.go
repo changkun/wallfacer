@@ -88,7 +88,6 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 		ContainerDigest:  "sha256:digest",
 		ModelName:        "model-1",
 		APIBaseURL:       "https://example.invalid",
-		InstructionsHash: "hash-1",
 		RecordedAt:       time.Unix(1_700_000_050, 0).UTC(),
 	}
 	task.WorktreePaths = map[string]string{"/repo": "/worktree"}

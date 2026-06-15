@@ -3,7 +3,6 @@ package runner
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/store"
@@ -31,47 +30,6 @@ func TestCaptureExecutionEnvironment_ModelFromEnvconfig(t *testing.T) {
 	}
 	if env.RecordedAt.IsZero() {
 		t.Error("RecordedAt should not be zero")
-	}
-}
-
-// TestCaptureExecutionEnvironment_InstructionsHash verifies that InstructionsHash
-// is a valid 64-character hex string when the instructions file exists.
-func TestCaptureExecutionEnvironment_InstructionsHash(t *testing.T) {
-	instrFile := filepath.Join(t.TempDir(), "CLAUDE.md")
-	content := []byte("# Workspace Instructions\n\nDo the thing.\n")
-	if err := os.WriteFile(instrFile, content, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	r := NewRunner(nil, RunnerConfig{
-		Command:          "echo",
-		InstructionsPath: instrFile,
-	})
-	t.Cleanup(func() { r.Shutdown() })
-
-	task := store.Task{}
-	env := r.captureExecutionEnvironment(task)
-
-	hexPattern := regexp.MustCompile(`^[0-9a-f]{64}$`)
-	if !hexPattern.MatchString(env.InstructionsHash) {
-		t.Errorf("InstructionsHash = %q, want 64-char lowercase hex", env.InstructionsHash)
-	}
-}
-
-// TestCaptureExecutionEnvironment_MissingInstructions verifies that a missing
-// instructions file leaves InstructionsHash empty without error.
-func TestCaptureExecutionEnvironment_MissingInstructions(t *testing.T) {
-	r := NewRunner(nil, RunnerConfig{
-		Command:          "echo",
-		InstructionsPath: "/nonexistent/path/CLAUDE.md",
-	})
-	t.Cleanup(func() { r.Shutdown() })
-
-	task := store.Task{}
-	env := r.captureExecutionEnvironment(task)
-
-	if env.InstructionsHash != "" {
-		t.Errorf("InstructionsHash = %q, want empty string when file does not exist", env.InstructionsHash)
 	}
 }
 

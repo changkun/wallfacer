@@ -1,9 +1,6 @@
 package runner
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"os"
 	"time"
 
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -34,16 +31,6 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 
 	// Sandbox: record the configured sandbox for this task.
 	env.Sandbox = r.sandboxForTaskActivity(&task, activityImplementation)
-
-	// Instructions hash: SHA-256 of the workspace CLAUDE.md file content.
-	instrPath := r.currentInstructionsPath()
-	if instrPath != "" {
-		data, err := os.ReadFile(instrPath)
-		if err == nil {
-			sum := sha256.Sum256(data)
-			env.InstructionsHash = hex.EncodeToString(sum[:])
-		}
-	}
 
 	return env
 }
