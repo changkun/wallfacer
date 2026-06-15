@@ -17,41 +17,6 @@ const ui = useUiStore();
           letter-spacing: 0.5px;
         "
       >
-        System Prompt Templates
-      </div>
-      <button
-        type="button"
-        class="btn-icon"
-        style="font-size: 12px; padding: 4px 10px"
-        @click="ui.openSystemPrompts()"
-      >
-        Manage
-      </button>
-      <div
-        style="
-          margin-top: 6px;
-          font-size: 11px;
-          color: var(--text-muted);
-          line-height: 1.4;
-        "
-      >
-        Override the 7 built-in agent prompt templates. Drop
-        <code style="font-family: monospace">.tmpl</code> files in the prompts
-        directory to customize how tasks are instructed.
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div
-        style="
-          margin-bottom: 8px;
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        "
-      >
         Prompt Templates
       </div>
       <button
