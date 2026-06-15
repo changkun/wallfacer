@@ -1,23 +1,22 @@
 # Known bugs / follow-ups
 
-## Workspace isolation: data-layer gating incomplete
+## Workspace isolation: data-layer gating
 
-The visibility fix (`visibleWorkspaces`/`isAllowedWorkspace`) covers the
-browser-facing read surfaces a user can see: spec tree, file list, file
-explorer, git status, terminal cwd. Two gaps remain for full defense-in-depth
-when an org-stamped workspace is active in a session that cannot see it:
+The visibility fix (`visibleWorkspaces`/`isAllowedWorkspace`/`requireVisibleWorkspace`)
+covers the browser-facing surfaces: spec tree, file list, file explorer, git
+status, terminal cwd, planning reads (thread list, messages, SSE stream),
+planning + spec mutations (send/clear/interrupt/start, thread create/patch,
+undo, archive/unarchive, dispatch/undispatch), and the stats planning
+aggregation. A session that cannot see the active org-stamped workspace gets
+empty reads and 403 mutations, matching `/api/config`.
 
-- **Planning data is still served.** The Plan view is hidden at the frontend
-  (`meta.needsWorkspace` gate), but `planning.go` handlers still read
-  `currentWorkspaces()` directly. The chat history / planning API would return
-  the hidden workspace's data if called directly. Frontend-hidden, not
-  backend-isolated.
-- **Mutation endpoints not gated.** Spec transitions (`specs.go` archive /
-  create), dispatch (`specs_dispatch.go`), planning actions, and
-  `instructions.go` reinit still use `currentWorkspaces()`. They are only
-  reachable from now-hidden UI, but are not isolated at the API layer.
+Remaining, intentionally not gated:
 
-Low priority for local single-user host mode (the caller owns all data); matters
-for any genuinely multi-tenant deployment. Route these through
-`visibleWorkspaces(ctx)` / a request-scoped principal if backend isolation is
-required.
+- **`env.go` TestSandbox** seeds its probe runner with `currentWorkspaces()`.
+  It is a Settings connectivity probe (reached from the always-available
+  Settings page), not a workspace-data surface, and gating it would block
+  sandbox testing whenever an org workspace is active. Left ungated by design;
+  revisit if a probe must never run against a workspace the caller can't see.
+- Internal/background callers (`persistPlanningRoundUsage`, group-toggle/limit
+  helpers, the spec-completion callback) keep `currentWorkspaces()` — they run
+  without a request principal and act on the active group regardless of viewer.
