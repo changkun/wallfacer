@@ -1,6 +1,6 @@
 ---
 title: Harness Abstraction
-status: complete
+status: archived
 depends_on:
   - specs/shared/host-default.md
   - specs/shared/agent-abstraction.md
@@ -17,6 +17,7 @@ updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Harness Abstraction
 

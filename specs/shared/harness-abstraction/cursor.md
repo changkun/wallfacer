@@ -1,6 +1,6 @@
 ---
 title: Add Cursor harness
-status: complete
+status: archived
 depends_on:
   - specs/shared/harness-abstraction/claude-and-codex-migration.md
 affects:
@@ -24,6 +24,7 @@ updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Add Cursor harness
 
