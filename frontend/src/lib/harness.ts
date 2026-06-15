@@ -15,3 +15,15 @@ export function harnessLabel(id: string): string {
   const key = (id || '').toLowerCase();
   return HARNESS_LABELS[key] ?? (key ? key.charAt(0).toUpperCase() + key.slice(1) : '');
 }
+
+// FALLBACK_HARNESSES mirrors the backend harness registry (harness.All()).
+// Used so harness pickers never render empty before /api/config loads its
+// authoritative `sandboxes` list. Keep in sync with HARNESS_LABELS.
+export const FALLBACK_HARNESSES = Object.keys(HARNESS_LABELS);
+
+// supportedHarnesses returns the harness ids the server advertises, falling
+// back to the full registry when config has not loaded yet (or returned an
+// empty list). Single source of truth for every harness picker.
+export function supportedHarnesses(sandboxes?: string[] | null): string[] {
+  return sandboxes && sandboxes.length ? sandboxes : [...FALLBACK_HARNESSES];
+}

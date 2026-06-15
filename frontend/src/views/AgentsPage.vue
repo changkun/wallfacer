@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from 'vue';
 import { api, ApiError } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
+import { useEnvConfig } from '../composables/useEnvConfig';
+import { supportedHarnesses, harnessLabel } from '../lib/harness';
 
 interface Agent {
   slug: string;
@@ -28,6 +30,7 @@ interface Draft {
 
 const store = useTaskStore();
 const ui = useUiStore();
+const { updateEnv } = useEnvConfig();
 
 const agents = ref<Agent[]>([]);
 const loading = ref(true);
@@ -41,6 +44,28 @@ const saving = ref(false);
 const editingDraft = ref<Draft | null>(null);
 
 const defaultHarness = computed(() => store.config?.default_sandbox || 'claude');
+
+// Supported harnesses advertised by the server (falls back to the full
+// registry before config loads), used to populate every harness picker.
+const harnessChoices = computed(() => supportedHarnesses(store.config?.sandboxes));
+
+const savingDefault = ref(false);
+async function setDefaultHarness(e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  if (value === defaultHarness.value) return;
+  savingDefault.value = true;
+  try {
+    await updateEnv({ default_sandbox: value });
+    await store.fetchConfig();
+  } catch (err) {
+    window.alert(
+      'Could not change default harness: ' +
+        (err instanceof ApiError ? err.message : String(err)),
+    );
+  } finally {
+    savingDefault.value = false;
+  }
+}
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -246,11 +271,10 @@ async function deleteAgent(slug: string) {
   }
 }
 
-const harnessOptions = [
+const harnessOptions = computed(() => [
   { value: '', label: 'Default' },
-  { value: 'claude', label: 'Claude' },
-  { value: 'codex', label: 'Codex' },
-];
+  ...harnessChoices.value.map((id) => ({ value: id, label: harnessLabel(id) })),
+]);
 const capabilityOptions = [
   { value: 'workspace.read', label: 'workspace.read', hint: 'read workspace files' },
   { value: 'workspace.write', label: 'workspace.write', hint: 'write + commit changes' },
@@ -303,14 +327,24 @@ onMounted(async () => {
         </div>
         <div class="agents-mode__default-row">
           <span class="agents-mode__default-label">Workspace default harness</span>
-          <span class="agents-mode__default-value">{{ defaultHarness }}</span>
+          <select
+            class="agents-mode__default-select"
+            :value="defaultHarness"
+            :disabled="savingDefault"
+            title="Pick the harness new tasks use by default"
+            @change="setDefaultHarness"
+          >
+            <option v-for="id in harnessChoices" :key="id" :value="id">
+              {{ harnessLabel(id) }}
+            </option>
+          </select>
           <button
             type="button"
             class="agents-mode__default-edit"
-            title="Change the default in Settings, Harness"
+            title="Configure harness credentials in Settings, Harness"
             @click="openSandboxSettings"
           >
-            Change
+            Configure…
           </button>
           <span class="agents-mode__default-hint">
             Agents with Harness (use workspace default) fall back to this.

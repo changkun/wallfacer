@@ -115,6 +115,20 @@
   border-radius: var(--r-sm);
   color: var(--ink);
 }
+.agents-mode__default-select {
+  font-family: inherit;
+  font-size: var(--fs-base);
+  padding: 3px var(--sp-3);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+.agents-mode__default-select:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
 .agents-mode__default-edit {
   font-family: inherit;
   font-size: var(--fs-10);
