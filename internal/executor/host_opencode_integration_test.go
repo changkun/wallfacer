@@ -65,10 +65,13 @@ func TestOpenCode_Integration_OneShot(t *testing.T) {
 	wg.Add(2)
 	go func() { defer wg.Done(); stdoutBytes, _ = io.ReadAll(h.Stdout()) }()
 	go func() { defer wg.Done(); _, _ = io.ReadAll(h.Stderr()) }()
+	// Drain to EOF before Wait, matching the runner (agent.go): cmd.Wait
+	// closes the opencode StdoutPipe the tee goroutine reads, so waiting
+	// before the drain finishes truncates the tee'd output.
+	wg.Wait()
 	if _, err := h.Wait(); err != nil {
 		t.Skipf("opencode run failed (likely no auth/network): %v", err)
 	}
-	wg.Wait()
 
 	var final map[string]any
 	scanner := bufio.NewScanner(strings.NewReader(string(stdoutBytes)))

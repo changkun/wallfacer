@@ -25,6 +25,10 @@ func launchCodexAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([]ma
 		t.Fatalf("launch: %v", err)
 	}
 
+	// Drain stdout/stderr to EOF before Wait, matching the runner's order
+	// (agent.go). cmd.Wait closes the codex StdoutPipe the tee goroutine
+	// reads; calling it before the drain finishes truncates the tee'd
+	// output (os/exec StdoutPipe hazard).
 	var wg sync.WaitGroup
 	var stdoutBytes []byte
 	wg.Add(2)
@@ -36,10 +40,10 @@ func launchCodexAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([]ma
 		defer wg.Done()
 		_, _ = io.ReadAll(h.Stderr())
 	}()
+	wg.Wait()
 	if _, err := h.Wait(); err != nil {
 		t.Fatalf("wait: %v", err)
 	}
-	wg.Wait()
 
 	var lines []map[string]any
 	scanner := bufio.NewScanner(strings.NewReader(string(stdoutBytes)))
