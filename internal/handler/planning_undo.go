@@ -121,7 +121,7 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 			"\n" + planThreadTrailerPrefix + threadID
 
 		args := []string{"-C", ws}
-		args = append(args, hostGitIdentityOverrides(ctx)...)
+		args = append(args, gitutil.GlobalIdentityOverrides(ctx)...)
 		args = append(args, "commit", "-m", commitMsg)
 		if err := cmdexec.New("git", args...).WithContext(ctx).Run(); err != nil {
 			_ = cmdexec.Git(ws, "revert", "--abort").WithContext(ctx).Run()
