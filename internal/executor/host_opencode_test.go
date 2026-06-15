@@ -55,10 +55,13 @@ func launchOpenCodeAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([
 		defer wg.Done()
 		_, _ = io.ReadAll(h.Stderr())
 	}()
+	// Drain to EOF before Wait, matching the runner (agent.go): cmd.Wait
+	// closes the opencode StdoutPipe the tee goroutine reads, so waiting
+	// before the drain finishes truncates the tee'd output.
+	wg.Wait()
 	if _, err := h.Wait(); err != nil {
 		t.Fatalf("wait: %v", err)
 	}
-	wg.Wait()
 
 	var lines []map[string]any
 	scanner := bufio.NewScanner(strings.NewReader(string(stdoutBytes)))
