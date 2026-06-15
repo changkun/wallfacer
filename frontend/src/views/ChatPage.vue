@@ -161,6 +161,7 @@ function applyQuick(insert: string) {
   z-index: 1;
   text-align: center;
   font-family: var(--font-serif);
+  font-style: italic;
   font-size: 42px;
   font-weight: 400;
   letter-spacing: 0.01em;

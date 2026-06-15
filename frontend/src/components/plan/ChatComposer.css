@@ -155,9 +155,9 @@
   border-top: none;
   padding: 12px 14px 12px;
   border: 1px solid var(--rule);
-  border-radius: var(--r-lg, 14px);
+  border-radius: var(--r-xl, 14px);
   background: var(--bg-card);
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sh-2);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
