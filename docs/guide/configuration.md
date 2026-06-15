@@ -14,7 +14,7 @@ This is the current and default runtime. Throughout this document, "the agent" r
 
 ### Opening Settings
 
-Open the Settings page by clicking the gear icon in the top-right corner of the task board, or press `Cmd+,` (`Ctrl+,`). The page has seven tabs: Appearance, Execution, Harness, Workspace, Prompts, Trash, and About.
+Open the Settings page by clicking the gear icon in the top-right corner of the task board, or press `Cmd+,` (`Ctrl+,`). The page has six tabs: Appearance, Execution, Harness, Workspace, Prompts, and About. (Trash moved to the board header; see [Trash Management](#trash-management).)
 
 ### Appearance
 
@@ -547,12 +547,14 @@ Request bodies are limited to prevent abuse:
 
 ### Trash Management
 
-View soft-deleted tasks that are within the retention window (default: 7 days, controlled by `WALLFACER_TOMBSTONE_RETENTION_DAYS`). Each entry shows the task prompt and deletion timestamp. You can:
+Trash is a board feature: click the trash-can icon in the board header to
+open the Trash popup. It lists soft-deleted tasks within the retention
+window (default: 7 days, controlled by `WALLFACER_TOMBSTONE_RETENTION_DAYS`).
+Each entry shows the task title, status, deletion time, and remaining
+retention. You can:
 
-- **Restore** a task to return it to its pre-deletion state
+- **Restore** a task to return it to the board
 - Wait for the retention window to expire for automatic permanent removal
-
-Access via **Settings > Trash**.
 
 ### About
 

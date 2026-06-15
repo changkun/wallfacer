@@ -21,6 +21,7 @@ export const useUiStore = defineStore('ui', () => {
   // panel). These delegate so existing callers keep working unchanged.
   const showTerminal = computed(() => useDockStore().terminalOpen);
   const showExplorer = ref(false);
+  const showTrash = ref(false);
   const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
@@ -65,13 +66,15 @@ export const useUiStore = defineStore('ui', () => {
   function openExplorer() { showExplorer.value = true; }
   function closeExplorer() { showExplorer.value = false; }
   function toggleExplorer() { showExplorer.value = !showExplorer.value; }
+  function openTrash() { showTrash.value = true; }
+  function closeTrash() { showTrash.value = false; }
   function openShortcuts() { showShortcuts.value = true; }
   function closeShortcuts() { showShortcuts.value = false; }
 
   return {
     showSettings, showWorkspaces, showPalette,
     showSystemPrompts, showTemplates, showTerminal,
-    showExplorer, showShortcuts, showArchived, setShowArchived,
+    showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
     openSettings, closeSettings,
@@ -82,6 +85,7 @@ export const useUiStore = defineStore('ui', () => {
     openTemplates, closeTemplates,
     openTerminal, closeTerminal, toggleTerminal,
     openExplorer, closeExplorer, toggleExplorer,
+    openTrash, closeTrash,
     openShortcuts, closeShortcuts,
   };
 });
