@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -113,66 +111,6 @@ func TestHostBackend_LaunchCodex_WrapsResult(t *testing.T) {
 	}
 }
 
-// TestHostBackend_LaunchCodex_EmptyInstructionsNoPathPrefix verifies that an
-// empty (or unreadable) WALLFACER_INSTRUCTIONS_PATH does not leave the file
-// PATH glued to the top of the codex prompt. requestFromClaudeSpec seeds
-// SystemPrompt with the path; launchCodex must replace it with the file
-// contents, which are empty here, so the harness prepends nothing.
-func TestHostBackend_LaunchCodex_EmptyInstructionsNoPathPrefix(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-
-	instr := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instr, nil, 0o600); err != nil { // empty file
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-codex-emptyinstr",
-		Env:     map[string]string{"WALLFACER_AGENT": "codex", "WALLFACER_INSTRUCTIONS_PATH": instr},
-		Cmd:     []string{"-p", "hello codex", "--output-format", "stream-json"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchCodexAndDrain(t, b, spec)
-	res, _ := final["result"].(string)
-	if strings.Contains(res, instr) {
-		t.Errorf("instructions file path leaked into the codex prompt: %q", res)
-	}
-}
-
-// TestHostBackend_LaunchCodex_InstructionsContentPrepended is the positive
-// control: a non-empty instructions file has its contents prepended.
-func TestHostBackend_LaunchCodex_InstructionsContentPrepended(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-
-	instr := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instr, []byte("REPO-GUIDELINES-MARKER"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-codex-instr",
-		Env:     map[string]string{"WALLFACER_AGENT": "codex", "WALLFACER_INSTRUCTIONS_PATH": instr},
-		Cmd:     []string{"-p", "hello codex", "--output-format", "stream-json"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchCodexAndDrain(t, b, spec)
-	res, _ := final["result"].(string)
-	if !strings.Contains(res, "REPO-GUIDELINES-MARKER") {
-		t.Errorf("instructions content not prepended into prompt: %q", res)
-	}
-	if strings.Contains(res, instr) {
-		t.Errorf("instructions file path should not appear, only its contents: %q", res)
-	}
-}
-
 func TestHostBackend_LaunchCodex_MissingPromptFails(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
 	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
@@ -192,33 +130,3 @@ func TestHostBackend_LaunchCodex_MissingPromptFails(t *testing.T) {
 		t.Errorf("error should cite missing -p flag; got %v", err)
 	}
 }
-
-func TestHostBackend_LaunchCodex_InstructionsPrepended(t *testing.T) {
-	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
-
-	instr := filepath.Join(t.TempDir(), "AGENTS.md")
-	if err := os.WriteFile(instr, []byte("WORKSPACE PREAMBLE"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name: "wallfacer-codex-instr",
-		Env: map[string]string{
-			"WALLFACER_AGENT":             "codex",
-			"WALLFACER_INSTRUCTIONS_PATH": instr,
-		},
-		Cmd:     []string{"-p", "the-task"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchCodexAndDrain(t, b, spec)
-
-	res, _ := final["result"].(string)
-	if !strings.Contains(res, "WORKSPACE PREAMBLE") {
-		t.Errorf("instructions preamble should be prepended to the prompt; got %q", res)
-	}
-	if !strings.Contains(res, "the-task") {
-		t.Errorf("original task should still appear in prompt; got %q", res)
-	}
-}
-

@@ -44,9 +44,6 @@ func requestFromClaudeSpec(spec ContainerSpec) harness.Request {
 			}
 		}
 	}
-	if instrPath := spec.Env["WALLFACER_INSTRUCTIONS_PATH"]; instrPath != "" {
-		req.SystemPrompt = instrPath
-	}
 	return req
 }
 
@@ -70,10 +67,6 @@ type HostBackendConfig struct {
 //     a leftover container path (/workspace/...) is rejected so bugs in
 //     the caller's path translation fail fast instead of silently running
 //     in the wrong directory.
-//   - spec.Env["WALLFACER_INSTRUCTIONS_PATH"] is delivered to the agent
-//     via --append-system-prompt when supported, or by prepending to the
-//     -p prompt value as a fallback (feature-detected on first Launch per
-//     agent type; cached thereafter).
 //
 // spec.CPUs / spec.Memory / spec.Network / spec.Entrypoint / spec.Volumes /
 // spec.Labels are ignored by this backend (labels are surfaced via

@@ -105,39 +105,6 @@ func TestHostBackend_LaunchPi_ForcesWritePermission(t *testing.T) {
 	}
 }
 
-// TestHostBackend_LaunchPi_InstructionsContentPrepended verifies the
-// instructions file CONTENTS (not its path) are prepended into the prompt.
-// Pi has no system-prompt flag in v1, so the harness prepends SystemPrompt
-// into the prompt; requestFromClaudeSpec seeds SystemPrompt with the path,
-// and launchPi must swap in the contents (mirrors launchCodex/launchCursor).
-func TestHostBackend_LaunchPi_InstructionsContentPrepended(t *testing.T) {
-	bin := buildFakePi(t)
-	b, err := NewHostBackend(HostBackendConfig{PiBinary: bin})
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-
-	instr := filepath.Join(t.TempDir(), "instructions.md")
-	if err := os.WriteFile(instr, []byte("REPO-GUIDELINES-MARKER"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := ContainerSpec{
-		Name:    "wallfacer-pi-instr",
-		Env:     map[string]string{"WALLFACER_AGENT": "pi", "WALLFACER_INSTRUCTIONS_PATH": instr},
-		Cmd:     []string{"-p", "hello pi", "--output-format", "stream-json"},
-		WorkDir: t.TempDir(),
-	}
-	_, final := launchPiAndDrain(t, b, spec)
-	res, _ := final["result"].(string)
-	if !strings.Contains(res, "REPO-GUIDELINES-MARKER") {
-		t.Errorf("instructions content not prepended into prompt: %q", res)
-	}
-	if strings.Contains(res, instr) {
-		t.Errorf("instructions file path should not appear, only its contents: %q", res)
-	}
-}
-
 // TestHostBackend_LaunchPi_RequiresPrompt verifies launchPi rejects a spec
 // whose Cmd has no -p <prompt> rather than execing pi with an empty prompt.
 func TestHostBackend_LaunchPi_RequiresPrompt(t *testing.T) {
