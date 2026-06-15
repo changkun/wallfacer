@@ -55,7 +55,9 @@ func searchDocs(docsFS fs.FS, query string, limit int) []DocSearchHit {
 		}
 	}
 
-	hits := append(titleHits, bodyHits...)
+	hits := make([]DocSearchHit, 0, len(titleHits)+len(bodyHits))
+	hits = append(hits, titleHits...)
+	hits = append(hits, bodyHits...)
 	if limit > 0 && len(hits) > limit {
 		hits = hits[:limit]
 	}
