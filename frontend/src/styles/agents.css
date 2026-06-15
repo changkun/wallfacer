@@ -74,6 +74,24 @@
   border-color: var(--accent-2);
 }
 
+.agents-mode__secondary {
+  font-family: inherit;
+  font-size: var(--fs-base);
+  padding: var(--sp-2) var(--sp-4);
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.agents-mode__secondary:hover {
+  color: var(--ink);
+  border-color: var(--rule-2);
+  background: var(--bg-hover);
+}
+
 .agents-mode__default-row {
   display: flex;
   align-items: center;

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { api, ApiError } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { useUiStore } from '../stores/ui';
 
 interface Agent {
   slug: string;
@@ -26,6 +27,7 @@ interface Draft {
 }
 
 const store = useTaskStore();
+const ui = useUiStore();
 
 const agents = ref<Agent[]>([]);
 const loading = ref(true);
@@ -286,6 +288,14 @@ onMounted(async () => {
             </p>
           </div>
           <div class="agents-mode__header-actions">
+            <button
+              type="button"
+              class="agents-mode__secondary"
+              title="Edit the built-in system prompt templates agents start from"
+              @click="ui.openSystemPrompts()"
+            >
+              System Prompts
+            </button>
             <button type="button" class="agents-mode__new" @click="openNewEditor">
               + New Agent
             </button>
