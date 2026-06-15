@@ -1,6 +1,6 @@
 ---
 title: Rebrand Module Path to latere.ai
-status: complete
+status: archived
 depends_on: []
 affects:
   - go.mod
@@ -8,10 +8,11 @@ affects:
   - "**/*.go"
 effort: medium
 created: 2026-03-28
-updated: 2026-06-14
+updated: 2026-06-15
 author: changkun
 dispatched_task_id: null
 ---
+
 
 # Rebrand Module Path to latere.ai
 
