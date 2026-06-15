@@ -21,8 +21,11 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Install frontend deps
+        uses: ./.github/actions/bun-install
+
       - name: Build Vue frontend
-        run: bun install --frozen-lockfile && bun run build
+        run: bun run build
         working-directory: frontend
 
       - name: Lint

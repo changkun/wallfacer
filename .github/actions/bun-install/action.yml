@@ -1,0 +1,23 @@
+name: bun install (with retry)
+description: >
+  Run `bun install --frozen-lockfile` in frontend/, retrying on transient
+  failures. The latere-ui dependency is fetched from the GitHub archive API,
+  which intermittently returns 504 while generating the tarball; bun does not
+  retry on its own, so a single blip fails the whole pipeline.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: frontend
+      run: |
+        for attempt in 1 2 3 4 5; do
+          if bun install --frozen-lockfile; then
+            exit 0
+          fi
+          delay=$((attempt * 10))
+          echo "bun install failed (attempt ${attempt}/5); retrying in ${delay}s..." >&2
+          sleep "${delay}"
+        done
+        echo "bun install failed after 5 attempts" >&2
+        exit 1

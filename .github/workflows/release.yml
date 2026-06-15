@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: cd frontend && bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
       - run: cd frontend && bunx --bun vue-tsc --noEmit
       - run: cd frontend && bunx --bun vite-ssg build
       - uses: actions/setup-go@v5
@@ -57,8 +57,10 @@ jobs:
         with:
           go-version-file: go.mod
       - uses: oven-sh/setup-bun@v2
+      - name: Install frontend deps
+        uses: ./.github/actions/bun-install
       - name: Build Vue frontend
-        run: bun install --frozen-lockfile && bun run build
+        run: bun run build
         working-directory: frontend
       - name: Resolve sandbox image tag
         id: sandbox_tag
