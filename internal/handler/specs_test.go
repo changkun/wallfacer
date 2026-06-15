@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 func doTransition(t *testing.T, fn http.HandlerFunc, path string) *httptest.ResponseRecorder {
@@ -62,24 +63,90 @@ func TestArchiveSpec_InvalidTransition(t *testing.T) {
 	}
 }
 
-func TestArchiveSpec_BlockedByDispatch(t *testing.T) {
-	h, ws := newTestHandlerWithWorkspaces(t)
-	// Drafted with a dispatched_task_id set — archiving should be blocked.
+// writeDispatchedSpec writes a drafted spec wired to taskID and returns its path.
+func writeDispatchedSpec(t *testing.T, ws, relPath, taskID string) {
+	t.Helper()
 	dispatched := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
 	dispatched = strings.Replace(dispatched, "dispatched_task_id: null",
-		"dispatched_task_id: 550e8400-e29b-41d4-a716-446655440000", 1)
-	writeTestSpec(t, ws, "specs/local/dispatched.md", dispatched)
+		"dispatched_task_id: "+taskID, 1)
+	writeTestSpec(t, ws, relPath, dispatched)
+}
 
-	w := doTransition(t, h.ArchiveSpec, "specs/local/dispatched.md")
-	if w.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusConflict, w.Body.String())
+// seedTask creates a task and force-sets its status, returning the id string.
+func seedTask(t *testing.T, s *store.Store, status store.TaskStatus) string {
+	t.Helper()
+	ctx := context.Background()
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "seed", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
 	}
-	if !strings.Contains(w.Body.String(), "cancel") {
-		t.Errorf("body = %q, want mention of cancel", w.Body.String())
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, status); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus(%s): %v", status, err)
 	}
-	// Status must be unchanged.
-	if got := readStatus(t, ws, "specs/local/dispatched.md"); got != spec.StatusDrafted {
-		t.Errorf("status = %q, want unchanged %q", got, spec.StatusDrafted)
+	return task.ID.String()
+}
+
+func TestArchiveSpec_BlockedByActiveTask(t *testing.T) {
+	for _, status := range []store.TaskStatus{
+		store.TaskStatusBacklog,
+		store.TaskStatusInProgress,
+		store.TaskStatusWaiting,
+		store.TaskStatusCommitting,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			h, ws := newTestHandlerWithWorkspaces(t)
+			taskID := seedTask(t, h.store, status)
+			writeDispatchedSpec(t, ws, "specs/local/dispatched.md", taskID)
+
+			w := doTransition(t, h.ArchiveSpec, "specs/local/dispatched.md")
+			if w.Code != http.StatusConflict {
+				t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusConflict, w.Body.String())
+			}
+			// Body must name the live status so the alert is actionable.
+			if !strings.Contains(w.Body.String(), string(status)) {
+				t.Errorf("body = %q, want mention of status %q", w.Body.String(), status)
+			}
+			// Status must be unchanged.
+			if got := readStatus(t, ws, "specs/local/dispatched.md"); got != spec.StatusDrafted {
+				t.Errorf("status = %q, want unchanged %q", got, spec.StatusDrafted)
+			}
+		})
+	}
+}
+
+func TestArchiveSpec_AllowedWhenTaskTerminal(t *testing.T) {
+	for _, status := range []store.TaskStatus{
+		store.TaskStatusDone,
+		store.TaskStatusFailed,
+		store.TaskStatusCancelled,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			h, ws := newTestHandlerWithWorkspaces(t)
+			taskID := seedTask(t, h.store, status)
+			writeDispatchedSpec(t, ws, "specs/local/dispatched.md", taskID)
+
+			w := doTransition(t, h.ArchiveSpec, "specs/local/dispatched.md")
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+			}
+			if got := readStatus(t, ws, "specs/local/dispatched.md"); got != spec.StatusArchived {
+				t.Errorf("status = %q, want %q", got, spec.StatusArchived)
+			}
+		})
+	}
+}
+
+func TestArchiveSpec_AllowedWhenLinkStale(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	// dispatched_task_id points at a task that does not exist in the store.
+	writeDispatchedSpec(t, ws, "specs/local/stale.md", "550e8400-e29b-41d4-a716-446655440000")
+
+	w := doTransition(t, h.ArchiveSpec, "specs/local/stale.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/stale.md"); got != spec.StatusArchived {
+		t.Errorf("status = %q, want %q", got, spec.StatusArchived)
 	}
 }
 
