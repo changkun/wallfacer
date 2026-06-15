@@ -247,23 +247,25 @@ watch(wsPopoverOpen, (open) => {
 
     <!-- Workspace switcher + command palette, above the nav -->
     <template #top>
-      <template v-if="!collapsed">
-        <div class="sb-ws-switch-wrap">
-          <button
-            type="button"
-            class="sb-ws-switch"
-            title="Switch workspace group"
-            :aria-expanded="wsPopoverOpen"
-            @click="wsPopoverOpen = !wsPopoverOpen"
-          >
-            <span class="ws-dot">W</span>
+      <div class="sb-ws-switch-wrap" :class="{ 'sb-ws-switch-wrap--collapsed': collapsed }">
+        <button
+          type="button"
+          class="sb-ws-switch"
+          :class="{ 'sb-ws-switch--icon': collapsed }"
+          :title="activeWorkspaceLabel"
+          :aria-expanded="wsPopoverOpen"
+          @click="wsPopoverOpen = !wsPopoverOpen"
+        >
+          <span class="ws-dot">W</span>
+          <template v-if="!collapsed">
             <span class="ws-name">{{ activeWorkspaceLabel }}</span>
             <span class="ws-caret">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </span>
-          </button>
+          </template>
+        </button>
           <div
             v-if="wsPopoverOpen"
             class="sb-ws-popover sb-ws-popover--inline"
@@ -304,7 +306,6 @@ watch(wsPopoverOpen, (open) => {
             </button>
           </div>
         </div>
-      </template>
     </template>
 
     <!-- Per-item icons -->
@@ -368,5 +369,23 @@ watch(wsPopoverOpen, (open) => {
 }
 .wf-cs :deep(.sb-ws-switch-wrap) {
   width: 100%;
+}
+.wf-cs :deep(.sb-ws-switch-wrap--collapsed) {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.wf-cs :deep(.sb-ws-switch--icon) {
+  width: 36px;
+  min-width: 36px;
+  margin: 6px 0 0;
+  padding: 0;
+  justify-content: center;
+}
+.wf-cs :deep(.sb-ws-switch-wrap--collapsed .sb-ws-popover--inline) {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 0;
+  z-index: 200;
 }
 </style>
