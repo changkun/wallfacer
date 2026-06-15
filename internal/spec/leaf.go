@@ -2,7 +2,6 @@ package spec
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -22,11 +21,4 @@ func IsLeafPath(absPath string) bool {
 		}
 	}
 	return true // subdirectory exists but has no .md files → leaf
-}
-
-// IsLeafRel reports whether a spec at the given relative path is a leaf
-// within the given workspace. It joins the workspace root with the
-// relative path and delegates to IsLeafPath.
-func IsLeafRel(workspace, relPath string) bool {
-	return IsLeafPath(filepath.Join(workspace, relPath))
 }
