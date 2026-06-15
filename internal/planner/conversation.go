@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -102,40 +103,79 @@ func (s *ConversationStore) Messages() ([]Message, error) {
 	}
 	defer func() { _ = f.Close() }()
 
+	return readMessages(f, maxMessageBytes)
+}
+
+// maxMessageBytes caps the size of a single JSONL record. A single assistant
+// message carries the entire raw NDJSON stream for that round in its raw_output
+// field, which can easily exceed the default 64 KiB Scanner token limit; 32 MiB
+// covers even lengthy agent transcripts. A record over the cap is skipped, not
+// fatal.
+const maxMessageBytes = 32 * 1024 * 1024
+
+// readMessages parses newline-delimited Message records from r. Malformed lines
+// are skipped with a warning. A record longer than maxLen is skipped (drained to
+// the next newline) rather than halting the read: bufio.Scanner cannot resume
+// after ErrTooLong, so a single oversized record would otherwise truncate the
+// entire rest of the history.
+func readMessages(r io.Reader, maxLen int) ([]Message, error) {
 	var msgs []Message
-	sc := bufio.NewScanner(f)
-	// A single assistant message carries the entire raw NDJSON stream for
-	// that round in its raw_output field; one round can easily exceed the
-	// default 64 KiB Scanner token limit. Bumping the buffer to 32 MiB
-	// covers even lengthy agent transcripts; over that, the scanner falls
-	// back to ErrTooLong and that line is skipped with a warning rather
-	// than failing the whole history read (old behaviour turned a single
-	// oversized record into a 500 that made the chat appear empty).
-	const maxScanSize = 32 * 1024 * 1024
-	sc.Buffer(make([]byte, 0, 64*1024), maxScanSize)
+	// 1 MiB read buffer keeps ReadLine fragment churn low for ordinary records
+	// while still allowing lines far larger than the buffer via isPrefix.
+	br := bufio.NewReaderSize(r, 1024*1024)
 	lineNum := 0
-	for sc.Scan() {
+	for {
 		lineNum++
-		var m Message
-		if err := json.Unmarshal(sc.Bytes(), &m); err != nil {
-			slog.Warn("conversation: skipping malformed line",
-				"line", lineNum, "file", messagesFile, "err", err)
-			continue
+		line, oversized, err := readLogicalLine(br, maxLen)
+		switch {
+		case oversized:
+			slog.Warn("conversation: skipping oversized record",
+				"line", lineNum, "file", messagesFile, "limit_bytes", maxLen)
+		case len(line) > 0:
+			var m Message
+			if uerr := json.Unmarshal(line, &m); uerr != nil {
+				slog.Warn("conversation: skipping malformed line",
+					"line", lineNum, "file", messagesFile, "err", uerr)
+			} else {
+				msgs = append(msgs, m)
+			}
 		}
-		msgs = append(msgs, m)
-	}
-	if err := sc.Err(); err != nil {
-		// Only swallow the oversized-token case (an individual record
-		// exceeded maxScanSize); everything else — I/O errors, reading
-		// a directory by mistake, truncated files — still propagates so
-		// the caller can surface it.
-		if !errors.Is(err, bufio.ErrTooLong) {
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return msgs, nil
+			}
 			return msgs, err
 		}
-		slog.Warn("conversation: skipping oversized record",
-			"file", messagesFile, "line", lineNum+1, "limit_bytes", maxScanSize, "err", err)
 	}
-	return msgs, nil
+}
+
+// readLogicalLine reads one newline-terminated line from br using ReadLine, so a
+// line larger than the read buffer is assembled from fragments without buffering
+// the whole oversized record up front (unlike ReadBytes/ReadString). If the line
+// exceeds maxLen, it is drained to the newline and (nil, true, nil) is returned.
+// On the final line without a trailing newline the line is returned with a nil
+// error; io.EOF is reported on the subsequent call.
+func readLogicalLine(br *bufio.Reader, maxLen int) (line []byte, oversized bool, err error) {
+	var buf []byte
+	for {
+		frag, isPrefix, e := br.ReadLine()
+		if e != nil {
+			if len(buf) > 0 {
+				return buf, oversized, nil
+			}
+			return nil, oversized, e
+		}
+		if !oversized && len(buf)+len(frag) > maxLen {
+			oversized = true
+			buf = nil
+		}
+		if !oversized {
+			buf = append(buf, frag...)
+		}
+		if !isPrefix {
+			return buf, oversized, nil
+		}
+	}
 }
 
 // Clear removes the message log and session file, starting a fresh conversation.
