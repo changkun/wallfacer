@@ -48,6 +48,42 @@ func TestConversationStore_LargeRawOutput(t *testing.T) {
 	}
 }
 
+// TestReadMessages_OversizedRecordSkippedNotTruncating verifies that a single
+// oversized record skips only itself and the rest of the history is still read.
+// bufio.Scanner could not resume after ErrTooLong, so an oversized record used
+// to truncate every subsequent message.
+func TestReadMessages_OversizedRecordSkipped(t *testing.T) {
+	const maxLen = 1024
+	valid1 := `{"role":"user","content":"first"}`
+	oversized := `{"role":"assistant","content":"` + strings.Repeat("x", 4*maxLen) + `"}`
+	valid2 := `{"role":"user","content":"third"}`
+	data := strings.Join([]string{valid1, oversized, valid2}, "\n") + "\n"
+
+	msgs, err := readMessages(strings.NewReader(data), maxLen)
+	if err != nil {
+		t.Fatalf("readMessages: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("len(msgs) = %d, want 2 (both valid records past the oversized one)", len(msgs))
+	}
+	if msgs[0].Content != "first" || msgs[1].Content != "third" {
+		t.Fatalf("got contents %q, %q; want first, third", msgs[0].Content, msgs[1].Content)
+	}
+}
+
+// TestReadMessages_FinalLineNoNewline verifies a trailing record without a
+// terminating newline is still read.
+func TestReadMessages_FinalLineNoNewline(t *testing.T) {
+	data := `{"role":"user","content":"a"}` + "\n" + `{"role":"user","content":"b"}`
+	msgs, err := readMessages(strings.NewReader(data), maxMessageBytes)
+	if err != nil {
+		t.Fatalf("readMessages: %v", err)
+	}
+	if len(msgs) != 2 || msgs[1].Content != "b" {
+		t.Fatalf("got %d msgs (last=%q), want 2 (last=b)", len(msgs), msgs[len(msgs)-1].Content)
+	}
+}
+
 func TestConversationStore_AppendAndRead(t *testing.T) {
 	cs := newTestStore(t)
 
