@@ -36,6 +36,14 @@ func (h *Handler) SetAuth(p AuthProvider) {
 	}
 }
 
+// SetCloudMode marks the handler as serving a multi-tenant cloud deployment
+// (WALLFACER_CLOUD). It gates org/personal workspace isolation: only cloud
+// deployments hide workspaces a principal can't see. A local single-user run
+// (the default) keeps every workspace visible regardless of session org.
+func (h *Handler) SetCloudMode(enabled bool) {
+	h.cloudMode = enabled
+}
+
 // HasAuth reports whether a cloud-mode OIDC client is wired. Used by
 // server-side wiring to decide whether to apply authorization wrappers
 // (e.g. RequireSuperadmin) to individual routes.

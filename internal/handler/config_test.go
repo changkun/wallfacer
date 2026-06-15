@@ -29,6 +29,7 @@ import (
 // org's board across the switch).
 func TestBuildConfigResponse_HidesCrossOrgWorkspace(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
+	h.SetCloudMode(true) // org isolation only applies to cloud deployments
 	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
 		{Workspaces: []string{ws}, OrgID: "org-a"},
 	}); err != nil {
@@ -292,6 +293,7 @@ func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
 // principal) and the owning org still see it.
 func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	h.SetCloudMode(true) // org isolation only applies to cloud deployments
 	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
 		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
@@ -325,6 +327,7 @@ func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T
 // has specs on disk.
 func TestGetSpecTree_HiddenForMismatchedPrincipal(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	h.SetCloudMode(true) // org isolation only applies to cloud deployments
 	specsDir := filepath.Join(ws, "specs")
 	if err := os.MkdirAll(specsDir, 0o755); err != nil {
 		t.Fatal(err)

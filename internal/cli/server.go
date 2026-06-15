@@ -208,6 +208,10 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		logger.Fatal("auth: client construction failed; check AUTH_* configuration")
 	}
 	h.SetAuth(authClient)
+	// Only multi-tenant cloud deployments isolate workspaces per org/principal;
+	// a local single-user run keeps every workspace visible regardless of the
+	// session's org label.
+	h.SetCloudMode(cloudMode)
 
 	// JWT validator for API requests that carry Authorization: Bearer
 	// <jwt>. Issuer and JWKS URL fall back to AuthURL derivatives when
