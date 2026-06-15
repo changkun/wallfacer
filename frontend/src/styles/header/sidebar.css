@@ -265,7 +265,7 @@
   margin: 0 10px var(--sp-3);
   padding: 7px 10px;
   border-radius: var(--r-md);
-  background: var(--bg-sunk);
+  background: var(--bg-elevated);
   border: 1px solid var(--rule);
   color: var(--ink-3);
   font-size: var(--fs-10);
