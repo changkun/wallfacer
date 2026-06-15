@@ -282,6 +282,29 @@ const visibleEvents = computed(() =>
   events.value.filter((e) => e.event_type !== 'span_start' && e.event_type !== 'span_end'),
 );
 
+// Collapse consecutive events with the same type + summary into one row with a
+// count, so a burst of identical "system" events reads as "system ×7" instead
+// of a wall of repeated rows.
+interface GroupedEvent {
+  ref: TaskEvent;
+  summary: string;
+  count: number;
+}
+const groupedEvents = computed<GroupedEvent[]>(() => {
+  const out: GroupedEvent[] = [];
+  for (const e of visibleEvents.value) {
+    const summary = eventSummary(e);
+    const last = out[out.length - 1];
+    if (last && last.ref.event_type === e.event_type && last.summary === summary) {
+      last.count++;
+      last.ref = e; // keep the most recent timestamp for the group
+    } else {
+      out.push({ ref: e, summary, count: 1 });
+    }
+  }
+  return out;
+});
+
 // Per-sub-agent usage breakdown (implementation/test/refinement/oversight/…).
 const USAGE_ACTIVITY_LABELS: Record<string, string> = {
   implementation: 'Implementation',
@@ -1028,14 +1051,17 @@ const isArchived = computed(() => !!props.task.archived);
                     <div v-else-if="!visibleEvents.length" class="text-xs text-v-muted">No events recorded.</div>
                     <ul v-else class="event-list">
                       <li
-                        v-for="e in visibleEvents"
-                        :key="e.id"
+                        v-for="g in groupedEvents"
+                        :key="g.ref.id"
                         class="event-row"
-                        :data-event-type="e.event_type"
+                        :data-event-type="g.ref.event_type"
                       >
-                        <span class="event-row__type">{{ e.event_type }}</span>
-                        <span class="event-row__summary">{{ eventSummary(e) }}</span>
-                        <span class="event-row__time">{{ timeStr(e.created_at) }}</span>
+                        <span class="event-row__type">{{ g.ref.event_type }}</span>
+                        <span class="event-row__summary">
+                          {{ g.summary }}
+                          <span v-if="g.count > 1" class="event-row__count">×{{ g.count }}</span>
+                        </span>
+                        <span class="event-row__time">{{ timeStr(g.ref.created_at) }}</span>
                       </li>
                     </ul>
                   </section>
@@ -1910,6 +1936,16 @@ const isArchived = computed(() => !!props.task.archived);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
+}
+.event-row__count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 .event-row__time {
   color: var(--text-muted);
