@@ -1687,11 +1687,11 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 
 	recorded := time.Date(2026, 3, 9, 12, 0, 0, 0, time.UTC)
 	env := ExecutionEnvironment{
-		ContainerImage:   "wallfacer-sandbox:latest",
-		ContainerDigest:  "sha256:abc123def456",
-		ModelName:        "claude-opus-4-6",
-		APIBaseURL:       "https://api.example.com",
-		RecordedAt:       recorded,
+		ContainerImage:  "wallfacer-sandbox:latest",
+		ContainerDigest: "sha256:abc123def456",
+		ModelName:       "claude-opus-4-6",
+		APIBaseURL:      "https://api.example.com",
+		RecordedAt:      recorded,
 	}
 
 	if err := s.UpdateTaskEnvironment(bg(), task.ID, env); err != nil {

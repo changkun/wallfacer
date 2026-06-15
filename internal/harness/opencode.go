@@ -106,15 +106,15 @@ type openCodeError struct {
 // uses Type "result" and carries Result / Usage / Cost / IsError at top level.
 // Unknown fields are ignored.
 type openCodeLine struct {
-	Type      string          `json:"type"`
-	SessionID string          `json:"sessionID"`
-	Part      *openCodePart   `json:"part"`
-	Error     *openCodeError  `json:"error"`
-	Result    string          `json:"result"`
-	IsError   bool            `json:"is_error"`
-	StopReason string         `json:"stop_reason"`
-	Usage     *openCodeTokens `json:"usage"`
-	Cost      float64         `json:"cost"`
+	Type       string          `json:"type"`
+	SessionID  string          `json:"sessionID"`
+	Part       *openCodePart   `json:"part"`
+	Error      *openCodeError  `json:"error"`
+	Result     string          `json:"result"`
+	IsError    bool            `json:"is_error"`
+	StopReason string          `json:"stop_reason"`
+	Usage      *openCodeTokens `json:"usage"`
+	Cost       float64         `json:"cost"`
 }
 
 // ParseEvent maps one NDJSON line of opencode output to a canonical Event.
