@@ -17,7 +17,7 @@ func TestResubscribingWakeSourceForwardsSignals(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	mgr := workspace.NewStatic(s, nil, "")
+	mgr := workspace.NewStatic(s, nil)
 	h := &Handler{workspace: mgr, store: s}
 
 	src := h.newResubscribingWakeSource()
@@ -53,7 +53,7 @@ func TestResubscribingWakeSourceResubscribes(t *testing.T) {
 	}
 	t.Cleanup(func() { storeB.Close() })
 
-	mgr := workspace.NewStatic(storeA, nil, "")
+	mgr := workspace.NewStatic(storeA, nil)
 	h := &Handler{workspace: mgr, store: storeA}
 
 	src := h.newResubscribingWakeSource()
@@ -88,7 +88,7 @@ func TestResubscribingWakeSourceCancelCleanup(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	mgr := workspace.NewStatic(s, nil, "")
+	mgr := workspace.NewStatic(s, nil)
 	h := &Handler{workspace: mgr, store: s}
 
 	src := h.newResubscribingWakeSource()
@@ -108,7 +108,7 @@ func TestResubscribingWakeSourceOldStoreClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr := workspace.NewStatic(s, nil, "")
+	mgr := workspace.NewStatic(s, nil)
 	h := &Handler{workspace: mgr, store: s}
 
 	src := h.newResubscribingWakeSource()

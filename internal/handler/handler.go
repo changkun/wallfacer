@@ -21,7 +21,6 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/lazyval"
 	"latere.ai/x/wallfacer/internal/planner"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/routine"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -203,7 +202,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		wsMgr = r.WorkspaceManager()
 	}
 	if wsMgr == nil {
-		wsMgr = workspace.NewStatic(s, workspaces, prompts.InstructionsFilePath(configDir, workspaces))
+		wsMgr = workspace.NewStatic(s, workspaces)
 	}
 	h := &Handler{
 		store:                s,

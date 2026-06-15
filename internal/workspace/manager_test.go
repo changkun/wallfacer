@@ -36,9 +36,6 @@ func TestNewManagerWithoutWorkspacesCreatesScopedStore(t *testing.T) {
 	if snap.Key == "" {
 		t.Fatal("expected workspace key for empty workspace set")
 	}
-	if snap.InstructionsPath != "" {
-		t.Fatalf("expected no instructions path for empty workspace set, got %q", snap.InstructionsPath)
-	}
 }
 
 // TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup verifies session
@@ -68,9 +65,6 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 	snap := m.Snapshot()
 	if len(snap.Workspaces) != 2 || snap.Workspaces[0] != wsA || snap.Workspaces[1] != wsB {
 		t.Fatalf("expected saved workspace group to load, got %v", snap.Workspaces)
-	}
-	if snap.InstructionsPath == "" {
-		t.Fatal("expected instructions path for restored workspace group")
 	}
 	if snap.Store == nil {
 		t.Fatal("expected store for restored workspace group")
@@ -163,9 +157,6 @@ func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T)
 	if len(snap.Workspaces) != 0 {
 		t.Fatalf("expected no restored workspaces, got %v", snap.Workspaces)
 	}
-	if snap.InstructionsPath != "" {
-		t.Fatalf("expected no instructions path for explicit empty startup, got %q", snap.InstructionsPath)
-	}
 	if snap.Store == nil {
 		t.Fatal("expected store for explicit empty workspace set")
 	}
@@ -191,7 +182,7 @@ func newTestManager(t *testing.T) (*Manager, string) {
 // --- Switch tests ---
 
 // TestSwitch_ToValidWorkspace verifies that switching to a valid directory
-// creates a store, instructions file, and populates the snapshot.
+// creates a store and populates the snapshot.
 func TestSwitch_ToValidWorkspace(t *testing.T) {
 	m, _ := newTestManager(t)
 	ws := t.TempDir()
@@ -206,13 +197,10 @@ func TestSwitch_ToValidWorkspace(t *testing.T) {
 	if snap.Store == nil {
 		t.Fatal("expected store after Switch")
 	}
-	if snap.InstructionsPath == "" {
-		t.Fatal("expected instructions path after Switch with workspace")
-	}
 }
 
 // TestSwitch_ToEmptyWorkspaces verifies that switching to an empty set clears
-// workspaces and instructions while still maintaining a store.
+// workspaces while still maintaining a store.
 func TestSwitch_ToEmptyWorkspaces(t *testing.T) {
 	m, _ := newTestManager(t)
 	ws := t.TempDir()
@@ -226,9 +214,6 @@ func TestSwitch_ToEmptyWorkspaces(t *testing.T) {
 	}
 	if len(snap.Workspaces) != 0 {
 		t.Fatalf("expected no workspaces after empty switch, got %v", snap.Workspaces)
-	}
-	if snap.InstructionsPath != "" {
-		t.Fatalf("expected no instructions path after empty switch, got %q", snap.InstructionsPath)
 	}
 }
 
@@ -302,29 +287,9 @@ func TestHasStore_TrueWhenStorePresent(t *testing.T) {
 
 func TestHasStore_FalseForNilStore(t *testing.T) {
 	// NewStatic with nil store should have HasStore()=false.
-	m := NewStatic(nil, nil, "")
+	m := NewStatic(nil, nil)
 	if m.HasStore() {
 		t.Fatal("expected HasStore()=false for nil store")
-	}
-}
-
-// --- InstructionsPath tests ---
-
-func TestInstructionsPath_EmptyWithNoWorkspaces(t *testing.T) {
-	m, _ := newTestManager(t)
-	if p := m.InstructionsPath(); p != "" {
-		t.Fatalf("expected empty instructions path, got %q", p)
-	}
-}
-
-func TestInstructionsPath_SetAfterSwitch(t *testing.T) {
-	m, _ := newTestManager(t)
-	ws := t.TempDir()
-	if _, err := m.Switch([]string{ws}); err != nil {
-		t.Fatalf("Switch: %v", err)
-	}
-	if p := m.InstructionsPath(); p == "" {
-		t.Fatal("expected non-empty instructions path after Switch with workspace")
 	}
 }
 
@@ -422,14 +387,11 @@ func TestNewStatic_SnapshotReflectsInputs(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	ws := []string{"/fake/ws"}
-	m := NewStatic(s, ws, "/path/to/instructions")
+	m := NewStatic(s, ws)
 
 	snap := m.Snapshot()
 	if snap.Store != s {
 		t.Fatal("expected store pointer to match")
-	}
-	if snap.InstructionsPath != "/path/to/instructions" {
-		t.Fatalf("expected instructions path, got %q", snap.InstructionsPath)
 	}
 	if snap.Generation != 1 {
 		t.Fatalf("expected generation=1, got %d", snap.Generation)
@@ -488,67 +450,6 @@ func TestSwitch_NoOpWhenWorkspacesMatch(t *testing.T) {
 	if len(groupsBefore) != len(groupsAfter) {
 		t.Errorf("workspace groups count changed on no-op switch: before=%d after=%d",
 			len(groupsBefore), len(groupsAfter))
-	}
-}
-
-// TestSwitch_FailedInstructionClosesCandidate verifies that when
-// instructions.Ensure fails the candidate store is closed (not leaked) and
-// the manager's current snapshot is left unchanged.
-func TestSwitch_FailedInstructionClosesCandidate(t *testing.T) {
-	configDir := t.TempDir()
-	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	m, err := NewManager(configDir, dataDir, envFile, nil)
-	if err != nil {
-		t.Fatalf("NewManager: %v", err)
-	}
-	originalSnap := m.Snapshot()
-
-	// Intercept the next store.NewStore call so we can verify Close() is
-	// called on the candidate when the switch fails.
-	var candidateStore *store.Store
-	m.newStore = func(dir string) (*store.Store, error) {
-		s, err := store.NewFileStore(dir)
-		if err == nil {
-			candidateStore = s
-		}
-		return s, err
-	}
-
-	// Block instructions.Ensure by placing a regular file where it expects to
-	// create the "instructions" sub-directory.
-	instrBlocker := filepath.Join(configDir, "instructions")
-	if err := os.WriteFile(instrBlocker, []byte("not a dir"), 0o644); err != nil {
-		t.Fatalf("create blocker: %v", err)
-	}
-
-	ws := t.TempDir()
-	_, err = m.Switch([]string{ws})
-	if err == nil {
-		t.Fatal("expected Switch to fail when instructions creation is blocked")
-	}
-
-	// The candidate store must have been closed.
-	if candidateStore == nil {
-		t.Fatal("expected a candidate store to have been created")
-	}
-	if !candidateStore.IsClosed() {
-		t.Error("expected candidate store to be closed after failed Switch")
-	}
-
-	// The manager's snapshot must be unchanged.
-	snap := m.Snapshot()
-	if snap.Generation != originalSnap.Generation {
-		t.Errorf("generation changed after failed switch: before=%d after=%d",
-			originalSnap.Generation, snap.Generation)
-	}
-	if !workspacesEqual(snap.Workspaces, originalSnap.Workspaces) {
-		t.Errorf("workspaces changed after failed switch: before=%v after=%v",
-			originalSnap.Workspaces, snap.Workspaces)
 	}
 }
 
@@ -663,7 +564,7 @@ func TestActiveGroupsInitializationStatic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
-	m := NewStatic(s, []string{"/fake/ws"}, "")
+	m := NewStatic(s, []string{"/fake/ws"})
 	keys := m.ActiveGroupKeys()
 	if len(keys) != 1 {
 		t.Fatalf("expected 1 active group, got %d", len(keys))

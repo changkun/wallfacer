@@ -78,7 +78,6 @@ var embeddedToAPI = map[string]string{
 	"commit.tmpl":                   "commit_message",
 	"conflict.tmpl":                 "conflict_resolution",
 	"test.tmpl":                     "test_verification",
-	"instructions.tmpl":             "instructions",
 	"planning.tmpl":                 "planning",
 	"planning_system_empty.tmpl":    "planning_system_empty",
 	"planning_system_nonempty.tmpl": "planning_system_nonempty",
@@ -93,7 +92,6 @@ var apiToEmbedded = map[string]string{
 	"commit_message":           "commit.tmpl",
 	"conflict_resolution":      "conflict.tmpl",
 	"test_verification":        "test.tmpl",
-	"instructions":             "instructions.tmpl",
 	"planning":                 "planning.tmpl",
 	"planning_system_empty":    "planning_system_empty.tmpl",
 	"planning_system_nonempty": "planning_system_nonempty.tmpl",
@@ -109,7 +107,6 @@ var knownNames = []string{
 	"commit_message",
 	"conflict_resolution",
 	"test_verification",
-	"instructions",
 	"planning",
 	"planning_system_empty",
 	"planning_system_nonempty",
@@ -282,11 +279,6 @@ func mockContextFor(apiName string) (interface{}, bool) {
 		return struct{ ActivityLog string }{ActivityLog: "example activity log"}, true
 	case "title":
 		return struct{ Prompt string }{Prompt: "example task"}, true
-	case "instructions":
-		return InstructionsData{
-			Workspaces:          []InstructionsWorkspace{{Name: "example-repo"}},
-			RepoInstructionRefs: []InstructionsRepoRef{{Workspace: "example-repo", Filename: "AGENTS.md"}},
-		}, true
 	case "planning":
 		return nil, true
 	case "planning_system_empty", "planning_system_nonempty":
@@ -427,23 +419,6 @@ type TestData struct {
 	Diff           string // optional
 }
 
-// InstructionsWorkspace represents a single workspace entry for the instructions template.
-type InstructionsWorkspace struct {
-	Name string // basename of the workspace directory
-}
-
-// InstructionsRepoRef represents a per-repo instructions file reference.
-type InstructionsRepoRef struct {
-	Workspace string // basename of the workspace directory
-	Filename  string // "AGENTS.md" or "CLAUDE.md"
-}
-
-// InstructionsData holds template variables for the workspace instructions prompt.
-type InstructionsData struct {
-	Workspaces          []InstructionsWorkspace
-	RepoInstructionRefs []InstructionsRepoRef
-}
-
 // --- Manager methods ---
 
 // TaskPromptRefine renders the task-mode planning agent system prompt.
@@ -474,9 +449,6 @@ func (m *Manager) ConflictResolution(d ConflictData) string { return m.render("c
 
 // TestVerification renders the test verification agent prompt.
 func (m *Manager) TestVerification(d TestData) string { return m.render("test.tmpl", d) }
-
-// Instructions renders the workspace instructions (AGENTS.md) content.
-func (m *Manager) Instructions(d InstructionsData) string { return m.render("instructions.tmpl", d) }
 
 // Planning renders the planning agent system prompt.
 func (m *Manager) Planning() string { return m.render("planning.tmpl", nil) }
