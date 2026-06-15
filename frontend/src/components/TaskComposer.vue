@@ -7,6 +7,7 @@ import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
 import TemplatePicker from './TemplatePicker.vue';
 import HarnessSelect from './HarnessSelect.vue';
+import AppSelect from './AppSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
@@ -58,6 +59,7 @@ const timeoutMin = ref<number | null>(null);
 
 // Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
 const allowsEmptyPrompt = computed(() => flowAllowsEmptyPrompt(flow.value, flows.value));
+const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
 const promptPlaceholder = computed(() => {
   const f = flow.value || 'implement';
   if (allowsEmptyPrompt.value) {
@@ -330,9 +332,7 @@ function onInput(e: Event) {
     <div class="composer__opts">
       <label class="composer__opt">
         <span class="composer__opt-label">Flow</span>
-        <select v-model="flow" class="composer__select" aria-label="Flow">
-          <option v-for="f in flows" :key="f.slug" :value="f.slug">{{ f.name }}</option>
-        </select>
+        <AppSelect v-model="flow" :options="flowOptions" aria-label="Flow" block />
       </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Tags</span>

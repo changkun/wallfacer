@@ -2,6 +2,13 @@
 import { ref, onMounted, watch, useTemplateRef, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../../api/client';
+import AppSelect from '../AppSelect.vue';
+
+const WINDOW_OPTIONS = [
+  { value: 7, label: 'Last 7 days' },
+  { value: 30, label: 'Last 30 days' },
+  { value: 0, label: 'All time' },
+];
 
 const router = useRouter();
 // Open a task from a Top Tasks row — deep-link via the hash route handler,
@@ -335,14 +342,11 @@ watch(planningWindowDays, () => fetchAndRender());
             <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Planning</div>
             <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
               Window
-              <select
-                v-model.number="planningWindowDays"
-                style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: inherit;"
-              >
-                <option :value="7">Last 7 days</option>
-                <option :value="30">Last 30 days</option>
-                <option :value="0">All time</option>
-              </select>
+              <AppSelect
+                v-model="planningWindowDays"
+                :options="WINDOW_OPTIONS"
+                aria-label="Planning window"
+              />
             </label>
           </div>
           <div style="overflow-x: auto">
