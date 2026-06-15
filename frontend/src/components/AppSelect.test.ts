@@ -26,9 +26,11 @@ function mount<T extends string | number>(props: {
         modelValue: model.value,
         options: props.options,
         placeholder: props.placeholder,
-        'onUpdate:modelValue': (v: T) => {
-          emitted.push(v);
-          model.value = v;
+        // AppSelect is generic, so via h() the emit handler is typed to the
+        // constraint (string | number), not the narrower T; cast back to T.
+        'onUpdate:modelValue': (v: string | number) => {
+          emitted.push(v as T);
+          model.value = v as T;
         },
       }),
   });
