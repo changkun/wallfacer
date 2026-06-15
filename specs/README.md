@@ -53,7 +53,7 @@ Cloud Platform - two axes (consume Latere services, don't absorb)
     ○ Tenant API
   archived: Multi-Tenant, Billing Idempotency (now owned by Cella / Identity)
 
-Intent - two shippable features + a residual
+Git Workflow - two shippable features + a residual
   ○ Pull Request Creation          ○ Task Revert
   ○ Intent-Driven Commits (mostly shipped; residual: explorer auto-commit)
 ```
@@ -61,7 +61,7 @@ Intent - two shippable features + a residual
 The two hot areas are **Identity / platform convergence** (auth-by-default and the
 latere-ui console shell, actively landing in `main`) and **Local Product** polish
 (spec state control plane, the file/diff/attachment trio). Cloud Platform is
-drafted and demand-gated; Intent is two independently-shippable features.
+drafted and demand-gated; Git Workflow is two independently-shippable features.
 
 ---
 
@@ -253,9 +253,9 @@ Why no wallfacer-owned K8s control plane? Cella already owns sandbox runtime, li
 
 ---
 
-## Intent
+## Git Workflow
 
-Git-history-as-product: revert, PR, and attribution over the commit graph. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec.
+Git and GitHub workflow as a product surface: revert, PR creation, and attribution over the commit graph. Pull-request is the GitHub-integration member (collects `git log`/`git diff` host-side, shells `gh pr create`); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
