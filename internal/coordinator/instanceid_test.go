@@ -3,6 +3,7 @@ package coordinator
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -56,6 +57,9 @@ func TestLoadOrCreateInstanceID_RegeneratesCorruptFile(t *testing.T) {
 }
 
 func TestLoadOrCreateInstanceID_Persisted0600(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows does not honor Unix permission bits via os.Stat().Perm()")
+	}
 	dir := t.TempDir()
 	if _, err := LoadOrCreateInstanceID(dir); err != nil {
 		t.Fatal(err)
