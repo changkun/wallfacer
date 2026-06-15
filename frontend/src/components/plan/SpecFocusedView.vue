@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router';
 import { usePlanningStore } from '../../stores/planning';
 import { useTaskStore } from '../../stores/tasks';
 import { useToastStore } from '../../stores/toast';
+import { useDialogStore } from '../../stores/dialog';
 import FloatingToc from './FloatingToc.vue';
 
 withDefaults(defineProps<{ chatVisible: boolean; chatEnabled?: boolean }>(), {
@@ -19,6 +20,7 @@ const emit = defineEmits<{ toggleChat: []; focusSibling: [path: string]; sendCha
 const planning = usePlanningStore();
 const tasks = useTaskStore();
 const toast = useToastStore();
+const dialog = useDialogStore();
 const router = useRouter();
 const {
   focusedSpecPath, focusedIsIndex, focusedNode, tree,
@@ -191,7 +193,11 @@ function focusedChildCount(): number {
 
 async function onDispatch() {
   if (!focusedSpecPath.value) return;
-  if (!confirm('Dispatch this spec to the task board?')) return;
+  if (!(await dialog.confirm({
+    title: 'Dispatch spec',
+    message: 'Dispatch this spec to the task board?',
+    confirmLabel: 'Dispatch',
+  }))) return;
   actionBusy.value = true;
   try {
     const resp = await api<DispatchResp>('POST', '/api/specs/transition', {
@@ -242,7 +248,7 @@ async function callSpecTransition(action: ArchiveAction['action'], path: string)
     await api('POST', '/api/specs/transition', { action, path });
     return true;
   } catch (e) {
-    alert(e instanceof Error ? e.message : String(e));
+    await dialog.alert(e instanceof Error ? e.message : String(e));
     return false;
   }
 }
@@ -250,7 +256,12 @@ async function callSpecTransition(action: ArchiveAction['action'], path: string)
 async function onArchive() {
   if (!focusedSpecPath.value) return;
   const childCount = focusedChildCount();
-  if (childCount > 0 && !confirm(`Archiving will hide ${childCount} descendant spec(s). Continue?`)) {
+  if (childCount > 0 && !(await dialog.confirm({
+    title: 'Archive spec',
+    message: `Archiving will hide ${childCount} descendant spec(s). Continue?`,
+    confirmLabel: 'Archive',
+    danger: true,
+  }))) {
     return;
   }
   const path = focusedSpecPath.value;

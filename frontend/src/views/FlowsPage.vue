@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import draggable from 'vuedraggable';
 import { api, ApiError } from '../api/client';
+import { useDialogStore } from '../stores/dialog';
 
 interface FlowStep {
   agent_slug: string;
@@ -254,18 +255,20 @@ async function saveEdit() {
 }
 
 async function deleteFlow(slug: string) {
-  if (!window.confirm(`Delete flow ${slug}?`)) return;
+  const ok = await dialog.confirm({
+    title: 'Delete flow',
+    message: `Delete flow ${slug}?`,
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api('DELETE', `/api/flows/${encodeURIComponent(slug)}`);
     selectedSlug.value = null;
     delete detailCache.value[slug];
     await loadFlows();
   } catch (e) {
-    if (e instanceof ApiError) {
-      window.alert('Delete failed: ' + e.message);
-    } else {
-      window.alert('Delete failed: ' + String(e));
-    }
+    await dialog.alert('Delete failed: ' + (e instanceof ApiError ? e.message : String(e)));
   }
 }
 
@@ -313,6 +316,7 @@ function chipLabel(step: FlowStep): string {
 }
 
 const router = useRouter();
+const dialog = useDialogStore();
 function gotoAgents() {
   void router.push('/agents');
 }

@@ -4,9 +4,11 @@ import { api } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import type { SystemPromptTemplate } from '../api/types';
 import { useEscapeToClose } from '../composables/useEscapeToClose';
+import { useDialogStore } from '../stores/dialog';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
+const dialog = useDialogStore();
 
 useEscapeToClose(() => props.modelValue, () => close());
 
@@ -132,9 +134,12 @@ async function saveOverride() {
 async function resetToDefault() {
   const tmpl = currentTemplate.value;
   if (!tmpl || !tmpl.has_override) return;
-  const ok = window.confirm(
-    `Reset "${tmpl.name}" to the embedded default? Your override will be deleted.`,
-  );
+  const ok = await dialog.confirm({
+    title: 'Reset to default',
+    message: `Reset "${tmpl.name}" to the embedded default? Your override will be deleted.`,
+    confirmLabel: 'Reset',
+    danger: true,
+  });
   if (!ok) return;
   setStatus('Resetting…', false, false);
   try {

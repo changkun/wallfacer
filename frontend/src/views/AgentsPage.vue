@@ -5,6 +5,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { useEnvConfig } from '../composables/useEnvConfig';
 import { supportedHarnesses, harnessLabel } from '../lib/harness';
+import { useDialogStore } from '../stores/dialog';
 
 interface Agent {
   slug: string;
@@ -31,6 +32,7 @@ interface Draft {
 const store = useTaskStore();
 const ui = useUiStore();
 const { updateEnv } = useEnvConfig();
+const dialog = useDialogStore();
 
 const agents = ref<Agent[]>([]);
 const loading = ref(true);
@@ -58,7 +60,7 @@ async function setDefaultHarness(e: Event) {
     await updateEnv({ default_sandbox: value });
     await store.fetchConfig();
   } catch (err) {
-    window.alert(
+    await dialog.alert(
       'Could not change default harness: ' +
         (err instanceof ApiError ? err.message : String(err)),
     );
@@ -256,18 +258,20 @@ function buildEditPayload(): Draft | null {
 }
 
 async function deleteAgent(slug: string) {
-  if (!window.confirm(`Delete agent ${slug}?`)) return;
+  const ok = await dialog.confirm({
+    title: 'Delete agent',
+    message: `Delete agent ${slug}?`,
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api('DELETE', `/api/agents/${encodeURIComponent(slug)}`);
     selectedSlug.value = null;
     delete detailCache.value[slug];
     await loadAgents();
   } catch (e) {
-    if (e instanceof ApiError) {
-      window.alert('Delete failed: ' + e.message);
-    } else {
-      window.alert('Delete failed: ' + String(e));
-    }
+    await dialog.alert('Delete failed: ' + (e instanceof ApiError ? e.message : String(e)));
   }
 }
 

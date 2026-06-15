@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { api, ApiError } from '../api/client';
+import { useDialogStore } from '../stores/dialog';
 
 interface BranchesResponse { current: string; branches: string[] }
 
@@ -14,6 +15,8 @@ const emit = defineEmits<{
   'update:modelValue': [boolean];
   'switched': [];
 }>();
+
+const dialog = useDialogStore();
 
 const loading = ref(true);
 const errorMsg = ref('');
@@ -61,9 +64,9 @@ async function selectBranch(branch: string) {
     close();
   } catch (e) {
     if (e instanceof ApiError && e.status === 409) {
-      window.alert('Branch switch blocked: another git operation is in progress.');
+      await dialog.alert('Branch switch blocked: another git operation is in progress.');
     } else {
-      window.alert('Branch switch failed: ' + (e instanceof Error ? e.message : String(e)));
+      await dialog.alert('Branch switch failed: ' + (e instanceof Error ? e.message : String(e)));
     }
   } finally {
     pending.value = '';
@@ -80,9 +83,9 @@ async function createBranch() {
     close();
   } catch (e) {
     if (e instanceof ApiError && e.status === 409) {
-      window.alert('Create branch blocked: another git operation is in progress.');
+      await dialog.alert('Create branch blocked: another git operation is in progress.');
     } else {
-      window.alert('Failed to create branch: ' + (e instanceof Error ? e.message : String(e)));
+      await dialog.alert('Failed to create branch: ' + (e instanceof Error ? e.message : String(e)));
     }
   } finally {
     pending.value = '';
@@ -94,7 +97,7 @@ async function openFolder() {
     await api('POST', '/api/git/open-folder', { workspace: props.workspacePath });
     close();
   } catch (e) {
-    window.alert('Failed to open folder: ' + (e instanceof Error ? e.message : String(e)));
+    await dialog.alert('Failed to open folder: ' + (e instanceof Error ? e.message : String(e)));
   }
 }
 

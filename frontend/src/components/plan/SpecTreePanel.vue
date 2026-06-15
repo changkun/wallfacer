@@ -6,10 +6,12 @@ import { usePlanningStore } from '../../stores/planning';
 import type { SpecNode } from '../../stores/planning';
 import { useTaskStore } from '../../stores/tasks';
 import { useUiStore } from '../../stores/ui';
+import { useDialogStore } from '../../stores/dialog';
 
 const planning = usePlanningStore();
 const taskStore = useTaskStore();
 const ui = useUiStore();
+const dialog = useDialogStore();
 const {
   tree, treeProgress, treeIndex, treeLoading,
   focusedSpecPath, focusedIsIndex, focusedTaskId,
@@ -297,7 +299,11 @@ interface DispatchResp {
 async function dispatchSelected() {
   const paths = [...selectedPaths.value];
   if (paths.length === 0) return;
-  if (!confirm(`Dispatch ${paths.length} specs to the task board?`)) return;
+  if (!(await dialog.confirm({
+    title: 'Dispatch specs',
+    message: `Dispatch ${paths.length} specs to the task board?`,
+    confirmLabel: 'Dispatch',
+  }))) return;
   dispatchPending.value = true;
   try {
     const resp = await api<DispatchResp>('POST', '/api/specs/transition', { action: 'dispatch', paths, run: false });
@@ -307,14 +313,14 @@ async function dispatchSelected() {
     if (resp.errors && resp.errors.length > 0) {
       const lines = resp.errors.map(e => `${e.spec_path}: ${e.error}`).join('\n');
       const dispatched = resp.dispatched?.length ?? 0;
-      alert(
+      await dialog.alert(
         dispatched > 0
           ? `Dispatched ${dispatched}. ${resp.errors.length} failed:\n${lines}`
           : `Dispatch failed:\n${lines}`,
       );
     }
   } catch (e) {
-    alert('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)));
+    await dialog.alert('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)));
   } finally {
     dispatchPending.value = false;
   }
