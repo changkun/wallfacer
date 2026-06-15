@@ -7,6 +7,7 @@ import type { SpecNode } from '../../stores/planning';
 import { useTaskStore } from '../../stores/tasks';
 import { useUiStore } from '../../stores/ui';
 import { useDialogStore } from '../../stores/dialog';
+import AppSelect from '../AppSelect.vue';
 
 const planning = usePlanningStore();
 const taskStore = useTaskStore();
@@ -228,6 +229,17 @@ function setStatusFilter(v: string) {
   localStorage.setItem(STATUS_KEY, v);
 }
 
+const statusFilterOptions = computed(() => [
+  { value: 'all', label: 'All' },
+  { value: 'incomplete', label: 'Incomplete' },
+  { value: 'vague', label: 'Vague' },
+  { value: 'drafted', label: 'Drafted' },
+  { value: 'validated', label: 'Validated' },
+  { value: 'complete', label: 'Complete' },
+  { value: 'stale', label: 'Stale' },
+  { value: 'archived', label: 'Archived', disabled: !showArchived.value },
+]);
+
 function toggleShowArchived() {
   showArchived.value = !showArchived.value;
   localStorage.setItem(ARCHIVED_KEY, String(showArchived.value));
@@ -359,16 +371,13 @@ onUnmounted(() => {
         type="search"
         placeholder="Filter specs…"
       />
-      <select :value="statusFilter" class="stp-status" @change="setStatusFilter(($event.target as HTMLSelectElement).value)">
-        <option value="all">All</option>
-        <option value="incomplete">Incomplete</option>
-        <option value="vague">Vague</option>
-        <option value="drafted">Drafted</option>
-        <option value="validated">Validated</option>
-        <option value="complete">Complete</option>
-        <option value="stale">Stale</option>
-        <option value="archived" :disabled="!showArchived">Archived</option>
-      </select>
+      <AppSelect
+        :model-value="statusFilter"
+        :options="statusFilterOptions"
+        class="stp-status"
+        aria-label="Filter by status"
+        @update:model-value="setStatusFilter"
+      />
       <label class="stp-archived-toggle">
         <input type="checkbox" :checked="showArchived" @change="toggleShowArchived" />
         Show archived
@@ -516,7 +525,7 @@ onUnmounted(() => {
 }
 
 .stp-search,
-.stp-status {
+.stp-status :deep(.app-select__trigger) {
   font-size: 12px;
   padding: 5px 8px;
   border: 1px solid var(--rule);
@@ -525,16 +534,12 @@ onUnmounted(() => {
   color: var(--ink);
 }
 
-/* Keep the native dropdown caret. Extra right padding leaves room for the
-   platform-drawn arrow. */
-.stp-status {
-  appearance: auto;
-  padding-right: 24px;
+.stp-status :deep(.app-select__trigger) {
   cursor: pointer;
 }
 
 .stp-search:focus,
-.stp-status:focus {
+.stp-status :deep(.app-select__trigger:focus-visible) {
   outline: none;
   border-color: var(--accent);
 }
