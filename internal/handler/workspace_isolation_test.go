@@ -39,7 +39,7 @@ func newStaleStoreHandler(t *testing.T, storeA, storeB *store.Store) *Handler {
 
 	// Step 1: replace the workspace manager so that h.requireStore() →
 	// h.workspace.Store() returns storeA (the "current" workspace's store).
-	h.workspace = workspace.NewStatic(storeA, nil, "")
+	h.workspace = workspace.NewStatic(storeA, nil)
 
 	// Step 2: set h.store (the cache) to storeB (empty/stale), simulating the
 	// race window where applySnapshot hasn't run yet after a workspace switch.

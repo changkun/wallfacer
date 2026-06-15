@@ -47,7 +47,7 @@ func TestTaskStoreResolution(t *testing.T) {
 	t.Cleanup(func() { storeB.Close() })
 
 	// Create a static manager with storeA as the viewed group.
-	mgr := workspace.NewStatic(storeA, []string{"/ws/a"}, "")
+	mgr := workspace.NewStatic(storeA, []string{"/ws/a"})
 
 	// Manually add storeB as a second active group.
 	// Since NewStatic only supports one group, we'll test the fallback path
@@ -74,7 +74,7 @@ func TestTaskStoreFallback(t *testing.T) {
 	}
 	t.Cleanup(func() { storeA.Close() })
 
-	mgr := workspace.NewStatic(storeA, nil, "")
+	mgr := workspace.NewStatic(storeA, nil)
 	_, r := setupTestRunnerWithManager(t, nil, mgr)
 
 	// Apply a snapshot so currentStore returns storeA.
@@ -102,7 +102,7 @@ func TestRunBackgroundCapturesWSKey(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	mgr := workspace.NewStatic(s, []string{"/ws/a"}, "")
+	mgr := workspace.NewStatic(s, []string{"/ws/a"})
 	snap := mgr.Snapshot()
 
 	_, r := setupTestRunnerWithManager(t, nil, mgr)
@@ -141,7 +141,7 @@ func TestRunBackgroundIncrementsTaskCount(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	mgr := workspace.NewStatic(s, []string{"/ws/a"}, "")
+	mgr := workspace.NewStatic(s, []string{"/ws/a"})
 	snap := mgr.Snapshot()
 
 	_, r := setupTestRunnerWithManager(t, nil, mgr)
@@ -174,7 +174,7 @@ func TestRunBackgroundCleansUpOnCompletion(t *testing.T) {
 	}
 	t.Cleanup(func() { storeA.Close() })
 
-	mgr := workspace.NewStatic(storeA, []string{"/ws/a"}, "")
+	mgr := workspace.NewStatic(storeA, []string{"/ws/a"})
 	snap := mgr.Snapshot()
 
 	// Manually increment to simulate pre-existing task count.
@@ -209,7 +209,7 @@ func TestTaskStoreFallbackOnMissingGroup(t *testing.T) {
 	}
 	t.Cleanup(func() { storeA.Close() })
 
-	mgr := workspace.NewStatic(storeA, nil, "")
+	mgr := workspace.NewStatic(storeA, nil)
 
 	_, r := setupTestRunnerWithManager(t, nil, mgr)
 	r.storeMu.Lock()

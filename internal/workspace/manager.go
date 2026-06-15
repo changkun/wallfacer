@@ -19,12 +19,11 @@ import (
 // Snapshot holds the immutable state of a workspace configuration at a point in time.
 // Callers receive copies (via cloneSnapshot) so they cannot mutate manager internals.
 type Snapshot struct {
-	Workspaces       []string     // sorted, deduplicated absolute paths
-	Store            *store.Store // scoped task store for this workspace set (may be shared across snapshots)
-	InstructionsPath string       // path to the merged AGENTS.md; empty when Workspaces is empty
-	ScopedDataDir    string       // per-workspace-key data directory under the global data dir
-	Key              string       // deterministic key derived from sorted workspace paths (via prompts.InstructionsKey)
-	Generation       uint64       // monotonically increasing counter; incremented on each successful Switch
+	Workspaces    []string     // sorted, deduplicated absolute paths
+	Store         *store.Store // scoped task store for this workspace set (may be shared across snapshots)
+	ScopedDataDir string       // per-workspace-key data directory under the global data dir
+	Key           string       // deterministic key derived from sorted workspace paths (via prompts.InstructionsKey)
+	Generation    uint64       // monotonically increasing counter; incremented on each successful Switch
 }
 
 // activeGroup tracks a workspace group whose store is still open, either
@@ -125,19 +124,18 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 }
 
 // NewStatic creates a Manager with a fixed workspace set that cannot be switched.
-// It bypasses path validation, instructions setup, and env persistence — useful
-// for testing and for CLI subcommands that operate on a known workspace.
-func NewStatic(store *store.Store, workspaces []string, instructionsPath string) *Manager {
+// It bypasses path validation and env persistence — useful for testing and for
+// CLI subcommands that operate on a known workspace.
+func NewStatic(store *store.Store, workspaces []string) *Manager {
 	m := &Manager{
 		subs:         make(map[int]chan Snapshot),
 		activeGroups: make(map[string]*activeGroup),
 	}
 	ws := cloneStrings(workspaces)
 	m.current = Snapshot{
-		Workspaces:       ws,
-		Store:            store,
-		InstructionsPath: instructionsPath,
-		Generation:       1,
+		Workspaces: ws,
+		Store:      store,
+		Generation: 1,
 	}
 	if len(ws) > 0 {
 		m.current.Key = prompts.InstructionsKey(ws)
@@ -169,13 +167,6 @@ func (m *Manager) Workspaces() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return cloneStrings(m.current.Workspaces)
-}
-
-// InstructionsPath returns the path to the merged instructions file.
-func (m *Manager) InstructionsPath() string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.current.InstructionsPath
 }
 
 // HasStore reports whether a scoped store is currently available.
@@ -280,14 +271,6 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		}
 	}
 
-	if len(validated) > 0 {
-		instructionsPath, err := prompts.EnsureInstructions(m.configDir, validated)
-		if err != nil {
-			swap.cleanup()
-			return Snapshot{}, fmt.Errorf("ensure instructions: %w", err)
-		}
-		swap.next.InstructionsPath = instructionsPath
-	}
 	if err := UpsertGroup(m.configDir, validated); err != nil {
 		swap.cleanup()
 		return Snapshot{}, fmt.Errorf("persist workspace group: %w", err)
