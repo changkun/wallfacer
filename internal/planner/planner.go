@@ -225,8 +225,16 @@ func (p *Planner) SetBusy(b bool, threadID string) {
 func (p *Planner) StartLiveLog() *livelog.Log {
 	l := livelog.New()
 	p.mu.Lock()
+	prev := p.liveLog
 	p.liveLog = l
 	p.mu.Unlock()
+	// Seal any previous live log so its readers (e.g. SSE consumers of the
+	// prior turn) receive io.EOF instead of hanging until the client
+	// disconnects. The stale-session retry path starts a second live log
+	// without closing the first.
+	if prev != nil {
+		prev.Close()
+	}
 	return l
 }
 

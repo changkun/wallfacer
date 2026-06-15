@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -233,6 +234,33 @@ func TestPlannerStartLiveLog(t *testing.T) {
 	if r2 != nil {
 		t.Error("LogReader should return nil after CloseLiveLog")
 	}
+}
+
+// TestPlannerStartLiveLog_SealsPrevious verifies that starting a new live log
+// seals the previous one so its readers receive io.EOF. The stale-session retry
+// path starts a second live log without closing the first; without sealing, a
+// reader of the first turn would hang until the client disconnects.
+func TestPlannerStartLiveLog_SealsPrevious(t *testing.T) {
+	p := New(Config{Command: "podman"})
+	first := p.StartLiveLog()
+	_, _ = first.Write([]byte("turn one"))
+	r := first.NewReader()
+
+	// Drain the buffered data first.
+	if _, err := r.ReadChunk(context.Background()); err != nil {
+		t.Fatalf("draining first chunk: %v", err)
+	}
+
+	// Starting a second live log (the retry) must seal the first.
+	p.StartLiveLog()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err := r.ReadChunk(ctx)
+	if err != io.EOF {
+		t.Fatalf("reader of first live log: err = %v, want io.EOF (it hung instead of being sealed)", err)
+	}
+	p.CloseLiveLog()
 }
 
 func TestPlannerLogReader_NoLiveLog(t *testing.T) {
