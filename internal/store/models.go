@@ -39,13 +39,12 @@ func (u *TaskUsage) Add(other TaskUsage) {
 // It is recorded once at the start of Run() and stored alongside the task for
 // reproducibility auditing and debugging when results differ between runs.
 type ExecutionEnvironment struct {
-	ContainerImage   string     `json:"container_image"`   // e.g. "wallfacer-sandbox"
-	ContainerDigest  string     `json:"container_digest"`  // sha256 of image, empty if unavailable
-	ModelName        string     `json:"model_name"`        // e.g. "claude-opus-4-6"
-	APIBaseURL       string     `json:"api_base_url"`      // empty string = default Anthropic endpoint
-	InstructionsHash string     `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
-	Sandbox          harness.ID `json:"sandbox"`           // configured sandbox: "claude", "codex", etc.
-	RecordedAt       time.Time  `json:"recorded_at"`
+	ContainerImage  string     `json:"container_image"`  // e.g. "wallfacer-sandbox"
+	ContainerDigest string     `json:"container_digest"` // sha256 of image, empty if unavailable
+	ModelName       string     `json:"model_name"`       // e.g. "claude-opus-4-6"
+	APIBaseURL      string     `json:"api_base_url"`     // empty string = default Anthropic endpoint
+	Sandbox         harness.ID `json:"sandbox"`          // configured sandbox: "claude", "codex", etc.
+	RecordedAt      time.Time  `json:"recorded_at"`
 }
 
 // TurnUsageRecord captures token consumption and stop reason for a single agent turn.

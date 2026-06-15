@@ -1691,7 +1691,6 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 		ContainerDigest:  "sha256:abc123def456",
 		ModelName:        "claude-opus-4-6",
 		APIBaseURL:       "https://api.example.com",
-		InstructionsHash: "deadbeef01234567deadbeef01234567deadbeef01234567deadbeef01234567",
 		RecordedAt:       recorded,
 	}
 
@@ -1718,9 +1717,6 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 	}
 	if got.Environment.APIBaseURL != env.APIBaseURL {
 		t.Errorf("APIBaseURL = %q, want %q", got.Environment.APIBaseURL, env.APIBaseURL)
-	}
-	if got.Environment.InstructionsHash != env.InstructionsHash {
-		t.Errorf("InstructionsHash = %q, want %q", got.Environment.InstructionsHash, env.InstructionsHash)
 	}
 	if !got.Environment.RecordedAt.Equal(env.RecordedAt) {
 		t.Errorf("RecordedAt = %v, want %v", got.Environment.RecordedAt, env.RecordedAt)
