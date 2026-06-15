@@ -23,7 +23,37 @@
     src: url('/fonts/instrument-serif-italic.woff2') format('woff2');
 }
 
-/* Inter */
+/* Hanken Grotesk — primary UI sans (warm humanist grotesk) */
+@font-face {
+    font-family: 'Hanken Grotesk';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('/fonts/hanken-400.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Hanken Grotesk';
+    font-style: normal;
+    font-weight: 500;
+    font-display: block;
+    src: url('/fonts/hanken-500.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Hanken Grotesk';
+    font-style: normal;
+    font-weight: 600;
+    font-display: block;
+    src: url('/fonts/hanken-600.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Hanken Grotesk';
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+    src: url('/fonts/hanken-700.woff2') format('woff2');
+}
+
+/* Inter — fallback sans */
 @font-face {
     font-family: 'Inter';
     font-style: normal;
