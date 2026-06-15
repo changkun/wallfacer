@@ -520,9 +520,6 @@ func ConflictResolution(d ConflictData) string { return Default.ConflictResoluti
 // TestVerification renders the test verification agent prompt.
 func TestVerification(d TestData) string { return Default.TestVerification(d) }
 
-// Instructions renders the workspace instructions (AGENTS.md) content.
-func Instructions(d InstructionsData) string { return Default.Instructions(d) }
-
 // Planning renders the planning agent system prompt.
 func Planning() string { return Default.Planning() }
 

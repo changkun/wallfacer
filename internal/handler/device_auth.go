@@ -57,20 +57,6 @@ type deviceFlowState struct {
 	finalErr error
 }
 
-// NewDeviceAuth constructs a DeviceAuth using the default token-store path.
-// Returns an error if the store path cannot be resolved.
-func NewDeviceAuth(client *oidc.Client) (*DeviceAuth, error) {
-	storePath, err := authkit.DefaultFileTokenStorePath()
-	if err != nil {
-		return nil, fmt.Errorf("locate token store: %w", err)
-	}
-	store, err := authkit.NewFileTokenStore(storePath)
-	if err != nil {
-		return nil, err
-	}
-	return &DeviceAuth{OIDC: client, Store: store}, nil
-}
-
 // Mount registers the device-auth routes on mux. Safe to call when DeviceAuth
 // is nil; the endpoints answer 503 in that case so the SPA can detect "auth
 // not available" without distinguishing 404 / 503.
@@ -85,10 +71,6 @@ func (d *DeviceAuth) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/auth/device/poll", d.poll)
 	mux.HandleFunc("POST /api/auth/device/cancel", d.cancel)
 }
-
-// SetDeviceAuth installs the local-mode device-code driver. nil disables the
-// /api/auth/device/* endpoints (they answer 503).
-func (h *Handler) SetDeviceAuth(d *DeviceAuth) { h.deviceAuth = d }
 
 // AuthDeviceStart is exposed as a *Handler method so the apicontract-driven
 // route registry in internal/cli/server.go can map it like any other endpoint.

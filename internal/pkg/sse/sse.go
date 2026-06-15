@@ -94,11 +94,3 @@ func (s *Writer) Heartbeat() error {
 	s.flusher.Flush()
 	return nil
 }
-
-// Flush forces any buffered data to be sent to the client. Most call
-// sites do not need this — Event, EventID, JSON, and Heartbeat all
-// flush implicitly. Use Flush only when writing raw bytes via the
-// underlying ResponseWriter (rare).
-func (s *Writer) Flush() {
-	s.flusher.Flush()
-}
