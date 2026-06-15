@@ -171,9 +171,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 		}
 	}()
-	// Clean up the per-task oversight mutex entry when Run exits to avoid
-	// unbounded growth in the oversightMu sync.Map for long-running servers.
-	defer r.oversightMu.Delete(taskID.String())
+	// The per-task oversight mutex is intentionally NOT deleted here. Background
+	// oversight generations (brainstorm/budget/end_turn) and the periodic worker
+	// can outlive Run; deleting the entry would let a later oversightLock hand out
+	// a fresh mutex, breaking serialization and racing two writers on
+	// oversight.json. The entry is a single small *sync.Mutex per distinct task
+	// ID, so retaining it for the server's lifetime is negligible.
 
 	task, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if err != nil {
