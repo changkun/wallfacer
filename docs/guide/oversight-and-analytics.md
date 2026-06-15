@@ -62,11 +62,7 @@ While a task is running, the detail modal streams live agent output in real time
 
 For completed tasks, saved turn output files are served from disk instead of a live stream.
 
-Switch between log display modes using the tabs above the log panel:
-
-- **Oversight** -- Shows the oversight summary (if available).
-- **Pretty** -- Parses NDJSON output and renders it with syntax highlighting, tool calls, and formatted content. This is the default for tasks without a ready oversight summary.
-- **Raw** -- Shows the raw text output with ANSI escape codes stripped.
+The Activity tab shows an oversight summary (when one has been generated) followed by parsed activity rows: thinking, tool calls, results, and text, each with an icon and label. Tasks with no parsed activity fall back to the raw output with ANSI escape codes stripped.
 
 ### Checking Task Costs
 
@@ -123,9 +119,7 @@ The system prompt used to generate oversight summaries is based on the built-in 
 
 ### Log Search and Filtering
 
-In Pretty and Raw modes, a search bar appears above the log panel. Type a query to filter log lines -- only lines containing the search term are shown. A counter displays how many lines matched out of the total. Matches are highlighted in the output.
-
-The search bar is hidden in Oversight mode since the structured view is not line-based.
+A **Filter activity...** box sits above the parsed activity rows. Type a query to keep only matching rows; a counter shows how many match out of the total.
 
 ### Truncation
 
