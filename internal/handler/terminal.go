@@ -460,15 +460,14 @@ func (r *sessionRegistry) sendSessionsList(conn *websocket.Conn) {
 func (s *terminalSession) cleanup() {
 	s.cancel()
 	if s.cmd.Process != nil {
-		// SIGHUP to process group.
+		// SIGHUP to process group. Wait for the process to be reaped by
+		// monitorSession (the sole owner of cmd.Wait) via sess.done rather
+		// than calling Process.Wait here — two goroutines reaping the same
+		// process race on its internal state. SIGKILL on timeout guarantees
+		// the process dies so cmd.Wait unblocks and closes done.
 		_ = syscall.Kill(-s.cmd.Process.Pid, syscall.SIGHUP)
-		done := make(chan struct{})
-		go func() {
-			_, _ = s.cmd.Process.Wait()
-			close(done)
-		}()
 		select {
-		case <-done:
+		case <-s.done:
 		case <-time.After(2 * time.Second):
 			_ = syscall.Kill(-s.cmd.Process.Pid, syscall.SIGKILL)
 		}

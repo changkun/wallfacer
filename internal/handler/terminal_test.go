@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/coder/websocket"
+	"latere.ai/x/wallfacer/internal/pkg/pty"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -882,5 +884,45 @@ func TestTerminalWS_CwdValidation(t *testing.T) {
 	msg := `{"type":"input","data":"` + input + `"}`
 	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
 		t.Fatalf("write: %v", err)
+	}
+}
+
+// TestTerminalSessionCleanup_SingleReaper verifies that cleanup does not reap
+// the shell itself: monitorSession (here, the sole reaper goroutine) owns the
+// only cmd.Wait, and cleanup waits on sess.done. Before the fix, cleanup
+// spawned its own Process.Wait, so two goroutines raced to reap the same
+// process. Run under -race; each iteration drives the concurrent path.
+func TestTerminalSessionCleanup_SingleReaper(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		cmd := exec.CommandContext(ctx, "/bin/sh")
+		cmd.Dir = t.TempDir()
+		ptmx, err := pty.StartWithSize(cmd, 24, 80)
+		if err != nil {
+			cancel()
+			t.Fatalf("pty start: %v", err)
+		}
+		sess := &terminalSession{
+			id:       "t",
+			ptmx:     ptmx,
+			cmd:      cmd,
+			cancel:   cancel,
+			done:     make(chan struct{}),
+			outputCh: make(chan []byte, 1),
+		}
+		// Sole reaper, exactly as monitorSession does it.
+		go func() {
+			_ = sess.cmd.Wait()
+			close(sess.done)
+		}()
+
+		sess.cleanup()
+
+		select {
+		case <-sess.done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("shell not reaped after cleanup (deadlock or missing reap)")
+		}
+		cancel()
 	}
 }
