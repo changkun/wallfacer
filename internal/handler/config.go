@@ -196,7 +196,6 @@ func (h *Handler) activeGroupInfos(ctx context.Context) []activeGroupInfo {
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
 	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()
-	instructionsPath := h.currentInstructionsPath()
 
 	groups, _ := workspace.LoadGroups(h.configDir)
 	// Org / personal filtering: cloud-mode callers see only groups their
@@ -276,7 +275,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"workspaces":               workspaces,
 		"workspace_browser_path":   workspaceBrowserPath,
 		"workspace_groups":         keyedGroups,
-		"instructions_path":        instructionsPath,
 		"prompts_dir":              promptsDir,
 		"sandbox_activities":       store.SandboxActivities,
 		"sandboxes":                harness.All(),

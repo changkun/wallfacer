@@ -22,7 +22,7 @@ import (
 
 // TestRunnerCommand verifies that Command() returns the configured binary path.
 func TestRunnerCommand(t *testing.T) {
-	r := newTestRunnerWithInstructions(t, "")
+	r := newTestRunner(t)
 	if r.Command() != "podman" {
 		t.Fatalf("expected command 'podman', got %q", r.Command())
 	}
@@ -973,25 +973,6 @@ func TestRunnerWorktreesDir(t *testing.T) {
 	t.Cleanup(func() { r.Shutdown() })
 	if r.WorktreesDir() != wtDir {
 		t.Errorf("WorktreesDir() = %q, want %q", r.WorktreesDir(), wtDir)
-	}
-}
-
-// TestRunnerInstructionsPath verifies InstructionsPath() when workspaceManager is nil.
-func TestRunnerInstructionsPath(t *testing.T) {
-	instructionsFile := filepath.Join(t.TempDir(), "CLAUDE.md")
-	if err := os.WriteFile(instructionsFile, []byte("# test\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	r := NewRunner(s, RunnerConfig{Command: "echo", InstructionsPath: instructionsFile})
-	t.Cleanup(func() { r.Shutdown() })
-	if r.InstructionsPath() != instructionsFile {
-		t.Errorf("InstructionsPath() = %q, want %q", r.InstructionsPath(), instructionsFile)
 	}
 }
 

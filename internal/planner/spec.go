@@ -1,7 +1,6 @@
 package planner
 
 import (
-	"os"
 	"strings"
 
 	"latere.ai/x/wallfacer/internal/executor"
@@ -10,8 +9,7 @@ import (
 
 // buildSpec creates a launch spec for the planning agent process. The
 // planner runs the agent CLI as a host process in the first configured
-// workspace; specs/ is a normal writable subdirectory of that cwd, and the
-// workspace instructions file is surfaced via WALLFACER_INSTRUCTIONS_PATH.
+// workspace; specs/ is a normal writable subdirectory of that cwd.
 func (p *Planner) buildSpec(name string, sb harness.ID) executor.ContainerSpec {
 	spec := executor.ContainerSpec{
 		Name: name,
@@ -28,11 +26,6 @@ func (p *Planner) buildSpec(name string, sb harness.ID) executor.ContainerSpec {
 	}
 	if p.envFile != "" {
 		spec.EnvFile = p.envFile
-	}
-	if p.instructionsPath != "" {
-		if _, err := os.Stat(p.instructionsPath); err == nil {
-			spec.Env["WALLFACER_INSTRUCTIONS_PATH"] = p.instructionsPath
-		}
 	}
 	return spec
 }

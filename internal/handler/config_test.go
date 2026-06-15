@@ -362,20 +362,6 @@ func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
 	}
 }
 
-func TestGetConfig_ReturnsInstructionsPath(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	if _, ok := resp["instructions_path"]; !ok {
-		t.Error("expected instructions_path in response")
-	}
-}
-
 func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
