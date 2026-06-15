@@ -14,12 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 	"latere.ai/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // collectSpecTree merges the spec trees across all workspaces into a
@@ -229,9 +231,10 @@ func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if t.spec.DispatchedTaskID != nil {
+		if status, active := h.activeDispatchedTask(r.Context(), t.spec.DispatchedTaskID); active {
 			http.Error(w,
-				fmt.Sprintf("%s: cancel the dispatched task before archiving", t.relPath),
+				fmt.Sprintf("%s: task is still active (%s); cancel or finish it before archiving",
+					t.relPath, status),
 				http.StatusConflict)
 			return
 		}
@@ -343,6 +346,31 @@ func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
 		Path:   req.Path,
 		Status: string(spec.StatusDrafted),
 	})
+}
+
+// activeDispatchedTask reports whether a spec's dispatched task is in an active
+// (non-terminal) state that should block archiving, returning that status for
+// the rejection message. A nil link, an unparseable id, a missing task, or a
+// terminal task (done/failed/cancelled) does not block: the link is then just
+// provenance and archiving is safe.
+func (h *Handler) activeDispatchedTask(ctx context.Context, id *string) (store.TaskStatus, bool) {
+	if id == nil {
+		return "", false
+	}
+	taskID, err := uuid.Parse(*id)
+	if err != nil {
+		return "", false
+	}
+	task, err := h.store.GetTask(ctx, taskID)
+	if err != nil {
+		return "", false // stale linkage: task no longer exists
+	}
+	switch task.Status {
+	case store.TaskStatusDone, store.TaskStatusFailed, store.TaskStatusCancelled:
+		return task.Status, false
+	default:
+		return task.Status, true
+	}
 }
 
 // archiveTarget bundles a spec's filesystem path, tree-relative path, and
