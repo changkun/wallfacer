@@ -77,15 +77,15 @@ func (t *Tree[K, V]) Add(key K, value V, parentKey *K) *Node[K, V] {
 		IsLeaf: true,
 	}
 
+	var parent *Node[K, V]
 	if parentKey != nil {
-		if parent, ok := t.All[*parentKey]; ok {
-			node.Parent = parent
-			node.Depth = parent.Depth + 1
-			parent.Children = append(parent.Children, node)
-			parent.IsLeaf = false
-		} else {
-			t.Roots = append(t.Roots, node)
-		}
+		parent = t.All[*parentKey]
+	}
+	if parent != nil {
+		node.Parent = parent
+		node.Depth = parent.Depth + 1
+		parent.Children = append(parent.Children, node)
+		parent.IsLeaf = false
 	} else {
 		t.Roots = append(t.Roots, node)
 	}
