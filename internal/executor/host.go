@@ -367,20 +367,6 @@ func setEnv(env []string, key, value string) []string {
 	return append(env, key+"="+value)
 }
 
-// prependToPromptFlag finds "-p <value>" in argv and prepends content
-// (separated by a blank line and a rule) to the value. Returns argv
-// unchanged when no -p flag is found — callers log that case upstream if
-// they care.
-func prependToPromptFlag(argv []string, content string) []string {
-	for i := 0; i < len(argv)-1; i++ {
-		if argv[i] == "-p" {
-			argv[i+1] = content + "\n\n---\n\n" + argv[i+1]
-			return argv
-		}
-	}
-	return argv
-}
-
 // hostHandle is a Handle backed by an os/exec.Cmd.
 type hostHandle struct {
 	name    string
