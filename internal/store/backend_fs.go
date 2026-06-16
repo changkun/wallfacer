@@ -33,10 +33,6 @@ func NewFilesystemBackend(dir string) (*FilesystemBackend, error) {
 	return &FilesystemBackend{dir: dir}, nil
 }
 
-// Dir returns the root data directory path. Used by Store.DataDir for
-// backward compatibility.
-func (b *FilesystemBackend) Dir() string { return b.dir }
-
 // Init creates the task directory and traces subdirectory.
 func (b *FilesystemBackend) Init(taskID uuid.UUID) error {
 	tracesDir := filepath.Join(b.dir, taskID.String(), "traces")
@@ -176,7 +172,7 @@ func (b *FilesystemBackend) LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, er
 			continue
 		}
 		var evt TaskEvent
-		if err := jsonUnmarshal(raw, &evt); err != nil {
+		if err := json.Unmarshal(raw, &evt); err != nil {
 			logger.Store.Warn("skipping trace", "task", dirName, "trace", te.Name(), "error", err)
 			continue
 		}

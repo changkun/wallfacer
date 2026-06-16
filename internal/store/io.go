@@ -141,10 +141,3 @@ func (s *Store) LoadSummary(id uuid.UUID) (*TaskSummary, error) {
 	}
 	return &summary, nil
 }
-
-// jsonUnmarshal is a thin wrapper around json.Unmarshal used internally.
-// It exists to provide a consistent call site for JSON parsing across the
-// store package, making it easy to swap in a different decoder if needed.
-func jsonUnmarshal(data []byte, v any) error {
-	return json.Unmarshal(data, v)
-}

@@ -23,7 +23,7 @@
 // # Usage
 //
 //	s, err := store.NewFileStore(dataDir)
-//	task, err := s.CreateTask(ctx, "implement feature X", "goal", 0)
+//	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "implement feature X", Timeout: 0})
 //	s.UpdateTaskStatus(ctx, task.ID, store.StatusInProgress)
 //	events, _ := s.GetTaskEvents(ctx, task.ID)
 package store

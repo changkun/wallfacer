@@ -454,13 +454,3 @@ func TestFilesystemBackend_LoadEvents_MissingTask(t *testing.T) {
 	}
 }
 
-func TestFilesystemBackend_Dir(t *testing.T) {
-	dir := t.TempDir()
-	b, err := NewFilesystemBackend(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if b.Dir() != dir {
-		t.Errorf("Dir() = %q, want %q", b.Dir(), dir)
-	}
-}

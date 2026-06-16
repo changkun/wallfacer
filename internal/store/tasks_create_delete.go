@@ -217,21 +217,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	return &ret, nil
 }
 
-// CreateTask creates a new task in backlog status and persists it.
-// kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
-// Optional tags are attached to the task for categorisation.
-//
-// Deprecated: prefer CreateTaskWithOptions for full initialization in one write.
-func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind TaskKind, tags ...string) (*Task, error) {
-	return s.CreateTaskWithOptions(ctx, TaskCreateOptions{
-		Prompt:         prompt,
-		Timeout:        timeout,
-		MountWorktrees: mountWorktrees,
-		Kind:           kind,
-		Tags:           tags,
-	})
-}
-
 // normalizeSandboxByActivity validates and normalizes a sandbox-by-activity map.
 // It lowercases and trims activity keys, validates them against the allowed set,
 // parses sandbox type values, and drops invalid entries. Returns nil for an
@@ -445,7 +430,7 @@ func (s *Store) PurgeExpiredTombstones(retentionDays int) {
 			continue
 		}
 		var tomb Tombstone
-		if err := jsonUnmarshal(raw, &tomb); err != nil {
+		if err := json.Unmarshal(raw, &tomb); err != nil {
 			logger.Store.Warn("purge: parse tombstone", "task", id, "error", err)
 			continue
 		}
