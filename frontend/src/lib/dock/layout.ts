@@ -98,16 +98,6 @@ export function isPanelPresent(layout: DockLayout, panel: PanelId): boolean {
   return findPanelRegion(layout, panel) !== null;
 }
 
-// Every panel id present in the layout, in region/DFS order.
-export function panelIds(layout: DockLayout): PanelId[] {
-  const ids: PanelId[] = [];
-  for (const region of DOCK_REGIONS) {
-    const node = layout.regions[region];
-    if (node) eachGroup(node, (g) => ids.push(...g.tabs));
-  }
-  return ids;
-}
-
 // ---------------------------------------------------------------------------
 // Removal / collapse
 // ---------------------------------------------------------------------------
@@ -203,20 +193,8 @@ export function ensurePanel(layout: DockLayout, panel: PanelId, region: DockRegi
 }
 
 // ---------------------------------------------------------------------------
-// Splits & tab groups (Phase 3)
+// Group rewriting
 // ---------------------------------------------------------------------------
-
-// Which region holds the group with `groupId`, or null.
-function regionOfGroup(layout: DockLayout, groupId: string): DockRegion | null {
-  for (const region of DOCK_REGIONS) {
-    const node = layout.regions[region];
-    if (!node) continue;
-    let found = false;
-    eachGroup(node, (g) => { if (g.id === groupId) found = true; });
-    if (found) return region;
-  }
-  return null;
-}
 
 // Rewrite the group identified by `groupId` within a subtree using `fn`, which
 // returns the replacement node. Structure elsewhere is preserved.
@@ -227,87 +205,6 @@ function replaceGroup(
 ): DockNode {
   if (node.kind === 'group') return node.id === groupId ? fn(node) : node;
   return { ...node, children: node.children.map((c) => replaceGroup(c, groupId, fn)) };
-}
-
-// Edge of a target group a panel is dropped onto: center merges as a tab,
-// left/right/top/bottom split the group and place the panel on that side.
-export type DropEdge = 'center' | 'left' | 'right' | 'top' | 'bottom';
-
-// Drop `panel` onto the group `targetGroupId` at `edge`. Center adds it as the
-// active tab; an edge splits the target group, placing the panel on that side at
-// 50/50. The panel is detached from its previous location first. If removing it
-// collapses the target group out of existence, falls back to docking into the
-// target's region. Returns a fresh layout.
-export function dropPanel(
-  layout: DockLayout,
-  panel: PanelId,
-  targetGroupId: string,
-  edge: DropEdge,
-): DockLayout {
-  const wasMax = layout.maximized === panel;
-  const region = regionOfGroup(layout, targetGroupId);
-  if (!region) return layout;
-  const next = closePanel(layout, panel);
-  // The target may have vanished if `panel` was its only tab.
-  if (regionOfGroup(next, targetGroupId) == null) {
-    const docked = dockPanel(layout, panel, region);
-    return docked;
-  }
-  const root = next.regions[region]!;
-  next.regions[region] = replaceGroup(root, targetGroupId, (g) => {
-    if (edge === 'center') {
-      return { kind: 'group', id: g.id, tabs: [...g.tabs, panel], active: panel };
-    }
-    const dir = edge === 'left' || edge === 'right' ? 'row' : 'col';
-    const fresh = group(nextGroupId(next), panel);
-    const children = edge === 'left' || edge === 'top' ? [fresh, g] : [g, fresh];
-    return { kind: 'split', dir, sizes: [0.5, 0.5], children };
-  });
-  if (next.sizes[region] == null) next.sizes[region] = DEFAULT_REGION_SIZE[region];
-  if (wasMax) next.maximized = panel;
-  return next;
-}
-
-// Move `panel` to be a tab of group `targetGroupId` at `index` (clamped). Used
-// for reordering / re-grouping tabs. Returns a fresh layout.
-export function moveTab(
-  layout: DockLayout,
-  panel: PanelId,
-  targetGroupId: string,
-  index: number,
-): DockLayout {
-  if (regionOfGroup(layout, targetGroupId) == null) return layout;
-  const region = regionOfGroup(layout, targetGroupId)!;
-  const next = closePanel(layout, panel);
-  if (regionOfGroup(next, targetGroupId) == null) return layout; // target gone
-  const root = next.regions[region]!;
-  next.regions[region] = replaceGroup(root, targetGroupId, (g) => {
-    const tabs = g.tabs.filter((t) => t !== panel);
-    const at = Math.max(0, Math.min(index, tabs.length));
-    tabs.splice(at, 0, panel);
-    return { kind: 'group', id: g.id, tabs, active: panel };
-  });
-  return next;
-}
-
-// All group nodes in the layout with their region (for rendering / drop zones).
-export function groups(layout: DockLayout): { region: DockRegion; node: Extract<DockNode, { kind: 'group' }> }[] {
-  const out: { region: DockRegion; node: Extract<DockNode, { kind: 'group' }> }[] = [];
-  for (const region of DOCK_REGIONS) {
-    const node = layout.regions[region];
-    if (node) eachGroup(node, (g) => out.push({ region, node: g }));
-  }
-  return out;
-}
-
-// The id of the group currently holding `panel`, or null.
-export function groupIdOf(layout: DockLayout, panel: PanelId): string | null {
-  let id: string | null = null;
-  for (const region of DOCK_REGIONS) {
-    const node = layout.regions[region];
-    if (node) eachGroup(node, (g) => { if (g.tabs.includes(panel)) id = g.id; });
-  }
-  return id;
 }
 
 // ---------------------------------------------------------------------------
