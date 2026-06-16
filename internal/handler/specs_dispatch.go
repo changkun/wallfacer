@@ -273,7 +273,14 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 	// Phase 5: If run is true, transition tasks to in_progress.
 	if req.Run {
 		for i := range resolved {
-			_ = s.UpdateTaskStatus(r.Context(), createdTaskIDs[i], store.TaskStatusInProgress)
+			if err := s.UpdateTaskStatus(r.Context(), createdTaskIDs[i], store.TaskStatusInProgress); err != nil {
+				// The store write did not persist; do not emit a state-change
+				// event for a transition that never happened, and do not launch
+				// a runner for a task the store still believes is in backlog.
+				logger.Handler.Error("dispatch: failed to transition task to in_progress",
+					"task", createdTaskIDs[i], "spec", resolved[i].relPath, "error", err)
+				continue
+			}
 			h.insertEventOrLog(r.Context(), createdTaskIDs[i], store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerUser, nil))
 			h.runner.RunBackground(createdTaskIDs[i], resolved[i].spec.Body, "", false)
