@@ -116,11 +116,25 @@ func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 		switch t.Status {
 		case store.TaskStatusInProgress:
 			h.runner.KillContainer(t.ID)
-			_ = s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
+			if err := s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled); err != nil {
+				// Status write failed; do not emit a cancel event or report
+				// cancelled=true for a transition that did not persist.
+				logger.Handler.Error("cancel ideation: failed to cancel task",
+					"task", t.ID, "from", t.Status, "error", err)
+				continue
+			}
 			h.insertEventOrLog(r.Context(), t.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusCancelled, "", nil))
 			cancelled = true
 		case store.TaskStatusBacklog:
+			// NOTE: backlog -> cancelled is NOT a valid task-state transition
+			// (see TaskMachine in store/models.go), so this UpdateTaskStatus
+			// always fails and the task is never actually cancelled, yet the
+			// handler still reports cancelled=true. This is a separate
+			// pre-existing bug whose fix is a product decision (add the
+			// transition, force it, or change the endpoint contract); left
+			// as-is pending human sign-off. The error is intentionally
+			// ignored here to preserve the current behavior unchanged.
 			_ = s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
 			h.insertEventOrLog(r.Context(), t.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusCancelled, "", nil))
