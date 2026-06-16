@@ -1185,11 +1185,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
 		"TestTask":       handler.BodyLimitDefault,
-
-		// Refinement agent.
-		"StartRefinement": handler.BodyLimitDefault,
-		"RefineApply":     handler.BodyLimitDefault,
-		"RefineDismiss":   handler.BodyLimitDefault,
 	}
 
 	// Register all routes from the contract. A missing handler entry panics at
