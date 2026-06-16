@@ -302,9 +302,7 @@ func FetchOrigin(repoPath string) error {
 
 // IsConflictOutput reports whether git output text indicates a merge conflict.
 func IsConflictOutput(s string) bool {
-	return strings.Contains(s, "CONFLICT") ||
-		strings.Contains(s, "Merge conflict") ||
-		strings.Contains(s, "conflict")
+	return strings.Contains(s, "CONFLICT") || strings.Contains(s, "conflict")
 }
 
 // HasConflicts reports whether the worktree at worktreePath has any unresolved
