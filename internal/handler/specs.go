@@ -362,7 +362,11 @@ func (h *Handler) activeDispatchedTask(ctx context.Context, id *string) (store.T
 	if err != nil {
 		return "", false
 	}
-	task, err := h.store.GetTask(ctx, taskID)
+	s, ok := h.currentStore()
+	if !ok {
+		return "", false
+	}
+	task, err := s.GetTask(ctx, taskID)
 	if err != nil {
 		return "", false // stale linkage: task no longer exists
 	}

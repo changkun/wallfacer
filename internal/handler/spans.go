@@ -12,12 +12,16 @@ import (
 // by phase+label, and returns a JSON object {"spans": [...]} sorted by started_at.
 // Unclosed spans are included with a zero ended_at and duration_ms=0.
 func (h *Handler) GetTaskSpans(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	if _, err := h.store.GetTask(r.Context(), id); err != nil {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	if _, err := s.GetTask(r.Context(), id); err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
 
-	events, err := h.store.GetEvents(r.Context(), id)
+	events, err := s.GetEvents(r.Context(), id)
 	if err != nil {
 		http.Error(w, "failed to read events", http.StatusInternalServerError)
 		return

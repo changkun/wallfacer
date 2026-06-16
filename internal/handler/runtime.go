@@ -44,7 +44,11 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 	runtime.ReadMemStats(&m)
 
 	// Task counts grouped by status (include archived tasks).
-	tasks, _ := h.store.ListTasks(r.Context(), true)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	tasks, _ := s.ListTasks(r.Context(), true)
 	taskStates := map[store.TaskStatus]int{
 		store.TaskStatusBacklog:    0,
 		store.TaskStatusInProgress: 0,

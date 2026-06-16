@@ -75,7 +75,11 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 		http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
 		return false
 	}
-	if err := h.store.UpdateTaskStatus(ctx, id, newStatus); err != nil {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return false
+	}
+	if err := s.UpdateTaskStatus(ctx, id, newStatus); err != nil {
 		if errors.Is(err, statemachine.ErrInvalidTransition) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {

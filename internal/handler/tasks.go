@@ -1009,7 +1009,11 @@ func (h *Handler) ListDeletedTasks(w http.ResponseWriter, r *http.Request) {
 // active again, and reverses the lifecycle-cascade thread archiving.
 // Invoked from the PATCH deleted=false path (UpdateTask).
 func (h *Handler) applyRestore(ctx context.Context, id uuid.UUID) error {
-	if err := h.store.RestoreTask(ctx, id); err != nil {
+	s, ok := h.currentStore()
+	if !ok {
+		return errors.New("no workspaces configured")
+	}
+	if err := s.RestoreTask(ctx, id); err != nil {
 		return err
 	}
 	h.cascadeUnarchiveThreadsForTask(id.String())

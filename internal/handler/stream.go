@@ -175,7 +175,11 @@ func marshalDeltaPayload(d store.TaskDelta) ([]byte, error) {
 // When phase=impl is specified, serves only the implementation-phase turn files
 // (up to task.TestRunStartTurn) so the UI can display impl and test outputs separately.
 func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -300,7 +304,11 @@ func pumpChunks(ctx context.Context, lr chunkReader, ch chan<- []byte) {
 // writeStoredTurns writes all previously stored turn outputs to w.
 // It is a non-failing best-effort helper — errors are silently ignored.
 func (h *Handler) writeStoredTurns(w http.ResponseWriter, id uuid.UUID) {
-	keys, err := h.store.ListBlobs(id, "outputs/turn-")
+	s, ok := h.currentStore()
+	if !ok {
+		return
+	}
+	keys, err := s.ListBlobs(id, "outputs/turn-")
 	if err != nil {
 		return
 	}
@@ -309,7 +317,7 @@ func (h *Handler) writeStoredTurns(w http.ResponseWriter, id uuid.UUID) {
 		if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".stderr.txt") {
 			continue
 		}
-		content, readErr := h.store.ReadBlob(id, key)
+		content, readErr := s.ReadBlob(id, key)
 		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
 			continue
 		}
@@ -338,7 +346,11 @@ func (h *Handler) serveStoredLogsFrom(w http.ResponseWriter, r *http.Request, id
 // serveStoredLogsRange serves saved turn files in the range (fromTurn, maxTurn].
 // fromTurn=0 means no lower bound; maxTurn=0 means no upper bound.
 func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, id uuid.UUID, fromTurn, maxTurn int) {
-	keys, err := h.store.ListBlobs(id, "outputs/turn-")
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	keys, err := s.ListBlobs(id, "outputs/turn-")
 	if err != nil {
 		http.Error(w, "no logs saved for this task", http.StatusNotFound)
 		return
@@ -361,7 +373,7 @@ func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, i
 		if fromTurn > 0 && turn <= fromTurn {
 			continue
 		}
-		content, readErr := h.store.ReadBlob(id, key)
+		content, readErr := s.ReadBlob(id, key)
 		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
 			continue
 		}

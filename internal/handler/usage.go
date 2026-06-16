@@ -74,7 +74,12 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tasks, err := h.store.ListTasks(r.Context(), true /* includeArchived */)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	tasks, err := s.ListTasks(r.Context(), true /* includeArchived */)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -170,6 +170,11 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	// Phase 2: Resolve dependencies.
 	// For each spec's depends_on, check if the dependency is in this batch
 	// (use pre-assigned UUID) or already dispatched (use existing task ID).
@@ -218,7 +223,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			tags = append(tags, rs.spec.Track)
 		}
 
-		task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+		task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 			ID:             preAssignedIDs[i],
 			Prompt:         rs.spec.Body,
 			Timeout:        60,
@@ -229,7 +234,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Rollback: delete any tasks created so far.
 			for j := 0; j < i; j++ {
-				_ = h.store.DeleteTask(r.Context(), createdTaskIDs[j], "dispatch rollback")
+				_ = s.DeleteTask(r.Context(), createdTaskIDs[j], "dispatch rollback")
 			}
 			http.Error(w, fmt.Sprintf("create task for %s: %v", rs.relPath, err), http.StatusInternalServerError)
 			return
@@ -252,7 +257,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Rollback: delete all created tasks.
 			for j := range resolved {
-				_ = h.store.DeleteTask(r.Context(), createdTaskIDs[j], "dispatch rollback: frontmatter write failed")
+				_ = s.DeleteTask(r.Context(), createdTaskIDs[j], "dispatch rollback: frontmatter write failed")
 			}
 			// Attempt to revert any frontmatter already written.
 			for j := 0; j < i; j++ {
@@ -268,7 +273,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 	// Phase 5: If run is true, transition tasks to in_progress.
 	if req.Run {
 		for i := range resolved {
-			_ = h.store.UpdateTaskStatus(r.Context(), createdTaskIDs[i], store.TaskStatusInProgress)
+			_ = s.UpdateTaskStatus(r.Context(), createdTaskIDs[i], store.TaskStatusInProgress)
 			h.insertEventOrLog(r.Context(), createdTaskIDs[i], store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerUser, nil))
 			h.runner.RunBackground(createdTaskIDs[i], resolved[i].spec.Body, "", false)
@@ -322,6 +327,11 @@ func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	st, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	var results []undispatchResult
 	var errs []dispatchError
 
@@ -351,14 +361,14 @@ func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Cancel the task if it's in a cancellable state.
-		task, err := h.store.GetTask(r.Context(), taskID)
+		task, err := st.GetTask(r.Context(), taskID)
 		if err == nil {
 			// Task exists — cancel if not already done/cancelled.
 			switch task.Status {
 			case store.TaskStatusDone, store.TaskStatusCancelled:
 				// Already terminal — skip cancellation.
 			default:
-				_ = h.store.CancelTask(r.Context(), taskID)
+				_ = st.CancelTask(r.Context(), taskID)
 				h.insertEventOrLog(r.Context(), taskID, store.EventTypeStateChange,
 					store.NewStateChangeData(task.Status, store.TaskStatusCancelled, store.TriggerUser, nil))
 			}

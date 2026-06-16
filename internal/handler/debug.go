@@ -124,7 +124,11 @@ func (h *Handler) BoardManifest(w http.ResponseWriter, r *http.Request) {
 // specified task: is_self=true for that task's entry, MountWorktrees matching
 // the task's setting.
 func (h *Handler) TaskBoardManifest(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil || task == nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -155,7 +159,12 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, _ := h.store.ListTasks(r.Context(), true)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	tasks, _ := s.ListTasks(r.Context(), true)
 	durations := make(map[string][]int64) // phase → []durationMs
 	spansTotal := 0
 
@@ -166,7 +175,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	totalFailed := 0
 
 	for _, t := range tasks {
-		events, err := h.store.GetEvents(r.Context(), t.ID)
+		events, err := s.GetEvents(r.Context(), t.ID)
 		if err != nil {
 			continue
 		}
@@ -179,7 +188,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 		switch t.Status {
 		case store.TaskStatusDone:
 			totalCompleted++
-			summary, _ := h.store.LoadSummary(t.ID)
+			summary, _ := s.LoadSummary(t.ID)
 			var execS float64
 			if summary != nil {
 				if summary.ExecutionDurationSeconds > 0 {
@@ -270,8 +279,13 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 //   - running container count and IDs
 //   - server uptime in seconds
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	// Task counts by status.
-	tasks, _ := h.store.ListTasks(r.Context(), false)
+	tasks, _ := s.ListTasks(r.Context(), false)
 	tasksByStatus := make(map[store.TaskStatus]int)
 	for _, t := range tasks {
 		tasksByStatus[t.Status]++

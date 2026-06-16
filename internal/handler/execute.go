@@ -26,7 +26,11 @@ import (
 // test run, auto-submit, etc.) so the timeline doesn't show an ever-growing
 // "Waiting for Feedback" bar.
 func (h *Handler) closeFeedbackWaitingSpan(ctx context.Context, taskID uuid.UUID) {
-	_ = h.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd,
+	s, ok := h.currentStore()
+	if !ok {
+		return
+	}
+	_ = s.InsertEvent(ctx, taskID, store.EventTypeSpanEnd,
 		store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 }
 
@@ -125,6 +129,11 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	// Acquire promoteMu BEFORE reading/modifying the task to prevent races
 	// with tryAutoSubmit (which also holds promoteMu in Phase 2). Without
 	// this, auto-submit can transition the task to committing between our
@@ -132,7 +141,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	// fail while the commit pipeline cleans up the worktree.
 	promoteMu.Lock()
 
-	task, err := h.store.GetTask(r.Context(), id)
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		promoteMu.Unlock()
 		http.Error(w, "task not found", http.StatusNotFound)
@@ -147,7 +156,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	// Any further implementation work invalidates prior test verification.
 	// This must happen AFTER the status check to avoid clearing test state
 	// when the transition will fail (e.g. task already moved to committing).
-	if err := h.store.UpdateTaskTestRun(r.Context(), id, false, ""); err != nil {
+	if err := s.UpdateTaskTestRun(r.Context(), id, false, ""); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -172,18 +181,22 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 // the background. Must be called with promoteMu held to prevent races
 // with tryAutoSubmit.
 func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task *store.Task, message string, trigger store.Trigger, systemMessage string) error {
-	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
+	s, ok := h.currentStore()
+	if !ok {
+		return nil
+	}
+	if err := s.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
 		return err
 	}
-	if err := h.store.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
+	if err := s.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
 		return err
 	}
 	// Reset the consecutive test failure counter so the auto-resume cycle
 	// can start fresh after manual intervention.
-	if err := h.store.ResetTestFailCount(ctx, task.ID); err != nil {
+	if err := s.ResetTestFailCount(ctx, task.ID); err != nil {
 		return err
 	}
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		return err
 	}
 
@@ -375,7 +388,11 @@ func (h *Handler) applyCancel(ctx context.Context, task store.Task) error {
 		// spawning instances if its status were ever moved back to an active
 		// lane (Done/Failed routines intentionally keep their flag so a move
 		// back to Backlog re-arms them; an explicit Cancel does not).
-		if err := h.store.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
+		s, ok := h.currentStore()
+		if !ok {
+			return nil
+		}
+		if err := s.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
 			logger.Handler.Warn("cancel routine: clear enabled", "routine", task.ID, "error", err)
 		}
 		h.unregisterRoutine(task.ID)
@@ -416,7 +433,11 @@ func (h *Handler) cascadeDisableRoutineIfLastLiveInstance(ctx context.Context, c
 	if routineID == uuid.Nil {
 		return
 	}
-	routine, err := h.store.GetTask(ctx, routineID)
+	s, ok := h.currentStore()
+	if !ok {
+		return
+	}
+	routine, err := s.GetTask(ctx, routineID)
 	if err != nil || routine == nil || !routine.IsRoutine() {
 		return
 	}
@@ -424,7 +445,7 @@ func (h *Handler) cascadeDisableRoutineIfLastLiveInstance(ctx context.Context, c
 		return
 	}
 	wantTag := "spawned-by:" + routineID.String()
-	tasks, err := h.store.ListTasks(ctx, false)
+	tasks, err := s.ListTasks(ctx, false)
 	if err != nil {
 		logger.Handler.Warn("cascade disable routine: list tasks", "routine", routineID, "error", err)
 		return
@@ -441,7 +462,7 @@ func (h *Handler) cascadeDisableRoutineIfLastLiveInstance(ctx context.Context, c
 			return // a live sibling exists — keep the routine armed
 		}
 	}
-	if err := h.store.UpdateRoutineEnabled(ctx, routineID, false); err != nil {
+	if err := s.UpdateRoutineEnabled(ctx, routineID, false); err != nil {
 		logger.Handler.Warn("cascade disable routine: update", "routine", routineID, "error", err)
 		return
 	}
@@ -471,7 +492,11 @@ func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error
 	}
 	h.runner.StopTaskWorker(task.ID)
 
-	if err := h.store.CancelTask(ctx, task.ID); err != nil {
+	s, ok := h.currentStore()
+	if !ok {
+		return nil
+	}
+	if err := s.CancelTask(ctx, task.ID); err != nil {
 		return err
 	}
 
@@ -489,7 +514,11 @@ func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error
 // children — done, failed, cancelled — are left alone so their results remain
 // inspectable. Errors are logged but not returned; cascade is best-effort.
 func (h *Handler) cascadeCancelRoutineChildren(ctx context.Context, routineID uuid.UUID) {
-	tasks, err := h.store.ListTasks(ctx, false)
+	s, ok := h.currentStore()
+	if !ok {
+		return
+	}
+	tasks, err := s.ListTasks(ctx, false)
 	if err != nil {
 		logger.Handler.Warn("cascade cancel: list tasks", "routine", routineID, "error", err)
 		return
@@ -521,7 +550,12 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -542,7 +576,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// autopilot will naturally refrain from promoting another backlog task while
 	// this resumed task is running, so the over-capacity is transient.
 	promoteMu.Lock()
-	if err := h.store.ResumeTask(r.Context(), id, req.Timeout); err != nil {
+	if err := s.ResumeTask(r.Context(), id, req.Timeout); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -559,7 +593,11 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 // ArchiveAllDone archives all done and cancelled tasks in one operation.
 func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
-	archived, err := h.store.ArchiveAllDone(r.Context())
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	archived, err := s.ArchiveAllDone(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -585,7 +623,11 @@ func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bo
 		// Safety net: stop any leaked worker containers.
 		h.runner.StopTaskWorker(task.ID)
 	}
-	if err := h.store.SetTaskArchived(ctx, task.ID, archived); err != nil {
+	s, ok := h.currentStore()
+	if !ok {
+		return nil
+	}
+	if err := s.SetTaskArchived(ctx, task.ID, archived); err != nil {
 		return err
 	}
 	to := "unarchived"
@@ -602,7 +644,7 @@ func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bo
 		// enabled flag so the put-away routine can never resume firing.
 		if task.IsRoutine() {
 			h.cascadeCancelRoutineChildren(ctx, task.ID)
-			if err := h.store.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
+			if err := s.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
 				logger.Handler.Warn("archive routine: clear enabled", "routine", task.ID, "error", err)
 			}
 			h.unregisterRoutine(task.ID)
@@ -627,7 +669,12 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -653,13 +700,13 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	h.closeFeedbackWaitingSpan(r.Context(), id)
 
 	// Mark task as a test run and clear any previous verdict.
-	if err := h.store.UpdateTaskTestRun(r.Context(), id, true, ""); err != nil {
+	if err := s.UpdateTaskTestRun(r.Context(), id, true, ""); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Transition waiting → in_progress.
-	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+	if err := s.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -724,7 +771,11 @@ func generateWorktreeDiff(worktreePaths map[string]string) string {
 
 // SyncTask rebases task worktrees onto the latest default branch without merging.
 func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
@@ -750,7 +801,7 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	// on an existing task, and rejecting it when autopilot has filled all slots
 	// leaves the user unable to recover or update the task.
 	promoteMu.Lock()
-	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+	if err := s.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

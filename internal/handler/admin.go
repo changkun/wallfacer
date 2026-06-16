@@ -15,7 +15,11 @@ type rebuildIndexResponse struct {
 // RebuildIndex rebuilds the in-memory search index from disk. It is safe to
 // call at any time; it holds locks only for the minimum duration per task.
 func (h *Handler) RebuildIndex(w http.ResponseWriter, r *http.Request) {
-	repaired, err := h.store.RebuildSearchIndex(r.Context())
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	repaired, err := s.RebuildSearchIndex(r.Context())
 	if err != nil {
 		http.Error(w, "rebuild failed: "+err.Error(), http.StatusInternalServerError)
 		return

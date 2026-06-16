@@ -272,7 +272,11 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 func (h *Handler) buildRoutineInstancePrompt(routineTask store.Task) string {
 	spawnFlow := flowRegistry().ResolveRoutineFlow(&routineTask)
 	if spawnFlow == "brainstorm" {
-		tasks, _ := h.store.ListTasks(context.Background(), false)
+		s, ok := h.currentStore()
+		if !ok {
+			return routineTask.Prompt
+		}
+		tasks, _ := s.ListTasks(context.Background(), false)
 		active := make([]store.Task, 0, len(tasks))
 		for _, t := range tasks {
 			if t.IsIdeaAgent() || t.IsRoutine() {
