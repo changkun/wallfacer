@@ -1429,7 +1429,7 @@ func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
 }
 
 // TestForCurrentStore_ScopesToViewedGroup verifies that automation actions
-// (auto-promote, auto-retry, auto-test, auto-submit, auto-sync, auto-refine)
+// (auto-promote, auto-retry, auto-test, auto-submit, auto-sync)
 // see only the currently viewed workspace group's store, even when other
 // groups have active stores holding backlog tasks. Pinned against regressing
 // to the global behavior where automation fanned out across every active

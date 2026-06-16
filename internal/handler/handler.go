@@ -233,7 +233,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			"auto-test":    newWatcherBreaker(),
 			"auto-submit":  newWatcherBreaker(),
 			"auto-sync":    newWatcherBreaker(),
-			"auto-refine":  newWatcherBreaker(),
 		},
 	}
 	oauthMgr := oauth.NewManager()
@@ -532,7 +531,7 @@ func (h *Handler) forEachActiveStore(fn func(s *store.Store, ws []string)) {
 
 // forCurrentStore calls fn only for the currently viewed workspace group's
 // store. This scopes automation actions (auto-promote, auto-retry, auto-test,
-// auto-submit, auto-sync, auto-refine) to the viewed group: tasks already
+// auto-submit, auto-sync) to the viewed group: tasks already
 // running in other groups finish as normal, but no new automation fires on
 // their backlogs. It is the action-taking counterpart to forEachActiveStore,
 // which remains in use for global concurrency counting.
