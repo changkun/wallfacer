@@ -94,31 +94,6 @@ func TestWorkspacesMethod_PathsWithSpaces(t *testing.T) {
 	}
 }
 
-func TestSanitizeBasename(t *testing.T) {
-	cases := []struct {
-		input, want string
-	}{
-		{"/home/user/my-repo", "my-repo"},
-		{"/home/user/My Project", "My_Project"},
-		{"/home/user/我的项目", "我的项目"},
-		{"/path/to/café-code", "café-code"},
-		{"/path/to/repo:special", "repo_special"},
-		{"/path/to/dir with $vars", "dir_with__vars"},
-		{"/path/with/trailing/", "trailing"},
-		{"", "workspace"},
-		{"/", "workspace"},
-		{".", "workspace"},
-		{"/path/to/a`b\"c'd", "a_b_c_d"},
-		{"/path/to/🚀rocket", "_rocket"},
-	}
-	for _, tc := range cases {
-		got := sanitizeBasename(tc.input)
-		if got != tc.want {
-			t.Errorf("sanitizeBasename(%q) = %q, want %q", tc.input, got, tc.want)
-		}
-	}
-}
-
 // TestKillContainer verifies that KillContainer does not panic when no
 // container is running (error from exec is silently ignored).
 func TestKillContainer(t *testing.T) {

@@ -9,11 +9,6 @@ func truncate(s string, n int) string {
 	return sanitize.Truncate(s, n)
 }
 
-// sanitizeBasename is a package-level alias for sanitize.Basename.
-func sanitizeBasename(path string) string {
-	return sanitize.Basename(path)
-}
-
 // slugifyPrompt is a package-level alias for sanitize.Slug.
 func slugifyPrompt(s string, maxLen int) string {
 	return sanitize.Slug(s, maxLen)
