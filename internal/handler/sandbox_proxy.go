@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -286,6 +285,3 @@ func delegatorSub(c *auth.Claims) string {
 	// Fallback: when act is absent, the principal IS the user.
 	return c.Sub
 }
-
-// Compile-time guard so future refactors keep JSON import wired.
-var _ = json.Marshal
