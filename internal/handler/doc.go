@@ -17,7 +17,7 @@
 // for workspace switching, [envconfig] for configuration, [instructions] for
 // AGENTS.md, [gitutil] (indirectly via runner), [constants], [logger], [metrics],
 // and several internal/pkg utilities ([circuitbreaker], [cache], [lazyval],
-// [watcher], [logpipe], [atomicfile]).
+// [watcher], [atomicfile]).
 // Consumed by [cli] which registers these handlers on the HTTP mux.
 // Changes to [store.Task] fields, [runner.Interface] methods, or [apicontract]
 // routes typically require corresponding handler updates.
