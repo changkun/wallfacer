@@ -139,6 +139,80 @@ func TestWrite_WriteError(t *testing.T) {
 	}
 }
 
+// TestWriteSync_SyncsBeforeRename verifies that WriteSync fsyncs the temp file
+// before renaming, so a crash right after the atomic rename cannot leave a
+// renamed-but-empty file. The spec.readme writer relies on this durability.
+func TestWriteSync_SyncsBeforeRename(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+
+	synced := false
+	swapHook(t, &syncFile, func(f *os.File) error {
+		synced = true
+		// Confirm the rename has NOT happened yet: target must be absent.
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Error("rename happened before fsync")
+		}
+		return f.Sync()
+	})
+
+	if err := WriteSync(path, []byte("durable"), 0644); err != nil {
+		t.Fatalf("WriteSync: %v", err)
+	}
+	if !synced {
+		t.Fatal("expected the temp file to be fsynced before rename")
+	}
+	data, _ := os.ReadFile(path)
+	if string(data) != "durable" {
+		t.Fatalf("content = %q, want %q", data, "durable")
+	}
+}
+
+// TestWrite_DoesNotSync verifies that the plain Write path (used by the
+// append-heavy event/task callers) does NOT fsync, keeping that hot path cheap.
+func TestWrite_DoesNotSync(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+
+	synced := false
+	swapHook(t, &syncFile, func(f *os.File) error {
+		synced = true
+		return f.Sync()
+	})
+
+	if err := Write(path, []byte("fast"), 0644); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if synced {
+		t.Fatal("Write should not fsync the temp file")
+	}
+}
+
+// TestWriteSync_SyncError verifies that an fsync error is returned and the temp
+// file is cleaned up (no renamed target).
+func TestWriteSync_SyncError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.txt")
+	injected := errors.New("injected sync error")
+	swapHook(t, &syncFile, func(_ *os.File) error {
+		return injected
+	})
+
+	err := WriteSync(path, []byte("data"), 0644)
+	if !errors.Is(err, injected) {
+		t.Fatalf("expected injected sync error, got %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("target file should not exist after sync error")
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Fatalf("temp file %q was not cleaned up", e.Name())
+		}
+	}
+}
+
 // TestWrite_CloseError verifies that a close error is returned and the
 // temp file is cleaned up.
 func TestWrite_CloseError(t *testing.T) {
