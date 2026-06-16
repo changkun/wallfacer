@@ -132,10 +132,8 @@ var IdeationIgnorePatterns = func() []string {
 // excluded from churn signal collection.
 func isIgnoredChurnPath(path string) bool {
 	base := filepath.Base(path)
-	for _, name := range ignoredChurnExactNames {
-		if base == name {
-			return true
-		}
+	if slices.Contains(ignoredChurnExactNames, base) {
+		return true
 	}
 	for _, sfx := range ignoredPathSuffixes {
 		if strings.HasSuffix(path, sfx) {
@@ -154,10 +152,8 @@ func isIgnoredChurnPath(path string) bool {
 // excluded from TODO signal collection.
 func isIgnoredTodoPath(path string) bool {
 	base := filepath.Base(path)
-	for _, name := range ignoredChurnExactNames {
-		if base == name {
-			return true
-		}
+	if slices.Contains(ignoredChurnExactNames, base) {
+		return true
 	}
 	for _, sfx := range ignoredPathSuffixes {
 		if strings.HasSuffix(path, sfx) {

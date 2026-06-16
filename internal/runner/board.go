@@ -287,15 +287,6 @@ func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID
 	return &m, nil
 }
 
-// generateBoardContext serializes all non-archived tasks into board.json bytes.
-// It is a thin wrapper around generateBoardContextAndMounts that discards the
-// sibling-mount map. Kept for backward compatibility with tests.
-func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
-	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
-	data, _, err := r.generateBoardContextAndMounts(selfTaskID, mountWorktrees)
-	return data, err
-}
-
 // logBoardManifestSizeWarning logs a warning that board.json has grown large,
 // and lists the top-5 tasks by estimated serialized size to help operators
 // pinpoint the source of the bloat. sizes contains pre-computed per-task byte
@@ -481,19 +472,4 @@ func (r *Runner) prepareBoardContext(ctx context.Context, selfTaskID uuid.UUID, 
 	}
 	dir, _, err := streamBoardJSON(ctx, s, selfTaskID, mountWorktrees)
 	return dir, err
-}
-
-// buildSiblingMounts returns shortID → (repoPath → worktreePath) for
-// eligible sibling tasks. Only tasks whose worktrees can be safely mounted
-// read-only are included.
-// It is a thin wrapper around generateBoardContextAndMounts that discards the
-// board JSON. Kept for backward compatibility with tests.
-func (r *Runner) buildSiblingMounts(ctx context.Context, selfTaskID uuid.UUID) map[string]map[string]string {
-	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
-	_, mounts, err := r.generateBoardContextAndMounts(selfTaskID, true)
-	if err != nil {
-		logger.Runner.Warn("buildSiblingMounts: list tasks", "error", err)
-		return nil
-	}
-	return mounts
 }
