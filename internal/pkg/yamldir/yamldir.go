@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"latere.ai/x/wallfacer/internal/pkg/slugutil"
 )
 
 // File is one .yaml/.yml entry returned by ReadAll: the absolute
@@ -60,4 +62,17 @@ func ReadAll(label, dir string) ([]File, error) {
 		files = append(files, File{Path: path, Body: body})
 	}
 	return files, nil
+}
+
+// Remove deletes dir/<slug>.yaml. It is idempotent: a missing file yields nil
+// so callers can treat delete as a no-op when the entry is already gone.
+// Returns an error for an invalid slug or any non-"not exist" removal failure.
+func Remove(dir, slug string) error {
+	if !slugutil.IsValid(slug) {
+		return fmt.Errorf("invalid slug %q", slug)
+	}
+	if err := os.Remove(filepath.Join(dir, slug+".yaml")); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
