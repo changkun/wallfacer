@@ -10,11 +10,21 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/constants"
+	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// TestGenerateBoardContext_Basic verifies that generateBoardContext produces
+// boardContext is a test helper that returns the board.json bytes for the given
+// self task via the production generateBoardContextAndMounts entry point,
+// discarding the sibling-mount map. It replaces the former generateBoardContext
+// wrapper that existed only for tests.
+func boardContext(t *testing.T, r *Runner, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
+	t.Helper()
+	data, _, err := r.generateBoardContextAndMounts(selfTaskID, mountWorktrees)
+	return data, err
+}
+
+// TestGenerateBoardContext_Basic verifies that the board manifest produces
 // valid JSON with correct is_self marking and no session_id leakage.
 func TestGenerateBoardContext_Basic(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
@@ -42,7 +52,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 
 	// t3 stays in backlog.
 
-	data, err := r.generateBoardContext(context.Background(), t2.ID, false)
+	data, err := boardContext(t, r, t2.ID, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -96,7 +106,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 func TestGenerateBoardContext_Empty(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 
-	data, err := r.generateBoardContext(context.Background(), [16]byte{}, false)
+	data, err := boardContext(t, r, [16]byte{}, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -143,80 +153,6 @@ func TestCanMountWorktree(t *testing.T) {
 	}
 }
 
-// TestPrepareBoardContext verifies that prepareBoardContext creates a temp
-// directory with a valid board.json file.
-func TestPrepareBoardContext(t *testing.T) {
-	s, r := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dir, err := r.prepareBoardContext(context.Background(), task.ID, false)
-	if err != nil {
-		t.Fatalf("prepareBoardContext: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(dir)
-	}()
-
-	boardPath := filepath.Join(dir, "board.json")
-	data, err := os.ReadFile(boardPath)
-	if err != nil {
-		t.Fatalf("board.json should exist: %v", err)
-	}
-
-	var manifest BoardManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("invalid board.json: %v", err)
-	}
-	if len(manifest.Tasks) != 1 {
-		t.Errorf("expected 1 task, got %d", len(manifest.Tasks))
-	}
-}
-
-// TestBuildSiblingMounts verifies that buildSiblingMounts returns eligible
-// sibling worktrees and excludes the self task and ineligible statuses.
-func TestBuildSiblingMounts(t *testing.T) {
-	s, r := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	t1, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 5, MountWorktrees: true})
-	t2, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 5})
-	t3, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 5})
-
-	// Set t2 to waiting with worktree paths.
-	_ = s.ForceUpdateTaskStatus(ctx, t2.ID, "waiting")
-
-	wtDir := t.TempDir()
-	_ = s.UpdateTaskWorktrees(ctx, t2.ID, map[string]string{"/myrepo": wtDir}, "task/"+t2.ID.String()[:8])
-
-	// t3 stays in backlog (no worktrees).
-	_ = t3
-
-	mounts := r.buildSiblingMounts(context.Background(), t1.ID)
-	if mounts == nil {
-		t.Fatal("expected non-nil sibling mounts")
-	}
-
-	shortID := t2.ID.String()[:8]
-	repos, ok := mounts[shortID]
-	if !ok {
-		t.Fatalf("expected mount for shortID %s", shortID)
-	}
-	if repos["/myrepo"] != wtDir {
-		t.Errorf("expected worktree path %q, got %q", wtDir, repos["/myrepo"])
-	}
-
-	// Self task should not appear.
-	selfShort := t1.ID.String()[:8]
-	if _, ok := mounts[selfShort]; ok {
-		t.Error("self task should not appear in sibling mounts")
-	}
-}
-
 // TestGenerateBoardContext_AllStatuses verifies that tasks in every
 // non-archived status appear in the manifest with the correct status field.
 func TestGenerateBoardContext_AllStatuses(t *testing.T) {
@@ -250,7 +186,7 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 		idByStatus[st] = task.ID.String()
 	}
 
-	data, err := r.generateBoardContext(context.Background(), [16]byte{}, false)
+	data, err := boardContext(t, r, [16]byte{}, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -309,7 +245,7 @@ func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := r.generateBoardContext(context.Background(), self.ID, true)
+	data, err := boardContext(t, r, self.ID, true)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -357,7 +293,7 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 		t.Fatalf("SetTaskArchived: %v", err)
 	}
 
-	data, err := r.generateBoardContext(context.Background(), [16]byte{}, false)
+	data, err := boardContext(t, r, [16]byte{}, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -375,159 +311,6 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 	}
 	if contains(string(data), archived.ID.String()) {
 		t.Error("archived task ID should not appear in the board manifest")
-	}
-}
-
-// TestStreamBoardJSON verifies that streamBoardJSON produces board.json output
-// whose task count, IsSelf flags, and truncation lengths match both the legacy
-// JSON path and GenerateBoardManifest for the same store state.
-func TestStreamBoardJSON(t *testing.T) {
-	s, r := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	longPrompt := strings.Repeat("A", 2000) // exceeds 500-char sibling cap
-	longResult := strings.Repeat("B", 3000) // exceeds 1000-char sibling cap
-
-	var selfID [16]byte
-	var selfIDStr string
-	for i := 0; i < 5; i++ {
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: longPrompt, Timeout: 5})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if i == 2 {
-			selfID = task.ID
-			selfIDStr = task.ID.String()
-		}
-		_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
-		_ = s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
-
-	}
-
-	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
-	if err != nil {
-		t.Fatalf("streamBoardJSON: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(dir)
-	}()
-
-	if written == 0 {
-		t.Error("written bytes should be > 0")
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "board.json"))
-	if err != nil {
-		t.Fatalf("read board.json: %v", err)
-	}
-	if int64(len(data)) != written {
-		t.Errorf("written counter %d != file size %d", written, len(data))
-	}
-
-	var manifest BoardManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("invalid JSON from streamBoardJSON: %v", err)
-	}
-
-	refData, err := r.generateBoardContext(ctx, selfID, false)
-	if err != nil {
-		t.Fatalf("generateBoardContext: %v", err)
-	}
-	var refJSON BoardManifest
-	if err := json.Unmarshal(refData, &refJSON); err != nil {
-		t.Fatalf("invalid JSON from generateBoardContext: %v", err)
-	}
-
-	// Task count.
-	if len(manifest.Tasks) != 5 {
-		t.Errorf("expected 5 tasks, got %d", len(manifest.Tasks))
-	}
-	if len(manifest.Tasks) != len(refJSON.Tasks) {
-		t.Errorf("task count mismatch: stream=%d legacy=%d", len(manifest.Tasks), len(refJSON.Tasks))
-	}
-
-	// IsSelf flag and truncation lengths.
-	for _, bt := range manifest.Tasks {
-		if bt.ID == selfIDStr {
-			if !bt.IsSelf {
-				t.Error("self task should have is_self=true")
-			}
-			if bt.Prompt != longPrompt {
-				t.Errorf("self task prompt truncated: len=%d, want %d", len(bt.Prompt), len(longPrompt))
-			}
-			if bt.Result == nil || *bt.Result != longResult {
-				t.Error("self task result should not be truncated")
-			}
-		} else {
-			if bt.IsSelf {
-				t.Errorf("task %s should not be is_self", bt.ShortID)
-			}
-			if len(bt.Prompt) > 503 { // 500 chars + "..."
-				t.Errorf("sibling prompt too long: len=%d", len(bt.Prompt))
-			}
-			if bt.Result != nil && len(*bt.Result) > 1003 { // 1000 chars + "..."
-				t.Errorf("sibling result too long: len=%d", len(*bt.Result))
-			}
-		}
-	}
-
-	// Compare task-level fields against GenerateBoardManifest for the same state.
-	waitBoardSeqStable(r)
-	refManifest, err := r.GenerateBoardManifest(ctx, selfID, false)
-	if err != nil {
-		t.Fatalf("GenerateBoardManifest: %v", err)
-	}
-	if len(refManifest.Tasks) != len(manifest.Tasks) {
-		t.Errorf("task count mismatch: stream=%d ref=%d", len(manifest.Tasks), len(refManifest.Tasks))
-	}
-
-	streamByID := make(map[string]BoardTask, len(manifest.Tasks))
-	for _, bt := range manifest.Tasks {
-		streamByID[bt.ID] = bt
-	}
-	refJSONByID := make(map[string]BoardTask, len(refJSON.Tasks))
-	for _, bt := range refJSON.Tasks {
-		refJSONByID[bt.ID] = bt
-	}
-	refByID := make(map[string]BoardTask, len(refManifest.Tasks))
-	for _, bt := range refManifest.Tasks {
-		refByID[bt.ID] = bt
-	}
-
-	for id, streamTask := range streamByID {
-		refJSONTask, ok := refJSONByID[id]
-		if !ok {
-			t.Errorf("task %s present in streamBoardJSON but missing from generateBoardContext", id)
-			continue
-		}
-		refTask, ok := refByID[id]
-		if !ok {
-			t.Errorf("task %s present in streamBoardJSON but missing from GenerateBoardManifest", id)
-			continue
-		}
-		if streamTask.IsSelf != refJSONTask.IsSelf {
-			t.Errorf("task %s IsSelf: stream=%v legacy=%v", id, streamTask.IsSelf, refJSONTask.IsSelf)
-		}
-		if len(streamTask.Prompt) != len(refJSONTask.Prompt) {
-			t.Errorf("task %s prompt length: stream=%d legacy=%d", id, len(streamTask.Prompt), len(refJSONTask.Prompt))
-		}
-		if (streamTask.Result == nil) != (refJSONTask.Result == nil) {
-			t.Errorf("task %s result nil mismatch: stream=%v legacy=%v", id, streamTask.Result == nil, refJSONTask.Result == nil)
-		} else if streamTask.Result != nil && len(*streamTask.Result) != len(*refJSONTask.Result) {
-			t.Errorf("task %s result length: stream=%d legacy=%d", id, len(*streamTask.Result), len(*refJSONTask.Result))
-		}
-		if streamTask.IsSelf != refTask.IsSelf {
-			t.Errorf("task %s IsSelf: stream=%v ref=%v", id, streamTask.IsSelf, refTask.IsSelf)
-		}
-		if len(streamTask.Prompt) != len(refTask.Prompt) {
-			t.Errorf("task %s prompt length: stream=%d ref=%d", id, len(streamTask.Prompt), len(refTask.Prompt))
-		}
-		if (streamTask.Result == nil) != (refTask.Result == nil) {
-			t.Errorf("task %s result nil mismatch: stream=%v ref=%v", id, streamTask.Result == nil, refTask.Result == nil)
-		} else if streamTask.Result != nil && len(*streamTask.Result) != len(*refTask.Result) {
-			t.Errorf("task %s result length: stream=%d ref=%d", id, len(*streamTask.Result), len(*refTask.Result))
-		}
 	}
 }
 
@@ -724,7 +507,7 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 
 	_ = s.UpdateTaskResult(ctx, selfTask.ID, longResult, "sess-self", "max_tokens", 7)
 
-	data, err := r.generateBoardContext(context.Background(), selfTask.ID, false)
+	data, err := boardContext(t, r, selfTask.ID, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -886,60 +669,5 @@ func TestWriteBoardDir_ReturnsDirPath(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Errorf("expected a directory, got a file at %q", dir)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// streamBoardJSON — large data triggers logBoardManifestSizeWarning
-// ---------------------------------------------------------------------------
-
-// TestStreamBoardJSON_LargeDataTriggersWarning verifies that streamBoardJSON
-// runs without error when the serialised manifest exceeds 64 KB and calls
-// logBoardManifestSizeWarning internally (no panic). We create enough tasks
-// with long prompts to push the JSON past the 64 KB threshold.
-//
-// Non-self prompts are truncated to 500 chars inside streamBoardJSON, so we
-// create 80 tasks (each ~1 200 B) to reliably exceed the 64 KB threshold.
-func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
-	s, _ := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	// 80 tasks × ~1 200 bytes each ≈ 96 KB > 64 KB threshold.
-	prompt := strings.Repeat("A", 500)
-	var selfID [16]byte
-	for i := 0; i < 80; i++ {
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 5})
-		if err != nil {
-			t.Fatalf("CreateTask %d: %v", i, err)
-		}
-		_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
-		if i == 0 {
-			selfID = task.ID
-		}
-	}
-
-	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
-	if err != nil {
-		t.Fatalf("streamBoardJSON: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(dir)
-	}()
-
-	t.Logf("streamBoardJSON wrote %d bytes", written)
-
-	// The manifest must exceed 64 KB so that logBoardManifestSizeWarning was called.
-	if written <= int64(constants.MaxBoardManifestBytes) {
-		t.Logf("note: written=%d did not exceed threshold %d; warning branch may not have fired", written, constants.MaxBoardManifestBytes)
-	}
-
-	// Verify board.json was created and is non-empty.
-	info, err := os.Stat(filepath.Join(dir, "board.json"))
-	if err != nil {
-		t.Fatalf("board.json not found: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Error("board.json should be non-empty")
 	}
 }
