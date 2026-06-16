@@ -45,7 +45,7 @@ func UpdateFrontmatter(path string, updates map[string]any) error {
 
 	rest := content[4:] // skip opening "---\n"
 	end := strings.Index(rest, "\n---\n")
-	bodyStart := end + 4 // skip "\n---\n"
+	bodyStart := end + 5 // skip the full "\n---\n" delimiter (5 bytes)
 	if end < 0 {
 		if strings.HasSuffix(rest, "\n---") {
 			end = len(rest) - 3
