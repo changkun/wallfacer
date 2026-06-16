@@ -380,21 +380,48 @@ func TestHostBackend_List(t *testing.T) {
 	_, _ = h.Wait()
 }
 
-func TestParseEnvFile(t *testing.T) {
+// TestBuildChildEnv_ParsesEnvFile verifies that buildChildEnv reads the env
+// file via envconfig.ReadRaw. Beyond the basics (blank/# lines, quote
+// stripping) the shared parser also honors "export " prefixes and strips
+// quote-aware inline "#" comments, which the previous local parseEnvFile did
+// not. spec.Env still overlays the file on collision.
+func TestBuildChildEnv_ParsesEnvFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env")
-	content := "# comment\nA=1\nB=\"quoted value\"\n\nC='single'\nD=no_quotes\n"
+	content := "" +
+		"# comment\n" +
+		"A=1\n" +
+		"B=\"quoted value\"\n" +
+		"\n" +
+		"C='single'\n" +
+		"D=no_quotes\n" +
+		"export E=exported\n" + // export prefix honored
+		"F=val # trailing comment\n" + // inline comment stripped
+		"G=\"with # hash\"\n" // hash inside quotes preserved
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got, err := parseEnvFile(path)
-	if err != nil {
-		t.Fatal(err)
+
+	b := &HostBackend{}
+	env := b.buildChildEnv(ContainerSpec{
+		EnvFile: path,
+		Env:     map[string]string{"A": "overlaid"}, // spec.Env wins on collision
+	})
+
+	got := map[string]string{}
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			got[k] = v
+		}
 	}
+
 	want := map[string]string{
-		"A": "1",
+		"A": "overlaid",
 		"B": "quoted value",
 		"C": "single",
 		"D": "no_quotes",
+		"E": "exported",
+		"F": "val",
+		"G": "with # hash",
 	}
 	for k, v := range want {
 		if got[k] != v {
