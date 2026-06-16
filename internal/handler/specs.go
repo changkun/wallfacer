@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -491,7 +492,7 @@ func findArchiveCommit(ctx context.Context, ws, relPath string) string {
 	// `--grep` uses a regex; anchor the start and escape the spec path so a
 	// path with regex metachars (unlikely but possible) doesn't confuse it.
 	prefix := archiveCommitSubjectPrefix(relPath)
-	pattern := "^" + regexpQuote(prefix)
+	pattern := "^" + regexp.QuoteMeta(prefix)
 	out, err := cmdexec.Git(ws,
 		"log", "--format=%H", "-1", "--grep", pattern, "--", relPath).
 		WithContext(ctx).Output()
@@ -499,19 +500,6 @@ func findArchiveCommit(ctx context.Context, ws, relPath string) string {
 		return ""
 	}
 	return strings.TrimSpace(out)
-}
-
-// regexpQuote escapes regex metacharacters for use in grep patterns.
-func regexpQuote(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		switch r {
-		case '.', '+', '*', '?', '(', ')', '[', ']', '{', '}', '^', '$', '|', '\\':
-			b.WriteByte('\\')
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
 }
 
 // revertArchiveCommit creates a revert commit that undoes the given archive

@@ -668,40 +668,6 @@ func TestUpdateEnvConfig_RejectsTrailingContent(t *testing.T) {
 	}
 }
 
-// --- reqBoolString ---
-
-// TestReqBoolString_Nil verifies that a nil pointer returns nil.
-func TestReqBoolString_Nil(t *testing.T) {
-	result := reqBoolString(nil)
-	if result != nil {
-		t.Errorf("expected nil for nil input, got %v", result)
-	}
-}
-
-// TestReqBoolString_True verifies that a true bool pointer returns "true".
-func TestReqBoolString_True(t *testing.T) {
-	b := true
-	result := reqBoolString(&b)
-	if result == nil {
-		t.Fatal("expected non-nil result for true input")
-	}
-	if *result != "true" {
-		t.Errorf("expected 'true', got %q", *result)
-	}
-}
-
-// TestReqBoolString_False verifies that a false bool pointer returns "false".
-func TestReqBoolString_False(t *testing.T) {
-	b := false
-	result := reqBoolString(&b)
-	if result == nil {
-		t.Fatal("expected non-nil result for false input")
-	}
-	if *result != "false" {
-		t.Errorf("expected 'false', got %q", *result)
-	}
-}
-
 // --- UpdateEnvConfig additional coverage ---
 
 // TestUpdateEnvConfig_EmptyOpenAIAPIKeyTreatedAsNoChange verifies that an empty

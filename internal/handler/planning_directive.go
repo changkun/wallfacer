@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -234,14 +235,14 @@ func scaffoldDirective(workspace string, d Directive, now time.Time) (string, er
 	if status == "" {
 		status = spec.StatusVague
 	}
-	if !isValidStatus(status) {
+	if !slices.Contains(spec.ValidStatuses(), status) {
 		return "", fmt.Errorf("invalid status %q", d.Status)
 	}
 	effort := d.Effort
 	if effort == "" {
 		effort = spec.EffortMedium
 	}
-	if !isValidEffort(effort) {
+	if !slices.Contains(spec.ValidEfforts(), effort) {
 		return "", fmt.Errorf("invalid effort %q", d.Effort)
 	}
 	title := d.Title
@@ -319,24 +320,6 @@ func firstSentence(body string) string {
 		}
 	}
 	return strings.TrimSpace(sentence.String())
-}
-
-func isValidStatus(s spec.Status) bool {
-	for _, v := range spec.ValidStatuses() {
-		if v == s {
-			return true
-		}
-	}
-	return false
-}
-
-func isValidEffort(e spec.Effort) bool {
-	for _, v := range spec.ValidEfforts() {
-		if v == e {
-			return true
-		}
-	}
-	return false
 }
 
 // appendDirectiveBody appends the agent's body to the end of a freshly
