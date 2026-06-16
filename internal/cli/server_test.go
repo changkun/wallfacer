@@ -48,9 +48,6 @@ func TestInitServer(t *testing.T) {
 	if sc.Runner == nil {
 		t.Fatal("expected non-nil Runner")
 	}
-	if sc.Handler == nil {
-		t.Fatal("expected non-nil Handler")
-	}
 	if sc.ActualPort == 0 {
 		t.Fatal("expected non-zero port")
 	}

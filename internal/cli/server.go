@@ -55,7 +55,6 @@ type ServerComponents struct {
 	Srv     *http.Server
 	Ln      net.Listener
 	Runner  *runner.Runner
-	Handler *handler.Handler
 	Planner *planner.Planner
 	WsMgr   *workspace.Manager
 	Ctx     context.Context
@@ -90,8 +89,8 @@ func (sc *ServerComponents) Shutdown() {
 	logger.Main.Info("shutdown complete")
 }
 
-// initServer performs the full server initialization sequence shared by
-// RunServer and RunDesktop. It creates the workspace manager, runner, handler,
+// initServer performs the full server initialization sequence for RunServer.
+// It creates the workspace manager, runner, handler,
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
 func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *ServerComponents {
@@ -407,7 +406,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		Srv:          srv,
 		Ln:           ln,
 		Runner:       r,
-		Handler:      h,
 		Planner:      p,
 		WsMgr:        wsMgr,
 		Ctx:          ctx,

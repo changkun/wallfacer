@@ -29,13 +29,6 @@ type taskSummary struct {
 	Tags   []string  `json:"tags"`
 }
 
-// containerSummary mirrors the JSON fields of runner.ContainerInfo that we need.
-// The server already extracts the wallfacer.task.id label into the task_id field.
-type containerSummary struct {
-	Name   string `json:"name"`
-	TaskID string `json:"task_id"`
-}
-
 // ANSI escape sequences for terminal formatting.
 const (
 	ansiReset = "\033[0m"
@@ -100,19 +93,6 @@ func truncate(s string, n int) string {
 	return sanitize.Truncate(s, n)
 }
 
-// matchContainers builds a map from task UUID → container name.
-// The /api/containers response already exposes the wallfacer.task.id label
-// as the task_id field, so no extra label-parsing is required.
-func matchContainers(containers []containerSummary) map[string]string {
-	result := make(map[string]string, len(containers))
-	for _, c := range containers {
-		if c.TaskID != "" {
-			result[c.TaskID] = c.Name
-		}
-	}
-	return result
-}
-
 // fetchTasks calls GET /api/tasks and returns the decoded slice.
 func fetchTasks(addr string) ([]taskSummary, error) {
 	resp, err := http.Get(addr + "/api/tasks?include_archived=false")
@@ -133,28 +113,8 @@ func fetchTasks(addr string) ([]taskSummary, error) {
 	return tasks, nil
 }
 
-// fetchContainers calls GET /api/containers and returns the decoded slice.
-func fetchContainers(addr string) ([]containerSummary, error) {
-	resp, err := http.Get(addr + "/api/containers")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var containers []containerSummary
-	if err := json.Unmarshal(body, &containers); err != nil {
-		return nil, err
-	}
-	return containers, nil
-}
-
 // printBoard renders the formatted board to stdout.
-func printBoard(addr string, tasks []taskSummary, containerMap map[string]string) {
+func printBoard(addr string, tasks []taskSummary) {
 	fmt.Printf("%sWallfacer%s  %s   %s\n\n",
 		ansiBold, ansiReset,
 		addr,
@@ -183,17 +143,11 @@ func printBoard(addr string, tasks []taskSummary, containerMap map[string]string
 				idShort = idShort[:8]
 			}
 
-			containerPart := ""
-			if name, ok := containerMap[t.ID]; ok {
-				containerPart = "  [" + name + "]"
-			}
-
-			fmt.Printf("  %s  %-56s  turns=%-3d  %s%s\n",
+			fmt.Printf("  %s  %-56s  turns=%-3d  %s\n",
 				idShort,
 				display,
 				t.Turns,
 				formatCost(t.Usage.CostUSD),
-				containerPart,
 			)
 		}
 		fmt.Println()
@@ -240,9 +194,7 @@ func RunStatus(_ string, args []string) {
 			fmt.Fprintf(os.Stderr, "wallfacer: server not reachable at %s\n", serverAddr)
 			return false
 		}
-		containers, _ := fetchContainers(serverAddr) // non-fatal if unavailable
-		containerMap := matchContainers(containers)
-		printBoard(serverAddr, tasks, containerMap)
+		printBoard(serverAddr, tasks)
 		return true
 	}
 

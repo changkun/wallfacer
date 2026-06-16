@@ -92,52 +92,6 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
-// TestMatchContainers verifies the task-ID-to-container-name mapping, including
-// that containers without a task ID are excluded.
-func TestMatchContainers(t *testing.T) {
-	containers := []containerSummary{
-		{Name: "wallfacer-impl-uuid-1", TaskID: "uuid-1"},
-		{Name: "wallfacer-impl-uuid-3", TaskID: "uuid-3"},
-		{Name: "wallfacer-unrelated", TaskID: ""},
-	}
-	result := matchContainers(containers)
-
-	if got := result["uuid-1"]; got != "wallfacer-impl-uuid-1" {
-		t.Errorf("uuid-1: got %q, want %q", got, "wallfacer-impl-uuid-1")
-	}
-	if got := result["uuid-3"]; got != "wallfacer-impl-uuid-3" {
-		t.Errorf("uuid-3: got %q, want %q", got, "wallfacer-impl-uuid-3")
-	}
-	if _, ok := result["uuid-2"]; ok {
-		t.Errorf("uuid-2 should have no container mapping")
-	}
-	if _, ok := result[""]; ok {
-		t.Errorf("empty task ID should not produce a mapping")
-	}
-}
-
-// TestMatchContainersEmpty verifies that nil input produces an empty map.
-func TestMatchContainersEmpty(t *testing.T) {
-	result := matchContainers(nil)
-	if len(result) != 0 {
-		t.Errorf("expected empty map, got %v", result)
-	}
-}
-
-// TestMatchContainersDuplicateTaskID verifies last-write-wins semantics when
-// multiple containers share the same task ID.
-func TestMatchContainersDuplicateTaskID(t *testing.T) {
-	// Last container wins when multiple containers share a task ID.
-	containers := []containerSummary{
-		{Name: "first", TaskID: "uuid-1"},
-		{Name: "second", TaskID: "uuid-1"},
-	}
-	result := matchContainers(containers)
-	if result["uuid-1"] != "second" {
-		t.Errorf("expected last-write-wins, got %q", result["uuid-1"])
-	}
-}
-
 // TestStatusLabel validates that known statuses return their display names and
 // unknown statuses get auto-capitalized.
 func TestStatusLabel(t *testing.T) {
@@ -190,42 +144,20 @@ func TestFetchTasks(t *testing.T) {
 	})
 }
 
-// TestFetchContainers validates successful container list fetching and JSON
-// deserialization of task_id fields.
-func TestFetchContainers(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/containers" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[{"name":"c1","task_id":"11111111-1111-1111-1111-111111111111"}]`))
-	}))
-	defer ts.Close()
-
-	containers, err := fetchContainers(ts.URL)
-	if err != nil {
-		t.Fatalf("fetchContainers failed: %v", err)
-	}
-	if len(containers) != 1 || containers[0].TaskID != "11111111-1111-1111-1111-111111111111" {
-		t.Fatalf("unexpected containers: %#v", containers)
-	}
-}
-
 // TestPrintBoard verifies that the board output contains status headings,
-// container name annotations, truncated task IDs, and cost totals.
+// truncated task IDs, and cost totals.
 func TestPrintBoard(t *testing.T) {
 	tasks := []taskSummary{
 		{ID: "1111111111111111111111111111111111111111", Title: "Short", Status: "done", Turns: 1, Usage: taskUsage{CostUSD: 0.1234}},
 		{ID: "2222222222222222222222222222222222222222", Prompt: "Long prompt with many words", Status: "done", Turns: 2, Usage: taskUsage{CostUSD: 1.0}},
 		{ID: "3333333333333333333333333333333333333333", Title: "Backlog", Status: "backlog", Turns: 0, Usage: taskUsage{CostUSD: 0.0}},
 	}
-	containers := map[string]string{"1111111111111111111111111111111111111111": "wallfacer-c1"}
 
 	output := captureStdout(func() {
-		printBoard("http://localhost:8080", tasks, containers)
+		printBoard("http://localhost:8080", tasks)
 	})
 
-	for _, want := range []string{"Done", "Backlog", "[wallfacer-c1]", "Total:", "33333333", "$1.0000"} {
+	for _, want := range []string{"Done", "Backlog", "Total:", "33333333", "$1.0000"} {
 		if !bytes.Contains([]byte(output), []byte(want)) {
 			t.Fatalf("expected output to contain %q, got: %s", want, output)
 		}
@@ -243,9 +175,6 @@ func TestRunStatus(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`[{"id":"11111111-1111-1111-1111-111111111111","title":"A","status":"done","turns":1,"usage":{"cost_usd":0.1}}]`))
-		case "/api/containers":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[{"name":"wallfacer-task-a","task_id":"11111111-1111-1111-1111-111111111111"}]`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -292,53 +221,10 @@ func TestFetchTasks_ReadBodyError(t *testing.T) {
 	}
 }
 
-// TestFetchContainers_ReadBodyError verifies error handling when the container
-// response body is malformed.
-func TestFetchContainers_ReadBodyError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Length", "100")
-		w.WriteHeader(http.StatusOK)
-		if h, ok := w.(http.Hijacker); ok {
-			conn, _, _ := h.Hijack()
-			_ = conn.Close()
-			return
-		}
-		_, _ = w.Write([]byte(`[`))
-	}))
-	defer ts.Close()
-
-	_, err := fetchContainers(ts.URL)
-	if err == nil {
-		t.Fatal("expected error when body read fails or JSON is truncated")
-	}
-}
-
-// TestFetchContainers_InvalidJSON verifies that fetchContainers returns an
-// error when the server responds with malformed JSON.
-func TestFetchContainers_InvalidJSON(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`not-json`))
-	}))
-	defer ts.Close()
-
-	if _, err := fetchContainers(ts.URL); err == nil {
-		t.Fatal("expected error for invalid JSON")
-	}
-}
-
 // TestFetchTasks_ServerDown verifies that fetchTasks returns an error when
 // the server is unreachable.
 func TestFetchTasks_ServerDown(t *testing.T) {
 	_, err := fetchTasks("http://127.0.0.1:1")
-	if err == nil {
-		t.Fatal("expected error for unreachable server")
-	}
-}
-
-// TestFetchContainers_ServerDown verifies that fetchContainers returns an error
-// when the server is unreachable.
-func TestFetchContainers_ServerDown(t *testing.T) {
-	_, err := fetchContainers("http://127.0.0.1:1")
 	if err == nil {
 		t.Fatal("expected error for unreachable server")
 	}
@@ -399,7 +285,7 @@ func TestRunStatus_JsonServerDown(t *testing.T) {
 // without panicking and still shows the total line.
 func TestPrintBoard_EmptyTasks(t *testing.T) {
 	output := captureStdout(func() {
-		printBoard("http://localhost:8080", nil, nil)
+		printBoard("http://localhost:8080", nil)
 	})
 	if !bytes.Contains([]byte(output), []byte("Total: 0 tasks")) {
 		t.Fatalf("expected total line with 0 tasks, got: %s", output)
@@ -413,7 +299,7 @@ func TestPrintBoard_TitleFallbackToPrompt(t *testing.T) {
 		{ID: "abcdef1234567890", Title: "", Prompt: "My prompt text", Status: "backlog", Turns: 0},
 	}
 	output := captureStdout(func() {
-		printBoard("http://localhost:8080", tasks, nil)
+		printBoard("http://localhost:8080", tasks)
 	})
 	if !bytes.Contains([]byte(output), []byte("My prompt text")) {
 		t.Fatalf("expected prompt as fallback display, got: %s", output)

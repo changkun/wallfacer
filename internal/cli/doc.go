@@ -1,6 +1,5 @@
 // Package cli implements all wallfacer CLI subcommands: run (start server),
-// status (print board state), doctor (check prerequisites), and exec (attach to
-// container).
+// status (print board state), and doctor (check prerequisites).
 //
 // The run subcommand wires together the HTTP server, workspace manager, task store,
 // runner, and handler into a running system. Other subcommands provide operational
@@ -22,5 +21,4 @@
 //	cli.RunServer(configDir, args, uiFS, docsFS)  // start HTTP server
 //	cli.RunStatus(configDir, args)                 // print board state
 //	cli.RunDoctor(configDir, args)                 // check prerequisites
-//	cli.RunExec(configDir, args)                   // attach to container
 package cli
