@@ -39,13 +39,6 @@ func (h *Handler) maxTestConcurrentTasks() int {
 	return h.cachedMaxTestParallel.Get()
 }
 
-// countRegularInProgress returns the number of non-test in-progress tasks
-// in the currently viewed workspace group. The context parameter is unused
-// but matches the calling convention for store query methods.
-func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
-	return h.countGlobalInProgress(), nil
-}
-
 // countRegularInProgress counts non-test in-progress tasks from a task slice.
 // Used in Phase 1 of auto-promotion where a snapshot is already available.
 func countRegularInProgress(tasks []store.Task) int {
@@ -66,11 +59,7 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 	promoteMu.Lock()
 	defer promoteMu.Unlock()
 
-	regularInProgress, err := h.countRegularInProgress(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return false
-	}
+	regularInProgress := h.countGlobalInProgress()
 	if regularInProgress >= h.maxConcurrentTasks() {
 		http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
 		return false

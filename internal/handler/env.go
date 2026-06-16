@@ -589,19 +589,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// reqBoolString converts an optional bool pointer to an optional string
-// pointer ("true"/"false") for use with envconfig.Updates.
-func reqBoolString(v *bool) *string {
-	if v == nil {
-		return nil
-	}
-	s := "false"
-	if *v {
-		s = "true"
-	}
-	return &s
-}
-
 // isAuthError checks if the test output contains authentication error indicators.
 func isAuthError(result, lastTestResult string) bool {
 	combined := strings.ToLower(result + " " + lastTestResult)

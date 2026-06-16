@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -485,7 +486,7 @@ func (h *Handler) resolveTerminalCwd(ctx context.Context, cwd string) string {
 		if err == nil {
 			// Accept if it's within any active workspace.
 			for _, ws := range workspaces {
-				if abs == ws || hasPrefix(abs, ws+string(filepath.Separator)) {
+				if abs == ws || strings.HasPrefix(abs, ws+string(filepath.Separator)) {
 					if info, err := os.Stat(abs); err == nil && info.IsDir() {
 						return abs
 					}
@@ -498,12 +499,6 @@ func (h *Handler) resolveTerminalCwd(ctx context.Context, cwd string) string {
 		return workspaces[0]
 	}
 	return os.TempDir()
-}
-
-// hasPrefix is a simple string prefix check. It avoids importing strings
-// for a single call site in resolveTerminalCwd.
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
 
 // parseIntParam reads an integer query parameter with a default fallback.
