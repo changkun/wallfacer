@@ -417,7 +417,11 @@ func appendWorkspaceDiff(combined *strings.Builder, multiWS bool, repoPath, diff
 // indefinitely; active tasks are cached for constants.DiffCacheTTL (10 s). ETag and
 // Cache-Control headers are set so browsers can issue conditional requests.
 func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	task, err := h.store.GetTask(r.Context(), id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return

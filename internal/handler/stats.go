@@ -316,20 +316,25 @@ func planningGroupLabel(paths []string) string {
 //     ago. Omitted or 0 means all time. Does not affect task buckets
 //     (execution analytics are unchanged).
 func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.store.ListTasks(r.Context(), true /* includeArchived */)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	tasks, err := s.ListTasks(r.Context(), true /* includeArchived */)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if ws := r.URL.Query().Get("workspace"); ws != "" {
-		var ok bool
-		tasks, ok = filterTasksByWorkspace(tasks, ws)
-		if !ok {
+		var matched bool
+		tasks, matched = filterTasksByWorkspace(tasks, ws)
+		if !matched {
 			http.Error(w, "no tasks found for workspace: "+ws, http.StatusBadRequest)
 			return
 		}
 	}
-	resp := aggregateStats(tasks, h.store.LoadSummary)
+	resp := aggregateStats(tasks, s.LoadSummary)
 
 	since := time.Time{}
 	if d := r.URL.Query().Get("days"); d != "" {

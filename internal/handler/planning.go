@@ -308,8 +308,8 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "focused_task: invalid UUID", http.StatusBadRequest)
 			return
 		}
-		if h.store != nil {
-			if _, lookupErr := h.store.GetTask(r.Context(), taskUUID); lookupErr != nil {
+		if s, ok := h.currentStore(); ok {
+			if _, lookupErr := s.GetTask(r.Context(), taskUUID); lookupErr != nil {
 				http.Error(w, "focused_task: task not found", http.StatusNotFound)
 				return
 			}

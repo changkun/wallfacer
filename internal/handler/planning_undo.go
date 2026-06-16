@@ -447,7 +447,11 @@ func (h *Handler) undoTaskModeRound(ctx context.Context, w http.ResponseWriter, 
 // cancel error). The spec file's dispatched_task_id is not touched here —
 // the caller has already reverted the frontmatter via git.
 func (h *Handler) cancelDispatchedTask(ctx context.Context, taskID uuid.UUID) {
-	task, err := h.store.GetTask(ctx, taskID)
+	s, ok := h.currentStore()
+	if !ok {
+		return
+	}
+	task, err := s.GetTask(ctx, taskID)
 	if err != nil {
 		slog.Warn("undo: dispatched task not found", "taskID", taskID, "err", err)
 		return
@@ -456,7 +460,7 @@ func (h *Handler) cancelDispatchedTask(ctx context.Context, taskID uuid.UUID) {
 	case store.TaskStatusDone, store.TaskStatusCancelled:
 		return
 	}
-	if err := h.store.CancelTask(ctx, taskID); err != nil {
+	if err := s.CancelTask(ctx, taskID); err != nil {
 		slog.Warn("undo: cancel dispatched task failed", "taskID", taskID, "err", err)
 		return
 	}

@@ -35,9 +35,10 @@ func (h *Handler) newResubscribingWakeSource() *resubscribingWakeSource {
 	// Subscribe to the current store's wake channel.
 	var storeWakeID int
 	var storeWakeCh <-chan struct{}
-	h.snapshotMu.RLock()
-	currentStore := h.store
-	h.snapshotMu.RUnlock()
+	currentStore, ok := h.currentStore()
+	if !ok {
+		currentStore = nil
+	}
 	if currentStore != nil {
 		storeWakeID, storeWakeCh = currentStore.SubscribeWake()
 	}

@@ -27,6 +27,11 @@ func (h *Handler) runBackfillBatch(
 	eligible func(store.Task) bool,
 	queue func(store.Task),
 ) {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	limit := 10
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -34,7 +39,7 @@ func (h *Handler) runBackfillBatch(
 		}
 	}
 
-	tasks, err := h.store.ListTasks(r.Context(), true)
+	tasks, err := s.ListTasks(r.Context(), true)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

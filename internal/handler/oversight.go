@@ -21,15 +21,19 @@ type oversightResponse struct {
 // the test-phase summary (`test`, generated when a test run transitions back
 // to waiting). Both phases share the same JSON envelope.
 func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	if _, err := h.store.GetTask(r.Context(), id); err != nil {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	if _, err := s.GetTask(r.Context(), id); err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
 
-	read := h.store.GetOversight
+	read := s.GetOversight
 	errMsg := "failed to read oversight"
 	if r.URL.Query().Get("phase") == "test" {
-		read = h.store.GetTestOversight
+		read = s.GetTestOversight
 		errMsg = "failed to read test oversight"
 	}
 
@@ -50,6 +54,10 @@ func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.U
 // Only tasks in a terminal state (done, waiting, failed, cancelled) with at least
 // one turn are eligible, since there must be agent activity to summarize.
 func (h *Handler) GenerateMissingOversight(w http.ResponseWriter, r *http.Request) {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
 	terminal := map[store.TaskStatus]bool{
 		store.TaskStatusDone:      true,
 		store.TaskStatusWaiting:   true,
@@ -61,7 +69,7 @@ func (h *Handler) GenerateMissingOversight(w http.ResponseWriter, r *http.Reques
 			if !terminal[t.Status] || t.Turns == 0 {
 				return false
 			}
-			o, err := h.store.GetOversight(t.ID)
+			o, err := s.GetOversight(t.ID)
 			if err != nil {
 				return false
 			}

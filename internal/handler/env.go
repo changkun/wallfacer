@@ -240,6 +240,11 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	tempEnvFile, err := h.buildTestEnvFile(req)
 	if err != nil {
 		http.Error(w, "failed to prepare test env: "+err.Error(), http.StatusInternalServerError)
@@ -257,7 +262,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		prompt = strings.TrimSpace(*req.Prompt)
 	}
 
-	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+	task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 		Prompt:  prompt,
 		Timeout: timeout,
 		Sandbox: sb,
@@ -267,16 +272,16 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := h.store.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusInProgress); err != nil {
+	if err := s.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusInProgress); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := h.store.UpdateTaskTestRun(r.Context(), task.ID, true, ""); err != nil {
+	if err := s.UpdateTaskTestRun(r.Context(), task.ID, true, ""); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	probeRunner := runner.NewRunner(h.store, runner.RunnerConfig{
+	probeRunner := runner.NewRunner(s, runner.RunnerConfig{
 		Command:       h.runner.Command(),
 		EnvFile:       tempEnvFile,
 		Workspaces:    h.currentWorkspaces(),
@@ -286,7 +291,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	})
 	probeRunner.Run(task.ID, prompt, "", false)
 
-	updated, err := h.store.GetTask(r.Context(), task.ID)
+	updated, err := s.GetTask(r.Context(), task.ID)
 	if err != nil {
 		http.Error(w, "failed to read sandbox test result: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -297,12 +302,12 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	// is represented as a terminal done task; failures keep their natural
 	// terminal state from the runner.
 	if updated.Status == store.TaskStatusWaiting && updated.LastTestResult == "pass" {
-		if err := h.store.ForceUpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
+		if err := s.ForceUpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		updated.Status = store.TaskStatusDone
-		updated, err = h.store.GetTask(r.Context(), task.ID)
+		updated, err = s.GetTask(r.Context(), task.ID)
 		if err != nil {
 			http.Error(w, "failed to read sandbox test result: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -310,7 +315,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-archive smoke-test tasks so they don't clutter the board.
-	if archiveErr := h.store.SetTaskArchived(r.Context(), task.ID, true); archiveErr != nil {
+	if archiveErr := s.SetTaskArchived(r.Context(), task.ID, true); archiveErr != nil {
 		logger.Handler.Warn("sandbox test: failed to archive smoke task", "task", task.ID, "error", archiveErr)
 		// non-fatal: the test result is still returned correctly
 	}

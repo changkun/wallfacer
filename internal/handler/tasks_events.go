@@ -13,7 +13,11 @@ import (
 
 // GetTurnUsage returns token usage for a specific task turn.
 func (h *Handler) GetTurnUsage(w http.ResponseWriter, _ *http.Request, id uuid.UUID) {
-	records, err := h.store.GetTurnUsages(id)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+	records, err := s.GetTurnUsages(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -57,9 +61,14 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 	q := r.URL.Query()
 	isPaged := q.Has("after") || q.Has("limit") || q.Has("types")
 
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
 	if !isPaged {
 		// Backward-compatible: return the full list as a plain JSON array.
-		events, err := h.store.GetEvents(r.Context(), id)
+		events, err := s.GetEvents(r.Context(), id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -115,7 +124,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 		}
 	}
 
-	page, err := h.store.GetEventsPage(r.Context(), id, afterID, limit, typeSet)
+	page, err := s.GetEventsPage(r.Context(), id, afterID, limit, typeSet)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -141,7 +150,12 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, _ *http.Request, id uuid.UU
 		return
 	}
 
-	data, err := h.store.ReadBlob(id, "outputs/"+filename)
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	data, err := s.ReadBlob(id, "outputs/"+filename)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
