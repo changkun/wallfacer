@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -209,7 +210,7 @@ func buildParallelGroups(steps []Step) [][]Step {
 			}
 		}
 		// Keep authored order within the group.
-		sortAscending(members)
+		slices.Sort(members)
 		group := make([]Step, len(members))
 		for k, idx := range members {
 			group[k] = steps[idx]
@@ -217,13 +218,4 @@ func buildParallelGroups(steps []Step) [][]Step {
 		groups = append(groups, group)
 	}
 	return groups
-}
-
-func sortAscending(a []int) {
-	// Tiny insertion sort — groups are small (typically 1-3 members).
-	for i := 1; i < len(a); i++ {
-		for j := i; j > 0 && a[j-1] > a[j]; j-- {
-			a[j-1], a[j] = a[j], a[j-1]
-		}
-	}
 }
