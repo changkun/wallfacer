@@ -15,7 +15,7 @@ import { storeToRefs } from 'pinia';
 import { api, authHeaders } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFetch';
-import { hasActivity, parseActivity } from '../lib/prettyNdjson';
+import { createNdjsonStreamParser } from '../lib/ndjsonStream';
 import { enhanceMermaid } from '../lib/mermaidRender';
 import { usePlanningStore } from '../stores/planning';
 import { useTaskStore } from '../stores/tasks';
@@ -23,8 +23,6 @@ import { useDialogStore } from '../stores/dialog';
 import type { PlanningMessage, PlanningThread } from '../stores/planning';
 import {
   type RenderedBubble,
-  extractAssistantText,
-  extractError,
   bubbleFromMessage,
   applyStreamingUpdate,
 } from '../lib/planningBubble';
@@ -87,8 +85,20 @@ export function useChatSession(): ChatSession {
   const interruptedAt = ref<number>(-1);
 
   let streamHandle: StreamingFetchHandle | null = null;
+  // Pending reconnect timer scheduled by the streaming retry path. Tracked so
+  // it can be cancelled on interrupt, thread-switch, or unmount; otherwise it
+  // fires connect() for a thread the user already left, re-opening a stream
+  // after teardown.
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
   // Monotonic counter for stable streaming-bubble ids (see applyStreamingUpdate).
   let streamBubbleSeq = 0;
+
+  function clearRetryTimer() {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  }
 
   function scrollToBottom(force = false) {
     void nextTick(() => {
@@ -161,8 +171,18 @@ export function useChatSession(): ChatSession {
     let rawBuffer = '';
     let receivedContent = false;
     let retried = false;
+    // Incremental parser: each NDJSON frame is parsed exactly once as it
+    // arrives, instead of re-parsing the whole accumulated buffer on every
+    // chunk (which was O(n^2) in frames). rawBuffer is still kept verbatim for
+    // rawOutput and for the markdown render of the full assistant text.
+    let parser = createNdjsonStreamParser();
 
     const connect = () => {
+      // A reconnect replays the stream from the start, so reset the buffer and
+      // parser to avoid double-counting frames from the aborted attempt.
+      rawBuffer = '';
+      receivedContent = false;
+      parser = createNdjsonStreamParser();
       const url =
         '/api/planning/messages/stream' +
         (streamingThreadId.value
@@ -172,10 +192,8 @@ export function useChatSession(): ChatSession {
         url,
         onChunk: (chunk: string) => {
           rawBuffer += chunk;
-          const text = extractAssistantText(rawBuffer);
-          const errorText = extractError(rawBuffer);
-          const activity = parseActivity(rawBuffer);
-          const hasAct = hasActivity(rawBuffer);
+          parser.push(chunk);
+          const { text, activity, errorText, hasActivity: hasAct } = parser.state();
           if (!receivedContent && (text || hasAct)) receivedContent = true;
           if (receivedContent) {
             // Locate the bubble by id, not a cached index: if the active thread
@@ -196,12 +214,12 @@ export function useChatSession(): ChatSession {
         onDone: (hadData: boolean) => {
           if (!hadData && !retried) {
             retried = true;
-            setTimeout(connect, 500);
+            retryTimer = setTimeout(connect, 500);
             return;
           }
-          const text = extractAssistantText(rawBuffer);
-          const errorText = extractError(rawBuffer);
-          const activity = parseActivity(rawBuffer);
+          // Parse any buffered trailing line that never got a newline.
+          parser.finalize();
+          const { text, activity, errorText } = parser.state();
           applyStreamingUpdate(renderedMessages.value, bubbleId, {
             rawText: text,
             contentHtml: text ? renderMarkdown(text) : '',
@@ -216,7 +234,7 @@ export function useChatSession(): ChatSession {
         onError: () => {
           if (!retried) {
             retried = true;
-            setTimeout(connect, 500);
+            retryTimer = setTimeout(connect, 500);
             return;
           }
           finishStreaming(false);
@@ -227,6 +245,7 @@ export function useChatSession(): ChatSession {
   }
 
   function finishStreaming(interrupted: boolean) {
+    clearRetryTimer();
     if (streamHandle) {
       streamHandle.abort();
       streamHandle = null;
@@ -439,6 +458,7 @@ export function useChatSession(): ChatSession {
 
     // Detach our local stream reader if leaving the in-flight thread.
     if (streaming.value && streamingThreadId.value !== id) {
+      clearRetryTimer();
       if (streamHandle) {
         streamHandle.abort();
         streamHandle = null;
@@ -629,6 +649,7 @@ export function useChatSession(): ChatSession {
   });
 
   onUnmounted(() => {
+    clearRetryTimer();
     if (streamHandle) streamHandle.abort();
   });
 

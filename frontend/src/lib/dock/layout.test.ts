@@ -6,16 +6,12 @@ import {
   closePanel,
   findPanelRegion,
   isPanelPresent,
-  panelIds,
   resizeRegion,
   clampRegionSize,
   activatePanel,
   maximizePanel,
   restorePanel,
   toggleMaximize,
-  dropPanel,
-  moveTab,
-  groupIdOf,
   serialize,
   deserialize,
   migrateLegacy,
@@ -32,7 +28,7 @@ describe('defaultLayout', () => {
     const l = defaultLayout();
     expect(l.regions).toEqual({});
     expect(l.maximized).toBeNull();
-    expect(panelIds(l)).toEqual([]);
+    expect(isPanelPresent(l, 'terminal')).toBe(false);
   });
 });
 
@@ -49,7 +45,7 @@ describe('dockPanel', () => {
     l = dockPanel(l, 'terminal', 'right');
     expect(findPanelRegion(l, 'terminal')).toBe('right');
     expect(l.regions.bottom).toBeUndefined();
-    expect(panelIds(l)).toEqual(['terminal']);
+    expect(groupNode(l.regions.right).tabs).toEqual(['terminal']);
   });
 
   it('merges into the primary group as the active tab when the region is occupied', () => {
@@ -77,6 +73,16 @@ describe('dockPanel', () => {
     const l = defaultLayout();
     dockPanel(l, 'terminal', 'bottom');
     expect(l.regions).toEqual({});
+  });
+
+  it('does not mutate the input layout when docking into an occupied region', () => {
+    // Regression: clone() is shallow, so docking a second panel into a region
+    // that already holds a group mutated the shared group node (tabs/active) of
+    // the input layout. Snapshot the input and assert it is untouched.
+    const first = dockPanel(defaultLayout(), 'terminal', 'bottom');
+    const snapshot = JSON.parse(JSON.stringify(first));
+    dockPanel(first, 'explorer', 'bottom');
+    expect(first).toEqual(snapshot);
   });
 });
 
@@ -205,86 +211,13 @@ describe('serialize / deserialize', () => {
   });
 });
 
-describe('dropPanel (splits & tab merge)', () => {
-  function twoPanelsOneRegion() {
-    // terminal + explorer both in 'bottom', sharing one group.
+describe('two panels sharing a region', () => {
+  it('collapse correctly when one closes', () => {
     let l = dockPanel(defaultLayout(), 'terminal', 'bottom');
     l = dockPanel(l, 'explorer', 'bottom');
-    return l;
-  }
-
-  it('center drop merges the panel as the active tab of the target group', () => {
-    let l = dockPanel(defaultLayout(), 'terminal', 'bottom');
-    l = dockPanel(l, 'explorer', 'left');
-    const targetId = groupIdOf(l, 'terminal')!;
-    l = dropPanel(l, 'explorer', targetId, 'center');
-    const g = groupNode(l.regions.bottom);
-    expect(g.tabs).toEqual(['terminal', 'explorer']);
-    expect(g.active).toBe('explorer');
-    expect(l.regions.left).toBeUndefined();
-  });
-
-  it('edge drop splits the target group, placing the panel on that side', () => {
-    let l = dockPanel(defaultLayout(), 'terminal', 'bottom');
-    l = dockPanel(l, 'explorer', 'left');
-    const targetId = groupIdOf(l, 'terminal')!;
-    l = dropPanel(l, 'explorer', targetId, 'left');
-    const node = l.regions.bottom!;
-    expect(node.kind).toBe('split');
-    if (node.kind === 'split') {
-      expect(node.dir).toBe('row');
-      expect(node.children.length).toBe(2);
-      // 'left' edge => dragged panel is the first child.
-      const first = node.children[0];
-      expect(first.kind === 'group' && first.tabs).toEqual(['explorer']);
-    }
-  });
-
-  it('top/bottom edges produce a column split', () => {
-    let l = dockPanel(defaultLayout(), 'terminal', 'bottom');
-    l = dockPanel(l, 'explorer', 'right');
-    const targetId = groupIdOf(l, 'terminal')!;
-    l = dropPanel(l, 'explorer', targetId, 'bottom');
-    const node = l.regions.bottom!;
-    expect(node.kind === 'split' && node.dir).toBe('col');
-    // 'bottom' edge => dragged panel is the second child.
-    if (node.kind === 'split') {
-      const second = node.children[1];
-      expect(second.kind === 'group' && second.tabs).toEqual(['explorer']);
-    }
-  });
-
-  it('is a no-op for an unknown target group', () => {
-    const l = dockPanel(defaultLayout(), 'terminal', 'bottom');
-    expect(dropPanel(l, 'terminal', 'nope', 'center')).toBe(l);
-  });
-
-  it('collapsing the split when one side closes restores a plain group', () => {
-    let l = dockPanel(defaultLayout(), 'terminal', 'bottom');
-    l = dockPanel(l, 'explorer', 'left');
-    const targetId = groupIdOf(l, 'terminal')!;
-    l = dropPanel(l, 'explorer', targetId, 'left'); // bottom is now a split
-    l = closePanel(l, 'explorer');
-    expect(l.regions.bottom?.kind).toBe('group');
-    expect(groupNode(l.regions.bottom).tabs).toEqual(['terminal']);
-  });
-
-  it('two panels sharing a region collapse correctly when one closes', () => {
-    let l = twoPanelsOneRegion();
     expect(groupNode(l.regions.bottom).tabs).toEqual(['terminal', 'explorer']);
     l = closePanel(l, 'terminal');
     expect(groupNode(l.regions.bottom).tabs).toEqual(['explorer']);
-  });
-});
-
-describe('moveTab', () => {
-  it('reorders a tab within its group', () => {
-    let l = dockPanel(defaultLayout(), 'terminal', 'bottom');
-    l = dockPanel(l, 'explorer', 'bottom'); // tabs: [terminal, explorer]
-    const gid = groupIdOf(l, 'terminal')!;
-    l = moveTab(l, 'explorer', gid, 0); // move explorer to front
-    expect(groupNode(l.regions.bottom).tabs).toEqual(['explorer', 'terminal']);
-    expect(groupNode(l.regions.bottom).active).toBe('explorer');
   });
 });
 

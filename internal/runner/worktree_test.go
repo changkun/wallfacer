@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 
@@ -101,4 +102,31 @@ func TestWorktreeConcurrencySetupAndPrune(t *testing.T) {
 	}()
 
 	wg.Wait()
+}
+
+// TestCwdInDir verifies separator-aware path containment: a process cwd that is
+// the worktree dir or strictly inside it matches, while a sibling that merely
+// shares the dir as a leading string (the prefix bug) must NOT match.
+func TestCwdInDir(t *testing.T) {
+	sep := string(os.PathSeparator)
+	dir := sep + "tmp" + sep + "worktrees" + sep + "abc"
+
+	cases := []struct {
+		name string
+		cwd  string
+		want bool
+	}{
+		{"exact dir", dir, true},
+		{"descendant", dir + sep + "sub" + sep + "pkg", true},
+		{"sibling sharing prefix", dir + "-backup", false},
+		{"sibling sharing prefix no sep", dir + "x", false},
+		{"unrelated", sep + "tmp" + sep + "other", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := cwdInDir(tc.cwd, dir); got != tc.want {
+				t.Errorf("cwdInDir(%q, %q) = %v, want %v", tc.cwd, dir, got, tc.want)
+			}
+		})
+	}
 }

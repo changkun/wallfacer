@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 )
@@ -277,7 +278,7 @@ func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Han
 func (b *HostBackend) buildChildEnv(spec ContainerSpec) []string {
 	env := os.Environ()
 	if spec.EnvFile != "" {
-		fromFile, err := parseEnvFile(spec.EnvFile)
+		fromFile, err := envconfig.ReadRaw(spec.EnvFile)
 		if err != nil {
 			logger.Runner.Warn("host backend: parse env file", "path", spec.EnvFile, "error", err)
 		} else {
@@ -324,35 +325,6 @@ func shortName(name string) string {
 		return name
 	}
 	return name[len(name)-12:]
-}
-
-// parseEnvFile reads KEY=VAL lines from an env file. Blank lines and lines
-// starting with # are skipped; one layer of surrounding quotes is stripped.
-// This is a passthrough layer for child process env, not a config parser —
-// values are not expanded or typed.
-func parseEnvFile(path string) (map[string]string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[string]string)
-	for line := range strings.SplitSeq(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		k, v, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		k = strings.TrimSpace(k)
-		v = strings.TrimSpace(v)
-		if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
-			v = v[1 : len(v)-1]
-		}
-		out[k] = v
-	}
-	return out, nil
 }
 
 // setEnv returns env with key=value, replacing any existing entry.

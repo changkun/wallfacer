@@ -237,14 +237,21 @@ func (h *Handler) runCommitTransition(s *store.Store, taskID uuid.UUID, sessionI
 				logger.Handler.Error("restore task worktrees for commit", "task", taskID, "error", err)
 			}
 			if err := validateTaskWorktreesForCommit(task); err != nil {
-				if waitErr := s.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
-					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
-						store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusWaiting, trigger, nil))
-					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeError, map[string]string{
-						"error": err.Error(),
-					})
+				if waitErr := s.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr != nil {
+					// Validation already established the worktrees are missing.
+					// If the recovery transition to waiting also failed, do not
+					// fall through to Commit with known-missing worktrees; log
+					// and leave the task in committing for the next reconcile.
+					logger.Handler.Error("commit: worktree validation failed and recovery to waiting failed",
+						"task", taskID, "validate_error", err, "wait_error", waitErr)
 					return
 				}
+				h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
+					store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusWaiting, trigger, nil))
+				h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeError, map[string]string{
+					"error": err.Error(),
+				})
+				return
 			}
 		}
 		if err := h.runner.Commit(taskID, sessionID); err != nil {

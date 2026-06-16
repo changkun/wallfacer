@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -111,6 +113,19 @@ func TestCancelIdeation_CancelsBacklogIdeaAgentTask(t *testing.T) {
 	}
 	if !resp["cancelled"] {
 		t.Error("expected cancelled=true for backlogged idea-agent task")
+	}
+
+	// The HTTP response claiming cancelled=true is not enough: assert the
+	// task is actually cancelled in the store. backlog -> cancelled is not a
+	// valid state-machine transition, so a plain UpdateTaskStatus would fail
+	// silently and leave the task in backlog while the handler still reported
+	// cancelled=true. CancelIdeation must force the cancellation.
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusCancelled {
+		t.Errorf("task status = %s in store, want cancelled", got.Status)
 	}
 }
 
@@ -265,4 +280,82 @@ func TestTriggerIdeation_UsesMockRunner(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("expected 1 RunBackground call, got %d", len(calls))
 	}
+}
+
+// newTestHandlerWithStoreDirAndMock builds a handler backed by a mock runner
+// (so KillContainer is a controlled no-op) and returns the store's root
+// directory so tests can manipulate on-disk permissions to inject failures.
+func newTestHandlerWithStoreDirAndMock(t *testing.T, mock *runner.MockRunner) (*Handler, string) {
+	t.Helper()
+	storeDir, err := os.MkdirTemp("", "wallfacer-ideate-fail-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewFileStore(storeDir)
+	if err != nil {
+		_ = os.RemoveAll(storeDir)
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		// Restore perms so cleanup can remove the tree.
+		_ = filepath.Walk(storeDir, func(p string, _ os.FileInfo, _ error) error {
+			_ = os.Chmod(p, 0o755)
+			return nil
+		})
+		_ = os.RemoveAll(storeDir)
+	})
+	t.Cleanup(s.WaitCompaction)
+	return &Handler{runner: mock, store: s}, storeDir
+}
+
+// TestCancelIdeation_StatusWriteFailureDoesNotReportCancelled verifies that when
+// the store status write fails on a valid transition, CancelIdeation does not
+// report cancelled=true and leaves the task in its prior status. Before the fix,
+// the error was discarded and cancelled=true was returned for a transition that
+// never persisted. Exercises the in_progress -> cancelled path (a valid
+// transition that reaches the disk write); the read-only data dir makes the
+// atomic task.json write fail.
+func TestCancelIdeation_StatusWriteFailureDoesNotReportCancelled(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: read-only dir does not block writes")
+	}
+	mock := &runner.MockRunner{}
+	h, storeDir := newTestHandlerWithStoreDirAndMock(t, mock)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "brainstorm", Timeout: 15, Kind: store.TaskKindIdeaAgent,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	// Move to in_progress so that in_progress -> cancelled is a valid transition
+	// that reaches saveTask.
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+
+	// Make the task's data directory read-only so the atomic task.json write fails.
+	taskDir := filepath.Join(storeDir, task.ID.String())
+	if err := os.Chmod(taskDir, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.CancelIdeation(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["cancelled"] {
+		t.Error("expected cancelled=false when the status write failed")
+	}
+
+	// Restore perms so the test cleanup can remove the tree.
+	_ = os.Chmod(taskDir, 0o755)
 }

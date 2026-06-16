@@ -33,7 +33,7 @@ interface ContentBlock {
   tool_use_id?: string;
 }
 
-interface Frame {
+export interface Frame {
   type?: string;
   message?: { content?: ContentBlock[] };
   is_error?: boolean;
@@ -73,19 +73,13 @@ function toolResultText(block: ContentBlock): string {
   return '';
 }
 
-export function parseActivity(raw: string): ActivityRow[] {
+// frameActivityRows returns the activity rows contributed by a single parsed
+// NDJSON frame. Shared by the one-shot parseActivity and the incremental
+// stream parser so both produce byte-identical rows in identical order.
+export function frameActivityRows(frame: Frame): ActivityRow[] {
   const out: ActivityRow[] = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed[0] !== '{') continue;
-    let frame: Frame;
-    try {
-      frame = JSON.parse(trimmed) as Frame;
-    } catch {
-      continue;
-    }
-    const blocks = frame.message?.content ?? [];
-    if (frame.type === 'assistant') {
+  const blocks = frame.message?.content ?? [];
+  if (frame.type === 'assistant') {
       for (const block of blocks) {
         if (block.type === 'tool_use') {
           const name = block.name ?? 'tool';
@@ -131,43 +125,66 @@ export function parseActivity(raw: string): ActivityRow[] {
           defaultOpen: !!frame.is_error,
         });
       }
-    } else if (frame.type === 'user') {
-      for (const block of blocks) {
-        if (block.type === 'tool_result') {
-          const text = toolResultText(block);
-          out.push({
-            kind: 'tool_result',
-            label: block.is_error ? 'error' : 'result',
-            summary: truncate(text),
-            detail: text.length > MAX_SUMMARY ? text : undefined,
-            defaultOpen: !!block.is_error,
-          });
-        }
+  } else if (frame.type === 'user') {
+    for (const block of blocks) {
+      if (block.type === 'tool_result') {
+        const text = toolResultText(block);
+        out.push({
+          kind: 'tool_result',
+          label: block.is_error ? 'error' : 'result',
+          summary: truncate(text),
+          detail: text.length > MAX_SUMMARY ? text : undefined,
+          defaultOpen: !!block.is_error,
+        });
       }
     }
   }
   return out;
 }
 
+// frameHasActivity reports whether a single parsed frame contributes any
+// tool/thinking/tool_result activity. Shared by the one-shot hasActivity and
+// the incremental stream parser.
+export function frameHasActivity(frame: Frame): boolean {
+  if (frame.type === 'assistant' && frame.message?.content) {
+    for (const block of frame.message.content) {
+      if (block.type === 'tool_use' || block.type === 'thinking') return true;
+    }
+  }
+  if (frame.type === 'user' && frame.message?.content) {
+    for (const block of frame.message.content) {
+      if (block.type === 'tool_result') return true;
+    }
+  }
+  return false;
+}
+
+// parseLine trims and JSON-parses one NDJSON line into a Frame, or null when
+// the line is blank, not a JSON object, or malformed. Shared by the one-shot
+// parsers and the incremental stream parser so they skip identical lines.
+export function parseFrameLine(line: string): Frame | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed[0] !== '{') return null;
+  try {
+    return JSON.parse(trimmed) as Frame;
+  } catch {
+    return null;
+  }
+}
+
+export function parseActivity(raw: string): ActivityRow[] {
+  const out: ActivityRow[] = [];
+  for (const line of raw.split('\n')) {
+    const frame = parseFrameLine(line);
+    if (frame) out.push(...frameActivityRows(frame));
+  }
+  return out;
+}
+
 export function hasActivity(raw: string): boolean {
   for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed[0] !== '{') continue;
-    try {
-      const obj = JSON.parse(trimmed) as Frame;
-      if (obj.type === 'assistant' && obj.message?.content) {
-        for (const block of obj.message.content) {
-          if (block.type === 'tool_use' || block.type === 'thinking') return true;
-        }
-      }
-      if (obj.type === 'user' && obj.message?.content) {
-        for (const block of obj.message.content) {
-          if (block.type === 'tool_result') return true;
-        }
-      }
-    } catch {
-      /* skip */
-    }
+    const frame = parseFrameLine(line);
+    if (frame && frameHasActivity(frame)) return true;
   }
   return false;
 }

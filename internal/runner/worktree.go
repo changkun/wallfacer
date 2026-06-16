@@ -222,6 +222,14 @@ func (r *Runner) PruneUnknownWorktrees() {
 	// (StartWorktreeGC) and by RemoveWorktree during normal task cleanup.
 }
 
+// cwdInDir reports whether cwdPath is dir itself or a path strictly inside dir.
+// It uses a separator-aware boundary so a sibling directory that merely shares
+// dir as a leading string (e.g. dir=".../<id>", cwd=".../<id>-backup") is NOT
+// treated as inside the worktree.
+func cwdInDir(cwdPath, dir string) bool {
+	return cwdPath == dir || strings.HasPrefix(cwdPath, dir+string(os.PathSeparator))
+}
+
 // killWorktreeProcesses sends SIGTERM (then SIGKILL after 3 s) to any host
 // processes whose working directory is inside dir. This cleans up servers and
 // watchers started during interactive Claude Code sessions before the worktree
@@ -251,7 +259,7 @@ func killWorktreeProcesses(dir string) {
 			}
 		case strings.HasPrefix(line, "n"):
 			cwdPath := strings.TrimPrefix(line, "n")
-			if strings.HasPrefix(cwdPath, dir) && curPID != 0 && curPID != os.Getpid() {
+			if cwdInDir(cwdPath, dir) && curPID != 0 && curPID != os.Getpid() {
 				pids = append(pids, curPID)
 			}
 		}
