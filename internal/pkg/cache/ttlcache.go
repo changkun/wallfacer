@@ -31,6 +31,15 @@ type TTLCache[K comparable, V any] struct {
 	now        func() time.Time
 }
 
+// sweepThreshold is the entry-count high-water mark above which Set
+// opportunistically reclaims expired non-permanent entries. Below it the
+// map is small enough that lazy eviction on Get is sufficient.
+const sweepThreshold = 256
+
+// sweepBudget caps how many entries a single Set scans for expiry, so the
+// hot insert path stays O(1) amortized rather than O(n) per call.
+const sweepBudget = 8
+
 // Option configures a [TTLCache].
 type Option[K comparable, V any] func(*TTLCache[K, V])
 
@@ -91,11 +100,42 @@ func (c *TTLCache[K, V]) Set(key K, value V) {
 	if e, ok := c.entries[key]; ok && e.elem != nil {
 		c.lru.Remove(e.elem)
 	}
+	c.sweepExpiredLocked()
 	c.entries[key] = entry[K, V]{
 		key:       key,
 		value:     value,
 		expiresAt: c.now().Add(c.defaultTTL),
 	}
+}
+
+// sweepExpiredLocked opportunistically reclaims expired non-permanent entries
+// so their map slots do not leak when the same key is never read again. It is
+// bounded: it does nothing until the map exceeds sweepThreshold, and it scans
+// at most sweepBudget entries per call, keeping the insert path O(1) amortized.
+// Permanent and live entries are left untouched. The caller must hold c.mu.
+func (c *TTLCache[K, V]) sweepExpiredLocked() {
+	if len(c.entries) <= sweepThreshold {
+		return
+	}
+	now := c.now()
+	scanned := 0
+	for k, e := range c.entries {
+		if scanned >= sweepBudget {
+			break
+		}
+		scanned++
+		if !e.permanent && now.After(e.expiresAt) {
+			delete(c.entries, k)
+		}
+	}
+}
+
+// Len returns the current number of entries (both live and not-yet-reclaimed
+// expired non-permanent entries). Intended for tests and diagnostics.
+func (c *TTLCache[K, V]) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.entries)
 }
 
 // SetPermanent stores a value that never expires by TTL. If MaxSize is
