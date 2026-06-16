@@ -11,7 +11,7 @@ name: Release
 # ghcr.io/latere-ai is a separate, watched change (touches live pods +
 # terraform/ghcr_cleanup.py).
 #
-# Pinned at @main until dockerfile + build_cli are validated and folded into @v1.
+# Pinned at the central pipeline's @v1 moving major tag.
 
 on:
   push:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   release:
-    uses: latere-ai/ci/.github/workflows/service-release.yml@main
+    uses: latere-ai/ci/.github/workflows/service-release.yml@v1
     with:
       service: wallfacerd
       image: ghcr.io/changkun/wallfacerd
