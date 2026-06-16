@@ -38,6 +38,7 @@ type MockRunner struct {
 	CleanupWorktreesCalls       []uuid.UUID
 	GenerateTitleCalls          []uuid.UUID
 	MaybeAutoPushWorkspaceCalls []string
+	CommitCalls                 []uuid.UUID
 
 	// Optional override for ContainerName return value.
 	// When nil the method returns "" (no container active), matching the default
@@ -74,8 +75,20 @@ func (m *MockRunner) RunBackground(taskID uuid.UUID, _, _ string, _ bool) {
 	m.mu.Unlock()
 }
 
-// Commit is a no-op mock.
-func (m *MockRunner) Commit(_ uuid.UUID, _ string) error { return nil }
+// Commit records the call and returns nil.
+func (m *MockRunner) Commit(taskID uuid.UUID, _ string) error {
+	m.mu.Lock()
+	m.CommitCalls = append(m.CommitCalls, taskID)
+	m.mu.Unlock()
+	return nil
+}
+
+// CommitCallsSnapshot returns a race-safe snapshot of the Commit call IDs.
+func (m *MockRunner) CommitCallsSnapshot() []uuid.UUID {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.CommitCalls)
+}
 
 // SyncWorktreesBackground is a no-op mock.
 func (m *MockRunner) SyncWorktreesBackground(_ uuid.UUID, _ string, _ store.TaskStatus, _ ...func()) {

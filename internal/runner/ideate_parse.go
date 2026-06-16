@@ -69,12 +69,8 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 	idea.Scope = strings.TrimSpace(idea.Scope)
 	idea.Rationale = strings.TrimSpace(idea.Rationale)
 	idea.Category = strings.TrimSpace(idea.Category)
-	if idea.Title == "" {
-		idea.Title = strings.TrimSpace(idea.Title)
-	}
-	if idea.Prompt == "" {
-		idea.Prompt = strings.TrimSpace(idea.Prompt)
-	}
+	idea.Title = strings.TrimSpace(idea.Title)
+	idea.Prompt = strings.TrimSpace(idea.Prompt)
 }
 
 // isIdeaDuplicateTitle reports whether title is empty or was already seen

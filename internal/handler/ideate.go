@@ -116,12 +116,27 @@ func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 		switch t.Status {
 		case store.TaskStatusInProgress:
 			h.runner.KillContainer(t.ID)
-			_ = s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
+			if err := s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled); err != nil {
+				// Status write failed; do not emit a cancel event or report
+				// cancelled=true for a transition that did not persist.
+				logger.Handler.Error("cancel ideation: failed to cancel task",
+					"task", t.ID, "from", t.Status, "error", err)
+				continue
+			}
 			h.insertEventOrLog(r.Context(), t.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusCancelled, "", nil))
 			cancelled = true
 		case store.TaskStatusBacklog:
-			_ = s.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
+			// backlog -> cancelled is not a state-machine transition, so use
+			// CancelTask (which force-sets the status and prunes orphaned
+			// dependents). This is the same cancellation primitive used
+			// elsewhere, e.g. handler/execute.go. Only report cancelled=true
+			// and emit the event when the status actually changed.
+			if err := s.CancelTask(r.Context(), t.ID); err != nil {
+				logger.Handler.Error("cancel ideation: failed to cancel task",
+					"task", t.ID, "from", t.Status, "error", err)
+				continue
+			}
 			h.insertEventOrLog(r.Context(), t.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusCancelled, "", nil))
 			cancelled = true

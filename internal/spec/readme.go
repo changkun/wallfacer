@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
 // Meta is the minimum information [EnsureReadme] needs to reference a
@@ -167,7 +169,7 @@ func EnsureReadme(workspace string, newSpec Meta) error {
 	if err := os.MkdirAll(filepath.Dir(readmePath), 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(readmePath), err)
 	}
-	return atomicWriteFile(readmePath, next, 0o644)
+	return atomicfile.WriteSync(readmePath, next, 0o644)
 }
 
 // renderInitialReadme produces the minimal template used when the
@@ -299,43 +301,4 @@ func ensureTrailingNewline(s string) string {
 		return s
 	}
 	return s + "\n"
-}
-
-// atomicWriteFile writes `data` to `path` via a sibling tempfile +
-// rename so a failure mid-write never truncates the existing file.
-func atomicWriteFile(path string, data []byte, perm os.FileMode) (err error) {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp.*")
-	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
-	}
-	tmpPath := tmp.Name()
-	defer func() {
-		if err != nil {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if _, werr := tmp.Write(data); werr != nil {
-		_ = tmp.Close()
-		err = fmt.Errorf("write temp: %w", werr)
-		return err
-	}
-	if serr := tmp.Sync(); serr != nil {
-		_ = tmp.Close()
-		err = fmt.Errorf("sync temp: %w", serr)
-		return err
-	}
-	if cerr := tmp.Close(); cerr != nil {
-		err = fmt.Errorf("close temp: %w", cerr)
-		return err
-	}
-	if chErr := os.Chmod(tmpPath, perm); chErr != nil {
-		err = fmt.Errorf("chmod temp: %w", chErr)
-		return err
-	}
-	if rerr := os.Rename(tmpPath, path); rerr != nil {
-		err = fmt.Errorf("rename: %w", rerr)
-		return err
-	}
-	return nil
 }

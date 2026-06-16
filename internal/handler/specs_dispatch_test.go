@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -694,5 +696,54 @@ func TestCompletionHook_AlreadyComplete(t *testing.T) {
 	}
 	if s.Status != spec.StatusComplete {
 		t.Errorf("status = %q, want %q", s.Status, spec.StatusComplete)
+	}
+}
+
+// failOnInProgressBackend wraps a StorageBackend and makes SaveTask fail when
+// the task is being persisted in the in_progress state, leaving all other
+// persistence (creation in backlog, frontmatter, events) working. This lets a
+// test deterministically fail only the dispatch run=true status transition.
+type failOnInProgressBackend struct {
+	store.StorageBackend
+}
+
+func (b *failOnInProgressBackend) SaveTask(t *store.Task) error {
+	if t.Status == store.TaskStatusInProgress {
+		return errors.New("injected save failure for in_progress")
+	}
+	return b.StorageBackend.SaveTask(t)
+}
+
+// TestDispatchSpecs_RunStatusWriteFailureSkipsRunner verifies that when the
+// run=true transition to in_progress fails to persist, DispatchSpecs does not
+// launch a runner for that task. Before the fix, the UpdateTaskStatus error was
+// discarded and RunBackground was called for a task the store still believed
+// was in backlog.
+func TestDispatchSpecs_RunStatusWriteFailureSkipsRunner(t *testing.T) {
+	ws := t.TempDir()
+	configDir := t.TempDir()
+
+	fsBackend, err := store.NewFilesystemBackend(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemBackend: %v", err)
+	}
+	s, err := store.NewStore(&failOnInProgressBackend{StorageBackend: fsBackend})
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	mock := &runner.MockRunner{}
+	h := NewHandler(s, mock, configDir, []string{ws}, nil)
+
+	writeTestSpec(t, ws, "specs/local/test.md", testSpecValidated)
+
+	w, _ := doDispatch(t, h, []string{"specs/local/test.md"}, true)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body: %s", w.Code, w.Body.String())
+	}
+
+	// The transition to in_progress failed, so no runner should have launched.
+	if calls := mock.RunCalls(); len(calls) != 0 {
+		t.Fatalf("expected 0 RunBackground calls when the status write failed, got %d", len(calls))
 	}
 }

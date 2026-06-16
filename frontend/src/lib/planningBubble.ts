@@ -2,7 +2,7 @@
 // PlanningChatPanel.vue so they can be unit-tested in isolation and reused
 // by the streaming code path (which also needs to parse incoming NDJSON).
 import { renderMarkdown } from './markdown';
-import { parseActivity, type ActivityRow } from './prettyNdjson';
+import { parseActivity, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
 import type { PlanningMessage } from '../stores/planning';
 
 export interface RenderedBubble {
@@ -48,22 +48,31 @@ export function timeOf(ts?: string): string {
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Assistant text contributed by a single parsed frame (empty if none). */
+export function frameAssistantText(frame: Frame): string {
+  let text = '';
+  if (frame.type === 'assistant' && frame.message?.content) {
+    for (const block of frame.message.content) {
+      if (block.type === 'text' && typeof block.text === 'string') {
+        text += block.text;
+      }
+    }
+  }
+  return text;
+}
+
+/** The error string a single frame reports, or '' if it is not an error result. */
+export function frameError(frame: Frame): string {
+  if (frame.type === 'result' && frame.is_error && frame.result) return String(frame.result);
+  return '';
+}
+
 /** Concatenate all `assistant` text blocks from a raw NDJSON stream. */
 export function extractAssistantText(raw: string): string {
   let text = '';
   for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed[0] !== '{') continue;
-    try {
-      const obj = JSON.parse(trimmed);
-      if (obj.type === 'assistant' && obj.message?.content) {
-        for (const block of obj.message.content) {
-          if (block.type === 'text' && typeof block.text === 'string') {
-            text += block.text;
-          }
-        }
-      }
-    } catch { /* skip malformed */ }
+    const frame = parseFrameLine(line);
+    if (frame) text += frameAssistantText(frame);
   }
   return text;
 }
@@ -72,12 +81,11 @@ export function extractAssistantText(raw: string): string {
 export function extractError(raw: string): string {
   const lines = raw.split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
-    const trimmed = lines[i].trim();
-    if (!trimmed || trimmed[0] !== '{') continue;
-    try {
-      const obj = JSON.parse(trimmed);
-      if (obj.type === 'result' && obj.is_error && obj.result) return String(obj.result);
-    } catch { /* skip */ }
+    const frame = parseFrameLine(lines[i]);
+    if (frame) {
+      const err = frameError(frame);
+      if (err) return err;
+    }
   }
   return '';
 }

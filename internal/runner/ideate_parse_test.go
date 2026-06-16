@@ -49,6 +49,30 @@ func TestNormalizeIdeationPriority_Trimmed(t *testing.T) {
 
 // --- normalizeIdeationImpact tests ---
 
+// TestNormalizeIdeationImpact_TrimsTitleAndPrompt is a regression test for an
+// inverted guard: Title and Prompt were trimmed only when already empty
+// (if idea.Title == ""), making the trim a no-op for any non-empty value. They
+// must be trimmed unconditionally like the sibling Scope/Rationale/Category.
+func TestNormalizeIdeationImpact_TrimsTitleAndPrompt(t *testing.T) {
+	idea := &IdeateResult{
+		Priority:    "high",
+		ImpactScore: 90,
+		Title:       "  spaced title  ",
+		Prompt:      "\n  spaced prompt \t",
+		Scope:       "  s  ",
+	}
+	normalizeIdeationImpact(idea)
+	if idea.Title != "spaced title" {
+		t.Errorf("Title = %q, want %q", idea.Title, "spaced title")
+	}
+	if idea.Prompt != "spaced prompt" {
+		t.Errorf("Prompt = %q, want %q", idea.Prompt, "spaced prompt")
+	}
+	if idea.Scope != "s" {
+		t.Errorf("Scope = %q, want %q", idea.Scope, "s")
+	}
+}
+
 func TestNormalizeIdeationImpact_ClampNegative(t *testing.T) {
 	idea := &IdeateResult{Priority: "high", ImpactScore: -10}
 	normalizeIdeationImpact(idea)

@@ -61,3 +61,69 @@ func TestRunCommitTransition_UsesCapturedStoreAcrossSnapshotSwap(t *testing.T) {
 		t.Fatalf("task in captured store should reach done, got %v", updated)
 	}
 }
+
+// failOnWaitingBackend wraps a StorageBackend and fails SaveTask only when the
+// task is being persisted in the waiting state. Lets a test make the
+// commit-transition recovery (ForceUpdateTaskStatus(waiting)) fail while the
+// committing seed and any later done/failed save still succeed.
+type failOnWaitingBackend struct {
+	store.StorageBackend
+}
+
+func (b *failOnWaitingBackend) SaveTask(t *store.Task) error {
+	if t.Status == store.TaskStatusWaiting {
+		return errInjectedWaiting
+	}
+	return b.StorageBackend.SaveTask(t)
+}
+
+var errInjectedWaiting = errInjected("injected save failure for waiting")
+
+type errInjected string
+
+func (e errInjected) Error() string { return string(e) }
+
+// TestRunCommitTransition_MissingWorktreesAndFailedRecoveryDoesNotCommit is a
+// regression test for a control-flow gap: when validateTaskWorktreesForCommit
+// fails AND the recovery ForceUpdateTaskStatus(waiting) also fails, the code
+// fell through to runner.Commit with known-missing worktrees, which (in the
+// mock) returns nil and drove the task to done. With the fix it returns early
+// and leaves the task in committing for the next reconcile.
+func TestRunCommitTransition_MissingWorktreesAndFailedRecoveryDoesNotCommit(t *testing.T) {
+	m := &runner.MockRunner{}
+
+	fsBackend, err := store.NewFilesystemBackend(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemBackend: %v", err)
+	}
+	s, err := store.NewStore(&failOnWaitingBackend{StorageBackend: fsBackend})
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	h := &Handler{runner: m, store: s}
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 30})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
+		t.Fatal(err)
+	}
+	// Point the worktree at a nonexistent path so validation fails (the mock
+	// runner's EnsureTaskWorktrees returns it unchanged, so it stays missing).
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{"/repo": "/nonexistent-worktree-xyz"}, "task/branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	h.runCommitTransition(s, task.ID, "session-1", store.TriggerUser, "commit error: ")
+
+	// Let the goroutine run to completion. The fix returns early on the
+	// double-failure path, so runner.Commit must never be called with the
+	// known-missing worktrees. Without the fix, control falls through and
+	// Commit is invoked.
+	time.Sleep(300 * time.Millisecond)
+	if calls := m.CommitCallsSnapshot(); len(calls) != 0 {
+		t.Fatalf("Commit was called %d time(s) despite missing worktrees and failed recovery", len(calls))
+	}
+}
