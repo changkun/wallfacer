@@ -78,6 +78,16 @@ describe('dockPanel', () => {
     dockPanel(l, 'terminal', 'bottom');
     expect(l.regions).toEqual({});
   });
+
+  it('does not mutate the input layout when docking into an occupied region', () => {
+    // Regression: clone() is shallow, so docking a second panel into a region
+    // that already holds a group mutated the shared group node (tabs/active) of
+    // the input layout. Snapshot the input and assert it is untouched.
+    const first = dockPanel(defaultLayout(), 'terminal', 'bottom');
+    const snapshot = JSON.parse(JSON.stringify(first));
+    dockPanel(first, 'explorer', 'bottom');
+    expect(first).toEqual(snapshot);
+  });
 });
 
 describe('ensurePanel', () => {
