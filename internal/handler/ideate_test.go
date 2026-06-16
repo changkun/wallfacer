@@ -114,6 +114,19 @@ func TestCancelIdeation_CancelsBacklogIdeaAgentTask(t *testing.T) {
 	if !resp["cancelled"] {
 		t.Error("expected cancelled=true for backlogged idea-agent task")
 	}
+
+	// The HTTP response claiming cancelled=true is not enough: assert the
+	// task is actually cancelled in the store. backlog -> cancelled is not a
+	// valid state-machine transition, so a plain UpdateTaskStatus would fail
+	// silently and leave the task in backlog while the handler still reported
+	// cancelled=true. CancelIdeation must force the cancellation.
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusCancelled {
+		t.Errorf("task status = %s in store, want cancelled", got.Status)
+	}
 }
 
 func TestCancelIdeation_IgnoresNonIdeaAgentTasks(t *testing.T) {
