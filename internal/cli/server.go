@@ -56,15 +56,11 @@ type ServerComponents struct {
 	Ln      net.Listener
 	Runner  *runner.Runner
 	Planner *planner.Planner
-	WsMgr   *workspace.Manager
 	Ctx     context.Context
 	Stop    context.CancelFunc
 
 	// ActualPort is the TCP port the listener is bound to.
 	ActualPort int
-
-	// ServerAPIKey is the configured API key for server authentication.
-	ServerAPIKey string
 }
 
 // Shutdown performs a graceful shutdown: drains HTTP connections and waits
@@ -403,15 +399,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	}
 
 	return &ServerComponents{
-		Srv:          srv,
-		Ln:           ln,
-		Runner:       r,
-		Planner:      p,
-		WsMgr:        wsMgr,
-		Ctx:          ctx,
-		Stop:         stop,
-		ActualPort:   actualPort,
-		ServerAPIKey: envCfg.ServerAPIKey,
+		Srv:        srv,
+		Ln:         ln,
+		Runner:     r,
+		Planner:    p,
+		Ctx:        ctx,
+		Stop:       stop,
+		ActualPort: actualPort,
 	}
 }
 
