@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -61,7 +62,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	// (2) Canonicalize DependsOn.
 	if len(task.DependsOn) > 0 {
 		canon := canonicalizeDependsOn(task.DependsOn)
-		if !stringSliceEqual(canon, task.DependsOn) {
+		if !slices.Equal(canon, task.DependsOn) {
 			task.DependsOn = canon
 			changed = true
 		}
@@ -72,7 +73,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		task.Sandbox = normalSandbox
 		changed = true
 	}
-	if normalSBA := normalizeSandboxByActivity(task.SandboxByActivity); !sandboxByActivityEqual(normalSBA, task.SandboxByActivity) {
+	if normalSBA := normalizeSandboxByActivity(task.SandboxByActivity); !maps.Equal(normalSBA, task.SandboxByActivity) {
 		task.SandboxByActivity = normalSBA
 		changed = true
 	}
@@ -124,29 +125,3 @@ func canonicalizeDependsOn(deps []string) []string {
 	return out
 }
 
-// stringSliceEqual reports whether a and b are identical element-by-element.
-func stringSliceEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// sandboxByActivityEqual reports whether two sandbox-by-activity maps contain
-// exactly the same keys and values.
-func sandboxByActivityEqual(a, b map[SandboxActivity]harness.ID) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
-}

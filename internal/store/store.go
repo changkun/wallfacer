@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -212,7 +213,7 @@ func (s *Store) loadAll() error {
 		// auto-promoter). Parsing only populates metadata.
 		if tombRaw, err := s.backend.ReadBlob(id, "tombstone.json"); err == nil {
 			var tomb Tombstone
-			if perr := jsonUnmarshal(tombRaw, &tomb); perr != nil {
+			if perr := json.Unmarshal(tombRaw, &tomb); perr != nil {
 				logger.Store.Warn("startup: corrupt tombstone, keeping task soft-deleted",
 					"task", id, "error", perr)
 			}

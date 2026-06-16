@@ -613,8 +613,8 @@ func TestAccumulateTaskUsage(t *testing.T) {
 		CacheCreationTokens:  5,
 		CostUSD:              0.01,
 	}
-	_ = s.AccumulateTaskUsage(bg(), task.ID, delta)
-	_ = s.AccumulateTaskUsage(bg(), task.ID, delta)
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, delta)
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, delta)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Usage.InputTokens != 200 {
@@ -636,7 +636,7 @@ func TestAccumulateTaskUsage(t *testing.T) {
 
 func TestAccumulateTaskUsage_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.AccumulateTaskUsage(bg(), uuid.New(), TaskUsage{}); err == nil {
+	if err := s.AccumulateSubAgentUsage(bg(), uuid.New(), SandboxActivityImplementation, TaskUsage{}); err == nil {
 		t.Error("expected error for unknown task")
 	}
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -694,13 +695,19 @@ func TestStore_ListBlobs_NoDir(t *testing.T) {
 	}
 }
 
-// --- CreateTask (deprecated wrapper) ---
+// --- CreateTaskWithOptions ---
 
 func TestCreateTask_DeprecatedWrapper(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "test prompt", 10, true, "", TaskKindTask, "tag1")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
+		Prompt:         "test prompt",
+		Timeout:        10,
+		MountWorktrees: true,
+		Kind:           TaskKindTask,
+		Tags:           []string{"tag1"},
+	})
 	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
+		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
 	if task.Prompt != "test prompt" {
 		t.Errorf("Prompt = %q, want %q", task.Prompt, "test prompt")
@@ -876,10 +883,10 @@ func TestClearFetchFailure_UnknownID(t *testing.T) {
 	}
 }
 
-// --- sandboxByActivityEqual ---
+// --- maps.Equal on sandbox-by-activity maps ---
 
 func TestSandboxByActivityEqual_BothEmpty(t *testing.T) {
-	if !sandboxByActivityEqual(nil, nil) {
+	if !maps.Equal[map[SandboxActivity]harness.ID, map[SandboxActivity]harness.ID](nil, nil) {
 		t.Error("expected equal for two nils")
 	}
 }
@@ -887,7 +894,7 @@ func TestSandboxByActivityEqual_BothEmpty(t *testing.T) {
 func TestSandboxByActivityEqual_DifferentLengths(t *testing.T) {
 	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
 	b := map[SandboxActivity]harness.ID{}
-	if sandboxByActivityEqual(a, b) {
+	if maps.Equal(a, b) {
 		t.Error("expected not equal for different lengths")
 	}
 }
@@ -895,7 +902,7 @@ func TestSandboxByActivityEqual_DifferentLengths(t *testing.T) {
 func TestSandboxByActivityEqual_DifferentValues(t *testing.T) {
 	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
 	b := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Codex}
-	if sandboxByActivityEqual(a, b) {
+	if maps.Equal(a, b) {
 		t.Error("expected not equal for different values")
 	}
 }
@@ -903,7 +910,7 @@ func TestSandboxByActivityEqual_DifferentValues(t *testing.T) {
 func TestSandboxByActivityEqual_SameValues(t *testing.T) {
 	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
 	b := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	if !sandboxByActivityEqual(a, b) {
+	if !maps.Equal(a, b) {
 		t.Error("expected equal for same values")
 	}
 }
@@ -1824,7 +1831,7 @@ func TestResetTaskForRetry_PreservesRetryHistory(t *testing.T) {
 	// Move to failed.
 	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                    //nolint:errcheck
 	s.UpdateTaskResult(bg(), task.ID, "failed result", "sess-1", "end_turn", 3) //nolint:errcheck
-	s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{CostUSD: 1.5})               //nolint:errcheck
+	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, TaskUsage{CostUSD: 1.5}) //nolint:errcheck
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)

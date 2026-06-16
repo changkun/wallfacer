@@ -162,19 +162,6 @@ func TestUpdateRoutineLastFiredAt_SetAndClear(t *testing.T) {
 	}
 }
 
-func TestUpdateRoutineSpawnKind_Persists(t *testing.T) {
-	s := newTestStore(t)
-	task := mkRoutine(t, s)
-
-	if err := s.UpdateRoutineSpawnKind(bg(), task.ID, TaskKindIdeaAgent); err != nil {
-		t.Fatalf("update: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.RoutineSpawnKind != TaskKindIdeaAgent {
-		t.Fatalf("SpawnKind = %q, want idea-agent", got.RoutineSpawnKind)
-	}
-}
-
 func TestUpdateRoutineWriters_RejectNonRoutine(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "normal", Timeout: 10})
@@ -191,9 +178,6 @@ func TestUpdateRoutineWriters_RejectNonRoutine(t *testing.T) {
 	}
 	if err := s.UpdateRoutineLastFiredAt(bg(), task.ID, &now); err == nil {
 		t.Fatalf("expected error setting LastFiredAt on non-routine task")
-	}
-	if err := s.UpdateRoutineSpawnKind(bg(), task.ID, TaskKindIdeaAgent); err == nil {
-		t.Fatalf("expected error setting spawn kind on non-routine task")
 	}
 }
 

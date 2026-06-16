@@ -124,7 +124,7 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Timeout: 15})
 	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
 	_ = s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
-	_ = s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{InputTokens: 100, CostUSD: 0.5})
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, TaskUsage{InputTokens: 100, CostUSD: 0.5})
 	_ = s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "task/rt")
 	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
 	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "some output")
@@ -428,7 +428,7 @@ func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {
 
 	want := []string{id1.String(), id2.String()}
 	slices.Sort(want)
-	if !stringSliceEqual(task.DependsOn, want) {
+	if !slices.Equal(task.DependsOn, want) {
 		t.Errorf("DependsOn = %v, want %v", task.DependsOn, want)
 	}
 }
