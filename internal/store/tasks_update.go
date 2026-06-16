@@ -487,6 +487,12 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	oldStatus := t.Status
 	t.PromptHistory = append(t.PromptHistory, t.Prompt)
 	t.Prompt = newPrompt
+	// Keep the search index in sync with the new prompt, matching the peer
+	// prompt mutators (UpdateTaskBacklog, UpdateTaskPromptDirect, ApplyRefinement).
+	if entry, ok := s.searchIndex[id]; ok {
+		entry.prompt = strings.ToLower(newPrompt)
+		s.searchIndex[id] = entry
+	}
 	t.FreshStart = freshStart
 	t.Result = nil
 	t.StopReason = nil
@@ -520,9 +526,6 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	// Search index not updated: although Prompt is reset to newPrompt, the
-	// index will be refreshed by UpdateTaskTitle when the title-generation
-	// runner fires at the start of the next run.
 	s.notify(t, false)
 	return nil
 }
