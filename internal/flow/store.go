@@ -122,14 +122,7 @@ func WriteUserFlow(dir string, f Flow) error {
 // DeleteUserFlow removes dir/<slug>.yaml. Idempotent: missing file
 // yields nil.
 func DeleteUserFlow(dir, slug string) error {
-	if !slugutil.IsValid(slug) {
-		return fmt.Errorf("invalid slug %q", slug)
-	}
-	path := filepath.Join(dir, slug+".yaml")
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
+	return yamldir.Remove(dir, slug)
 }
 
 // NewMergedRegistry combines the built-in catalog with user-authored

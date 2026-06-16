@@ -101,14 +101,7 @@ func WriteUserAgent(dir string, role Role) error {
 // DeleteUserAgent removes dir/<slug>.yaml. Returns nil when the
 // file is already absent so callers can treat delete as idempotent.
 func DeleteUserAgent(dir, slug string) error {
-	if !slugutil.IsValid(slug) {
-		return fmt.Errorf("invalid slug %q", slug)
-	}
-	path := filepath.Join(dir, slug+".yaml")
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
+	return yamldir.Remove(dir, slug)
 }
 
 // NewMergedRegistry returns a Registry combining the built-in
