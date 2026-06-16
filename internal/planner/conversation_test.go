@@ -361,15 +361,15 @@ func TestPlannerConversation(t *testing.T) {
 		Fingerprint: "test123",
 		ConfigDir:   t.TempDir(),
 	})
-	if p.Conversation() == nil {
-		t.Error("Conversation() = nil, want non-nil when ConfigDir is set")
+	if p.ActiveConversation() == nil {
+		t.Error("ActiveConversation() = nil, want non-nil when ConfigDir is set")
 	}
 }
 
 func TestPlannerConversation_NoConfigDir(t *testing.T) {
 	p := New(Config{Command: "podman", Fingerprint: "test123"})
-	if p.Conversation() != nil {
-		t.Error("Conversation() should be nil when ConfigDir is empty")
+	if p.ActiveConversation() != nil {
+		t.Error("ActiveConversation() should be nil when ConfigDir is empty")
 	}
 }
 

@@ -97,15 +97,6 @@ func (p *Planner) ActiveConversation() *ConversationStore {
 	return s
 }
 
-// Conversation is a compatibility shim for callers that haven't yet
-// been migrated to pass an explicit thread ID. It returns the active
-// thread's store. New code should go through Threads().Store(id).
-//
-// TODO(multi-thread): remove once all handlers route through thread IDs.
-func (p *Planner) Conversation() *ConversationStore {
-	return p.ActiveConversation()
-}
-
 // Start marks the planner as active. The agent process is spawned lazily
 // on the first Exec call.
 func (p *Planner) Start(_ context.Context) error {

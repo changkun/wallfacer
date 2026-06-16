@@ -163,7 +163,7 @@ func TestGetPlanningMessages_WithHistory(t *testing.T) {
 	p := newPlannerWithStore(t)
 	h.planner = p
 
-	cs := p.Conversation()
+	cs := p.ActiveConversation()
 	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
 	_ = cs.AppendMessage(planner.Message{Role: "assistant", Content: "hi", Timestamp: time.Now().UTC()})
 
@@ -195,7 +195,7 @@ func TestGetPlanningMessages_Pagination(t *testing.T) {
 	p := newPlannerWithStore(t)
 	h.planner = p
 
-	cs := p.Conversation()
+	cs := p.ActiveConversation()
 	t1 := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 4, 1, 11, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
@@ -297,7 +297,7 @@ func TestClearPlanningMessages(t *testing.T) {
 	p := newPlannerWithStore(t)
 	h.planner = p
 
-	cs := p.Conversation()
+	cs := p.ActiveConversation()
 	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
 
 	rec := httptest.NewRecorder()
