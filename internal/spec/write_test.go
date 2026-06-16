@@ -407,3 +407,48 @@ func TestUpdateFrontmatter_PreservesFilePermissions(t *testing.T) {
 		t.Errorf("permissions = %o, want 0600", info.Mode().Perm())
 	}
 }
+
+// TestUpdateFrontmatter_DoesNotAccreteBlankLines is a regression test for an
+// off-by-one on the closing-delimiter length: bodyStart was end+4 but the
+// "\n---\n" delimiter is 5 bytes, so write.go retained the delimiter's
+// trailing newline and prepended another on every reassembly. Repeated calls
+// must not grow the blank lines between the frontmatter and the body.
+func TestUpdateFrontmatter_DoesNotAccreteBlankLines(t *testing.T) {
+	dir := t.TempDir()
+	original := "---\nstatus: draft\n---\n\n# Body\n"
+	path := filepath.Join(dir, "accrete.md")
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	leadingNewlines := func() int {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read: %v", err)
+		}
+		s := string(data)
+		idx := strings.Index(s, "\n---\n")
+		if idx < 0 {
+			t.Fatalf("no closing delimiter in %q", s)
+		}
+		body := s[idx+5:]
+		n := 0
+		for n < len(body) && body[n] == '\n' {
+			n++
+		}
+		return n
+	}
+
+	for i := 0; i < 3; i++ {
+		if err := UpdateFrontmatter(path, map[string]any{"status": "active"}); err != nil {
+			t.Fatalf("UpdateFrontmatter[%d]: %v", i, err)
+		}
+	}
+
+	// The body in the original had exactly one leading blank line ("\n\n# Body").
+	// It must stay at one regardless of how many times the frontmatter is touched.
+	if got := leadingNewlines(); got != 1 {
+		data, _ := os.ReadFile(path)
+		t.Fatalf("leading newlines before body = %d, want 1; file=%q", got, string(data))
+	}
+}
