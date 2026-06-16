@@ -87,8 +87,20 @@ export function useChatSession(): ChatSession {
   const interruptedAt = ref<number>(-1);
 
   let streamHandle: StreamingFetchHandle | null = null;
+  // Pending reconnect timer scheduled by the streaming retry path. Tracked so
+  // it can be cancelled on interrupt, thread-switch, or unmount; otherwise it
+  // fires connect() for a thread the user already left, re-opening a stream
+  // after teardown.
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
   // Monotonic counter for stable streaming-bubble ids (see applyStreamingUpdate).
   let streamBubbleSeq = 0;
+
+  function clearRetryTimer() {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  }
 
   function scrollToBottom(force = false) {
     void nextTick(() => {
@@ -196,7 +208,7 @@ export function useChatSession(): ChatSession {
         onDone: (hadData: boolean) => {
           if (!hadData && !retried) {
             retried = true;
-            setTimeout(connect, 500);
+            retryTimer = setTimeout(connect, 500);
             return;
           }
           const text = extractAssistantText(rawBuffer);
@@ -216,7 +228,7 @@ export function useChatSession(): ChatSession {
         onError: () => {
           if (!retried) {
             retried = true;
-            setTimeout(connect, 500);
+            retryTimer = setTimeout(connect, 500);
             return;
           }
           finishStreaming(false);
@@ -227,6 +239,7 @@ export function useChatSession(): ChatSession {
   }
 
   function finishStreaming(interrupted: boolean) {
+    clearRetryTimer();
     if (streamHandle) {
       streamHandle.abort();
       streamHandle = null;
@@ -439,6 +452,7 @@ export function useChatSession(): ChatSession {
 
     // Detach our local stream reader if leaving the in-flight thread.
     if (streaming.value && streamingThreadId.value !== id) {
+      clearRetryTimer();
       if (streamHandle) {
         streamHandle.abort();
         streamHandle = null;
@@ -629,6 +643,7 @@ export function useChatSession(): ChatSession {
   });
 
   onUnmounted(() => {
+    clearRetryTimer();
     if (streamHandle) streamHandle.abort();
   });
 
