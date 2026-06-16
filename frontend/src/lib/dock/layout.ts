@@ -176,8 +176,16 @@ export function dockPanel(layout: DockLayout, panel: PanelId, region: DockRegion
   } else {
     const g = firstGroup(target);
     if (g) {
-      g.tabs = [...g.tabs, panel];
-      g.active = panel;
+      // clone() is a shallow copy: it shares DockNode objects with the input
+      // layout. Mutating `g` in place would corrupt the caller's layout.
+      // Rebuild the target group via replaceGroup so the returned layout is a
+      // genuinely fresh tree (replaceGroup handles split roots too).
+      next.regions[region] = replaceGroup(target, g.id, (old) => ({
+        kind: 'group',
+        id: old.id,
+        tabs: [...old.tabs, panel],
+        active: panel,
+      }));
     } else {
       next.regions[region] = group(nextGroupId(next), panel);
     }
