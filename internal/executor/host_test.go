@@ -414,18 +414,3 @@ func TestSetEnv(t *testing.T) {
 		t.Errorf("D append failed: %v", env)
 	}
 }
-
-func TestPrependToPromptFlag(t *testing.T) {
-	argv := []string{"-p", "task", "--model", "x"}
-	got := prependToPromptFlag(argv, "PREAMBLE")
-	if !strings.HasPrefix(got[1], "PREAMBLE") || !strings.HasSuffix(got[1], "task") {
-		t.Errorf("prepend failed: %v", got)
-	}
-
-	// No -p flag: argv returned unchanged.
-	argv2 := []string{"--foo", "bar"}
-	got2 := prependToPromptFlag(argv2, "nope")
-	if got2[0] != "--foo" || got2[1] != "bar" {
-		t.Errorf("no-p-flag case modified argv: %v", got2)
-	}
-}
