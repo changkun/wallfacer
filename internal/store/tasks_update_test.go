@@ -486,3 +486,46 @@ func TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart(t *testing.T) {
 		}
 	})
 }
+
+// TestResetTaskForRetry_RefreshesSearchIndex verifies that ResetTaskForRetry
+// updates the in-memory search index to reflect the new prompt: the new prompt
+// becomes findable and the old prompt no longer produces a false-positive hit.
+// Before the fix, the index kept the old prompt because ResetTaskForRetry set
+// t.Prompt without refreshing s.searchIndex[id].
+func TestResetTaskForRetry_RefreshesSearchIndex(t *testing.T) {
+	s := newTestStore(t)
+	ctx := bg()
+
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "oldprompt-needle", Timeout: 60, Kind: TaskKindTask})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Drive to failed so ResetTaskForRetry is a valid transition.
+	if err := s.UpdateTaskStatus(ctx, task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed: %v", err)
+	}
+
+	if err := s.ResetTaskForRetry(ctx, task.ID, "newprompt-needle", false); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	newHits, err := s.SearchTasks(ctx, "newprompt-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks(new): %v", err)
+	}
+	if len(newHits) != 1 {
+		t.Fatalf("expected new prompt to be findable: got %d hits, want 1", len(newHits))
+	}
+
+	oldHits, err := s.SearchTasks(ctx, "oldprompt-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks(old): %v", err)
+	}
+	if len(oldHits) != 0 {
+		t.Fatalf("expected old prompt to be unfindable: got %d hits, want 0", len(oldHits))
+	}
+}
