@@ -188,6 +188,46 @@ func TestTTLCache_Invalidate_Permanent(t *testing.T) {
 	}
 }
 
+// TestTTLCache_SweepReclaimsExpiredOnSet verifies that expired non-permanent
+// entries that are never re-accessed via Get are eventually reclaimed by the
+// amortized sweep-on-Set path, so the map does not grow without bound. Without
+// the sweep, each distinct key leaves a permanently retained map slot.
+func TestTTLCache_SweepReclaimsExpiredOnSet(t *testing.T) {
+	now := time.Now()
+	c := New[int, int](time.Second, WithClock[int, int](func() time.Time { return now }))
+
+	// Insert many distinct keys that all expire, never reading them back.
+	const n = 5000
+	for i := range n {
+		c.Set(i, i)
+		now = now.Add(2 * time.Second) // each entry is expired by the next Set
+	}
+
+	// With the sweep, the live map stays bounded near sweepThreshold rather
+	// than retaining all n expired slots. Allow generous headroom.
+	if got := c.Len(); got > sweepThreshold*4 {
+		t.Fatalf("expired entries not reclaimed: Len()=%d, want <= %d", got, sweepThreshold*4)
+	}
+}
+
+// TestTTLCache_SweepKeepsLiveAndPermanent verifies the sweep never evicts live
+// (unexpired) non-permanent entries or permanent entries.
+func TestTTLCache_SweepKeepsLiveAndPermanent(t *testing.T) {
+	c := New[int, int](time.Hour)
+
+	c.SetPermanent(-1, 999)
+	for i := range 1000 {
+		c.Set(i, i) // long TTL, all still live
+	}
+
+	if v, ok := c.Get(-1); !ok || v != 999 {
+		t.Fatalf("permanent entry evicted by sweep: (%d, %v)", v, ok)
+	}
+	if v, ok := c.Get(500); !ok || v != 500 {
+		t.Fatalf("live entry evicted by sweep: (%d, %v)", v, ok)
+	}
+}
+
 // TestTTLCache_Concurrent exercises concurrent Set and Get operations to verify
 // the mutex-based thread safety does not cause data races.
 func TestTTLCache_Concurrent(_ *testing.T) {
