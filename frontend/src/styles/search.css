@@ -50,8 +50,8 @@ mark.search-highlight {
 .task-search-input:focus,
 .task-search-input:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 .task-search-input::placeholder {
   color: var(--text-muted);

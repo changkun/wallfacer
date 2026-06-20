@@ -431,12 +431,12 @@
   background: var(--bg-hover);
 }
 
-/* Inputs: soft accent focus ring to match the buttons. */
+/* Inputs: soft, diffuse focus glow rather than a hard accent ring. */
 .ws-picker .ws-picker__path-input:focus,
 .ws-picker .ws-picker__filter:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 
 /* Stepper: replace the global bold accent focus box with a soft ring on the
