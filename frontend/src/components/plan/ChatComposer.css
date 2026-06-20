@@ -183,9 +183,13 @@
   min-height: 56px;
 }
 
+/* In the hero/docked composer the textarea is chromeless — the container owns
+   the focus glow (.pcp-composer--*:focus-within), so the inner field must drop
+   both the focus border and the focus shadow to avoid a boxed-in look. */
 .pcp-composer--hero .pcp-textarea:focus,
 .pcp-composer--docked .pcp-textarea:focus {
   border: none;
+  box-shadow: none;
 }
 
 .pcp-composer--compact {
