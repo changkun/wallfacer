@@ -36,24 +36,30 @@ function loadState(): PopupState {
   // Default anchor: bottom-right.
   const x = saved.x ?? Math.max(MARGIN, vw() - w - MARGIN);
   const y = saved.y ?? Math.max(MARGIN, vh() - h - MARGIN);
-  return { w, h, x: clampX(x, w), y: clampY(y, h), open: saved.open ?? false };
+  return { w, h, x: clampX(x, w), y: clampY(y), open: saved.open ?? false };
 }
 
 function persist() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(geom)); } catch { /* ignore */ }
 }
 
+// The popup may sit partly off-screen, but at least this much of it must stay
+// on-screen so the header remains grabbable to drag it back. Horizontally this
+// is a strip of either side; vertically the top stays put (the header is at the
+// top, so it can never slip above the viewport) while the body may run off the
+// bottom.
+const KEEP_VISIBLE = 48;
 function vw() { return typeof window !== 'undefined' ? window.innerWidth : 1280; }
 function vh() { return typeof window !== 'undefined' ? window.innerHeight : 800; }
 function clampNum(v: number, lo: number, hi: number) { return Math.min(Math.max(v, lo), Math.max(lo, hi)); }
-function clampX(x: number, w: number) { return clampNum(x, 0, Math.max(0, vw() - w)); }
-function clampY(y: number, h: number) { return clampNum(y, 0, Math.max(0, vh() - h)); }
+function clampX(x: number, w: number) { return clampNum(x, KEEP_VISIBLE - w, vw() - KEEP_VISIBLE); }
+function clampY(y: number) { return clampNum(y, 0, vh() - KEEP_VISIBLE); }
 
 function reclamp() {
   geom.w = clampNum(geom.w, MIN_W, vw());
   geom.h = clampNum(geom.h, MIN_H, vh());
   geom.x = clampX(geom.x, geom.w);
-  geom.y = clampY(geom.y, geom.h);
+  geom.y = clampY(geom.y);
 }
 
 const popupStyle = computed(() => ({
@@ -79,7 +85,7 @@ function onDragDown(ev: PointerEvent) {
 function onDragMove(ev: PointerEvent) {
   if (!dragStart) return;
   geom.x = clampX(dragStart.ox + (ev.clientX - dragStart.px), geom.w);
-  geom.y = clampY(dragStart.oy + (ev.clientY - dragStart.py), geom.h);
+  geom.y = clampY(dragStart.oy + (ev.clientY - dragStart.py));
 }
 function onDragUp() {
   dragStart = null;

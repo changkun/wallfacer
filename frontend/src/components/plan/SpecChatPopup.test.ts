@@ -132,12 +132,26 @@ describe('SpecChatPopup geometry', () => {
     expect(win.style.height).toBe('440px');
   });
 
-  it('clamps an out-of-viewport saved position back on screen', async () => {
+  it('clamps a wildly out-of-viewport saved position to a grabbable strip', async () => {
     memStore.set(KEY, JSON.stringify({ x: 5000, y: 5000, w: 380, h: 520, open: true }));
     const { host } = await mount();
     const win = host.querySelector('.scp-window') as HTMLElement;
-    expect(win.style.left).toBe(`${1280 - 380}px`);
-    expect(win.style.top).toBe(`${800 - 520}px`);
+    // 48px of the popup stays on-screen on each axis so the header is reachable.
+    expect(win.style.left).toBe(`${1280 - 48}px`);
+    expect(win.style.top).toBe(`${800 - 48}px`);
+  });
+
+  it('lets the window be dragged partly off the left edge, keeping a grabbable strip', async () => {
+    memStore.set(KEY, JSON.stringify({ x: 200, y: 150, w: 380, h: 520, open: true }));
+    const { host } = await mount();
+    const header = host.querySelector('.scp-header') as HTMLElement;
+    header.dispatchEvent(pointer('pointerdown', 300, 250));
+    window.dispatchEvent(pointer('pointermove', -1000, 250)); // far past the left edge
+    window.dispatchEvent(pointer('pointerup', -1000, 250));
+    await nextTick();
+    const win = host.querySelector('.scp-window') as HTMLElement;
+    // x bottoms out at KEEP_VISIBLE - w = 48 - 380, leaving 48px on screen.
+    expect(win.style.left).toBe(`${48 - 380}px`);
   });
 
   it('restores persisted geometry and open state on reopen', async () => {
