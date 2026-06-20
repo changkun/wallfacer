@@ -88,10 +88,17 @@ function onDragUp() {
   persist();
 }
 
-// ── Resize (bottom-right corner) ───────────────────────────────────
-let resizeStart: { px: number; py: number; ow: number; oh: number } | null = null;
-function onResizeDown(ev: PointerEvent) {
-  resizeStart = { px: ev.clientX, py: ev.clientY, ow: geom.w, oh: geom.h };
+// ── Resize (any edge or corner) ────────────────────────────────────
+// A direction string carries a vertical (n/s) and/or horizontal (e/w) edge.
+// The e/s edges grow against a fixed top-left, so only w/h change. The n/w
+// edges keep the opposite edge pinned, so the origin (x/y) shifts as the size
+// changes.
+type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+let resizeStart:
+  | { px: number; py: number; ox: number; oy: number; ow: number; oh: number; dir: ResizeDir }
+  | null = null;
+function onResizeDown(ev: PointerEvent, dir: ResizeDir) {
+  resizeStart = { px: ev.clientX, py: ev.clientY, ox: geom.x, oy: geom.y, ow: geom.w, oh: geom.h, dir };
   window.addEventListener('pointermove', onResizeMove);
   window.addEventListener('pointerup', onResizeUp);
   ev.preventDefault();
@@ -99,8 +106,25 @@ function onResizeDown(ev: PointerEvent) {
 }
 function onResizeMove(ev: PointerEvent) {
   if (!resizeStart) return;
-  geom.w = clampNum(resizeStart.ow + (ev.clientX - resizeStart.px), MIN_W, vw() - geom.x);
-  geom.h = clampNum(resizeStart.oh + (ev.clientY - resizeStart.py), MIN_H, vh() - geom.y);
+  const { px, py, ox, oy, ow, oh, dir } = resizeStart;
+  const dx = ev.clientX - px;
+  const dy = ev.clientY - py;
+  if (dir.includes('e')) {
+    geom.w = clampNum(ow + dx, MIN_W, vw() - ox);
+  } else if (dir.includes('w')) {
+    const right = ox + ow; // pinned; dragging left grows width until it hits x=0
+    const newW = clampNum(ow - dx, MIN_W, right);
+    geom.w = newW;
+    geom.x = right - newW;
+  }
+  if (dir.includes('s')) {
+    geom.h = clampNum(oh + dy, MIN_H, vh() - oy);
+  } else if (dir.includes('n')) {
+    const bottom = oy + oh; // pinned; dragging up grows height until it hits y=0
+    const newH = clampNum(oh - dy, MIN_H, bottom);
+    geom.h = newH;
+    geom.y = bottom - newH;
+  }
 }
 function onResizeUp() {
   resizeStart = null;
@@ -210,7 +234,15 @@ defineExpose({
         @interrupt="chat.onInterrupt"
       />
 
-      <span class="scp-resize" title="Resize" @pointerdown="onResizeDown" />
+      <!-- Resize handles: 4 edges + 4 corners. -->
+      <span class="scp-rz scp-rz-n" @pointerdown="(e) => onResizeDown(e, 'n')" />
+      <span class="scp-rz scp-rz-s" @pointerdown="(e) => onResizeDown(e, 's')" />
+      <span class="scp-rz scp-rz-e" @pointerdown="(e) => onResizeDown(e, 'e')" />
+      <span class="scp-rz scp-rz-w" @pointerdown="(e) => onResizeDown(e, 'w')" />
+      <span class="scp-rz scp-rz-c scp-rz-ne" @pointerdown="(e) => onResizeDown(e, 'ne')" />
+      <span class="scp-rz scp-rz-c scp-rz-nw" @pointerdown="(e) => onResizeDown(e, 'nw')" />
+      <span class="scp-rz scp-rz-c scp-rz-sw" @pointerdown="(e) => onResizeDown(e, 'sw')" />
+      <span class="scp-rz scp-rz-c scp-rz-se" title="Resize" @pointerdown="(e) => onResizeDown(e, 'se')" />
     </section>
   </div>
 </template>
@@ -371,18 +403,27 @@ defineExpose({
 }
 .scp-iconbtn:hover { background: var(--bg-hover); color: var(--ink); }
 
-.scp-resize {
-  position: absolute;
-  right: 0;
+/* Resize handles line the edges and corners. Kept inside the frame so the
+   window's `overflow: hidden` (for the rounded corners) doesn't clip them. */
+.scp-rz { position: absolute; z-index: 2; touch-action: none; }
+.scp-rz-n { top: 0; left: 0; right: 0; height: 6px; cursor: ns-resize; }
+.scp-rz-s { bottom: 0; left: 0; right: 0; height: 6px; cursor: ns-resize; }
+.scp-rz-e { top: 0; bottom: 0; right: 0; width: 6px; cursor: ew-resize; }
+.scp-rz-w { top: 0; bottom: 0; left: 0; width: 6px; cursor: ew-resize; }
+/* Corners sit above the edges so their diagonal cursor wins on overlap. */
+.scp-rz-c { width: 14px; height: 14px; z-index: 3; }
+.scp-rz-ne { top: 0; right: 0; cursor: nesw-resize; }
+.scp-rz-nw { top: 0; left: 0; cursor: nwse-resize; }
+.scp-rz-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.scp-rz-se {
   bottom: 0;
-  width: 16px;
-  height: 16px;
+  right: 0;
   cursor: nwse-resize;
   background:
     linear-gradient(135deg, transparent 50%, var(--ink-4) 50%, var(--ink-4) 60%, transparent 60%, transparent 70%, var(--ink-4) 70%, var(--ink-4) 80%, transparent 80%);
   opacity: 0.5;
 }
-.scp-resize:hover { opacity: 0.9; }
+.scp-rz-se:hover { opacity: 0.9; }
 
 @media (prefers-reduced-motion: reduce) {
   .scp-window { animation: none; }

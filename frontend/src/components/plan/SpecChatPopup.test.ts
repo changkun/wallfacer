@@ -90,6 +90,48 @@ describe('SpecChatPopup geometry', () => {
     expect(JSON.parse(memStore.get(KEY)!).y).toBe(244);
   });
 
+  it('resizes from the east edge, keeping the top-left pinned', async () => {
+    memStore.set(KEY, JSON.stringify({ x: 200, y: 150, w: 400, h: 400, open: true }));
+    const { host } = await mount();
+    const e = host.querySelector('.scp-rz-e') as HTMLElement;
+    e.dispatchEvent(pointer('pointerdown', 600, 350));
+    window.dispatchEvent(pointer('pointermove', 660, 350)); // +60 wider
+    window.dispatchEvent(pointer('pointerup', 660, 350));
+    await nextTick();
+    const win = host.querySelector('.scp-window') as HTMLElement;
+    expect(win.style.left).toBe('200px'); // origin unchanged
+    expect(win.style.width).toBe('460px');
+    expect(JSON.parse(memStore.get(KEY)!).w).toBe(460);
+  });
+
+  it('resizes from the west edge, shifting the origin while pinning the right edge', async () => {
+    memStore.set(KEY, JSON.stringify({ x: 200, y: 150, w: 400, h: 400, open: true }));
+    const { host } = await mount();
+    const w = host.querySelector('.scp-rz-w') as HTMLElement;
+    w.dispatchEvent(pointer('pointerdown', 200, 350));
+    window.dispatchEvent(pointer('pointermove', 150, 350)); // drag left edge 50px left
+    window.dispatchEvent(pointer('pointerup', 150, 350));
+    await nextTick();
+    const win = host.querySelector('.scp-window') as HTMLElement;
+    // Right edge pinned at 600; left moves to 150, width grows to 450.
+    expect(win.style.left).toBe('150px');
+    expect(win.style.width).toBe('450px');
+  });
+
+  it('resizes from the north edge, shifting y while pinning the bottom edge', async () => {
+    memStore.set(KEY, JSON.stringify({ x: 200, y: 150, w: 400, h: 400, open: true }));
+    const { host } = await mount();
+    const n = host.querySelector('.scp-rz-n') as HTMLElement;
+    n.dispatchEvent(pointer('pointerdown', 400, 150));
+    window.dispatchEvent(pointer('pointermove', 400, 110)); // drag top edge 40px up
+    window.dispatchEvent(pointer('pointerup', 400, 110));
+    await nextTick();
+    const win = host.querySelector('.scp-window') as HTMLElement;
+    // Bottom edge pinned at 550; top moves to 110, height grows to 440.
+    expect(win.style.top).toBe('110px');
+    expect(win.style.height).toBe('440px');
+  });
+
   it('clamps an out-of-viewport saved position back on screen', async () => {
     memStore.set(KEY, JSON.stringify({ x: 5000, y: 5000, w: 380, h: 520, open: true }));
     const { host } = await mount();
