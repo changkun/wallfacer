@@ -81,10 +81,18 @@ describe('ChatMessageList — trajectory placement', () => {
     expect(host.querySelector('details.pcp-activity')!.hasAttribute('open')).toBe(false);
   });
 
-  it('shows a live, open "Working…" disclosure while streaming', () => {
+  it('shows a live, open, freeform "Working…" trajectory while streaming', () => {
     mount([assistant({ isStreaming: true, contentHtml: '' })]);
     const details = host.querySelector('details.pcp-activity')!;
     expect(details.hasAttribute('open')).toBe(true);
+    // The freeform (boxless) live mode is signalled by the --live modifier.
+    expect(details.classList.contains('pcp-activity--live')).toBe(true);
     expect(host.querySelector('.pcp-activity-title')!.textContent).toBe('Working…');
+  });
+
+  it('drops the --live modifier once the turn has finished', () => {
+    mount([assistant({ isStreaming: false })]);
+    const details = host.querySelector('details.pcp-activity')!;
+    expect(details.classList.contains('pcp-activity--live')).toBe(false);
   });
 });

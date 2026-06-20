@@ -37,9 +37,15 @@ const s = props.session;
           </div>
           <div class="pcp-agent-body">
             <div v-if="m.errorText" class="pcp-bubble-error">{{ m.errorText }}</div>
-            <!-- Trajectory leads the answer: live & open while streaming, then
-                 collapsed into an informative one-liner above the prose. -->
-            <details v-if="m.hasActivity" class="pcp-activity" :open="m.isStreaming">
+            <!-- Trajectory leads the answer: while streaming, the steps render
+                 freeform inline (no enclosing box); once the turn finishes the
+                 whole trajectory folds into an informative one-liner. -->
+            <details
+              v-if="m.hasActivity"
+              class="pcp-activity"
+              :class="{ 'pcp-activity--live': m.isStreaming }"
+              :open="m.isStreaming"
+            >
               <summary>
                 <span class="pcp-activity-title">{{
                   m.isStreaming ? 'Working…' : activitySummary(m.activity)
