@@ -321,6 +321,36 @@ func (m *ThreadManager) Unarchive(id string) error {
 	return ErrThreadNotFound
 }
 
+// Delete permanently removes a thread: its manifest entry and its on-disk
+// conversation directory. Only archived threads may be deleted, so a visible
+// or in-flight thread cannot be destroyed out from under a running turn. The
+// manifest entry is dropped first so a later failure to remove the directory
+// still hides the thread from the UI.
+func (m *ThreadManager) Delete(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	idx := -1
+	for i := range m.manifest.Threads {
+		if m.manifest.Threads[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return ErrThreadNotFound
+	}
+	if !m.manifest.Threads[idx].Archived {
+		return ErrThreadNotArchived
+	}
+	m.manifest.Threads = append(m.manifest.Threads[:idx], m.manifest.Threads[idx+1:]...)
+	if err := m.writeManifest(); err != nil {
+		return err
+	}
+	delete(m.stores, id)
+	_ = os.RemoveAll(m.threadDir(id))
+	return nil
+}
+
 // CascadeArchiveForTask archives every non-archived task-mode thread whose
 // pinned task matches taskID, setting AutoArchivedByTaskLifecycle=true on
 // each. Returns the list of thread IDs that were archived.
@@ -497,6 +527,10 @@ func (m *ThreadManager) Touch(id string) {
 
 // ErrThreadNotFound is returned for any operation on an unknown thread ID.
 var ErrThreadNotFound = errors.New("thread: not found")
+
+// ErrThreadNotArchived is returned by Delete when the target thread is still
+// visible; only archived threads may be permanently deleted.
+var ErrThreadNotArchived = errors.New("thread: not archived")
 
 // --- internal helpers ----------------------------------------------------
 

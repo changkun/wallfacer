@@ -7,6 +7,55 @@ import (
 	"testing"
 )
 
+func TestThreadManager_Delete(t *testing.T) {
+	root := t.TempDir()
+	tm, err := NewThreadManager(root)
+	if err != nil {
+		t.Fatalf("NewThreadManager: %v", err)
+	}
+	meta, err := tm.Create("Doomed")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	// Touch the conversation so the thread has an on-disk directory.
+	cs, err := tm.Store(meta.ID)
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if err := cs.AppendMessage(Message{Role: "user", Content: "hi"}); err != nil {
+		t.Fatalf("AppendMessage: %v", err)
+	}
+	dir := tm.threadDir(meta.ID)
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("thread dir should exist: %v", err)
+	}
+
+	// A visible thread cannot be deleted.
+	if err := tm.Delete(meta.ID); err != ErrThreadNotArchived {
+		t.Fatalf("Delete(visible) = %v, want ErrThreadNotArchived", err)
+	}
+
+	if err := tm.Archive(meta.ID); err != nil {
+		t.Fatalf("Archive: %v", err)
+	}
+	if err := tm.Delete(meta.ID); err != nil {
+		t.Fatalf("Delete(archived): %v", err)
+	}
+	// Gone from the manifest (including the archived view) and from disk.
+	for _, m := range tm.List(true) {
+		if m.ID == meta.ID {
+			t.Error("deleted thread still present in manifest")
+		}
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("thread dir should be removed, stat err = %v", err)
+	}
+	// Deleting a missing thread reports not found.
+	if err := tm.Delete("nope"); err != ErrThreadNotFound {
+		t.Errorf("Delete(missing) = %v, want ErrThreadNotFound", err)
+	}
+}
+
 func TestThreadManager_CreateRenameArchive(t *testing.T) {
 	tm, err := NewThreadManager(t.TempDir())
 	if err != nil {

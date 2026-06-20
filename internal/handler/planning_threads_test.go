@@ -116,6 +116,83 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	}
 }
 
+func TestDeletePlanningThread(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+
+	// Create a thread to delete.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
+		strings.NewReader(`{"name":"Doomed"}`))
+	h.CreatePlanningThread(rec, req)
+	var created map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	id := created["id"].(string)
+
+	del := func() *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodDelete, "/api/planning/threads/"+id, nil)
+		req.SetPathValue("id", id)
+		h.DeletePlanningThread(rec, req)
+		return rec
+	}
+
+	// A visible thread cannot be deleted (must archive first).
+	if rec := del(); rec.Code != http.StatusConflict {
+		t.Fatalf("delete(visible) status = %d, want 409: %s", rec.Code, rec.Body.String())
+	}
+
+	// Archive, then delete succeeds with 204.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
+		strings.NewReader(`{"state":"archived"}`))
+	req.SetPathValue("id", id)
+	h.PatchPlanningThread(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d", rec.Code)
+	}
+	if rec := del(); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete(archived) status = %d, want 204: %s", rec.Code, rec.Body.String())
+	}
+
+	// Gone even from the includeArchived listing.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/planning/threads?includeArchived=true", nil)
+	h.ListPlanningThreads(rec, req)
+	if strings.Contains(rec.Body.String(), id) {
+		t.Errorf("deleted thread still listed: %s", rec.Body.String())
+	}
+
+	// Deleting again is a 404.
+	if rec := del(); rec.Code != http.StatusNotFound {
+		t.Errorf("delete(missing) status = %d, want 404", rec.Code)
+	}
+}
+
+func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	// Archive a thread so it is deletable, then mark it busy.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
+		strings.NewReader(`{"name":"Busy"}`))
+	h.CreatePlanningThread(rec, req)
+	var created map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	id := created["id"].(string)
+	if err := h.planner.Threads().Archive(id); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	h.planner.SetBusy(true, id)
+	defer h.planner.SetBusy(false, "")
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodDelete, "/api/planning/threads/"+id, nil)
+	req.SetPathValue("id", id)
+	h.DeletePlanningThread(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (busy)", rec.Code)
+	}
+}
+
 func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
 	threads := h.planner.Threads().List(false)

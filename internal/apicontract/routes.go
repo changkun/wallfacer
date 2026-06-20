@@ -346,6 +346,12 @@ var Routes = []Route{
 		Description: "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
 		Tags:        []string{"planning"},
 	},
+	{
+		Method: http.MethodDelete, Pattern: "/api/planning/threads/{id}", Name: "DeletePlanningThread",
+		JSName:      "deleteThread",
+		Description: "Permanently delete an archived planning chat thread and its stored conversation.",
+		Tags:        []string{"planning"},
+	},
 
 	// --- Environment configuration ---
 
