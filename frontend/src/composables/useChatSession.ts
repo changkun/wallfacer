@@ -61,6 +61,7 @@ export interface ChatSession {
   switchToThread: (id: string) => Promise<void>;
   archiveThread: (id: string) => Promise<void>;
   unarchiveThread: (id: string) => Promise<void>;
+  deleteThread: (id: string) => Promise<void>;
   renamingId: Ref<string>;
   renameDraft: Ref<string>;
   startRename: (id: string) => void;
@@ -554,6 +555,34 @@ export function useChatSession(): ChatSession {
     }
   }
 
+  async function deleteThread(id: string) {
+    const ok = await dialog.confirm({
+      title: 'Delete session',
+      message: 'Permanently delete this archived session and its history? This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const res = await fetch('/api/planning/threads/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      });
+      if (res.status === 409) {
+        appendSystem('Session is busy — interrupt it before deleting.');
+        return;
+      }
+      if (!res.ok && res.status !== 204) {
+        appendSystem('Delete failed: HTTP ' + res.status);
+        return;
+      }
+      await planning.loadThreads();
+    } catch (e) {
+      appendSystem('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
   // ── Per-bubble undo ────────────────────────────────────────────────
 
   const latestRound = computed(() => {
@@ -657,7 +686,7 @@ export function useChatSession(): ChatSession {
     renderedMessages, streaming, interruptedAt, messagesEl, userScrolledUp, latestRound,
     loadHistory, sendMessage, onInterrupt, clearHistory, appendSystem, onScroll, undoRound,
     currentQueue, editingQueueId, editQueueDraft, removeFromQueue, startQueueEdit, commitQueueEdit, cancelQueueEdit,
-    createThread, switchToThread, archiveThread, unarchiveThread,
+    createThread, switchToThread, archiveThread, unarchiveThread, deleteThread,
     renamingId, renameDraft, startRename, commitRename, cancelRename, archiveMenuOpen,
   };
 }
