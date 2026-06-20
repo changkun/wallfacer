@@ -550,7 +550,10 @@ function onInput(e: Event) {
 .composer__tag-x:hover { color: var(--text); }
 .composer__tag-input { flex: 1; min-width: 60px; background: none; border: none; outline: none; color: var(--text); font-size: 12px; }
 .composer__select:focus,
-.composer__input:focus { border-color: var(--accent); }
+.composer__input:focus {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
+}
 .composer__more {
   background: none;
   border: none;

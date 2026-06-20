@@ -20,7 +20,8 @@ textarea.field {
   color: var(--text-muted);
 }
 .field:focus {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 #new-prompt {
   font-family: inherit;
@@ -39,5 +40,6 @@ textarea.field {
   max-width: 160px;
 }
 .select:focus {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
 }

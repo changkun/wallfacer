@@ -24,7 +24,8 @@
 
 .pcp-textarea:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 
 .pcp-dropdown {
@@ -161,12 +162,13 @@
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-/* Ember focus ring — the composer lights up warm when active. */
+/* Ember focus glow — the composer warms up when active. A soft, diffuse
+   shadow rather than a hard accent ring, so the edge stays gentle. */
 .pcp-composer--hero:focus-within,
 .pcp-composer--docked:focus-within {
-  border-color: color-mix(in oklab, var(--accent) 55%, var(--rule));
-  box-shadow: 0 4px 22px color-mix(in oklab, var(--accent) 16%, transparent),
-              0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 25%, var(--rule));
+  box-shadow: 0 8px 30px color-mix(in oklab, var(--accent) 15%, transparent),
+              0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .pcp-composer--hero .pcp-textarea,
