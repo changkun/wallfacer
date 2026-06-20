@@ -2,7 +2,9 @@
 // SessionList — the vertical session sub-sidebar for the dedicated Chat view.
 // Renders the workspace group's planning threads as the "sessions" of this
 // surface (the same threads the legacy panel showed as tabs), with active
-// highlight, unread dots, inline rename, archive, and an archived overflow.
+// highlight, unread dots, inline rename, archive, a running spinner, and an
+// archived overflow.
+import { onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlanningStore } from '../../stores/planning';
 import type { ChatSession } from '../../composables/useChatSession';
@@ -11,7 +13,29 @@ const props = defineProps<{ session: ChatSession }>();
 const s = props.session;
 
 const planning = usePlanningStore();
-const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(planning);
+const {
+  threads, threadOrder, archivedThreads, activeThreadId,
+  streaming, streamingThreadId, busyThreadId,
+} = storeToRefs(planning);
+
+// A session shows a spinner while an agent turn is in flight on it. busyThreadId
+// is the server's truth (so a session running in the background still spins
+// while you view another); streamingThreadId gives instant local feedback for
+// the session you just sent to, before the next poll lands.
+function isRunning(id: string): boolean {
+  return id === busyThreadId.value || (streaming.value && id === streamingThreadId.value);
+}
+
+// Poll the server's busy thread on a light interval so background activity is
+// reflected without disturbing the thread list or active selection.
+let busyTimer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  void planning.refreshBusy();
+  busyTimer = setInterval(() => void planning.refreshBusy(), 3000);
+});
+onUnmounted(() => {
+  if (busyTimer !== null) clearInterval(busyTimer);
+});
 </script>
 
 <template>
@@ -52,7 +76,14 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
         />
         <template v-else>
           <span class="chat-session-name">{{ threads[id]?.name }}</span>
-          <span v-if="id !== activeThreadId && threads[id]?.unread" class="chat-session-unread" />
+          <span
+            v-if="isRunning(id)"
+            class="chat-session-spinner"
+            role="status"
+            aria-label="Agent running"
+            title="Agent running"
+          />
+          <span v-else-if="id !== activeThreadId && threads[id]?.unread" class="chat-session-unread" />
           <span class="chat-session-actions">
             <button
               type="button"
@@ -208,6 +239,24 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
   border-radius: 50%;
   background: var(--accent);
   flex-shrink: 0;
+}
+
+.chat-session-spinner {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  animation: chat-session-spin 0.7s linear infinite;
+}
+
+@keyframes chat-session-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-session-spinner { animation-duration: 2s; }
 }
 
 .chat-session-actions {

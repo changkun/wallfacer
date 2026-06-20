@@ -87,6 +87,10 @@ export const usePlanningStore = defineStore('planning', () => {
 
   const streaming = ref(false);
   const streamingThreadId = ref<string>('');
+  // Thread the server reports as having an in-flight agent turn. Refreshed by a
+  // light poll so the session list can show a spinner on a session that is
+  // working in the background, even while the user views another one.
+  const busyThreadId = ref<string>('');
 
   const sortedNodes = computed(() =>
     [...tree.value].sort((a, b) => a.path.localeCompare(b.path)),
@@ -240,6 +244,22 @@ export const usePlanningStore = defineStore('planning', () => {
       task_id?: string;
     }>;
     active_id?: string;
+    busy_thread_id?: string;
+  }
+
+  // refreshBusy updates only busyThreadId from the threads endpoint, leaving the
+  // thread list and active selection untouched. Safe to poll on an interval
+  // (unlike loadThreads, which reassigns activeThreadId and reloads history).
+  async function refreshBusy() {
+    try {
+      const res = await api<ThreadListResponse>(
+        'GET',
+        '/api/planning/threads?includeArchived=true',
+      );
+      busyThreadId.value = res.busy_thread_id ?? '';
+    } catch {
+      /* ignore transient poll failures */
+    }
   }
 
   async function loadThreads() {
@@ -275,6 +295,7 @@ export const usePlanningStore = defineStore('planning', () => {
       archivedThreads.value = archived;
       const wantActive = res.active_id ?? order[0] ?? '';
       activeThreadId.value = wantActive in next ? wantActive : (order[0] ?? '');
+      busyThreadId.value = res.busy_thread_id ?? '';
     } catch (e) {
       console.error('planning threads:', e);
     }
@@ -289,10 +310,10 @@ export const usePlanningStore = defineStore('planning', () => {
     focusedSpecPath, focusedIsIndex,
     focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
     threads, threadOrder, archivedThreads, activeThreadId,
-    streaming, streamingThreadId,
+    streaming, streamingThreadId, busyThreadId,
     sortedNodes, nodesByPath, focusedNode,
     applyTree, fetchTree, focusSpec, focusIndex, clearFocus,
     openPlanForTask,
-    loadThreads, activeThread,
+    loadThreads, refreshBusy, activeThread,
   };
 });
