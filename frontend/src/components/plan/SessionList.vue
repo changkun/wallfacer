@@ -85,13 +85,29 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
         Archived ({{ archivedThreads.length }}) <span>{{ s.archiveMenuOpen.value ? '▾' : '▸' }}</span>
       </button>
       <div v-if="s.archiveMenuOpen.value" class="chat-sessions-archived-list">
-        <button
+        <div
           v-for="t in archivedThreads"
           :key="t.id"
-          type="button"
-          class="chat-sessions-archived-item"
-          @click="s.unarchiveThread(t.id)"
-        >{{ t.name }}</button>
+          class="chat-sessions-archived-row"
+        >
+          <button
+            type="button"
+            class="chat-sessions-archived-item"
+            title="Restore session"
+            @click="s.unarchiveThread(t.id)"
+          >{{ t.name }}</button>
+          <button
+            type="button"
+            class="chat-sessions-archived-delete"
+            title="Delete permanently"
+            aria-label="Delete session permanently"
+            @click="s.deleteThread(t.id)"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </aside>
@@ -257,9 +273,20 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
   flex-direction: column;
 }
 
+.chat-sessions-archived-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-sm);
+}
+
+.chat-sessions-archived-row:hover {
+  background: var(--bg-hover);
+}
+
 .chat-sessions-archived-item {
+  flex: 1;
+  min-width: 0;
   display: block;
-  width: 100%;
   padding: 6px 10px;
   font-size: 12px;
   text-align: left;
@@ -267,11 +294,31 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
   border: none;
   color: var(--ink-2);
   cursor: pointer;
-  border-radius: var(--r-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.chat-sessions-archived-item:hover {
-  background: var(--bg-hover);
+.chat-sessions-archived-row:hover .chat-sessions-archived-item {
   color: var(--ink);
+}
+
+.chat-sessions-archived-delete {
+  display: none;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+
+.chat-sessions-archived-row:hover .chat-sessions-archived-delete {
+  display: inline-flex;
+}
+
+.chat-sessions-archived-delete:hover {
+  color: var(--danger, #c0392b);
 }
 </style>
