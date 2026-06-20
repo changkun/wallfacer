@@ -64,8 +64,13 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
               type="button"
               class="chat-session-btn"
               title="Archive session"
+              aria-label="Archive session"
               @click.stop="s.archiveThread(id)"
-            >×</button>
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              </svg>
+            </button>
           </span>
         </template>
       </div>
@@ -199,6 +204,8 @@ const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(pl
 }
 
 .chat-session-btn {
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: none;
   cursor: pointer;
