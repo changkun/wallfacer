@@ -51,6 +51,31 @@ func TestListPlanningThreads_DefaultChat1(t *testing.T) {
 	}
 }
 
+func TestListPlanningThreads_BusyThreadID(t *testing.T) {
+	h := newPlannerHandlerWithThreads(t)
+	id := h.planner.Threads().List(false)[0].ID
+
+	get := func() string {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
+		h.ListPlanningThreads(rec, req)
+		var resp struct {
+			BusyThreadID string `json:"busy_thread_id"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+		return resp.BusyThreadID
+	}
+
+	if got := get(); got != "" {
+		t.Errorf("idle busy_thread_id = %q, want empty", got)
+	}
+	h.planner.SetBusy(true, id)
+	defer h.planner.SetBusy(false, "")
+	if got := get(); got != id {
+		t.Errorf("busy_thread_id = %q, want %q", got, id)
+	}
+}
+
 func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
 
