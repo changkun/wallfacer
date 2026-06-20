@@ -113,7 +113,11 @@ function remainingDays(task: Task): string {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" @click.self="close">
+    <div
+      v-if="modelValue"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="close"
+    >
       <div class="trash-modal" role="dialog" aria-label="Trash">
         <header class="trash-modal__head">
           <div class="trash-modal__heading">
