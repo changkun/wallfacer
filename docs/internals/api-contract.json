@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 111,
+  "route_count": 112,
   "routes": [
     {
       "method": "GET",
@@ -414,6 +414,15 @@
       "pattern": "/api/planning/threads/{id}",
       "name": "PatchPlanningThread",
       "description": "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/planning/threads/{id}",
+      "name": "DeletePlanningThread",
+      "description": "Permanently delete an archived planning chat thread and its stored conversation.",
       "tags": [
         "planning"
       ]

@@ -1010,6 +1010,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ListPlanningThreads":  h.ListPlanningThreads,
 		"CreatePlanningThread": h.CreatePlanningThread,
 		"PatchPlanningThread":  h.PatchPlanningThread,
+		"DeletePlanningThread": h.DeletePlanningThread,
 
 		// Environment configuration.
 		"GetEnvConfig":    h.GetEnvConfig,

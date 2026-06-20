@@ -135,11 +135,14 @@ func threadMode(tm *planner.ThreadManager, id string) (mode, taskID string) {
 
 // writeThreadErr maps a ThreadManager error to an HTTP status code.
 func writeThreadErr(w http.ResponseWriter, err error) {
-	if errors.Is(err, planner.ErrThreadNotFound) {
+	switch {
+	case errors.Is(err, planner.ErrThreadNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+	case errors.Is(err, planner.ErrThreadNotArchived):
+		http.Error(w, err.Error(), http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 // ListPlanningThreads returns the set of planning chat threads for the
@@ -272,6 +275,30 @@ func (h *Handler) PatchPlanningThread(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "body must set name or state (archived|visible|active)", http.StatusBadRequest)
 	}
+}
+
+// DeletePlanningThread permanently removes an archived thread and its stored
+// conversation. A visible thread must be archived first (409), and a thread
+// with an in-flight turn cannot be deleted (409).
+func (h *Handler) DeletePlanningThread(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	tm := h.threadsManager()
+	if tm == nil {
+		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		return
+	}
+	id := r.PathValue("id")
+	if h.planner != nil && h.planner.BusyThreadID() == id {
+		httpjson.Write(w, http.StatusConflict, map[string]any{"error": "thread is busy; interrupt or wait before deleting"})
+		return
+	}
+	if err := tm.Delete(id); err != nil {
+		writeThreadErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // writeThreadSummary refreshes a thread's meta and writes its summary as
