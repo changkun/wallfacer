@@ -4,7 +4,7 @@
 // as full-width prose; user turns are right-aligned high-contrast pills. Pure
 // presentation over a ChatSession; mounted by the Chat view, the docked panel,
 // and the spec-mode popup alike.
-import { activityIcon } from '../../lib/planningBubble';
+import { activityIcon, activitySummary } from '../../lib/planningBubble';
 import BrandMark from '../BrandMark.vue';
 import type { ChatSession } from '../../composables/useChatSession';
 
@@ -37,14 +37,14 @@ const s = props.session;
           </div>
           <div class="pcp-agent-body">
             <div v-if="m.errorText" class="pcp-bubble-error">{{ m.errorText }}</div>
-            <div
-              v-if="m.contentHtml"
-              class="pcp-bubble-content prose-content"
-              v-html="m.contentHtml"
-            />
-            <div v-else-if="m.isStreaming" class="pcp-thinking"><i></i><i></i><i></i></div>
+            <!-- Trajectory leads the answer: live & open while streaming, then
+                 collapsed into an informative one-liner above the prose. -->
             <details v-if="m.hasActivity" class="pcp-activity" :open="m.isStreaming">
-              <summary>Agent activity</summary>
+              <summary>
+                <span class="pcp-activity-title">{{
+                  m.isStreaming ? 'Working…' : activitySummary(m.activity)
+                }}</span>
+              </summary>
               <div class="pcp-activity-log">
                 <div
                   v-for="(row, ri) in m.activity"
@@ -62,6 +62,12 @@ const s = props.session;
                 </div>
               </div>
             </details>
+            <div
+              v-if="m.contentHtml"
+              class="pcp-bubble-content prose-content"
+              v-html="m.contentHtml"
+            />
+            <div v-else-if="m.isStreaming" class="pcp-thinking"><i></i><i></i><i></i></div>
             <div v-if="m.planRound > 0 && !m.reverted" class="pcp-turn-actions">
               <button
                 type="button"
