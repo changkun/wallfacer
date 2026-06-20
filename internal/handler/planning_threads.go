@@ -164,9 +164,14 @@ func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
 		mode, taskID := threadMode(tm, m.ID)
 		out = append(out, toThreadSummary(m, activeID, mode, taskID))
 	}
+	busyID := ""
+	if h.planner != nil {
+		busyID = h.planner.BusyThreadID()
+	}
 	httpjson.Write(w, http.StatusOK, map[string]any{
-		"threads":   out,
-		"active_id": activeID,
+		"threads":        out,
+		"active_id":      activeID,
+		"busy_thread_id": busyID,
 	})
 }
 
