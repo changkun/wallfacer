@@ -12,6 +12,7 @@ import DockWorkspace from '../components/DockWorkspace.vue';
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import Toaster from '../components/Toaster.vue';
+import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -28,6 +29,12 @@ const router = useRouter();
 const SIDEBAR_KEY = 'wallfacer-sidebar-collapsed';
 const sidebarCollapsed = ref<boolean>(getStored(SIDEBAR_KEY) === '1');
 watch(sidebarCollapsed, (v) => setStored(SIDEBAR_KEY, v ? '1' : '0'));
+
+// The floating planning-chat popup is available app-wide so chat can be
+// triggered from any tab (board, agents, flows, …). The Plan view owns its own
+// chat surface, so the global popup stands down there to avoid two chat
+// sessions racing on the shared planning store.
+const showChatPopup = computed(() => !router.currentRoute.value.path.startsWith('/plan'));
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
@@ -148,6 +155,7 @@ useKeyboard({
     <KeyboardShortcutsModal v-model="ui.showShortcuts" />
     <ConfirmDialog />
     <Toaster />
+    <SpecChatPopup v-if="showChatPopup" />
   </div>
 </template>
 
