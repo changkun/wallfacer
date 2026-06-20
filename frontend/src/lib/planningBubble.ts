@@ -99,6 +99,31 @@ export function activityIcon(kind: ActivityRow['kind']): string {
   }
 }
 
+// Tool labels to show in a collapsed activity summary before eliding the rest.
+const SUMMARY_TOOL_CAP = 4;
+
+/**
+ * One-line summary of a finished agent trajectory, shown on the collapsed
+ * activity disclosure (e.g. "6 steps · Read ×3, Edit, Bash"). Steps count tool
+ * calls and thinking blocks — the actual work — not text/result narration,
+ * which is already echoed in the answer prose. Tool names are tallied and
+ * capped so a long run stays one tidy line. Falls back to a generic label for a
+ * turn that produced only narration.
+ */
+export function activitySummary(activity: ActivityRow[]): string {
+  const steps = activity.filter((r) => r.kind === 'tool' || r.kind === 'thinking').length;
+  if (steps === 0) return 'Agent activity';
+  const counts = new Map<string, number>();
+  for (const r of activity) {
+    if (r.kind === 'tool') counts.set(r.label, (counts.get(r.label) ?? 0) + 1);
+  }
+  const names = [...counts.entries()].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name));
+  const shown = names.slice(0, SUMMARY_TOOL_CAP);
+  if (names.length > shown.length) shown.push('…');
+  const stepLabel = steps === 1 ? '1 step' : `${steps} steps`;
+  return shown.length ? `${stepLabel} · ${shown.join(', ')}` : stepLabel;
+}
+
 export function bubbleFromMessage(m: PlanningMessage): RenderedBubble {
   if (m.role === 'assistant') {
     if (m.raw_output) {

@@ -206,8 +206,10 @@
 
 /* ── Agent activity ────────────────────────────────────────────────── */
 
+/* The trajectory leads the answer, so it sits above the prose and keeps a
+   bottom gap rather than a top one. */
 .pcp-activity {
-  margin-top: 8px;
+  margin-bottom: 8px;
   font-size: 12px;
 }
 
@@ -216,6 +218,17 @@
   color: var(--ink-3);
   user-select: none;
   padding: 2px 0;
+}
+
+/* Collapsed-summary one-liner: a count plus the tools touched, dimmed so it
+   reads as meta about the turn, not part of the answer. */
+.pcp-activity-title {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pcp-activity[open] > summary .pcp-activity-title {
+  color: var(--ink-2);
 }
 
 .pcp-activity-log {

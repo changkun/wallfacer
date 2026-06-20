@@ -4,10 +4,12 @@ import {
   extractAssistantText,
   extractError,
   activityIcon,
+  activitySummary,
   bubbleFromMessage,
   applyStreamingUpdate,
   type RenderedBubble,
 } from './planningBubble';
+import type { ActivityRow } from './prettyNdjson';
 
 describe('applyStreamingUpdate', () => {
   const mk = (id: string, rawText: string): RenderedBubble => ({
@@ -101,6 +103,41 @@ describe('activityIcon', () => {
   it('falls back to bullet for unknown', () => {
     // @ts-expect-error — exercising the default branch
     expect(activityIcon('whatever')).toBe('·');
+  });
+});
+
+describe('activitySummary', () => {
+  const row = (kind: ActivityRow['kind'], label: string): ActivityRow => ({ kind, label });
+
+  it('counts tool + thinking as steps and tallies tool names', () => {
+    const activity = [
+      row('tool', 'Read'),
+      row('tool_result', 'result'),
+      row('tool', 'Read'),
+      row('tool_result', 'result'),
+      row('thinking', 'thinking'),
+      row('tool', 'Bash'),
+    ];
+    // 3 tools + 1 thinking = 4 steps; tool_result rows are not steps.
+    expect(activitySummary(activity)).toBe('4 steps · Read ×2, Bash');
+  });
+
+  it('uses the singular for a single step', () => {
+    expect(activitySummary([row('tool', 'Edit')])).toBe('1 step · Edit');
+  });
+
+  it('caps the tool list and elides the rest', () => {
+    const activity = ['Read', 'Edit', 'Bash', 'Grep', 'Glob', 'Write'].map((n) => row('tool', n));
+    expect(activitySummary(activity)).toBe('6 steps · Read, Edit, Bash, Grep, …');
+  });
+
+  it('falls back to a generic label when a turn is only narration', () => {
+    const activity = [row('system', 'text'), row('system', 'result')];
+    expect(activitySummary(activity)).toBe('Agent activity');
+  });
+
+  it('handles a thinking-only turn without listing tools', () => {
+    expect(activitySummary([row('thinking', 'thinking')])).toBe('1 step');
   });
 });
 
