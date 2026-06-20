@@ -19,6 +19,17 @@ const activeId = ref<string>('');
 let observer: IntersectionObserver | null = null;
 let idSeq = 0;
 
+// Collapsed state persists so hiding the TOC sticks across specs and reloads.
+const COLLAPSE_KEY = 'wallfacer-spec-toc-collapsed';
+const collapsed = ref(loadCollapsed());
+function loadCollapsed(): boolean {
+  try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
+}
+function setCollapsed(v: boolean) {
+  collapsed.value = v;
+  try { localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+}
+
 function rebuild() {
   observer?.disconnect();
   observer = null;
@@ -73,18 +84,38 @@ function jumpTo(ev: Event, id: string) {
 </script>
 
 <template>
-  <nav v-if="entries.length > 0" class="floating-toc" aria-label="On this page">
-    <div class="floating-toc__title">Contents</div>
-    <a
-      v-for="e in entries"
-      :key="e.id"
-      :href="'#' + e.id"
-      class="floating-toc__entry"
-      :class="['floating-toc__entry--l' + e.level, { 'floating-toc__entry--active': e.id === activeId }]"
-      :title="e.text"
-      @click="jumpTo($event, e.id)"
-    >{{ e.text }}</a>
-  </nav>
+  <template v-if="entries.length > 0">
+    <!-- Collapsed: a small tab that brings the TOC back. -->
+    <button
+      v-if="collapsed"
+      type="button"
+      class="floating-toc__reveal"
+      title="Show contents"
+      aria-label="Show contents"
+      @click="setCollapsed(false)"
+    >☰</button>
+    <nav v-else class="floating-toc" aria-label="On this page">
+      <div class="floating-toc__head">
+        <span class="floating-toc__title">Contents</span>
+        <button
+          type="button"
+          class="floating-toc__collapse"
+          title="Hide contents"
+          aria-label="Hide contents"
+          @click="setCollapsed(true)"
+        >×</button>
+      </div>
+      <a
+        v-for="e in entries"
+        :key="e.id"
+        :href="'#' + e.id"
+        class="floating-toc__entry"
+        :class="['floating-toc__entry--l' + e.level, { 'floating-toc__entry--active': e.id === activeId }]"
+        :title="e.text"
+        @click="jumpTo($event, e.id)"
+      >{{ e.text }}</a>
+    </nav>
+  </template>
 </template>
 
 <style scoped>
@@ -111,14 +142,53 @@ function jumpTo(ev: Event, id: string) {
 
 .floating-toc:hover { opacity: 1; }
 
+.floating-toc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
 .floating-toc__title {
   font-weight: 600;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--ink-3);
-  margin-bottom: 4px;
 }
+
+.floating-toc__collapse {
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+.floating-toc__collapse:hover { color: var(--ink); background: var(--bg-hover); }
+
+/* Collapsed tab: same top-right anchor as the panel, shrunk to an icon. */
+.floating-toc__reveal {
+  position: absolute;
+  top: 72px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--ink-3);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.85;
+  z-index: 2;
+}
+.floating-toc__reveal:hover { opacity: 1; color: var(--ink); }
 
 .floating-toc__entry {
   display: block;
@@ -144,6 +214,7 @@ function jumpTo(ev: Event, id: string) {
 }
 
 @media (max-width: 1100px) {
-  .floating-toc { display: none; }
+  .floating-toc,
+  .floating-toc__reveal { display: none; }
 }
 </style>
