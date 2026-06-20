@@ -247,6 +247,30 @@
   gap: 3px;
 }
 
+/* Live (streaming): the steps render freeform inline — no enclosing box, no
+   inner scroll — like Claude/Codex, flowing with the conversation. They fold
+   into the boxed, collapsed summary only once the turn finishes. The "Working…"
+   header reads as a label, so its disclosure marker is hidden. */
+.pcp-activity--live > summary {
+  list-style: none;
+}
+.pcp-activity--live > summary::-webkit-details-marker {
+  display: none;
+}
+.pcp-activity--live > summary .pcp-activity-title {
+  font-style: italic;
+}
+.pcp-activity--live .pcp-activity-log {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-top: 6px;
+  max-height: none;
+  overflow: visible;
+  gap: 6px;
+}
+
 .pcp-activity-row {
   display: grid;
   grid-template-columns: 14px auto 1fr;
