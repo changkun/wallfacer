@@ -31,10 +31,13 @@ const sidebarCollapsed = ref<boolean>(getStored(SIDEBAR_KEY) === '1');
 watch(sidebarCollapsed, (v) => setStored(SIDEBAR_KEY, v ? '1' : '0'));
 
 // The floating planning-chat popup is available app-wide so chat can be
-// triggered from any tab (board, agents, flows, …). The Plan view owns its own
-// chat surface, so the global popup stands down there to avoid two chat
-// sessions racing on the shared planning store.
-const showChatPopup = computed(() => !router.currentRoute.value.path.startsWith('/plan'));
+// triggered from any tab (board, agents, flows, …). The dedicated Chat tab and
+// the Plan view own their own chat surface, so the global popup stands down on
+// those routes to avoid two chat sessions racing on the shared planning store.
+const CHAT_OWNING_ROUTES = ['/chat', '/plan'];
+const showChatPopup = computed(() =>
+  !CHAT_OWNING_ROUTES.some((p) => router.currentRoute.value.path.startsWith(p)),
+);
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
