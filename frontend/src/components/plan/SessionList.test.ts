@@ -49,14 +49,18 @@ async function mount() {
 beforeEach(() => { document.body.innerHTML = ''; });
 afterEach(() => { app?.unmount(); app = null; document.body.innerHTML = ''; });
 
+function rowFor(name: string): Element | undefined {
+  return [...host.querySelectorAll('.chat-session-row')].find(
+    (r) => r.querySelector('.chat-session-name')?.textContent === name,
+  );
+}
+
 describe('SessionList running spinner', () => {
   it('shows a spinner only on the busy session', async () => {
     await mount();
-    const rows = host.querySelectorAll('.chat-session-row');
-    expect(rows).toHaveLength(2);
-    // Row order matches threadOrder [a, b]; b is the busy one.
-    expect(rows[0].querySelector('.chat-session-spinner')).toBeNull();
-    expect(rows[1].querySelector('.chat-session-spinner')).not.toBeNull();
+    expect(host.querySelectorAll('.chat-session-row')).toHaveLength(2);
+    expect(rowFor('Alpha')!.querySelector('.chat-session-spinner')).toBeNull();
+    expect(rowFor('Beta')!.querySelector('.chat-session-spinner')).not.toBeNull();
   });
 
   it('spins the locally-streaming thread immediately', async () => {
@@ -64,7 +68,28 @@ describe('SessionList running spinner', () => {
     planning.streaming = true;
     planning.streamingThreadId = 'a';
     await nextTick();
-    const rows = host.querySelectorAll('.chat-session-row');
-    expect(rows[0].querySelector('.chat-session-spinner')).not.toBeNull();
+    expect(rowFor('Alpha')!.querySelector('.chat-session-spinner')).not.toBeNull();
+  });
+});
+
+describe('SessionList status groups', () => {
+  it('groups the busy session under "In progress" and idle ones under "Sessions"', async () => {
+    await mount(); // busy_thread_id = 'b' (Beta)
+    const headings = [...host.querySelectorAll('.chat-sessions-title')].map((h) => h.textContent);
+    expect(headings).toContain('In progress');
+    expect(headings).toContain('Sessions');
+    // "In progress" group comes first and contains the busy session.
+    const heads = [...host.querySelectorAll('.chat-sessions-head')];
+    expect(heads[0].querySelector('.chat-sessions-title')?.textContent).toBe('In progress');
+  });
+
+  it('groups an unread session under "Needs feedback"', async () => {
+    const planning = await mount();
+    // Make a non-active, non-busy thread unread.
+    planning.busyThreadId = '';
+    planning.threads.b.unread = true;
+    await nextTick();
+    const headings = [...host.querySelectorAll('.chat-sessions-title')].map((h) => h.textContent);
+    expect(headings).toContain('Needs feedback');
   });
 });
