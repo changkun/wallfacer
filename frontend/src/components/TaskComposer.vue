@@ -570,6 +570,8 @@ function onInput(e: Event) {
   font-size: 11px;
   color: var(--text-muted);
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .composer__toggle input { margin: 0; accent-color: var(--accent); }
 .composer__toggle-hint { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
