@@ -5,6 +5,7 @@
 // presentation over a ChatSession; mounted by the Chat view, the docked panel,
 // and the spec-mode popup alike.
 import { activityIcon, activitySummary } from '../../lib/planningBubble';
+import { formatTokens, formatCost } from '../../lib/planningUsage';
 import BrandMark from '../BrandMark.vue';
 import type { ChatSession } from '../../composables/useChatSession';
 
@@ -93,6 +94,16 @@ const s = props.session;
               v-html="m.contentHtml"
             />
             <div v-else-if="m.isStreaming" class="pcp-thinking"><i></i><i></i><i></i></div>
+            <div v-if="m.usage" class="pcp-usage">
+              <span class="pcp-usage-item" title="Input tokens (fresh, not cached)">↑ {{ formatTokens(m.usage.inputTokens) }}</span>
+              <span class="pcp-usage-item" title="Output tokens (includes reasoning)">↓ {{ formatTokens(m.usage.outputTokens) }}</span>
+              <span
+                v-if="m.usage.cacheReadTokens"
+                class="pcp-usage-item pcp-usage-cache"
+                title="Input served from the prompt cache (cheaper)"
+              >♻ {{ formatTokens(m.usage.cacheReadTokens) }}</span>
+              <span class="pcp-usage-item pcp-usage-cost" :title="'Turn cost ' + formatCost(m.usage.costUSD)">{{ formatCost(m.usage.costUSD) }}</span>
+            </div>
             <div v-if="m.planRound > 0 && !m.reverted" class="pcp-turn-actions">
               <button
                 type="button"

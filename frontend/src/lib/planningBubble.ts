@@ -3,6 +3,7 @@
 // by the streaming code path (which also needs to parse incoming NDJSON).
 import { renderMarkdown } from './markdown';
 import { parseActivity, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
+import { parseTurnUsage, type TurnUsage } from './planningUsage';
 import type { PlanningMessage } from '../stores/planning';
 
 export interface RenderedBubble {
@@ -17,6 +18,9 @@ export interface RenderedBubble {
   hasActivity: boolean;
   isStreaming: boolean;
   errorText?: string;
+  // Token/cost usage for an assistant turn, parsed from its raw_output result
+  // frame. Null/absent for user turns and turns with no usage reported.
+  usage?: TurnUsage | null;
   // id is a stable client-side identifier assigned to a streaming bubble so
   // its incremental updates can locate it by identity rather than by a cached
   // array index (which goes stale if the rendered list is replaced mid-stream).
@@ -142,6 +146,7 @@ export function bubbleFromMessage(m: PlanningMessage): RenderedBubble {
         hasActivity: activity.length > 0,
         isStreaming: false,
         errorText,
+        usage: parseTurnUsage(m.raw_output),
       };
     }
     return {

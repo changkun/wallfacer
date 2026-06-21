@@ -6,6 +6,7 @@
 // state. All conversation behaviour comes from the shared chat core.
 import { ref, computed } from 'vue';
 import { useChatSession } from '../composables/useChatSession';
+import { aggregateUsage, formatTokens, formatCost, formatPercent } from '../lib/planningUsage';
 import BrandMark from '../components/BrandMark.vue';
 import SessionList from '../components/plan/SessionList.vue';
 import ChatMessageList from '../components/plan/ChatMessageList.vue';
@@ -16,6 +17,20 @@ const chat = useChatSession();
 // Entry screen while the active session has no messages; the first user bubble
 // flips this to the conversation view, producing the centered→docked morph.
 const showEntry = computed(() => chat.renderedMessages.value.length === 0);
+
+// Per-thread token/cost rollup for the header, summed from each turn's usage.
+const usage = computed(() => aggregateUsage(chat.renderedMessages.value));
+const usageTooltip = computed(() => {
+  const u = usage.value;
+  return [
+    `${u.rounds} assistant ${u.rounds === 1 ? 'round' : 'rounds'}`,
+    `Input: ${u.inputTokens.toLocaleString()} fresh + ${u.cacheReadTokens.toLocaleString()} from cache`,
+    `Output: ${u.outputTokens.toLocaleString()} (includes reasoning)`,
+    u.cacheCreationTokens ? `Cache writes: ${u.cacheCreationTokens.toLocaleString()}` : '',
+    `Cache hit: ${formatPercent(u.cacheHitRatio)} of input served from cache`,
+    `Cost: ${formatCost(u.costUSD)}`,
+  ].filter(Boolean).join('\n');
+});
 
 const heroComposer = ref<{ setText: (t: string) => void } | null>(null);
 
@@ -69,6 +84,13 @@ function applyQuick(insert: string) {
         <div v-else key="conversation" class="chat-conversation">
           <header class="chat-conversation-head">
             <span class="chat-conversation-title">Chat</span>
+            <div v-if="usage.rounds > 0" class="chat-usage" :title="usageTooltip">
+              <span class="chat-usage-item">{{ usage.rounds }} {{ usage.rounds === 1 ? 'round' : 'rounds' }}</span>
+              <span class="chat-usage-item">↑ {{ formatTokens(usage.inputTokens) }}</span>
+              <span class="chat-usage-item">↓ {{ formatTokens(usage.outputTokens) }}</span>
+              <span v-if="usage.cacheReadTokens" class="chat-usage-item chat-usage-cache">♻ {{ formatPercent(usage.cacheHitRatio) }} cached</span>
+              <span class="chat-usage-item chat-usage-cost">{{ formatCost(usage.costUSD) }}</span>
+            </div>
             <button
               type="button"
               class="chat-conversation-clear"
@@ -244,6 +266,19 @@ function applyQuick(insert: string) {
   background: var(--bg-hover);
   color: var(--ink);
 }
+
+.chat-usage {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.chat-usage-cache { color: var(--ok); }
+.chat-usage-cost { color: var(--ink-3); font-weight: 500; }
 
 .chat-conversation :deep(.pcp-stream) {
   max-width: 820px;

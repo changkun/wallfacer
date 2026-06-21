@@ -375,6 +375,21 @@
   color: var(--ink-2);
 }
 
+/* ── Per-turn token usage ──────────────────────────────────────────── */
+
+.pcp-usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+.pcp-usage-item { white-space: nowrap; cursor: default; }
+.pcp-usage-cache { color: var(--ok); }
+.pcp-usage-cost { color: var(--ink-3); }
+
 /* ── System / interrupted ──────────────────────────────────────────── */
 
 .pcp-system {
