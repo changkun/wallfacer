@@ -231,20 +231,22 @@
   color: var(--ink-2);
 }
 
+/* The finished trajectory is a tidy prose-styled list (not a monospace log):
+   sans type, generous spacing, muted secondary ink. */
 .pcp-activity-log {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
   background: var(--bg-sunk);
   border: 1px solid var(--rule);
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--r-lg, 10px);
-  max-height: 320px;
+  max-height: 360px;
   overflow-y: auto;
   margin: 6px 0 0;
   color: var(--ink-2);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 9px;
 }
 
 /* Live (streaming): the steps render freeform inline — no enclosing box, no
@@ -265,52 +267,73 @@
   border: none;
   border-radius: 0;
   padding: 0;
-  margin-top: 6px;
+  margin-top: 8px;
   max-height: none;
   overflow: visible;
-  gap: 6px;
+  gap: 11px;
 }
 
-.pcp-activity-row {
-  display: grid;
-  grid-template-columns: 14px auto 1fr;
-  align-items: baseline;
-  gap: 6px;
-  line-height: 1.4;
+/* A step is one prose-styled line of the trajectory. */
+.pcp-step {
+  line-height: 1.5;
   word-break: break-word;
 }
 
-.pcp-activity-icon { text-align: center; }
-
-.pcp-activity-label {
-  color: var(--ink-3);
-  text-transform: lowercase;
-}
-
-.pcp-activity-row--tool .pcp-activity-label { color: var(--accent); }
-.pcp-activity-row--tool_result .pcp-activity-label { color: var(--ok); }
-.pcp-activity-row--thinking .pcp-activity-label { color: var(--warn); font-style: italic; }
-
-.pcp-activity-summary { white-space: pre-wrap; }
-
-.pcp-activity-detail {
-  grid-column: 2 / 4;
-  margin-top: 2px;
-}
-
-.pcp-activity-detail summary {
+/* Tool step: a quiet clickable line — small icon, accent kind, muted title. */
+.pcp-step--tool > summary,
+.pcp-step--plain {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
   cursor: pointer;
+  list-style: none;
+  color: var(--ink-3);
+}
+.pcp-step--plain { cursor: default; }
+.pcp-step--tool > summary::-webkit-details-marker { display: none; }
+.pcp-step--tool > summary:hover { color: var(--ink-2); }
+
+.pcp-step-icon { color: var(--ink-4); font-size: 11px; flex-shrink: 0; }
+.pcp-step-kind { color: var(--accent); font-weight: 500; flex-shrink: 0; }
+.pcp-step-text { min-width: 0; overflow-wrap: anywhere; }
+
+/* Reasoning: muted, italic prose; expandable to the full thought. */
+.pcp-step--thinking { color: var(--ink-4); font-style: italic; }
+.pcp-step--thinking > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.pcp-step--thinking > summary::-webkit-details-marker { display: none; }
+.pcp-step--thinking .pcp-step-text { white-space: pre-wrap; }
+.pcp-step-thought {
+  margin-top: 4px;
+  white-space: pre-wrap;
   color: var(--ink-4);
-  font-size: 10px;
 }
 
-.pcp-activity-detail pre {
-  margin: 4px 0 0;
-  padding: 6px;
+/* Failure: clear and open by default. */
+.pcp-step--error { color: var(--danger, #c0392b); }
+.pcp-step--error > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  cursor: pointer;
+  list-style: none;
+}
+.pcp-step--error > summary::-webkit-details-marker { display: none; }
+
+/* Expanded raw call/output: monospace only here, in a quiet code block. */
+.pcp-step pre {
+  font-family: var(--font-mono);
+  font-size: 11px;
   background: var(--bg);
-  border-radius: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 6px 0 0;
   white-space: pre-wrap;
-  font-size: 10px;
+  overflow-x: auto;
+  color: var(--ink-2);
 }
 
 /* ── System / interrupted ──────────────────────────────────────────── */

@@ -10,18 +10,25 @@ describe('parseActivity', () => {
     expect(parseActivity('not json\n\n   ')).toEqual([]);
   });
 
-  it('extracts tool_use with summary from a priority key', () => {
+  it('titles a tool by the file name, not a raw "key: value" dump', () => {
     const raw = ndjson({
       type: 'assistant',
-      message: { content: [{ type: 'tool_use', name: 'Write', input: { file_path: 'CONTRIBUTING.md', content: 'x' } }] },
+      message: { content: [{ type: 'tool_use', name: 'Write', input: { file_path: 'docs/CONTRIBUTING.md', content: 'x' } }] },
     });
     const rows = parseActivity(raw);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ kind: 'tool', label: 'Write' });
-    expect(rows[0].summary).toContain('file_path: CONTRIBUTING.md');
+    expect(rows[0]).toMatchObject({ kind: 'tool', label: 'Write', summary: 'CONTRIBUTING.md' });
   });
 
-  it('extracts thinking and assistant text blocks', () => {
+  it('prefers the agent-supplied description as the tool title', () => {
+    const raw = ndjson({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'serve .', description: 'Open deck preview' } }] },
+    });
+    expect(parseActivity(raw)[0].summary).toBe('Open deck preview');
+  });
+
+  it('emits thinking but NOT assistant text (text is the answer, not activity)', () => {
     const raw = ndjson({
       type: 'assistant',
       message: { content: [
@@ -30,58 +37,48 @@ describe('parseActivity', () => {
       ] },
     });
     const rows = parseActivity(raw);
-    expect(rows.map(r => [r.kind, r.label])).toEqual([
-      ['thinking', 'thinking'],
-      ['system', 'text'],
-    ]);
-    expect(rows[1].summary).toBe('Done — created the file.');
+    expect(rows.map(r => [r.kind, r.label])).toEqual([['thinking', 'Thinking']]);
+    expect(rows[0].summary).toBe('let me plan');
   });
 
-  it('collapses long thinking blocks behind a "+N lines" expander', () => {
-    const thinking = Array.from({ length: 9 }, (_, i) => `line ${i + 1}`).join('\n');
-    const raw = ndjson({ type: 'assistant', message: { content: [{ type: 'thinking', thinking }] } });
-    const row = parseActivity(raw)[0];
-    expect(row.kind).toBe('thinking');
-    expect(row.detailLabel).toBe('+4 lines'); // 9 lines - 5 preview
+  it('keeps the full thinking body as expandable detail when long', () => {
+    const thinking = 'x'.repeat(400);
+    const row = parseActivity(ndjson({ type: 'assistant', message: { content: [{ type: 'thinking', thinking }] } }))[0];
     expect(row.detail).toBe(thinking);
   });
 
-  it('short thinking blocks have no expander', () => {
-    const raw = ndjson({ type: 'assistant', message: { content: [{ type: 'thinking', thinking: 'a\nb' }] } });
-    const row = parseActivity(raw)[0];
-    expect(row.detailLabel).toBeUndefined();
-    expect(row.detail).toBeUndefined();
-  });
-
-  it('skips empty assistant text blocks', () => {
-    const raw = ndjson({ type: 'assistant', message: { content: [{ type: 'text', text: '   ' }] } });
+  it('skips empty text and empty thinking blocks', () => {
+    const raw = ndjson({ type: 'assistant', message: { content: [
+      { type: 'text', text: '   ' },
+      { type: 'thinking', thinking: '  ' },
+    ] } });
     expect(parseActivity(raw)).toEqual([]);
   });
 
-  it('extracts tool_result and flags errors as defaultOpen', () => {
-    const raw = ndjson({
-      type: 'user',
-      message: { content: [{ type: 'tool_result', is_error: true, content: 'boom' }] },
-    });
-    const rows = parseActivity(raw);
-    expect(rows[0]).toMatchObject({ kind: 'tool_result', label: 'error', defaultOpen: true });
+  it('surfaces a failed tool result, open by default', () => {
+    const raw = ndjson({ type: 'user', message: { content: [{ type: 'tool_result', is_error: true, content: 'boom' }] } });
+    expect(parseActivity(raw)[0]).toMatchObject({ kind: 'tool_result', label: 'error', defaultOpen: true });
   });
 
-  it('extracts the final result frame', () => {
-    const raw = ndjson({ type: 'result', result: 'All done.' });
-    const rows = parseActivity(raw);
-    expect(rows).toEqual([{ kind: 'system', label: 'result', summary: 'All done.', detail: undefined, defaultOpen: false }]);
+  it('drops a successful tool result (the answer already covers it)', () => {
+    const raw = ndjson({ type: 'user', message: { content: [{ type: 'tool_result', content: 'ok' }] } });
+    expect(parseActivity(raw)).toEqual([]);
   });
 
-  it('flags an error result frame as defaultOpen', () => {
-    const raw = ndjson({ type: 'result', is_error: true, result: 'failed' });
-    expect(parseActivity(raw)[0]).toMatchObject({ label: 'error', defaultOpen: true });
+  it('drops a successful result frame and surfaces an error one', () => {
+    expect(parseActivity(ndjson({ type: 'result', result: 'All done.' }))).toEqual([]);
+    expect(parseActivity(ndjson({ type: 'result', is_error: true, result: 'failed' }))[0])
+      .toMatchObject({ label: 'error', defaultOpen: true });
   });
 });
 
 describe('hasActivity', () => {
-  it('is true when tool/thinking/tool_result frames exist', () => {
+  it('is true when tool or thinking frames exist', () => {
     expect(hasActivity(ndjson({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read' }] } }))).toBe(true);
+  });
+  it('is true for a failed tool result but false for a successful one', () => {
+    expect(hasActivity(ndjson({ type: 'user', message: { content: [{ type: 'tool_result', is_error: true, content: 'x' }] } }))).toBe(true);
+    expect(hasActivity(ndjson({ type: 'user', message: { content: [{ type: 'tool_result', content: 'x' }] } }))).toBe(false);
   });
   it('is false for plain text', () => {
     expect(hasActivity('hello world')).toBe(false);
