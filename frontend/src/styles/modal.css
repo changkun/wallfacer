@@ -101,18 +101,33 @@
 }
 .activity-block__label,
 .activity-block__label-row {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  font-weight: 600;
-  margin-bottom: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 .activity-block__label-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+.activity-block__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.activity-block__label::before {
+  content: '';
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 .activity-block--oversight {
   padding-top: 16px;
@@ -170,13 +185,45 @@
    .usage-grid, bordered sandbox-override panels). The redesign lets the
    content sit directly on the modal canvas, separated by typography and
    thin 1px rules — no nested card backgrounds. */
+/* Section headers read as distinct bands: a clay accent tick, a darker/bolder
+   label, and a hairline separator — so Spec / Result / Activity / Events don't
+   blur together. */
 #modal .section-title {
-  font-size: 10px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  margin: 0 0 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+#modal .section-title::before {
+  content: '';
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+/* When the header carries trailing actions (Copy/Raw), the separator lives on
+   the row so it spans full width; the inner title drops its own. */
+#modal .md-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+#modal .md-section-head .section-title {
+  margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 #modal .code-block:not(pre):not(.logs-block) {
   background: transparent;

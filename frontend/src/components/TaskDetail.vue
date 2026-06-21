@@ -954,6 +954,7 @@ const isArchived = computed(() => !!props.task.archived);
 
                       <!-- Pretty activity rows (thinking / tool calls / results / text). -->
                       <div v-if="activity.length">
+                        <h3 class="section-title" style="margin-top: 18px;">Transcript</h3>
                         <div class="ta-activity-search">
                           <input
                             v-model="activitySearch"
@@ -1601,11 +1602,23 @@ const isArchived = computed(() => !!props.task.archived);
   background: var(--bg-input);
 }
 .ta-oversight__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-bottom: 8px;
+}
+.ta-oversight__label::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--accent) 70%, transparent);
+  flex-shrink: 0;
 }
 .ta-oversight__phase { padding: 6px 0; border-top: 1px solid var(--border); }
 .ta-oversight__phase:first-of-type { border-top: none; }
@@ -1840,12 +1853,23 @@ const isArchived = computed(() => !!props.task.archived);
 .ta-events__sec { padding: 14px 0; border-top: 1px solid var(--border); }
 .ta-events__sec:first-child { padding-top: 0; border-top: none; }
 .ta-events__h {
-  font-size: 10px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  color: var(--text);
   margin: 0 0 10px;
+}
+.ta-events__h::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 
 /* Event timeline rows: taller rows + a colour-coded type pill. */
@@ -1855,10 +1879,15 @@ const isArchived = computed(() => !!props.task.archived);
   grid-template-columns: 116px 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 10px;
   font-size: 12px;
-  border-radius: var(--r-md, 6px);
+  /* A type-coloured left rail makes the stream scannable at a glance. */
+  border-left: 2px solid var(--border);
+  border-radius: 0 var(--r-md, 6px) var(--r-md, 6px) 0;
 }
+.event-row[data-event-type="state_change"] { border-left-color: color-mix(in oklab, var(--accent) 55%, transparent); }
+.event-row[data-event-type="error"] { border-left-color: var(--err, #c0392b); }
+.event-row[data-event-type="output"] { border-left-color: color-mix(in oklab, var(--ok, #3f7a4a) 55%, transparent); }
 .event-row:hover { background: var(--bg-hover); }
 .event-row__type {
   justify-self: start;
