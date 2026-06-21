@@ -1,12 +1,11 @@
 // The incremental NDJSON stream parser must produce the same derived state
-// (assistant text, activity rows, last error, hasActivity) as running the
-// one-shot extractAssistantText / parseActivity / extractError / hasActivity
-// helpers over the full accumulated buffer, regardless of how the byte stream
-// is chunked.
+// (trailing answer text, interleaved activity rows, last error, hasActivity) as
+// the one-shot parseTurn over the full accumulated buffer, regardless of how the
+// byte stream is chunked.
 import { describe, it, expect } from 'vitest';
 import { createNdjsonStreamParser } from './ndjsonStream';
-import { extractAssistantText, extractError } from './planningBubble';
-import { parseActivity, hasActivity } from './prettyNdjson';
+import { extractError } from './planningBubble';
+import { parseTurn } from './prettyNdjson';
 
 function frames(): string[] {
   return [
@@ -36,11 +35,12 @@ function runChunked(raw: string, size: number) {
 describe('createNdjsonStreamParser', () => {
   const raw = frames().join('\n');
 
+  const turn = parseTurn(raw);
   const oneShot = {
-    text: extractAssistantText(raw),
-    activity: parseActivity(raw),
+    text: turn.answer,
+    activity: turn.rows,
     errorText: extractError(raw),
-    hasActivity: hasActivity(raw),
+    hasActivity: turn.rows.length > 0,
   };
 
   it('matches the one-shot helpers when fed in one chunk', () => {

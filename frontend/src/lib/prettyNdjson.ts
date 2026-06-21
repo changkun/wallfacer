@@ -2,7 +2,7 @@
 // shape of ui/js/markdown.js's renderPrettyLogs in a structured form so
 // the chat panel can render rich activity rows instead of a raw text dump.
 
-export type ActivityKind = 'tool' | 'tool_result' | 'thinking' | 'system';
+export type ActivityKind = 'tool' | 'tool_result' | 'thinking' | 'system' | 'text';
 
 export interface ActivityRow {
   kind: ActivityKind;
@@ -167,6 +167,106 @@ export function frameActivityRows(frame: Frame): ActivityRow[] {
     }
   }
   return out;
+}
+
+// ── Turn timeline (interleaved narration + steps) ──────────────────────
+//
+// frameActivityRows deliberately drops assistant `text` blocks (they are the
+// answer). But narration emitted *between* tool calls ("Let me check the
+// specs…") is part of the working trajectory, not the conclusion — rendering it
+// all as the trailing answer puts a preamble at the bottom, out of order.
+//
+// The accumulator below walks frames in order and flushes any pending narration
+// into a `text` row right before the next step, so intermediate narration lands
+// in the trajectory in chronological position. Whatever narration trails the
+// final step (with no step after it) is the answer.
+
+export interface TurnAccumulator {
+  rows: ActivityRow[];
+  /** Narration seen since the last flushed step — becomes the answer if no
+   *  further step arrives. */
+  pending: string;
+}
+
+function flushPending(acc: TurnAccumulator): void {
+  const t = acc.pending.trim();
+  if (t) acc.rows.push({ kind: 'text', label: 'note', summary: t });
+  acc.pending = '';
+}
+
+// accumulateFrame folds one parsed frame into the turn timeline. Shared by the
+// one-shot parseTurn and the incremental stream parser so both interleave
+// identically.
+export function accumulateFrame(frame: Frame, acc: TurnAccumulator): void {
+  if (frame.type === 'assistant') {
+    for (const block of frame.message?.content ?? []) {
+      if (block.type === 'text') {
+        acc.pending += block.text ?? '';
+      } else if (block.type === 'thinking') {
+        const text = block.thinking ?? '';
+        if (text.trim()) {
+          flushPending(acc);
+          acc.rows.push({
+            kind: 'thinking',
+            label: 'Thinking',
+            summary: truncate(text),
+            detail: text.length > MAX_SUMMARY ? text : undefined,
+          });
+        }
+      } else if (block.type === 'tool_use') {
+        flushPending(acc);
+        acc.rows.push({
+          kind: 'tool',
+          label: block.name ?? 'tool',
+          summary: summariseToolInput(block.input),
+          preview: toolPreview(block.input),
+          detail: block.input ? JSON.stringify(block.input, null, 2) : undefined,
+        });
+      }
+    }
+  } else if (frame.type === 'result') {
+    if (frame.is_error && frame.result?.trim()) {
+      flushPending(acc);
+      acc.rows.push({
+        kind: 'system',
+        label: 'error',
+        summary: truncate(frame.result),
+        detail: frame.result.length > MAX_SUMMARY ? frame.result : undefined,
+        defaultOpen: true,
+      });
+    }
+  } else if (frame.type === 'user') {
+    for (const block of frame.message?.content ?? []) {
+      if (block.type === 'tool_result' && block.is_error) {
+        const text = toolResultText(block);
+        flushPending(acc);
+        acc.rows.push({
+          kind: 'tool_result',
+          label: 'error',
+          summary: truncate(text),
+          detail: text.length > MAX_SUMMARY ? text : undefined,
+          defaultOpen: true,
+        });
+      }
+    }
+  }
+}
+
+export interface ParsedTurn {
+  /** Trajectory: steps and any narration between them, in order. */
+  rows: ActivityRow[];
+  /** Trailing narration — the conclusion, rendered as the answer. */
+  answer: string;
+}
+
+/** One-shot timeline parse over a full raw_output buffer. */
+export function parseTurn(raw: string): ParsedTurn {
+  const acc: TurnAccumulator = { rows: [], pending: '' };
+  for (const line of raw.split('\n')) {
+    const frame = parseFrameLine(line);
+    if (frame) accumulateFrame(frame, acc);
+  }
+  return { rows: acc.rows, answer: acc.pending.trim() };
 }
 
 // frameHasActivity reports whether a single parsed frame contributes any

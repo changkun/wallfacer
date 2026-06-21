@@ -2,7 +2,7 @@
 // PlanningChatPanel.vue so they can be unit-tested in isolation and reused
 // by the streaming code path (which also needs to parse incoming NDJSON).
 import { renderMarkdown } from './markdown';
-import { parseActivity, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
+import { parseTurn, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
 import { parseTurnUsage, type TurnUsage } from './planningUsage';
 import type { PlanningMessage } from '../stores/planning';
 
@@ -131,19 +131,18 @@ export function activitySummary(activity: ActivityRow[]): string {
 export function bubbleFromMessage(m: PlanningMessage): RenderedBubble {
   if (m.role === 'assistant') {
     if (m.raw_output) {
-      const text = extractAssistantText(m.raw_output);
+      const { rows, answer } = parseTurn(m.raw_output);
       const errorText = extractError(m.raw_output);
-      const activity = parseActivity(m.raw_output);
       return {
         role: 'assistant',
-        contentHtml: text ? renderMarkdown(text) : '',
-        rawText: text,
+        contentHtml: answer ? renderMarkdown(answer) : '',
+        rawText: answer,
         rawOutput: m.raw_output,
         timestamp: m.timestamp,
         planRound: m.plan_round ?? 0,
         reverted: false,
-        activity,
-        hasActivity: activity.length > 0,
+        activity: rows,
+        hasActivity: rows.length > 0,
         isStreaming: false,
         errorText,
         usage: parseTurnUsage(m.raw_output),
