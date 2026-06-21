@@ -77,7 +77,7 @@ export function useChatSession(): ChatSession {
   const dialog = useDialogStore();
   const {
     threads, threadOrder, activeThreadId,
-    streaming, streamingThreadId, focusedSpecPath,
+    streaming, streamingThreadId, busyThreadId, focusedSpecPath,
   } = storeToRefs(planning);
 
   const messagesEl = ref<HTMLElement | null>(null);
@@ -94,6 +94,9 @@ export function useChatSession(): ChatSession {
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   // Monotonic counter for stable streaming-bubble ids (see applyStreamingUpdate).
   let streamBubbleSeq = 0;
+  // Id of the in-flight streaming bubble, if any. loadHistory uses it to carry
+  // the live (not-yet-persisted) turn across a history reload.
+  let activeStreamBubbleId: string | null = null;
 
   function clearRetryTimer() {
     if (retryTimer !== null) {
@@ -144,7 +147,14 @@ export function useChatSession(): ChatSession {
         '/api/planning/messages?thread=' + encodeURIComponent(fetched),
       );
       if (fetched !== activeThreadId.value) return;
-      renderedMessages.value = (msgs ?? []).map(bubbleFromMessage);
+      const next = (msgs ?? []).map(bubbleFromMessage);
+      // An in-flight turn isn't persisted yet, so a reload would drop it. If we
+      // are streaming this thread, carry the live bubble across the reload.
+      if (streaming.value && streamingThreadId.value === fetched && activeStreamBubbleId) {
+        const live = renderedMessages.value.find((b) => b.id === activeStreamBubbleId);
+        if (live) next.push(live);
+      }
+      renderedMessages.value = next;
       interruptedAt.value = -1;
       void scrollToBottom(true);
     } catch {
@@ -168,6 +178,7 @@ export function useChatSession(): ChatSession {
       isStreaming: true,
     };
     renderedMessages.value.push(bubble);
+    activeStreamBubbleId = bubbleId;
     void scrollToBottom();
 
     let rawBuffer = '';
@@ -254,6 +265,7 @@ export function useChatSession(): ChatSession {
       streamHandle = null;
     }
     streaming.value = false;
+    activeStreamBubbleId = null;
     const finishedThread = streamingThreadId.value;
     streamingThreadId.value = '';
     if (interrupted) {
@@ -643,6 +655,22 @@ export function useChatSession(): ChatSession {
 
   watch(activeThreadId, () => {
     void loadHistory();
+  });
+
+  // Re-attach to a thread's live stream when it's the one viewed and the server
+  // reports it as running (busyThreadId). The in-flight turn isn't persisted, so
+  // without this, returning to a session that's still working shows it empty.
+  // StreamPlanningMessages replays the in-flight turn from the start. Fires both
+  // on thread switch and when the busy poll discovers the active thread is busy.
+  watch([activeThreadId, busyThreadId], () => {
+    if (
+      !streaming.value &&
+      activeThreadId.value &&
+      busyThreadId.value === activeThreadId.value
+    ) {
+      streamingThreadId.value = activeThreadId.value;
+      startStreaming();
+    }
   });
 
   // Whenever the rendered list changes, run the mermaid enhancer over the
