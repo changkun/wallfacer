@@ -28,6 +28,29 @@ describe('parseActivity', () => {
     expect(parseActivity(raw)[0].summary).toBe('Open deck preview');
   });
 
+  it('previews the command under a described bash step, and the full path for file ops', () => {
+    const bash = parseActivity(ndjson({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'find . -name Makefile', description: 'Find build files' } }] },
+    }))[0];
+    expect(bash.summary).toBe('Find build files');
+    expect(bash.preview).toBe('find . -name Makefile');
+
+    const read = parseActivity(ndjson({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: 'specs/foo/bar.md' } }] },
+    }))[0];
+    expect(read.summary).toBe('bar.md');
+    expect(read.preview).toBe('specs/foo/bar.md');
+
+    // A bare command (no description) is already the title — no duplicate preview.
+    const bare = parseActivity(ndjson({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }] },
+    }))[0];
+    expect(bare.preview).toBeUndefined();
+  });
+
   it('emits thinking but NOT assistant text (text is the answer, not activity)', () => {
     const raw = ndjson({
       type: 'assistant',

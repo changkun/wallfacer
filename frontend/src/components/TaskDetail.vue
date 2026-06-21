@@ -1003,6 +1003,7 @@ const isArchived = computed(() => !!props.task.archived);
                             <span class="ta-activity-icon" aria-hidden="true">{{ activityIcon(row.kind) }}</span>
                             <span class="ta-activity-label">{{ row.label }}</span>
                             <span v-if="row.summary" class="ta-activity-summary">{{ row.summary }}</span>
+                            <span v-if="row.preview" class="ta-activity-preview">{{ row.preview }}</span>
                             <details v-if="row.detail" class="ta-activity-detail" :open="row.defaultOpen">
                               <summary>{{ row.detailLabel || 'details' }}</summary>
                               <pre>{{ row.detail }}</pre>
@@ -2070,6 +2071,16 @@ const isArchived = computed(() => !!props.task.archived);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.ta-activity-preview {
+  grid-column: 2 / -1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .ta-activity-detail { grid-column: 2 / -1; }
 .ta-activity-detail summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }

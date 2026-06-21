@@ -10,6 +10,10 @@ export interface ActivityRow {
   label: string;
   /** One-line summary of inputs / first line of body. */
   summary?: string;
+  /** A compact, secondary preview of the raw call (e.g. the bash command or
+   *  full file path) shown under the friendly title — helps skim what's
+   *  actually running without expanding the full detail. */
+  preview?: string;
   /** Optional full body, only set when summary alone is truncated. */
   detail?: string;
   /** Expander label, e.g. "+12 lines" (used by the task-detail activity stream). */
@@ -73,6 +77,28 @@ function summariseToolInput(input: Record<string, unknown> | undefined): string 
   return truncate(JSON.stringify(input));
 }
 
+const PREVIEW_MAX = 120;
+
+// toolPreview returns a compact view of the raw call to show under the friendly
+// title — the bash command (when a description already titles the step) or a
+// file's full path (when the title is just its basename). Returns undefined
+// when the title already conveys the raw input (e.g. a bare command or pattern),
+// to avoid a redundant duplicate line.
+function toolPreview(input: Record<string, unknown> | undefined): string | undefined {
+  if (!input) return undefined;
+  const hasDescription = typeof input.description === 'string' && input.description.trim() !== '';
+  if (hasDescription && typeof input.command === 'string') {
+    return truncate(input.command, PREVIEW_MAX);
+  }
+  for (const k of ['file_path', 'path']) {
+    if (typeof input[k] === 'string') {
+      const full = String(input[k]);
+      return full.includes('/') ? truncate(full, PREVIEW_MAX) : undefined;
+    }
+  }
+  return undefined;
+}
+
 function toolResultText(block: ContentBlock): string {
   if (typeof block.content === 'string') return block.content;
   if (Array.isArray(block.content)) {
@@ -94,6 +120,7 @@ export function frameActivityRows(frame: Frame): ActivityRow[] {
           kind: 'tool',
           label: block.name ?? 'tool',
           summary: summariseToolInput(block.input),
+          preview: toolPreview(block.input),
           detail: block.input ? JSON.stringify(block.input, null, 2) : undefined,
         });
       } else if (block.type === 'thinking') {

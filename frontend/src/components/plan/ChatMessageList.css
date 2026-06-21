@@ -318,12 +318,13 @@
   }
 }
 
-/* Tool step: a quiet clickable line — small icon, accent kind, muted title. */
+/* Tool step: a quiet clickable line — small icon, accent kind, muted title,
+   with an optional compact command/path preview beneath. */
 .pcp-step--tool > summary,
 .pcp-step--plain {
   display: flex;
-  align-items: baseline;
-  gap: 7px;
+  flex-direction: column;
+  gap: 2px;
   cursor: pointer;
   list-style: none;
   color: var(--ink-3);
@@ -332,9 +333,27 @@
 .pcp-step--tool > summary::-webkit-details-marker { display: none; }
 .pcp-step--tool > summary:hover { color: var(--ink-2); }
 
+.pcp-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
 .pcp-step-icon { color: var(--ink-4); font-size: 11px; flex-shrink: 0; }
 .pcp-step-kind { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 .pcp-step-text { min-width: 0; overflow-wrap: anywhere; }
+
+/* Compact preview of the raw call — monospace, one truncated line, indented to
+   sit under the title. */
+.pcp-step-preview {
+  margin-left: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 
 /* Reasoning: muted, italic prose; expandable to the full thought. */
 .pcp-step--thinking { color: var(--ink-4); font-style: italic; }
