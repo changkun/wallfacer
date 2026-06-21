@@ -279,6 +279,45 @@
   word-break: break-word;
 }
 
+/* While streaming, each new step eases in (no sudden pop) and the most recent
+   one shimmers left-to-right so it's clear work is still in progress. */
+.pcp-activity--live .pcp-step {
+  animation: pcp-step-in 240ms ease-out both;
+}
+@keyframes pcp-step-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+.pcp-activity--live .pcp-activity-log > .pcp-step:last-child .pcp-step-text {
+  background: linear-gradient(
+    90deg,
+    var(--ink-4) 0%,
+    var(--ink-4) 38%,
+    var(--ink) 50%,
+    var(--ink-4) 62%,
+    var(--ink-4) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: pcp-shimmer 1.4s linear infinite;
+}
+@keyframes pcp-shimmer {
+  from { background-position: -150% 0; }
+  to { background-position: 150% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pcp-activity--live .pcp-step { animation: none; }
+  .pcp-activity--live .pcp-activity-log > .pcp-step:last-child .pcp-step-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: inherit;
+  }
+}
+
 /* Tool step: a quiet clickable line — small icon, accent kind, muted title. */
 .pcp-step--tool > summary,
 .pcp-step--plain {
