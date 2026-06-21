@@ -54,8 +54,10 @@ const s = props.session;
               </summary>
               <div class="pcp-activity-log">
                 <template v-for="(row, ri) in m.activity" :key="ri">
+                  <!-- Narration between steps: prose, in chronological order. -->
+                  <div v-if="row.kind === 'text'" class="pcp-step pcp-step--note">{{ row.summary }}</div>
                   <!-- Reasoning: muted prose, expandable when there's more. -->
-                  <details v-if="row.kind === 'thinking' && row.detail" class="pcp-step pcp-step--thinking">
+                  <details v-else-if="row.kind === 'thinking' && row.detail" class="pcp-step pcp-step--thinking">
                     <summary class="pcp-step-text">{{ row.summary }}</summary>
                     <div class="pcp-step-thought">{{ row.detail }}</div>
                   </details>

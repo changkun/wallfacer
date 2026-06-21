@@ -10,22 +10,23 @@
 // It reuses the exact per-frame helpers used by the one-shot functions, so the
 // final state is identical to running those functions over the full buffer.
 
-import { frameAssistantText, frameError } from './planningBubble';
+import { frameError } from './planningBubble';
 import {
   parseFrameLine,
-  frameActivityRows,
-  frameHasActivity,
+  accumulateFrame,
   type ActivityRow,
+  type TurnAccumulator,
 } from './prettyNdjson';
 
 export interface NdjsonStreamState {
-  /** Concatenated assistant text across all frames seen so far. */
+  /** Trailing assistant narration — the answer (narration before a step is
+   *  folded into the activity rows instead). */
   text: string;
-  /** Activity rows in arrival order. */
+  /** Trajectory rows (steps + interleaved narration) in arrival order. */
   activity: ActivityRow[];
   /** Most recent error result, or '' if none. */
   errorText: string;
-  /** True once any tool/thinking/tool_result activity has been seen. */
+  /** True once any step (and thus any trajectory) exists. */
   hasActivity: boolean;
 }
 
@@ -39,41 +40,41 @@ export interface NdjsonStreamParser {
 }
 
 export function createNdjsonStreamParser(): NdjsonStreamParser {
-  let pending = ''; // text after the last newline, not yet a complete line
-  let text = '';
-  const activity: ActivityRow[] = [];
+  let lineBuf = ''; // bytes after the last newline, not yet a complete line
+  const acc: TurnAccumulator = { rows: [], pending: '' };
   let errorText = '';
-  let hasAct = false;
 
   function consumeLine(line: string): void {
     const frame = parseFrameLine(line);
     if (!frame) return;
-    text += frameAssistantText(frame);
-    const rows = frameActivityRows(frame);
-    if (rows.length > 0) activity.push(...rows);
-    if (!hasAct && frameHasActivity(frame)) hasAct = true;
+    accumulateFrame(frame, acc);
     const err = frameError(frame);
     if (err) errorText = err; // last error wins
   }
 
   return {
     push(chunk: string) {
-      pending += chunk;
-      let nl = pending.indexOf('\n');
+      lineBuf += chunk;
+      let nl = lineBuf.indexOf('\n');
       while (nl !== -1) {
-        consumeLine(pending.slice(0, nl));
-        pending = pending.slice(nl + 1);
-        nl = pending.indexOf('\n');
+        consumeLine(lineBuf.slice(0, nl));
+        lineBuf = lineBuf.slice(nl + 1);
+        nl = lineBuf.indexOf('\n');
       }
     },
     finalize() {
-      if (pending.length > 0) {
-        consumeLine(pending);
-        pending = '';
+      if (lineBuf.length > 0) {
+        consumeLine(lineBuf);
+        lineBuf = '';
       }
     },
-    state() {
-      return { text, activity, errorText, hasActivity: hasAct };
+    state(): NdjsonStreamState {
+      return {
+        text: acc.pending.trim(),
+        activity: acc.rows,
+        errorText,
+        hasActivity: acc.rows.length > 0,
+      };
     },
   };
 }

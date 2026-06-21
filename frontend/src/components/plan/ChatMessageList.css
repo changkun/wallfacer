@@ -355,6 +355,9 @@
   max-width: 100%;
 }
 
+/* Narration between steps: normal prose, in chronological position. */
+.pcp-step--note { color: var(--ink-2); white-space: pre-wrap; }
+
 /* Reasoning: muted, italic prose; expandable to the full thought. */
 .pcp-step--thinking { color: var(--ink-4); font-style: italic; }
 .pcp-step--thinking > summary {

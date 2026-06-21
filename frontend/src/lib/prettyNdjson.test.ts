@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseActivity, hasActivity } from './prettyNdjson';
+import { parseActivity, hasActivity, parseTurn } from './prettyNdjson';
 
 function ndjson(...frames: unknown[]): string {
   return frames.map(f => JSON.stringify(f)).join('\n');
@@ -92,6 +92,29 @@ describe('parseActivity', () => {
     expect(parseActivity(ndjson({ type: 'result', result: 'All done.' }))).toEqual([]);
     expect(parseActivity(ndjson({ type: 'result', is_error: true, result: 'failed' }))[0])
       .toMatchObject({ label: 'error', defaultOpen: true });
+  });
+});
+
+describe('parseTurn', () => {
+  it('interleaves narration before a step into the trajectory, trailing text is the answer', () => {
+    const raw = ndjson(
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'Let me explore the structure.' }] } },
+      { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }] } },
+      { type: 'assistant', message: { content: [{ type: 'text', text: "Here's the overview." }] } },
+    );
+    const { rows, answer } = parseTurn(raw);
+    expect(rows.map((r) => [r.kind, r.label])).toEqual([
+      ['text', 'note'], // the preamble, in chronological position
+      ['tool', 'Bash'],
+    ]);
+    expect(rows[0].summary).toBe('Let me explore the structure.');
+    expect(answer).toBe("Here's the overview."); // the conclusion only
+  });
+
+  it('a text-only turn is all answer with no trajectory', () => {
+    const { rows, answer } = parseTurn(ndjson({ type: 'assistant', message: { content: [{ type: 'text', text: 'Just a reply.' }] } }));
+    expect(rows).toEqual([]);
+    expect(answer).toBe('Just a reply.');
   });
 });
 
