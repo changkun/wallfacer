@@ -1,7 +1,11 @@
 package runner
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -54,4 +58,47 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	if err := r.taskStore(taskID).UpdateTaskTitle(r.shutdownCtx, taskID, title); err != nil {
 		logger.Runner.Warn("title generation: store update failed", "task", taskID, "error", err)
 	}
+}
+
+// GeneratePlanningThreadTitle produces a short (2–5 word) title for a planning
+// chat thread from its opening user message, using the lightweight title model.
+// Task-free, like GenerateCommitMessage: it records no spans or usage. A blank
+// model response returns ("", nil) and should be treated as "no title".
+func (r *Runner) GeneratePlanningThreadTitle(ctx context.Context, firstUserMessage string) (string, error) {
+	if strings.TrimSpace(firstUserMessage) == "" {
+		return "", nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+
+	sb := r.sandboxFromEnvForActivity(activityTitle)
+	if sb == "" {
+		sb = harness.Claude
+	}
+	model := r.titleModelFromEnvForSandbox(sb)
+	containerName := "wallfacer-planttitle-" + uuid.NewString()[:8]
+	titlePrompt := r.promptsMgr.Title(firstUserMessage)
+	labels := map[string]string{"wallfacer.task.activity": "title_planning"}
+
+	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	spec.Labels = labels
+	spec.Cmd = buildAgentCmd(titlePrompt, model)
+
+	handle, err := r.backend.Launch(ctx, spec)
+	if err != nil {
+		return "", fmt.Errorf("launch planning title container: %w", err)
+	}
+	rawStdout, _ := io.ReadAll(handle.Stdout())
+	_, _ = io.ReadAll(handle.Stderr())
+	_, _ = handle.Wait()
+
+	raw := strings.TrimSpace(string(rawStdout))
+	if raw == "" {
+		return "", fmt.Errorf("empty title output")
+	}
+	output, err := r.parseAgentStream(sb, raw)
+	if err != nil {
+		return "", fmt.Errorf("parse title output: %w", err)
+	}
+	return strings.TrimSpace(strings.Trim(strings.TrimSpace(output.Result), `"'`)), nil
 }

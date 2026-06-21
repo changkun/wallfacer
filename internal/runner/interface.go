@@ -54,6 +54,10 @@ type Interface interface {
 	// not have a task ID in scope, e.g. the planning commit pipeline.
 	GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error)
 
+	// Planning-thread title generation (task-free flavor). Names a chat
+	// thread from its opening user message using the lightweight title model.
+	GeneratePlanningThreadTitle(ctx context.Context, firstUserMessage string) (string, error)
+
 	// Auto-push for a single workspace (task-free flavor). Used by callers
 	// that do not have a task ID in scope, e.g. the planning commit pipeline.
 	MaybeAutoPushWorkspace(ctx context.Context, ws string)

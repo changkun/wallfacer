@@ -7,6 +7,19 @@ import (
 	"testing"
 )
 
+func TestIsDefaultThreadName(t *testing.T) {
+	for _, name := range []string{"Chat 1", "Chat 42"} {
+		if !IsDefaultThreadName(name) {
+			t.Errorf("IsDefaultThreadName(%q) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"Auth refactor", "Chat", "Chatter 2", "My Chat 3"} {
+		if IsDefaultThreadName(name) {
+			t.Errorf("IsDefaultThreadName(%q) = true, want false", name)
+		}
+	}
+}
+
 func TestThreadManager_Delete(t *testing.T) {
 	root := t.TempDir()
 	tm, err := NewThreadManager(root)

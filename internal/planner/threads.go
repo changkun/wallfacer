@@ -256,6 +256,13 @@ func (m *ThreadManager) nextDefaultName() string {
 	return fmt.Sprintf("Chat %d", highest+1)
 }
 
+// IsDefaultThreadName reports whether name is still an auto-generated
+// "Chat N" name — i.e. the user (or auto-titler) has not titled the thread.
+func IsDefaultThreadName(name string) bool {
+	_, ok := parseChatN(name)
+	return ok
+}
+
 // Rename updates a thread's display name.
 func (m *ThreadManager) Rename(id, name string) error {
 	name = strings.TrimSpace(name)
