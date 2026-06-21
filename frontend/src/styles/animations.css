@@ -1,0 +1,47 @@
+/* Shared progress affordances for incrementally-appearing / streaming content.
+   Reused across the task-detail activity stream, oversight phases, and other
+   live surfaces so "work is happening" reads consistently instead of content
+   popping in suddenly. The planning chat keeps its own scoped copy. */
+
+/* Each newly-arrived item eases in rather than popping. */
+@keyframes wf-content-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A bright band sweeps the text left-to-right to signal in-progress work. */
+@keyframes wf-text-shimmer {
+  from { background-position: -150% 0; }
+  to { background-position: 150% 0; }
+}
+
+.wf-fade-in {
+  animation: wf-content-in 240ms ease-out both;
+}
+
+.wf-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--ink-4) 0%,
+    var(--ink-4) 38%,
+    var(--ink) 50%,
+    var(--ink-4) 62%,
+    var(--ink-4) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: wf-text-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-fade-in { animation: none; }
+  .wf-shimmer-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: inherit;
+  }
+}

@@ -6,6 +6,7 @@ import { initTelemetry } from './telemetry';
 import './styles/tokens.css';
 import './styles/board-tokens.css';
 import './styles/base.css';
+import './styles/animations.css';
 import './styles/header.css';
 import './styles/status-bar.css';
 import './styles/dock.css';
