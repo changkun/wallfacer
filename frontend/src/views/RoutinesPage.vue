@@ -97,7 +97,10 @@ onMounted(() => { loadRoutines(); loadFlows(); });
 
 <template>
   <div v-if="loading" class="routines-page">
-    <div class="routines-loading">Loading…</div>
+    <div class="routines-loading">
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="wf-shimmer-text">Loading routines…</span>
+    </div>
   </div>
 
   <!-- Empty: centered hero with the create form. -->

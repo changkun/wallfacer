@@ -150,6 +150,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   color: var(--text-muted);
   font-size: 13px;
+}
+.routines-loading .spinner {
+  width: 13px;
+  height: 13px;
+  border-width: 1.5px;
 }

@@ -961,7 +961,10 @@ const isArchived = computed(() => !!props.task.archived);
                         </div>
                       </div>
                       <div v-else-if="oversightStatus === 'pending'" class="text-xs text-v-muted">Oversight summary not yet generated.</div>
-                      <div v-else-if="oversightStatus === 'generating'" class="text-xs text-v-muted">Generating oversight summary…</div>
+                      <div v-else-if="oversightStatus === 'generating'" class="text-xs text-v-muted ta-oversight__generating">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span class="wf-shimmer-text">Generating oversight summary…</span>
+                      </div>
                       <div v-else-if="oversightStatus === 'failed'" class="text-xs" style="color: var(--err, #c0392b);">Oversight generation failed{{ oversightError ? `: ${oversightError}` : '' }}</div>
 
                       <!-- Pretty activity rows (thinking / tool calls / results / text). -->
@@ -990,7 +993,7 @@ const isArchived = computed(() => !!props.task.archived);
                           Showing last {{ ACTIVITY_MAX_ROWS.toLocaleString() }} rows.
                           <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
                         </div>
-                        <div class="ta-activity-log">
+                        <div class="ta-activity-log" :class="{ 'ta-activity-log--streaming': streaming }">
                           <div
                             v-for="(row, i) in visibleActivity"
                             :key="i"
@@ -2009,6 +2012,50 @@ const isArchived = computed(() => !!props.task.archived);
   border-radius: 0 4px 4px 0;
 }
 .ta-activity-row:hover { background: var(--bg-hover); }
+
+/* While the task is running, rows ease in instead of popping, and the most
+   recent one shimmers so it's clear new work is still arriving. Uses the shared
+   wf-* keyframes (styles/animations.css). */
+.ta-activity-log--streaming .ta-activity-row {
+  animation: wf-content-in 240ms ease-out both;
+}
+.ta-activity-log--streaming .ta-activity-row:last-child .ta-activity-summary {
+  background: linear-gradient(
+    90deg,
+    var(--ink-4) 0%,
+    var(--ink-4) 38%,
+    var(--ink) 50%,
+    var(--ink-4) 62%,
+    var(--ink-4) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: wf-text-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ta-activity-log--streaming .ta-activity-row { animation: none; }
+  .ta-activity-log--streaming .ta-activity-row:last-child .ta-activity-summary {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: inherit;
+  }
+}
+
+.ta-oversight__generating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ta-oversight__generating .spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
 .ta-activity-icon { text-align: center; opacity: 0.8; }
 .ta-activity-label { font-weight: 600; color: var(--text); }
 .ta-activity-row--tool { border-left-color: color-mix(in oklab, var(--accent) 55%, transparent); }
