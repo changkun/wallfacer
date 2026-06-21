@@ -247,9 +247,10 @@ export const usePlanningStore = defineStore('planning', () => {
     busy_thread_id?: string;
   }
 
-  // refreshBusy updates only busyThreadId from the threads endpoint, leaving the
-  // thread list and active selection untouched. Safe to poll on an interval
-  // (unlike loadThreads, which reassigns activeThreadId and reloads history).
+  // refreshBusy updates busyThreadId and picks up in-place thread renames (e.g.
+  // server-side auto-titling) from the threads endpoint, leaving the list order
+  // and active selection untouched. Safe to poll on an interval (unlike
+  // loadThreads, which reassigns activeThreadId and reloads history).
   async function refreshBusy() {
     try {
       const res = await api<ThreadListResponse>(
@@ -257,6 +258,10 @@ export const usePlanningStore = defineStore('planning', () => {
         '/api/planning/threads?includeArchived=true',
       );
       busyThreadId.value = res.busy_thread_id ?? '';
+      for (const t of res.threads ?? []) {
+        const cur = threads.value[t.id];
+        if (cur && cur.name !== t.name) cur.name = t.name;
+      }
     } catch {
       /* ignore transient poll failures */
     }
