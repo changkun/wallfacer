@@ -171,7 +171,7 @@ function tabJumps(task: Task): { tab: string; label: string }[] {
   if (task.status === 'backlog') return [];
   const jumps = [{ tab: 'changes', label: 'Open changes' }];
   if (task.turns > 0) {
-    jumps.push({ tab: 'results', label: 'Open results' });
+    jumps.push({ tab: 'verification', label: 'Open verification' });
     jumps.push({ tab: 'timeline', label: 'Open timeline' });
   }
   return jumps;

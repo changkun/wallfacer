@@ -87,8 +87,8 @@ useFocusTrap(modalRoot, () => !!props.task);
 const dialog = useDialogStore();
 const toast = useToastStore();
 
-type MainTab = 'spec' | 'activity' | 'changes' | 'results' | 'events' | 'timeline';
-const MAIN_TABS: readonly MainTab[] = ['spec', 'activity', 'changes', 'results', 'events', 'timeline'];
+type MainTab = 'spec' | 'activity' | 'changes' | 'verification' | 'events' | 'timeline';
+const MAIN_TABS: readonly MainTab[] = ['spec', 'activity', 'changes', 'verification', 'events', 'timeline'];
 // Honour an initial tab (command-palette tab-switch jumps / deep links).
 const mainTab = ref<MainTab>(
   MAIN_TABS.includes(props.initialTab as MainTab) ? (props.initialTab as MainTab) : 'spec',
@@ -141,7 +141,6 @@ interface ResultEntry {
   type: 'plan' | 'result';
   showRaw: boolean;
 }
-const implResults = ref<ResultEntry[]>([]);
 const testResults = ref<ResultEntry[]>([]);
 const resultsLoading = ref(false);
 const resultsError = ref('');
@@ -160,19 +159,13 @@ async function fetchResults() {
     const outputs = events
       .filter((e) => e.event_type === 'output' && typeof e.data?.result === 'string' && e.data.result.length > 0)
       .map((e) => e.data!.result as string);
-    // Split outputs into implementation vs test runs at task.test_run_start_turn
-    // (1-based; turns >= it belong to the test agent). The backend serves the
-    // same boundary for phase=impl|test log streams. Mirrors modal-results.js.
+    // The Verification tab shows only the test/verify-phase transcript: turns at
+    // or after task.test_run_start_turn (1-based) belong to the test agent.
+    // Earlier (implementation) turns live in Activity and Spec, so they're not
+    // repeated here.
     const startTurn = props.task.test_run_start_turn ?? 0;
     const splitIdx = startTurn > 0 ? Math.min(startTurn - 1, outputs.length) : outputs.length;
-    const impl = outputs.slice(0, splitIdx);
     const tests = outputs.slice(splitIdx);
-    implResults.value = impl.map((text, i) => ({
-      turn: i + 1,
-      text,
-      type: detectResultType(text),
-      showRaw: false,
-    })).reverse();
     testResults.value = tests.map((text, i) => ({
       turn: splitIdx + i + 1,
       text,
@@ -185,14 +178,6 @@ async function fetchResults() {
   } finally {
     resultsLoading.value = false;
   }
-}
-
-// A turn entry needs the collapsible <details> chrome only when its summary
-// would show something: a Plan badge, or a "Turn N" label (multi-turn). A
-// single, non-plan turn has an empty summary, so we render its content flat
-// (no clickable empty box + stray triangle).
-function isCollapsible(entry: ResultEntry, list: ResultEntry[]): boolean {
-  return entry.type === 'plan' || list.length > 1;
 }
 
 function copyResult(entry: ResultEntry) {
@@ -336,7 +321,7 @@ const promptHistory = computed(() => props.task.prompt_history ?? []);
 function fetchForTab(t: MainTab) {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
-  if (t === 'results' && !resultsFetched.value) fetchResults();
+  if (t === 'verification' && !resultsFetched.value) fetchResults();
   if (t === 'timeline' && !spansFetched.value) fetchSpans();
   if (t === 'events' && !eventsFetched.value) fetchEvents();
 }
@@ -351,10 +336,10 @@ watch(
   () => props.task?.id,
   () => {
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
-    resultsFetched.value = false; implResults.value = []; testResults.value = [];
+    resultsFetched.value = false; testResults.value = [];
     eventsFetched.value = false; events.value = [];
     if (mainTab.value === 'timeline') fetchSpans();
-    if (mainTab.value === 'results') fetchResults();
+    if (mainTab.value === 'verification') fetchResults();
     if (mainTab.value === 'events') fetchEvents();
   },
 );
@@ -837,12 +822,12 @@ const isArchived = computed(() => !!props.task.archived);
             <button
               type="button"
               class="main-tab"
-              :class="{ active: mainTab === 'results' }"
+              :class="{ active: mainTab === 'verification' }"
               role="tab"
-              :aria-selected="mainTab === 'results'"
+              :aria-selected="mainTab === 'verification'"
               aria-controls="modal-row"
-              @click="mainTab = 'results'"
-            >Results</button>
+              @click="mainTab = 'verification'"
+            >Verification</button>
             <button
               type="button"
               class="main-tab"
@@ -1165,72 +1150,35 @@ const isArchived = computed(() => !!props.task.archived);
                 </div>
 
                 <!-- RESULTS tab (multi-turn) -->
-                <div data-main-tab-section="results">
-                  <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading results…</div>
+                <!-- Verification: the test/verify-phase transcript only. The
+                     implementation turns live in Activity (full transcript) and
+                     the latest result shows in Spec, so they're not repeated
+                     here. -->
+                <div data-main-tab-section="verification">
+                  <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading verification…</div>
                   <div v-else-if="resultsError" class="text-xs" style="color: var(--err, #c0392b);">{{ resultsError }}</div>
-                  <div v-else-if="!implResults.length && !testResults.length" class="text-xs text-v-muted">No turn results yet.</div>
+                  <div v-else-if="!testResults.length" class="text-xs text-v-muted">No verification run for this task yet.</div>
                   <template v-else>
-                    <template v-if="implResults.length">
-                      <h3 class="section-title">Implementation</h3>
-                      <!-- Newest turn expanded; older turns collapse into
-                           <details> (mirrors ui/js/modal-results.js). A single
-                           non-plan turn has no labels, so it renders flat -->
-                      <template v-for="(entry, idx) in implResults" :key="`impl-${entry.turn}`">
-                        <details
-                          v-if="isCollapsible(entry, implResults)"
-                          class="result-entry"
-                          :open="idx === 0"
-                        >
-                          <summary class="result-entry-summary">
-                            <div class="result-entry-labels">
-                              <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
-                              <span v-if="implResults.length > 1" class="result-turn-label">Turn {{ entry.turn }}</span>
-                            </div>
-                          </summary>
-                          <div class="result-entry-actions flex items-center gap-1.5">
-                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                          </div>
-                          <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                          <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                        </details>
-                        <div v-else class="result-entry">
-                          <div class="result-entry-actions flex items-center gap-1.5">
-                            <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                            <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                          </div>
-                          <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                          <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
+                    <details
+                      v-for="(entry, idx) in testResults"
+                      :key="`test-${entry.turn}`"
+                      class="result-entry"
+                      :open="idx === 0"
+                    >
+                      <summary class="result-entry-summary">
+                        <div class="result-entry-labels">
+                          <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
+                          <span class="result-turn-label">Turn {{ entry.turn }}</span>
                         </div>
-                      </template>
-                    </template>
-                    <template v-if="testResults.length">
-                      <h3 class="section-title" style="margin-top: 16px;">Testing</h3>
-                      <!-- Test-side always shows a Turn label, so its summary is
-                           never empty; keep the original collapsible layout. -->
-                      <details
-                        v-for="(entry, idx) in testResults"
-                        :key="`test-${entry.turn}`"
-                        class="result-entry"
-                        :open="idx === 0"
-                      >
-                        <summary class="result-entry-summary">
-                          <div class="result-entry-labels">
-                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
-                            <span class="result-turn-label">Turn {{ entry.turn }}</span>
-                          </div>
-                        </summary>
-                        <div class="result-entry-actions flex items-center gap-1.5">
-                          <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                          <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                        </div>
-                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                      </details>
-                    </template>
+                      </summary>
+                      <div class="result-entry-actions flex items-center gap-1.5">
+                        <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                        <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
+                      </div>
+                      <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
+                      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                      <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
+                    </details>
                   </template>
                 </div>
 
