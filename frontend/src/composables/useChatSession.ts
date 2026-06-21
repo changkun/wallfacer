@@ -16,6 +16,7 @@ import { api, authHeaders } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFetch';
 import { createNdjsonStreamParser } from '../lib/ndjsonStream';
+import { parseTurnUsage } from '../lib/planningUsage';
 import { enhanceMermaid } from '../lib/mermaidRender';
 import { usePlanningStore } from '../stores/planning';
 import { useTaskStore } from '../stores/tasks';
@@ -229,6 +230,7 @@ export function useChatSession(): ChatSession {
             hasActivity: activity.length > 0,
             errorText: errorText || undefined,
             isStreaming: false,
+            usage: parseTurnUsage(rawBuffer),
           });
           finishStreaming(false);
         },
