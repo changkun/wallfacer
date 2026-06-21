@@ -52,20 +52,39 @@ const s = props.session;
                 }}</span>
               </summary>
               <div class="pcp-activity-log">
-                <div
-                  v-for="(row, ri) in m.activity"
-                  :key="ri"
-                  class="pcp-activity-row"
-                  :class="'pcp-activity-row--' + row.kind"
-                >
-                  <span class="pcp-activity-icon">{{ activityIcon(row.kind) }}</span>
-                  <span class="pcp-activity-label">{{ row.label }}</span>
-                  <span v-if="row.summary" class="pcp-activity-summary">{{ row.summary }}</span>
-                  <details v-if="row.detail" class="pcp-activity-detail" :open="row.defaultOpen">
-                    <summary>show</summary>
+                <template v-for="(row, ri) in m.activity" :key="ri">
+                  <!-- Reasoning: muted prose, expandable when there's more. -->
+                  <details v-if="row.kind === 'thinking' && row.detail" class="pcp-step pcp-step--thinking">
+                    <summary class="pcp-step-text">{{ row.summary }}</summary>
+                    <div class="pcp-step-thought">{{ row.detail }}</div>
+                  </details>
+                  <div v-else-if="row.kind === 'thinking'" class="pcp-step pcp-step--thinking">
+                    <span class="pcp-step-text">{{ row.summary }}</span>
+                  </div>
+                  <!-- Failures only: surfaced clearly, open by default. -->
+                  <details
+                    v-else-if="row.kind === 'system' || row.kind === 'tool_result'"
+                    class="pcp-step pcp-step--error"
+                    :open="row.defaultOpen"
+                  >
+                    <summary><span class="pcp-step-icon">⚠</span><span class="pcp-step-text">{{ row.summary }}</span></summary>
+                    <pre v-if="row.detail">{{ row.detail }}</pre>
+                  </details>
+                  <!-- Tool: a quiet, clickable step; click to reveal the call. -->
+                  <details v-else-if="row.detail" class="pcp-step pcp-step--tool">
+                    <summary>
+                      <span class="pcp-step-icon">{{ activityIcon(row.kind) }}</span>
+                      <span class="pcp-step-kind">{{ row.label }}</span>
+                      <span v-if="row.summary" class="pcp-step-text">{{ row.summary }}</span>
+                    </summary>
                     <pre>{{ row.detail }}</pre>
                   </details>
-                </div>
+                  <div v-else class="pcp-step pcp-step--tool pcp-step--plain">
+                    <span class="pcp-step-icon">{{ activityIcon(row.kind) }}</span>
+                    <span class="pcp-step-kind">{{ row.label }}</span>
+                    <span v-if="row.summary" class="pcp-step-text">{{ row.summary }}</span>
+                  </div>
+                </template>
               </div>
             </details>
             <div
