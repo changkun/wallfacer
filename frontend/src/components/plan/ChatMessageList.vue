@@ -74,16 +74,22 @@ const s = props.session;
                   <!-- Tool: a quiet, clickable step; click to reveal the call. -->
                   <details v-else-if="row.detail" class="pcp-step pcp-step--tool">
                     <summary>
-                      <span class="pcp-step-icon">{{ activityIcon(row.kind) }}</span>
-                      <span class="pcp-step-kind">{{ row.label }}</span>
-                      <span v-if="row.summary" class="pcp-step-text">{{ row.summary }}</span>
+                      <span class="pcp-step-head">
+                        <span class="pcp-step-icon">{{ activityIcon(row.kind) }}</span>
+                        <span class="pcp-step-kind">{{ row.label }}</span>
+                        <span v-if="row.summary" class="pcp-step-text">{{ row.summary }}</span>
+                      </span>
+                      <span v-if="row.preview" class="pcp-step-preview">{{ row.preview }}</span>
                     </summary>
                     <pre>{{ row.detail }}</pre>
                   </details>
                   <div v-else class="pcp-step pcp-step--tool pcp-step--plain">
-                    <span class="pcp-step-icon">{{ activityIcon(row.kind) }}</span>
-                    <span class="pcp-step-kind">{{ row.label }}</span>
-                    <span v-if="row.summary" class="pcp-step-text">{{ row.summary }}</span>
+                    <span class="pcp-step-head">
+                      <span class="pcp-step-icon">{{ activityIcon(row.kind) }}</span>
+                      <span class="pcp-step-kind">{{ row.label }}</span>
+                      <span v-if="row.summary" class="pcp-step-text">{{ row.summary }}</span>
+                    </span>
+                    <span v-if="row.preview" class="pcp-step-preview">{{ row.preview }}</span>
                   </div>
                 </template>
               </div>
