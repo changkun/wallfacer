@@ -49,6 +49,10 @@ type MockRunner struct {
 	// generator. When nil the method returns an empty string and a nil
 	// error so callers fall back to their deterministic path.
 	GenerateCommitMessageFn func(ctx context.Context, data prompts.CommitData) (string, error)
+
+	// GeneratePlanningThreadTitleFn lets tests stub the task-free planning
+	// thread title generation. When nil, the method returns ("", nil).
+	GeneratePlanningThreadTitleFn func(ctx context.Context, firstUserMessage string) (string, error)
 }
 
 // compile-time assertion.
@@ -217,6 +221,15 @@ func (m *MockRunner) Prompts() *prompts.Manager { return prompts.NewManager("") 
 func (m *MockRunner) GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error) {
 	if m.GenerateCommitMessageFn != nil {
 		return m.GenerateCommitMessageFn(ctx, data)
+	}
+	return "", nil
+}
+
+// GeneratePlanningThreadTitle delegates to GeneratePlanningThreadTitleFn when
+// set; the default returns ("", nil) so callers skip the rename.
+func (m *MockRunner) GeneratePlanningThreadTitle(ctx context.Context, firstUserMessage string) (string, error) {
+	if m.GeneratePlanningThreadTitleFn != nil {
+		return m.GeneratePlanningThreadTitleFn(ctx, firstUserMessage)
 	}
 	return "", nil
 }

@@ -629,12 +629,42 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 				// Touch the thread so the UI can sort by recent activity.
 				if tm := h.threadsManager(); tm != nil {
 					tm.Touch(threadID)
+					// Name a still-default ("Chat N") thread from its opening
+					// message, like ChatGPT/Claude auto-titling a conversation.
+					h.maybeAutoTitleThread(tm, threadID, req.Message)
 				}
 			}
 		}
 	}()
 
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"status": "accepted"})
+}
+
+// maybeAutoTitleThread names an untitled ("Chat N") planning thread from its
+// opening user message, using the lightweight title model. It is a no-op when
+// the thread already has a user/auto-assigned title, the runner is absent, or
+// the message is blank. Runs inline on the caller's (already detached) exec
+// goroutine; title generation carries its own timeout and never blocks the
+// HTTP response.
+func (h *Handler) maybeAutoTitleThread(tm *planner.ThreadManager, threadID, firstMessage string) {
+	if h.runner == nil || strings.TrimSpace(firstMessage) == "" {
+		return
+	}
+	meta, err := tm.Meta(threadID)
+	if err != nil || !planner.IsDefaultThreadName(meta.Name) {
+		return
+	}
+	title, err := h.runner.GeneratePlanningThreadTitle(context.Background(), firstMessage)
+	if err != nil {
+		slog.Warn("planning thread auto-title failed", "thread", threadID, "err", err)
+		return
+	}
+	if title == "" {
+		return
+	}
+	if err := tm.Rename(threadID, title); err != nil {
+		slog.Warn("planning thread rename failed", "thread", threadID, "err", err)
+	}
 }
 
 // StreamPlanningMessages streams the current planning exec's raw stdout.
