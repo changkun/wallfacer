@@ -4,7 +4,7 @@
 // surface (the same threads the legacy panel showed as tabs), with active
 // highlight, unread dots, inline rename, archive, a running spinner, and an
 // archived overflow.
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlanningStore } from '../../stores/planning';
 import type { ChatSession } from '../../composables/useChatSession';
@@ -25,6 +25,30 @@ const {
 function isRunning(id: string): boolean {
   return id === busyThreadId.value || (streaming.value && id === streamingThreadId.value);
 }
+
+// Group sessions by status so a busy or unanswered session is easy to find:
+//  - In progress: an agent turn is running, or messages are queued to send.
+//  - Needs feedback: a finished response you haven't read yet (the agent is
+//    waiting on you). The session you're viewing is never "unread".
+//  - Sessions: everything else, idle.
+// Only non-empty groups render, preserving the thread order within each.
+const sessionGroups = computed(() => {
+  const inProgress: string[] = [];
+  const needsFeedback: string[] = [];
+  const idle: string[] = [];
+  for (const id of threadOrder.value) {
+    const t = threads.value[id];
+    if (!t) continue;
+    if (isRunning(id) || (t.queue?.length ?? 0) > 0) inProgress.push(id);
+    else if (id !== activeThreadId.value && t.unread) needsFeedback.push(id);
+    else idle.push(id);
+  }
+  const groups: { key: string; label: string; ids: string[] }[] = [];
+  if (inProgress.length) groups.push({ key: 'progress', label: 'In progress', ids: inProgress });
+  if (needsFeedback.length) groups.push({ key: 'feedback', label: 'Needs feedback', ids: needsFeedback });
+  if (idle.length) groups.push({ key: 'idle', label: 'Sessions', ids: idle });
+  return groups;
+});
 
 // Poll the server's busy thread on a light interval so background activity is
 // reflected without disturbing the thread list or active selection.
@@ -49,62 +73,64 @@ onUnmounted(() => {
       <span>New chat</span>
     </button>
 
-    <div class="chat-sessions-head">
-      <span class="chat-sessions-title">Sessions</span>
-    </div>
-
     <div class="chat-session-scroll">
-      <div
-        v-for="id in threadOrder"
-        :key="id"
-        class="chat-session-row"
-        :class="{ 'chat-session-row--active': id === activeThreadId }"
-        role="button"
-        tabindex="0"
-        @click="s.switchToThread(id)"
-        @keydown.enter="s.switchToThread(id)"
-      >
-        <input
-          v-if="s.renamingId.value === id"
-          v-model="s.renameDraft.value"
-          class="chat-session-rename"
-          type="text"
-          @keydown.enter.prevent="s.commitRename"
-          @keydown.escape.prevent="s.cancelRename"
-          @blur="s.commitRename"
-          @click.stop
-        />
-        <template v-else>
-          <span class="chat-session-name">{{ threads[id]?.name }}</span>
-          <span
-            v-if="isRunning(id)"
-            class="chat-session-spinner"
-            role="status"
-            aria-label="Agent running"
-            title="Agent running"
+      <template v-for="group in sessionGroups" :key="group.key">
+        <div class="chat-sessions-head" :class="'chat-sessions-head--' + group.key">
+          <span class="chat-sessions-title">{{ group.label }}</span>
+          <span class="chat-sessions-count">{{ group.ids.length }}</span>
+        </div>
+        <div
+          v-for="id in group.ids"
+          :key="id"
+          class="chat-session-row"
+          :class="{ 'chat-session-row--active': id === activeThreadId }"
+          role="button"
+          tabindex="0"
+          @click="s.switchToThread(id)"
+          @keydown.enter="s.switchToThread(id)"
+        >
+          <input
+            v-if="s.renamingId.value === id"
+            v-model="s.renameDraft.value"
+            class="chat-session-rename"
+            type="text"
+            @keydown.enter.prevent="s.commitRename"
+            @keydown.escape.prevent="s.cancelRename"
+            @blur="s.commitRename"
+            @click.stop
           />
-          <span v-else-if="id !== activeThreadId && threads[id]?.unread" class="chat-session-unread" />
-          <span class="chat-session-actions">
-            <button
-              type="button"
-              class="chat-session-btn"
-              title="Rename"
-              @click.stop="s.startRename(id)"
-            >✎</button>
-            <button
-              type="button"
-              class="chat-session-btn"
-              title="Archive session"
-              aria-label="Archive session"
-              @click.stop="s.archiveThread(id)"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              </svg>
-            </button>
-          </span>
-        </template>
-      </div>
+          <template v-else>
+            <span class="chat-session-name">{{ threads[id]?.name }}</span>
+            <span
+              v-if="isRunning(id)"
+              class="chat-session-spinner"
+              role="status"
+              aria-label="Agent running"
+              title="Agent running"
+            />
+            <span v-else-if="id !== activeThreadId && threads[id]?.unread" class="chat-session-unread" />
+            <span class="chat-session-actions">
+              <button
+                type="button"
+                class="chat-session-btn"
+                title="Rename"
+                @click.stop="s.startRename(id)"
+              >✎</button>
+              <button
+                type="button"
+                class="chat-session-btn"
+                title="Archive session"
+                aria-label="Archive session"
+                @click.stop="s.archiveThread(id)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                </svg>
+              </button>
+            </span>
+          </template>
+        </div>
+      </template>
     </div>
 
     <div v-if="archivedThreads.length > 0" class="chat-sessions-archived">
@@ -185,6 +211,9 @@ onUnmounted(() => {
 }
 
 .chat-sessions-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 12px 10px 4px;
 }
 
@@ -195,6 +224,36 @@ onUnmounted(() => {
   letter-spacing: 0.05em;
   color: var(--ink-4);
 }
+
+.chat-sessions-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: var(--bg-sunk);
+  border-radius: 999px;
+  padding: 0 6px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Actionable groups read warmer; a leading dot makes them scannable. */
+.chat-sessions-head--progress .chat-sessions-title,
+.chat-sessions-head--feedback .chat-sessions-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-sessions-head--progress .chat-sessions-title::before,
+.chat-sessions-head--feedback .chat-sessions-title::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.chat-sessions-head--progress .chat-sessions-title { color: var(--accent); }
+.chat-sessions-head--progress .chat-sessions-title::before { background: var(--accent); }
+.chat-sessions-head--feedback .chat-sessions-title { color: var(--warn, #a56a12); }
+.chat-sessions-head--feedback .chat-sessions-title::before { background: var(--warn, #a56a12); }
 
 .chat-session-scroll {
   flex: 1;
