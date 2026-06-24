@@ -13,6 +13,7 @@ import (
 	"latere.ai/x/wallfacer/internal/coordinator/client"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/handler"
+	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/speccomment"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -154,11 +155,21 @@ func coordinationManifestFunc(instanceID, hostLabel, version string, wsMgr *work
 	}
 }
 
-// newCommentStore selects the coordinator's authoritative comment store. The
-// durable Postgres store (WALLFACER_DATABASE_URL) is wired in a later step; for
-// now this is the in-memory store (single-replica dev, byte-identical for one
-// process).
-func newCommentStore(_ context.Context) coordinator.CommentStore {
+// newCommentStore selects the coordinator's authoritative comment store. With
+// WALLFACER_DATABASE_URL set it uses the durable Postgres store (the system of
+// record for the cloud-authoritative comments); otherwise an in-memory store
+// (single-replica dev, byte-identical for one process). A Postgres failure
+// falls back to memory rather than taking the web server down, since comments
+// are best-effort infrastructure.
+func newCommentStore(ctx context.Context) coordinator.CommentStore {
+	if dsn := os.Getenv("WALLFACER_DATABASE_URL"); dsn != "" {
+		st, err := coordinator.NewPostgresCommentStore(ctx, dsn)
+		if err == nil {
+			logger.Main.Info("coordination: using Postgres comment store")
+			return st
+		}
+		logger.Main.Error("coordination: Postgres comment store unavailable; using memory", "err", err)
+	}
 	return coordinator.NewMemCommentStore()
 }
 
