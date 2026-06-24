@@ -8,6 +8,14 @@ const props = defineProps<{
   contentKey: string;
 }>();
 
+const emit = defineEmits<{
+  // True while the panel occupies the top-right corner. The pinned TOC never
+  // scrolls, so the parent reserves a right gutter to keep body text from
+  // sliding under it. False when there are no headings or it is collapsed to
+  // the reveal tab, so the parent can reclaim the width.
+  (e: 'reserve', value: boolean): void;
+}>();
+
 interface Entry {
   id: string;
   text: string;
@@ -72,6 +80,13 @@ watch(
   () => {
     void nextTick(rebuild);
   },
+  { immediate: true },
+);
+
+// Mirror the panel's footprint to the parent so it can reserve the gutter.
+watch(
+  () => entries.value.length > 0 && !collapsed.value,
+  (occupies) => emit('reserve', occupies),
   { immediate: true },
 );
 

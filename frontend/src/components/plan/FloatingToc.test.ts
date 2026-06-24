@@ -43,6 +43,19 @@ async function mount(bodyEl: HTMLElement | null): Promise<void> {
   await nextTick(); // rebuild runs in a queued nextTick
 }
 
+// Same mount, but records every `reserve` emit for gutter-contract assertions.
+function mountCapturingReserve(bodyEl: HTMLElement | null): { emitted: boolean[] } {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  const emitted: boolean[] = [];
+  app = createApp({
+    render: () =>
+      h(FloatingToc, { bodyEl, contentKey: 'k1', onReserve: (v: boolean) => emitted.push(v) }),
+  });
+  app.mount(host);
+  return { emitted };
+}
+
 beforeEach(() => { memStore.clear(); });
 afterEach(() => {
   app?.unmount();
@@ -90,5 +103,46 @@ describe('FloatingToc collapse toggle', () => {
     await mount(empty);
     expect(host.querySelector('.floating-toc')).toBeNull();
     expect(host.querySelector('.floating-toc__reveal')).toBeNull();
+  });
+});
+
+// The pinned TOC occludes the same top-right band at every scroll position, so
+// the parent reserves a body gutter while the panel is up. These pin the signal
+// that drives it: reserve with headings + open panel, release otherwise.
+describe('FloatingToc reserve signal', () => {
+  it('reserves the gutter once headings are surfaced', async () => {
+    const { emitted } = mountCapturingReserve(bodyWithHeadings());
+    await nextTick();
+    await nextTick();
+    expect(emitted.at(-1)).toBe(true);
+  });
+
+  it('releases the gutter when collapsed', async () => {
+    const { emitted } = mountCapturingReserve(bodyWithHeadings());
+    await nextTick();
+    await nextTick();
+    expect(emitted.at(-1)).toBe(true);
+
+    (host.querySelector('.floating-toc__collapse') as HTMLElement).click();
+    await nextTick();
+    expect(emitted.at(-1)).toBe(false);
+  });
+
+  it('never reserves when there are no headings', async () => {
+    const empty = document.createElement('div');
+    document.body.appendChild(empty);
+    const { emitted } = mountCapturingReserve(empty);
+    await nextTick();
+    await nextTick();
+    expect(emitted).not.toContain(true);
+    expect(emitted.at(-1)).toBe(false);
+  });
+
+  it('stays released when mounted already collapsed', async () => {
+    memStore.set(KEY, '1');
+    const { emitted } = mountCapturingReserve(bodyWithHeadings());
+    await nextTick();
+    await nextTick();
+    expect(emitted).not.toContain(true);
   });
 });
