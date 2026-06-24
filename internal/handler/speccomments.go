@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/speccomment"
 )
@@ -83,6 +85,7 @@ type specCommentThread struct {
 	speccomment.Thread
 	Line     int  `json:"line"`     // 1-based current line, 0 when orphaned
 	Orphaned bool `json:"orphaned"` // anchor could not be resolved against the body
+	Outdated bool `json:"outdated"` // the spec file changed since the comment was made (advisory)
 }
 
 // ListSpecComments returns the comment threads for every repo the visible
@@ -166,6 +169,10 @@ func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		anchor := spec.ComputeAnchor(parsed.Body, req.StartLine, req.EndLine)
+		// Advisory git metadata: the commit the body was at and the file's blob,
+		// for "view as of" and the outdated signal. Empty when not in git (the
+		// anchor still resolves on content hash).
+		anchor.CommitSHA, anchor.BlobSHA = gitObjectSHAs(root, req.Spec)
 		ev.Thread = &speccomment.Thread{
 			SpecPath: req.Spec,
 			Anchor:   anchor,
@@ -274,5 +281,28 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 		return specCommentThread{Thread: t, Orphaned: true}
 	}
 	t.Anchor = newAnchor
-	return specCommentThread{Thread: t, Line: line}
+	// Outdated is advisory: the file content changed since the comment was made,
+	// even if the anchored line still resolves. It is the repo-out-of-sync hint.
+	outdated := false
+	if t.Anchor.BlobSHA != "" {
+		if _, blob := gitObjectSHAs(root, t.SpecPath); blob != "" && blob != t.Anchor.BlobSHA {
+			outdated = true
+		}
+	}
+	return specCommentThread{Thread: t, Line: line, Outdated: outdated}
+}
+
+// gitObjectSHAs returns the current HEAD commit and the working-tree blob hash
+// of specs/<specPath> under root, for advisory anchor metadata. Either is empty
+// when the path is not in a git repo or the command fails; the content-hash
+// anchor never depends on them.
+func gitObjectSHAs(root, specPath string) (commit, blob string) {
+	full := filepath.Join(root, "specs", specPath)
+	if out, err := cmdexec.Git(root, "rev-parse", "HEAD").Output(); err == nil {
+		commit = strings.TrimSpace(out)
+	}
+	if out, err := cmdexec.Git(root, "hash-object", full).Output(); err == nil {
+		blob = strings.TrimSpace(out)
+	}
+	return commit, blob
 }
