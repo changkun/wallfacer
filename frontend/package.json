@@ -12,6 +12,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.8.0",
+    "@codemirror/language": "^6.10.8",
+    "@codemirror/language-data": "^6.5.1",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.36.2",
+    "codemirror": "^6.0.1",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-zone": "^2.7.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",

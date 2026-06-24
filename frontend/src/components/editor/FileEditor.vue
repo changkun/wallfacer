@@ -1,10 +1,18 @@
 <script setup lang="ts">
-// One open file tab's editor pane. The buffer lives in the editorTabs store
-// (the source of truth that survives BoardPage unmount), so this component is a
-// thin view: it reads `tab.content` and writes edits back via `setContent`.
-// The text-editing internals (currently a <textarea>) are deliberately isolated
-// here so they can be upgraded (e.g. CodeMirror) without touching the tab shell.
-import { computed } from 'vue';
+// One open file tab's editor pane, backed by CodeMirror 6. The buffer lives in
+// the editorTabs store (the source of truth that survives BoardPage unmount),
+// so this component is a thin view: the store seeds the initial doc, edits flow
+// back via setContent, and async loads / external changes are pushed into the
+// view. CodeMirror is constructed in onMounted only, so vite-ssg's prerender
+// (which has no DOM) never touches it.
+import { onMounted, onBeforeUnmount, ref, shallowRef, computed, watch } from 'vue';
+import { EditorView, keymap } from '@codemirror/view';
+import { EditorState, Compartment } from '@codemirror/state';
+import { basicSetup } from 'codemirror';
+import { indentWithTab } from '@codemirror/commands';
+import { LanguageDescription } from '@codemirror/language';
+import { languages } from '@codemirror/language-data';
+import { oneDark } from '@codemirror/theme-one-dark';
 import { useEditorTabsStore } from '../../stores/editorTabs';
 
 const props = defineProps<{ path: string }>();
@@ -13,31 +21,89 @@ const tabs = useEditorTabsStore();
 const tab = computed(() => tabs.find(props.path));
 const dirty = computed(() => tabs.isDirty(props.path));
 
-function onInput(e: Event) {
-  tabs.setContent(props.path, (e.target as HTMLTextAreaElement).value);
+const host = ref<HTMLElement | null>(null);
+const view = shallowRef<EditorView | null>(null);
+const languageConf = new Compartment();
+const themeConf = new Compartment();
+// True while we push store→view, so the update listener doesn't echo back into
+// the store (which would clobber the dirty baseline).
+let applyingExternal = false;
+let themeObserver: MutationObserver | null = null;
+
+// The app writes the resolved theme to <html data-theme>; mirror it into CM.
+function activeTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? oneDark : [];
 }
 
 function onSave() {
   void tabs.save(props.path);
 }
 
-// Cmd/Ctrl+S saves; Tab inserts two spaces rather than leaving the field.
-function onKeydown(e: KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-    e.preventDefault();
-    onSave();
-    return;
-  }
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const ta = e.target as HTMLTextAreaElement;
-    const start = ta.selectionStart ?? 0;
-    const end = ta.selectionEnd ?? 0;
-    const next = (tab.value?.content ?? '').slice(0, start) + '  ' + (tab.value?.content ?? '').slice(end);
-    tabs.setContent(props.path, next);
-    requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 2; });
+// Lazily load the language for this filename (keeps grammars out of the main
+// bundle). Plain text when the extension is unknown.
+async function loadLanguage(path: string) {
+  const desc = LanguageDescription.matchFilename(languages, path.split('/').pop() || path);
+  if (!desc) return;
+  try {
+    const support = await desc.load();
+    view.value?.dispatch({ effects: languageConf.reconfigure(support) });
+  } catch {
+    /* unknown / failed grammar: leave as plain text */
   }
 }
+
+onMounted(() => {
+  if (!host.value) return;
+  const state = EditorState.create({
+    doc: tab.value?.content ?? '',
+    extensions: [
+      basicSetup,
+      keymap.of([
+        { key: 'Mod-s', preventDefault: true, run: () => { onSave(); return true; } },
+        indentWithTab,
+      ]),
+      languageConf.of([]),
+      themeConf.of(activeTheme()),
+      EditorView.updateListener.of((u) => {
+        if (u.docChanged && !applyingExternal) {
+          tabs.setContent(props.path, u.state.doc.toString());
+        }
+      }),
+      EditorView.theme({
+        '&': { height: '100%' },
+        '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px' },
+      }),
+    ],
+  });
+  view.value = new EditorView({ state, parent: host.value });
+  void loadLanguage(props.path);
+
+  themeObserver = new MutationObserver(() => {
+    view.value?.dispatch({ effects: themeConf.reconfigure(activeTheme()) });
+  });
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+});
+
+// Push external content changes (async load completing, or a future reload)
+// into the view without echoing back through the update listener.
+watch(
+  () => tab.value?.content,
+  (next) => {
+    const v = view.value;
+    if (!v || next == null || next === v.state.doc.toString()) return;
+    applyingExternal = true;
+    v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: next } });
+    applyingExternal = false;
+  },
+);
+
+onBeforeUnmount(() => {
+  themeObserver?.disconnect();
+  view.value?.destroy();
+});
 </script>
 
 <template>
@@ -55,21 +121,12 @@ function onKeydown(e: KeyboardEvent) {
       >{{ tab.saving ? 'Saving…' : 'Save' }}</button>
     </div>
     <div class="file-editor__body">
-      <div v-if="tab.loading" class="file-editor__placeholder">Loading…</div>
+      <div ref="host" class="file-editor__cm"></div>
+      <div v-if="tab.loading" class="file-editor__overlay">Loading…</div>
       <div
         v-else-if="tab.loadError"
-        class="file-editor__placeholder file-editor__placeholder--error"
+        class="file-editor__overlay file-editor__overlay--error"
       >{{ tab.loadError }}</div>
-      <textarea
-        v-else
-        class="file-editor__textarea"
-        spellcheck="false"
-        autocomplete="off"
-        autocapitalize="off"
-        :value="tab.content"
-        @input="onInput"
-        @keydown="onKeydown"
-      ></textarea>
     </div>
   </section>
 </template>
@@ -130,35 +187,36 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 .file-editor__body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
 }
 
-.file-editor__placeholder {
-  margin: auto;
+.file-editor__cm {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.file-editor__cm :deep(.cm-editor) {
+  height: 100%;
+}
+.file-editor__cm :deep(.cm-editor.cm-focused) {
+  outline: none;
+}
+
+.file-editor__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
   color: var(--ink-4);
   font-size: 13px;
 }
-.file-editor__placeholder--error {
+.file-editor__overlay--error {
   color: var(--danger, #e5534b);
-}
-
-.file-editor__textarea {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  resize: none;
-  border: none;
-  outline: none;
-  padding: 12px 16px;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
-  tab-size: 2;
-  white-space: pre;
-  overflow: auto;
 }
 </style>
