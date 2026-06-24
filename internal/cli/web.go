@@ -66,6 +66,12 @@ func runWeb(args []string) error {
 	// it. Behind Auth so the principal is the validated JWT, never the manifest.
 	coordReg := coordinator.NewRegistry()
 	coord := coordinator.NewCoordinator(coordReg)
+	// Spec comments are cloud-authoritative (the one relay-not-mirror exception).
+	// The durable store is Postgres when WALLFACER_DATABASE_URL is set; otherwise
+	// an in-memory store (single-replica dev). Either way the capability mints
+	// ids, stamps the principal, and fans out per org+repo.
+	commentStore := newCommentStore(context.Background())
+	coord.SetCommentService(coordinator.NewCommentService(commentStore, coordReg))
 	mux.Handle("GET /api/coordination/ws", auth.Auth(jwtValidator, http.HandlerFunc(coord.HandleWS)))
 
 	// Same-origin RUM ingest for the SPA; forwards browser OTLP to the

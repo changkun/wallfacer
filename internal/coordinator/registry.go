@@ -174,6 +174,15 @@ func (r *Registry) InstancesForRemote(remote string) []Instance {
 	return out
 }
 
+// instance returns a single registered instance by id (for re-sync after a
+// manifest update). Unexported: capability code queries by org or remote.
+func (r *Registry) instance(instanceID string) (Instance, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	inst, ok := r.byInstance[instanceID]
+	return inst, ok
+}
+
 // Len returns the number of registered instances.
 func (r *Registry) Len() int {
 	r.mu.RLock()

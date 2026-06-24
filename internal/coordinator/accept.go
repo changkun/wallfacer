@@ -13,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 
 	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/speccomment"
 )
 
 // Timing for the accept-side connection. The client pings every pingInterval;
@@ -32,14 +33,20 @@ const (
 // control, comments) reads the registry it feeds. It holds no task or content
 // data.
 type Coordinator struct {
-	reg *Registry
-	log *slog.Logger
+	reg      *Registry
+	log      *slog.Logger
+	comments *CommentService // nil until SetCommentService; the spec-comment capability
 }
 
 // NewCoordinator returns a Coordinator feeding the given registry.
 func NewCoordinator(reg *Registry) *Coordinator {
 	return &Coordinator{reg: reg, log: slog.Default()}
 }
+
+// SetCommentService attaches the spec-comment capability so the coordinator
+// dispatches FrameSpecComment ops and syncs threads on connect. Without it,
+// comment frames are ignored (forward-compatible).
+func (c *Coordinator) SetCommentService(s *CommentService) { c.comments = s }
 
 // HandleWS is the GET /api/coordination/ws handler. It must run behind the
 // server's auth path: the principal is read from the validated request context
@@ -83,6 +90,12 @@ func (c *Coordinator) serve(ctx context.Context, cancel context.CancelFunc, conn
 
 	go c.pinger(ctx, cancel, conn)
 
+	// Push the comment threads for the repos this instance serves, so a freshly
+	// connected board has its comments without a separate fetch.
+	if c.comments != nil {
+		c.comments.SyncTo(ctx, inst)
+	}
+
 	for {
 		typ, data, err := conn.Read(ctx)
 		if err != nil {
@@ -91,7 +104,7 @@ func (c *Coordinator) serve(ctx context.Context, cancel context.CancelFunc, conn
 		if typ != websocket.MessageText {
 			continue
 		}
-		c.dispatch(m.InstanceID, data)
+		c.dispatch(ctx, p, m.InstanceID, data)
 	}
 }
 
@@ -129,7 +142,7 @@ func (c *Coordinator) readManifest(ctx context.Context, conn *websocket.Conn) (M
 // (reconnect or workspace-set change), but only for the same instance id this
 // socket opened with. Reserved capability frames and unknown types are ignored
 // without dropping the connection (forward-compatible with newer peers).
-func (c *Coordinator) dispatch(instanceID string, data []byte) {
+func (c *Coordinator) dispatch(ctx context.Context, p Principal, instanceID string, data []byte) {
 	env, err := DecodeEnvelope(data)
 	if err != nil {
 		c.log.Warn("coordinator: bad frame", "err", err)
@@ -148,8 +161,33 @@ func (c *Coordinator) dispatch(instanceID string, data []byte) {
 			return
 		}
 		c.reg.UpdateManifest(instanceID, m)
+		// A workspace-set change may newly serve a repo; re-sync its comments.
+		if c.comments != nil {
+			if inst, ok := c.reg.instance(instanceID); ok {
+				c.comments.SyncTo(ctx, inst)
+			}
+		}
+	case FrameSpecComment:
+		c.dispatchComment(ctx, p, env.Raw)
 	default:
 		c.log.Debug("coordinator: ignoring frame type", "type", env.Type)
+	}
+}
+
+// dispatchComment decodes a spec-comment op and applies it through the comment
+// capability, which mints ids, stamps the principal, persists, and fans out. The
+// principal is the validated connection identity, never the wire body.
+func (c *Coordinator) dispatchComment(ctx context.Context, p Principal, raw []byte) {
+	if c.comments == nil {
+		return
+	}
+	var ev speccomment.Event
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		c.log.Warn("coordinator: bad spec-comment frame", "err", err)
+		return
+	}
+	if err := c.comments.Apply(ctx, p, ev); err != nil {
+		c.log.Debug("coordinator: spec-comment op rejected", "op", ev.Op, "err", err)
 	}
 }
 
