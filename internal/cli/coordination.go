@@ -143,6 +143,14 @@ func coordinationManifestFunc(instanceID, hostLabel, version string, wsMgr *work
 	}
 }
 
+// newCommentStore selects the coordinator's authoritative comment store. The
+// durable Postgres store (WALLFACER_DATABASE_URL) is wired in a later step; for
+// now this is the in-memory store (single-replica dev, byte-identical for one
+// process).
+func newCommentStore(_ context.Context) coordinator.CommentStore {
+	return coordinator.NewMemCommentStore()
+}
+
 // envCoordinationOptIn reads the server-side default for the coordination
 // opt-in. The default is off (the data boundary): coordination only engages
 // when explicitly enabled via WALLFACER_COORDINATION or the settings toggle.
