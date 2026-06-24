@@ -295,3 +295,16 @@ governed coordination channel," with:
    control.
 5. **Workspaces without a remote.** Collaboration requires a shared git remote.
    Confirm the UX when a workspace has none (local-only, no presence join).
+
+## Status (2026-06-25)
+
+The **connection** (phase 1 transport) and **spec comments** (phase 4) shipped
+end-to-end as a vertical slice: one outbound WSS per signed-in, opted-in instance
+to `wf.latere.ai`, an org-scoped coordinator that is authoritative for comment
+threads (Postgres-durable), instance-side relay to browsers over SSE, content-hash
+anchoring with reposition/orphan handling, and the comment UI (select-to-comment,
+markers, popover, resolve, triage, out-of-sync banner). The opt-in gate is off by
+default and persisted. See `coordination-plane/spec-comments.md` Outcome for the
+detail and divergences. **Presence, metadata projection, remote control, and the
+multi-replica Valkey `Directory`** remain unbuilt (the connection, registry, and
+`Directory` seam are in place for them); `replicas` stays at 1 (`memDirectory`).

@@ -9,7 +9,7 @@ affects:
   - frontend/src/components/plan/
 effort: large
 created: 2026-06-14
-updated: 2026-06-16
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
@@ -468,3 +468,52 @@ is a serializer, not a rewrite.
    onto the successor spec (Spec lifecycle), so it is never lost. What stays deferred is
    **automatic** recovery (following git rename detection to re-anchor without human
    action), a git-export-era concern.
+
+## Outcome (built 2026-06-25)
+
+The v1 vertical slice shipped end-to-end on `main`. What landed:
+
+- **Domain + store.** `internal/speccomment` holds `Thread`/`Comment`/`Anchor`/`Event`
+  and the coordinator-minted ULID (oklog/ulid v2). The coordinator's `CommentStore`
+  has an in-memory impl and a durable Postgres impl (`pgstore.go`, pgx v5,
+  `WALLFACER_DATABASE_URL`), selected at startup with a memory fallback. Every query
+  is scoped by `(org, repo)` in SQL: the tenant boundary is enforced in the store.
+- **Capability (coordinator).** `CommentService.Apply` handles create/reply/resolve/
+  reopen: mints the ULID, stamps `AuthorSub`/`OrgID` from the validated JWT (never the
+  wire), persists, and fans the authoritative thread out to `InstancesForRemote`
+  **filtered to the same org**. On connect the coordinator syncs each served repo's
+  full thread set (the relay-not-mirror load path), so a board has its comments
+  without a separate fetch.
+- **Anchoring (`internal/spec/anchor.go`).** Frozen normalization (trim/collapse/NFC),
+  `LineHash`, `ComputeAnchor`, and `Reposition` (exact/ambiguous/fuzzy/orphan). A
+  shared-fixture test pins hashes for the portability property (criterion 7). Runs
+  instance-side; the coordinator stores anchors verbatim and never computes them.
+- **Relay + endpoints (instance).** `internal/handler/CommentRelay` is a read-through
+  cache that applies coordinator pushes and fans them to browsers over a new
+  `spec-comment` SSE stream (`GET /api/spec-comments/stream`); browser ops post to
+  `POST /api/spec-comments` and ride the WSS up. The instance resolves repo identity
+  from the workspace git remote (the browser never sends it), reads the spec body to
+  compute the create anchor and to reposition each thread on load.
+- **Advisory git metadata + out-of-sync.** Create captures the spec's HEAD commit and
+  working-tree blob hash; on load a thread whose blob differs is flagged `outdated`.
+  With the `orphaned` flag this drives the repo-level out-of-sync banner.
+- **Frontend (`frontend/src/components/plan/`).** `SpecCommentsLayer.vue` +
+  `specComments.ts`: select text to comment, gutter markers mapped onto
+  `data-source-line` (added to `markdown.ts`), a thread popover with replies and
+  resolve/reopen, a Show-resolved toggle, a header count, and a triage list for
+  orphaned threads. Live updates via the SSE stream.
+
+Divergences from the spec, deferred (not blocking the v1 goal):
+
+- **RBAC viewer gate.** v1 lets any org member resolve/reply (collaboration default);
+  the per-role gate (viewers read-only, criterion 5) re-homes from
+  multi-user-collaboration and is stubbed at `canResolve`. The org boundary is fully
+  enforced.
+- **`outdated`/`re-place` triage ops.** The backend supports create/reply/resolve/
+  reopen; "mark outdated" and "re-place an orphan onto a new line" are not yet wired
+  (triage shows them disabled). Resolve from triage works.
+- **Comment edit, git fast-path reposition, schema migrations framework.** Deferred;
+  the Postgres schema is applied idempotently on init rather than via golang-migrate.
+- The two-hop relay is presence-unaware (fans out to all org instances on the repo,
+  not just those focused on the spec); the presence-aware optimization is a follow-up
+  once the presence leaf lands.
