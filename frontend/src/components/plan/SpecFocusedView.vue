@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { api, authHeaders } from '../../api/client';
-import { renderMarkdown } from '../../lib/markdown';
+import { renderMarkdown, renderMarkdownWithSourceLines } from '../../lib/markdown';
 import { enhanceMermaid } from '../../lib/mermaidRender';
 import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
 import { useRouter } from 'vue-router';
@@ -11,6 +11,7 @@ import { useTaskStore } from '../../stores/tasks';
 import { useToastStore } from '../../stores/toast';
 import { useDialogStore } from '../../stores/dialog';
 import FloatingToc from './FloatingToc.vue';
+import SpecCommentsLayer from './SpecCommentsLayer.vue';
 
 withDefaults(defineProps<{ chatVisible: boolean; chatEnabled?: boolean }>(), {
   chatEnabled: true,
@@ -148,7 +149,10 @@ const metaParts = computed(() => {
 
 const renderedBody = computed(() => {
   if (!parsed.value.body) return '';
-  let html = renderMarkdown(parsed.value.body);
+  // Source-line stamping so the spec-comments layer can map a selection (and a
+  // server-resolved thread line) onto rendered DOM. Other bodies (task prompt,
+  // docs) keep the unstamped render.
+  let html = renderMarkdownWithSourceLines(parsed.value.body);
   // Strip the leading <h1> and <hr> so they don't duplicate the title bar.
   html = html.replace(/^\s*<h1\b[^>]*>[\s\S]*?<\/h1>\s*/, '');
   html = html.replace(/^\s*<hr\s*\/?>\s*/, '');
@@ -460,12 +464,18 @@ defineExpose({ dispatchFocused, breakdownFocused });
           class="sf-frontmatter-warning"
           role="alert"
         >⚠ {{ parsed.warning }}</div>
-        <div
-          v-if="renderedBody"
-          ref="bodyRef"
-          class="sf-content sf-content--spec prose-content"
-          v-html="renderedBody"
-        />
+        <div v-if="renderedBody" class="sf-comment-host">
+          <div
+            ref="bodyRef"
+            class="sf-content sf-content--spec prose-content"
+            v-html="renderedBody"
+          />
+          <SpecCommentsLayer
+            :body-el="bodyRef"
+            :content-key="renderedBody"
+            :spec-path="focusedSpecPath || ''"
+          />
+        </div>
         <div v-else-if="!loading && !parsed.warning" class="sf-loading">Select a spec from the tree.</div>
       </template>
       <FloatingToc
@@ -670,6 +680,12 @@ defineExpose({ dispatchFocused, breakdownFocused });
   .sf-body--toc {
     padding-right: 28px;
   }
+}
+
+/* Positioning context for the spec-comments marker overlay, which absolutely
+   positions gutter markers against the body content's top-left. */
+.sf-comment-host {
+  position: relative;
 }
 
 .sf-content--spec {

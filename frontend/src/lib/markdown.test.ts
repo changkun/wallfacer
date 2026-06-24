@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarkdown } from './markdown';
+import { renderMarkdown, renderMarkdownWithSourceLines } from './markdown';
+
+describe('renderMarkdownWithSourceLines', () => {
+  it('stamps the 1-based start line on top-level blocks', () => {
+    const html = renderMarkdownWithSourceLines('# Title\n\nFirst para.\n\n## Heading');
+    // First para is on source line 3, the ## heading on line 5.
+    expect(html).toContain('data-source-line="3"');
+    expect(html).toContain('data-source-line="5"');
+  });
+
+  it('stamps nested list items at their own line, not the list start', () => {
+    // The bug: a level filter stamps only the <ul>, so a selection inside the
+    // second item maps to line 1 instead of line 2.
+    const html = renderMarkdownWithSourceLines('- one\n- two\n- three');
+    // The list opens on line 1; the items are on lines 1, 2, 3.
+    expect(html).toMatch(/<li[^>]*data-source-line="2"/);
+    expect(html).toMatch(/<li[^>]*data-source-line="3"/);
+  });
+
+  it('leaves the default render path free of source-line attrs', () => {
+    expect(renderMarkdown('# Title\n\n- a\n- b')).not.toContain('data-source-line');
+  });
+});
 
 describe('renderMarkdown doc images', () => {
   it('emits a light/dark pair for doc-relative images, rewritten to the asset route', () => {
