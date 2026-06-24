@@ -223,7 +223,9 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// collaboration. The connector self-gates (off by default), so this is safe
 	// to start unconditionally; nothing dials until both the token and the
 	// opt-in are present.
-	coordGate := startCoordinationClient(ctx, configDir, wsMgr,
+	commentRelay := handler.NewCommentRelay()
+	h.SetCommentRelay(commentRelay)
+	coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay,
 		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID},
 		logger.Main)
 	_ = coordGate
@@ -979,6 +981,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SpecTreeStream": h.SpecTreeStream,
 		"SpecTransition": h.SpecTransition,
 
+		"ListSpecComments":   h.ListSpecComments,
+		"SubmitSpecComment":  h.SubmitSpecComment,
+		"StreamSpecComments": h.StreamSpecComments,
+
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
 		"TriggerIdeation":   h.TriggerIdeation,
@@ -1134,6 +1140,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Spec tree.
 		"SpecTransition": handler.BodyLimitDefault,
+
+		// Spec comments.
+		"SubmitSpecComment": handler.BodyLimitDefault,
 
 		// Ideation agent.
 		"TriggerIdeation": handler.BodyLimitDefault,

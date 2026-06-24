@@ -10,15 +10,22 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
 )
+
+// ErrNotConnected is returned by Send when no live connection is held (signed
+// out, opted out, or mid-reconnect). The caller surfaces it to the browser as a
+// transient unavailability rather than a hard failure.
+var ErrNotConnected = errors.New("coordination: not connected")
 
 const (
 	defaultPingInterval = 20 * time.Second
@@ -45,6 +52,11 @@ type Config struct {
 	OptedIn func() bool
 	// Manifest builds the registration frame sent first on every connection.
 	Manifest func() coordinator.Manifest
+	// OnInbound, if set, receives the raw bytes of every coordinator-to-instance
+	// text frame (presence snapshots, comment relay). The capability layer
+	// decodes and dispatches it. Called from the read goroutine; it must not
+	// block.
+	OnInbound func([]byte)
 
 	PingInterval time.Duration
 	BaseBackoff  time.Duration
@@ -60,6 +72,14 @@ type Config struct {
 // backoff while signed in and opted in.
 type Connector struct {
 	cfg Config
+
+	// mu guards the live connection handle so Send (called from browser-facing
+	// handlers) races safely with connect/teardown. writeMu serializes writes:
+	// the WebSocket allows only one data writer at a time.
+	mu      sync.Mutex
+	conn    *websocket.Conn
+	connCtx context.Context
+	writeMu sync.Mutex
 }
 
 // NewConnector applies defaults and returns a connector. Run drives it.
@@ -150,7 +170,10 @@ func (c *Connector) connectOnce(ctx context.Context) bool {
 	connCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := writeJSON(connCtx, conn, c.cfg.Manifest()); err != nil {
+	c.setConn(connCtx, conn)
+	defer c.clearConn()
+
+	if err := c.write(connCtx, conn, c.cfg.Manifest()); err != nil {
 		c.cfg.Logger.Debug("coordinator client: manifest send failed", "err", err)
 		return true
 	}
@@ -159,13 +182,49 @@ func (c *Connector) connectOnce(ctx context.Context) bool {
 	go c.watchGate(connCtx, cancel)
 
 	for {
-		if _, _, err := conn.Read(connCtx); err != nil {
+		typ, data, err := conn.Read(connCtx)
+		if err != nil {
 			return true
 		}
-		// Coordinator-to-instance frames (presence snapshots, commands, comment
-		// relay) are consumed by later capability leaves; this leaf only keeps
-		// the connection live and drains them.
+		// Coordinator-to-instance frames (comment relay, presence snapshots) are
+		// handed to the capability layer via OnInbound; an unset callback drains
+		// them, keeping the connection live (forward-compatible).
+		if typ == websocket.MessageText && c.cfg.OnInbound != nil {
+			c.cfg.OnInbound(data)
+		}
 	}
+}
+
+func (c *Connector) setConn(ctx context.Context, conn *websocket.Conn) {
+	c.mu.Lock()
+	c.conn, c.connCtx = conn, ctx
+	c.mu.Unlock()
+}
+
+func (c *Connector) clearConn() {
+	c.mu.Lock()
+	c.conn, c.connCtx = nil, nil
+	c.mu.Unlock()
+}
+
+// Send writes a frame to the live coordinator connection. It is safe for
+// concurrent use (browser-facing handlers call it). Returns ErrNotConnected
+// when no connection is held; the caller treats that as transient.
+func (c *Connector) Send(v any) error {
+	c.mu.Lock()
+	conn, connCtx := c.conn, c.connCtx
+	c.mu.Unlock()
+	if conn == nil {
+		return ErrNotConnected
+	}
+	return c.write(connCtx, conn, v)
+}
+
+// write serializes a single data-frame write (the WebSocket allows one writer).
+func (c *Connector) write(ctx context.Context, conn *websocket.Conn, v any) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return writeJSON(ctx, conn, v)
 }
 
 // pinger sends a ping every PingInterval and tears the connection down if one
