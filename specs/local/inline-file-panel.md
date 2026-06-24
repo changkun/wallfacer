@@ -1,103 +1,194 @@
 ---
-title: Inline File Panel with Multi-Modal Preview
+title: Editor Tabs (VS Code-Style File Tabs in the Board)
 status: drafted
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
-  - frontend/src/components/ExplorerPanel.vue
   - frontend/src/views/BoardPage.vue
-  - internal/handler/explorer.go
-  - internal/apicontract/routes.go
-  - internal/constants/constants.go
+  - frontend/src/components/ExplorerPanel.vue
+  - frontend/src/components/editor/EditorTabStrip.vue
+  - frontend/src/components/editor/FileEditor.vue
+  - frontend/src/stores/editorTabs.ts
+  - frontend/package.json
 effort: large
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
 
-# Inline File Panel with Multi-Modal Preview
+# Editor Tabs (VS Code-Style File Tabs in the Board)
 
-Supersedes the archived [[file-panel-viewer]] (specs/local/file-panel-viewer.md), which was written against the deleted vanilla-JS frontend (`ui/js/explorer.js`) and the container model. Every file and symbol it names is gone. This spec re-targets the same idea against the current Vue architecture.
+## Design Revision (2026-06-25)
+
+This spec originally proposed an inline preview panel *inside the explorer aside*,
+keeping the board always visible, retaining the `<textarea>` editor, and adding
+multi-modal media rendering (image/video/audio/PDF/hex). Per direct user
+direction it is re-scoped to a **VS Code-style tab model in the board's top
+bar**:
+
+1. The Kanban board becomes a pinned, non-closeable **tab** (tab 0).
+2. Clicking a file in the tree opens (or focuses) a **file tab**; the active tab
+   swaps the center pane. The board stays open as a tab you switch back to.
+3. Editing uses a **real code editor (CodeMirror 6)**, not a textarea, for a
+   VS Code-like experience (syntax highlighting while editing, line numbers,
+   bracket matching, find).
+
+The earlier media-rendering and aside-panel design moves to [Future](#future);
+the raw-bytes endpoint is not part of this scope.
 
 ## Problem
 
-The explorer previews files in a centered modal. `ExplorerPanel.vue` (template lines around `.explorer-preview-backdrop`, line 537) opens a `role="dialog"` overlay over the board grid. This is disruptive: the modal blocks the board, and browsing several files means opening and closing a dialog for each one. Users coming from VS Code expect an inline panel with tabs.
-
-The preview is also format-blind. `selectFile()` (ExplorerPanel.vue:295) fetches `GET /api/explorer/file`, which returns either `text/plain` bytes or, for binary content, a JSON body `{binary:true, size}` with no payload (explorer.go:284). The component stringifies that JSON into `fileContent` (line 306), so a PNG or PDF renders as the literal text `{"binary":true,"size":1234}`. Images, video, audio, and PDFs have no visual preview, and there is no hex fallback for opaque binaries.
-
-## Goal
-
-Replace the modal preview with an inline, tabbed file panel inside the explorer, and add multi-modal rendering: text with syntax highlighting, image, video, audio, PDF, and a hex view for binary. Media renders via a new raw-bytes endpoint with the correct `Content-Type`, streamed natively by the browser.
+The explorer previews files in a centered modal. `ExplorerPanel.vue` opens an
+`.explorer-preview-backdrop` `role="dialog"` overlay over the board grid. This is
+disruptive: the modal blocks the board, only one file is open at a time, and
+browsing several files means opening and closing a dialog for each one. The
+board's top bar (`app-header`) has a large unused `.app-header__spacer` (literally
+where workspace-group tabs used to live). Users coming from VS Code expect file
+tabs there, multiple files open at once, and a proper text editor.
 
 ## Current State
 
-- `frontend/src/components/ExplorerPanel.vue` is the Vue explorer, mounted inside `frontend/src/views/BoardPage.vue` to the left of the board grid. The header comment (lines 13-16) notes the preview is a modal precisely because the board grid occupies the inline space a pane would use.
-  - `selectFile(entry)` (line 295) fetches `GET /api/explorer/file?workspace=&path=` and stores the body in `fileContent`. Only one file is open at a time; opening another replaces it.
-  - Text: `highlightCode()` + `previewLines` (line 338) render line-numbered hljs HTML.
-  - Markdown (`.md`, `.markdown`): `isMarkdownFile` + `renderMarkdown()` with a Raw/Preview toggle (line 376).
-  - Edit mode: `startEdit` / `saveFile` / `cancelEdit` persist via `PUT /api/explorer/file` (line 210). Escape closes the modal first, then the panel (`onKeydown`, line 384).
-  - Binary, video, audio, image, PDF: no handling. The JSON sentinel is shown as text.
-- `internal/handler/explorer.go`: `ExplorerReadFile` (line 210) validates via `isAllowedWorkspace` + `isWithinWorkspace`, enforces `constants.ExplorerMaxFileSize` (2 MiB, constants.go:128), sniffs the first 8 KiB with `isBinaryContent` (line 204), and either streams `text/plain` or returns the binary JSON sentinel. There is no raw-bytes path and no `Range` support.
-- `internal/apicontract/routes.go` (lines 656-666) declares only `GET /api/explorer/file` (`ExplorerReadFile`) and `PUT /api/explorer/file` (`ExplorerWriteFile`).
-- `withAuthToken(url)` (frontend/src/api/client.ts:31) appends `?token=` so URL-driven loads (like the existing EventSource stream) carry auth.
-- Tests today: Go `internal/handler/explorer_test.go`, frontend `frontend/src/lib/explorerTree.test.ts`. There is no `ExplorerPanel.vue` component test.
+- `frontend/src/views/BoardPage.vue` owns the board: `<header class="app-header">`
+  (the spacer + `SearchBar` + action buttons) and `.board-with-explorer`
+  (the `ExplorerPanel` aside + `.board-grid`).
+- `frontend/src/components/ExplorerPanel.vue` is the file tree + preview modal.
+  `selectFile(entry)` fetches `GET /api/explorer/file?workspace=&path=` into
+  `fileContent`/`selectedPath` and renders the `.explorer-preview-backdrop`
+  modal. Editing is a `<textarea>`; `saveFile` persists via
+  `PUT /api/explorer/file`; a `dialog.confirm` dirty guard protects discards.
+  View highlighting uses `highlight.js` via `highlightCode`/`splitHighlightedLines`.
+- `frontend/src/stores/ui.ts` toggles `showExplorer` (tree visibility); the tree
+  is independently shown/hidden from any tab state.
+- No code-editor library is installed (no Monaco/CodeMirror). Build is
+  `vite-ssg` (pages are prerendered), so any editor must mount client-side only.
+  `useMermaid` is the existing precedent for a browser-only render path.
 
 ## Design
 
-### Raw-content endpoint
+### Tab model and source of truth
 
-Add a sibling route `GET /api/explorer/file/raw?workspace=&path=` (`Name: ExplorerReadFileRaw`, `JSName: readFileRaw`) in routes.go, mirroring the existing entry shape and `explorer` tag. The handler reuses `isAllowedWorkspace` + `isWithinWorkspace` for identical path validation (same escape and not-found handling), then serves the file with `http.ServeContent(w, r, name, modTime, file)`. `ServeContent` gives us three things the panel needs: a `Content-Type` from the extension (with content sniff fallback), `Range` request support (required for video and audio seeking), and conditional GET.
+A new Pinia store `frontend/src/stores/editorTabs.ts` is the source of truth, so
+tabs survive `BoardPage` unmount (navigating to /chat and back) and editor DOM
+teardown:
 
-The 2 MiB limit stays on the existing JSON/text path (content is read into memory and highlighted). The raw endpoint is deliberately not subject to it: media uses native browser streaming, so a large video is fine and never buffered server-side.
+```ts
+interface FileTab {
+  path: string;          // workspace-relative path; identity key
+  workspace: string;
+  name: string;          // basename; disambiguated by parent dir on collision
+  content: string;       // live buffer (CM rehydrates from this)
+  baseline: string;      // last-saved content; dirty = content !== baseline
+  loading: boolean;
+  loadError: string | null;
+  saving: boolean;
+  saveError: string | null;
+}
+// state: tabs: FileTab[]; activeId: string ('board' | path)
+// 'board' is a synthetic, pinned, non-closeable tab that is always present.
+```
 
-### Inline tabbed panel
+Actions: `openFile(ws, path)` (focus if already open, else fetch + append + focus),
+`focus(id)`, `close(id)` (board is uncloseable; dirty tabs run the confirm guard),
+`setContent(path, text)`, `save(path)`, `markSaved(path)`, `isDirty(path)`.
+The file-read (`GET /api/explorer/file`) moves into `openFile`; the
+write (`PUT /api/explorer/file`) into `save`.
 
-`ExplorerPanel.vue` replaces the `.explorer-preview-backdrop` modal with an inline panel rendered in the explorer body, below the tree. The explorer already lives left of the board grid in `BoardPage.vue`; the panel occupies the lower region of the explorer aside (the tree and panel split the aside's height), so the board grid is never covered. On narrow viewports the panel may expand to fill the aside with the tree collapsed to a header strip.
+### Tab strip in the top bar
 
-Open-files state: a small reactive store `openFiles: { path, workspace, pinned, dirty }[]` plus an active index, replacing the single `selectedPath`. Tab semantics follow VS Code:
+`frontend/src/components/editor/EditorTabStrip.vue` renders into
+`.app-header__spacer` in `BoardPage.vue` (left-aligned, `flex: 1`, horizontally
+scrollable on overflow). `SearchBar` + action buttons stay right-aligned. Tabs:
+the pinned **Board** tab first, then file tabs in open order. Each file tab shows
+the basename, a dirty dot when unsaved, and a `×` close (also middle-click and
+`Ctrl/Cmd+W` on the active tab). Active tab is visually distinct.
 
-- Single-click a tree file: open in a preview tab (italic title, reused/replaced by the next single-click).
-- Double-click: pin the tab (normal title, persists until closed). Promotes the current preview tab.
-- Duplicate filenames disambiguate by parent directory in the tab label.
-- Close via `×`, middle-click, or `Ctrl/Cmd+W`. Closing the last tab hides the panel.
+### Center-pane swap
 
-### Multi-modal rendering
+`.board-with-explorer` keeps the `ExplorerPanel` aside (tree, independently
+toggled by `showExplorer`). The center area holds the board grid plus one editor
+per open file, switched by the active tab. State preservation is mandatory, so
+this uses `v-show`, never `v-if`: switching to a file tab must not reset the
+board (filter, scroll, drag) and must not wipe another editor's undo/cursor.
 
-Dispatch by extension via a shared map. Media tabs build their `src` with `withAuthToken('/api/explorer/file/raw?...')` so `<img>`, `<video>`, `<audio>`, and `<iframe>` carry the `?token=` (element src URLs cannot send auth headers).
+```
+.board-grid                       v-show="activeId === 'board'"
+FileEditor (one per tab, v-for)   v-show="activeId === tab.path"
+```
 
-| Type | Extensions | Rendering |
-|------|-----------|-----------|
-| Text/code | default | `highlightCode` + line numbers (current path) |
-| Markdown | `.md`, `.markdown` | `renderMarkdown` with Raw/Preview toggle (current path) |
-| Image | `.png .jpg .jpeg .gif .svg .webp .ico .avif` | `<img>` fit-to-panel, click toggles original size |
-| Video | `.mp4 .webm .mov .ogv` | `<video controls preload="metadata">` |
-| Audio | `.mp3 .wav .ogg .flac .m4a` | `<audio controls>` |
-| PDF | `.pdf` | `<iframe>` at the raw URL, download-link fallback |
-| Binary (other) | sniffed via the JSON sentinel | hex view of the first 256 bytes (offset, hex, ASCII) |
+### Editor: CodeMirror 6
 
-Text, markdown, and image continue to use the existing `GET /api/explorer/file` JSON/text response for classification and content. Media and PDF use the raw endpoint directly and skip the 2 MiB ceiling. The hex view reuses the binary sentinel (`{binary:true, size}`); to populate bytes it fetches a bounded slice from the raw endpoint via a `Range` request (`bytes=0-255`).
+`frontend/src/components/editor/FileEditor.vue` wraps a CodeMirror 6 instance
+(chosen over Monaco: Monaco fights `vite-ssg` prerender with web workers and a
+multi-MB bundle; CM6 mounts cleanly client-side and is modular). The CM view is
+constructed in `onMounted` only. Setup: line numbers, history (undo/redo),
+bracket matching, default search, active-line highlight, and a theme bound to
+the app light/dark pref. Per-file language is resolved lazily via
+`@codemirror/language-data`'s `matchFilename` (do not reuse the highlight.js
+`extToLang` map; different system). The editor is editable; an `update` listener
+writes the buffer back to the store (`setContent`) which recomputes dirty.
 
-### Edit mode
+New deps (`frontend/package.json`): `codemirror`, `@codemirror/state`,
+`@codemirror/view`, `@codemirror/commands`, `@codemirror/language-data`, and a
+theme package. Pin versions verified against current CM6 docs at implement time.
 
-Edit controls (Edit / Save / Discard, dirty dot) move from the modal header into the active tab's toolbar; `saveFile` / `cancelEdit` and the dirty-edit guard are unchanged. Edit applies only to text and markdown tabs.
+The store buffer is the source of truth; the CM instance rehydrates from
+`tab.content` on (re)mount. highlight.js stays for any other consumers (diff,
+spec view) but the explorer file-preview path stops using it.
+
+### Save and dirty handling
+
+Per-tab dirty = `content !== baseline`. A toolbar above the editor shows the
+path, a Save button (`Ctrl/Cmd+S`), and save/error state. `save` calls
+`PUT /api/explorer/file` and sets `baseline = content` on success. Closing a
+dirty tab, and an explicit guard, reuse the existing `dialog.confirm`
+("Discard changes?"). Navigating routes does not destroy buffers (store-held),
+so unsaved work persists across board ↔ chat navigation.
+
+### ExplorerPanel changes
+
+- `selectFile(entry)` calls `editorTabs.openFile(ws, entry.path)` instead of
+  setting `selectedPath` / fetching inline.
+- Delete the `.explorer-preview-backdrop` modal block and its now-unused
+  preview/edit/highlight state. Keep the tree, lazy children fetch, and keyboard
+  navigation untouched.
 
 ## Phasing / Acceptance Criteria
 
-Phase 1, panel shell and tabs:
-- Inline panel replaces the modal; `openFiles` store with preview vs pinned tabs, duplicate-name disambiguation, close affordances, `Ctrl/Cmd+W`.
-- Text, markdown, and edit mode work in the panel; Escape returns focus to the board.
-- New component test under `frontend/src/components/__tests__/` covers: open preview tab, double-click pins, single-click another file replaces the preview, `Cmd+W` closes active, duplicate-name labels.
+Phase 1, store + tab shell:
+- `editorTabs` store with board-pinned-uncloseable, open/focus-existing, close,
+  close-dirty-guard, duplicate-name disambiguation, dirty computed.
+- `EditorTabStrip` in the top-bar spacer; center-pane `v-show` swap; board state
+  (filter/scroll) survives switching to a file tab and back.
+- Vitest store test: open appends+focuses, opening an open file focuses (no dup),
+  close removes, board cannot be closed, dirty guard invoked for dirty close,
+  buffers survive a simulated route change. (Do not assert CM layout in
+  happy-dom; verify the editor in a real browser.)
 
-Phase 2, raw endpoint and media:
-- `ExplorerReadFileRaw` added to `explorer.go` and `routes.go`; serves correct `Content-Type` and honors `Range`.
-- Extension dispatch renders image, video, audio, PDF, and hex; media URLs pass through `withAuthToken`.
-- Go tests in `explorer_test.go`: Content-Type per extension, `Range` partial-content (206), path-escape rejection (400), missing file (404), binary sniff for hex.
+Phase 2, CodeMirror editor:
+- `FileEditor` mounts CM6 client-side only; line numbers, syntax highlighting,
+  undo, find; theme follows light/dark pref; language lazy-loaded by filename.
+- Edit → buffer → store dirty → Save (`PUT`) → baseline updates; `Ctrl/Cmd+S`
+  saves; dirty guard on close.
+- ExplorerPanel modal deleted; tree still opens files into tabs.
+- Real-browser verification (vite dev + Playwright): open two files, edit one,
+  switch tabs preserving state, save, close with dirty guard.
 
 ## Non-Goals
 
-- No full code editor (Monaco, CodeMirror). The textarea editor stays.
-- No split-view or diff comparison.
-- No file create, delete, or rename from the panel.
-- No raising the 2 MiB limit for the text path. Media streams natively via the raw URL.
-- No `sessionStorage` persistence of open tabs (possible later polish).
+- No split panes, no tab drag-reorder, no diff view, no minimap.
+- No custom find/replace UI (CM's built-in search is enough).
+- No VS Code single-click-preview (italic) tab behavior; every open is a normal
+  tab in v1.
+- No URL-syncing of open files (active-tab-in-query is a possible later polish;
+  file tabs do not belong in the URL).
+- No media rendering (image/video/audio/PDF/hex) or raw-bytes endpoint in scope.
+- Tabs are board-only (the user said "in the Kanban UI"); not added to Chat/Plan
+  now. The store is kept extractable so that is cheap later.
+
+## Future
+
+- Multi-modal rendering + a `GET /api/explorer/file/raw` endpoint with `Range`
+  support (the prior revision of this spec), for image/video/audio/PDF/hex.
+- Preview vs pinned tabs (single vs double click), tab drag-reorder, split view.
+- Reusing the tab shell on Chat/Plan.
