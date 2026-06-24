@@ -291,6 +291,8 @@ async function undoToast(toast: { id: number; action: ArchiveAction }) {
 // ── Spec link interception ────────────────────────────────────────
 
 const bodyRef = ref<HTMLElement | null>(null);
+// True while the pinned TOC occupies the top-right; reserves a body gutter.
+const tocReserve = ref(false);
 
 function isSpecLink(href: string): boolean {
   if (!href) return false;
@@ -439,6 +441,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
     <div
       class="sf-body"
+      :class="{ 'sf-body--toc': tocReserve }"
       :key="(focusedTaskId || focusedSpecPath) + ':' + (focusedIsIndex ? '1' : '0')"
     >
       <div v-if="focusedTaskId">
@@ -465,7 +468,11 @@ defineExpose({ dispatchFocused, breakdownFocused });
         />
         <div v-else-if="!loading && !parsed.warning" class="sf-loading">Select a spec from the tree.</div>
       </template>
-      <FloatingToc :body-el="bodyRef" :content-key="(renderedBody || renderedTaskPrompt)" />
+      <FloatingToc
+        :body-el="bodyRef"
+        :content-key="(renderedBody || renderedTaskPrompt)"
+        @reserve="tocReserve = $event"
+      />
     </div>
 
     <div class="sf-toasts" role="status" aria-live="polite">
@@ -648,6 +655,21 @@ defineExpose({ dispatchFocused, breakdownFocused });
   overflow-y: auto;
   padding: 20px 28px 80px;
   animation: sf-fade-in 0.18s ease-out;
+}
+
+/* The TOC is pinned (position:absolute, anchored to the pane, not the
+   scroller), so it occludes the same top-right band at every scroll position.
+   Reserve a gutter wide enough to clear its 180px panel (right:12px) plus a
+   gap, so body text never slides under it. FloatingToc hides itself below
+   1100px, where the gutter is released. */
+.sf-body--toc {
+  padding-right: calc(180px + 12px + 16px);
+}
+
+@media (max-width: 1100px) {
+  .sf-body--toc {
+    padding-right: 28px;
+  }
 }
 
 .sf-content--spec {
