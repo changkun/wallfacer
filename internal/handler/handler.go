@@ -125,6 +125,9 @@ type Handler struct {
 	// fan-out + forward-up). Nil until SetCommentRelay; the comment endpoints
 	// then report coordination unavailable. Guarded by snapshotMu.
 	commentRelay *CommentRelay
+	// coordToggle is the coordination opt-in gate. Nil until SetCoordinationToggle.
+	// Guarded by snapshotMu.
+	coordToggle CoordinationToggle
 
 	autopilot  atomic.Bool
 	autotest   atomic.Bool

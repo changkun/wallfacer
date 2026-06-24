@@ -228,7 +228,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay,
 		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID},
 		logger.Main)
-	_ = coordGate
+	h.SetCoordinationToggle(coordGate)
 
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
@@ -981,9 +981,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SpecTreeStream": h.SpecTreeStream,
 		"SpecTransition": h.SpecTransition,
 
-		"ListSpecComments":   h.ListSpecComments,
-		"SubmitSpecComment":  h.SubmitSpecComment,
-		"StreamSpecComments": h.StreamSpecComments,
+		"ListSpecComments":      h.ListSpecComments,
+		"SubmitSpecComment":     h.SubmitSpecComment,
+		"StreamSpecComments":    h.StreamSpecComments,
+		"GetCoordinationStatus": h.GetCoordinationStatus,
+		"SetCoordinationOptIn":  h.SetCoordinationOptIn,
 
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
