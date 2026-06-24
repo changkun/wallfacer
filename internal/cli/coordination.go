@@ -12,6 +12,8 @@ import (
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/coordinator/client"
 	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/handler"
+	"latere.ai/x/wallfacer/internal/speccomment"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -35,7 +37,7 @@ func (g *coordinationGate) SetOptedIn(v bool) { g.optedIn.Store(v) }
 // a goroutine. It returns the gate so the settings layer can toggle opt-in. The
 // connector self-gates on sign-in (a stored token) and opt-in, so calling this
 // unconditionally is safe: nothing dials until both hold.
-func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
+func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
 	gate := &coordinationGate{}
 	gate.optedIn.Store(envCoordinationOptIn())
 
@@ -74,13 +76,22 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 		version = "dev"
 	}
 
-	connector := client.NewConnector(client.Config{
+	cfg := client.Config{
 		URL:      url,
 		Token:    coordinationTokenFunc(ctx, tokenStore, oidcClient),
 		OptedIn:  gate.OptedIn,
 		Manifest: coordinationManifestFunc(instanceID, hostLabel, version, wsMgr),
 		Logger:   logger,
-	})
+	}
+	// Wire the comment relay to the connection: coordinator pushes flow into the
+	// relay (cache + browser SSE), browser ops flow up via the connector's Send.
+	if relay != nil {
+		cfg.OnInbound = relay.HandleInbound
+	}
+	connector := client.NewConnector(cfg)
+	if relay != nil {
+		relay.SetSendUp(func(ev speccomment.Event) error { return connector.Send(ev) })
+	}
 	go connector.Run(ctx)
 	return gate
 }

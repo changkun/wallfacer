@@ -121,6 +121,11 @@ type Handler struct {
 	startTime  time.Time
 	reg        *metrics.Registry
 
+	// commentRelay is the instance side of the spec-comment relay (cache + SSE
+	// fan-out + forward-up). Nil until SetCommentRelay; the comment endpoints
+	// then report coordination unavailable. Guarded by snapshotMu.
+	commentRelay *CommentRelay
+
 	autopilot  atomic.Bool
 	autotest   atomic.Bool
 	autosubmit atomic.Bool

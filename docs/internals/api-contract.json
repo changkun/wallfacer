@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 112,
+  "route_count": 115,
   "routes": [
     {
       "method": "GET",
@@ -290,6 +290,34 @@
       "description": "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive take a single path and return {path, status}.",
       "tags": [
         "specs"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/spec-comments",
+      "name": "ListSpecComments",
+      "description": "List cloud-resident spec comment threads for the visible repos, each repositioned against the current spec body (orphaned flag set when the anchor is lost).",
+      "tags": [
+        "spec-comments"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/spec-comments",
+      "name": "SubmitSpecComment",
+      "description": "Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection. The coordinator is authoritative and echoes the result back over the SSE stream.",
+      "tags": [
+        "spec-comments"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/spec-comments/stream",
+      "name": "StreamSpecComments",
+      "description": "SSE stream of spec-comment events relayed from the coordinator (create/reply/resolve/reopen/sync).",
+      "tags": [
+        "spec-comments",
+        "sse"
       ]
     },
     {

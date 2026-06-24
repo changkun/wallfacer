@@ -254,6 +254,26 @@ var Routes = []Route{
 		Tags:        []string{"specs"},
 	},
 
+	// --- Spec comments (coordination plane) ---
+	{
+		Method: http.MethodGet, Pattern: "/api/spec-comments", Name: "ListSpecComments",
+		JSName:      "listSpecComments",
+		Description: "List cloud-resident spec comment threads for the visible repos, each repositioned against the current spec body (orphaned flag set when the anchor is lost).",
+		Tags:        []string{"spec-comments"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/spec-comments", Name: "SubmitSpecComment",
+		JSName:      "submitSpecComment",
+		Description: "Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection. The coordinator is authoritative and echoes the result back over the SSE stream.",
+		Tags:        []string{"spec-comments"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/spec-comments/stream", Name: "StreamSpecComments",
+		JSName:      "specCommentsStream",
+		Description: "SSE stream of spec-comment events relayed from the coordinator (create/reply/resolve/reopen/sync).",
+		Tags:        []string{"spec-comments", "sse"},
+	},
+
 	// --- Planning sandbox ---
 
 	{
