@@ -22,6 +22,53 @@ func (h *Handler) SetCommentRelay(r *CommentRelay) {
 	h.snapshotMu.Unlock()
 }
 
+// CoordinationToggle is the runtime opt-in gate, set once at startup. The
+// settings endpoints read and flip it; the connector re-reads it every cycle.
+type CoordinationToggle interface {
+	OptedIn() bool
+	SetOptedIn(bool)
+}
+
+// SetCoordinationToggle attaches the coordination opt-in gate.
+func (h *Handler) SetCoordinationToggle(t CoordinationToggle) {
+	h.snapshotMu.Lock()
+	h.coordToggle = t
+	h.snapshotMu.Unlock()
+}
+
+func (h *Handler) coordinationToggle() CoordinationToggle {
+	h.snapshotMu.RLock()
+	defer h.snapshotMu.RUnlock()
+	return h.coordToggle
+}
+
+// GetCoordinationStatus reports whether coordination is opted in. The browser
+// uses it to render the settings switch and decide whether to show the comment
+// UI.
+func (h *Handler) GetCoordinationStatus(w http.ResponseWriter, _ *http.Request) {
+	t := h.coordinationToggle()
+	optedIn := t != nil && t.OptedIn()
+	writeCommentJSON(w, map[string]any{"opted_in": optedIn, "available": t != nil})
+}
+
+// SetCoordinationOptIn flips the coordination opt-in. Body {"enabled": bool}.
+func (h *Handler) SetCoordinationOptIn(w http.ResponseWriter, r *http.Request) {
+	t := h.coordinationToggle()
+	if t == nil {
+		http.Error(w, "coordination unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	t.SetOptedIn(req.Enabled)
+	writeCommentJSON(w, map[string]any{"opted_in": req.Enabled})
+}
+
 func (h *Handler) relay() *CommentRelay {
 	h.snapshotMu.RLock()
 	defer h.snapshotMu.RUnlock()

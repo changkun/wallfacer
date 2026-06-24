@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 115,
+  "route_count": 117,
   "routes": [
     {
       "method": "GET",
@@ -318,6 +318,24 @@
       "tags": [
         "spec-comments",
         "sse"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/coordination/status",
+      "name": "GetCoordinationStatus",
+      "description": "Report whether the coordination opt-in is enabled (and available).",
+      "tags": [
+        "spec-comments"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/coordination/opt-in",
+      "name": "SetCoordinationOptIn",
+      "description": "Flip the coordination opt-in (the data-boundary gate). Body {enabled}.",
+      "tags": [
+        "spec-comments"
       ]
     },
     {

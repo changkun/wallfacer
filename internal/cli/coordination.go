@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 
 	"latere.ai/x/pkg/authkit"
@@ -28,21 +30,47 @@ const defaultCoordinationURL = "wss://wf.latere.ai/api/coordination/ws"
 // coordinationGate holds the runtime opt-in switch. It is the data-boundary
 // gate: while closed (the default), the connector dials nothing and emits
 // nothing. The settings UI flips it without restarting the connector, which
-// re-reads it every cycle.
+// re-reads it every cycle. The choice persists to a flag file so it survives a
+// restart.
 type coordinationGate struct {
 	optedIn atomic.Bool
+	path    string // persistence file; empty disables persistence
 }
 
-func (g *coordinationGate) OptedIn() bool  { return g.optedIn.Load() }
-func (g *coordinationGate) SetOptedIn(v bool) { g.optedIn.Store(v) }
+func (g *coordinationGate) OptedIn() bool { return g.optedIn.Load() }
+
+// SetOptedIn flips the gate and persists the choice. Persistence failure is
+// logged, not fatal: the in-memory state still governs the connector.
+func (g *coordinationGate) SetOptedIn(v bool) {
+	g.optedIn.Store(v)
+	if g.path == "" {
+		return
+	}
+	data := []byte("0")
+	if v {
+		data = []byte("1")
+	}
+	if err := os.WriteFile(g.path, data, 0o600); err != nil {
+		logger.Main.Warn("coordination: persist opt-in failed", "err", err)
+	}
+}
+
+// loadOptIn seeds the gate: the persisted flag file wins if present, else the
+// server-side env default (off).
+func loadOptIn(path string) bool {
+	if b, err := os.ReadFile(path); err == nil {
+		return strings.TrimSpace(string(b)) == "1"
+	}
+	return envCoordinationOptIn()
+}
 
 // startCoordinationClient wires and runs the outbound coordination connector in
 // a goroutine. It returns the gate so the settings layer can toggle opt-in. The
 // connector self-gates on sign-in (a stored token) and opt-in, so calling this
 // unconditionally is safe: nothing dials until both hold.
 func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
-	gate := &coordinationGate{}
-	gate.optedIn.Store(envCoordinationOptIn())
+	gate := &coordinationGate{path: filepath.Join(configDir, "coordination-opt-in")}
+	gate.optedIn.Store(loadOptIn(gate.path))
 
 	instanceID, err := coordinator.LoadOrCreateInstanceID(configDir)
 	if err != nil {

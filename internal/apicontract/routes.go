@@ -273,6 +273,18 @@ var Routes = []Route{
 		Description: "SSE stream of spec-comment events relayed from the coordinator (create/reply/resolve/reopen/sync).",
 		Tags:        []string{"spec-comments", "sse"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/coordination/status", Name: "GetCoordinationStatus",
+		JSName:      "coordinationStatus",
+		Description: "Report whether the coordination opt-in is enabled (and available).",
+		Tags:        []string{"spec-comments"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/coordination/opt-in", Name: "SetCoordinationOptIn",
+		JSName:      "setCoordinationOptIn",
+		Description: "Flip the coordination opt-in (the data-boundary gate). Body {enabled}.",
+		Tags:        []string{"spec-comments"},
+	},
 
 	// --- Planning sandbox ---
 

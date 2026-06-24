@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -71,6 +72,34 @@ func TestCoordinationGate(t *testing.T) {
 	g.SetOptedIn(false)
 	if g.OptedIn() {
 		t.Fatal("gate did not close after SetOptedIn(false)")
+	}
+}
+
+func TestCoordinationGatePersistence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "coordination-opt-in")
+
+	// Default (no file, no env) is off, the data-boundary default.
+	t.Setenv("WALLFACER_COORDINATION", "")
+	if loadOptIn(path) {
+		t.Fatal("loadOptIn should default off with no file and no env")
+	}
+
+	// Flipping on persists, and a fresh load reads it back (survives restart).
+	g := &coordinationGate{path: path}
+	g.SetOptedIn(true)
+	if !loadOptIn(path) {
+		t.Fatal("opt-in did not persist across a reload")
+	}
+	g2 := &coordinationGate{path: path}
+	g2.optedIn.Store(loadOptIn(path))
+	if !g2.OptedIn() {
+		t.Fatal("a restarted gate did not pick up the persisted opt-in")
+	}
+
+	// Flipping off persists too.
+	g.SetOptedIn(false)
+	if loadOptIn(path) {
+		t.Fatal("opt-out did not persist")
 	}
 }
 
