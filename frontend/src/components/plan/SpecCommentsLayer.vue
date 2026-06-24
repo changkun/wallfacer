@@ -18,6 +18,7 @@ import {
   buildReplyTree,
   initials,
   inlineThreads,
+  outOfSyncCount,
   threadPreview,
   triageThreads,
   type BlockLine,
@@ -67,7 +68,10 @@ useSse({
   onStaleRestart() { void refresh(); },
 });
 
-onMounted(() => { void refresh(); });
+onMounted(() => {
+  void refresh();
+  void fetchStatus();
+});
 
 // ── Derived sets ───────────────────────────────────────────────────
 
@@ -76,6 +80,43 @@ const specThreads = computed(() => inlineThreads(threads.value, props.specPath, 
 }));
 const openCount = computed(() => countActive(threads.value, props.specPath));
 const triage = computed(() => triageThreads(threads.value));
+// outOfSync drives the repo-level banner: comments that no longer match this
+// clone's spec text (anchor lost, or the file changed since the comment).
+const outOfSync = computed(() => outOfSyncCount(threads.value));
+
+// ── Coordination opt-in (the data-boundary gate) ───────────────────
+
+// optedIn is the persisted server switch; coordToggleAvailable is true only when
+// the server can toggle it. When available but off, the layer shows an enable
+// prompt instead of the comment chrome.
+const optedIn = ref(false);
+const coordToggleAvailable = ref(false);
+const enabling = ref(false);
+
+async function fetchStatus() {
+  try {
+    const s = await api<{ opted_in?: boolean; available?: boolean }>('GET', '/api/coordination/status');
+    optedIn.value = !!s.opted_in;
+    coordToggleAvailable.value = !!s.available;
+  } catch {
+    coordToggleAvailable.value = false;
+  }
+}
+
+async function enableCoordination() {
+  enabling.value = true;
+  try {
+    await api('POST', '/api/coordination/opt-in', { enabled: true });
+    optedIn.value = true;
+    void refresh();
+    // The connector takes a moment to dial and sync; refetch shortly after.
+    setTimeout(() => void refresh(), 1500);
+  } catch {
+    // leave the prompt up
+  } finally {
+    enabling.value = false;
+  }
+}
 
 // ── Source-line block index ────────────────────────────────────────
 // Collect every data-source-line element with its offset relative to the body's
@@ -279,6 +320,32 @@ defineExpose({ openCount, showResolved, available });
 
 <template>
   <template v-if="available">
+    <!-- Opt-in prompt: coordination is off by default (the data boundary). -->
+    <div v-if="coordToggleAvailable && !optedIn" class="sc-banner sc-banner--optin">
+      <span>Spec comments are off. Enable to comment and see your team's comments.</span>
+      <button
+        type="button"
+        class="sc-btn sc-btn--primary"
+        :disabled="enabling"
+        @click="enableCoordination"
+      >{{ enabling ? 'Enabling' : 'Enable' }}</button>
+    </div>
+
+    <template v-if="optedIn">
+    <!-- Out-of-sync warning: comments that no longer match this clone's specs. -->
+    <div v-if="outOfSync > 0" class="sc-banner sc-banner--warn">
+      <span>
+        {{ outOfSync }} {{ outOfSync === 1 ? 'comment does' : 'comments do' }} not match your
+        current spec text. Your copy may be out of sync with your team.
+      </span>
+      <button
+        v-if="triage.length > 0"
+        type="button"
+        class="sc-banner-link"
+        @click="triageOpen = true"
+      >Review</button>
+    </div>
+
     <!-- Header strip: open-thread count + Show resolved toggle + triage entry. -->
     <div class="sc-bar">
       <span class="sc-count" :class="{ 'sc-count--zero': openCount === 0 }">
@@ -436,10 +503,42 @@ defineExpose({ openCount, showResolved, available });
         </div>
       </div>
     </div>
+    </template>
   </template>
 </template>
 
 <style scoped>
+/* Banners: the opt-in prompt and the out-of-sync warning, above the prose. */
+.sc-banner {
+  order: -2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.sc-banner--optin {
+  background: var(--color-surface-2, #f3f4f6);
+  border: 1px solid var(--color-border, #d1d5db);
+}
+.sc-banner--warn {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, transparent);
+}
+.sc-banner span { flex: 1; }
+.sc-banner-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent, #2563eb);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
 /* Header strip sits at the top of the body, before the prose. */
 .sc-bar {
   display: flex;

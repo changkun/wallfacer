@@ -6,6 +6,7 @@ import {
   buildReplyTree,
   inlineThreads,
   initials,
+  outOfSyncCount,
   threadPreview,
   threadsForSpec,
   triageThreads,
@@ -158,6 +159,23 @@ describe('applyEvent', () => {
   it('ignores an event with no repo', () => {
     const input = { repo: [t1] };
     expect(applyEvent(input, { op: 'create', repo: '', thread: t2 })).toBe(input);
+  });
+});
+
+describe('outOfSyncCount', () => {
+  it('counts orphaned and outdated threads, not active or resolved', () => {
+    const all = [
+      thread({ id: '1' }),
+      thread({ id: '2', orphaned: true }),
+      thread({ id: '3', status: 'orphaned' }),
+      thread({ id: '4', outdated: true }),
+      thread({ id: '5', resolved: true, status: 'resolved' }),
+    ];
+    expect(outOfSyncCount(all)).toBe(3);
+  });
+
+  it('is zero when every thread is in sync', () => {
+    expect(outOfSyncCount([thread({ id: '1' }), thread({ id: '2' })])).toBe(0);
   });
 });
 
