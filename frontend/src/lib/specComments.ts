@@ -52,6 +52,18 @@ export interface Thread {
 export interface SpecCommentThread extends Thread {
   line: number;
   orphaned: boolean;
+  // outdated is advisory: the spec file changed since the comment was made (the
+  // stored blob differs from the file's current blob), even when the anchored
+  // line still resolves. Drives the repo out-of-sync banner.
+  outdated?: boolean;
+}
+
+// outOfSyncCount counts threads whose anchor was lost (orphaned) or whose spec
+// text changed since the comment was made (outdated), across all specs in the
+// repo. A non-zero count means this clone differs from where teammates
+// commented: the signal for the out-of-sync banner.
+export function outOfSyncCount(threads: SpecCommentThread[]): number {
+  return threads.filter((t) => t.orphaned || t.status === 'orphaned' || t.outdated).length;
 }
 
 // The SSE event shape from GET /api/spec-comments/stream (event: spec-comment).
