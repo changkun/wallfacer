@@ -1766,6 +1766,47 @@
     return { x: cx + dx * t, y: cy + dy * t };
   }
 
+  // _dragEdgePoints recomputes an incident edge's polyline when one of its
+  // endpoint nodes is dragged to `self`. `end` is "from" or "to" — which
+  // endpoint of this edge the dragged node owns. `pts` is the current
+  // polyline (source perimeter, dummy waypoints…, dest perimeter).
+  //
+  //   Direct (2-point) edges re-aim BOTH perimeter points at the live node
+  //   centres so the line stays anchored on both rectangles. `other` is the
+  //   non-dragged endpoint's position.
+  //
+  //   Waypoint-routed (>2-point) edges move only the dragged endpoint
+  //   against its adjacent waypoint; the layout waypoints stay fixed
+  //   (recomputing them needs the layout engine). This still keeps the
+  //   arrow attached to the node as it moves — the reported bug was that it
+  //   stayed frozen until drag-end.
+  //
+  // Returns a fresh points array for _smoothPath.
+  function _dragEdgePoints(pts, end, self, other) {
+    var out = pts.slice();
+    if (pts.length === 2 && other) {
+      var selfCx = self.x + NODE_W / 2;
+      var selfCy = self.y + (self.height || NODE_H) / 2;
+      var otherCx = other.x + NODE_W / 2;
+      var otherCy = other.y + (other.height || NODE_H) / 2;
+      if (end === "from") {
+        out[0] = _rectPerimeterPoint(self, otherCx, otherCy);
+        out[1] = _rectPerimeterPoint(other, selfCx, selfCy);
+      } else {
+        out[0] = _rectPerimeterPoint(other, selfCx, selfCy);
+        out[1] = _rectPerimeterPoint(self, otherCx, otherCy);
+      }
+      return out;
+    }
+    if (end === "from") {
+      out[0] = _rectPerimeterPoint(self, pts[1].x, pts[1].y);
+    } else {
+      var prev = pts[pts.length - 2];
+      out[out.length - 1] = _rectPerimeterPoint(self, prev.x, prev.y);
+    }
+    return out;
+  }
+
   // _edgeDetourWaypoints inspects the straight line between startPt and
   // endPt and returns an array of detour waypoints needed to route the
   // edge around any non-endpoint nodes that sit in the direct path.
@@ -2329,13 +2370,14 @@
       }
       svg.appendChild(path);
 
-      // Store incident records for both endpoints. Only direct (2-point)
-      // routed edges get live-updates; dummy-chained edges stay static
-      // since recomputing their waypoints requires the layout engine.
-      if (pts.length === 2) {
-        _addIncident(e.from, { pathEl: path, otherId: e.to });
-        _addIncident(e.to, { pathEl: path, otherId: e.from });
-      }
+      // Store incident records for both endpoints so the drag handler can
+      // re-route the edge live. Both records SHARE one mutable polyline:
+      // pins don't re-render (see depgraph _pinNode), so dragging one node
+      // then the other must compose on the same array — separate copies
+      // would reset the first node's endpoint on the second drag.
+      var recPts = pts.slice();
+      _addIncident(e.from, { pathEl: path, otherId: e.to, end: "from", pts: recPts });
+      _addIncident(e.to, { pathEl: path, otherId: e.from, end: "to", pts: recPts });
     });
 
     // livePositions: a positions-like Map that _edgeDetourWaypoint can
@@ -2373,22 +2415,15 @@
       for (var i = 0; i < incident.length; i++) {
         var rec = incident[i];
         var other = nodePosRef.get(rec.otherId);
-        if (!other) continue;
-        var selfCx = self.x + NODE_W / 2;
-        var selfCy = self.y + self.height / 2;
-        var otherCx = other.x + NODE_W / 2;
-        var otherCy = other.y + other.height / 2;
-        // Determine source vs dest from the path's data-from.
-        var fromId = rec.pathEl.getAttribute("data-from");
-        var srcPos = fromId === nodeId ? self : other;
-        var dstPos = fromId === nodeId ? other : self;
-        var srcCx = srcPos === self ? selfCx : otherCx;
-        var srcCy = srcPos === self ? selfCy : otherCy;
-        var dstCx = dstPos === self ? selfCx : otherCx;
-        var dstCy = dstPos === self ? selfCy : otherCy;
-        var startPt = _rectPerimeterPoint(srcPos, dstCx, dstCy);
-        var endPt = _rectPerimeterPoint(dstPos, srcCx, srcCy);
-        rec.pathEl.setAttribute("d", _smoothPath([startPt, endPt]));
+        // Direct edges need the other endpoint; waypoint-routed edges don't
+        // (only the dragged end moves), so a missing `other` only skips the
+        // 2-point case.
+        if (!other && rec.pts.length === 2) continue;
+        // Write back into the shared array in place so the sibling record
+        // (the other endpoint) keeps seeing this update on a later drag.
+        var next = _dragEdgePoints(rec.pts, rec.end, self, other);
+        for (var k = 0; k < next.length; k++) rec.pts[k] = next[k];
+        rec.pathEl.setAttribute("d", _smoothPath(rec.pts));
       }
     }
 
