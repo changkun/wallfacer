@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"os"
 	"sync/atomic"
@@ -140,7 +142,11 @@ func coordinationManifestFunc(instanceID, hostLabel, version string, wsMgr *work
 		seen := make(map[string]bool)
 		if wsMgr != nil {
 			for _, snap := range wsMgr.AllActiveSnapshots() {
-				localKey := workspace.GroupKey(snap.Workspaces)
+				// LocalKey must be an opaque hash, never a path: GroupKey joins the
+				// raw local folder paths, so hash it before it crosses the wire
+				// (the data boundary forbids local paths). The coordinator ignores
+				// it anyway; it joins on the canonical remote.
+				localKey := hashLocalKey(workspace.GroupKey(snap.Workspaces))
 				for _, path := range snap.Workspaces {
 					remote := coordinator.NormalizeRemoteURL(gitutil.WorkspaceStatus(path).RemoteURL)
 					if remote == "" || seen[remote] {
@@ -171,6 +177,14 @@ func newCommentStore(ctx context.Context) coordinator.CommentStore {
 		logger.Main.Error("coordination: Postgres comment store unavailable; using memory", "err", err)
 	}
 	return coordinator.NewMemCommentStore()
+}
+
+// hashLocalKey turns the path-bearing workspace.GroupKey into an opaque hex
+// digest so no local filesystem path crosses the wire (the data boundary). The
+// hash is stable per machine, which is all the instance's own routing needs.
+func hashLocalKey(groupKey string) string {
+	sum := sha256.Sum256([]byte(groupKey))
+	return hex.EncodeToString(sum[:])
 }
 
 // envCoordinationOptIn reads the server-side default for the coordination
