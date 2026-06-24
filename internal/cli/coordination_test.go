@@ -2,10 +2,15 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/oauth2"
+
+	"latere.ai/x/wallfacer/internal/coordinator"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // fakeTokenStore is an in-memory authkit.TokenStore for exercising the token
@@ -66,6 +71,45 @@ func TestCoordinationGate(t *testing.T) {
 	g.SetOptedIn(false)
 	if g.OptedIn() {
 		t.Fatal("gate did not close after SetOptedIn(false)")
+	}
+}
+
+// TestManifestLocalKeyIsHashedNotPath is the data-boundary regression: the
+// manifest's local_key is derived from workspace.GroupKey, which joins the raw
+// local folder paths. It must be hashed before it crosses the wire so no local
+// filesystem path ever reaches the coordinator.
+func TestManifestLocalKeyIsHashedNotPath(t *testing.T) {
+	paths := []string{"/Users/alice/dev/secret-project", "/Users/alice/work/widgets"}
+	groupKey := workspace.GroupKey(paths) // joins the raw paths
+	localKey := hashLocalKey(groupKey)
+
+	if len(localKey) != 64 {
+		t.Fatalf("hashLocalKey = %q (len %d), want a 64-char hex digest", localKey, len(localKey))
+	}
+	for _, p := range paths {
+		if strings.Contains(localKey, p) {
+			t.Fatalf("local_key leaks a local path: %q contains %q", localKey, p)
+		}
+	}
+	if strings.Contains(localKey, "/") {
+		t.Fatalf("local_key contains a path separator: %q", localKey)
+	}
+
+	// The full manifest, as it would be marshaled onto the wire, carries no path.
+	m := coordinator.NewManifest("inst_1", "host", "dev",
+		[]coordinator.WorkspaceRef{{Remote: "github.com/acme/widgets", LocalKey: localKey}},
+		[]string{"comments"})
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	for _, p := range paths {
+		if strings.Contains(string(b), p) {
+			t.Fatalf("manifest wire bytes leak a local path: %s", b)
+		}
+	}
+	if strings.Contains(string(b), "/Users/") {
+		t.Fatalf("manifest wire bytes contain a local path: %s", b)
 	}
 }
 
