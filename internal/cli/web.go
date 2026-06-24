@@ -14,6 +14,7 @@ import (
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/webserver"
 )
 
@@ -52,7 +53,20 @@ func runWeb(args []string) error {
 	}
 	authClient := auth.New(authCfg)
 
+	// JWT validator for the coordination WebSocket: a local instance dials with
+	// Authorization: Bearer <jwt>, validated on the same internal/auth path as
+	// every API request. Issuer/JWKS fall back to AuthURL derivatives.
+	jwtValidator := auth.BuildValidator(authCfg, os.Getenv("AUTH_JWKS_URL"), os.Getenv("AUTH_ISSUER"))
+
 	mux := http.NewServeMux()
+
+	// Coordination plane (accept side): terminate the one outbound WebSocket
+	// each signed-in, opted-in local instance dials. The registry it feeds is
+	// in-memory and ephemeral (the single-replica view); capability code reads
+	// it. Behind Auth so the principal is the validated JWT, never the manifest.
+	coordReg := coordinator.NewRegistry()
+	coord := coordinator.NewCoordinator(coordReg)
+	mux.Handle("GET /api/coordination/ws", auth.Auth(jwtValidator, http.HandlerFunc(coord.HandleWS)))
 
 	// Same-origin RUM ingest for the SPA; forwards browser OTLP to the
 	// in-cluster collector. POST-scoped to avoid a ServeMux conflict with the

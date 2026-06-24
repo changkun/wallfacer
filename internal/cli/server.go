@@ -217,6 +217,17 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		envconfig.Lookup(envFileKV, "AUTH_JWKS_URL"),
 		envconfig.Lookup(envFileKV, "AUTH_ISSUER"),
 	)
+
+	// Coordination plane (dial side): hold one outbound WebSocket to the cloud
+	// coordinator while signed in and opted in, for cross-machine spec-comment
+	// collaboration. The connector self-gates (off by default), so this is safe
+	// to start unconditionally; nothing dials until both the token and the
+	// opt-in are present.
+	coordGate := startCoordinationClient(ctx, configDir, wsMgr,
+		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID},
+		logger.Main)
+	_ = coordGate
+
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
 		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces)
