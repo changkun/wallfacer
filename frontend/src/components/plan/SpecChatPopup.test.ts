@@ -59,6 +59,62 @@ describe('SpecChatPopup geometry', () => {
     expect(win.style.display).toBe('none');
   });
 
+  it('anchors the launcher bottom-right by default', async () => {
+    const { host } = await mount();
+    const fab = host.querySelector('.scp-launcher') as HTMLElement;
+    // 48px button, 20px from the bottom-right of 1280x800.
+    expect(fab.style.left).toBe(`${1280 - 48 - 20}px`);
+    expect(fab.style.top).toBe(`${800 - 48 - 20}px`);
+  });
+
+  it('a plain launcher click (no drag) opens the chat', async () => {
+    const { host } = await mount();
+    const fab = host.querySelector('.scp-launcher') as HTMLElement;
+    fab.dispatchEvent(pointer('pointerdown', 1212, 732));
+    window.dispatchEvent(pointer('pointerup', 1212, 732));
+    await nextTick();
+    const win = host.querySelector('.scp-window') as HTMLElement;
+    expect(win.style.display).not.toBe('none');
+    expect(JSON.parse(memStore.get(KEY)!).open).toBe(true);
+  });
+
+  it('drags the launcher anywhere and persists it without opening', async () => {
+    const { host } = await mount();
+    const fab = host.querySelector('.scp-launcher') as HTMLElement;
+    fab.dispatchEvent(pointer('pointerdown', 1212, 732));
+    window.dispatchEvent(pointer('pointermove', 200, 150)); // far past the threshold
+    window.dispatchEvent(pointer('pointerup', 200, 150));
+    await nextTick();
+    // Moved by (-1012, -582) from (1212, 732) → (200, 150), both on-screen.
+    expect(fab.style.left).toBe('200px');
+    expect(fab.style.top).toBe('150px');
+    const saved = JSON.parse(memStore.get(KEY)!);
+    expect(saved.lx).toBe(200);
+    expect(saved.ly).toBe(150);
+    expect(saved.open).toBe(false); // a drag must not open the chat
+    expect(host.querySelector('.scp-window')?.matches('[style*="display: none"]')).toBe(true);
+  });
+
+  it('clamps a launcher drag so it stays fully on-screen', async () => {
+    const { host } = await mount();
+    const fab = host.querySelector('.scp-launcher') as HTMLElement;
+    fab.dispatchEvent(pointer('pointerdown', 1212, 732));
+    window.dispatchEvent(pointer('pointermove', 5000, 5000)); // far off the bottom-right
+    window.dispatchEvent(pointer('pointerup', 5000, 5000));
+    await nextTick();
+    // Bottoms out at viewport minus the 48px button.
+    expect(fab.style.left).toBe(`${1280 - 48}px`);
+    expect(fab.style.top).toBe(`${800 - 48}px`);
+  });
+
+  it('restores a persisted launcher position', async () => {
+    memStore.set(KEY, JSON.stringify({ lx: 40, ly: 300, open: false }));
+    const { host } = await mount();
+    const fab = host.querySelector('.scp-launcher') as HTMLElement;
+    expect(fab.style.left).toBe('40px');
+    expect(fab.style.top).toBe('300px');
+  });
+
   it('opens bottom-right by default and persists open state', async () => {
     const { host, vm } = await mount();
     vm.toggle();

@@ -21,8 +21,11 @@ const STORE_KEY = 'wallfacer-spec-chat-popup';
 const MARGIN = 16;
 const MIN_W = 300, MIN_H = 320;
 const DEFAULT_W = 380, DEFAULT_H = 520;
+const LAUNCHER_SIZE = 48, LAUNCHER_MARGIN = 20;
 
-interface PopupState { x: number; y: number; w: number; h: number; open: boolean }
+// lx/ly are the collapsed launcher's top-left, persisted separately from the
+// window so each remembers where the user parked it.
+interface PopupState { x: number; y: number; w: number; h: number; lx: number; ly: number; open: boolean }
 
 const geom = reactive<PopupState>(loadState());
 
@@ -36,7 +39,14 @@ function loadState(): PopupState {
   // Default anchor: bottom-right.
   const x = saved.x ?? Math.max(MARGIN, vw() - w - MARGIN);
   const y = saved.y ?? Math.max(MARGIN, vh() - h - MARGIN);
-  return { w, h, x: clampX(x, w), y: clampY(y), open: saved.open ?? false };
+  const lx = saved.lx ?? Math.max(0, vw() - LAUNCHER_SIZE - LAUNCHER_MARGIN);
+  const ly = saved.ly ?? Math.max(0, vh() - LAUNCHER_SIZE - LAUNCHER_MARGIN);
+  return {
+    w, h,
+    x: clampX(x, w), y: clampY(y),
+    lx: clampLX(lx), ly: clampLY(ly),
+    open: saved.open ?? false,
+  };
 }
 
 function persist() {
@@ -54,12 +64,17 @@ function vh() { return typeof window !== 'undefined' ? window.innerHeight : 800;
 function clampNum(v: number, lo: number, hi: number) { return Math.min(Math.max(v, lo), Math.max(lo, hi)); }
 function clampX(x: number, w: number) { return clampNum(x, KEEP_VISIBLE - w, vw() - KEEP_VISIBLE); }
 function clampY(y: number) { return clampNum(y, 0, vh() - KEEP_VISIBLE); }
+// The launcher is a single button, so keep it fully on-screen.
+function clampLX(x: number) { return clampNum(x, 0, vw() - LAUNCHER_SIZE); }
+function clampLY(y: number) { return clampNum(y, 0, vh() - LAUNCHER_SIZE); }
 
 function reclamp() {
   geom.w = clampNum(geom.w, MIN_W, vw());
   geom.h = clampNum(geom.h, MIN_H, vh());
   geom.x = clampX(geom.x, geom.w);
   geom.y = clampY(geom.y);
+  geom.lx = clampLX(geom.lx);
+  geom.ly = clampLY(geom.ly);
 }
 
 const popupStyle = computed(() => ({
@@ -68,6 +83,8 @@ const popupStyle = computed(() => ({
   width: geom.w + 'px',
   height: geom.h + 'px',
 }));
+
+const launcherStyle = computed(() => ({ left: geom.lx + 'px', top: geom.ly + 'px' }));
 
 // ── Open / close ───────────────────────────────────────────────────
 function toggle() { geom.open = !geom.open; persist(); }
@@ -92,6 +109,36 @@ function onDragUp() {
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointerup', onDragUp);
   persist();
+}
+
+// ── Launcher drag ──────────────────────────────────────────────────
+// The collapsed launcher doubles as a drag handle: move past a small threshold
+// to reposition it anywhere, or release without moving to open the chat.
+const DRAG_THRESHOLD = 4;
+let launchDrag: { px: number; py: number; ox: number; oy: number; moved: boolean } | null = null;
+function onLauncherDown(ev: PointerEvent) {
+  launchDrag = { px: ev.clientX, py: ev.clientY, ox: geom.lx, oy: geom.ly, moved: false };
+  window.addEventListener('pointermove', onLauncherMove);
+  window.addEventListener('pointerup', onLauncherUp);
+  ev.preventDefault();
+}
+function onLauncherMove(ev: PointerEvent) {
+  if (!launchDrag) return;
+  const dx = ev.clientX - launchDrag.px;
+  const dy = ev.clientY - launchDrag.py;
+  if (!launchDrag.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) launchDrag.moved = true;
+  if (launchDrag.moved) {
+    geom.lx = clampLX(launchDrag.ox + dx);
+    geom.ly = clampLY(launchDrag.oy + dy);
+  }
+}
+function onLauncherUp() {
+  const moved = launchDrag?.moved ?? false;
+  launchDrag = null;
+  window.removeEventListener('pointermove', onLauncherMove);
+  window.removeEventListener('pointerup', onLauncherUp);
+  if (moved) persist();
+  else toggle();
 }
 
 // ── Resize (any edge or corner) ────────────────────────────────────
@@ -181,8 +228,9 @@ defineExpose({
       v-if="!geom.open"
       type="button"
       class="scp-launcher"
-      title="Open planning chat (C)"
-      @click="toggle"
+      :style="launcherStyle"
+      title="Open planning chat (C) — drag to move"
+      @pointerdown="onLauncherDown"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
     </button>
@@ -256,15 +304,14 @@ defineExpose({
 <style scoped>
 .scp-launcher {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
   width: 48px;
   height: 48px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
   border: none;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,6 +320,7 @@ defineExpose({
   transition: transform 120ms ease;
 }
 .scp-launcher:hover { transform: scale(1.06); }
+.scp-launcher:active { cursor: grabbing; }
 
 .scp-window {
   position: fixed;
