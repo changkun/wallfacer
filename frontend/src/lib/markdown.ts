@@ -19,6 +19,29 @@ const md = new MarkdownIt({
     s.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim(),
 });
 
+// Source-line stamping (opt-in via env.sourceLines). When enabled, every block
+// token that knows its source position gets a `data-source-line` attribute set
+// to the 1-based line where that block starts (token.map[0] + 1). This matches
+// the server's 1-based thread.line so the spec-comments layer can map both
+// directions (selection to line on create, server line to element on placement)
+// against the same convention. Default callers (docs, task prompts, chat) pass
+// no flag and get unchanged output. This is the standard VS-Code-preview
+// technique, scoped here so it never perturbs the shared render path.
+md.core.ruler.push('source_line', (state) => {
+  if (!(state.env as { sourceLines?: boolean })?.sourceLines) return;
+  // state.tokens is the flat stream of every block token at every depth (only
+  // inline content nests in .children), so stamping all non-inline tokens with
+  // a source map reaches list items, blockquote contents, and table rows, not
+  // just top-level blocks. Mapping a selection inside a list to the <li>'s own
+  // line (not the list's start line) is what keeps create/placement accurate.
+  // Closers have map === null and are skipped.
+  for (const token of state.tokens) {
+    if (token.map && token.type !== 'inline') {
+      token.attrSet('data-source-line', String(token.map[0] + 1));
+    }
+  }
+});
+
 // Custom fence renderer: mermaid fences become a placeholder div consumed
 // by enhanceMarkdown(); other fences get the standard <pre><code class="language-X">.
 const defaultFence = md.renderer.rules.fence!;
@@ -68,6 +91,13 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
 
 export function renderMarkdown(src: string, baseDir = ''): string {
   return md.render(src, { baseDir });
+}
+
+// renderMarkdownWithSourceLines renders with the source-line plugin enabled, so
+// block elements carry `data-source-line`. Used by the spec viewer to map a
+// text selection (and a server-resolved thread line) onto rendered DOM.
+export function renderMarkdownWithSourceLines(src: string, baseDir = ''): string {
+  return md.render(src, { baseDir, sourceLines: true });
 }
 
 export function stripFirstHeading(src: string): string {
