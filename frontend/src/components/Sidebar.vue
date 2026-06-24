@@ -382,10 +382,15 @@ watch(wsPopoverOpen, (open) => {
   padding: 0;
   justify-content: center;
 }
+/* When collapsed the popover flies out to the right of the rail. The base
+ * --inline rule pins left:0 + right:0 to span the trigger; clear right and give
+ * it a real width, else the two anchors squeeze it to a sliver. */
 .wf-cs :deep(.sb-ws-switch-wrap--collapsed .sb-ws-popover--inline) {
   position: absolute;
   left: calc(100% + 4px);
+  right: auto;
   top: 0;
+  width: 220px;
   z-index: 200;
 }
 </style>
