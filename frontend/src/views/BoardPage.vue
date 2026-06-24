@@ -10,8 +10,11 @@ import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import SearchBar from '../components/SearchBar.vue';
 import ExplorerPanel from '../components/ExplorerPanel.vue';
+import EditorTabStrip from '../components/editor/EditorTabStrip.vue';
+import FileEditor from '../components/editor/FileEditor.vue';
 import AutomationMenu from '../components/AutomationMenu.vue';
 import TrashModal from '../components/TrashModal.vue';
+import { useEditorTabsStore, BOARD_TAB_ID } from '../stores/editorTabs';
 import { useAutomationToggles } from '../composables/useAutomationToggles';
 import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
@@ -32,6 +35,7 @@ function dismissComposer() {
 
 const store = useTaskStore();
 const ui = useUiStore();
+const editorTabs = useEditorTabsStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -231,7 +235,9 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
 
 <template>
   <header class="app-header">
-    <div class="app-header__spacer"></div>
+    <div class="app-header__spacer">
+      <EditorTabStrip />
+    </div>
     <div class="app-header__actions">
       <SearchBar />
       <div class="app-header__button-row">
@@ -309,6 +315,10 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
          browse before one is picked). The board stays visible beside it. -->
     <ExplorerPanel v-if="ui.showExplorer && hasWorkspace" @close="ui.closeExplorer()" />
 
+    <!-- Center pane. The board itself is a tab; switching to a file tab swaps
+         it for that file's editor. v-show (not v-if) preserves board scroll and
+         filter, and each editor's buffer, across tab switches. -->
+    <div class="board-host" v-show="editorTabs.activeId === BOARD_TAB_ID">
   <main v-if="needsWorkspace" class="board-empty">
     <div class="board-empty__inner">
       <h1 class="board-empty__title">Pick a workspace to begin</h1>
@@ -417,6 +427,15 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       </div>
     </div>
   </main>
+    </div>
+
+    <!-- One editor pane per open file; only the active tab's pane is shown. -->
+    <FileEditor
+      v-for="tab in editorTabs.tabs"
+      v-show="editorTabs.activeId === tab.path"
+      :key="tab.path"
+      :path="tab.path"
+    />
   </div>
 
   <!-- Mobile-only column nav: jump between the snap-scrolled columns. -->
@@ -435,6 +454,16 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
 </template>
 
 <style scoped>
+/* Wraps the board so the tab strip can swap it out (v-show) for a file editor
+   without the board losing its place. Mirrors the flex sizing the board mains
+   relied on as direct children of .board-with-explorer. */
+.board-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
 .board-empty {
   flex: 1;
   min-height: 0;
