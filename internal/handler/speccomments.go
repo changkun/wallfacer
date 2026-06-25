@@ -26,9 +26,12 @@ func (h *Handler) SetCommentRelay(r *CommentRelay) {
 
 // CoordinationToggle is the runtime opt-in gate, set once at startup. The
 // settings endpoints read and flip it; the connector re-reads it every cycle.
+// Connected and SignedIn surface live state for the status indicator.
 type CoordinationToggle interface {
 	OptedIn() bool
 	SetOptedIn(bool)
+	Connected() bool // the outbound WebSocket to the coordinator is live
+	SignedIn() bool  // a usable token exists for the connection
 }
 
 // SetCoordinationToggle attaches the coordination opt-in gate.
@@ -49,8 +52,30 @@ func (h *Handler) coordinationToggle() CoordinationToggle {
 // UI.
 func (h *Handler) GetCoordinationStatus(w http.ResponseWriter, _ *http.Request) {
 	t := h.coordinationToggle()
-	optedIn := t != nil && t.OptedIn()
-	writeCommentJSON(w, map[string]any{"opted_in": optedIn, "available": t != nil})
+	if t == nil {
+		writeCommentJSON(w, map[string]any{"available": false})
+		return
+	}
+	// state summarizes the connection for the UI: the precedence is what a human
+	// would want to see and act on (sign in, then opt in, then it connects).
+	var state string
+	switch {
+	case !t.SignedIn():
+		state = "signed-out"
+	case !t.OptedIn():
+		state = "opted-out"
+	case t.Connected():
+		state = "connected"
+	default:
+		state = "connecting"
+	}
+	writeCommentJSON(w, map[string]any{
+		"available": true,
+		"opted_in":  t.OptedIn(),
+		"signed_in": t.SignedIn(),
+		"connected": t.Connected(),
+		"state":     state,
+	})
 }
 
 // SetCoordinationOptIn flips the coordination opt-in. Body {"enabled": bool}.

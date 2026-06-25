@@ -40,9 +40,20 @@ const defaultCoordinationURL = "wss://wf.latere.ai/api/coordination/ws"
 type coordinationGate struct {
 	optedIn atomic.Bool
 	path    string // persistence file; empty disables persistence
+
+	// connected and signedIn report live state for the status surface, set once
+	// the connector exists. Nil-safe: a disabled connector reports false for both.
+	connected func() bool
+	signedIn  func() bool
 }
 
 func (g *coordinationGate) OptedIn() bool { return g.optedIn.Load() }
+
+// Connected reports whether the outbound WebSocket to the coordinator is live.
+func (g *coordinationGate) Connected() bool { return g.connected != nil && g.connected() }
+
+// SignedIn reports whether a usable token exists for the coordination connection.
+func (g *coordinationGate) SignedIn() bool { return g.signedIn != nil && g.signedIn() }
 
 // SetOptedIn flips the gate and persists the choice. Persistence failure is
 // logged, not fatal: the in-memory state still governs the connector.
@@ -109,9 +120,11 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 		version = "dev"
 	}
 
+	tokenFunc := coordinationTokenFunc(ctx, tokenStore, oidcClient)
+	gate.signedIn = func() bool { _, ok := tokenFunc(); return ok }
 	cfg := client.Config{
 		URL:      url,
-		Token:    coordinationTokenFunc(ctx, tokenStore, oidcClient),
+		Token:    tokenFunc,
 		OptedIn:  gate.OptedIn,
 		Manifest: coordinationManifestFunc(instanceID, hostLabel, version, wsMgr),
 		Logger:   logger,
@@ -122,6 +135,7 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 		cfg.OnInbound = relay.HandleInbound
 	}
 	connector := client.NewConnector(cfg)
+	gate.connected = connector.Connected
 	if relay != nil {
 		// Translate "no live connection" into the handler's transient-unavailable
 		// error so a browser op while disconnected surfaces as 503 (retry), not a

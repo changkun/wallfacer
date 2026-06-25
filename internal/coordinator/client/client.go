@@ -207,6 +207,14 @@ func (c *Connector) clearConn() {
 	c.mu.Unlock()
 }
 
+// Connected reports whether a live connection to the coordinator is currently
+// held. Used to surface the coordination state in the UI.
+func (c *Connector) Connected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn != nil
+}
+
 // Send writes a frame to the live coordinator connection. It is safe for
 // concurrent use (browser-facing handlers call it). Returns ErrNotConnected
 // when no connection is held; the caller treats that as transient.
