@@ -1,6 +1,6 @@
 ---
 title: Auth by Default and Platform Console Convergence
-status: drafted
+status: archived
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -17,12 +17,17 @@ affects:
   - frontend/package.json
 effort: medium
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
 
 # Auth by Default and Platform Console Convergence
+
+> **Archived 2026-06-25 (shipped).** This was an adoption spec capturing
+> already-landing convergence work; every Current State item shipped and all
+> three Acceptance Criteria are met. Kept as system of record. See the Outcome
+> section at the end.
 
 The near-term thrust of the project is consolidation onto the shared Latere
 platform: `wallfacer run` now signs in through the browser with no setup, the
@@ -130,3 +135,19 @@ shape so further UI work has a target.
 - User docs explain the `AUTH_*` defaults, the public client, the precedence
   rules, and how to point at a different auth service or use a confidential
   client.
+
+## Outcome
+
+Shipped and archived 2026-06-25. All three acceptance criteria are met by the
+Current State above:
+
+- Zero-config browser sign-in in `wallfacer run` (`resolveAuthConfig` public
+  client), silent-available on first run, fully usable signed-out.
+- Shared latere-ui console chrome via thin wrappers (`AccountControl.vue`,
+  `Sidebar.vue`) over `AccountMenu` / `ConsoleSidebar`, `brandTheme: 'wallfacer'`.
+- `docs/guide/configuration.md` documents the `AUTH_*` defaults, public client,
+  precedence, and how to point at a different auth service.
+
+No remaining wallfacer-side work. Future console-shell improvements land by
+bumping the `latere-ui` pin, not by reopening this spec. Org-scoped behavior
+(shared boards, RBAC) is owned by `multi-user-collaboration`.
