@@ -1,45 +1,8 @@
-// Package sanitize provides string sanitization utilities for filesystem paths,
-// container names, and display truncation.
+// Package sanitize provides string sanitization utilities for display
+// truncation and generated slugs.
 package sanitize
 
-import (
-	"path/filepath"
-	"strings"
-	"unicode"
-)
-
-// Basename returns a filesystem- and container-path-safe version of the last
-// component of a workspace path. It replaces characters that are problematic
-// in container mount paths (colons, control chars, etc.) with underscores and
-// preserves unicode letters/digits so paths like "我的项目" remain
-// human-readable. Falls back to "workspace" if the result is empty.
-func Basename(path string) string {
-	base := filepath.Base(path)
-	return Base(base)
-}
-
-// Base returns a container-path-safe version of a directory basename.
-// It replaces characters problematic in mount paths (colons, spaces, shell
-// metacharacters) with underscores, preserving unicode letters/digits.
-// Falls back to "workspace" if the result is empty.
-func Base(name string) string {
-	if name == "." || name == "/" || name == `\` || name == "" {
-		return "workspace"
-	}
-	var b strings.Builder
-	for _, r := range name {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.' {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte('_')
-		}
-	}
-	result := b.String()
-	if result == "" {
-		return "workspace"
-	}
-	return result
-}
+import "strings"
 
 // Truncate returns s truncated to at most n runes, appending "…" when trimmed.
 // It handles multi-byte characters correctly by operating on runes rather than
