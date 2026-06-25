@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
@@ -23,6 +25,16 @@ import (
 // maxFileWriteSize is the maximum content size accepted by ExplorerWriteFile.
 // Set to 2 MB to prevent accidental or malicious large writes through the API.
 const maxFileWriteSize = 2 << 20
+
+// explorerFileDebounce coalesces the burst of fsnotify events an atomic
+// write (temp file + rename) emits into a single change notification.
+const explorerFileDebounce = 150 * time.Millisecond
+
+// explorerFilePollInterval is the fallback fingerprint check. fsnotify drives
+// sub-second notifications; this ticker guarantees eventual convergence even
+// when a platform or filesystem drops the underlying event, so the stream is
+// never worse than the poll it replaces.
+const explorerFilePollInterval = 3 * time.Second
 
 // explorerEntry is a single directory or file entry returned by ExplorerTree.
 type explorerEntry struct {
@@ -295,6 +307,144 @@ func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(head)
 	_, _ = io.Copy(w, f)
+}
+
+// fileFingerprint returns a size:mtime fingerprint of the file at path, or ""
+// if it is missing or unreadable. A change in either field (a write replaces
+// both via atomic rename) yields a different fingerprint, so equality means
+// "no observable content change" — chmod and atime touches are ignored.
+func fileFingerprint(path string) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d", info.Size(), info.ModTime().UnixNano())
+}
+
+// ExplorerFileStream sends an SSE "changed" event whenever a single watched
+// file's contents change, so clients can refetch via ExplorerReadFile instead
+// of polling. The client passes the file "path" and its "workspace" as query
+// params (same validation as ExplorerReadFile).
+//
+// Change detection watches the file's parent directory, not the file itself:
+// editors and ExplorerWriteFile write atomically (temp file + rename), which
+// replaces the inode and would be missed by a watch on the file path. fsnotify
+// gives sub-second latency; a fallback ticker (explorerFilePollInterval)
+// guarantees eventual convergence if a platform drops the event.
+//
+//	event: connected — stream attached (data: {})
+//	event: changed   — the file changed; refetch it (data: {"path": "..."})
+func (h *Handler) ExplorerFileStream(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	workspace := r.URL.Query().Get("workspace")
+	if path == "" || workspace == "" {
+		http.Error(w, "path and workspace query params required", http.StatusBadRequest)
+		return
+	}
+	if !h.isAllowedWorkspace(r.Context(), workspace) {
+		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+	resolved, err := isWithinWorkspace(path, workspace)
+	if err != nil {
+		// Distinguish a missing-but-contained path from a path-escape attempt,
+		// mirroring ExplorerReadFile (EvalSymlinks fails on non-existent paths).
+		cleaned := filepath.Clean(path)
+		wsClean := filepath.Clean(workspace)
+		if cleaned == wsClean || strings.HasPrefix(cleaned, wsClean+string(filepath.Separator)) {
+			http.Error(w, "file not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	if info.IsDir() {
+		http.Error(w, "path is a directory", http.StatusBadRequest)
+		return
+	}
+
+	stream := sse.NewWriter(w)
+	if stream == nil {
+		return
+	}
+
+	// Attach the watcher to the parent dir. A nil watcher (or failed Add) is
+	// non-fatal: the fallback poll ticker below still drives change detection,
+	// just at coarser latency.
+	base := filepath.Base(resolved)
+	var watcherEvents <-chan fsnotify.Event
+	var watcherErrors <-chan error
+	if watcher, werr := fsnotify.NewWatcher(); werr == nil {
+		if addErr := watcher.Add(filepath.Dir(resolved)); addErr != nil {
+			_ = watcher.Close()
+		} else {
+			defer func() { _ = watcher.Close() }()
+			watcherEvents = watcher.Events
+			watcherErrors = watcher.Errors
+		}
+	}
+
+	if err := stream.Event("connected", []byte("{}")); err != nil {
+		return
+	}
+
+	last := fileFingerprint(resolved)
+	emitIfChanged := func() error {
+		fp := fileFingerprint(resolved)
+		if fp == last {
+			return nil
+		}
+		last = fp
+		return stream.JSON("changed", map[string]string{"path": path})
+	}
+
+	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
+	defer keepalive.Stop()
+	poll := time.NewTicker(explorerFilePollInterval)
+	defer poll.Stop()
+
+	// debounce is nil (blocks forever) until an fsnotify event arms it; each
+	// event re-arms it, so the change fires once after the write burst settles.
+	var debounce <-chan time.Time
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-keepalive.C:
+			if err := stream.Heartbeat(); err != nil {
+				return
+			}
+		case <-poll.C:
+			if err := emitIfChanged(); err != nil {
+				return
+			}
+		case evt, ok := <-watcherEvents:
+			if !ok {
+				watcherEvents = nil
+				continue
+			}
+			if filepath.Base(evt.Name) != base {
+				continue
+			}
+			debounce = time.After(explorerFileDebounce)
+		case err, ok := <-watcherErrors:
+			if !ok {
+				watcherErrors = nil
+				continue
+			}
+			logger.Handler.Warn("explorer file stream: fsnotify error", "error", err)
+		case <-debounce:
+			debounce = nil
+			if err := emitIfChanged(); err != nil {
+				return
+			}
+		}
+	}
 }
 
 // isGitPath reports whether p refers to a path inside a .git directory.

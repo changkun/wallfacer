@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -880,4 +882,192 @@ func TestTaskPromptsEndpoint_ExcludesArchivedAndTombstoned(t *testing.T) {
 	if entries[0].TaskID != visible.ID.String() {
 		t.Errorf("expected visible task %s, got %s", visible.ID, entries[0].TaskID)
 	}
+}
+
+// --- ExplorerFileStream tests ---
+
+// syncSSERecorder is a race-free http.ResponseWriter+Flusher for SSE handler
+// tests. Unlike httptest.ResponseRecorder it guards the body buffer with a
+// mutex so a test goroutine can poll body() while the handler goroutine writes.
+type syncSSERecorder struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+	hdr http.Header
+}
+
+func newSyncSSERecorder() *syncSSERecorder {
+	return &syncSSERecorder{hdr: http.Header{}}
+}
+
+func (s *syncSSERecorder) Header() http.Header { return s.hdr }
+func (s *syncSSERecorder) WriteHeader(int)     {}
+func (s *syncSSERecorder) Flush()              {}
+
+func (s *syncSSERecorder) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncSSERecorder) body() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
+
+// waitForBody polls rec until substr appears or timeout elapses.
+func waitForBody(rec *syncSSERecorder, substr string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if strings.Contains(rec.body(), substr) {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return strings.Contains(rec.body(), substr)
+}
+
+// atomicWrite replaces path's contents via temp file + rename, the way editors
+// and ExplorerWriteFile do. A bare in-place write has different fsnotify
+// semantics across platforms, so tests must exercise the real path.
+func atomicWrite(t *testing.T, path, content string) {
+	t.Helper()
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFileFingerprint_ChangesOnWrite(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "spec.md")
+
+	if got := fileFingerprint(fp); got != "" {
+		t.Errorf("missing file: expected empty fingerprint, got %q", got)
+	}
+
+	if err := os.WriteFile(fp, []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	first := fileFingerprint(fp)
+	if first == "" {
+		t.Fatal("existing file: expected non-empty fingerprint")
+	}
+
+	atomicWrite(t, fp, "v2-different-length")
+	second := fileFingerprint(fp)
+	if second == "" {
+		t.Fatal("rewritten file: expected non-empty fingerprint")
+	}
+	if first == second {
+		t.Errorf("fingerprint did not change after write: %q", first)
+	}
+
+	if err := os.Remove(fp); err != nil {
+		t.Fatal(err)
+	}
+	if got := fileFingerprint(fp); got != "" {
+		t.Errorf("removed file: expected empty fingerprint, got %q", got)
+	}
+}
+
+func TestExplorerFileStream_BadParams(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	cases := []struct {
+		name string
+		url  string
+		want int
+	}{
+		{"missing params", "/api/explorer/file/stream", http.StatusBadRequest},
+		{"workspace not configured", "/api/explorer/file/stream?path=/bogus/x.md&workspace=/bogus", http.StatusBadRequest},
+		{"file not found", "/api/explorer/file/stream?path=" + filepath.Join(ws, "nope.md") + "&workspace=" + ws, http.StatusNotFound},
+		{"is a directory", "/api/explorer/file/stream?path=" + ws + "&workspace=" + ws, http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			w := httptest.NewRecorder()
+			h.ExplorerFileStream(w, req)
+			if w.Code != tc.want {
+				t.Errorf("expected %d, got %d: %s", tc.want, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestExplorerFileStream_ConnectedEvent(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	fp := filepath.Join(ws, "spec.md")
+	if err := os.WriteFile(fp, []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file/stream?path="+fp+"&workspace="+ws, nil).WithContext(reqCtx)
+	rec := newSyncSSERecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.ExplorerFileStream(rec, req)
+	}()
+
+	if !waitForBody(rec, "event: connected", 2*time.Second) {
+		cancel()
+		<-done
+		t.Fatalf("expected 'event: connected', got:\n%s", rec.body())
+	}
+	cancel()
+	<-done
+
+	if ct := rec.Header().Get("Content-Type"); ct != "text/event-stream" {
+		t.Errorf("expected text/event-stream content type, got %q", ct)
+	}
+}
+
+// TestExplorerFileStream_EmitsChangedOnWrite is the end-to-end check: an atomic
+// rewrite of the watched file yields a "changed" event. fsnotify catches it
+// sub-second; the fallback poll ticker guarantees it within
+// explorerFilePollInterval, so the test is deterministic on every platform.
+func TestExplorerFileStream_EmitsChangedOnWrite(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	fp := filepath.Join(ws, "spec.md")
+	if err := os.WriteFile(fp, []byte("v1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file/stream?path="+fp+"&workspace="+ws, nil).WithContext(reqCtx)
+	rec := newSyncSSERecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.ExplorerFileStream(rec, req)
+	}()
+
+	// Wait for connect so the watcher is attached and the baseline captured.
+	if !waitForBody(rec, "event: connected", 2*time.Second) {
+		cancel()
+		<-done
+		t.Fatalf("stream never connected, got:\n%s", rec.body())
+	}
+
+	atomicWrite(t, fp, "v2-changed-contents")
+
+	// Generous timeout: > explorerFilePollInterval to cover the ticker fallback
+	// on platforms/filesystems where fsnotify misses the event.
+	if !waitForBody(rec, "event: changed", explorerFilePollInterval+3*time.Second) {
+		cancel()
+		<-done
+		t.Fatalf("expected 'event: changed' after write, got:\n%s", rec.body())
+	}
+	cancel()
+	<-done
 }
