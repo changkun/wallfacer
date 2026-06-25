@@ -1,13 +1,13 @@
 ---
 title: "Lifecycle: should there be a testing state?"
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/spec/lifecycle.go
   - internal/spec/model.go
   - specs/spec-coordination/spec-coordination/spec-document-model.md
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 effort: small
@@ -147,6 +147,30 @@ Transitions to **reject**:
   `testing`): validator error. Only the drift pipeline should write it.
 
 ---
+
+## Outcome
+
+**Option A adopted (2026-06-25).** `StatusTesting = "testing"` is the 7th
+lifecycle state (`internal/spec/model.go`). Transition edges in
+`internal/spec/lifecycle.go`:
+
+- `validated → testing` (drift pipeline on task done)
+- `testing → complete` (verdict: minimal/moderate drift)
+- `testing → stale` (verdict: significant drift, or override)
+- `testing → archived` (archive race)
+
+**Reconciliation with the propagation algorithm.** The recommendation listed
+both `validated → complete` and `validated → stale` as edges to reject. Only
+`validated → complete` is removed — that enforces the completion gate. But
+`validated → stale` stays legal: `FanOutStale`
+([propagation-algorithm.md](propagation-algorithm.md)) marks validated
+dependents stale when an upstream changes, and that path needs the edge. The
+drift pipeline never writes `validated → stale` as a verdict (it writes
+`testing → stale`); the edge exists only for propagation.
+
+`ValidStatuses()` now returns 7 values; the document-model spec's lifecycle
+diagram and `valid-status` enum are updated. Frontend explorer gets a 🧪
+icon, a Testing filter, and a `--tint-plum` status pill.
 
 ## Open Questions
 

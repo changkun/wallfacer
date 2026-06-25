@@ -16,6 +16,7 @@ const (
 	StatusVague     Status = "vague"     // initial idea; design incomplete
 	StatusDrafted   Status = "drafted"   // enough detail for review
 	StatusValidated Status = "validated" // reviewed, approved, ready to execute
+	StatusTesting   Status = "testing"   // implementation landed; drift verdict pending
 	StatusComplete  Status = "complete"  // all work done
 	StatusStale     Status = "stale"     // no longer matches reality
 	StatusArchived  Status = "archived"  // deliberately archived; no longer active

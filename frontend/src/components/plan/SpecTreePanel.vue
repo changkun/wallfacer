@@ -102,6 +102,7 @@ function persistExpanded() {
 
 const STATUS_ICONS: Record<string, string> = {
   complete: '✅',
+  testing: '🧪',
   validated: '✔',
   drafted: '📝',
   vague: '💭',
@@ -242,6 +243,7 @@ const statusFilterOptions = computed(() => [
   { value: 'vague', label: 'Vague' },
   { value: 'drafted', label: 'Drafted' },
   { value: 'validated', label: 'Validated' },
+  { value: 'testing', label: 'Testing' },
   { value: 'complete', label: 'Complete' },
   { value: 'stale', label: 'Stale' },
   { value: 'archived', label: 'Archived', disabled: !showArchived.value },

@@ -28,7 +28,7 @@ Every spec document carries structured frontmatter:
 ```yaml
 ---
 title: Sandbox Backends
-status: validated          # vague | drafted | validated | complete | stale | archived
+status: validated          # vague | drafted | validated | testing | complete | stale | archived
 depends_on:                # specs this one requires (DAG edges — can point anywhere)
   - specs/foundations/storage-backends.md
 affects:                   # packages and files this spec describes
@@ -106,7 +106,7 @@ A spec validator checks structural correctness of spec documents. It runs on ind
 | Rule | Severity | Description |
 |------|----------|-------------|
 | **Required fields** | error | `title`, `status`, `effort`, `created`, `updated`, `author` must be present |
-| **Valid status** | error | `status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale`, `archived` |
+| **Valid status** | error | `status` must be one of: `vague`, `drafted`, `validated`, `testing`, `complete`, `stale`, `archived` |
 | **Valid effort** | error | `effort` must be one of: `small`, `medium`, `large`, `xlarge` |
 | **Date format** | error | `created` and `updated` must be valid ISO dates; `updated` ≥ `created` |
 | **Dispatch consistency** | error | Non-leaf specs must have `dispatched_task_id: null`. Leaf specs may have null or a valid UUID |
@@ -141,19 +141,25 @@ Validation results are not stored — they are computed fresh each time, like pr
 A spec has one status dimension that covers both design maturity and readiness:
 
 ```
-vague ──▶ drafted ──▶ validated ──▶ complete
-            │          │    ▲          │
-            │          │    │          │
-            ▼          ▼    │          ▼
-          stale      stale  └───── stale
-            │                         │
-            ├─────────────────────────┤
-            ▼                         ▼
-                    archived
-                       │
-                       ▼
-                    drafted   (resurrect — only valid exit)
+vague ──▶ drafted ──▶ validated ──▶ testing ──▶ complete
+            │          │    ▲          │            │
+            │          │    │          │            │
+            ▼          ▼    │          ▼            ▼
+          stale      stale  └───── stale ───────── stale
+            │                                        │
+            ├────────────────────────────────────────┤
+            ▼                                        ▼
+                          archived
+                             │
+                             ▼
+                          drafted   (resurrect — only valid exit)
 ```
+
+`testing` is the completion gate: a spec reaches `complete` only after the
+drift pipeline renders a verdict (`validated → complete` is rejected). The
+drift pipeline is the only writer of `testing`. `validated → stale` stays
+legal so stale propagation can mark validated dependents stale when an
+upstream changes.
 
 | State | Meaning | Transitions |
 |-------|---------|-------------|
