@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
-	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
@@ -176,8 +176,8 @@ func (h *Handler) buildTaskModeSystemPrompt(ctx context.Context, taskID string) 
 	return prompts.TaskPromptRefine(d)
 }
 
-// GetPlanningStatus reports whether the planning sandbox is running.
-func (h *Handler) GetPlanningStatus(w http.ResponseWriter, _ *http.Request) {
+// GetAgentSessionStatus reports whether the planning sandbox is running.
+func (h *Handler) GetAgentSessionStatus(w http.ResponseWriter, _ *http.Request) {
 	running := false
 	if h.planner != nil {
 		running = h.planner.IsRunning()
@@ -187,9 +187,9 @@ func (h *Handler) GetPlanningStatus(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// StartPlanning starts the planning sandbox container.
+// StartAgentSession starts the planning sandbox container.
 // If already running, returns 200 with running=true (idempotent).
-func (h *Handler) StartPlanning(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StartAgentSession(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -208,19 +208,19 @@ func (h *Handler) StartPlanning(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"running": true})
 }
 
-// StopPlanning stops the planning sandbox container.
-func (h *Handler) StopPlanning(w http.ResponseWriter, _ *http.Request) {
+// StopAgentSession stops the planning sandbox container.
+func (h *Handler) StopAgentSession(w http.ResponseWriter, _ *http.Request) {
 	if h.planner != nil {
 		h.planner.Stop()
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{"stopped": true})
 }
 
-// GetPlanningMessages returns the planning conversation history as a JSON array.
+// GetAgentMessages returns the planning conversation history as a JSON array.
 // Supports optional ?before=<RFC3339> for pagination. The `?thread=<id>`
 // query parameter selects which thread's history is returned; when
 // omitted, the currently active thread is used.
-func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetAgentMessages(w http.ResponseWriter, r *http.Request) {
 	// Hidden workspace: present an empty history, matching /api/config.
 	if h.workspaceHiddenFromRequest(r) {
 		httpjson.Write(w, http.StatusOK, []any{})
@@ -260,12 +260,12 @@ func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, msgs)
 }
 
-// SendPlanningMessage sends a user message to the planning agent.
+// SendAgentMessage sends a user message to the planning agent.
 // The agent exec runs in a background goroutine; returns 202 immediately.
 // Returns 409 if an exec is already in flight. The `?thread=<id>` query
 // parameter (or body field) selects which thread receives the message;
 // when omitted, the active thread is used.
-func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -667,12 +667,12 @@ func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, first
 	}
 }
 
-// StreamPlanningMessages streams the current planning exec's raw stdout.
+// StreamAgentMessages streams the current planning exec's raw stdout.
 // Uses the same plain-text streaming pattern as task log streaming
 // (streamLiveLog) so the frontend can reuse renderPrettyLogs().
 // Returns 204 No Content if no exec is in flight, or if the `?thread=<id>`
 // query parameter does not match the thread that owns the exec.
-func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StreamAgentMessages(w http.ResponseWriter, r *http.Request) {
 	// Hidden workspace: nothing to stream, matching /api/config.
 	if h.planner == nil || h.workspaceHiddenFromRequest(r) {
 		w.WriteHeader(http.StatusNoContent)
@@ -720,10 +720,10 @@ func (h *Handler) StreamPlanningMessages(w http.ResponseWriter, r *http.Request)
 	relayLiveChunks(w, flusher, r, lr)
 }
 
-// ClearPlanningMessages clears a thread's conversation history and
+// ClearAgentMessages clears a thread's conversation history and
 // session. The `?thread=<id>` query parameter selects which thread;
 // when omitted the active thread is used.
-func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ClearAgentMessages(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -739,11 +739,11 @@ func (h *Handler) ClearPlanningMessages(w http.ResponseWriter, r *http.Request) 
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
 }
 
-// InterruptPlanningMessage interrupts the current agent turn. When a
+// InterruptAgentMessage interrupts the current agent turn. When a
 // `?thread=<id>` is supplied it must match the in-flight thread,
 // otherwise the request is rejected (409). Returns 409 if no exec is
 // in flight.
-func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -803,8 +803,8 @@ func (h *Handler) persistPlanningRoundUsage(raw []byte) {
 	}
 }
 
-// GetPlanningCommands returns the list of available slash commands.
-func (h *Handler) GetPlanningCommands(w http.ResponseWriter, _ *http.Request) {
+// GetAgentCommands returns the list of available slash commands.
+func (h *Handler) GetAgentCommands(w http.ResponseWriter, _ *http.Request) {
 	if h.commandRegistry == nil {
 		httpjson.Write(w, http.StatusOK, []any{})
 		return

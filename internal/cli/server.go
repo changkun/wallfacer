@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -28,7 +29,6 @@ import (
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -1034,23 +1034,23 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TriggerRoutine":        h.TriggerRoutine,
 
 		// Planning sandbox.
-		"GetPlanningStatus":        h.GetPlanningStatus,
-		"StartPlanning":            h.StartPlanning,
-		"StopPlanning":             h.StopPlanning,
-		"GetPlanningMessages":      h.GetPlanningMessages,
-		"SendPlanningMessage":      h.SendPlanningMessage,
-		"ClearPlanningMessages":    h.ClearPlanningMessages,
-		"StreamPlanningMessages":   h.StreamPlanningMessages,
-		"InterruptPlanningMessage": h.InterruptPlanningMessage,
-		"UndoPlanningRound":        h.UndoPlanningRound,
-		"GetPlanningCommands":      h.GetPlanningCommands,
-		"UpdateTaskPromptTool":     h.UpdateTaskPromptTool,
+		"GetAgentSessionStatus": h.GetAgentSessionStatus,
+		"StartAgentSession":     h.StartAgentSession,
+		"StopAgentSession":      h.StopAgentSession,
+		"GetAgentMessages":      h.GetAgentMessages,
+		"SendAgentMessage":      h.SendAgentMessage,
+		"ClearAgentMessages":    h.ClearAgentMessages,
+		"StreamAgentMessages":   h.StreamAgentMessages,
+		"InterruptAgentMessage": h.InterruptAgentMessage,
+		"UndoPlanningRound":     h.UndoPlanningRound,
+		"GetAgentCommands":      h.GetAgentCommands,
+		"UpdateTaskPromptTool":  h.UpdateTaskPromptTool,
 
 		// Planning chat threads.
-		"ListPlanningThreads":  h.ListPlanningThreads,
-		"CreatePlanningThread": h.CreatePlanningThread,
-		"PatchPlanningThread":  h.PatchPlanningThread,
-		"DeletePlanningThread": h.DeletePlanningThread,
+		"ListAgentSessions":  h.ListAgentSessions,
+		"CreateAgentSession": h.CreateAgentSession,
+		"PatchAgentSession":  h.PatchAgentSession,
+		"DeleteAgentSession": h.DeleteAgentSession,
 
 		// Environment configuration.
 		"GetEnvConfig":    h.GetEnvConfig,
@@ -1177,14 +1177,14 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TriggerRoutine":        handler.BodyLimitDefault,
 
 		// Planning sandbox.
-		"StartPlanning":            handler.BodyLimitDefault,
-		"SendPlanningMessage":      handler.BodyLimitDefault,
-		"InterruptPlanningMessage": handler.BodyLimitDefault,
-		"UndoPlanningRound":        handler.BodyLimitDefault,
+		"StartAgentSession":     handler.BodyLimitDefault,
+		"SendAgentMessage":      handler.BodyLimitDefault,
+		"InterruptAgentMessage": handler.BodyLimitDefault,
+		"UndoPlanningRound":     handler.BodyLimitDefault,
 
 		// Planning chat threads.
-		"CreatePlanningThread": handler.BodyLimitDefault,
-		"PatchPlanningThread":  handler.BodyLimitDefault,
+		"CreateAgentSession": handler.BodyLimitDefault,
+		"PatchAgentSession":  handler.BodyLimitDefault,
 
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,

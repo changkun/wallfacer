@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/agentsession"
 )
 
 // isTaskLockedByPlanner reports whether any task-mode planning thread currently
@@ -145,10 +145,10 @@ func writeThreadErr(w http.ResponseWriter, err error) {
 	}
 }
 
-// ListPlanningThreads returns the set of planning chat threads for the
+// ListAgentSessions returns the set of planning chat threads for the
 // current workspace group. Pass ?includeArchived=true to include
 // archived threads in the result.
-func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
 	tm := h.threadsManager()
 	// Hidden workspace (org-scoped, not visible to this principal): present no
 	// threads, matching /api/config's "no workspace" state.
@@ -175,10 +175,10 @@ func (h *Handler) ListPlanningThreads(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CreatePlanningThread creates a new planning chat thread. Body is
+// CreateAgentSession creates a new planning chat thread. Body is
 // optional; when `name` is empty, a default "Chat N" name is used.
 // When `focused_task` is set, the thread is pinned to task-mode immediately.
-func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateAgentSession(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -231,7 +231,7 @@ func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusCreated, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
-// PatchPlanningThread mutates a single planning chat thread. The body
+// PatchAgentSession mutates a single planning chat thread. The body
 // carries exactly one mutation:
 //
 //	{"name": "New name"}     — rename the thread
@@ -240,7 +240,7 @@ func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
 //	{"state": "active"}      — set the UI's active thread
 //
 // All variants return the refreshed threadSummary.
-func (h *Handler) PatchPlanningThread(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PatchAgentSession(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -282,10 +282,10 @@ func (h *Handler) PatchPlanningThread(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// DeletePlanningThread permanently removes an archived thread and its stored
+// DeleteAgentSession permanently removes an archived thread and its stored
 // conversation. A visible thread must be archived first (409), and a thread
 // with an in-flight turn cannot be deleted (409).
-func (h *Handler) DeletePlanningThread(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteAgentSession(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
@@ -320,7 +320,7 @@ func (h *Handler) writeThreadSummary(w http.ResponseWriter, tm *agentsession.Man
 
 // mutatePlanningThread is the shared scaffold for the single-verb
 // planning-thread state mutations (archive, unarchive, activate)
-// dispatched from PatchPlanningThread. Each caller supplies its own
+// dispatched from PatchAgentSession. Each caller supplies its own
 // ThreadManager method; the require-configured, busy-check (archive
 // only), apply, and response shape stay identical across the trio.
 func (h *Handler) mutatePlanningThread(
