@@ -71,6 +71,16 @@ type Spec struct {
 	Author           string   `yaml:"author" json:"author"`
 	DispatchedTaskID *string  `yaml:"dispatched_task_id" json:"dispatched_task_id"`
 
+	// ImplementationCommit records the task's commit range (base..tip) while a
+	// spec is in testing, set by the drift pipeline on validated → testing and
+	// cleared when the verdict lands. Optional; absent by default.
+	ImplementationCommit *string `yaml:"implementation_commit,omitempty" json:"implementation_commit,omitempty"`
+
+	// TestingPending is a non-status marker set when the drift tester fails
+	// (crash, timeout, malformed output). The spec stays at testing; the value
+	// holds the failure reason for the explorer. Cleared on retry/override.
+	TestingPending *string `yaml:"testing_pending,omitempty" json:"testing_pending,omitempty"`
+
 	// Derived fields (not from YAML).
 	Path  string `yaml:"-" json:"path"`
 	Track string `yaml:"-" json:"track"`
