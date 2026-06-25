@@ -77,6 +77,51 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 	}
 }
 
+// TestIdeationTaskBillsUsageOnce verifies the no-planner (ephemeral) path bills
+// the brainstorm agent's usage/cost exactly once. Previously runAgent's
+// auto-billing AND the manual block in runIdeationTask both charged the same
+// turn, doubling Usage.CostUSD and writing two Turn-1 idea_agent records.
+func TestIdeationTaskBillsUsageOnce(t *testing.T) {
+	ideas := []IdeateResult{
+		{Title: "Add tests", Prompt: "Write unit tests for all handlers.", ImpactScore: 80},
+	}
+	cmd := fakeCmdScript(t, ideaOutput(ideas), 0) // ideaOutput sets total_cost_usd:0.002
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "", "", false)
+
+	updated, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A single 0.002 charge; the double-bill produced 0.004.
+	if updated.Usage.CostUSD < 0.0015 || updated.Usage.CostUSD > 0.0025 {
+		t.Errorf("task cost: want one ~0.002 charge, got %v", updated.Usage.CostUSD)
+	}
+
+	turns, err := s.GetTurnUsages(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ideaTurns := 0
+	for _, tu := range turns {
+		if tu.SubAgent == store.SandboxActivityIdeaAgent && tu.Turn == 1 {
+			ideaTurns++
+		}
+	}
+	if ideaTurns != 1 {
+		t.Errorf("expected exactly 1 Turn-1 idea_agent usage record, got %d", ideaTurns)
+	}
+}
+
 // TestIdeationTaskCreatesChildTasks verifies that Run creates backlog child
 // tasks from the brainstorm results.
 func TestIdeationTaskCreatesChildTasks(t *testing.T) {

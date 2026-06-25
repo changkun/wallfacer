@@ -327,9 +327,12 @@ func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, pro
 	res, err := r.runAgent(ctx, roleIdeaAgentEphemeral, task, prompt, runAgentOpts{
 		ContainerName:  containerName,
 		EmitSpanEvents: taskID != uuid.Nil,
-		TrackUsage:     taskID != uuid.Nil,
-		Turn:           1,
-		OnLaunch:       onLaunch,
+		// Billing for ideation is done once by the caller (runIdeationTask),
+		// matching the planner path which bills only there. Letting runAgent
+		// also bill here would double-count usage/cost on the no-planner path.
+		TrackUsage: false,
+		Turn:       1,
+		OnLaunch:   onLaunch,
 	})
 	cleanup()
 
@@ -489,6 +492,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
+			Sandbox:              output.ActualSandbox,
 			SubAgent:             store.SandboxActivityIdeaAgent,
 		}); appErr != nil {
 			logger.Runner.Warn("ideation: append turn usage failed", "task", taskID, "error", appErr)
