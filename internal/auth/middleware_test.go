@@ -184,6 +184,30 @@ func TestOptionalAuth_ExpiredTokenPassesThroughAnonymous(t *testing.T) {
 	}
 }
 
+func TestOptionalAuth_AudienceMismatchPassesThroughAnonymous(t *testing.T) {
+	key := genKey(t)
+	srv := serveJWKS(t, key)
+	v := auth.BuildValidator(auth.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+
+	payload := defaultPayload(time.Now().Add(time.Hour))
+	payload["aud"] = "other-client"
+	tok := signToken(t, key, defaultHeader(key), payload)
+
+	capt := &claimsCapture{}
+	h := auth.OptionalAuth(v, capt.handler())
+	r := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (pass through)", w.Code)
+	}
+	if capt.ok {
+		t.Fatalf("expected no claims on audience mismatch, got %+v", capt.seen)
+	}
+}
+
 func TestOptionalAuth_MalformedHeaderPassesThrough(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
@@ -280,6 +304,26 @@ func TestAuth_ExpiredTokenReturns401(t *testing.T) {
 	v := auth.BuildValidator(auth.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
 
 	tok := signToken(t, key, defaultHeader(key), defaultPayload(time.Now().Add(-time.Hour)))
+
+	h := auth.Auth(v, (&claimsCapture{}).handler())
+	r := httptest.NewRequest(http.MethodGet, "/api/admin/rebuild-index", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestAuth_AudienceMismatchReturns401(t *testing.T) {
+	key := genKey(t)
+	srv := serveJWKS(t, key)
+	v := auth.BuildValidator(auth.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+
+	payload := defaultPayload(time.Now().Add(time.Hour))
+	payload["aud"] = "other-client"
+	tok := signToken(t, key, defaultHeader(key), payload)
 
 	h := auth.Auth(v, (&claimsCapture{}).handler())
 	r := httptest.NewRequest(http.MethodGet, "/api/admin/rebuild-index", nil)
