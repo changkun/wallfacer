@@ -229,17 +229,42 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 // stay a thin translation layer until upstream code passes Request
 // directly.
 func (b *HostBackend) launchClaude(ctx context.Context, spec ContainerSpec) (Handle, error) {
-	bin, err := b.binaryFor(harness.Claude)
+	return b.launchPlainHostAgent(ctx, spec, plainHostLaunch{id: harness.Claude})
+}
+
+// plainHostLaunch carries the per-agent knobs for launchPlainHostAgent, which
+// covers the agents whose stdout is forwarded verbatim with no result synthesis
+// (claude, cursor, pi). The tee-and-wrap agents (codex, opencode) have their own
+// launchers because they substitute an io.Pipe and run a post-start goroutine.
+type plainHostLaunch struct {
+	id            harness.ID
+	requirePrompt bool // cursor/pi require a -p prompt in spec.Cmd; claude does not
+	forceFull     bool // cursor/pi force PermissionFull (host always runs with write access)
+}
+
+// launchPlainHostAgent runs a host CLI whose native stdout is the stream the
+// runner consumes directly, registering the process in b.procs. The startup
+// sequence (binary, child env, request, argv, cmd, pipes, handle, start,
+// register) is identical across claude/cursor/pi; only the knobs in p differ.
+func (b *HostBackend) launchPlainHostAgent(ctx context.Context, spec ContainerSpec, p plainHostLaunch) (Handle, error) {
+	bin, err := b.binaryFor(p.id)
 	if err != nil {
 		return nil, err
 	}
 
 	env := b.buildChildEnv(spec)
 	req := requestFromClaudeSpec(spec)
-	claudeH, _ := harness.Lookup(harness.Claude)
-	argv, _, argvErr := claudeH.BuildArgv(req)
+	if p.requirePrompt && req.Prompt == "" {
+		return nil, fmt.Errorf("host backend: %s launch requires a -p <prompt> argument in spec.Cmd", p.id)
+	}
+	if p.forceFull {
+		req.Permission = harness.PermissionFull
+	}
+
+	agentH, _ := harness.Lookup(p.id)
+	argv, _, argvErr := agentH.BuildArgv(req)
 	if argvErr != nil {
-		return nil, fmt.Errorf("host backend: claude argv: %w", argvErr)
+		return nil, fmt.Errorf("host backend: %s argv: %w", p.id, argvErr)
 	}
 
 	cmd := exec.CommandContext(ctx, bin, argv...)

@@ -2,8 +2,6 @@ package executor
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
 
 	"latere.ai/x/wallfacer/internal/harness"
 )
@@ -21,51 +19,9 @@ import (
 //     cursor only *proposes* edits and exits without writing, so a task
 //     would never produce a commit.
 func (b *HostBackend) launchCursor(ctx context.Context, spec ContainerSpec) (Handle, error) {
-	bin, err := b.binaryFor(harness.Cursor)
-	if err != nil {
-		return nil, err
-	}
-
-	env := b.buildChildEnv(spec)
-	req := requestFromClaudeSpec(spec)
-	if req.Prompt == "" {
-		return nil, fmt.Errorf("host backend: cursor launch requires a -p <prompt> argument in spec.Cmd")
-	}
-	req.Permission = harness.PermissionFull
-
-	cursorH, _ := harness.Lookup(harness.Cursor)
-	argv, _, argvErr := cursorH.BuildArgv(req)
-	if argvErr != nil {
-		return nil, fmt.Errorf("host backend: cursor argv: %w", argvErr)
-	}
-
-	cmd := exec.CommandContext(ctx, bin, argv...)
-	cmd.Env = env
-	if spec.WorkDir != "" {
-		cmd.Dir = spec.WorkDir
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("stdout pipe: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("stderr pipe: %w", err)
-	}
-
-	taskID := spec.Labels["wallfacer.task.id"]
-	h := newHostHandle(spec.Name, cmd, stdout, stderr, taskID, b)
-
-	if err := cmd.Start(); err != nil {
-		transition(&h.state, StateFailed)
-		return nil, fmt.Errorf("start host agent: %w", err)
-	}
-	transition(&h.state, StateRunning)
-
-	b.procMu.Lock()
-	b.procs[spec.Name] = h
-	b.procMu.Unlock()
-
-	return h, nil
+	return b.launchPlainHostAgent(ctx, spec, plainHostLaunch{
+		id:            harness.Cursor,
+		requirePrompt: true,
+		forceFull:     true,
+	})
 }
