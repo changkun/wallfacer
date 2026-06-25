@@ -116,11 +116,16 @@ func checkDependsOnExist(s *Spec, repoRoot string) []Result {
 	}
 	var results []Result
 	for _, dep := range s.DependsOn {
-		full := filepath.Join(repoRoot, dep)
-		if _, err := os.Stat(full); err != nil {
-			results = append(results, Result{s.Path, SeverityError, "depends-on-exist",
-				fmt.Sprintf("dependency %q does not exist", dep)})
+		if _, err := os.Stat(filepath.Join(repoRoot, dep)); err == nil {
+			continue
 		}
+		// A dependency may be an archived spec relocated under specs/.archive/;
+		// it is referenced by its logical path but lives at the physical one.
+		if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(ArchivePath(dep)))); err == nil {
+			continue
+		}
+		results = append(results, Result{s.Path, SeverityError, "depends-on-exist",
+			fmt.Sprintf("dependency %q does not exist", dep)})
 	}
 	return results
 }
