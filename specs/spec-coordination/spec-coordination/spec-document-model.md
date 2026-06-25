@@ -39,8 +39,17 @@ created: 2026-01-15
 updated: 2026-03-28
 author: changkun
 dispatched_task_id: null   # UUID of board task (leaf specs only, set on dispatch)
+# implementation_commit: <base>..<tip>   # optional; set by the drift pipeline while in testing
+# testing_pending: "<reason>"            # optional; set when the drift tester fails
 ---
 ```
+
+Two optional fields are managed by the drift pipeline (see
+[spec-state-control-plane](spec-state-control-plane.md)) and absent otherwise:
+`implementation_commit` records the task's `base..tip` range while a spec is in
+`testing`, cleared when the verdict lands. `testing_pending` is a non-status
+marker holding a tester-failure reason; the spec stays at `testing` until a
+retry or override clears it.
 
 **No `parent`, `children`, or `track` fields.** Parent-child relationships are derived from the filesystem: a spec's parent is the spec file in its containing directory; a spec's children are the specs in its subdirectory. The track is derived from the first directory component under `specs/` (e.g., `specs/foundations/foo.md` has track `foundations`). New tracks are created simply by adding a directory under `specs/`. This avoids maintaining redundant fields that duplicate what the directory structure already provides.
 
