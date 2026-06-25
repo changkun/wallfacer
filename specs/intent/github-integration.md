@@ -248,12 +248,31 @@ Strategy only; per-component test plans live in the children.
 
 ---
 
-## Next Steps
+## Design Breakdown
 
-This is an xlarge non-leaf umbrella. Break it down with
-`/wf-spec-breakdown specs/intent/github-integration.md design`. Suggested child
-order: OAuth + token store (1) leads and blocks the rest; repo selection (2),
-read surface (3), and write surface (4) follow and are largely parallel; cloud
-clone (5) is gated on the Executor seam and dispatched last. Re-home
-pull-request.md under `github-integration/` as the PR-write child during
-breakdown.
+| # | Sub-design | Design problem | Depends on | Effort | Status |
+|---|-----------|---------------|-----------|--------|--------|
+| 1 | [oauth-token-store](github-integration/oauth-token-store.md) | GitHub OAuth/App auth + principal-scoped server-side token store + refresh | identity/authentication | large | drafted |
+| 2 | [repo-selection](github-integration/repo-selection.md) | List accessible user/org repos, pick one, resolve to `host/owner/repo` | #1, repo-identity | medium | drafted |
+| 3 | [read-surface](github-integration/read-surface.md) | List PRs/issues, detail + comments, REST/GraphQL, rate-limit, caching | #1 | large | drafted |
+| 4 | [pull-request](github-integration/pull-request.md) | Create PR via API (supersedes `gh`) + comment on PR/issue | #1, #2 | medium | drafted |
+| 5 | [cloud-remote-fix](github-integration/cloud-remote-fix.md) | Clone + run agents in a cloud sandbox, no local checkout (gated) | #1, cella-runtime, topos | large | vague |
+
+```mermaid
+graph LR
+  AUTH[identity/authentication] --> O[1 oauth-token-store]
+  RI[repo-identity] --> R2[2 repo-selection]
+  O --> R2
+  O --> R3[3 read-surface]
+  O --> W[4 pull-request write]
+  R2 --> W
+  O --> C[5 cloud-remote-fix]
+  EX[Axis B Executor seam] -.gated.-> C
+  style C fill:#eee,stroke:#999
+  style EX stroke-dasharray: 5 5
+```
+
+**Recommended iteration order:** #1 leads and blocks everything (no GitHub call
+works without a token). Once it settles, #2, #3, and #4 iterate largely in
+parallel (#4 also wants #2 for repo context). #5 stays `vague` and is iterated
+only after the Cloud Axis B Executor seam is built.
