@@ -119,12 +119,12 @@ The board stays flat — it shows dispatched leaf specs as tasks. All structure 
 
 ## Child Specs
 
-| Spec | Focus |
-|------|-------|
-| [spec-document-model.md](spec-coordination/spec-document-model.md) | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
-| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan |
-| [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
-| [spec-archival.md](spec-coordination/spec-archival.md) | Archived status — hide finished or abandoned specs from the live graph, explorer, drift checks, and impact queries |
+| Spec | Status | Focus |
+|------|--------|-------|
+| [spec-document-model.md](spec-coordination/spec-document-model.md) | ✅ complete | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
+| [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | ✅ complete | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
+| [spec-archival.md](spec-coordination/spec-archival.md) | ✅ complete | Archived status — hide finished or abandoned specs from the live graph, explorer, drift checks, and impact queries |
+| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | ○ drafted | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan |
 
 ---
 
@@ -133,30 +133,33 @@ The board stays flat — it shows dispatched leaf specs as tasks. All structure 
 Each step is independently shippable:
 
 ```
-Step 1: Spec Document Model
+Step 1: Spec Document Model ✅ shipped
   → Define frontmatter schema, lifecycle states, tree relationships
   → Specs become structured, machine-readable documents
 
-Step 2: Spec Explorer + Chat Iteration
+Step 2: Spec Explorer + Chat Iteration ✅ shipped
   → Browse specs in a tree view, open in focused markdown view
   → Iterate via chat: agent proposes changes, user reviews
   → Builds on the existing file explorer infrastructure
 
-Step 3: Dispatch Workflow
+Step 3: Dispatch Workflow ✅ shipped
   → Dispatch leaf specs as board tasks
   → Link dispatched tasks back to their spec
   → Progress tracking via tree aggregation
 
-Step 4: Cross-Task Context
+Step 4: Cross-Task Context ✅ shipped
   → Use spec tree relationships for richer board.json context
   → Sibling leaves get more context than unrelated tasks
 
-Step 5: Drift Detection
+Step 5: Drift Detection ○ outstanding (spec-state-control-plane)
   → Detect when implementation diverges from spec
   → Propagate staleness through the tree
 ```
 
-Step 1 is foundational. Steps 2-3 deliver the core planning workflow. Steps 4-5 are refinements.
+Step 1 is foundational. Steps 2-3 deliver the core planning workflow. Steps 4-5
+are refinements. Steps 1-4 have shipped; Step 5 (drift detection) is the
+remaining [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md)
+subtree.
 
 ---
 
@@ -177,6 +180,6 @@ Step 1 is foundational. Steps 2-3 deliver the core planning workflow. Steps 4-5 
 
 ### Dependency on File Explorer
 
-The spec coordination UX depends on the file explorer (complete) for browsing and editing spec files. The spec explorer is a specialized view on top of the file explorer infrastructure.
+The spec coordination UX depends on the file explorer (shipped, since archived as a retired spec) for browsing and editing spec files. The spec explorer is a specialized view on top of the file explorer infrastructure.
 
-**Implementation order:** File explorer (done) → Spec document model → Spec explorer + chat → Dispatch workflow.
+**Implementation order:** File explorer (shipped) → Spec document model → Spec explorer + chat → Dispatch workflow.
