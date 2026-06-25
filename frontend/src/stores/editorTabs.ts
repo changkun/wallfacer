@@ -62,7 +62,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       activeId.value = path;
       return;
     }
-    const tab: FileTab = {
+    tabs.value.push({
       path,
       workspace,
       name: basename(path),
@@ -72,19 +72,23 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       loadError: null,
       saving: false,
       saveError: null,
-    };
-    tabs.value.push(tab);
+    });
     activeId.value = path;
+    // Mutate through the reactive proxy (find), not the pushed raw object — Vue
+    // wraps array elements in a proxy, so writing the raw reference changes the
+    // value without firing reactivity, leaving the editor stuck on "Loading…".
+    const live = find(path);
+    if (!live) return;
     try {
       const url = `/api/explorer/file?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`;
       const res = await api<{ content: string }>('GET', url);
       const text = typeof res === 'string' ? res : (res.content ?? JSON.stringify(res, null, 2));
-      tab.content = text;
-      tab.baseline = text;
+      live.content = text;
+      live.baseline = text;
     } catch (e: unknown) {
-      tab.loadError = e instanceof Error ? e.message : 'Failed to load file.';
+      live.loadError = e instanceof Error ? e.message : 'Failed to load file.';
     } finally {
-      tab.loading = false;
+      live.loading = false;
     }
   }
 
