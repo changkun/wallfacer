@@ -439,7 +439,11 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
   </div>
 
   <!-- Mobile-only column nav: jump between the snap-scrolled columns. -->
-  <nav v-if="!isEmptyBoard && !needsWorkspace" class="board-mobile-nav" aria-label="Board columns">
+  <nav
+    v-if="!isEmptyBoard && !needsWorkspace && editorTabs.activeId === BOARD_TAB_ID"
+    class="board-mobile-nav"
+    aria-label="Board columns"
+  >
     <button
       v-for="(label, i) in MOBILE_COLS"
       :key="label"
