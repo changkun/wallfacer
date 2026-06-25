@@ -315,6 +315,46 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
          browse before one is picked). The board stays visible beside it. -->
     <ExplorerPanel v-if="ui.showExplorer && hasWorkspace" @close="ui.closeExplorer()" />
 
+    <!-- Collapsed rail: when the explorer is hidden but a workspace exists, a
+         thin strip on the left edge advertises that the file tree can be
+         reopened. The header toggle alone wasn't discoverable. Click or press e. -->
+    <button
+      v-else-if="hasWorkspace"
+      type="button"
+      class="explorer-rail"
+      title="Open Explorer (e)"
+      aria-label="Open Explorer"
+      @click="ui.openExplorer()"
+    >
+      <svg
+        class="explorer-rail__icon"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        <line x1="9" y1="9" x2="9" y2="21"></line>
+      </svg>
+      <svg
+        class="explorer-rail__chevron"
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+
     <!-- Center pane. The board itself is a tab; switching to a file tab swaps
          it for that file's editor. v-show (not v-if) preserves board scroll and
          filter, and each editor's buffer, across tab switches. -->
