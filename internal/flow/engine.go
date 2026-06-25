@@ -95,8 +95,6 @@ func (e *Engine) Execute(ctx context.Context, f Flow, task *store.Task) error {
 		g, gctx := errgroup.WithContext(ctx)
 		parsedBySlug := make(map[string]any, len(group))
 		var parsedMu sync.Mutex
-		var skipMu sync.Mutex
-		var skipped []string
 		for i, step := range group {
 			step := step
 			prompt := prompts[i]
@@ -106,9 +104,6 @@ func (e *Engine) Execute(ctx context.Context, f Flow, task *store.Task) error {
 					if step.Optional {
 						slog.Warn("flow: optional parallel step failed, continuing",
 							"slug", step.AgentSlug, "err", err)
-						skipMu.Lock()
-						skipped = append(skipped, step.AgentSlug)
-						skipMu.Unlock()
 						return nil
 					}
 					return fmt.Errorf("flow step %q: %w", step.AgentSlug, err)
