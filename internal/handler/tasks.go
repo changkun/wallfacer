@@ -906,25 +906,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			return
 		}
 
-		// Also block any direct in_progress transition that is not marked as
-		// a test run. This protects API callers that PATCH waiting/failed →
-		// in_progress from bypassing the concurrency limit.
+		// Reject any other direct PATCH to in_progress (i.e. from waiting or
+		// failed; backlog is handled above). These transitions only flip the
+		// status and consume a concurrency slot — they do NOT launch an agent
+		// worker, leaving the task stuck in_progress with no worker. Resuming a
+		// waiting/failed task must go through ResumeTask/TestTask/SubmitFeedback,
+		// which pair the status flip with a RunBackground launch.
 		if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
-			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, newStatus) {
-				return
-			}
-			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
-				store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
-			h.diffCache.invalidate(id)
-			if oldStatus == store.TaskStatusWaiting {
-				h.cascadeArchiveThreadsForTask(id.String())
-			}
-			updated, err := s.GetTask(r.Context(), id)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			httpjson.Write(w, http.StatusOK, updated)
+			http.Error(w, "cannot move a task to in_progress via PATCH; use resume, test, or feedback to start a worker", http.StatusBadRequest)
 			return
 		}
 
