@@ -1,12 +1,20 @@
 <script setup lang="ts">
-// VS Code-style tab strip that lives in the board's top-bar spacer. The first
-// tab is the pinned Board; the rest are open files from the editorTabs store.
-// Clicking a tab focuses it (swapping the board's center pane); the active file
-// tab can be closed via its ×, middle-click, or Cmd/Ctrl+W.
+// VS Code-style tab strip in the board's top-bar spacer. The first tab is the
+// pinned Board (which surfaces in-progress / waiting task status); the rest are
+// open files from the editorTabs store. Single-click focuses; double-click pins
+// a preview tab; the active file tab closes via its ×, middle-click, or
+// Cmd/Ctrl+W.
 import { onMounted, onUnmounted } from 'vue';
-import { useEditorTabsStore, BOARD_TAB_ID } from '../../stores/editorTabs';
+import { useEditorTabsStore, BOARD_TAB_ID, type FileTab } from '../../stores/editorTabs';
+import { useTaskStore } from '../../stores/tasks';
+import { fileIcon } from '../../lib/fileIcon';
 
 const tabs = useEditorTabsStore();
+const store = useTaskStore();
+
+function iconFor(tab: FileTab) {
+  return fileIcon(tab.name, false);
+}
 
 function closeTab(e: Event, path: string) {
   e.stopPropagation();
@@ -20,8 +28,7 @@ function onAuxClick(e: MouseEvent, path: string) {
   }
 }
 
-// Cmd/Ctrl+W closes the active file tab (the board tab is pinned). Capture phase
-// so it wins over the browser's own close-tab where the embedder allows it.
+// Cmd/Ctrl+W closes the active file tab (the board tab is pinned).
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w' && tabs.activeId !== BOARD_TAB_ID) {
     e.preventDefault();
@@ -46,8 +53,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
     >
       <svg
         class="editor-tab__icon"
-        width="13"
-        height="13"
+        width="14"
+        height="14"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -61,23 +68,50 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
         <line x1="15" y1="3" x2="15" y2="21"></line>
       </svg>
       <span class="editor-tab__label">Board</span>
+      <span
+        v-if="store.inProgress.length"
+        class="editor-tab__spinner"
+        :title="store.inProgress.length + ' task(s) in progress'"
+        aria-label="tasks in progress"
+      ></span>
+      <span
+        v-if="store.waiting.length"
+        class="editor-tab__wait-dot"
+        :title="store.waiting.length + ' task(s) waiting for feedback'"
+        aria-label="tasks waiting for feedback"
+      ></span>
     </button>
 
     <button
       v-for="tab in tabs.tabs"
       :key="tab.path"
       type="button"
-      class="editor-tab"
+      class="editor-tab editor-tab--file"
       :class="{
         'editor-tab--active': tabs.activeId === tab.path,
         'editor-tab--dirty': tabs.isDirty(tab.path),
+        'editor-tab--preview': tab.preview,
       }"
       role="tab"
       :aria-selected="tabs.activeId === tab.path"
       :title="tab.path"
       @click="tabs.focus(tab.path)"
+      @dblclick="tabs.promote(tab.path)"
       @auxclick="onAuxClick($event, tab.path)"
     >
+      <svg
+        class="editor-tab__icon"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        :stroke="iconFor(tab).color"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        v-html="iconFor(tab).paths"
+      ></svg>
       <span class="editor-tab__label">{{ tabs.labelFor(tab) }}</span>
       <span
         class="editor-tab__close"
@@ -99,40 +133,63 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   min-width: 0;
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  /* Fill the header band and bleed past its vertical padding so tabs read as a
+     VS Code tab bar rather than floating pills. */
+  height: calc(100% + 12px);
+  margin: -6px 0;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
-  height: 100%;
 }
 .editor-tabs::-webkit-scrollbar {
   display: none;
 }
 
 .editor-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex: 0 0 auto;
-  max-width: 200px;
-  padding: 4px 8px 4px 10px;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
+  max-width: 180px;
+  height: 100%;
+  padding: 0 8px 0 11px;
+  border: none;
+  border-right: 1px solid var(--border);
   background: transparent;
-  color: var(--ink-3);
-  font-size: 12px;
+  color: var(--text-muted, var(--ink-3));
+  font-size: 12.5px;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  align-self: flex-end;
+}
+.editor-tab:first-child {
+  border-left: 1px solid var(--border);
 }
 .editor-tab:hover {
-  background: var(--bg-hover);
-  color: var(--ink-2);
+  background: color-mix(in oklab, var(--bg) 55%, var(--bg-card));
+  color: var(--ink-2, var(--text-secondary));
 }
+
+/* Active tab matches the editor surface and grows a top accent rule — the
+   signature VS Code "this tab owns the pane below" cue. */
 .editor-tab--active {
   background: var(--bg);
-  color: var(--ink);
-  border-color: var(--rule);
+  color: var(--ink, var(--text));
+}
+.editor-tab--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* Preview (temporary) tabs read in italics until promoted. */
+.editor-tab--preview .editor-tab__label {
+  font-style: italic;
 }
 
 .editor-tab__icon {
@@ -144,6 +201,31 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   text-overflow: ellipsis;
 }
 
+/* Board task-status cues. */
+.editor-tab__spinner {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border: 2px solid color-mix(in oklab, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: editor-tab-spin 0.7s linear infinite;
+}
+.editor-tab__wait-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--col-waiting, #e0a52e);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--col-waiting, #e0a52e) 22%, transparent);
+}
+@keyframes editor-tab-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-tab__spinner { animation: none; }
+}
+
 .editor-tab__close {
   position: relative;
   flex: 0 0 auto;
@@ -153,14 +235,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  color: var(--ink-3);
+  color: var(--ink-3, var(--text-muted));
 }
 .editor-tab__close:hover {
-  background: var(--bg-sunk, rgba(127, 127, 127, 0.18));
-  color: var(--ink);
+  background: color-mix(in oklab, var(--ink, #000) 12%, transparent);
+  color: var(--ink, var(--text));
 }
 
-/* A dirty tab shows a dot at rest and swaps to the × on hover, matching VS Code. */
 .editor-tab__x {
   font-size: 15px;
   line-height: 1;
@@ -179,15 +260,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 .editor-tab--dirty .editor-tab__x {
   display: none;
 }
-.editor-tab:not(.editor-tab--dirty) .editor-tab__x {
+.editor-tab--file:not(.editor-tab--dirty) .editor-tab__x {
   opacity: 0;
 }
-.editor-tab:hover .editor-tab__x,
+.editor-tab--file:hover .editor-tab__x,
 .editor-tab--active .editor-tab__x {
   display: inline;
   opacity: 1;
 }
-.editor-tab:hover.editor-tab--dirty .editor-tab__dot {
+.editor-tab--file:hover.editor-tab--dirty .editor-tab__dot {
   display: none;
 }
 </style>

@@ -8,11 +8,14 @@
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
 }
 
-/* Spacer takes the place of the old workspace-group-tabs div so the search
-   and action buttons stay right-aligned. */
+/* Spacer holds the editor tab strip (and keeps the search + action buttons
+   right-aligned). Stretch it to the full header height so the tab strip can
+   fill the band like a VS Code tab bar. */
 .app-header__spacer {
   flex: 1 1 0;
   min-width: 0;
+  align-self: stretch;
+  display: flex;
 }
 
 .app-header__actions {
