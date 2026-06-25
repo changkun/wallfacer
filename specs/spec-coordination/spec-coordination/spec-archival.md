@@ -393,7 +393,7 @@ When this spec is later dispatched as an implementation task, the following must
 | [explorer-ux.md](spec-archival/explorer-ux.md) | core-model | medium | complete |
 | [focused-view-ux.md](spec-archival/focused-view-ux.md) | archive-api, explorer-ux | medium | complete |
 | [skills-and-readme.md](spec-archival/skills-and-readme.md) | — | small | complete |
-| [archive-relocation.md](spec-archival/archive-relocation.md) | archive-api | large | drafted |
+| [archive-relocation.md](spec-archival/archive-relocation.md) | archive-api | large | complete |
 
 ```mermaid
 graph LR
