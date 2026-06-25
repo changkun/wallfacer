@@ -44,6 +44,31 @@ func TestCriticalPathScore(t *testing.T) {
 	}
 }
 
+// TestCriticalPathScores_MatchesSingle verifies the batch method returns the
+// same per-id score as the single-id CriticalPathScore, including for an
+// unknown id (0).
+func TestCriticalPathScores_MatchesSingle(t *testing.T) {
+	s := newTestStore(t)
+
+	taskA, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "A", Timeout: 15})
+	taskB, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "B", Timeout: 15})
+	taskC, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "C", Timeout: 15})
+	taskD, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "D", Timeout: 15})
+
+	_ = s.UpdateTaskDependsOn(bg(), taskB.ID, []string{taskA.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskB.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskD.ID, []string{taskA.ID.String()})
+
+	unknown := uuid.New()
+	ids := []uuid.UUID{taskA.ID, taskB.ID, taskC.ID, taskD.ID, unknown}
+	batch := s.CriticalPathScores(ids)
+	for _, id := range ids {
+		if got, want := batch[id], s.CriticalPathScore(id); got != want {
+			t.Errorf("CriticalPathScores[%s] = %d, want %d (single)", id, got, want)
+		}
+	}
+}
+
 // TestCriticalPathScore_UnknownTask verifies that an unknown task ID returns 0.
 func TestCriticalPathScore_UnknownTask(t *testing.T) {
 	s := newTestStore(t)

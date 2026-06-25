@@ -322,7 +322,18 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 								"task", t.ID, "thread", threadID)
 							continue
 						}
-						cpCandidates = append(cpCandidates, cpCandidate{task: *t, store: s, score: s.CriticalPathScore(t.ID)})
+						cpCandidates = append(cpCandidates, cpCandidate{task: *t, store: s})
+					}
+					// Score all candidates in one batch: CriticalPathScores
+					// builds the reverse-dependency graph once rather than once
+					// per candidate.
+					ids := make([]uuid.UUID, len(cpCandidates))
+					for i := range cpCandidates {
+						ids[i] = cpCandidates[i].task.ID
+					}
+					scores := s.CriticalPathScores(ids)
+					for i := range cpCandidates {
+						cpCandidates[i].score = scores[cpCandidates[i].task.ID]
 					}
 				})
 				// Arm a precise timer for the soonest scheduled task so it is
