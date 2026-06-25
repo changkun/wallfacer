@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -125,7 +126,16 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 	}
 	connector := client.NewConnector(cfg)
 	if relay != nil {
-		relay.SetSendUp(func(ev speccomment.Event) error { return connector.Send(ev) })
+		// Translate "no live connection" into the handler's transient-unavailable
+		// error so a browser op while disconnected surfaces as 503 (retry), not a
+		// 502 bad-gateway.
+		relay.SetSendUp(func(ev speccomment.Event) error {
+			err := connector.Send(ev)
+			if errors.Is(err, client.ErrNotConnected) {
+				return handler.ErrCoordinatorUnavailable
+			}
+			return err
+		})
 	}
 	go connector.Run(ctx)
 	return gate

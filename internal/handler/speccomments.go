@@ -158,7 +158,12 @@ func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
 	ev := speccomment.Event{Op: req.Op, Repo: repo}
 	switch req.Op {
 	case speccomment.OpCreate:
-		body, err := os.ReadFile(filepath.Join(root, "specs", req.Spec))
+		full, found := specFilePath(root, req.Spec)
+		if !found {
+			http.Error(w, "spec not found", http.StatusNotFound)
+			return
+		}
+		body, err := os.ReadFile(full)
 		if err != nil {
 			http.Error(w, "spec not found", http.StatusNotFound)
 			return
@@ -249,10 +254,10 @@ func (h *Handler) repoRoots(r *http.Request) map[string]string {
 }
 
 // resolveSpecRepo finds the repo and workspace root for a spec path by locating
-// the visible workspace whose specs/<spec> exists.
+// the visible workspace that contains the spec file (either path convention).
 func (h *Handler) resolveSpecRepo(r *http.Request, specPath string) (repo, root string, ok bool) {
 	for _, ws := range h.visibleWorkspaces(r.Context()) {
-		if _, err := os.Stat(filepath.Join(ws, "specs", specPath)); err != nil {
+		if _, found := specFilePath(ws, specPath); !found {
 			continue
 		}
 		repo = coordinator.NormalizeRemoteURL(gitutil.WorkspaceStatus(ws).RemoteURL)
@@ -268,7 +273,11 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 	if t.Status == speccomment.StatusOutdated {
 		return specCommentThread{Thread: t}
 	}
-	body, err := os.ReadFile(filepath.Join(root, "specs", t.SpecPath))
+	full, found := specFilePath(root, t.SpecPath)
+	if !found {
+		return specCommentThread{Thread: t, Orphaned: true}
+	}
+	body, err := os.ReadFile(full)
 	if err != nil {
 		return specCommentThread{Thread: t, Orphaned: true}
 	}
@@ -292,12 +301,35 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 	return specCommentThread{Thread: t, Line: line, Outdated: outdated}
 }
 
+// specFilePath resolves a spec path to an absolute file under root, tolerant of
+// either convention: the frontend's focusedSpecPath is workspace-relative WITH
+// the leading "specs/" (e.g. "specs/cloud/x.md"), while the spec-tree node path
+// omits it ("cloud/x.md"). Try the path as-is first, then under specs/. Returns
+// ok=false when neither exists.
+func specFilePath(root, specPath string) (string, bool) {
+	if p := filepath.Join(root, specPath); fileExists(p) {
+		return p, true
+	}
+	if p := filepath.Join(root, "specs", specPath); fileExists(p) {
+		return p, true
+	}
+	return "", false
+}
+
+func fileExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && !info.IsDir()
+}
+
 // gitObjectSHAs returns the current HEAD commit and the working-tree blob hash
-// of specs/<specPath> under root, for advisory anchor metadata. Either is empty
+// of the spec file under root, for advisory anchor metadata. Either is empty
 // when the path is not in a git repo or the command fails; the content-hash
 // anchor never depends on them.
 func gitObjectSHAs(root, specPath string) (commit, blob string) {
-	full := filepath.Join(root, "specs", specPath)
+	full, ok := specFilePath(root, specPath)
+	if !ok {
+		return "", ""
+	}
 	if out, err := cmdexec.Git(root, "rev-parse", "HEAD").Output(); err == nil {
 		commit = strings.TrimSpace(out)
 	}
