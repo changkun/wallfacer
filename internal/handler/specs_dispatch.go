@@ -564,14 +564,22 @@ func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
 // workspace (e.g. via "../") are rejected so the spec endpoints cannot read or
 // write files outside the workspace tree.
 func findSpecFile(workspaces []string, relPath string) string {
+	// Probe the live path first, then the relocated archive path, so an
+	// archived spec resolves by its logical key.
+	candidates := []string{relPath}
+	if arch := spec.ArchivePath(relPath); arch != relPath {
+		candidates = append(candidates, arch)
+	}
 	for _, ws := range workspaces {
-		abs := filepath.Join(ws, relPath)
-		rel, err := filepath.Rel(ws, abs)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			continue // escapes the workspace
-		}
-		if _, err := os.Stat(abs); err == nil {
-			return abs
+		for _, cand := range candidates {
+			abs := filepath.Join(ws, cand)
+			rel, err := filepath.Rel(ws, abs)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue // escapes the workspace
+			}
+			if _, err := os.Stat(abs); err == nil {
+				return abs
+			}
 		}
 	}
 	return ""
