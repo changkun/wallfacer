@@ -9,7 +9,7 @@
 import { ref, watch, onUnmounted } from 'vue';
 import type { Ref } from 'vue';
 import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFetch';
-import { parseActivity, type ActivityRow } from '../lib/prettyNdjson';
+import { createActivityParser, type ActivityRow } from '../lib/prettyNdjson';
 
 export function useTaskActivity(taskId: Ref<string | null>) {
   const raw = ref('');
@@ -28,13 +28,19 @@ export function useTaskActivity(taskId: Ref<string | null>) {
     raw.value = '';
     activity.value = [];
     streaming.value = true;
+    // Incremental parser: parse each NDJSON line once instead of re-parsing the
+    // whole accumulated buffer on every chunk (which is O(n^2) in frames).
+    const parser = createActivityParser();
     handle = startStreamingFetch({
       url: `/api/tasks/${id}/logs`,
       onChunk: (chunk) => {
         raw.value += chunk;
-        activity.value = parseActivity(raw.value);
+        activity.value = [...parser.push(chunk)];
       },
-      onDone: () => { streaming.value = false; },
+      onDone: () => {
+        activity.value = [...parser.finalize()];
+        streaming.value = false;
+      },
       onError: () => { streaming.value = false; },
     });
   }

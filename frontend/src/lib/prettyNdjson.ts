@@ -309,6 +309,49 @@ export function parseActivity(raw: string): ActivityRow[] {
   return out;
 }
 
+// ActivityParser incrementally parses streamed NDJSON. push(chunk) parses only
+// the newly completed lines and appends their rows; finalize() flushes a final
+// newline-less line. The accumulated rows are byte-for-byte equal to calling
+// parseActivity over the full buffer (plus finalize), but each frame is parsed
+// once instead of re-splitting and re-JSON.parsing the WHOLE buffer per chunk,
+// which is O(n^2) in frames for a long-running stream.
+export interface ActivityParser {
+  push(chunk: string): ActivityRow[];
+  finalize(): ActivityRow[];
+  rows(): ActivityRow[];
+}
+
+export function createActivityParser(): ActivityParser {
+  const out: ActivityRow[] = [];
+  let pending = '';
+  const consume = (line: string) => {
+    const frame = parseFrameLine(line);
+    if (frame) out.push(...frameActivityRows(frame));
+  };
+  return {
+    push(chunk: string): ActivityRow[] {
+      pending += chunk;
+      let nl = pending.indexOf('\n');
+      while (nl !== -1) {
+        consume(pending.slice(0, nl));
+        pending = pending.slice(nl + 1);
+        nl = pending.indexOf('\n');
+      }
+      return out;
+    },
+    finalize(): ActivityRow[] {
+      if (pending) {
+        consume(pending);
+        pending = '';
+      }
+      return out;
+    },
+    rows(): ActivityRow[] {
+      return out;
+    },
+  };
+}
+
 export function hasActivity(raw: string): boolean {
   for (const line of raw.split('\n')) {
     const frame = parseFrameLine(line);
