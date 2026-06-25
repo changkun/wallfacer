@@ -28,4 +28,13 @@ describe('parseSpecFrontmatter', () => {
     expect(r.frontmatter.depends_on).toBeUndefined();
     expect(r.frontmatter.description).toBeUndefined();
   });
+  // Body line 1 must be the first content line, matching the backend's
+  // spec.ParseBytes TrimLeft. Almost every spec has a blank line after the
+  // closing ---; if it were kept, data-source-line would offset every spec
+  // comment by one line. Guard the alignment.
+  it('strips leading blank lines so body line 1 is the first heading', () => {
+    const r = parseSpecFrontmatter('---\ntitle: X\n---\n\n# Heading\n\nFirst paragraph.\n');
+    expect(r.body.startsWith('# Heading')).toBe(true);
+    expect(r.body.split('\n')[0]).toBe('# Heading');
+  });
 });
