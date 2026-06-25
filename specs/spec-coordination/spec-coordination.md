@@ -24,11 +24,11 @@ dispatched_task_id: null
 > chat-driven iteration, dispatch workflow, undo snapshots, planning cost
 > tracking, the `archived` lifecycle state, and the server-managed control plane
 > (7th `testing` state, stale propagation, chat-edit fan-out, folder dispatch,
-> explicit-validate, advisory staleness scan, and the task-done drift pipeline)
-> are live. One follow-up remains: the drift pipeline's concrete agent-backed
-> tester is gated behind `WALLFACER_DRIFT_TESTER` and not yet wired, so
-> `SpecCompletionHook` preserves the historical complete-on-done behavior by
-> default until that tester lands.
+> explicit-validate, advisory staleness scan, and the task-done drift pipeline
+> with its agent-backed tester) are live. The drift tester is gated behind
+> `WALLFACER_DRIFT_TESTER` (off by default per the design's "default on once
+> stable"); with the flag off, `SpecCompletionHook` preserves the historical
+> complete-on-done behavior.
 
 ## Problem
 
@@ -127,7 +127,7 @@ The board stays flat — it shows dispatched leaf specs as tasks. All structure 
 | [spec-document-model.md](spec-coordination/spec-document-model.md) | ✅ complete | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
 | [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | ✅ complete | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
 | [spec-archival.md](spec-coordination/spec-archival.md) | ✅ complete | Archived status — hide finished or abandoned specs from the live graph, explorer, drift checks, and impact queries |
-| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | ✅ complete | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan (concrete drift tester gated off pending wiring) |
+| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | ✅ complete | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan (drift tester gated behind `WALLFACER_DRIFT_TESTER`, off by default) |
 
 ---
 
@@ -162,8 +162,8 @@ Step 5: Drift Detection ✅ shipped (spec-state-control-plane)
 Step 1 is foundational. Steps 2-3 deliver the core planning workflow. Steps 4-5
 are refinements. All five steps have shipped; the
 [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md)
-subtree delivered Step 5 (one follow-up: wiring the concrete drift tester,
-gated off by default).
+subtree delivered Step 5, including the agent-backed drift tester (gated behind
+`WALLFACER_DRIFT_TESTER`, off by default).
 
 ---
 

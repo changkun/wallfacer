@@ -12,6 +12,7 @@ import (
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -50,6 +51,9 @@ type MockRunner struct {
 	// generator. When nil the method returns an empty string and a nil
 	// error so callers fall back to their deterministic path.
 	GenerateCommitMessageFn func(ctx context.Context, data prompts.CommitData) (string, error)
+
+	// AssessDriftFn lets tests stub the drift-assessment agent call.
+	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
 	// GeneratePlanningThreadTitleFn lets tests stub the task-free planning
 	// thread title generation. When nil, the method returns ("", nil).
@@ -224,6 +228,15 @@ func (m *MockRunner) GenerateCommitMessage(ctx context.Context, data prompts.Com
 		return m.GenerateCommitMessageFn(ctx, data)
 	}
 	return "", nil
+}
+
+// AssessDrift delegates to AssessDriftFn when set; the default returns a zero
+// verdict and nil error so tests that don't exercise drift stay simple.
+func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error) {
+	if m.AssessDriftFn != nil {
+		return m.AssessDriftFn(ctx, specBody, affects, changedFiles, diff)
+	}
+	return spec.DriftVerdict{}, nil
 }
 
 // GeneratePlanningThreadTitle delegates to GeneratePlanningThreadTitleFn when

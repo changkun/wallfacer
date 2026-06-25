@@ -411,6 +411,16 @@ type ConflictData struct {
 	DefaultBranch string
 }
 
+// DriftData holds template variables for the drift-assessment prompt: the
+// spec body and the task's actual changes. Affects and ChangedFiles are
+// newline-joined for rendering.
+type DriftData struct {
+	SpecBody     string
+	Affects      string
+	ChangedFiles string
+	Diff         string
+}
+
 // TestData holds template variables for the test verification prompt.
 type TestData struct {
 	OriginalPrompt string
@@ -443,6 +453,9 @@ func (m *Manager) Title(taskPrompt string) string {
 
 // CommitMessage renders the commit message generation prompt.
 func (m *Manager) CommitMessage(d CommitData) string { return m.render("commit.tmpl", d) }
+
+// DriftAssessment renders the task-done drift-assessment prompt.
+func (m *Manager) DriftAssessment(d DriftData) string { return m.render("drift.tmpl", d) }
 
 // ConflictResolution renders the rebase conflict resolution prompt.
 func (m *Manager) ConflictResolution(d ConflictData) string { return m.render("conflict.tmpl", d) }
@@ -485,6 +498,9 @@ func Title(taskPrompt string) string { return Default.Title(taskPrompt) }
 
 // CommitMessage renders the commit message generation prompt.
 func CommitMessage(d CommitData) string { return Default.CommitMessage(d) }
+
+// DriftAssessment renders the task-done drift-assessment prompt.
+func DriftAssessment(d DriftData) string { return Default.DriftAssessment(d) }
 
 // ConflictResolution renders the rebase conflict resolution prompt.
 func ConflictResolution(d ConflictData) string { return Default.ConflictResolution(d) }

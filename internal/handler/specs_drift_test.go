@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -141,6 +142,32 @@ func TestDriftPipeline_SkipsNonValidated(t *testing.T) {
 	s, _ := spec.ParseFile(filepath.Join(ws, "specs/source.md"))
 	if s.Status != spec.StatusStale {
 		t.Errorf("status = %q, want stale unchanged (pipeline skipped non-validated)", s.Status)
+	}
+}
+
+func TestDriftPipeline_ThroughRunnerAdapter(t *testing.T) {
+	// Exercises NewRunnerDriftTester: the hook runs the verdict via the runner
+	// interface, not a hand-rolled stub.
+	ws := initPlanningTestRepo(t)
+	writeFanoutSpec(t, ws, "source.md", "validated", "Source", nil, []string{"internal/x/"})
+	runGit(t, ws, "add", "specs/")
+	runGit(t, ws, "commit", "-m", "seed")
+
+	mock := &runner.MockRunner{
+		AssessDriftFn: func(_ context.Context, _ string, _, _ []string, _ string) (spec.DriftVerdict, error) {
+			return spec.DriftVerdict{Criteria: spec.DriftCriteria{Satisfied: 6, Total: 6}}, nil
+		},
+	}
+	hook := SpecCompletionHook(
+		func() []string { return []string{ws} },
+		NewRunnerDriftTester(mock),
+		func() bool { return true },
+	)
+	hook(store.Task{SpecSourcePath: "specs/source.md"})
+
+	s, _ := spec.ParseFile(filepath.Join(ws, "specs/source.md"))
+	if s.Status != spec.StatusComplete {
+		t.Errorf("status = %q, want complete (verdict via runner adapter)", s.Status)
 	}
 }
 

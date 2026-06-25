@@ -1,0 +1,42 @@
+You are assessing whether a code change matches the specification it was meant to implement.
+
+Compare the spec below against the actual changes (the git diff and the list of changed files). Judge how far the implementation drifted from the spec's intent.
+
+Output ONLY a single JSON object — no markdown, no code fences, no prose — with exactly this shape:
+{
+  "expected_files": ["..."],
+  "actual_files": ["..."],
+  "unexpected": ["..."],
+  "missing": ["..."],
+  "criteria": {
+    "satisfied": 0,
+    "diverged": 0,
+    "not_implemented": 0,
+    "superseded": 0,
+    "total": 0,
+    "notes": "..."
+  },
+  "drift_level": "minimal",
+  "summary": "one or two sentences"
+}
+
+Field meanings:
+- expected_files: files the spec implies should change (derived from its affects list and body).
+- actual_files: files actually changed in the diff.
+- unexpected: changed files not implied by the spec.
+- missing: spec-implied files that were NOT changed.
+- criteria: how the spec's acceptance-criteria section fared. If the spec has NO explicit acceptance-criteria section, set every count (including total) to 0.
+- drift_level: your own minimal/moderate/significant opinion — advisory only; the server recomputes the authoritative level from the fields above.
+- summary: one or two sentences on what matched and what diverged.
+
+Spec:
+{{.SpecBody}}
+
+Spec affects paths:
+{{.Affects}}
+
+Changed files:
+{{.ChangedFiles}}
+
+Diff:
+{{.Diff}}
