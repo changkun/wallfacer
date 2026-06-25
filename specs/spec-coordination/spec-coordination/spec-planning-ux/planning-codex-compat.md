@@ -1,6 +1,6 @@
 ---
 title: Planning Chat Agent — Codex Compatibility
-status: drafted
+status: stale
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
 affects:
@@ -9,12 +9,27 @@ affects:
   - internal/cli/server.go
 effort: small
 created: 2026-04-03
-updated: 2026-04-12
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
 
 # Planning Chat Agent — Codex Compatibility
+
+> **Status: stale (re-scope, do not drop).** The *intent* still holds: the
+> planner hard-codes one harness and should run Codex (and the other Tier-A
+> harnesses) like task activities do. The live gap is `planner.go:144`, which
+> calls `p.buildSpec(name, harness.Claude)` unconditionally. But the
+> *implementation* below is obsolete: the container/sandbox model it targets
+> (`buildContainerSpec`, `sandbox.Type`, the `codex.sh` image entrypoint
+> wrapper, `~/.codex` bind mounts, image rewriting) was replaced by the
+> [harness abstraction](../../../shared/harness-abstraction.md) and host
+> execution. The planner is now a host process emitting an
+> `executor.ContainerSpec` via `buildSpec(name, harness.ID)`; there is no image
+> to rewrite and no auth volume to mount. A revival re-scopes around plumbing a
+> `harness.ID` into `planner.Config` and forwarding the harness's own `AuthEnv`,
+> not the container plumbing described below. The original design is preserved
+> for the record.
 
 ## Current State
 
