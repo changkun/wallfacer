@@ -57,12 +57,12 @@ function applyQuick(insert: string) {
             <div class="chat-entry-mark" aria-hidden="true">
               <BrandMark :size="34" />
             </div>
-            <h1 class="chat-entry-greeting">What should we plan?</h1>
+            <h1 class="chat-entry-greeting">What should we work on?</h1>
             <ChatComposer
               ref="heroComposer"
               :streaming="chat.streaming.value"
               variant="hero"
-              placeholder="Message the planning agent…"
+              placeholder="Message the agent…"
               @send="chat.sendMessage"
               @interrupt="chat.onInterrupt"
             />
@@ -97,7 +97,7 @@ function applyQuick(insert: string) {
             <ChatComposer
               :streaming="chat.streaming.value"
               variant="docked"
-              placeholder="Message the planning agent…"
+              placeholder="Message the agent…"
               @send="chat.sendMessage"
               @interrupt="chat.onInterrupt"
             />
