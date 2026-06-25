@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -328,6 +329,63 @@ func TestHostBackend_Kill_Escalates(t *testing.T) {
 			t.Errorf("handle %q still in List after Wait", spec.Name)
 		}
 	}
+}
+
+// TestHostBackend_Kill_EscalatesImmediatelyWhenSignalUnsupported simulates the
+// Windows case where the graceful signal cannot be delivered: Kill must escalate
+// to a hard kill at once instead of waiting out the 5 s SIGTERM grace period.
+// Without the immediate escalation the child survives until the 5 s fallback and
+// this test (which only waits 3 s) fails — mirroring TestRunContainerRegistersHandleForKill
+// on Windows CI.
+func TestHostBackend_Kill_EscalatesImmediatelyWhenSignalUnsupported(t *testing.T) {
+	// Inject a signal the OS rejects so Process.Signal returns an error,
+	// reproducing Windows behaviour on any platform. Not parallel: gracefulSig
+	// is process-global mutable state.
+	orig := gracefulSig
+	gracefulSig = syscall.Signal(0x7f) // out-of-range signal number → EINVAL
+	t.Cleanup(func() { gracefulSig = orig })
+
+	bin := buildFakeAgent(t, "fakeagent")
+	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+
+	spec := ContainerSpec{
+		Name: "wallfacer-test-kill-unsupported",
+		Env: map[string]string{
+			"WALLFACER_AGENT": "claude",
+			"FAKEAGENT_SLEEP": "60",
+		},
+		Cmd:     []string{"-p", "wait"},
+		WorkDir: t.TempDir(),
+	}
+	h, err := b.Launch(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); _, _ = io.ReadAll(h.Stdout()) }()
+	go func() { defer wg.Done(); _, _ = io.ReadAll(h.Stderr()) }()
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := h.Kill(); err != nil {
+		t.Fatalf("kill: %v", err)
+	}
+
+	done := make(chan int, 1)
+	go func() {
+		code, _ := h.Wait()
+		done <- code
+	}()
+
+	select {
+	case <-done:
+		// success: escalation happened well before the 5 s grace period.
+	case <-time.After(3 * time.Second):
+		t.Fatal("Kill did not escalate immediately when the graceful signal was unsupported")
+	}
+	wg.Wait()
 }
 
 func TestHostBackend_List(t *testing.T) {
