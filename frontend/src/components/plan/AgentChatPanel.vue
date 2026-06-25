@@ -28,7 +28,7 @@ defineExpose({
 <template>
   <aside v-show="visible" class="agent-chat-panel">
     <header class="pcp-header">
-      <span class="pcp-title">Planning Chat</span>
+      <span class="pcp-title">Chat</span>
       <div class="pcp-header-actions">
         <button
           type="button"
@@ -45,7 +45,7 @@ defineExpose({
       </div>
     </header>
 
-    <div class="pcp-tabs" role="tablist" aria-label="Planning chat threads">
+    <div class="pcp-tabs" role="tablist" aria-label="Chat sessions">
       <template v-for="id in threadOrder" :key="id">
         <component
           :is="id === activeThreadId ? 'div' : 'button'"
