@@ -181,6 +181,7 @@ Claude Code's headless mode (`-p`) is single-shot: one prompt in, one response o
 | [Slash Command Registry](planning-chat-agent/slash-command-registry.md) | message-api | medium | **complete** |
 | [UI Chat Send and Stream](planning-chat-agent/ui-chat-send-stream.md) | message-stream | medium | **complete** |
 | [UI Message Queue and Interrupt](planning-chat-agent/ui-message-queue.md) | ui-chat-send-stream | medium | **complete** |
+| [Session Persistence](planning-chat-agent/session-persistence.md) | conversation-store | medium | stale — residual (lossy resume still live; needs re-scope or archive) |
 
 ```mermaid
 graph LR

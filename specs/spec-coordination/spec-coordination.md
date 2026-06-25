@@ -1,6 +1,6 @@
 ---
 title: Spec Coordination Layer
-status: drafted
+status: complete
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
@@ -187,3 +187,32 @@ subtree delivered Step 5, including the agent-backed drift tester (gated behind
 The spec coordination UX depends on the file explorer (shipped, since archived as a retired spec) for browsing and editing spec files. The spec explorer is a specialized view on top of the file explorer infrastructure.
 
 **Implementation order:** File explorer (shipped) → Spec document model → Spec explorer + chat → Dispatch workflow.
+
+---
+
+## Outcome
+
+**Complete (2026-06-25).** All four child subtrees shipped: the structured
+spec document model, the three-pane planning UX (explorer, focused view, chat),
+the `archived` lifecycle, and the server-managed state control plane. The
+coordination layer is the spec workflow Wallfacer now runs on — specs are
+authored and iterated in chat, broken down into a recursive tree, dispatched to
+the board as tasks, and moved through their lifecycle by server hooks.
+
+**Two residual stale leaves** (acknowledged, tracked, orthogonal to the
+coordination model — not blockers):
+
+- [planning-chat-agent/session-persistence.md](spec-coordination/spec-planning-ux/planning-chat-agent/session-persistence.md):
+  planning-conversation resume is still lossy (the `BuildHistoryContext`
+  fallback is live). Needs re-scoping against the host-process planner or
+  archiving.
+- [planning-codex-compat.md](spec-coordination/spec-planning-ux/planning-codex-compat.md):
+  re-scoped onto the harness abstraction; the planning agent runs Claude Code
+  only for now.
+
+**One operational default:** the drift pipeline's agent-backed tester is wired
+but gated behind `WALLFACER_DRIFT_TESTER` (off by default); with the flag off,
+the task-done hook preserves complete-on-done. Turning it on enables per-task
+drift verdicts. The structured drift sidecar (`SaveDriftReport` + `GET .../drift`)
+and a Retry-Test action remain optional follow-ups; the inline `## Outcome`
+section is the git-tracked verdict persistence.
