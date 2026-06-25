@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { api, authHeaders, withAuthToken } from '../../api/client';
 import { renderMarkdown, renderMarkdownWithSourceLines } from '../../lib/markdown';
@@ -366,12 +366,11 @@ watch([renderedBody, renderedTaskPrompt, bodyRef], () => {
   });
 }, { immediate: true });
 
-onMounted(() => {
-  bodyRef.value?.addEventListener('click', onBodyClick);
-});
-onUnmounted(() => {
-  bodyRef.value?.removeEventListener('click', onBodyClick);
-});
+// onBodyClick is bound declaratively via @click on the body div(s) so Vue
+// re-attaches it across re-renders and the out-in crossfade element swap. The
+// old onMounted addEventListener ran when bodyRef was still null (the body is
+// gated behind v-if="renderedBody", absent until the async fetch resolves), so
+// it never attached and spec-link clicks were never intercepted.
 
 // Exposed for the PlanPage keyboard shortcuts (d = dispatch, b = break down).
 function dispatchFocused() { if (showDispatch.value) void onDispatch(); }
@@ -465,6 +464,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
           ref="bodyRef"
           class="sf-content prose-content"
           v-html="renderedTaskPrompt"
+          @click="onBodyClick"
         />
         <div v-else class="sf-loading">No prompt for this task.</div>
       </div>
@@ -480,6 +480,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
             ref="bodyRef"
             class="sf-content sf-content--spec prose-content"
             v-html="renderedBody"
+            @click="onBodyClick"
           />
           <SpecCommentsLayer
             :body-el="bodyRef"
