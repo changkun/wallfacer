@@ -38,6 +38,13 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
+	// Cancelling/finishing a task schedules background trace compaction
+	// (scheduleTerminalCompaction) that writes data/<uuid>/traces/. Close only
+	// flips a flag — it does not drain that goroutine. Registered right after
+	// the store so it runs (LIFO) just before t.TempDir's RemoveAll, otherwise
+	// the compactor races cleanup ("directory not empty" on macOS/Linux, a
+	// chmod-on-missing-tmp error on Windows) and the test flakes.
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(func() { s.Close() })
 
 	mock := &runner.MockRunner{
