@@ -9,8 +9,8 @@ const fontsCss = readFileSync(resolve(root, 'src/styles/fonts.css'), 'utf8');
 describe('font loading', () => {
   it('preloads the critical Latin fonts so first paint avoids a FOUT swap', () => {
     for (const href of [
-      '/fonts/inter-400.woff2',
-      '/fonts/inter-600.woff2',
+      '/fonts/hanken-400.woff2',
+      '/fonts/hanken-600.woff2',
       '/fonts/instrument-serif-regular.woff2',
       '/fonts/instrument-serif-italic.woff2',
     ]) {
