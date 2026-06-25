@@ -33,6 +33,9 @@ function arg(name, fallback) {
 // working .parity check scripts. Steps run in order before the screenshot.
 const SURFACES = {
   board: { route: '/' },
+  // Workspace switcher open — guards the sidebar-popover anchoring against
+  // chrome changes (e.g. backdrop-filter establishing a new containing block).
+  switcher: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 400 }] },
   palette: { route: '/', steps: [{ key: 'Meta+k' }, { wait: 700 }] },
   'task-detail': {
     route: '/',
