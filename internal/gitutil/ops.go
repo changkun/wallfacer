@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -108,11 +110,31 @@ func recoverRebaseState(worktreePath string) error {
 	return nil
 }
 
-// hasRebaseOrMergeState checks whether Git currently has leftover rebase or
-// merge state under .git/rebase-apply, .git/rebase-merge, or .git/MERGE_HEAD.
+// hasRebaseOrMergeState reports whether Git currently has leftover rebase or
+// merge state. It detects an in-progress rebase by the presence of the
+// .git/rebase-merge or .git/rebase-apply directory (these exist at every
+// rebase stop, including one triggered by a failed `--exec` step where
+// REBASE_HEAD is absent), and an in-progress merge or cherry-pick via the
+// MERGE_HEAD / CHERRY_PICK_HEAD refs.
 func hasRebaseOrMergeState(worktreePath string) (bool, error) {
-	if _, err := cmdexec.Git(worktreePath, "rev-parse", "--verify", "-q", "REBASE_HEAD").Output(); err == nil {
-		return true, nil
+	for _, dir := range []string{"rebase-merge", "rebase-apply"} {
+		// `git rev-parse --git-path <name>` resolves <name> relative to the
+		// repo's git dir; with `-C worktreePath` the printed path is relative
+		// to worktreePath, so join before stat'ing.
+		out, err := cmdexec.Git(worktreePath, "rev-parse", "--git-path", dir).Output()
+		if err != nil {
+			continue
+		}
+		p := strings.TrimSpace(string(out))
+		if p == "" {
+			continue
+		}
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(worktreePath, p)
+		}
+		if info, statErr := os.Stat(p); statErr == nil && info.IsDir() {
+			return true, nil
+		}
 	}
 	if _, err := cmdexec.Git(worktreePath, "rev-parse", "--verify", "-q", "MERGE_HEAD").Output(); err == nil {
 		return true, nil
