@@ -532,12 +532,19 @@ Divergences from the spec, deferred (not blocking the v1 goal):
 The v1 slice drew only a left-gutter marker; the anchored text was never marked in the
 prose, and two threads that snapped to the same source-line block were given the same
 gutter top, so a newer marker stacked on the older one and hid it. Fixed by highlighting
-the anchored text in place: `frontend/src/lib/specHighlight.ts` wraps each inline
-thread's `anchor.exact_text` in a clickable `<mark>` *within its source-line block*
-(block-scoped, so an `exact_text` that recurs in an unrelated code/mermaid block is not
-mis-highlighted), with `locateQuote` disambiguating duplicates by prefix/suffix. Inline
-marks are now the primary affordance; the gutter marker is a fallback for threads whose
-text cannot be located inline. This closed both bugs (no highlight; new comment hides
-others) and brings the design in line with the "highlight on the anchored text" intent
-above. `status` moved `drafted → complete`: the v1 capability shipped and the highlight
-gap is closed; the deferred divergences listed above remain their own follow-up leaves.
+the commented line in place: `frontend/src/lib/specHighlight.ts` wraps the text of the
+block at the thread's resolved line in a clickable `<mark>`. The highlight is **line-level
+by construction**, not a sub-span match: `anchor.exact_text` is the *raw* source line(s)
+(`rawRange` in `internal/spec/anchor.go`, markdown markup and all — `**bold**`,
+`[link](url)`), which does not substring-match the *rendered* DOM text, so matching it
+was abandoned. `collectSourceBlocks` keeps the deepest element per source line (a list
+item is not shadowed by its `<ol>` sharing the line); the wrap skips links (kept
+navigable), code blocks, and mermaid. Inline marks are the primary affordance; a gutter
+marker remains for the extra threads on a line and for any line with no wrappable text,
+de-stacked (`destack`) so fallback markers never overlap. This closed both bugs (no
+highlight; new comment hides others) and brings the design in line with the "highlight on
+the anchored text" intent above; verified in real Chromium against the markdown pipeline.
+Sub-line (word-level) precision like ai-as-an-infrastructure would require storing the
+rendered selection offsets in the anchor, a schema change deferred as a follow-up.
+`status` moved `drafted → complete`: the v1 capability shipped and the highlight gap is
+closed; the deferred divergences listed above remain their own follow-up leaves.
