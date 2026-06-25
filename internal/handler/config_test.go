@@ -1863,9 +1863,9 @@ func TestMkdirWorkspace_RejectsRelativePath(t *testing.T) {
 
 func TestMkdirWorkspace_RejectsPathTraversal(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
-	cases := []string{"..", "../escape", "a/b"}
+	cases := []string{"..", "../escape", "..\\escape", "a/b", "a\\b"}
 	for _, name := range cases {
-		body := `{"path":` + jsonStr(ws) + `,"name":"` + name + `"}`
+		body := `{"path":` + jsonStr(ws) + `,"name":` + jsonStr(name) + `}`
 		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
 		w := httptest.NewRecorder()
 		h.MkdirWorkspace(w, req)

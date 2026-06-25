@@ -87,7 +87,7 @@ func (h *Handler) MkdirWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Name == "" || req.Name == "." || req.Name == ".." ||
-		strings.Contains(req.Name, "/") {
+		strings.ContainsAny(req.Name, "/\\") {
 		http.Error(w, "invalid folder name", http.StatusBadRequest)
 		return
 	}
