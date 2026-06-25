@@ -22,7 +22,7 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -1670,7 +1670,7 @@ func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
 	}
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: task.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: task.ID.String()})
 	h.planner.SetBusy(true, threadID)
 	defer h.planner.SetBusy(false, "")
 

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -39,7 +39,7 @@ func TestGetPlanningStatus_NilPlanner(t *testing.T) {
 
 func TestGetPlanningStatus_WithPlanner(t *testing.T) {
 	h := newTestHandler(t)
-	h.planner = planner.New(planner.Config{Command: "podman"})
+	h.planner = agentsession.New(agentsession.Config{Command: "podman"})
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/planning", nil)
@@ -93,7 +93,7 @@ func TestStopPlanning_NilPlanner(t *testing.T) {
 
 func TestStopPlanning_WithPlanner(t *testing.T) {
 	h := newTestHandler(t)
-	h.planner = planner.New(planner.Config{Command: "podman"})
+	h.planner = agentsession.New(agentsession.Config{Command: "podman"})
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/api/planning", nil)
@@ -118,7 +118,7 @@ func TestSetPlanner(t *testing.T) {
 		t.Fatal("expected nil planner by default")
 	}
 
-	p := planner.New(planner.Config{Command: "podman"})
+	p := agentsession.New(agentsession.Config{Command: "podman"})
 	h.SetPlanner(p)
 
 	if h.planner != p {
@@ -128,9 +128,9 @@ func TestSetPlanner(t *testing.T) {
 
 // --- Planning Messages ---
 
-func newPlannerWithStore(t *testing.T) *planner.Planner {
+func newPlannerWithStore(t *testing.T) *agentsession.Planner {
 	t.Helper()
-	return planner.New(planner.Config{
+	return agentsession.New(agentsession.Config{
 		Command:     "podman",
 		Fingerprint: "test-fp",
 		ConfigDir:   t.TempDir(),
@@ -149,7 +149,7 @@ func TestGetPlanningMessages_Empty(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var msgs []planner.Message
+	var msgs []agentsession.Message
 	if err := json.Unmarshal(rec.Body.Bytes(), &msgs); err != nil {
 		t.Fatalf("json decode: %v", err)
 	}
@@ -164,8 +164,8 @@ func TestGetPlanningMessages_WithHistory(t *testing.T) {
 	h.planner = p
 
 	cs := p.ActiveConversation()
-	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
-	_ = cs.AppendMessage(planner.Message{Role: "assistant", Content: "hi", Timestamp: time.Now().UTC()})
+	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
+	_ = cs.AppendMessage(agentsession.Message{Role: "assistant", Content: "hi", Timestamp: time.Now().UTC()})
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages", nil)
@@ -175,7 +175,7 @@ func TestGetPlanningMessages_WithHistory(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var msgs []planner.Message
+	var msgs []agentsession.Message
 	if err := json.Unmarshal(rec.Body.Bytes(), &msgs); err != nil {
 		t.Fatalf("json decode: %v", err)
 	}
@@ -199,9 +199,9 @@ func TestGetPlanningMessages_Pagination(t *testing.T) {
 	t1 := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 4, 1, 11, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "first", Timestamp: t1})
-	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "second", Timestamp: t2})
-	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "third", Timestamp: t3})
+	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "first", Timestamp: t1})
+	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "second", Timestamp: t2})
+	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "third", Timestamp: t3})
 
 	// Filter: only messages before t3.
 	rec := httptest.NewRecorder()
@@ -212,7 +212,7 @@ func TestGetPlanningMessages_Pagination(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var msgs []planner.Message
+	var msgs []agentsession.Message
 	if err := json.Unmarshal(rec.Body.Bytes(), &msgs); err != nil {
 		t.Fatalf("json decode: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestClearPlanningMessages(t *testing.T) {
 	h.planner = p
 
 	cs := p.ActiveConversation()
-	_ = cs.AppendMessage(planner.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
+	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/api/planning/messages", nil)
@@ -397,7 +397,7 @@ func TestGetPlanningCommands(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var cmds []planner.Command
+	var cmds []agentsession.Command
 	if err := json.Unmarshal(rec.Body.Bytes(), &cmds); err != nil {
 		t.Fatalf("json decode: %v", err)
 	}
@@ -722,7 +722,7 @@ func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskID}); err != nil {
+	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskID}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 
@@ -762,7 +762,7 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: created.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: created.ID.String()})
 
 	h2 := h
 
@@ -857,7 +857,7 @@ func TestUpdateTaskPromptTool_MismatchedTaskID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskA.ID.String()}); err != nil {
+	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskA.ID.String()}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 
@@ -894,7 +894,7 @@ func TestUpdateTaskPromptTool_ResumeHintOnWaiting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: created.ID.String()}); err != nil {
+	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: created.ID.String()}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 
@@ -964,7 +964,7 @@ func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tm.Store: %v", err)
 	}
-	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskID}); err != nil {
+	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskID}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 

@@ -246,30 +246,46 @@ func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Apply the status change to every target in a loop. If a mid-loop write
-	// fails, surface the error — the caller sees a partial apply, but the
-	// already-written files remain archived on disk (no rollback). This
-	// matches how dispatch handles partial writes (error bubbles up).
-	now := time.Now()
-	for _, t := range targets {
-		if err := spec.UpdateFrontmatter(t.absPath, map[string]any{
-			"status":  string(spec.StatusArchived),
-			"updated": now,
-		}); err != nil {
-			http.Error(w,
-				fmt.Sprintf("update %s: %v", t.relPath, err),
-				http.StatusInternalServerError)
+	// Relocate the spec (and its companion subtree) into specs/.archive/, then
+	// flip status on the moved files. ws is empty only if the spec sits outside
+	// every workspace (shouldn't happen — findSpecFile found it); in that case
+	// fall back to an in-place status flip.
+	ws := findWorkspaceRoot(workspaces, absPath)
+	moved := ws != ""
+	if moved {
+		if err := relocateSpec(r.Context(), ws, req.Path, spec.ArchivePath(req.Path)); err != nil {
+			http.Error(w, fmt.Sprintf("relocate %s: %v", req.Path, err), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	// Commit all frontmatter changes in one commit so unarchive can revert it.
-	subject := archiveCommitSubject(req.Path, len(targets)-1)
-	paths := make([]string, 0, len(targets))
+	// Apply the status change to every target at its (possibly relocated) path.
+	// A mid-loop failure surfaces the error with no rollback, matching dispatch.
+	now := time.Now()
+	commitPaths := make([]string, 0, len(targets))
+	commitTarget := absPath
 	for _, t := range targets {
-		paths = append(paths, t.relPath)
+		rel, abs := t.relPath, t.absPath
+		if moved {
+			rel = spec.ArchivePath(t.relPath)
+			abs = filepath.Join(ws, filepath.FromSlash(rel))
+		}
+		if err := spec.UpdateFrontmatter(abs, map[string]any{
+			"status":  string(spec.StatusArchived),
+			"updated": now,
+		}); err != nil {
+			http.Error(w, fmt.Sprintf("update %s: %v", t.relPath, err), http.StatusInternalServerError)
+			return
+		}
+		commitPaths = append(commitPaths, rel)
+		if t.relPath == req.Path {
+			commitTarget = abs
+		}
 	}
-	if err := commitSpecChanges(r.Context(), workspaces, absPath, paths, subject); err != nil {
+
+	// One commit captures the moves + status writes so unarchive reverts both.
+	subject := archiveCommitSubject(req.Path, len(targets)-1)
+	if err := commitSpecChanges(r.Context(), workspaces, commitTarget, commitPaths, subject); err != nil {
 		slog.Warn("spec archive commit failed",
 			"path", req.Path, "err", err)
 	}
@@ -335,15 +351,29 @@ func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fallback: single-spec transition archived → drafted.
-	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+	// Fallback: single-spec archived → drafted, moving the file back to its
+	// live location when it was relocated under .archive/ (e.g. a spec moved by
+	// the migration command, which has no per-spec archive commit to revert).
+	liveRel, liveAbs := req.Path, absPath
+	if ws != "" {
+		archiveRel := spec.ArchivePath(req.Path)
+		if _, err := os.Stat(filepath.Join(ws, filepath.FromSlash(archiveRel))); err == nil {
+			if err := relocateSpec(r.Context(), ws, archiveRel, liveRel); err != nil {
+				http.Error(w, fmt.Sprintf("relocate %s: %v", req.Path, err), http.StatusInternalServerError)
+				return
+			}
+			liveAbs = filepath.Join(ws, filepath.FromSlash(liveRel))
+		}
+	}
+	if err := spec.UpdateFrontmatter(liveAbs, map[string]any{
 		"status":  string(spec.StatusDrafted),
 		"updated": time.Now(),
 	}); err != nil {
 		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if err := commitSpecTransition(r.Context(), workspaces, absPath, req.Path, spec.StatusDrafted); err != nil {
+	if err := commitSpecChanges(r.Context(), workspaces, liveAbs, []string{liveRel},
+		fmt.Sprintf("%s: unarchive", liveRel)); err != nil {
 		slog.Warn("unarchive fallback commit failed",
 			"path", req.Path, "err", err)
 	}
@@ -789,6 +819,41 @@ func commitSpecChanges(
 
 func isGitRepo(ctx context.Context, ws string) bool {
 	return cmdexec.Git(ws, "rev-parse", "--git-dir").WithContext(ctx).Run() == nil
+}
+
+// relocateSpec moves a spec file (and its companion directory, when present)
+// between the live tree and specs/.archive/. fromRel/toRel are the relative
+// paths of the .md file; the companion dir (same path minus .md) moves with it.
+// Uses git mv in a git repo so history follows; os.Rename otherwise.
+func relocateSpec(ctx context.Context, ws, fromRel, toRel string) error {
+	if err := moveSpecPath(ctx, ws, fromRel, toRel); err != nil {
+		return err
+	}
+	fromDir := strings.TrimSuffix(fromRel, ".md")
+	toDir := strings.TrimSuffix(toRel, ".md")
+	if info, err := os.Stat(filepath.Join(ws, filepath.FromSlash(fromDir))); err == nil && info.IsDir() {
+		if err := moveSpecPath(ctx, ws, fromDir, toDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// moveSpecPath moves a single path (file or directory) within a workspace,
+// creating the destination's parent directory first.
+func moveSpecPath(ctx context.Context, ws, fromRel, toRel string) error {
+	fromAbs := filepath.Join(ws, filepath.FromSlash(fromRel))
+	toAbs := filepath.Join(ws, filepath.FromSlash(toRel))
+	if err := os.MkdirAll(filepath.Dir(toAbs), 0o755); err != nil {
+		return fmt.Errorf("mkdir for move: %w", err)
+	}
+	if isGitRepo(ctx, ws) {
+		if err := cmdexec.Git(ws, "mv", fromRel, toRel).WithContext(ctx).Run(); err == nil {
+			return nil
+		}
+		// git mv fails on an untracked file; fall back to a plain rename.
+	}
+	return os.Rename(fromAbs, toAbs)
 }
 
 // findArchiveCommit looks up the most recent commit whose subject begins with

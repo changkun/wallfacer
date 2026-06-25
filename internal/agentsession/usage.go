@@ -1,4 +1,4 @@
-package planner
+package agentsession
 
 import (
 	"latere.ai/x/wallfacer/internal/pkg/ndjson"

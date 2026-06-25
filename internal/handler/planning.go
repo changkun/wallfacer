@@ -14,7 +14,7 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
@@ -238,7 +238,7 @@ func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if msgs == nil {
-		msgs = []planner.Message{}
+		msgs = []agentsession.Message{}
 	}
 
 	// Optional pagination: filter messages before a given timestamp.
@@ -248,7 +248,7 @@ func (h *Handler) GetPlanningMessages(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid before timestamp", http.StatusBadRequest)
 			return
 		}
-		filtered := make([]planner.Message, 0, len(msgs))
+		filtered := make([]agentsession.Message, 0, len(msgs))
 		for _, m := range msgs {
 			if m.Timestamp.Before(t) {
 				filtered = append(filtered, m)
@@ -343,7 +343,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Append user message to conversation store.
-	userMsg := planner.Message{
+	userMsg := agentsession.Message{
 		Role:        "user",
 		Content:     req.Message,
 		Timestamp:   time.Now().UTC(),
@@ -361,12 +361,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	// Pin thread mode before exec so the mode is durable even if exec crashes.
 	if existingSess.FocusedTask == "" && existingSess.FocusedSpec == "" {
 		if focusedTaskID != "" {
-			_ = cs.SaveSession(planner.SessionInfo{
+			_ = cs.SaveSession(agentsession.SessionInfo{
 				SessionID:   existingSess.SessionID,
 				FocusedTask: focusedTaskID,
 			})
 		} else if req.FocusedSpec != "" {
-			_ = cs.SaveSession(planner.SessionInfo{
+			_ = cs.SaveSession(agentsession.SessionInfo{
 				SessionID:   existingSess.SessionID,
 				FocusedSpec: req.FocusedSpec,
 			})
@@ -483,14 +483,14 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		// Load the existing session first to preserve both mode pins.
 		// Use pinned.FocusedSpec as fallback when req.FocusedSpec is empty so
 		// that spec-mode remains pinned across free-form (non-focused) messages.
-		sessionID := planner.ExtractSessionID(rawStdout)
+		sessionID := agentsession.ExtractSessionID(rawStdout)
 		if sessionID != "" {
 			pinned, _ := cs.LoadSession()
 			savedSpec := req.FocusedSpec
 			if savedSpec == "" {
 				savedSpec = pinned.FocusedSpec
 			}
-			_ = cs.SaveSession(planner.SessionInfo{
+			_ = cs.SaveSession(agentsession.SessionInfo{
 				SessionID:   sessionID,
 				LastActive:  time.Now().UTC(),
 				FocusedSpec: savedSpec,
@@ -500,11 +500,11 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 
 		// If the error is a stale session, clear session (not history) and retry
 		// with conversation history prepended to give the agent prior context.
-		if planner.IsErrorResult(rawStdout) && planner.IsStaleSessionError(rawStdout) {
+		if agentsession.IsErrorResult(rawStdout) && agentsession.IsStaleSessionError(rawStdout) {
 			slog.Warn("planning: stale session, retrying with history context")
 			// Preserve mode pin while clearing the stale session ID.
 			pinned, _ := cs.LoadSession()
-			_ = cs.SaveSession(planner.SessionInfo{
+			_ = cs.SaveSession(agentsession.SessionInfo{
 				FocusedSpec: pinned.FocusedSpec,
 				FocusedTask: pinned.FocusedTask,
 			})
@@ -526,14 +526,14 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			_, _ = retryHandle.Wait()
 			h.planner.CloseLiveLog()
 
-			sessionID = planner.ExtractSessionID(rawStdout)
+			sessionID = agentsession.ExtractSessionID(rawStdout)
 			if sessionID != "" {
 				pinned2, _ := cs.LoadSession()
 				savedSpec2 := req.FocusedSpec
 				if savedSpec2 == "" {
 					savedSpec2 = pinned2.FocusedSpec
 				}
-				_ = cs.SaveSession(planner.SessionInfo{
+				_ = cs.SaveSession(agentsession.SessionInfo{
 					SessionID:   sessionID,
 					LastActive:  time.Now().UTC(),
 					FocusedSpec: savedSpec2,
@@ -549,8 +549,8 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 		h.persistPlanningRoundUsage(rawStdout)
 
 		// Parse response text and append assistant message (skip errors).
-		if !planner.IsErrorResult(rawStdout) {
-			resultText := planner.ExtractResultText(rawStdout)
+		if !agentsession.IsErrorResult(rawStdout) {
+			resultText := agentsession.ExtractResultText(rawStdout)
 			planRound := 0
 
 			// Task-mode: the agent's output IS the new task prompt. Write it
@@ -617,7 +617,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if resultText != "" {
-				_ = cs.AppendMessage(planner.Message{
+				_ = cs.AppendMessage(agentsession.Message{
 					Role:        "assistant",
 					Content:     resultText,
 					Timestamp:   time.Now().UTC(),
@@ -646,12 +646,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 // the message is blank. Runs inline on the caller's (already detached) exec
 // goroutine; title generation carries its own timeout and never blocks the
 // HTTP response.
-func (h *Handler) maybeAutoTitleThread(tm *planner.ThreadManager, threadID, firstMessage string) {
+func (h *Handler) maybeAutoTitleThread(tm *agentsession.ThreadManager, threadID, firstMessage string) {
 	if h.runner == nil || strings.TrimSpace(firstMessage) == "" {
 		return
 	}
 	meta, err := tm.Meta(threadID)
-	if err != nil || !planner.IsDefaultThreadName(meta.Name) {
+	if err != nil || !agentsession.IsDefaultThreadName(meta.Name) {
 		return
 	}
 	title, err := h.runner.GeneratePlanningThreadTitle(context.Background(), firstMessage)
@@ -773,14 +773,14 @@ func (h *Handler) InterruptPlanningMessage(w http.ResponseWriter, r *http.Reques
 // configuration short-circuit silently. Append errors are logged so a
 // persistence failure never fails the user-facing round.
 func (h *Handler) persistPlanningRoundUsage(raw []byte) {
-	if planner.IsErrorResult(raw) {
+	if agentsession.IsErrorResult(raw) {
 		return
 	}
 	workspaces := h.currentWorkspaces()
 	if len(workspaces) == 0 || h.configDir == "" {
 		return
 	}
-	usage, ok := planner.ExtractUsage(raw)
+	usage, ok := agentsession.ExtractUsage(raw)
 	if !ok {
 		return
 	}

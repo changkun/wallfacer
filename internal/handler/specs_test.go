@@ -30,7 +30,13 @@ func doTransition(t *testing.T, fn http.HandlerFunc, path string) *httptest.Resp
 
 func readStatus(t *testing.T, ws, relPath string) spec.Status {
 	t.Helper()
-	s, err := spec.ParseFile(filepath.Join(ws, relPath))
+	// Resolve by logical path so an archived spec relocated under .archive/ is
+	// still found.
+	abs := findSpecFile([]string{ws}, relPath)
+	if abs == "" {
+		t.Fatalf("spec %q not found in %s", relPath, ws)
+	}
+	s, err := spec.ParseFile(abs)
 	if err != nil {
 		t.Fatalf("parse %q: %v", relPath, err)
 	}

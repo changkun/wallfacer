@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/spec"
 )
 
@@ -422,21 +422,21 @@ func applySlashSpecNew(prompt, workspace string, now time.Time) (string, string,
 }
 
 // processDirectives runs each captured [Directive] against a workspace.
-// Returns one [planner.Message] per directive that failed so the
+// Returns one [agentsession.Message] per directive that failed so the
 // caller can surface the error as a `system`-role entry in the thread
 // history; successfully scaffolded directives produce no message.
 //
 // Errors are reported but never bubbled up — a failed directive must
 // not block subsequent directives, nor prevent the agent's raw
 // response from being appended to the conversation log.
-func processDirectives(workspace string, dirs []Directive, focused string, now time.Time) []planner.Message {
+func processDirectives(workspace string, dirs []Directive, focused string, now time.Time) []agentsession.Message {
 	if len(dirs) == 0 {
 		return nil
 	}
-	var out []planner.Message
+	var out []agentsession.Message
 	for _, d := range dirs {
 		if _, err := scaffoldDirective(workspace, d, now); err != nil {
-			out = append(out, planner.Message{
+			out = append(out, agentsession.Message{
 				Role:        "system",
 				Content:     fmt.Sprintf("Couldn't create %s: %s", d.Path, err.Error()),
 				Timestamp:   now,

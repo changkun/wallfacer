@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 )
 
 // isTaskLockedByPlanner reports whether any task-mode planning thread currently
@@ -53,7 +53,7 @@ func (h *Handler) cascadeUnarchiveThreadsForTask(taskID string) {
 
 // threadsManager returns the planner's thread manager if both are
 // configured, else nil.
-func (h *Handler) threadsManager() *planner.ThreadManager {
+func (h *Handler) threadsManager() *agentsession.ThreadManager {
 	if h.planner == nil {
 		return nil
 	}
@@ -79,7 +79,7 @@ func (h *Handler) threadIDFromRequest(r *http.Request) string {
 // Returns nil if the thread manager is not configured or the ID is
 // empty / unknown (the latter so callers can return an empty response
 // for "no thread yet" rather than a 404).
-func (h *Handler) lookupThreadStore(id string) *planner.ConversationStore {
+func (h *Handler) lookupThreadStore(id string) *agentsession.ConversationStore {
 	tm := h.threadsManager()
 	if tm == nil || id == "" {
 		return nil
@@ -103,7 +103,7 @@ type threadSummary struct {
 	TaskID   string `json:"task_id,omitempty"` // set when Mode == "task"
 }
 
-func toThreadSummary(m planner.ThreadMeta, activeID, mode, taskID string) threadSummary {
+func toThreadSummary(m agentsession.ThreadMeta, activeID, mode, taskID string) threadSummary {
 	return threadSummary{
 		ID:       m.ID,
 		Name:     m.Name,
@@ -118,7 +118,7 @@ func toThreadSummary(m planner.ThreadMeta, activeID, mode, taskID string) thread
 
 // threadMode derives the mode and task ID from a thread's session.
 // Returns ("spec", "") when the session is absent or task-mode is not pinned.
-func threadMode(tm *planner.ThreadManager, id string) (mode, taskID string) {
+func threadMode(tm *agentsession.ThreadManager, id string) (mode, taskID string) {
 	cs, err := tm.Store(id)
 	if err != nil {
 		return "spec", ""
@@ -136,9 +136,9 @@ func threadMode(tm *planner.ThreadManager, id string) (mode, taskID string) {
 // writeThreadErr maps a ThreadManager error to an HTTP status code.
 func writeThreadErr(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, planner.ErrThreadNotFound):
+	case errors.Is(err, agentsession.ErrThreadNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
-	case errors.Is(err, planner.ErrThreadNotArchived):
+	case errors.Is(err, agentsession.ErrThreadNotArchived):
 		http.Error(w, err.Error(), http.StatusConflict)
 	default:
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -223,7 +223,7 @@ func (h *Handler) CreatePlanningThread(w http.ResponseWriter, r *http.Request) {
 	if taskIDStr != "" {
 		cs, csErr := tm.Store(meta.ID)
 		if csErr == nil {
-			_ = cs.SaveSession(planner.SessionInfo{FocusedTask: taskIDStr})
+			_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskIDStr})
 		}
 		mode, taskID = "task", taskIDStr
 	}
@@ -271,12 +271,12 @@ func (h *Handler) PatchPlanningThread(w http.ResponseWriter, r *http.Request) {
 	case "archived":
 		h.mutatePlanningThread(w, r,
 			"thread is busy; interrupt or wait before archiving",
-			(*planner.ThreadManager).Archive,
+			(*agentsession.ThreadManager).Archive,
 		)
 	case "visible":
-		h.mutatePlanningThread(w, r, "", (*planner.ThreadManager).Unarchive)
+		h.mutatePlanningThread(w, r, "", (*agentsession.ThreadManager).Unarchive)
 	case "active":
-		h.mutatePlanningThread(w, r, "", (*planner.ThreadManager).SetActiveID)
+		h.mutatePlanningThread(w, r, "", (*agentsession.ThreadManager).SetActiveID)
 	default:
 		http.Error(w, "body must set name or state (archived|visible|active)", http.StatusBadRequest)
 	}
@@ -308,7 +308,7 @@ func (h *Handler) DeletePlanningThread(w http.ResponseWriter, r *http.Request) {
 
 // writeThreadSummary refreshes a thread's meta and writes its summary as
 // a 200 response, mapping ThreadManager errors to the right status.
-func (h *Handler) writeThreadSummary(w http.ResponseWriter, tm *planner.ThreadManager, id string) {
+func (h *Handler) writeThreadSummary(w http.ResponseWriter, tm *agentsession.ThreadManager, id string) {
 	meta, err := tm.Meta(id)
 	if err != nil {
 		writeThreadErr(w, err)
@@ -326,7 +326,7 @@ func (h *Handler) writeThreadSummary(w http.ResponseWriter, tm *planner.ThreadMa
 func (h *Handler) mutatePlanningThread(
 	w http.ResponseWriter, r *http.Request,
 	busyConflict string,
-	apply func(*planner.ThreadManager, string) error,
+	apply func(*agentsession.ThreadManager, string) error,
 ) {
 	tm := h.threadsManager()
 	if tm == nil {

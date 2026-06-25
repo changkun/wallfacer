@@ -22,7 +22,7 @@ import (
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -4510,7 +4510,7 @@ func TestPatchTask_RejectedWhenLocked(t *testing.T) {
 	}
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: task.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: task.ID.String()})
 	h.planner.SetBusy(true, threadID)
 	defer h.planner.SetBusy(false, "")
 
