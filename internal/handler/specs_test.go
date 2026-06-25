@@ -3,12 +3,14 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -634,5 +636,40 @@ func TestSpecTreeStream_IncludesIndex(t *testing.T) {
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func TestWorkspaceCommitLock_SerializesConcurrentCommits(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	ctx := context.Background()
+
+	const n = 8
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			rel := fmt.Sprintf("specs/c%d.md", i)
+			writeSpec(t, ws, fmt.Sprintf("c%d.md", i), "# c\n\nbody\n")
+			errs[i] = commitSpecChanges(ctx, []string{ws}, filepath.Join(ws, rel),
+				[]string{rel}, fmt.Sprintf("%s: add", rel))
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("concurrent commit %d errored: %v", i, err)
+		}
+	}
+	// All n commits landed (plus the initial commit) — none lost to an index race.
+	out, err := exec.Command("git", "-C", ws, "log", "--oneline").Output()
+	if err != nil {
+		t.Fatalf("git log: %v", err)
+	}
+	lines := strings.Count(strings.TrimSpace(string(out)), "\n") + 1
+	if lines != n+1 {
+		t.Errorf("commit count = %d, want %d (8 specs + init)", lines, n+1)
 	}
 }

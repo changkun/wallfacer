@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -145,6 +146,9 @@ func commitSpecTransition(
 	if err := cmdexec.Git(ws, "rev-parse", "--git-dir").WithContext(ctx).Run(); err != nil {
 		return nil
 	}
+	lk := workspaceCommitLock(ws)
+	lk.Lock()
+	defer lk.Unlock()
 	if err := cmdexec.Git(ws, "add", relPath).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("git add %s: %w", relPath, err)
 	}
@@ -659,6 +663,27 @@ func archiveCommitSubjectPrefix(relPath string) string {
 	return relPath + ": archive"
 }
 
+// specCommitLocksMu guards specCommitLocks. workspaceCommitLock returns a
+// per-workspace mutex held across git add + commit so concurrent spec commits
+// in the same workspace (archive, validate, dismiss, drift verdicts landing
+// from near-simultaneous task completions) serialize instead of racing the git
+// index lock and partially applying.
+var (
+	specCommitLocksMu sync.Mutex
+	specCommitLocks   = map[string]*sync.Mutex{}
+)
+
+func workspaceCommitLock(ws string) *sync.Mutex {
+	specCommitLocksMu.Lock()
+	defer specCommitLocksMu.Unlock()
+	mu, ok := specCommitLocks[ws]
+	if !ok {
+		mu = &sync.Mutex{}
+		specCommitLocks[ws] = mu
+	}
+	return mu
+}
+
 // commitSpecChanges stages the given set of paths and commits them with the
 // given subject. Non-fatal on missing git repo or empty staged set.
 func commitSpecChanges(
@@ -675,6 +700,9 @@ func commitSpecChanges(
 	if !isGitRepo(ctx, ws) {
 		return nil
 	}
+	lk := workspaceCommitLock(ws)
+	lk.Lock()
+	defer lk.Unlock()
 	addArgs := append([]string{"add", "--"}, relPaths...)
 	if err := cmdexec.Git(ws, addArgs...).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("git add: %w", err)
