@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -316,6 +317,9 @@ func newTestHandlerWithStoreDirAndMock(t *testing.T, mock *runner.MockRunner) (*
 // transition that reaches the disk write); the read-only data dir makes the
 // atomic task.json write fail.
 func TestCancelIdeation_StatusWriteFailureDoesNotReportCancelled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows: chmod 0500 on a dir does not block file writes inside it")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("running as root: read-only dir does not block writes")
 	}
