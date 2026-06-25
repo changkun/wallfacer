@@ -338,9 +338,11 @@ watch(
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
     resultsFetched.value = false; testResults.value = [];
     eventsFetched.value = false; events.value = [];
+    diffFetched.value = false; diffFiles.value = []; behindCounts.value = {};
     if (mainTab.value === 'timeline') fetchSpans();
     if (mainTab.value === 'verification') fetchResults();
     if (mainTab.value === 'events') fetchEvents();
+    if (mainTab.value === 'changes') fetchDiff();
   },
 );
 
