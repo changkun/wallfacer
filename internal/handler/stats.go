@@ -242,7 +242,7 @@ func aggregatePlanningStats(configDir string, activeWorkspaces []string, since t
 	if configDir == "" {
 		return result
 	}
-	planningDir := filepath.Join(configDir, "planning")
+	planningDir := store.AgentSessionsRoot(configDir)
 	entries, err := os.ReadDir(planningDir)
 	if err != nil {
 		return result

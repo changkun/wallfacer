@@ -3,7 +3,6 @@ package handler
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -41,7 +40,7 @@ func mergePlanningUsage(resp *usageResponse, configDir string, cutoff time.Time)
 	if configDir == "" {
 		return
 	}
-	entries, err := os.ReadDir(filepath.Join(configDir, "planning"))
+	entries, err := os.ReadDir(store.AgentSessionsRoot(configDir))
 	if err != nil {
 		return
 	}

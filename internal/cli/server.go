@@ -93,6 +93,14 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	logger.Init(cfg.LogFormat)
 	initConfigDir(configDir, cfg.EnvFile)
 
+	// One-time rename of the legacy <configDir>/planning state directory to
+	// <configDir>/agent-sessions. Runs before any agent-session path is read.
+	if moved, err := store.MigrateAgentSessionsDir(configDir); err != nil {
+		logger.Main.Warn("agent-sessions dir migration failed", "error", err)
+	} else if moved {
+		logger.Main.Info("migrated legacy planning/ dir to agent-sessions/")
+	}
+
 	// Workspaces start empty; the manager restores the last active set from
 	// the persisted env file (WALLFACER_WORKSPACES). Users configure them
 	// later via the Settings UI or PUT /api/workspaces.
