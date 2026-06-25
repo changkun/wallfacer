@@ -158,7 +158,7 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 		ctx:             ctx,
 		cancel:          cancel,
 		done:            make(chan struct{}),
-		expiresAt:       time.Now().Add(time.Duration(time.Until(da.Expiry).Seconds()) * time.Second),
+		expiresAt:       da.Expiry,
 		verificationURI: verify,
 		userCode:        da.UserCode,
 	}
