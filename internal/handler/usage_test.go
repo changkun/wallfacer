@@ -254,8 +254,8 @@ func TestUsage_NoPlanningRecords(t *testing.T) {
 	h := newTestHandler(t)
 	// No planning dir on disk — response must not include a planning key.
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
-	if _, ok := resp.BySubAgent[store.SandboxActivityPlanning]; ok {
-		t.Errorf("BySubAgent[planning] should be absent, got %+v", resp.BySubAgent[store.SandboxActivityPlanning])
+	if _, ok := resp.BySubAgent[store.SandboxActivityAgentSession]; ok {
+		t.Errorf("BySubAgent[planning] should be absent, got %+v", resp.BySubAgent[store.SandboxActivityAgentSession])
 	}
 	if resp.Total.CostUSD != 0 || resp.Total.InputTokens != 0 {
 		t.Errorf("Total should be zero, got %+v", resp.Total)
@@ -278,7 +278,7 @@ func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
 
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
 
-	got, ok := resp.BySubAgent[store.SandboxActivityPlanning]
+	got, ok := resp.BySubAgent[store.SandboxActivityAgentSession]
 	if !ok {
 		t.Fatal("BySubAgent[planning] missing")
 	}
@@ -312,7 +312,7 @@ func TestUsage_PlanningRespectsDaysWindow(t *testing.T) {
 
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=1")
 
-	got := resp.BySubAgent[store.SandboxActivityPlanning]
+	got := resp.BySubAgent[store.SandboxActivityAgentSession]
 	if got.InputTokens != 10 || got.OutputTokens != 5 {
 		t.Errorf("expected only recent record included, got %+v", got)
 	}
@@ -339,7 +339,7 @@ func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
 	}
 
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
-	got := resp.BySubAgent[store.SandboxActivityPlanning]
+	got := resp.BySubAgent[store.SandboxActivityAgentSession]
 	if got.InputTokens != 100 || got.OutputTokens != 30 {
 		t.Errorf("planning tokens across groups = %+v, want sum", got)
 	}

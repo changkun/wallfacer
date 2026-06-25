@@ -54,7 +54,7 @@ const AGENT_LABELS: Record<string, string> = {
   title: 'Title gen.',
   oversight: 'Oversight',
   'oversight-test': 'Oversight (test)',
-  planning: 'Planning',
+  'agent-session': 'Agent Session',
 };
 
 function statusColor(s: string) {
@@ -104,9 +104,9 @@ async function fetchStats() {
 
 async function seedPeriodFromConfig() {
   try {
-    const cfg = await api<{ planning_window_days?: number }>('GET', '/api/config');
+    const cfg = await api<{ agent_session_window_days?: number }>('GET', '/api/config');
     if (cfg) {
-      const n = parseInt(String(cfg.planning_window_days), 10);
+      const n = parseInt(String(cfg.agent_session_window_days), 10);
       if (!Number.isNaN(n) && n >= 0) period.value = String(n);
     }
   } catch { /* ignore */ }

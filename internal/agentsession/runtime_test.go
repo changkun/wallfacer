@@ -168,8 +168,8 @@ func TestBuildContainerSpec(t *testing.T) {
 	if spec.Labels["wallfacer.task.id"] != agentSessionTaskID {
 		t.Errorf("task.id label = %q, want %q", spec.Labels["wallfacer.task.id"], agentSessionTaskID)
 	}
-	if spec.Labels["wallfacer.task.activity"] != "planning" {
-		t.Errorf("task.activity label = %q, want %q", spec.Labels["wallfacer.task.activity"], "planning")
+	if spec.Labels["wallfacer.task.activity"] != "agent-session" {
+		t.Errorf("task.activity label = %q, want %q", spec.Labels["wallfacer.task.activity"], "agent-session")
 	}
 
 	// Working directory is the host workspace path, not a container path.
