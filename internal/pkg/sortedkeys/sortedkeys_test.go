@@ -49,53 +49,6 @@ func TestOf_Empty(t *testing.T) {
 	}
 }
 
-// TestOfMap_KeyValuePairs verifies that OfMap yields key-value pairs in key-sorted order.
-func TestOfMap_KeyValuePairs(t *testing.T) {
-	m := map[string]int{"c": 3, "a": 1, "b": 2}
-	var keys []string
-	var vals []int
-	for k, v := range OfMap(m) {
-		keys = append(keys, k)
-		vals = append(vals, v)
-	}
-	wantKeys := []string{"a", "b", "c"}
-	wantVals := []int{1, 2, 3}
-	for i := range keys {
-		if keys[i] != wantKeys[i] {
-			t.Errorf("key[%d] = %q, want %q", i, keys[i], wantKeys[i])
-		}
-		if vals[i] != wantVals[i] {
-			t.Errorf("val[%d] = %d, want %d", i, vals[i], wantVals[i])
-		}
-	}
-}
-
-// TestOfMap_EarlyBreak verifies that breaking from the OfMap iterator stops iteration.
-func TestOfMap_EarlyBreak(t *testing.T) {
-	m := map[string]int{"c": 3, "a": 1, "b": 2}
-	count := 0
-	for range OfMap(m) {
-		count++
-		if count == 2 {
-			break
-		}
-	}
-	if count != 2 {
-		t.Fatalf("expected 2 iterations before break, got %d", count)
-	}
-}
-
-// TestOfMap_Empty verifies that OfMap over an empty map yields zero iterations.
-func TestOfMap_Empty(t *testing.T) {
-	count := 0
-	for range OfMap(map[string]int{}) {
-		count++
-	}
-	if count != 0 {
-		t.Fatalf("expected 0 iterations, got %d", count)
-	}
-}
-
 // TestOf_EarlyBreak verifies that breaking from the Of iterator stops iteration.
 func TestOf_EarlyBreak(t *testing.T) {
 	m := map[string]int{"c": 3, "a": 1, "b": 2}

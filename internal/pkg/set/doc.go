@@ -2,8 +2,8 @@
 //
 // Many places in wallfacer need to track unique items (workspace paths, task IDs,
 // file names) and test membership efficiently. This package provides a simple
-// [Set] type with Add, Remove, Has, and Items operations, avoiding repeated
-// map[T]struct{} boilerplate throughout the codebase.
+// [Set] type with Add, Has, and Len operations, avoiding repeated map[T]struct{}
+// boilerplate throughout the codebase.
 //
 // # Connected packages
 //
@@ -16,5 +16,4 @@
 //	s := set.New("a", "b", "c")
 //	s.Add("d")
 //	if s.Has("a") { ... }
-//	items := s.Items()
 package set

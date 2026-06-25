@@ -319,7 +319,7 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 	// even if the anchored line still resolves. It is the repo-out-of-sync hint.
 	outdated := false
 	if t.Anchor.BlobSHA != "" {
-		if _, blob := gitObjectSHAs(root, t.SpecPath); blob != "" && blob != t.Anchor.BlobSHA {
+		if blob := gitBlobSHA(root, full); blob != "" && blob != t.Anchor.BlobSHA {
 			outdated = true
 		}
 	}
@@ -344,6 +344,19 @@ func specFilePath(root, specPath string) (string, bool) {
 func fileExists(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && !info.IsDir()
+}
+
+// gitBlobSHA returns the working-tree blob hash of an already-resolved spec file
+// path under root, for advisory anchor metadata. Empty when the path is not in a
+// git repo or the command fails. Unlike gitObjectSHAs it skips `git rev-parse
+// HEAD` and the path re-resolution, so the per-thread reposition loop (which
+// already holds full and only consumes the blob) avoids a wasted subprocess and
+// stat per thread on every list/reconcile.
+func gitBlobSHA(root, full string) string {
+	if out, err := cmdexec.Git(root, "hash-object", full).Output(); err == nil {
+		return strings.TrimSpace(out)
+	}
+	return ""
 }
 
 // gitObjectSHAs returns the current HEAD commit and the working-tree blob hash

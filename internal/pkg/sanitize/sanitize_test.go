@@ -2,54 +2,6 @@ package sanitize
 
 import "testing"
 
-func TestBasename(t *testing.T) {
-	cases := []struct {
-		input, want string
-	}{
-		{"/home/user/my-repo", "my-repo"},
-		{"/home/user/My Project", "My_Project"},
-		{"/home/user/我的项目", "我的项目"},
-		{"/path/to/café-code", "café-code"},
-		{"/path/to/repo:special", "repo_special"},
-		{"/path/to/dir with $vars", "dir_with__vars"},
-		{"/path/with/trailing/", "trailing"},
-		{"", "workspace"},
-		{"/", "workspace"},
-		{".", "workspace"},
-		{"/path/to/a`b\"c'd", "a_b_c_d"},
-		{"/path/to/🚀rocket", "_rocket"},
-	}
-	for _, tc := range cases {
-		got := Basename(tc.input)
-		if got != tc.want {
-			t.Errorf("Basename(%q) = %q, want %q", tc.input, got, tc.want)
-		}
-	}
-}
-
-func TestBase(t *testing.T) {
-	cases := []struct {
-		input, want string
-	}{
-		{"my-repo", "my-repo"},
-		{"My Project", "My_Project"},
-		{"我的项目", "我的项目"},
-		{"café-code", "café-code"},
-		{"repo:special", "repo_special"},
-		{"", "workspace"},
-		{"/", "workspace"},
-		{".", "workspace"},
-		{`\`, "workspace"},
-		{"a`b\"c'd", "a_b_c_d"},
-	}
-	for _, tc := range cases {
-		got := Base(tc.input)
-		if got != tc.want {
-			t.Errorf("Base(%q) = %q, want %q", tc.input, got, tc.want)
-		}
-	}
-}
-
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		name  string

@@ -3,8 +3,7 @@
 //
 // Maps in Go have non-deterministic iteration order. When producing stable output
 // (Prometheus metrics, container environment variables), deterministic key ordering
-// is required. [Of] returns keys in sorted order, and [OfMap] returns key-value
-// pairs in sorted order, both as range-compatible iterators.
+// is required. [Of] returns keys in sorted order as a range-compatible iterator.
 //
 // # Connected packages
 //
@@ -16,8 +15,5 @@
 //
 //	for k := range sortedkeys.Of(m) {
 //	    fmt.Println(k, m[k])
-//	}
-//	for k, v := range sortedkeys.OfMap(m) {
-//	    fmt.Println(k, v)
 //	}
 package sortedkeys
