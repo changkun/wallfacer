@@ -1,8 +1,7 @@
 package planner
 
 import (
-	"encoding/json"
-	"strings"
+	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 )
 
 // RoundUsage captures the token and cost fields from a single planning round's
@@ -52,33 +51,15 @@ func (r resultLine) toRoundUsage() RoundUsage {
 //
 // Returns ok=false when no usable result line is found.
 func ExtractUsage(raw []byte) (RoundUsage, bool) {
-	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	var fallback *resultLine
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if len(line) == 0 || line[0] != '{' {
-			continue
-		}
-		var obj resultLine
-		if err := json.Unmarshal([]byte(line), &obj); err != nil {
-			continue
-		}
-		// Accept "type":"result" lines and plain result-shaped lines
-		// (single-blob outputs carry no explicit type field).
-		isResult := obj.Type == "result" || obj.Type == ""
-		if !isResult {
-			continue
-		}
-		if fallback == nil {
-			cp := obj
-			fallback = &cp
-		}
-		if obj.StopReason != "" {
-			return obj.toRoundUsage(), true
-		}
+	// Scan backwards for the terminal result line. The candidate gate accepts
+	// only "type":"result" lines and plain result-shaped lines (single-blob
+	// outputs carry no explicit type field), excluding non-result lines from
+	// both the terminal match and the fallback.
+	obj, ok := ndjson.PreferResultLine(string(raw), true,
+		func(r *resultLine) bool { return r.Type == "result" || r.Type == "" },
+		func(r *resultLine) bool { return r.StopReason != "" })
+	if !ok {
+		return RoundUsage{}, false
 	}
-	if fallback != nil {
-		return fallback.toRoundUsage(), true
-	}
-	return RoundUsage{}, false
+	return obj.toRoundUsage(), true
 }
