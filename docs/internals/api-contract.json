@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 118,
+  "route_count": 119,
   "routes": [
     {
       "method": "GET",
@@ -284,10 +284,19 @@
       ]
     },
     {
+      "method": "GET",
+      "pattern": "/api/specs/stale-candidates",
+      "name": "StaleCandidates",
+      "description": "Advisory scan: complete specs whose affects files changed since the spec's updated date. No mutation; returns {candidates:[{path,files,reason}]}.",
+      "tags": [
+        "specs"
+      ]
+    },
+    {
       "method": "POST",
       "pattern": "/api/specs/transition",
       "name": "SpecTransition",
-      "description": "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive take a single path and return {path, status}.",
+      "description": "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive/validate/stale/dismiss-stale/force-complete take a single path and return {path, status}.",
       "tags": [
         "specs"
       ]

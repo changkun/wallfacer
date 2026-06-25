@@ -95,6 +95,27 @@ func TestDriftPipeline_SignificantToStaleWithFanout(t *testing.T) {
 	}
 }
 
+func TestDriftPipeline_ModerateCompletesWithFanout(t *testing.T) {
+	// Moderate drift: 7/10 criteria, two unexpected files → complete + fan-out.
+	tester := stubTester{verdict: spec.DriftVerdict{
+		Unexpected: []string{"a.go", "b.go"},
+		Criteria:   spec.DriftCriteria{Satisfied: 7, Total: 10},
+	}}
+	ws := runDriftHook(t, tester, "specs/source.md", func(ws string) {
+		writeFanoutSpec(t, ws, "source.md", "validated", "Source", nil, []string{"internal/x/"})
+		writeFanoutSpec(t, ws, "dep.md", "validated", "Dep", []string{"specs/source.md"}, nil)
+	})
+
+	src, _ := spec.ParseFile(filepath.Join(ws, "specs/source.md"))
+	if src.Status != spec.StatusComplete {
+		t.Errorf("source status = %q, want complete (moderate)", src.Status)
+	}
+	dep, _ := spec.ParseFile(filepath.Join(ws, "specs/dep.md"))
+	if dep.Status != spec.StatusStale {
+		t.Errorf("dependent status = %q, want stale (moderate fans out)", dep.Status)
+	}
+}
+
 func TestDriftPipeline_TesterFailureHoldsAtTesting(t *testing.T) {
 	tester := stubTester{err: context.DeadlineExceeded}
 	ws := runDriftHook(t, tester, "specs/source.md", func(ws string) {
