@@ -350,6 +350,56 @@ func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MigrateSpec converts a free-form, frontmatter-less spec file into a
+// lifecycle-managed spec by injecting a frontmatter block (status drafted,
+// title from the first H1). The prose body is preserved byte-for-byte. The
+// change is committed like other spec mutations. Rejects files that already
+// carry frontmatter (nothing to migrate).
+func (h *Handler) MigrateSpec(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	if err := spec.InjectFrontmatter(absPath, spec.ScaffoldOptions{}); err != nil {
+		if errors.Is(err, spec.ErrAlreadyHasFrontmatter) {
+			http.Error(w, "spec already has frontmatter", http.StatusUnprocessableEntity)
+			return
+		}
+		http.Error(w, fmt.Sprintf("migrate %s: %v", req.Path, err), http.StatusInternalServerError)
+		return
+	}
+
+	subject := fmt.Sprintf("%s: adopt spec frontmatter", req.Path)
+	if err := commitSpecChanges(r.Context(), workspaces, absPath, []string{req.Path}, subject); err != nil {
+		slog.Warn("spec migrate commit failed", "path", req.Path, "err", err)
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(spec.StatusDrafted),
+	})
+}
+
 // activeDispatchedTask reports whether a spec's dispatched task is in an active
 // (non-terminal) state that should block archiving, returning that status for
 // the rejection message. A nil link, an unparseable id, a missing task, or a
