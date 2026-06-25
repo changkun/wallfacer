@@ -2,7 +2,7 @@
 // so the checkable/blocked predicates can be unit-tested without driving a
 // component (shiftKey events are awkward to simulate).
 
-import type { SpecNode } from '../../stores/planning';
+import type { SpecNode } from '../../stores/agentSession';
 
 /** A spec node is checkable for dispatch only when validated. */
 export function isNodeCheckable(node: SpecNode | undefined): boolean {

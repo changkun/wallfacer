@@ -5,7 +5,7 @@
 // ChatComposer) so this surface stays in lockstep with the dedicated Chat view
 // and the floating popup.
 import { storeToRefs } from 'pinia';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 import { useChatSession } from '../../composables/useChatSession';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
@@ -13,7 +13,7 @@ import ChatComposer from './ChatComposer.vue';
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
 
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(planning);
 
 const chat = useChatSession();

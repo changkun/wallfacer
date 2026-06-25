@@ -2,8 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
-import { usePlanningStore } from '../stores/planning';
-import type { SpecNode, SpecIndexMeta, SpecProgress } from '../stores/planning';
+import { useAgentStore } from '../stores/agentSession';
+import type { SpecNode, SpecIndexMeta, SpecProgress } from '../stores/agentSession';
 import { useTaskStore } from '../stores/tasks';
 import { useSse } from '../composables/useSse';
 import { watchThemeReinit } from '../lib/mermaidRender';
@@ -14,7 +14,7 @@ import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 
 const route = useRoute();
 const router = useRouter();
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const tasks = useTaskStore();
 const { tree, treeIndex, treeLoading, focusedSpecPath } = storeToRefs(planning);
 

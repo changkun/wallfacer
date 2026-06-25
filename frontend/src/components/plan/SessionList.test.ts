@@ -12,7 +12,7 @@ vi.mock('../../api/client', () => ({
 }));
 
 import SessionList from './SessionList.vue';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 
 let app: App | null = null;
 let host: HTMLElement;
@@ -31,7 +31,7 @@ const DAY = 86_400_000;
 
 async function mount(updatedA = Date.now(), updatedB = Date.now()) {
   setActivePinia(createPinia());
-  const planning = usePlanningStore();
+  const planning = useAgentStore();
   planning.threads = {
     a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: updatedA },
     b: { id: 'b', name: 'Beta', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: updatedB },

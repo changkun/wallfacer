@@ -6,12 +6,12 @@
 // core; the popup adds only its floating chrome and a compact session switcher.
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 import { useChatSession } from '../../composables/useChatSession';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
 
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const { threads, threadOrder, activeThreadId } = storeToRefs(planning);
 
 const chat = useChatSession();

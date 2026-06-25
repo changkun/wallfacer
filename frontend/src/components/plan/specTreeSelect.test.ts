@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { SpecNode } from '../../stores/planning';
+import type { SpecNode } from '../../stores/agentSession';
 import { isNodeCheckable, nodeUnmetDeps, selectableRange } from './specTreeSelect';
 
 function node(path: string, status: string, depends_on: string[] = []): SpecNode {

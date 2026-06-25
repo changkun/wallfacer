@@ -12,7 +12,7 @@ import { createApp, nextTick, type App } from 'vue';
 import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import SpecFocusedView from './SpecFocusedView.vue';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 
 vi.mock('../../lib/mermaidRender', () => ({
   enhanceMermaid: vi.fn(),
@@ -50,7 +50,7 @@ describe('SpecFocusedView spec-link interception', () => {
   });
 
   it('intercepts a relative .md link rendered into the body after mount', async () => {
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     planning.focusedTaskId = 't1';
     planning.focusedTaskTitle = 'Task';
     // Empty at mount: the body (with ref="bodyRef") is absent, exactly when the

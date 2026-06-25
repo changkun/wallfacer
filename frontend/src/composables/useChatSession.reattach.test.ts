@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick, type App } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { useChatSession } from './useChatSession';
-import { usePlanningStore } from '../stores/planning';
+import { useAgentStore } from '../stores/agentSession';
 
 function streamFetchCount(): number {
   const f = globalThis.fetch as unknown as { mock: { calls: unknown[][] } };
@@ -54,7 +54,7 @@ describe('useChatSession live-stream re-attach', () => {
 
   it('attaches when the active thread is the busy one', async () => {
     await mount();
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     planning.activeThreadId = 'thread-x';
     planning.busyThreadId = 'thread-x';
     await nextTick();
@@ -65,7 +65,7 @@ describe('useChatSession live-stream re-attach', () => {
 
   it('does not attach when a different thread is busy', async () => {
     await mount();
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     planning.activeThreadId = 'thread-x';
     planning.busyThreadId = 'thread-y';
     await nextTick();

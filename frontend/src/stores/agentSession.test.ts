@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { usePlanningStore, type SpecNode } from './planning';
+import { useAgentStore, type SpecNode } from './agentSession';
 import { useToastStore } from './toast';
 
 function node(path: string): SpecNode {
@@ -17,7 +17,7 @@ describe('planning.applyTree bootstrap choreography', () => {
   // must NOT fire the "first spec created" toast. The initial load just
   // populates the tree from empty; it is not a creation event.
   it('does not fire on the initial load even when specs already exist', () => {
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     const toast = useToastStore();
 
     expect(planning.tree.length).toBe(0);
@@ -29,7 +29,7 @@ describe('planning.applyTree bootstrap choreography', () => {
   });
 
   it('fires focus + toast when the first spec is created after an empty load', () => {
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     const toast = useToastStore();
 
     // Initial load: empty workspace establishes the baseline.
@@ -49,7 +49,7 @@ describe('planning.applyTree bootstrap choreography', () => {
   });
 
   it('does not fire again on updates after the first creation', () => {
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     const toast = useToastStore();
     planning.applyTree({ nodes: [] }); // baseline
     planning.applyTree({ nodes: [node('a.md')] }); // first creation
@@ -62,7 +62,7 @@ describe('planning.applyTree bootstrap choreography', () => {
   });
 
   it('does not fire when the snapshot remains empty', () => {
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     const toast = useToastStore();
     planning.applyTree({ nodes: [] });
     vi.advanceTimersByTime(200);

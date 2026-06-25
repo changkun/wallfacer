@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick, type App } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { useChatSession, type ChatSession } from './useChatSession';
-import { usePlanningStore } from '../stores/planning';
+import { useAgentStore } from '../stores/agentSession';
 
 let session: ChatSession;
 
@@ -111,7 +111,7 @@ describe('useChatSession deferred chat creation', () => {
 
   it('opens a blank draft without creating a server thread', async () => {
     await mount();
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     // Land on an existing thread with content so we can prove it blanks.
     planning.threads = {
       a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: 0 },
@@ -132,7 +132,7 @@ describe('useChatSession deferred chat creation', () => {
 
   it('creates the thread on first send and keeps the user bubble', async () => {
     await mount();
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
 
     await session.createThread();
     await flush();
@@ -150,7 +150,7 @@ describe('useChatSession deferred chat creation', () => {
 
   it('detaches a streaming thread on draft entry so the first message sends', async () => {
     await mount();
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     // Thread "a" is mid-stream when the user clicks "New chat".
     planning.streaming = true;
     planning.streamingThreadId = 'a';
@@ -170,7 +170,7 @@ describe('useChatSession deferred chat creation', () => {
 
   it('a stale history load that resolves after a send does not wipe the message', async () => {
     await mount();
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     planning.threads = {
       a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: 0 },
     };

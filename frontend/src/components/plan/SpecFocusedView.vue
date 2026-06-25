@@ -6,7 +6,7 @@ import { renderMarkdown, renderMarkdownWithSourceLines } from '../../lib/markdow
 import { enhanceMermaid } from '../../lib/mermaidRender';
 import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
 import { useRouter } from 'vue-router';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 import { useTaskStore } from '../../stores/tasks';
 import { useToastStore } from '../../stores/toast';
 import { useDialogStore } from '../../stores/dialog';
@@ -18,7 +18,7 @@ withDefaults(defineProps<{ chatVisible: boolean; chatEnabled?: boolean }>(), {
 });
 const emit = defineEmits<{ toggleChat: []; focusSibling: [path: string]; sendChat: [text: string] }>();
 
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const tasks = useTaskStore();
 const toast = useToastStore();
 const dialog = useDialogStore();
