@@ -165,8 +165,8 @@ func TestBuildContainerSpec(t *testing.T) {
 	}
 
 	// Check labels for backend worker routing.
-	if spec.Labels["wallfacer.task.id"] != planningTaskID {
-		t.Errorf("task.id label = %q, want %q", spec.Labels["wallfacer.task.id"], planningTaskID)
+	if spec.Labels["wallfacer.task.id"] != agentSessionTaskID {
+		t.Errorf("task.id label = %q, want %q", spec.Labels["wallfacer.task.id"], agentSessionTaskID)
 	}
 	if spec.Labels["wallfacer.task.activity"] != "planning" {
 		t.Errorf("task.activity label = %q, want %q", spec.Labels["wallfacer.task.activity"], "planning")

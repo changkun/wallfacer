@@ -1663,14 +1663,14 @@ func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
 	}
 
 	// Pin the planner thread to this task and mark it busy (in-flight turn).
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
 	}
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
-	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: task.ID.String()})
+	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: task.ID.String()})
 	h.planner.SetBusy(true, threadID)
 	defer h.planner.SetBusy(false, "")
 

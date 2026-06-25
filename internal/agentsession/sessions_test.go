@@ -131,10 +131,10 @@ func TestThreadManager_SessionIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store(b): %v", err)
 	}
-	if err := sa.SaveSession(SessionInfo{SessionID: "sess-a"}); err != nil {
+	if err := sa.SaveSession(ResumeInfo{SessionID: "sess-a"}); err != nil {
 		t.Fatalf("SaveSession a: %v", err)
 	}
-	if err := sb.SaveSession(SessionInfo{SessionID: "sess-b"}); err != nil {
+	if err := sb.SaveSession(ResumeInfo{SessionID: "sess-b"}); err != nil {
 		t.Fatalf("SaveSession b: %v", err)
 	}
 	ga, _ := sa.LoadSession()
@@ -170,7 +170,7 @@ func TestThreadManager_Migration_FromLegacyLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	legacySess := filepath.Join(root, sessionFile)
-	payload, _ := json.Marshal(SessionInfo{SessionID: "old-sess"})
+	payload, _ := json.Marshal(ResumeInfo{SessionID: "old-sess"})
 	if err := os.WriteFile(legacySess, payload, 0o644); err != nil {
 		t.Fatal(err)
 	}

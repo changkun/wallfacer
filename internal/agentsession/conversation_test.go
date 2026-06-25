@@ -183,7 +183,7 @@ func TestConversationStore_Clear(t *testing.T) {
 	cs := newTestStore(t)
 
 	_ = cs.AppendMessage(Message{Role: "user", Content: "a", Timestamp: time.Now()})
-	_ = cs.SaveSession(SessionInfo{SessionID: "s1", LastActive: time.Now()})
+	_ = cs.SaveSession(ResumeInfo{SessionID: "s1", LastActive: time.Now()})
 
 	if err := cs.Clear(); err != nil {
 		t.Fatalf("Clear: %v", err)
@@ -209,7 +209,7 @@ func TestConversationStore_Clear(t *testing.T) {
 func TestConversationStore_SessionRoundTrip(t *testing.T) {
 	cs := newTestStore(t)
 
-	want := SessionInfo{
+	want := ResumeInfo{
 		SessionID:   "sess-abc123",
 		LastActive:  time.Now().Truncate(time.Millisecond),
 		FocusedSpec: "specs/local/foo.md",
@@ -292,8 +292,8 @@ func TestMessageFocusedTask_SerDe(t *testing.T) {
 		t.Errorf("msg[1].FocusedTask = %q, want empty (legacy back-compat)", got[1].FocusedTask)
 	}
 
-	// Also verify SessionInfo round-trips FocusedTask.
-	sess := SessionInfo{FocusedTask: taskID}
+	// Also verify ResumeInfo round-trips FocusedTask.
+	sess := ResumeInfo{FocusedTask: taskID}
 	if err := cs.SaveSession(sess); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestMessageFocusedTask_SerDe(t *testing.T) {
 		t.Fatalf("LoadSession: %v", err)
 	}
 	if loaded.FocusedTask != taskID {
-		t.Errorf("SessionInfo.FocusedTask = %q, want %q", loaded.FocusedTask, taskID)
+		t.Errorf("ResumeInfo.FocusedTask = %q, want %q", loaded.FocusedTask, taskID)
 	}
 }
 

@@ -16,7 +16,7 @@ import (
 
 func TestMaybeAutoTitleThread(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	id := tm.List(false)[0].ID // default "Chat 1"
 
 	var gotMsg string
@@ -46,7 +46,7 @@ func TestMaybeAutoTitleThread(t *testing.T) {
 
 func TestMaybeAutoTitleThread_Skips(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	id := tm.List(false)[0].ID
 
 	called := false
@@ -108,7 +108,7 @@ func TestListPlanningThreads_DefaultChat1(t *testing.T) {
 
 func TestListPlanningThreads_BusyThreadID(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	id := h.planner.Threads().List(false)[0].ID
+	id := h.planner.Sessions().List(false)[0].ID
 
 	get := func() string {
 		rec := httptest.NewRecorder()
@@ -258,7 +258,7 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 	var created map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	id := created["id"].(string)
-	if err := h.planner.Threads().Archive(id); err != nil {
+	if err := h.planner.Sessions().Archive(id); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
 	h.planner.SetBusy(true, id)
@@ -275,7 +275,7 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 
 func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	threads := h.planner.Threads().List(false)
+	threads := h.planner.Sessions().List(false)
 	id := threads[0].ID
 	// Simulate an exec in flight owned by this thread.
 	h.planner.SetBusy(true, id)
@@ -313,7 +313,7 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("activate status = %d: %s", rec.Code, rec.Body.String())
 	}
-	if got := h.planner.Threads().ActiveID(); got != id {
+	if got := h.planner.Sessions().ActiveID(); got != id {
 		t.Errorf("active id = %q, want %q", got, id)
 	}
 }
@@ -322,7 +322,7 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 // name nor a recognized state returns 400.
 func TestPatchPlanningThread_RejectsEmptyBody(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	id := h.planner.Threads().List(false)[0].ID
+	id := h.planner.Sessions().List(false)[0].ID
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
@@ -500,13 +500,13 @@ func TestListPlanningThreads_DefaultMode(t *testing.T) {
 
 // pinThreadToTask saves a task-mode session for a thread, making it look like
 // the thread is actively planning for the given task.
-func pinThreadToTask(t *testing.T, tm *agentsession.ThreadManager, threadID, taskID string) {
+func pinThreadToTask(t *testing.T, tm *agentsession.Manager, threadID, taskID string) {
 	t.Helper()
 	cs, err := tm.Store(threadID)
 	if err != nil {
 		t.Fatalf("pinThreadToTask: Store(%q): %v", threadID, err)
 	}
-	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskID}); err != nil {
+	if err := cs.SaveSession(agentsession.ResumeInfo{FocusedTask: taskID}); err != nil {
 		t.Fatalf("pinThreadToTask: SaveSession: %v", err)
 	}
 }
@@ -522,7 +522,7 @@ func TestCascade_ArchiveOnTaskLeavesBacklog(t *testing.T) {
 	}
 
 	// Pin the planner thread to this task.
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -567,7 +567,7 @@ func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
 	}
 
 	// Pin the planner thread to this task.
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -619,7 +619,7 @@ func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
 		t.Fatalf("ForceUpdateTaskStatus: %v", err)
 	}
 
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	pinThreadToTask(t, tm, threadID, task.ID.String())
@@ -667,7 +667,7 @@ func TestUpdateTaskPromptTool_FailsOnCascadeArchivedThread(t *testing.T) {
 	}
 
 	// Pin the thread to this task.
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	pinThreadToTask(t, tm, threadID, task.ID.String())
