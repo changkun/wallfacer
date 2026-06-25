@@ -34,7 +34,7 @@ mark.search-highlight {
   border-radius: var(--r-md, 6px);
   /* Left pad clears the absolutely-positioned search icon; right pad clears
      the × clear button at right: 7px. */
-  padding: 7px 28px 7px 30px;
+  padding: 5px 28px 5px 30px;
   font-size: 13px;
   line-height: 1.4;
   outline: none;

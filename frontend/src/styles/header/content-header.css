@@ -3,7 +3,9 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 6px 16px;
+  /* Tight vertical padding keeps the band at a VS Code-style ~36px so the
+     editor tab strip reads compact rather than full-height. */
+  padding: 3px 16px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
 }
