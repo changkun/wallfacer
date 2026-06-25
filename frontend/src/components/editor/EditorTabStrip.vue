@@ -194,13 +194,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   left: 0;
   right: 0;
   top: 0;
-  height: 2px;
-  background: var(--accent);
-}
-
-/* Preview (temporary) tabs read in italics until promoted. */
-.editor-tab--preview .editor-tab__label {
-  font-style: italic;
+  height: 1.5px;
+  /* Muted toward the surface so the active cue reads as a calm rule, not a
+     saturated clay bar. */
+  background: color-mix(in oklab, var(--accent) 72%, var(--bg));
 }
 
 .editor-tab__icon {
@@ -208,6 +205,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 }
 
 .editor-tab__label {
+  /* min-width:0 lets the flex child shrink so text-overflow can ellipsis even
+     an unbreakable long name, instead of hard-clipping it mid-character. */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
