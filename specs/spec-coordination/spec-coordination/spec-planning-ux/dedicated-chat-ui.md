@@ -177,21 +177,21 @@ The current chat is wired as a docked pane inside `PlanPage.vue`. Each coupling 
 
 - [x] The Workspace nav group leads with `Chat` (`/chat`), `Plan` (`/plan`), `Board` (`/`), in that order; Agents/Flows/Routines/Map remain below, unremoved.
 - [x] The spec page keeps its `/plan` route and "Plan" label. `?spec=`/`?task=` deep links and legacy `#plan/<path>`/`#spec/<path>` hashes still focus the right spec under `/plan`. (No `/spec` rename or redirect was introduced.)
-- [ ] The Chat surface (`/chat`) renders a session sub-sidebar (vertical list of the workspace group's non-archived threads, active highlight, unread dot, `+ New chat`, rename, archive) — not a horizontal tab bar.
-- [ ] With no active session or an empty session, the Chat surface shows a centered greeting + a large `hero` composer + wallfacer-relevant quick-action chips. Clicking a chip pre-fills the composer with the matching slash command.
-- [ ] Sending the first message transitions the entry screen into the conversation view within one fluid animation (composer morphs centered→docked, greeting fades, stream fades in); no full-page swap or flash.
-- [ ] The conversation view shows the message stream above a generous `docked` composer with `+`, `/`, `@`, send-mode hint, and send/interrupt buttons. Streaming, queue, per-round undo, `Agent activity` disclosure, and autocomplete all behave exactly as in the current `PlanningChatPanel`.
-- [ ] The chat core is extracted into shared pieces (`ChatMessageList`, `ChatComposer`, `SessionList`, `useChatSession`) mounted by both surfaces. There is exactly one composer implementation and one streaming lifecycle — no forked logic between Chat and Spec.
-- [ ] In `/spec`, the chat is a floating popup anchored bottom-right, overlaying the focused view; the spec tree + focused view occupy the full content width with no permanent chat column.
-- [ ] The popup can be dragged anywhere via its header handle; its position is clamped to the viewport and persisted to `localStorage` (`wallfacer-spec-chat-popup`). Reopening the page restores the last position, size, and open/closed state.
-- [ ] On viewport resize, a popup positioned near an edge re-clamps so it stays fully visible.
-- [ ] The popup is resizable within min/max bounds; size persists alongside position.
-- [ ] The popup header carries a compact session switcher (current session name + dropdown) that switches/creates threads and shows unread, without the full sub-sidebar.
-- [ ] `C` toggles the popup open/closed in `/spec`. `D` dispatches the focused spec; `B` opens the popup (if closed) and sends the break-down message. The `SpecFocusedView` break-down bridge opens the popup and sends through the shared session lifecycle.
-- [ ] Switching workspace groups while a chat surface is mounted reloads the thread list (a watch on the active workspace key calls `loadThreads()`); the session sub-sidebar and popup switcher reflect the new group's threads without a page reload.
-- [ ] The `chat-first` empty-composer state is removed from `/spec`; the Chat surface's entry screen is the single empty/start state. No two empty composers coexist.
-- [ ] All new motion (entry→conversation, popup open/close, drag release) collapses to instant under `prefers-reduced-motion: reduce` while preserving final geometry and content.
-- [ ] No backend route, handler, storage layout, or streaming-protocol change is introduced (verified: diff touches only `frontend/` plus this spec).
+- [x] The Chat surface (`/chat`) renders a session sub-sidebar (vertical list of the workspace group's non-archived threads, active highlight, unread dot, `+ New chat`, rename, archive) — not a horizontal tab bar.
+- [x] With no active session or an empty session, the Chat surface shows a centered greeting + a large `hero` composer + wallfacer-relevant quick-action chips. Clicking a chip pre-fills the composer with the matching slash command.
+- [x] Sending the first message transitions the entry screen into the conversation view within one fluid animation (composer morphs centered→docked, greeting fades, stream fades in); no full-page swap or flash.
+- [x] The conversation view shows the message stream above a generous `docked` composer with `+`, `/`, `@`, send-mode hint, and send/interrupt buttons. Streaming, queue, per-round undo, `Agent activity` disclosure, and autocomplete all behave exactly as in the current `PlanningChatPanel`.
+- [x] The chat core is extracted into shared pieces (`ChatMessageList`, `ChatComposer`, `SessionList`, `useChatSession`) mounted by both surfaces. There is exactly one composer implementation and one streaming lifecycle — no forked logic between Chat and Spec.
+- [x] In `/spec`, the chat is a floating popup anchored bottom-right, overlaying the focused view; the spec tree + focused view occupy the full content width with no permanent chat column.
+- [x] The popup can be dragged anywhere via its header handle; its position is clamped to the viewport and persisted to `localStorage` (`wallfacer-spec-chat-popup`). Reopening the page restores the last position, size, and open/closed state.
+- [x] On viewport resize, a popup positioned near an edge re-clamps so it stays fully visible.
+- [x] The popup is resizable within min/max bounds; size persists alongside position.
+- [x] The popup header carries a compact session switcher (current session name + dropdown) that switches/creates threads and shows unread, without the full sub-sidebar.
+- [x] `C` toggles the popup open/closed in `/spec`. `D` dispatches the focused spec; `B` opens the popup (if closed) and sends the break-down message. The `SpecFocusedView` break-down bridge opens the popup and sends through the shared session lifecycle.
+- [x] Switching workspace groups while a chat surface is mounted reloads the thread list (a watch on the active workspace key calls `loadThreads()`); the session sub-sidebar and popup switcher reflect the new group's threads without a page reload.
+- [x] The `chat-first` empty-composer state is removed from `/spec`; the Chat surface's entry screen is the single empty/start state. No two empty composers coexist.
+- [x] All new motion (entry→conversation, popup open/close, drag release) collapses to instant under `prefers-reduced-motion: reduce` while preserving final geometry and content.
+- [x] No backend route, handler, storage layout, or streaming-protocol change is introduced (verified: diff touches only `frontend/` plus this spec).
 
 ## Test Plan
 
