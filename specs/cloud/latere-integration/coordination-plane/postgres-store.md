@@ -1,0 +1,179 @@
+---
+title: Shared Postgres Store and Migrations
+status: drafted
+depends_on:
+  - specs/cloud/latere-integration/coordination-plane/spec-comments.md
+affects:
+  - internal/store/postgres/
+  - internal/coordinator/pgstore.go
+  - internal/coordinator/commentstore.go
+  - internal/coordinator/commentstore_contract_test.go
+  - internal/cli/coordination.go
+  - internal/cli/web.go
+  - go.mod
+effort: medium
+created: 2026-06-25
+updated: 2026-06-25
+author: changkun
+dispatched_task_id: null
+---
+
+# Shared Postgres Store and Migrations
+
+## Overview
+
+The cloud Postgres schema is currently applied by `Exec`-ing an inline
+`CREATE TABLE IF NOT EXISTS` string at store init (`internal/coordinator/pgstore.go`).
+[spec-comments.md](spec-comments.md) shipped that way and explicitly deferred a
+real migration framework (its Outcome: "schema migrations framework. Deferred;
+the Postgres schema is applied idempotently on init rather than via golang-migrate").
+This spec delivers that framework: a single shared Postgres store that owns the
+pool and runs embedded, versioned migrations, so the next durable consumer
+([metadata-projection.md](metadata-projection.md)'s rollups, and any future
+storage) adds a numbered migration file instead of another inline schema string.
+
+The inline `IF NOT EXISTS` pattern only ever creates new tables. It cannot
+express an `ALTER`, a backfill, or a type change, and it leaves no version marker
+to know which shape a database is on. The first time any Postgres table needs a
+breaking change, the current approach has no answer. This closes that gap before
+it bites, while a second consumer is already landing on the same database.
+
+## Current State
+
+- `internal/coordinator/pgstore.go` holds a `const pgSchema` string and
+  `NewPostgresCommentStore(ctx, dsn)` opens its own `pgxpool.Pool`, `Exec`s the
+  schema, and the returned `pgStore` owns `Close()` (closes that pool).
+- `internal/cli/coordination.go` `newCommentStore` reads `WALLFACER_DATABASE_URL`
+  and calls `NewPostgresCommentStore`, falling back to the in-memory store when
+  unset. `internal/cli/web.go` wires the result into the web server.
+- `internal/coordinator/commentstore_contract_test.go` exercises the Postgres
+  store only when `WALLFACER_TEST_DATABASE_URL` is set; CI does not provision
+  Postgres, so the pg path is local-only and skipped in CI.
+- `go.mod` has `github.com/jackc/pgx/v5`; no migration library.
+- The reference convention is `../sixt.com/com.sixt.service.agent-sandbox/internal/store/postgres`:
+  golang-migrate `v4.19.1`, `//go:embed migrations/*.sql`, numbered
+  `NNNNNN_name.up.sql` / `.down.sql`, migrations run at `New()` before the pool
+  is handed out, `Pool()` shared to each domain store.
+
+## Architecture
+
+A new `internal/store/postgres` package is the single owner of the wallfacer
+Postgres pool. It runs migrations at construction, then hands the live pool to
+each domain store (comments today; rollups and future storage next). Domain
+stores never open or close the pool. The migration sequence is one linear,
+embedded set of numbered files with one `schema_migrations` table, matching the
+reference. "Generic for extension" means exactly this shared-pool-plus-one-
+sequence shape, no per-module registry, no per-module migration namespace.
+
+```mermaid
+graph TD
+  cli["internal/cli (coordination.go / web.go)<br/>reads WALLFACER_DATABASE_URL"]
+  store["internal/store/postgres.Store<br/>runMigrations() then pool; owns Close()"]
+  migs["migrations/*.sql (go:embed)<br/>000001_spec_comments, 00000N_future"]
+  comments["coordinator.pgStore<br/>takes *pgxpool.Pool, does not close it"]
+  future["future durable store(s)<br/>(metadata-projection rollups, ...)"]
+  cli --> store
+  store --> migs
+  store -->|Pool| comments
+  store -->|Pool| future
+```
+
+## Components
+
+### `internal/store/postgres` (new package)
+
+The shared store. Mirrors the reference `postgres.go`:
+
+- `New(ctx, dsn) (*Store, error)`: `runMigrations(dsn)` first; on success open
+  `pgxpool.New`, `Ping`, return a `*Store` wrapping the pool. Migration failure
+  is fatal (the caller refuses to start), matching the reference fail-fast.
+- `runMigrations(dsn)`: `iofs.New(migrationsFS, "migrations")` +
+  `migrate.NewWithSourceInstance("iofs", src, pgxScheme(dsn))`, then `m.Up()`
+  tolerating `migrate.ErrNoChange`.
+- `pgxScheme(dsn)`: rewrite `postgres://` / `postgresql://` to the `pgx5://`
+  scheme golang-migrate's pgx/v5 driver expects (reference helper).
+- `Pool() *pgxpool.Pool`: shared to domain stores.
+- `Close()`: closes the pool. The store owns the pool lifecycle; nothing else
+  closes it.
+- `//go:embed migrations/*.sql` + `var migrationsFS embed.FS`.
+
+Files: new `internal/store/postgres/postgres.go`, new
+`internal/store/postgres/migrations/`, new `internal/store/postgres/postgres_test.go`.
+
+### Migration `000001_spec_comments`
+
+`000001_spec_comments.up.sql` is the **verbatim** current `pgSchema` body: the
+two `CREATE TABLE IF NOT EXISTS` plus their `CREATE INDEX IF NOT EXISTS`. This
+is load-bearing for upgrades: an existing deployment that already set
+`WALLFACER_DATABASE_URL` has both tables but no `schema_migrations` table.
+golang-migrate reads version 0 and runs `000001` against it; the idempotent
+`IF NOT EXISTS` DDL makes that a no-op that simply stamps version 1. Rewriting
+to bare `CREATE TABLE` would error on those databases and mark the schema dirty,
+which then blocks every subsequent migration for every consumer. Keep the DDL
+exactly as it is today. `000001_spec_comments.down.sql` drops `spec_comments`
+then `spec_comment_threads` (child first).
+
+### `internal/coordinator/pgstore.go`
+
+- Delete the `const pgSchema` and the `pool.Exec(pgSchema)` path.
+- Change the constructor to accept an injected pool:
+  `NewPostgresCommentStore(pool *pgxpool.Pool) CommentStore`. It no longer opens
+  the pool and no longer reads `dsn`.
+- Drop `pgStore.Close()` (the shared `Store` owns the pool). The pool-ownership
+  rule matters even though the CLI shutdown path does not call `Close()` today:
+  the contract test does, and the next domain store will share the same pool, so
+  one domain store closing it would break the others.
+- All query methods are unchanged (they already take `pool`).
+
+### CLI wiring (`internal/cli/coordination.go`, `web.go`)
+
+`newCommentStore(ctx)` opens the shared store once when `WALLFACER_DATABASE_URL`
+is set (`postgres.New(ctx, dsn)`), then constructs the comment store from
+`store.Pool()`. The in-memory fallback when the env var is unset is unchanged
+(`commentstore_contract_test.go:19` asserts the unset-message wording, keep it).
+The owner of `store.Close()` is the CLI/web shutdown path, alongside the existing
+store lifecycle; the comment store no longer carries `Close()`. `web.go` keeps
+wiring the returned `CommentStore` into the web server unchanged.
+
+## API Surface
+
+No new external surface. `WALLFACER_DATABASE_URL` (durable store, unchanged) and
+`WALLFACER_TEST_DATABASE_URL` (test-only, unchanged) keep their meaning. New
+dependency: `github.com/golang-migrate/migrate/v4 v4.19.1` (pinned to the
+reference version), with its `database/pgx5` and `source/iofs` drivers.
+
+## Error Handling
+
+- Migration failure at startup is fatal: `New` returns the error, the caller
+  does not start with an unknown schema state. Matches the reference.
+- A dirty `schema_migrations` (a half-applied migration) surfaces as a
+  `New` error naming the dirty version; recovery is the standard golang-migrate
+  `force`, out of scope for automation here but noted so the failure is legible.
+- Existing-table upgrade (version 0 with tables present) must not error: that is
+  exactly what the idempotent `000001` DDL guarantees and what the test below
+  pins.
+
+## Testing Strategy
+
+Per the project rule, the framework ships with tests; the Postgres-touching ones
+stay env-gated on `WALLFACER_TEST_DATABASE_URL` (CI has no Postgres), the same
+gate `commentstore_contract_test.go` already uses.
+
+- **`postgres_test.go` (new), env-gated.**
+  - `New` on an empty database creates `schema_migrations` and applies `000001`;
+    the comment tables exist and version is 1.
+  - **Existing-table upgrade (the load-bearing case):** pre-create
+    `spec_comment_threads` / `spec_comments` (the pre-migration shape), then run
+    `New`; assert it succeeds, is not dirty, and stamps version 1. This proves
+    today's `WALLFACER_DATABASE_URL` deployments upgrade cleanly. It fails if
+    anyone rewrites `000001` to non-idempotent DDL.
+  - `New` is idempotent: a second `New` against the same database is a no-op
+    (`ErrNoChange` tolerated), version stays 1.
+  - `000001` down migration drops both tables (child-first, no FK error).
+- **`commentstore_contract_test.go` (update).** Switch the Postgres branch to
+  open the shared store and pass `store.Pool()` to the new
+  `NewPostgresCommentStore(pool)` signature; the store, not the comment store,
+  owns `Close()`. The contract assertions over the `CommentStore` behavior are
+  unchanged.
+- **`make build`** is the gate (lint catches unused code the go toolchain
+  misses): run it after the new imports land.
