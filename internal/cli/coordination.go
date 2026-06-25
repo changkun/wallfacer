@@ -24,6 +24,7 @@ import (
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/speccomment"
+	"latere.ai/x/wallfacer/internal/store/postgres"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -301,10 +302,13 @@ func newCommentStore(ctx context.Context) coordinator.CommentStore {
 	dsn := os.Getenv("WALLFACER_DATABASE_URL")
 	var openErr error
 	if dsn != "" {
-		st, err := coordinator.NewPostgresCommentStore(ctx, dsn)
+		// The shared store owns the pool and runs migrations; the comment store
+		// borrows the pool. The pool lives for the process, the same lifetime the
+		// inline-schema store had.
+		st, err := postgres.New(ctx, dsn)
 		if err == nil {
 			logger.Main.Info("coordination: using Postgres comment store")
-			return st
+			return coordinator.NewPostgresCommentStore(st.Pool())
 		}
 		openErr = err
 	}

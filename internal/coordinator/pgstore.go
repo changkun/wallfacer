@@ -3,7 +3,6 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,40 +11,6 @@ import (
 	"latere.ai/x/wallfacer/internal/speccomment"
 )
 
-// pgSchema is the durable schema for cloud-authoritative spec comments. It is
-// applied idempotently on store init. Spec comments are the one relay-not-mirror
-// exception, so their system of record is Postgres (durable), not the Valkey
-// cache. The flat thread/comment shape mirrors internal/speccomment so the
-// future git-export path is a serializer, not a transform.
-const pgSchema = `
-CREATE TABLE IF NOT EXISTS spec_comment_threads (
-  id           text PRIMARY KEY,
-  org_id       text NOT NULL,
-  workspace_id text NOT NULL,
-  spec_path    text NOT NULL,
-  anchor       jsonb NOT NULL,
-  author_sub   text NOT NULL,
-  created_at   timestamptz NOT NULL,
-  resolved     boolean NOT NULL DEFAULT false,
-  resolved_by  text NOT NULL DEFAULT '',
-  resolved_at  timestamptz,
-  status       text NOT NULL
-);
-CREATE INDEX IF NOT EXISTS spec_comment_threads_repo
-  ON spec_comment_threads (org_id, workspace_id);
-
-CREATE TABLE IF NOT EXISTS spec_comments (
-  id         text PRIMARY KEY,
-  thread_id  text NOT NULL REFERENCES spec_comment_threads(id) ON DELETE CASCADE,
-  parent_id  text NOT NULL DEFAULT '',
-  author_sub text NOT NULL,
-  body       text NOT NULL,
-  created_at timestamptz NOT NULL,
-  edited_at  timestamptz
-);
-CREATE INDEX IF NOT EXISTS spec_comments_thread ON spec_comments (thread_id);
-`
-
 // pgStore is the durable, Postgres-backed CommentStore. Every query is scoped by
 // org (the tenant boundary), so a forged repo claim never reaches another org's
 // threads. It shares the wallfacer database with the projection rollups.
@@ -53,22 +18,12 @@ type pgStore struct {
 	pool *pgxpool.Pool
 }
 
-// NewPostgresCommentStore opens a pgx pool against dsn, applies the schema, and
-// returns a durable comment store. dsn is WALLFACER_DATABASE_URL.
-func NewPostgresCommentStore(ctx context.Context, dsn string) (CommentStore, error) {
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open pool: %w", err)
-	}
-	if _, err := pool.Exec(ctx, pgSchema); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("apply schema: %w", err)
-	}
-	return &pgStore{pool: pool}, nil
+// NewPostgresCommentStore returns a durable comment store backed by pool. The
+// pool and its migrations are owned by internal/store/postgres; this store
+// borrows the pool and never closes it, since other domain stores share it.
+func NewPostgresCommentStore(pool *pgxpool.Pool) CommentStore {
+	return &pgStore{pool: pool}
 }
-
-// Close releases the pool.
-func (s *pgStore) Close() { s.pool.Close() }
 
 func (s *pgStore) ThreadsForRepo(ctx context.Context, org, repo string) ([]speccomment.Thread, error) {
 	rows, err := s.pool.Query(ctx, `
