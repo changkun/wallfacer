@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import { ConsoleSidebar, type ConsoleNavModel } from 'latere-ui';
 import 'latere-ui/console';
@@ -198,17 +198,30 @@ watch(
 
 // Click outside the workspace popover closes it. Only attach the listener
 // while open so we're not doing global work for every click on the page.
+// Track the handler so it is always torn down — on a programmatic close
+// (button toggle / workspace pick) and on unmount, not only on an outside
+// click — otherwise repeated open/close cycles stack document listeners.
+let wsOutsideHandler: ((e: MouseEvent) => void) | null = null;
+function removeWsOutsideHandler() {
+  if (wsOutsideHandler) {
+    document.removeEventListener('mousedown', wsOutsideHandler);
+    wsOutsideHandler = null;
+  }
+}
 watch(wsPopoverOpen, (open) => {
+  removeWsOutsideHandler();
   if (!open) return;
   const handler = (e: MouseEvent) => {
     const wrap = (e.target as HTMLElement).closest('.sb-ws-switch-wrap');
-    if (!wrap) {
-      wsPopoverOpen.value = false;
-      document.removeEventListener('mousedown', handler);
-    }
+    if (!wrap) wsPopoverOpen.value = false; // the watcher's close branch removes the listener
   };
-  setTimeout(() => document.addEventListener('mousedown', handler), 0);
+  wsOutsideHandler = handler;
+  setTimeout(() => {
+    // Skip if the popover was toggled closed before this fired.
+    if (wsOutsideHandler === handler) document.addEventListener('mousedown', handler);
+  }, 0);
 });
+onUnmounted(removeWsOutsideHandler);
 </script>
 
 <template>
