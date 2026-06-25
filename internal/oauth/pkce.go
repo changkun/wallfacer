@@ -10,7 +10,7 @@ import (
 )
 
 // randReader is the source of randomness. Tests may override it.
-var randReader io.Reader = rand.Reader
+var randReader = rand.Reader
 
 // GenerateCodeVerifier returns a cryptographically random PKCE code verifier
 // (32 random bytes, base64url-encoded without padding, yielding 43 characters).

@@ -4,7 +4,8 @@ This guide is for contributors who want to build Wallfacer from source, run test
 
 ## Prerequisites
 
-- **Go 1.25+**, [go.dev](https://go.dev/)
+- **Go 1.26+**, [go.dev](https://go.dev/)
+- **`golangci-lint` 2.11.3**, pinned to match CI and local `make lint-go`
 - **`claude` CLI** (and optionally `codex` and `cursor-agent`) on your `PATH`, tasks exec the selected CLI directly as a host process
 - **Bun**, for frontend install, build, typecheck, and tests
 - **A Claude credential**, OAuth token (`claude setup-token`) or API key from [console.anthropic.com](https://console.anthropic.com/)
@@ -54,7 +55,7 @@ make test-frontend  # Frontend tests: cd frontend && bunx vitest run
 | `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
 | `make server` | Build and run the server natively |
 | `make fmt` | Format Go in place |
-| `make lint` | Lint only (golangci-lint + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
+| `make lint` | Lint only (`golangci-lint` 2.11.3 + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
 | `make test` | fmt + lint + backend tests + frontend tests |
 | `make test-backend` | Go unit tests (`go test ./...`) |
 | `make test-frontend` | Frontend Vitest runner (`cd frontend && bunx vitest run`) |
