@@ -266,7 +266,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"watcher_health":           watcherHealth,
 		"active_groups":            h.activeGroupInfos(ctx),
 		"terminal_enabled":         true,
-		"planning_window_days":     30,
+		"agent_session_window_days":     30,
 		"auth_enabled":             h.auth != nil,
 	}
 	if h.authURL != "" {
@@ -299,7 +299,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
 	resp["terminal_enabled"] = cfg.TerminalEnabled
-	resp["planning_window_days"] = cfg.PlanningWindowDays
+	resp["agent_session_window_days"] = cfg.AgentSessionWindowDays
 	return resp
 }
 

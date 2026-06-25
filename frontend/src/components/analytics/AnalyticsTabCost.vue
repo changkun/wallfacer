@@ -59,8 +59,8 @@ type State = typeof STATE[keyof typeof STATE];
 const state = ref<State>(STATE.LOADING);
 const errorMsg = ref('');
 const data = ref<StatsResponse | null>(null);
-const planningWindowDays = ref(30);
-const planningPeriodInitialized = ref(false);
+const agentSessionWindowDays = ref(30);
+const agentSessionPeriodInitialized = ref(false);
 const dailyChart = useTemplateRef<HTMLCanvasElement>('dailyChart');
 
 const ACTIVITY_ORDER = [
@@ -167,8 +167,8 @@ function drawDailyChart() {
 async function fetchAndRender() {
   state.value = STATE.LOADING;
   try {
-    const url = planningWindowDays.value > 0
-      ? `/api/stats?days=${planningWindowDays.value}`
+    const url = agentSessionWindowDays.value > 0
+      ? `/api/stats?days=${agentSessionWindowDays.value}`
       : '/api/stats';
     const r = await api<StatsResponse>('GET', url);
     data.value = r;
@@ -182,13 +182,13 @@ async function fetchAndRender() {
 }
 
 async function seedPlanningPeriod() {
-  if (planningPeriodInitialized.value) return;
-  planningPeriodInitialized.value = true;
+  if (agentSessionPeriodInitialized.value) return;
+  agentSessionPeriodInitialized.value = true;
   try {
-    const cfg = await api<{ planning_window_days?: number }>('GET', '/api/config');
+    const cfg = await api<{ agent_session_window_days?: number }>('GET', '/api/config');
     if (cfg) {
-      const n = parseInt(String(cfg.planning_window_days), 10);
-      if (!Number.isNaN(n) && n >= 0) planningWindowDays.value = n;
+      const n = parseInt(String(cfg.agent_session_window_days), 10);
+      if (!Number.isNaN(n) && n >= 0) agentSessionWindowDays.value = n;
     }
   } catch { /* ignore */ }
 }
@@ -198,7 +198,7 @@ onMounted(async () => {
   fetchAndRender();
 });
 
-watch(planningWindowDays, () => fetchAndRender());
+watch(agentSessionWindowDays, () => fetchAndRender());
 </script>
 
 <template>
@@ -343,7 +343,7 @@ watch(planningWindowDays, () => fetchAndRender());
             <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
               Window
               <AppSelect
-                v-model="planningWindowDays"
+                v-model="agentSessionWindowDays"
                 :options="WINDOW_OPTIONS"
                 aria-label="Planning window"
               />

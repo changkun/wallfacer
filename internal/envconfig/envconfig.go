@@ -29,7 +29,7 @@ type Config struct {
 	ArchivedTasksPerPage int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 	AutoPushEnabled      bool   // WALLFACER_AUTO_PUSH ("true"/"false")
 	AutoPushThreshold    int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
-	PlanningWindowDays   int    // WALLFACER_PLANNING_WINDOW_DAYS — default planning cost window (days); 0 = all time
+	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -92,6 +92,7 @@ var knownKeys = []string{
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
+	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
 	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
 	"WALLFACER_SANDBOX_IMPLEMENTATION",
@@ -121,12 +122,12 @@ func Parse(path string) (Config, error) {
 	// file disables it. This opt-out semantic means a missing key preserves the
 	// safer default (feature enabled).
 	//
-	// PlanningWindowDays defaults to 30 so the planning-cost period picker
-	// opens on a sensible "last month" view when the user hasn't configured
-	// anything. An explicit 0 in the file still means "all time".
+	// AgentSessionWindowDays defaults to 30 so the agent-session cost period
+	// picker opens on a sensible "last month" view when the user hasn't
+	// configured anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
 		TerminalEnabled:    true,
-		PlanningWindowDays: 30,
+		AgentSessionWindowDays: 30,
 	}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
@@ -170,11 +171,12 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.AutoPushThreshold = n
 			}
-		case "WALLFACER_PLANNING_WINDOW_DAYS":
+		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
 			// 0 means "all time"; negative values are rejected silently (keeps
-			// the initialized default of 30).
+			// the initialized default of 30). WALLFACER_PLANNING_WINDOW_DAYS is
+			// the deprecated alias; when both appear, file order decides.
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-				cfg.PlanningWindowDays = n
+				cfg.AgentSessionWindowDays = n
 			}
 		case "OPENAI_API_KEY":
 			cfg.OpenAIAPIKey = v

@@ -795,7 +795,7 @@ func TestParseTerminalEnabledFalse(t *testing.T) {
 	}
 }
 
-// --- PlanningWindowDays ---
+// --- AgentSessionWindowDays ---
 
 func TestParse_PlanningWindowDaysDefault(t *testing.T) {
 	path := writeEnvFile(t, ``)
@@ -803,8 +803,8 @@ func TestParse_PlanningWindowDaysDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if cfg.PlanningWindowDays != 30 {
-		t.Errorf("PlanningWindowDays = %d; want 30 when unset", cfg.PlanningWindowDays)
+	if cfg.AgentSessionWindowDays != 30 {
+		t.Errorf("AgentSessionWindowDays = %d; want 30 when unset", cfg.AgentSessionWindowDays)
 	}
 }
 
@@ -824,10 +824,24 @@ func TestParse_PlanningWindowDays(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Parse: %v", err)
 			}
-			if cfg.PlanningWindowDays != tc.want {
-				t.Errorf("PlanningWindowDays = %d; want %d", cfg.PlanningWindowDays, tc.want)
+			if cfg.AgentSessionWindowDays != tc.want {
+				t.Errorf("AgentSessionWindowDays = %d; want %d", cfg.AgentSessionWindowDays, tc.want)
 			}
 		})
+	}
+}
+
+// TestParse_AgentSessionWindowDays covers the canonical env var name. The
+// deprecated alias WALLFACER_PLANNING_WINDOW_DAYS is exercised by
+// TestParse_PlanningWindowDays above; both must set the same field.
+func TestParse_AgentSessionWindowDays(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_AGENT_SESSION_WINDOW_DAYS=21")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.AgentSessionWindowDays != 21 {
+		t.Errorf("AgentSessionWindowDays = %d; want 21 from canonical var", cfg.AgentSessionWindowDays)
 	}
 }
 
@@ -849,8 +863,8 @@ func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Parse: %v", err)
 			}
-			if cfg.PlanningWindowDays != 30 {
-				t.Errorf("PlanningWindowDays = %d; want 30 (fallback for %q)", cfg.PlanningWindowDays, tc.raw)
+			if cfg.AgentSessionWindowDays != 30 {
+				t.Errorf("AgentSessionWindowDays = %d; want 30 (fallback for %q)", cfg.AgentSessionWindowDays, tc.raw)
 			}
 		})
 	}
