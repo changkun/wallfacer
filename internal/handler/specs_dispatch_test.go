@@ -319,23 +319,76 @@ dispatched_task_id: 550e8400-e29b-41d4-a716-446655440000
 	}
 }
 
-func TestDispatchSpecs_RejectsNonLeaf(t *testing.T) {
+func TestDispatchSpecs_FolderDispatch(t *testing.T) {
 	h, ws := newDispatchTestHandler(t)
-	// Create a non-leaf spec: parent.md with a child directory parent/ containing a child spec.
+	// A validated non-leaf parent with two leaves: one drafted, one validated.
 	writeTestSpec(t, ws, "specs/local/parent.md", testSpecValidated)
+	writeTestSpec(t, ws, "specs/local/parent/child1.md", testSpecDrafted)
+	writeTestSpec(t, ws, "specs/local/parent/child2.md", testSpecValidated)
+
+	w, resp := doDispatch(t, h, []string{"specs/local/parent.md"}, false)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if len(resp.Dispatched) != 2 {
+		t.Fatalf("dispatched count = %d, want 2 (both leaves)", len(resp.Dispatched))
+	}
+	// Both leaves get a task link and are promoted to validated. The parent is
+	// never dispatched (no task link) but stays validated.
+	for _, child := range []string{"specs/local/parent/child1.md", "specs/local/parent/child2.md"} {
+		s, err := spec.ParseFile(filepath.Join(ws, child))
+		if err != nil {
+			t.Fatalf("parse %s: %v", child, err)
+		}
+		if s.DispatchedTaskID == nil {
+			t.Errorf("%s: dispatched_task_id is nil", child)
+		}
+		if s.Status != spec.StatusValidated {
+			t.Errorf("%s: status = %q, want validated", child, s.Status)
+		}
+	}
+	parent, _ := spec.ParseFile(filepath.Join(ws, "specs/local/parent.md"))
+	if parent.DispatchedTaskID != nil {
+		t.Error("non-leaf parent must not be dispatched")
+	}
+}
+
+func TestDispatchSpecs_FolderDispatch_PromotesDraftedNonLeaf(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	// Validated root, a drafted intermediate non-leaf, and a leaf under it.
+	writeTestSpec(t, ws, "specs/local/root.md", testSpecValidated)
+	writeTestSpec(t, ws, "specs/local/root/mid.md", testSpecDrafted)
+	writeTestSpec(t, ws, "specs/local/root/mid/leaf.md", testSpecValidated)
+
+	w, _ := doDispatch(t, h, []string{"specs/local/root.md"}, false)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	// The drafted intermediate non-leaf is promoted to validated.
+	mid, _ := spec.ParseFile(filepath.Join(ws, "specs/local/root/mid.md"))
+	if mid.Status != spec.StatusValidated {
+		t.Errorf("intermediate non-leaf status = %q, want validated", mid.Status)
+	}
+}
+
+func TestDispatchSpecs_FolderDispatch_RejectsUnvalidatedParent(t *testing.T) {
+	h, ws := newDispatchTestHandler(t)
+	// A drafted (not validated) non-leaf must be validated before folder dispatch.
+	writeTestSpec(t, ws, "specs/local/parent.md", testSpecDrafted)
 	writeTestSpec(t, ws, "specs/local/parent/child.md", testSpecValidated)
 
 	w, resp := doDispatch(t, h, []string{"specs/local/parent.md"}, false)
-
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
-	if len(resp.Errors) != 1 {
-		t.Fatalf("errors count = %d, want 1", len(resp.Errors))
+	if len(resp.Errors) != 1 || !strings.Contains(resp.Errors[0].Error, "validate it before folder dispatch") {
+		t.Fatalf("errors = %+v, want one mentioning validate-before-folder-dispatch", resp.Errors)
 	}
-	if !strings.Contains(resp.Errors[0].Error, "non-leaf") {
-		t.Errorf("error message = %q, should mention non-leaf", resp.Errors[0].Error)
+	// Nothing dispatched — atomic rejection.
+	tasks, _ := h.store.ListTasks(context.Background(), false)
+	if len(tasks) != 0 {
+		t.Errorf("task count = %d, want 0 (atomic rejection)", len(tasks))
 	}
 }
 

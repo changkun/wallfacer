@@ -91,6 +91,91 @@ type resolvedSpec struct {
 	taskDeps []string // resolved task dependency UUIDs
 }
 
+// promoteTarget is a non-leaf spec marked validated as part of folder dispatch.
+type promoteTarget struct {
+	relPath string
+	absPath string
+}
+
+// dispatchExpansion is the result of expanding requested paths into the
+// concrete leaves to dispatch. A leaf path passes through unchanged; a
+// non-leaf path expands to its subtree leaves and contributes its drafted
+// non-leaf descendants to promote.
+type dispatchExpansion struct {
+	leafPaths  []string        // dedup'd leaf relPaths to dispatch
+	promote    []promoteTarget // drafted non-leaves to mark validated
+	fromFolder map[string]bool // leaf relPaths that came from a non-leaf expansion
+	errs       []dispatchError // non-leaf expansion failures
+	folderMode bool            // true if any requested path was a non-leaf
+}
+
+// expandDispatchPaths turns requested paths into the leaf paths to dispatch.
+// Leaf paths (and unresolvable paths, which the validation loop reports) pass
+// through. A non-leaf path must be validated first; it expands to its subtree
+// leaves, and its drafted non-leaf descendants are collected for promotion to
+// validated. Folder dispatch is atomic: the caller rejects the whole request
+// if errs is non-empty.
+func (h *Handler) expandDispatchPaths(workspaces []string, paths []string) dispatchExpansion {
+	exp := dispatchExpansion{fromFolder: make(map[string]bool)}
+	seen := make(map[string]bool)
+	addLeaf := func(p string) {
+		if !seen[p] {
+			seen[p] = true
+			exp.leafPaths = append(exp.leafPaths, p)
+		}
+	}
+	promoted := make(map[string]bool)
+
+	for _, p := range paths {
+		absPath := findSpecFile(workspaces, p)
+		if absPath == "" || spec.IsLeafPath(absPath) {
+			// Not found or a leaf — let the validation loop handle it.
+			addLeaf(p)
+			continue
+		}
+
+		// Non-leaf: folder dispatch.
+		exp.folderMode = true
+		s, err := spec.ParseFile(absPath)
+		if err != nil {
+			exp.errs = append(exp.errs, dispatchError{p, fmt.Sprintf("parse error: %v", err)})
+			continue
+		}
+		if s.Status != spec.StatusValidated {
+			exp.errs = append(exp.errs, dispatchError{p,
+				fmt.Sprintf("non-leaf spec status is %q — validate it before folder dispatch", s.Status)})
+			continue
+		}
+
+		ws := findWorkspaceRoot(workspaces, absPath)
+		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
+		if err != nil {
+			exp.errs = append(exp.errs, dispatchError{p, fmt.Sprintf("build spec tree: %v", err)})
+			continue
+		}
+		leaves, nonLeaves := spec.SubtreeSpecs(tree, p)
+		if len(leaves) == 0 {
+			exp.errs = append(exp.errs, dispatchError{p, "no dispatchable leaves in subtree"})
+			continue
+		}
+		for _, lf := range leaves {
+			addLeaf(lf.Key)
+			exp.fromFolder[lf.Key] = true
+		}
+		for _, nl := range nonLeaves {
+			if nl.Value == nil || nl.Value.Status != spec.StatusDrafted || promoted[nl.Key] {
+				continue
+			}
+			promoted[nl.Key] = true
+			exp.promote = append(exp.promote, promoteTarget{
+				relPath: nl.Key,
+				absPath: findSpecFile(workspaces, nl.Key),
+			})
+		}
+	}
+	return exp
+}
+
 // DispatchSpecs creates board tasks from validated specs atomically.
 // For each spec path, it reads and validates the spec, creates a task with
 // the spec body as the prompt, and writes the task ID back to the spec's
@@ -116,17 +201,29 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Phase 0: Expand non-leaf paths into their subtree leaves (folder
+	// dispatch). Leaf paths pass through unchanged.
+	exp := h.expandDispatchPaths(workspaces, req.Paths)
+	if exp.folderMode && len(exp.errs) > 0 {
+		// Folder dispatch is atomic: reject the whole request, dispatch nothing.
+		httpjson.Write(w, http.StatusBadRequest, map[string]any{
+			"dispatched": []dispatchResult{},
+			"errors":     exp.errs,
+		})
+		return
+	}
+
 	// Phase 1: Resolve and validate all specs.
-	resolved := make([]resolvedSpec, 0, len(req.Paths))
-	var errs []dispatchError
+	resolved := make([]resolvedSpec, 0, len(exp.leafPaths))
+	errs := exp.errs
 
 	// Track which paths are in this batch for intra-batch dependency resolution.
 	batchPaths := make(map[string]int) // relPath → index in resolved
-	for _, p := range req.Paths {
+	for _, p := range exp.leafPaths {
 		batchPaths[p] = -1 // placeholder, updated after validation
 	}
 
-	for _, relPath := range req.Paths {
+	for _, relPath := range exp.leafPaths {
 		absPath := findSpecFile(workspaces, relPath)
 		if absPath == "" {
 			errs = append(errs, dispatchError{relPath, "spec file not found in any workspace"})
@@ -139,7 +236,14 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if s.Status != spec.StatusValidated {
+		// A directly-requested leaf must be validated. A leaf reached through
+		// folder dispatch may still be drafted — the validated non-leaf root
+		// blessed the subtree, and Part 1 promotes the leaf to validated on
+		// dispatch. Other statuses (stale, complete, vague, archived) are never
+		// dispatchable.
+		okStatus := s.Status == spec.StatusValidated ||
+			(exp.fromFolder[relPath] && s.Status == spec.StatusDrafted)
+		if !okStatus {
 			msg := fmt.Sprintf("spec status is %q, must be %q", s.Status, spec.StatusValidated)
 			if s.Status == spec.StatusArchived {
 				msg = fmt.Sprintf("spec status is %q — unarchive the spec first before dispatching", s.Status)
@@ -164,6 +268,17 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			absPath: absPath,
 			relPath: relPath,
 		})
+	}
+
+	// Folder dispatch is atomic: if any expanded leaf failed validation,
+	// reject the whole request and create nothing. Direct leaf dispatch keeps
+	// its best-effort behavior (dispatch the valid specs, report the rest).
+	if exp.folderMode && len(errs) > 0 {
+		httpjson.Write(w, http.StatusBadRequest, map[string]any{
+			"dispatched": []dispatchResult{},
+			"errors":     errs,
+		})
+		return
 	}
 
 	if len(resolved) == 0 {
@@ -272,6 +387,22 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			}
 			http.Error(w, fmt.Sprintf("write dispatched_task_id to %s: %v", rs.relPath, err), http.StatusInternalServerError)
 			return
+		}
+	}
+
+	// Phase 4b: Promote drafted non-leaf ancestors in dispatched subtrees to
+	// validated. Best-effort — the leaves are already dispatched; a failed
+	// promotion is cosmetic and logged, not fatal.
+	for _, pt := range exp.promote {
+		if pt.absPath == "" {
+			continue
+		}
+		if err := spec.UpdateFrontmatter(pt.absPath, map[string]any{
+			"status":  string(spec.StatusValidated),
+			"updated": time.Now(),
+		}); err != nil {
+			logger.Handler.Error("folder dispatch: failed to promote non-leaf to validated",
+				"spec", pt.relPath, "error", err)
 		}
 	}
 
