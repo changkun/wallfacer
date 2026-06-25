@@ -32,6 +32,8 @@ const staleCandidate = computed(() =>
   focusedSpecPath.value ? staleCandidates.value[focusedSpecPath.value] : undefined,
 );
 
+const testingPending = computed(() => focusedNode.value?.spec?.testing_pending ?? '');
+
 const specText = ref<string>('');
 const loading = ref(false);
 const loadEpoch = ref(0);
@@ -304,6 +306,25 @@ async function onStaleCandidateAction(action: 'stale' | 'dismiss-stale') {
   }
 }
 
+async function onForceComplete() {
+  if (!focusedSpecPath.value) return;
+  if (!(await dialog.confirm({
+    title: 'Mark complete without drift check',
+    message: 'Skip the drift check and mark this spec complete?',
+    confirmLabel: 'Mark Complete',
+  }))) return;
+  actionBusy.value = true;
+  try {
+    await api('POST', '/api/specs/transition', { action: 'force-complete', path: focusedSpecPath.value });
+    await loadCurrent();
+    toast.push('Spec marked complete (drift check skipped)', { kind: 'success' });
+  } catch (e) {
+    toast.push('Action failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+  } finally {
+    actionBusy.value = false;
+  }
+}
+
 interface ArchiveAction {
   action: 'archive' | 'unarchive';
   path: string;
@@ -548,6 +569,17 @@ defineExpose({ dispatchFocused, breakdownFocused });
         :disabled="actionBusy"
         @click="onStaleCandidateAction('dismiss-stale')"
       >Dismiss</button>
+    </div>
+
+    <div v-if="testingPending && !isArchived" class="sf-stale-banner" role="status">
+      <span aria-hidden="true">⏳</span>
+      <span>Drift check needs attention: {{ testingPending }}</span>
+      <button
+        type="button"
+        class="sf-action"
+        :disabled="actionBusy"
+        @click="onForceComplete"
+      >Mark Complete Without Drift Check</button>
     </div>
 
     <div

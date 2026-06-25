@@ -195,6 +195,57 @@ func TestDismissStaleCandidate_BumpsUpdatedKeepsStatus(t *testing.T) {
 	}
 }
 
+const testSpecTesting = `---
+title: Test Spec
+status: testing
+depends_on: []
+affects: []
+effort: small
+created: 2026-01-01
+updated: 2026-01-01
+author: test
+implementation_commit: aaa..bbb
+testing_pending: "tester failed: timeout"
+---
+
+# Test Spec
+
+Body.
+`
+
+func TestForceComplete_FromTesting(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	writeTestSpec(t, ws, "specs/local/stuck.md", testSpecTesting)
+
+	w := doTransition(t, h.ForceCompleteSpec, "specs/local/stuck.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/stuck.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != spec.StatusComplete {
+		t.Errorf("status = %q, want complete", s.Status)
+	}
+	if s.TestingPending != nil || s.ImplementationCommit != nil {
+		t.Errorf("testing markers not cleared: pending=%v impl=%v", s.TestingPending, s.ImplementationCommit)
+	}
+	if !strings.Contains(s.Body, "Drift: skipped") {
+		t.Errorf("outcome should record the skipped drift check:\n%s", s.Body)
+	}
+}
+
+func TestForceComplete_RejectsNonTesting(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	writeTestSpec(t, ws, "specs/local/v.md", testSpecValidated)
+
+	w := doTransition(t, h.ForceCompleteSpec, "specs/local/v.md")
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+}
+
 // writeDispatchedSpec writes a drafted spec wired to taskID and returns its path.
 func writeDispatchedSpec(t *testing.T, ws, relPath, taskID string) {
 	t.Helper()
