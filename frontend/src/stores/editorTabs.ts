@@ -19,6 +19,10 @@ export interface FileTab {
   name: string;        // basename; disambiguated by parent dir on collision
   content: string;     // live buffer; the editor reads/writes this
   baseline: string;    // last-saved content; dirty = content !== baseline
+  // Preview (VS Code "temporary") tab: a single-click opens here in italics and
+  // the next single-click reuses this slot. Saving, double-click, or editing-
+  // then-navigating-away promotes it to a permanent (kept) tab.
+  preview: boolean;
   loading: boolean;
   loadError: string | null;
   saving: boolean;
@@ -54,20 +58,44 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
 
   const anyDirty = computed(() => tabs.value.some((t) => t.content !== t.baseline));
 
-  // Open a file tab, or focus it if already open (no duplicate). The content is
+  // Open a file tab, or focus it if already open (no duplicate). Single-click
+  // (preview, the default) opens a temporary tab that the next preview reuses;
+  // pass { preview: false } (double-click) to open a kept tab. Content is
   // fetched lazily; the tab appears immediately in a loading state.
-  async function openFile(workspace: string, path: string): Promise<void> {
+  async function openFile(
+    workspace: string,
+    path: string,
+    opts: { preview?: boolean } = {},
+  ): Promise<void> {
+    const asPreview = opts.preview ?? true;
     const existing = find(path);
     if (existing) {
       activeId.value = path;
+      if (!asPreview) existing.preview = false; // an explicit open pins it
       return;
     }
-    tabs.value.push({
+    // Reuse the existing preview slot: a clean preview is replaced in place; a
+    // dirty preview is kept (promoted) so its edits survive.
+    let insertAt = tabs.value.length;
+    if (asPreview) {
+      const pvIdx = tabs.value.findIndex((t) => t.preview);
+      if (pvIdx >= 0) {
+        const pv = tabs.value[pvIdx];
+        if (pv.content !== pv.baseline) {
+          pv.preview = false;
+        } else {
+          tabs.value.splice(pvIdx, 1);
+          insertAt = pvIdx;
+        }
+      }
+    }
+    tabs.value.splice(insertAt, 0, {
       path,
       workspace,
       name: basename(path),
       content: '',
       baseline: '',
+      preview: asPreview,
       loading: true,
       loadError: null,
       saving: false,
@@ -96,6 +124,13 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     if (id === BOARD_TAB_ID || find(id)) activeId.value = id;
   }
 
+  // Promote a preview tab to a permanent (kept) one. Triggered by saving and by
+  // double-click.
+  function promote(path: string): void {
+    const t = find(path);
+    if (t) t.preview = false;
+  }
+
   function setContent(path: string, text: string): void {
     const t = find(path);
     if (t) t.content = text;
@@ -109,6 +144,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     try {
       await api('PUT', '/api/explorer/file', { workspace: t.workspace, path: t.path, content: t.content });
       t.baseline = t.content;
+      t.preview = false; // saving keeps the tab (VS Code preview → permanent)
     } catch (e: unknown) {
       t.saveError = e instanceof Error ? e.message : 'Failed to save file.';
     } finally {
@@ -152,6 +188,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     anyDirty,
     openFile,
     focus,
+    promote,
     setContent,
     save,
     close,

@@ -64,8 +64,8 @@ describe('editorTabs store', () => {
   it('focuses an already-open file instead of duplicating it', async () => {
     mockRead('x');
     const s = useEditorTabsStore();
-    await s.openFile('/ws', 'a.ts');
-    await s.openFile('/ws', 'b.ts');
+    await s.openFile('/ws', 'a.ts', { preview: false });
+    await s.openFile('/ws', 'b.ts', { preview: false });
     expect(s.tabs.length).toBe(2);
     expect(s.activeId).toBe('b.ts');
 
@@ -83,8 +83,8 @@ describe('editorTabs store', () => {
   it('closes a tab and falls back to a neighbour, then the board', async () => {
     mockRead('x');
     const s = useEditorTabsStore();
-    await s.openFile('/ws', 'a.ts');
-    await s.openFile('/ws', 'b.ts'); // active = b
+    await s.openFile('/ws', 'a.ts', { preview: false });
+    await s.openFile('/ws', 'b.ts', { preview: false }); // active = b
 
     await s.close('b.ts');
     expect(s.tabs.map((t) => t.path)).toEqual(['a.ts']);
@@ -147,14 +147,60 @@ describe('editorTabs store', () => {
     expect(s.isDirty('a.ts')).toBe(true);
   });
 
+  it('reuses the preview slot on single-click, pins on save/double-click', async () => {
+    mockRead('x');
+    const s = useEditorTabsStore();
+
+    // single-click opens a preview tab (italic, reusable)
+    await s.openFile('/ws', 'a.ts');
+    expect(s.tabs.length).toBe(1);
+    expect(s.find('a.ts')!.preview).toBe(true);
+
+    // another single-click reuses the (clean) preview slot, no accumulation
+    await s.openFile('/ws', 'b.ts');
+    expect(s.tabs.map((t) => t.path)).toEqual(['b.ts']);
+    expect(s.find('b.ts')!.preview).toBe(true);
+
+    // double-click / explicit open pins it
+    await s.openFile('/ws', 'b.ts', { preview: false });
+    expect(s.find('b.ts')!.preview).toBe(false);
+
+    // now a fresh single-click adds a new preview alongside the pinned tab
+    await s.openFile('/ws', 'c.ts');
+    expect(s.tabs.map((t) => t.path)).toEqual(['b.ts', 'c.ts']);
+  });
+
+  it('keeps a dirty preview tab when another file is previewed', async () => {
+    mockRead('orig');
+    const s = useEditorTabsStore();
+    await s.openFile('/ws', 'a.ts'); // preview
+    s.setContent('a.ts', 'edited'); // dirty, still preview
+    expect(s.find('a.ts')!.preview).toBe(true);
+
+    await s.openFile('/ws', 'b.ts'); // dirty preview must survive, not be reused
+    expect(s.tabs.map((t) => t.path)).toEqual(['a.ts', 'b.ts']);
+    expect(s.find('a.ts')!.preview).toBe(false); // promoted to keep its edits
+    expect(s.find('a.ts')!.content).toBe('edited');
+  });
+
+  it('promotes the preview tab on save', async () => {
+    mockRead('orig');
+    const s = useEditorTabsStore();
+    await s.openFile('/ws', 'a.ts');
+    s.setContent('a.ts', 'new');
+    apiMock.mockResolvedValue({});
+    await s.save('a.ts');
+    expect(s.find('a.ts')!.preview).toBe(false);
+  });
+
   it('disambiguates tab labels by parent dir only on basename collision', async () => {
     mockRead('x');
     const s = useEditorTabsStore();
-    await s.openFile('/ws', 'README.md');
+    await s.openFile('/ws', 'README.md', { preview: false });
     expect(s.labelFor(s.find('README.md')!)).toBe('README.md');
 
-    await s.openFile('/ws', 'src/index.ts');
-    await s.openFile('/ws', 'lib/index.ts');
+    await s.openFile('/ws', 'src/index.ts', { preview: false });
+    await s.openFile('/ws', 'lib/index.ts', { preview: false });
     expect(s.labelFor(s.find('src/index.ts')!)).toBe('src/index.ts');
     expect(s.labelFor(s.find('lib/index.ts')!)).toBe('lib/index.ts');
     expect(s.labelFor(s.find('README.md')!)).toBe('README.md');
