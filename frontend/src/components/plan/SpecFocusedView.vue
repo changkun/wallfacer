@@ -699,9 +699,13 @@ defineExpose({ dispatchFocused, breakdownFocused });
 }
 
 /* Positioning context for the spec-comments marker overlay, which absolutely
-   positions gutter markers against the body content's top-left. */
+   positions gutter markers against the body content's top-left. Flex column so
+   the comments header strip (order:-1) can sit above the prose; the rail and
+   markers offset themselves by the content's top to stay line-aligned. */
 .sf-comment-host {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .sf-content--spec {
