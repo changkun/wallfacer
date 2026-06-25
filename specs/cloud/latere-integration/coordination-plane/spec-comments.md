@@ -548,3 +548,23 @@ Sub-line (word-level) precision like ai-as-an-infrastructure would require stori
 rendered selection offsets in the anchor, a schema change deferred as a follow-up.
 `status` moved `drafted → complete`: the v1 capability shipped and the highlight gap is
 closed; the deferred divergences listed above remain their own follow-up leaves.
+
+### Follow-up: margin comment rail (2026-06-25)
+
+The centered modal popover (`.sc-popover--thread`) read as a "popup window": it covered
+the prose, showed one thread at a time, and lost the spatial tie to the commented line.
+Replaced with an Overleaf/Confluence-style margin rail. Every inline thread on the spec
+renders at once as a card in a right-hand column, vertically aligned to its anchored
+line; the inline `<mark>` stays the in-prose affordance. The active card (its mark/card
+clicked, or a fresh selection's compose) expands to the full reply tree + reply box +
+resolve/reopen; the rest collapse to author + preview. Cards never overlap: a pure
+`layoutCards(items{top,height}, gap)` (specComments.ts, a variable-height generalization
+of `destack`) flows them top-down, pushing a later card below an earlier one when their
+anchors cluster (accepted Overleaf behavior; the pushed card drifts from its exact line).
+Heights are measured per card via `ResizeObserver` into a reactive map so a streamed
+reply or late mermaid render re-runs the layout. The whole rail folds (Overleaf-style) to
+a thin strip via a header toggle, leaving only the inline marks; it defaults folded below
+a width breakpoint so it coexists with the floating TOC rather than fighting it for the
+right gutter. The triage panel (orphaned, unanchored threads) stays a list, unchanged.
+The data path (GET/POST/SSE, server line resolution, anchoring) is untouched; this is a
+presentation-only rework of the frontend layer.
