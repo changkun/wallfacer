@@ -498,6 +498,38 @@ func TestExplorerWriteFile_GitPathRejection(t *testing.T) {
 	}
 }
 
+func TestExplorerWriteFile_GitPathSymlinkRejection(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	gitDir := filepath.Join(ws, ".git")
+	if err := os.Mkdir(gitDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	gitFile := filepath.Join(gitDir, "config")
+	if err := os.WriteFile(gitFile, []byte("original"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(ws, "meta")
+	if err := os.Symlink(gitDir, link); err != nil {
+		t.Fatal(err)
+	}
+
+	req := writeFileRequest(t, filepath.Join(link, "config"), ws, "hacked")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for .git symlink write, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := os.ReadFile(gitFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "original" {
+		t.Fatalf(".git file was modified through symlink: %q", got)
+	}
+}
+
 func TestExplorerWriteFile_OutsideWorkspace(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 
