@@ -128,7 +128,7 @@ func TestSetPlanner(t *testing.T) {
 
 // --- Planning Messages ---
 
-func newPlannerWithStore(t *testing.T) *agentsession.Planner {
+func newPlannerWithStore(t *testing.T) *agentsession.Runtime {
 	t.Helper()
 	return agentsession.New(agentsession.Config{
 		Command:     "podman",
@@ -710,7 +710,7 @@ func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
 	}
 	taskID := task.ID.String()
 
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threadList := tm.List(false)
 	if len(threadList) == 0 {
 		t.Fatal("expected at least one thread")
@@ -722,7 +722,7 @@ func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskID}); err != nil {
+	if err := cs.SaveSession(agentsession.ResumeInfo{FocusedTask: taskID}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 
@@ -758,11 +758,11 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
 
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
-	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: created.ID.String()})
+	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: created.ID.String()})
 
 	h2 := h
 
@@ -821,7 +821,7 @@ func TestUpdateTaskPromptTool_WrongThreadMode(t *testing.T) {
 	}
 
 	// Use the default thread, which is NOT pinned to any task (spec/file-mode).
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 
@@ -850,14 +850,14 @@ func TestUpdateTaskPromptTool_MismatchedTaskID(t *testing.T) {
 	}
 
 	// Pin thread to task A.
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	cs, err := tm.Store(threadID)
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskA.ID.String()}); err != nil {
+	if err := cs.SaveSession(agentsession.ResumeInfo{FocusedTask: taskA.ID.String()}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 
@@ -887,14 +887,14 @@ func TestUpdateTaskPromptTool_ResumeHintOnWaiting(t *testing.T) {
 	}
 
 	// Pin thread to task.
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	cs, err := tm.Store(threadID)
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: created.ID.String()}); err != nil {
+	if err := cs.SaveSession(agentsession.ResumeInfo{FocusedTask: created.ID.String()}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 
@@ -951,7 +951,7 @@ func TestTaskPromptRefine_TemplateFieldsPopulated(t *testing.T) {
 
 func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	tm := h.planner.Threads()
+	tm := h.planner.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -964,7 +964,7 @@ func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tm.Store: %v", err)
 	}
-	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskID}); err != nil {
+	if err := cs.SaveSession(agentsession.ResumeInfo{FocusedTask: taskID}); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
 

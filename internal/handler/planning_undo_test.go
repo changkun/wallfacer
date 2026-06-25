@@ -301,9 +301,9 @@ func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
 
-	threadID := p.Threads().ActiveID()
-	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
+	threadID := p.Sessions().ActiveID()
+	cs, _ := p.Sessions().Store(threadID)
+	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: tsk.ID.String()})
 
 	// Simulate two prompt rounds.
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
@@ -371,9 +371,9 @@ func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
 
-	threadID := p.Threads().ActiveID()
-	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
+	threadID := p.Sessions().ActiveID()
+	cs, _ := p.Sessions().Store(threadID)
+	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: tsk.ID.String()})
 
 	// Two prompt rounds.
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
@@ -433,9 +433,9 @@ func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
 
-	threadID := p.Threads().ActiveID()
-	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
+	threadID := p.Sessions().ActiveID()
+	cs, _ := p.Sessions().Store(threadID)
+	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: tsk.ID.String()})
 	_ = ctx
 
 	// No prompt_round events written — undo should return 409.
@@ -466,7 +466,7 @@ func TestUndo_FileMode_Unchanged(t *testing.T) {
 	_ = p.Start(context.Background())
 	h.planner = p
 
-	specThreadID := p.Threads().ActiveID()
+	specThreadID := p.Sessions().ActiveID()
 	// Do NOT set FocusedTask — this keeps the thread in spec-mode.
 
 	rec := httptest.NewRecorder()
@@ -510,9 +510,9 @@ func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
 
-	threadID := p.Threads().ActiveID()
-	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
+	threadID := p.Sessions().ActiveID()
+	cs, _ := p.Sessions().Store(threadID)
+	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: tsk.ID.String()})
 
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
 

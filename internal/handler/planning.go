@@ -361,12 +361,12 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 	// Pin thread mode before exec so the mode is durable even if exec crashes.
 	if existingSess.FocusedTask == "" && existingSess.FocusedSpec == "" {
 		if focusedTaskID != "" {
-			_ = cs.SaveSession(agentsession.SessionInfo{
+			_ = cs.SaveSession(agentsession.ResumeInfo{
 				SessionID:   existingSess.SessionID,
 				FocusedTask: focusedTaskID,
 			})
 		} else if req.FocusedSpec != "" {
-			_ = cs.SaveSession(agentsession.SessionInfo{
+			_ = cs.SaveSession(agentsession.ResumeInfo{
 				SessionID:   existingSess.SessionID,
 				FocusedSpec: req.FocusedSpec,
 			})
@@ -490,7 +490,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			if savedSpec == "" {
 				savedSpec = pinned.FocusedSpec
 			}
-			_ = cs.SaveSession(agentsession.SessionInfo{
+			_ = cs.SaveSession(agentsession.ResumeInfo{
 				SessionID:   sessionID,
 				LastActive:  time.Now().UTC(),
 				FocusedSpec: savedSpec,
@@ -504,7 +504,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("planning: stale session, retrying with history context")
 			// Preserve mode pin while clearing the stale session ID.
 			pinned, _ := cs.LoadSession()
-			_ = cs.SaveSession(agentsession.SessionInfo{
+			_ = cs.SaveSession(agentsession.ResumeInfo{
 				FocusedSpec: pinned.FocusedSpec,
 				FocusedTask: pinned.FocusedTask,
 			})
@@ -533,7 +533,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 				if savedSpec2 == "" {
 					savedSpec2 = pinned2.FocusedSpec
 				}
-				_ = cs.SaveSession(agentsession.SessionInfo{
+				_ = cs.SaveSession(agentsession.ResumeInfo{
 					SessionID:   sessionID,
 					LastActive:  time.Now().UTC(),
 					FocusedSpec: savedSpec2,
@@ -646,7 +646,7 @@ func (h *Handler) SendPlanningMessage(w http.ResponseWriter, r *http.Request) {
 // the message is blank. Runs inline on the caller's (already detached) exec
 // goroutine; title generation carries its own timeout and never blocks the
 // HTTP response.
-func (h *Handler) maybeAutoTitleThread(tm *agentsession.ThreadManager, threadID, firstMessage string) {
+func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, firstMessage string) {
 	if h.runner == nil || strings.TrimSpace(firstMessage) == "" {
 		return
 	}

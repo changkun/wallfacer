@@ -16,8 +16,8 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
-// ThreadMeta describes a single planning chat thread.
-type ThreadMeta struct {
+// SessionMeta describes a single planning chat thread.
+type SessionMeta struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`
 	Created  time.Time `json:"created"`
@@ -32,7 +32,7 @@ type ThreadMeta struct {
 // threadManifest is the on-disk shape of threads.json.
 type threadManifest struct {
 	Version int          `json:"version"`
-	Threads []ThreadMeta `json:"threads"`
+	Threads []SessionMeta `json:"threads"`
 }
 
 // activeThreadFile is the on-disk shape of active.json.
@@ -47,14 +47,14 @@ const (
 	threadManifestV1    = 1
 )
 
-// ThreadManager owns the set of planning chat threads for a single
+// Manager owns the set of planning chat threads for a single
 // workspace-group fingerprint. Each thread has its own on-disk
 // [ConversationStore] under threads/<id>/. The manager persists the
 // ordered list of threads in threads.json and the UI's active-thread
 // preference in active.json.
 //
-// ThreadManager is safe for concurrent use.
-type ThreadManager struct {
+// Manager is safe for concurrent use.
+type Manager struct {
 	root string
 
 	mu       sync.Mutex
@@ -68,11 +68,11 @@ type ThreadManager struct {
 // session.json sitting directly in root — the manager migrates those
 // files into a new thread named "Chat 1" using a crash-safe copy/write/
 // delete sequence.
-func NewThreadManager(root string) (*ThreadManager, error) {
+func NewThreadManager(root string) (*Manager, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, err
 	}
-	tm := &ThreadManager{root: root, stores: map[string]*ConversationStore{}}
+	tm := &Manager{root: root, stores: map[string]*ConversationStore{}}
 	if err := tm.loadOrMigrate(); err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func NewThreadManager(root string) (*ThreadManager, error) {
 
 // loadOrMigrate reads threads.json when present; otherwise migrates from
 // the single-thread layout, or creates a fresh manifest with one thread.
-func (m *ThreadManager) loadOrMigrate() error {
+func (m *Manager) loadOrMigrate() error {
 	manifestPath := filepath.Join(m.root, threadsManifestFile)
 	data, err := os.ReadFile(manifestPath)
 	switch {
@@ -111,7 +111,7 @@ func (m *ThreadManager) loadOrMigrate() error {
 
 // migrateOrInit handles the first-load case: either there's a legacy
 // layout to migrate, or there's nothing and we create a fresh thread.
-func (m *ThreadManager) migrateOrInit() error {
+func (m *Manager) migrateOrInit() error {
 	legacyMsgs := filepath.Join(m.root, messagesFile)
 	legacySess := filepath.Join(m.root, sessionFile)
 
@@ -136,7 +136,7 @@ func (m *ThreadManager) migrateOrInit() error {
 	now := time.Now().UTC()
 	m.manifest = threadManifest{
 		Version: threadManifestV1,
-		Threads: []ThreadMeta{{
+		Threads: []SessionMeta{{
 			ID:      id,
 			Name:    "Chat 1",
 			Created: now,
@@ -162,12 +162,12 @@ func (m *ThreadManager) migrateOrInit() error {
 // removeLegacyFiles deletes leftover root-level messages.jsonl /
 // session.json when the manifest already exists (crash between the
 // manifest write and the delete step of migration).
-func (m *ThreadManager) removeLegacyFiles() {
+func (m *Manager) removeLegacyFiles() {
 	_ = os.Remove(filepath.Join(m.root, messagesFile))
 	_ = os.Remove(filepath.Join(m.root, sessionFile))
 }
 
-func (m *ThreadManager) loadActive() error {
+func (m *Manager) loadActive() error {
 	data, err := os.ReadFile(filepath.Join(m.root, activeThreadJSON))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -185,7 +185,7 @@ func (m *ThreadManager) loadActive() error {
 
 // ensureValidActive falls back to the first non-archived thread when
 // the stored active thread is missing or archived.
-func (m *ThreadManager) ensureValidActive() {
+func (m *Manager) ensureValidActive() {
 	if m.active != "" {
 		for _, t := range m.manifest.Threads {
 			if t.ID == m.active && !t.Archived {
@@ -205,10 +205,10 @@ func (m *ThreadManager) ensureValidActive() {
 
 // List returns the threads in manifest order, optionally including
 // archived ones.
-func (m *ThreadManager) List(includeArchived bool) []ThreadMeta {
+func (m *Manager) List(includeArchived bool) []SessionMeta {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	out := make([]ThreadMeta, 0, len(m.manifest.Threads))
+	out := make([]SessionMeta, 0, len(m.manifest.Threads))
 	for _, t := range m.manifest.Threads {
 		if !includeArchived && t.Archived {
 			continue
@@ -221,32 +221,32 @@ func (m *ThreadManager) List(includeArchived bool) []ThreadMeta {
 // Create adds a new thread with the given display name (default "Chat N")
 // and returns its metadata. The new thread is not automatically made
 // active — the caller chooses.
-func (m *ThreadManager) Create(name string) (ThreadMeta, error) {
+func (m *Manager) Create(name string) (SessionMeta, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if name == "" {
 		name = m.nextDefaultName()
 	}
 	now := time.Now().UTC()
-	meta := ThreadMeta{
+	meta := SessionMeta{
 		ID:      newThreadID(),
 		Name:    name,
 		Created: now,
 		Updated: now,
 	}
 	if err := os.MkdirAll(m.threadDir(meta.ID), 0o755); err != nil {
-		return ThreadMeta{}, err
+		return SessionMeta{}, err
 	}
 	m.manifest.Threads = append(m.manifest.Threads, meta)
 	if err := m.writeManifest(); err != nil {
-		return ThreadMeta{}, err
+		return SessionMeta{}, err
 	}
 	return meta, nil
 }
 
 // nextDefaultName returns "Chat N" where N is the next unused index
 // based on existing "Chat <n>" names.
-func (m *ThreadManager) nextDefaultName() string {
+func (m *Manager) nextDefaultName() string {
 	highest := 0
 	for _, t := range m.manifest.Threads {
 		if n, ok := parseChatN(t.Name); ok && n > highest {
@@ -264,7 +264,7 @@ func IsDefaultThreadName(name string) bool {
 }
 
 // Rename updates a thread's display name.
-func (m *ThreadManager) Rename(id, name string) error {
+func (m *Manager) Rename(id, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("thread: name is required")
@@ -282,7 +282,7 @@ func (m *ThreadManager) Rename(id, name string) error {
 }
 
 // Archive marks a thread archived. Files on disk are retained.
-func (m *ThreadManager) Archive(id string) error {
+func (m *Manager) Archive(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i := range m.manifest.Threads {
@@ -315,7 +315,7 @@ func (m *ThreadManager) Archive(id string) error {
 // flag=true) so that a subsequent task re-archive will skip this thread and
 // respect the user's explicit intent. The flag is only cleared by
 // CascadeUnarchiveForTask (programmatic reversal of a cascade-archive).
-func (m *ThreadManager) Unarchive(id string) error {
+func (m *Manager) Unarchive(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i := range m.manifest.Threads {
@@ -333,7 +333,7 @@ func (m *ThreadManager) Unarchive(id string) error {
 // or in-flight thread cannot be destroyed out from under a running turn. The
 // manifest entry is dropped first so a later failure to remove the directory
 // still hides the thread from the UI.
-func (m *ThreadManager) Delete(id string) error {
+func (m *Manager) Delete(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	idx := -1
@@ -361,7 +361,7 @@ func (m *ThreadManager) Delete(id string) error {
 // CascadeArchiveForTask archives every non-archived task-mode thread whose
 // pinned task matches taskID, setting AutoArchivedByTaskLifecycle=true on
 // each. Returns the list of thread IDs that were archived.
-func (m *ThreadManager) CascadeArchiveForTask(taskID string) ([]string, error) {
+func (m *Manager) CascadeArchiveForTask(taskID string) ([]string, error) {
 	// Collect candidate thread IDs outside the manifest lock so that loading
 	// session.json (disk I/O) does not hold the manifest lock for long.
 	m.mu.Lock()
@@ -418,7 +418,7 @@ func (m *ThreadManager) CascadeArchiveForTask(taskID string) ([]string, error) {
 // it unarchives every task-mode thread pinned to taskID whose
 // AutoArchivedByTaskLifecycle flag is still true (i.e. the user has not
 // manually unarchived it since).
-func (m *ThreadManager) CascadeUnarchiveForTask(taskID string) error {
+func (m *Manager) CascadeUnarchiveForTask(taskID string) error {
 	m.mu.Lock()
 	var candidates []string
 	for _, t := range m.manifest.Threads {
@@ -453,7 +453,7 @@ func (m *ThreadManager) CascadeUnarchiveForTask(taskID string) error {
 }
 
 // Meta returns the metadata for a thread.
-func (m *ThreadManager) Meta(id string) (ThreadMeta, error) {
+func (m *Manager) Meta(id string) (SessionMeta, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, t := range m.manifest.Threads {
@@ -461,18 +461,18 @@ func (m *ThreadManager) Meta(id string) (ThreadMeta, error) {
 			return t, nil
 		}
 	}
-	return ThreadMeta{}, ErrThreadNotFound
+	return SessionMeta{}, ErrThreadNotFound
 }
 
 // Store returns the on-disk conversation store for a thread, creating
 // it lazily on first access. Returns ErrThreadNotFound if id is unknown.
-func (m *ThreadManager) Store(id string) (*ConversationStore, error) {
+func (m *Manager) Store(id string) (*ConversationStore, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.storeLocked(id)
 }
 
-func (m *ThreadManager) storeLocked(id string) (*ConversationStore, error) {
+func (m *Manager) storeLocked(id string) (*ConversationStore, error) {
 	if s, ok := m.stores[id]; ok {
 		return s, nil
 	}
@@ -496,14 +496,14 @@ func (m *ThreadManager) storeLocked(id string) (*ConversationStore, error) {
 
 // ActiveID returns the UI's current active thread ID. Empty string if
 // no threads exist (e.g. all archived).
-func (m *ThreadManager) ActiveID() string {
+func (m *Manager) ActiveID() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.active
 }
 
 // SetActiveID records a new active thread. Rejects archived or unknown IDs.
-func (m *ThreadManager) SetActiveID(id string) error {
+func (m *Manager) SetActiveID(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, t := range m.manifest.Threads {
@@ -520,7 +520,7 @@ func (m *ThreadManager) SetActiveID(id string) error {
 
 // Touch marks a thread's Updated timestamp so the UI can sort by recent
 // activity. Call sites: after appending a message, after rename, etc.
-func (m *ThreadManager) Touch(id string) {
+func (m *Manager) Touch(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i := range m.manifest.Threads {
@@ -541,11 +541,11 @@ var ErrThreadNotArchived = errors.New("thread: not archived")
 
 // --- internal helpers ----------------------------------------------------
 
-func (m *ThreadManager) threadDir(id string) string {
+func (m *Manager) threadDir(id string) string {
 	return filepath.Join(m.root, threadsSubdir, id)
 }
 
-func (m *ThreadManager) writeManifest() error {
+func (m *Manager) writeManifest() error {
 	// Sort for deterministic serialization: by Created timestamp.
 	sort.SliceStable(m.manifest.Threads, func(i, j int) bool {
 		return m.manifest.Threads[i].Created.Before(m.manifest.Threads[j].Created)
@@ -554,7 +554,7 @@ func (m *ThreadManager) writeManifest() error {
 	return atomicfile.WriteJSON(filepath.Join(m.root, threadsManifestFile), m.manifest, 0o644)
 }
 
-func (m *ThreadManager) writeActive() error {
+func (m *Manager) writeActive() error {
 	return atomicfile.WriteJSON(filepath.Join(m.root, activeThreadJSON), activeThreadFile{ActiveThreadID: m.active}, 0o644)
 }
 

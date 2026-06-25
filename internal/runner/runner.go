@@ -164,7 +164,7 @@ type Runner struct {
 	onStopReason           func(taskID uuid.UUID, stopReason string)
 	autosubmitFn           func() bool      // returns true when auto-submit is enabled
 	ideationExploitRatioFn func() float64   // returns the current exploitation ratio (0–1)
-	planner                *agentsession.Planner // planning sandbox for ideation and chat; may be nil
+	planner                *agentsession.Runtime // planning sandbox for ideation and chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
@@ -299,7 +299,7 @@ func (r *Runner) SetIdeationExploitRatioFunc(fn func() float64) {
 
 // SetPlanner registers the planning sandbox so that ideation runs through
 // the long-lived planning worker container instead of ephemeral containers.
-func (r *Runner) SetPlanner(p *agentsession.Planner) {
+func (r *Runner) SetPlanner(p *agentsession.Runtime) {
 	r.planner = p
 }
 

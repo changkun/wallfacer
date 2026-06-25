@@ -31,8 +31,8 @@ type Message struct {
 	PlanRound int `json:"plan_round,omitempty"`
 }
 
-// SessionInfo tracks the active Claude Code session for --resume.
-type SessionInfo struct {
+// ResumeInfo tracks the active Claude Code session for --resume.
+type ResumeInfo struct {
 	SessionID   string    `json:"session_id"`             // Claude Code session ID
 	LastActive  time.Time `json:"last_active"`            // last interaction timestamp
 	FocusedSpec string    `json:"focused_spec,omitempty"` // last focused spec path (spec-mode)
@@ -56,7 +56,7 @@ const (
 // NewConversationStore creates a store rooted at dir. The directory is
 // created if it does not exist. Prior callers that used a
 // (configDir, fingerprint) pair now compose the path themselves — most
-// code should go through [ThreadManager] so that the multi-thread
+// code should go through [Manager] so that the multi-thread
 // layout (threads/<id>/) is used.
 func NewConversationStore(dir string) (*ConversationStore, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -193,28 +193,28 @@ func (s *ConversationStore) Clear() error {
 }
 
 // SaveSession atomically writes the session info file.
-func (s *ConversationStore) SaveSession(info SessionInfo) error {
+func (s *ConversationStore) SaveSession(info ResumeInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return atomicfile.WriteJSON(filepath.Join(s.dir, sessionFile), info, 0o644)
 }
 
 // LoadSession reads the session info file. Returns a zero-value
-// SessionInfo and nil error if the file does not exist.
-func (s *ConversationStore) LoadSession() (SessionInfo, error) {
+// ResumeInfo and nil error if the file does not exist.
+func (s *ConversationStore) LoadSession() (ResumeInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	data, err := os.ReadFile(filepath.Join(s.dir, sessionFile))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return SessionInfo{}, nil
+			return ResumeInfo{}, nil
 		}
-		return SessionInfo{}, err
+		return ResumeInfo{}, err
 	}
-	var info SessionInfo
+	var info ResumeInfo
 	if err := json.Unmarshal(data, &info); err != nil {
-		return SessionInfo{}, err
+		return ResumeInfo{}, err
 	}
 	return info, nil
 }

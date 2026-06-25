@@ -187,7 +187,7 @@ type Handler struct {
 	ideationMu           sync.Mutex
 	ideationExploitRatio float64
 
-	planner         *agentsession.Planner
+	planner         *agentsession.Runtime
 	commandRegistry *agentsession.CommandRegistry
 
 	// routineEngine multiplexes per-routine scheduled fires. Nil until
@@ -295,7 +295,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 
 // SetPlanner sets the planner instance for planning sandbox operations.
 // Called by the server after both the handler and planner are constructed.
-func (h *Handler) SetPlanner(p *agentsession.Planner) {
+func (h *Handler) SetPlanner(p *agentsession.Runtime) {
 	h.planner = p
 	h.commandRegistry = agentsession.NewCommandRegistry()
 }

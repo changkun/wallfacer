@@ -55,7 +55,7 @@ type ServerComponents struct {
 	Srv     *http.Server
 	Ln      net.Listener
 	Runner  *runner.Runner
-	Planner *agentsession.Planner
+	Planner *agentsession.Runtime
 	Ctx     context.Context
 	Stop    context.CancelFunc
 
