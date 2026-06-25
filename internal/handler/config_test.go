@@ -2075,13 +2075,13 @@ func TestConfigResponse_IncludesPlanningWindowDays(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	got, ok := resp["planning_window_days"]
+	got, ok := resp["agent_session_window_days"]
 	if !ok {
-		t.Fatal("planning_window_days missing from config response")
+		t.Fatal("agent_session_window_days missing from config response")
 	}
 	// JSON numbers decode into float64 when the target is map[string]any.
 	if n, _ := got.(float64); int(n) != 14 {
-		t.Errorf("planning_window_days = %v, want 14", got)
+		t.Errorf("agent_session_window_days = %v, want 14", got)
 	}
 }
 
@@ -2101,12 +2101,12 @@ func TestConfigResponse_PlanningWindowDaysDefault(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	got, ok := resp["planning_window_days"]
+	got, ok := resp["agent_session_window_days"]
 	if !ok {
-		t.Fatal("planning_window_days missing from config response")
+		t.Fatal("agent_session_window_days missing from config response")
 	}
 	if n, _ := got.(float64); int(n) != 30 {
-		t.Errorf("planning_window_days = %v, want 30 (default)", got)
+		t.Errorf("agent_session_window_days = %v, want 30 (default)", got)
 	}
 }
 
