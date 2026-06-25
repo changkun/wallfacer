@@ -206,13 +206,13 @@ The file explorer panel lets you browse workspace files directly in the web UI w
 
 **Browsing files:** Each active workspace appears as a root folder in the tree. Click a folder to expand it -- contents are loaded one level at a time from the server. Click again to collapse. Dot-prefixed entries (`.git`, `.env`, etc.) appear dimmed. Directories are listed first, then files, both in case-insensitive alphabetical order.
 
-**File preview:** Click any file to open a syntax-highlighted preview modal. The modal shows line-numbered code with language detection based on the file extension. Binary files and files exceeding 2 MB show a placeholder message instead of content. Press **Escape** or click outside the modal to close it.
+**Opening files in tabs:** Click any file to open it as a tab in the top bar, VS Code style. The board itself is the first, pinned tab; each file you open adds another, so you can keep several files and the board open at once and switch between them from the tab strip. Clicking a tab swaps the main area to that file (the board keeps its scroll and filter while you are away). Close a file tab with its **×**, a middle-click, or **Cmd/Ctrl+W**; the board tab cannot be closed.
 
-**Layout:** The panel sits at a fixed width on the left of the board, between the header and status bar, so the board columns stay visible alongside it.
+**Layout:** The explorer tree sits at a fixed width on the left; the active tab fills the rest. The board grid and the open editors share that area, only the active one is shown.
 
-**Editing files:** In the file preview modal, click **Edit** to switch to a plain-text editor. Make your changes, then click **Save** to write the file back to the workspace, or **Cancel** to revert. If you try to close the modal or cancel with unsaved changes, a confirmation prompt appears. The Tab key inserts two spaces in the editor. Saving uses an atomic write (temp file + rename) so partial writes cannot corrupt the file. Files inside `.git/` directories cannot be edited, and content exceeding 2 MB is rejected. Saves use `PUT /api/explorer/file` with a JSON body of `{path, workspace, content}`.
+**Editing files:** Files open in a CodeMirror editor with line numbers, syntax highlighting by file type, and find (**Cmd/Ctrl+F**). Edit directly; a dot on the tab marks unsaved changes. Save with the toolbar **Save** button or **Cmd/Ctrl+S**. Closing a tab with unsaved changes prompts to discard or keep editing. Saving uses an atomic write (temp file + rename) so partial writes cannot corrupt the file. Files inside `.git/` directories cannot be edited, and content exceeding 2 MB is rejected. Saves use `PUT /api/explorer/file` with a JSON body of `{path, workspace, content}`.
 
-**Keyboard navigation:** When focused inside the tree, use arrow keys to navigate between nodes. **Right arrow** expands a collapsed directory, **Left arrow** collapses an expanded one (or moves to the parent). **Enter** toggles directories or opens file preview.
+**Keyboard navigation:** When focused inside the tree, use arrow keys to navigate between nodes. **Right arrow** expands a collapsed directory, **Left arrow** collapses an expanded one (or moves to the parent). **Enter** toggles directories or opens the file in a tab.
 
 ### Integrated Terminal
 
