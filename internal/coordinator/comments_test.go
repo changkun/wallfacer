@@ -2,11 +2,26 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/speccomment"
 )
+
+// failingPutStore wraps a CommentStore and fails PutThread once armed, to
+// exercise the persist-before-fanout ordering.
+type failingPutStore struct {
+	CommentStore
+	fail bool
+}
+
+func (f *failingPutStore) PutThread(ctx context.Context, t speccomment.Thread) error {
+	if f.fail {
+		return errors.New("store write failed")
+	}
+	return f.CommentStore.PutThread(ctx, t)
+}
 
 // captureSender records frames pushed to an instance, for asserting fan-out.
 type captureSender struct {
@@ -154,6 +169,34 @@ func TestCommentReplyAndResolve(t *testing.T) {
 	reEv := author.opsFor(speccomment.OpReopen)
 	if len(reEv) != 1 || reEv[0].Thread.Resolved || reEv[0].Thread.Status != speccomment.StatusActive {
 		t.Fatalf("reopen did not reactivate thread: %+v", reEv)
+	}
+}
+
+// TestCommentResolveDoesNotFanOutOnStoreFailure verifies that setResolved
+// persists before fanning out (like create/reply). If the store write fails,
+// peers must NOT have been pushed the authoritative thread, otherwise
+// originator, peers, and store would disagree.
+func TestCommentResolveDoesNotFanOutOnStoreFailure(t *testing.T) {
+	reg := NewRegistry()
+	store := &failingPutStore{CommentStore: NewMemCommentStore()}
+	svc := NewCommentService(store, reg)
+	author := joinInst(reg, "inst_a", "u_alice", "org_1")
+	p := Principal{Sub: "u_alice", OrgID: "org_1"}
+
+	if err := svc.Apply(context.Background(), p, createEvent("specs/x.md", "root", "")); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	threadID := author.opsFor(speccomment.OpCreate)[0].Thread.ID
+
+	// Arm the store to fail the resolve's PutThread.
+	store.fail = true
+	resolve := speccomment.Event{Op: speccomment.OpResolve, Repo: testRepo, Thread: &speccomment.Thread{ID: threadID}}
+	if err := svc.Apply(context.Background(), p, resolve); err == nil {
+		t.Fatal("expected resolve to fail when the store write fails")
+	}
+
+	if got := author.opsFor(speccomment.OpResolve); len(got) != 0 {
+		t.Fatalf("fanned out %d resolve events despite a failed store write; want 0", len(got))
 	}
 }
 

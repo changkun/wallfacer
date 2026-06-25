@@ -129,20 +129,27 @@ func (s *CommentService) setResolved(ctx context.Context, p Principal, ev specco
 		return fmt.Errorf("not permitted to resolve thread")
 	}
 	now := s.now()
+	op := speccomment.OpResolve
 	if resolved {
 		t.Resolved = true
 		t.ResolvedBy = p.Sub
 		t.ResolvedAt = now
 		t.Status = speccomment.StatusResolved
-		s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpResolve, t)
 	} else {
 		t.Resolved = false
 		t.ResolvedBy = ""
 		t.ResolvedAt = time.Time{}
 		t.Status = speccomment.StatusActive
-		s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpReopen, t)
+		op = speccomment.OpReopen
 	}
-	return s.store.PutThread(ctx, t)
+	// Persist before fanning out, matching create/reply. Fanning out first
+	// would push the authoritative thread to peers even when the store write
+	// then fails, leaving originator, peers, and store disagreeing.
+	if err := s.store.PutThread(ctx, t); err != nil {
+		return err
+	}
+	s.fanout(tenantKey(p), t.WorkspaceID, op, t)
+	return nil
 }
 
 // tenantKey is the isolation key for a principal: the org when present, else the
