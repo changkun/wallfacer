@@ -1,9 +1,9 @@
-// Package planner manages the planning agent lifecycle. The planner runs
+// Package agentsession manages the agent session lifecycle. The runtime runs
 // the chat agent as a host process scoped to the workspace, letting it
 // read the full workspace and write to specs/. It delegates launches to
 // an [executor.Backend] so the same code serves the host backend today
 // and cloud backends later.
-package planner
+package agentsession
 
 import (
 	"context"

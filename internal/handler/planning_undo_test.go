@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -303,7 +303,7 @@ func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
 
 	threadID := p.Threads().ActiveID()
 	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
 
 	// Simulate two prompt rounds.
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
@@ -373,7 +373,7 @@ func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 
 	threadID := p.Threads().ActiveID()
 	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
 
 	// Two prompt rounds.
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
@@ -435,7 +435,7 @@ func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
 
 	threadID := p.Threads().ActiveID()
 	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
 	_ = ctx
 
 	// No prompt_round events written — undo should return 409.
@@ -512,7 +512,7 @@ func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
 
 	threadID := p.Threads().ActiveID()
 	cs, _ := p.Threads().Store(threadID)
-	_ = cs.SaveSession(planner.SessionInfo{FocusedTask: tsk.ID.String()})
+	_ = cs.SaveSession(agentsession.SessionInfo{FocusedTask: tsk.ID.String()})
 
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
 

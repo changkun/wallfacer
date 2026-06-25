@@ -20,7 +20,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/lazyval"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/routine"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -187,8 +187,8 @@ type Handler struct {
 	ideationMu           sync.Mutex
 	ideationExploitRatio float64
 
-	planner         *planner.Planner
-	commandRegistry *planner.CommandRegistry
+	planner         *agentsession.Planner
+	commandRegistry *agentsession.CommandRegistry
 
 	// routineEngine multiplexes per-routine scheduled fires. Nil until
 	// StartRoutineEngine runs at server start; guarded by routineMu so
@@ -295,9 +295,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 
 // SetPlanner sets the planner instance for planning sandbox operations.
 // Called by the server after both the handler and planner are constructed.
-func (h *Handler) SetPlanner(p *planner.Planner) {
+func (h *Handler) SetPlanner(p *agentsession.Planner) {
 	h.planner = p
-	h.commandRegistry = planner.NewCommandRegistry()
+	h.commandRegistry = agentsession.NewCommandRegistry()
 }
 
 // currentStore returns the active store, preferring the workspace manager's

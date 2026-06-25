@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -63,7 +63,7 @@ func TestMaybeAutoTitleThread_Skips(t *testing.T) {
 	}
 	// Blank title result: no rename; the default name stays.
 	h.maybeAutoTitleThread(tm, id, "hi")
-	if meta, _ := tm.Meta(id); !planner.IsDefaultThreadName(meta.Name) {
+	if meta, _ := tm.Meta(id); !agentsession.IsDefaultThreadName(meta.Name) {
 		t.Errorf("name should remain default, got %q", meta.Name)
 	}
 }
@@ -500,13 +500,13 @@ func TestListPlanningThreads_DefaultMode(t *testing.T) {
 
 // pinThreadToTask saves a task-mode session for a thread, making it look like
 // the thread is actively planning for the given task.
-func pinThreadToTask(t *testing.T, tm *planner.ThreadManager, threadID, taskID string) {
+func pinThreadToTask(t *testing.T, tm *agentsession.ThreadManager, threadID, taskID string) {
 	t.Helper()
 	cs, err := tm.Store(threadID)
 	if err != nil {
 		t.Fatalf("pinThreadToTask: Store(%q): %v", threadID, err)
 	}
-	if err := cs.SaveSession(planner.SessionInfo{FocusedTask: taskID}); err != nil {
+	if err := cs.SaveSession(agentsession.SessionInfo{FocusedTask: taskID}); err != nil {
 		t.Fatalf("pinThreadToTask: SaveSession: %v", err)
 	}
 }

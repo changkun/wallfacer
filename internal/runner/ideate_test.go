@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -1213,7 +1213,7 @@ func TestIdeationViaPlanner(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a planner backed by the same sandbox backend the runner uses.
-	p := planner.New(planner.Config{
+	p := agentsession.New(agentsession.Config{
 		Backend:     r.backend,
 		Command:     r.command,
 		Workspaces:  r.workspaces,
@@ -1260,7 +1260,7 @@ func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
 	cmd := fakeCmdScript(t, tokenLimitOutput, 0)
 	_, r := setupRunnerWithCmd(t, nil, cmd)
 
-	p := planner.New(planner.Config{
+	p := agentsession.New(agentsession.Config{
 		Backend:     r.backend,
 		Command:     r.command,
 		Workspaces:  r.workspaces,

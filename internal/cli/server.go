@@ -28,7 +28,7 @@ import (
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/planner"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -55,7 +55,7 @@ type ServerComponents struct {
 	Srv     *http.Server
 	Ln      net.Listener
 	Runner  *runner.Runner
-	Planner *planner.Planner
+	Planner *agentsession.Planner
 	Ctx     context.Context
 	Stop    context.CancelFunc
 
@@ -256,7 +256,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	r.SetIdeationExploitRatioFunc(h.IdeationExploitRatio)
 
 	// Create and wire the planning sandbox manager.
-	p := planner.New(planner.Config{
+	p := agentsession.New(agentsession.Config{
 		Backend:     r.SandboxBackend(),
 		Workspaces:  snapshot.Workspaces,
 		EnvFile:     cfg.EnvFile,
