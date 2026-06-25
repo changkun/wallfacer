@@ -1,6 +1,6 @@
 ---
 title: "Archival: relocate archived specs to specs/.archive/"
-status: drafted
+status: complete
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-archival/archive-api.md
 affects:
@@ -188,13 +188,29 @@ No frontend changes. Tree keys remain logical, so:
 - `git revert` of an archive commit reverses the move and the status together.
 - The migration command relocates all already-archived specs.
 
-## Open Questions
+## Outcome
 
-1. **Status frontmatter vs location as source of truth.** Keep both (status
-   stays `archived` and the file lives under `.archive/`)? Tentative: yes —
-   location drives the tree, status stays authoritative for the lifecycle model
-   so nothing else changes.
-2. **Server-run migration vs explicit command.** Auto-migrate on workspace load,
-   or require `wallfacer spec migrate-archive`? Tentative: explicit command, so
-   the move is a deliberate, reviewable commit — no surprise git history on
-   startup.
+**Complete (2026-06-25).** Implemented as designed, in tested stages:
+
+- `ArchivePath`/`LogicalPath`/`IsArchivedPath` + `Spec.PhysicalPath`
+  (`internal/spec/archive.go`).
+- `BuildTree` skips `.archive/` in the live scan and adds a second pass keying
+  archived specs by their logical path, forcing archived status, recording the
+  physical path, and attaching each to its logical parent (live or archived).
+- `findSpecFile` and the explorer file read/stream endpoints fall through to
+  `.archive/`, so the focused view loads an archived spec by its logical path.
+- `ArchiveSpec` git-mv's the spec + companion dir into `.archive/` and commits
+  the move + status together; `UnarchiveSpec`'s revert reverses both, and its
+  fallback moves the file back.
+- The 196 already-archived specs were relocated in one commit
+  (`specs: relocate archived specs into specs/.archive/`).
+- `checkDependsOnExist` resolves archived dependencies via `.archive/` (the
+  relocation otherwise flagged ~247 archived deps as missing).
+
+**Decisions that changed from the draft:**
+
+1. **No permanent migration command.** The one-time bulk move was run via a
+   throwaway and removed — not shipped as `wallfacer spec migrate-archive` —
+   since the archive action relocates going forward and a standing command
+   would be one-time dead code. Status frontmatter stays authoritative for the
+   lifecycle; physical location drives the tree.
