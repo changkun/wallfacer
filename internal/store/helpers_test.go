@@ -35,6 +35,8 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	result := "result-1"
 	stopReason := "stop-1"
 	scheduledAt := time.Unix(1_700_000_000, 0).UTC()
+	routineNextRun := time.Unix(1_700_000_060, 0).UTC()
+	routineLastFiredAt := time.Unix(1_700_000_070, 0).UTC()
 
 	messageTime := time.Unix(1_700_000_010, 0).UTC()
 
@@ -96,6 +98,8 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.Tags = []string{"tag-1"}
 	task.DependsOn = []string{"dep-1"}
 	task.ScheduledAt = &scheduledAt
+	task.RoutineNextRun = &routineNextRun
+	task.RoutineLastFiredAt = &routineLastFiredAt
 
 	return deepCloneTask(task)
 }
@@ -121,6 +125,8 @@ func mutateTaskCloneForIsolation(task *Task) {
 	*task.Result = "mutated-result"
 	*task.StopReason = "mutated-stop"
 	*task.ScheduledAt = time.Unix(1_800_000_000, 0).UTC()
+	*task.RoutineNextRun = time.Unix(1_800_000_010, 0).UTC()
+	*task.RoutineLastFiredAt = time.Unix(1_800_000_020, 0).UTC()
 }
 
 // assertTaskMatchesSnapshot fails the test if got does not deeply equal want.
