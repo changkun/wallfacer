@@ -12,6 +12,7 @@ import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardAc
 import AppSelect from './AppSelect.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
+import { useNow } from '../composables/useNow';
 import { toRef } from 'vue';
 
 const props = defineProps<{ task: Task; rank?: number }>();
@@ -41,8 +42,8 @@ const routineIntervalOptions = computed(() =>
   routineIntervalChoices.value.map((m) => ({ value: m, label: `${m} min` })),
 );
 
-const now = ref(Date.now());
-let tickerHandle: ReturnType<typeof setInterval> | null = null;
+// Shared 1s clock: one interval across all cards rather than one per card.
+const now = useNow();
 
 // One-shot "just created" pulse for cards freshly dispatched from Plan mode.
 const uiStore = useUiStore();
@@ -50,7 +51,6 @@ const justDispatched = ref(false);
 let pulseHandle: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(() => {
-  tickerHandle = setInterval(() => { now.value = Date.now(); }, 1000);
   if (uiStore.dispatchedIds.has(props.task.id)) {
     justDispatched.value = true;
     pulseHandle = setTimeout(() => {
@@ -61,7 +61,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (tickerHandle !== null) clearInterval(tickerHandle);
   if (pulseHandle !== null) clearTimeout(pulseHandle);
 });
 
