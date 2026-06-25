@@ -250,7 +250,7 @@ func aggregatePlanningStats(configDir string, activeWorkspaces []string, since t
 
 	activeKey := ""
 	if len(activeWorkspaces) > 0 {
-		activeKey = store.PlanningGroupKey(activeWorkspaces)
+		activeKey = store.AgentSessionGroupKey(activeWorkspaces)
 	}
 
 	for _, e := range entries {
@@ -258,7 +258,7 @@ func aggregatePlanningStats(configDir string, activeWorkspaces []string, since t
 			continue
 		}
 		key := e.Name()
-		recs, err := store.ReadPlanningUsage(configDir, key, since)
+		recs, err := store.ReadAgentSessionUsage(configDir, key, since)
 		if err != nil || len(recs) == 0 {
 			continue
 		}

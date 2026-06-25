@@ -615,18 +615,18 @@ func TestAggregatePlanningStats_Aggregation(t *testing.T) {
 
 	wsA := []string{"/repo/a"}
 	wsB := []string{"/repo/b"}
-	keyA := store.PlanningGroupKey(wsA)
-	keyB := store.PlanningGroupKey(wsB)
+	keyA := store.AgentSessionGroupKey(wsA)
+	keyB := store.AgentSessionGroupKey(wsB)
 
 	for i, rec := range []store.TurnUsageRecord{
 		{Turn: 1, Timestamp: base, InputTokens: 10, OutputTokens: 5, CostUSD: 0.01},
 		{Turn: 2, Timestamp: base.Add(time.Minute), InputTokens: 20, OutputTokens: 8, CostUSD: 0.02},
 	} {
-		if err := store.AppendPlanningUsage(configDir, keyA, rec); err != nil {
+		if err := store.AppendAgentSessionUsage(configDir, keyA, rec); err != nil {
 			t.Fatalf("append A[%d]: %v", i, err)
 		}
 	}
-	if err := store.AppendPlanningUsage(configDir, keyB, store.TurnUsageRecord{
+	if err := store.AppendAgentSessionUsage(configDir, keyB, store.TurnUsageRecord{
 		Turn: 1, Timestamp: base, InputTokens: 100, OutputTokens: 40, CostUSD: 0.5,
 	}); err != nil {
 		t.Fatalf("append B: %v", err)
@@ -672,7 +672,7 @@ func TestAggregatePlanningStats_RespectsSince(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 	ws := []string{"/repo/a"}
-	key := store.PlanningGroupKey(ws)
+	key := store.AgentSessionGroupKey(ws)
 
 	records := []store.TurnUsageRecord{
 		{Turn: 1, Timestamp: base.Add(-2 * time.Hour), InputTokens: 10, CostUSD: 0.01},
@@ -680,7 +680,7 @@ func TestAggregatePlanningStats_RespectsSince(t *testing.T) {
 		{Turn: 3, Timestamp: base, InputTokens: 30, CostUSD: 0.03},
 	}
 	for i, rec := range records {
-		if err := store.AppendPlanningUsage(configDir, key, rec); err != nil {
+		if err := store.AppendAgentSessionUsage(configDir, key, rec); err != nil {
 			t.Fatalf("append[%d]: %v", i, err)
 		}
 	}
@@ -707,7 +707,7 @@ func TestAggregatePlanningStats_TimelineOrdered(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 	ws := []string{"/repo/a"}
-	key := store.PlanningGroupKey(ws)
+	key := store.AgentSessionGroupKey(ws)
 
 	// Append out of chronological order (timestamps jump).
 	for i, rec := range []store.TurnUsageRecord{
@@ -715,7 +715,7 @@ func TestAggregatePlanningStats_TimelineOrdered(t *testing.T) {
 		{Turn: 1, Timestamp: base, CostUSD: 0.01, InputTokens: 10},
 		{Turn: 3, Timestamp: base.Add(5 * time.Minute), CostUSD: 0.05, InputTokens: 50},
 	} {
-		if err := store.AppendPlanningUsage(configDir, key, rec); err != nil {
+		if err := store.AppendAgentSessionUsage(configDir, key, rec); err != nil {
 			t.Fatalf("append[%d]: %v", i, err)
 		}
 	}
@@ -753,8 +753,8 @@ func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
 	withPlanning := aggregateStats(tasks, noSummary)
 	configDir := t.TempDir()
 	ws := []string{"/repo/x"}
-	key := store.PlanningGroupKey(ws)
-	if err := store.AppendPlanningUsage(configDir, key, store.TurnUsageRecord{
+	key := store.AgentSessionGroupKey(ws)
+	if err := store.AppendAgentSessionUsage(configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: now, CostUSD: 0.99, InputTokens: 9999, OutputTokens: 9999,
 	}); err != nil {
 		t.Fatalf("seed planning: %v", err)
@@ -779,8 +779,8 @@ func TestGetStats_PlanningEndpoint(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
-	key := store.PlanningGroupKey([]string{ws})
-	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+	key := store.AgentSessionGroupKey([]string{ws})
+	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, OutputTokens: 5, CostUSD: 0.01,
 	}); err != nil {
 		t.Fatalf("seed planning: %v", err)

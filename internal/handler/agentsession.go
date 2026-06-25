@@ -784,8 +784,8 @@ func (h *Handler) persistPlanningRoundUsage(raw []byte) {
 	if !ok {
 		return
 	}
-	groupKey := store.PlanningGroupKey(workspaces)
-	existing, _ := store.ReadPlanningUsage(h.configDir, groupKey, time.Time{})
+	groupKey := store.AgentSessionGroupKey(workspaces)
+	existing, _ := store.ReadAgentSessionUsage(h.configDir, groupKey, time.Time{})
 	rec := store.TurnUsageRecord{
 		Turn:                 len(existing) + 1,
 		Timestamp:            time.Now().UTC(),
@@ -798,7 +798,7 @@ func (h *Handler) persistPlanningRoundUsage(raw []byte) {
 		Sandbox:              harness.Claude,
 		SubAgent:             store.SandboxActivityPlanning,
 	}
-	if err := store.AppendPlanningUsage(h.configDir, groupKey, rec); err != nil {
+	if err := store.AppendAgentSessionUsage(h.configDir, groupKey, rec); err != nil {
 		slog.Warn("planning: failed to append round usage", "error", err)
 	}
 }
