@@ -295,6 +295,18 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	if !ok {
 		return
 	}
+
+	// Hold promoteMu across the read-check-write so a concurrent tryAutoSubmit
+	// cannot transition the task between our status check and the status write.
+	// Without this, auto-submit can move waiting→committing and start the commit
+	// pipeline while CompleteTask's validation-bypassing ForceUpdateTaskStatus
+	// launches a SECOND pipeline, double-committing and tearing down the worktree
+	// under the other. Mirrors SubmitFeedback/ResumeTask/SyncTask. The background
+	// runCommitTransition goroutine does not take promoteMu, so holding it until
+	// this handler returns cannot deadlock.
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
+
 	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
@@ -680,6 +692,14 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	if !ok {
 		return
 	}
+
+	// Hold promoteMu across the read-check-write so a concurrent tryAutoSubmit
+	// cannot move the task to committing between our status check and the
+	// status/test-run writes (which would otherwise leave IsTestRun set on a task
+	// now in the commit pipeline and return a confusing 500). Mirrors
+	// SubmitFeedback; RunBackground below runs under the lock as it does there.
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
 
 	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
