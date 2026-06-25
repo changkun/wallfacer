@@ -1,6 +1,6 @@
 ---
 title: update_task_prompt Tool and Task-Mode System Prompt
-status: complete
+status: archived
 depends_on:
   - specs/local/refinement-into-plan/message-schema-task-mode.md
   - specs/local/refinement-into-plan/prompt-round-events.md
@@ -11,7 +11,7 @@ affects:
   - internal/prompts/
 effort: medium
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: 49504f37-3059-4826-bc09-71a6b5170d41
 ---

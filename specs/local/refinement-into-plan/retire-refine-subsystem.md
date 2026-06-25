@@ -1,6 +1,6 @@
 ---
 title: Retire the Refine Subsystem
-status: complete
+status: archived
 depends_on:
   - specs/local/refinement-into-plan/task-mode-undo.md
   - specs/local/refinement-into-plan/send-to-plan-card-action.md
@@ -16,7 +16,7 @@ affects:
   - CLAUDE.md
 effort: medium
 created: 2026-04-19
-updated: 2026-04-20
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: 1341e963-9ccf-44fa-8d18-b3bbaaae73d7
 ---
