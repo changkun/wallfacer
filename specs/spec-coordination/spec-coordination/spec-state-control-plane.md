@@ -1,6 +1,6 @@
 ---
 title: Spec State Control Plane
-status: drafted
+status: complete
 depends_on:
   - specs/spec-coordination/spec-coordination.md
   - specs/spec-coordination/spec-coordination/spec-archival.md
@@ -120,13 +120,13 @@ independently:
 
 | Child spec | Focus | Effort | Status |
 |---|---|---|---|
-| [propagation-algorithm.md](spec-state-control-plane/propagation-algorithm.md) | Two-channel fan-out (`depends_on` reverse + `affects` overlap); reverse index; containment; `FanOutStale` helper. Shared infrastructure used by chat-edit and drift-pipeline. | medium | drafted |
-| [lifecycle-testing-state.md](spec-state-control-plane/lifecycle-testing-state.md) | Decide: add a 7th `testing` state or keep implicit. Load-bearing for the drift pipeline. | small | drafted |
-| [drift-pipeline.md](spec-state-control-plane/drift-pipeline.md) | Task-done flow: `validated → testing`, tester agent + verdict schema, branch to `complete`/`stale`, fan-out, tester failure handling, `implementation_commit` frontmatter, commit concurrency. | large | drafted |
-| [chat-edit-fanout.md](spec-state-control-plane/chat-edit-fanout.md) | Chat rounds that modify specs fan out staleness to dependents using the propagation algorithm. `updated`-only bumps skipped. | small | drafted |
-| [dispatch-validated.md](spec-state-control-plane/dispatch-validated.md) | Dispatch writes `status: validated`; folder dispatch accepts non-leaf paths and marks the subtree validated. | medium | drafted |
-| [explicit-validate.md](spec-state-control-plane/explicit-validate.md) | User-facing `drafted → validated` action: toolbar button + transition action + breakdown tasks-mode auto-validate. | small | drafted |
-| [periodic-scan.md](spec-state-control-plane/periodic-scan.md) | Advisory scan catching drift from code changes outside the spec flow (manual edits, refactors). No auto-mutation. | small | drafted |
+| [propagation-algorithm.md](spec-state-control-plane/propagation-algorithm.md) | Two-channel fan-out (`depends_on` reverse + `affects` overlap); reverse index; containment; `FanOutStale` helper. Shared infrastructure used by chat-edit and drift-pipeline. | medium | complete |
+| [lifecycle-testing-state.md](spec-state-control-plane/lifecycle-testing-state.md) | Decide: add a 7th `testing` state or keep implicit. Load-bearing for the drift pipeline. | small | complete |
+| [drift-pipeline.md](spec-state-control-plane/drift-pipeline.md) | Task-done flow: `validated → testing`, tester agent + verdict schema, branch to `complete`/`stale`, fan-out, tester failure handling, `implementation_commit` frontmatter, commit concurrency. | large | complete |
+| [chat-edit-fanout.md](spec-state-control-plane/chat-edit-fanout.md) | Chat rounds that modify specs fan out staleness to dependents using the propagation algorithm. `updated`-only bumps skipped. | small | complete |
+| [dispatch-validated.md](spec-state-control-plane/dispatch-validated.md) | Dispatch writes `status: validated`; folder dispatch accepts non-leaf paths and marks the subtree validated. | medium | complete |
+| [explicit-validate.md](spec-state-control-plane/explicit-validate.md) | User-facing `drafted → validated` action: toolbar button + transition action + breakdown tasks-mode auto-validate. | small | complete |
+| [periodic-scan.md](spec-state-control-plane/periodic-scan.md) | Advisory scan catching drift from code changes outside the spec flow (manual edits, refactors). No auto-mutation. | small | complete |
 
 ### Dependencies
 
@@ -207,6 +207,42 @@ implementation starts:
    Tentative: periodic-scan handles the gap; no git post-commit hook.
 
 ---
+
+## Outcome
+
+**Shipped (2026-06-25).** All seven child designs are implemented, each with
+tests and `make build` green:
+
+- **7th `testing` state** added with the completion gate (`validated → complete`
+  is illegal; completion routes through `testing`). `validated → stale` stays
+  legal for propagation.
+- **Stale propagation** (`internal/spec/propagation.go`): two-channel
+  `DependsOnImpact` + `AffectsImpactFrom{Diff,Spec}`, `FanOutStale`, plus the
+  `affects-too-broad` validator advisory.
+- **Chat-edit fan-out** (`planning_git.go`): edited specs cascade staleness to
+  live dependents in the same planning commit; `updated`-only bumps skip.
+- **Dispatch → validated + folder dispatch** (`specs_dispatch.go`): non-leaf
+  subtrees dispatch atomically and promote drafted members.
+- **Explicit validate** + **mark-stale/dismiss** + **force-complete** actions on
+  `POST /api/specs/transition`.
+- **Periodic scan** (`GET /api/specs/stale-candidates`): advisory git-log scan,
+  surfaced with a Rescan button and Mark Stale / Dismiss.
+- **Drift pipeline** (`specs_drift.go`): `validated → testing` with
+  `implementation_commit`, injectable tester, server-side `ClassifyDrift` (with
+  the criteria-absent file-level fallback), branch to `complete`/`stale` with
+  fan-out in one commit, and `testing_pending` + override on tester failure.
+- **Per-workspace commit mutex** in the shared spec-commit helpers.
+
+**Deferred / follow-up.** Two pieces are intentionally not wired:
+
+1. **Concrete agent-backed `DriftTester`.** The pipeline takes an injectable
+   tester and is gated behind `WALLFACER_DRIFT_TESTER`; with no tester wired
+   (the default) the hook preserves the historical complete-on-done behavior.
+   Wiring an agent that reads spec + diff and returns the verdict JSON is the
+   remaining integration (OQ2: default on once stable).
+2. **Structured drift sidecar** (`store.SaveDriftReport` + `GET .../drift`) and
+   the **Retry Test** action — both depend on (1). The inline `## Outcome`
+   section is the git-tracked verdict persistence and is implemented.
 
 ## Acceptance
 

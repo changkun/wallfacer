@@ -15,17 +15,20 @@ dispatched_task_id: null
 
 # Spec Coordination Layer
 
-> **Progress (2026-06-25): 3 of 4 child subtrees complete.**
+> **Progress (2026-06-25): all 4 child subtrees implemented.**
 > [spec-document-model.md](spec-coordination/spec-document-model.md),
-> [spec-planning-ux.md](spec-coordination/spec-planning-ux.md), and
-> [spec-archival.md](spec-coordination/spec-archival.md) have all shipped — the
-> structured spec tree, the three-pane planning UX, chat-driven iteration,
-> dispatch workflow, undo snapshots, planning cost tracking, and the `archived`
-> lifecycle state are live. The remaining work is
+> [spec-planning-ux.md](spec-coordination/spec-planning-ux.md),
+> [spec-archival.md](spec-coordination/spec-archival.md), and
 > [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md)
-> (drafted, 7 leaves): server-managed lifecycle transitions and drift
-> detection. `SpecCompletionHook` still writes `complete` unconditionally with
-> no tester verdict. The umbrella stays non-complete until that subtree lands.
+> have all shipped — the structured spec tree, the three-pane planning UX,
+> chat-driven iteration, dispatch workflow, undo snapshots, planning cost
+> tracking, the `archived` lifecycle state, and the server-managed control plane
+> (7th `testing` state, stale propagation, chat-edit fan-out, folder dispatch,
+> explicit-validate, advisory staleness scan, and the task-done drift pipeline)
+> are live. One follow-up remains: the drift pipeline's concrete agent-backed
+> tester is gated behind `WALLFACER_DRIFT_TESTER` and not yet wired, so
+> `SpecCompletionHook` preserves the historical complete-on-done behavior by
+> default until that tester lands.
 
 ## Problem
 
@@ -124,7 +127,7 @@ The board stays flat — it shows dispatched leaf specs as tasks. All structure 
 | [spec-document-model.md](spec-coordination/spec-document-model.md) | ✅ complete | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
 | [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | ✅ complete | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
 | [spec-archival.md](spec-coordination/spec-archival.md) | ✅ complete | Archived status — hide finished or abandoned specs from the live graph, explorer, drift checks, and impact queries |
-| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | ○ drafted | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan |
+| [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md) | ✅ complete | Server-managed lifecycle transitions: chat-edit → `stale` fan-out, dispatch → `validated`, task done → tester-mediated drift verdict → `complete`/`stale`, periodic staleness scan (concrete drift tester gated off pending wiring) |
 
 ---
 
@@ -151,15 +154,16 @@ Step 4: Cross-Task Context ✅ shipped
   → Use spec tree relationships for richer board.json context
   → Sibling leaves get more context than unrelated tasks
 
-Step 5: Drift Detection ○ outstanding (spec-state-control-plane)
+Step 5: Drift Detection ✅ shipped (spec-state-control-plane)
   → Detect when implementation diverges from spec
   → Propagate staleness through the tree
 ```
 
 Step 1 is foundational. Steps 2-3 deliver the core planning workflow. Steps 4-5
-are refinements. Steps 1-4 have shipped; Step 5 (drift detection) is the
-remaining [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md)
-subtree.
+are refinements. All five steps have shipped; the
+[spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md)
+subtree delivered Step 5 (one follow-up: wiring the concrete drift tester,
+gated off by default).
 
 ---
 
