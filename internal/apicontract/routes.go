@@ -683,6 +683,11 @@ var Routes = []Route{
 		Tags:        []string{"explorer"},
 	},
 	{
+		Method: http.MethodGet, Pattern: "/api/explorer/file/stream", Name: "ExplorerFileStream",
+		Description: "SSE stream that notifies when a single watched file's contents change.",
+		Tags:        []string{"explorer", "sse"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/explorer/task-prompts", Name: "ExplorerTaskPrompts",
 		JSName:      "taskPrompts",
 		Description: "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
