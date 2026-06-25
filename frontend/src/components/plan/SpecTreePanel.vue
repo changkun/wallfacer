@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia';
 import { api } from '../../api/client';
 import { usePlanningStore } from '../../stores/planning';
 import type { SpecNode } from '../../stores/planning';
+import { selectableRange } from './specTreeSelect';
 import { useTaskStore } from '../../stores/tasks';
 import { useUiStore } from '../../stores/ui';
 import { useDialogStore } from '../../stores/dialog';
@@ -287,10 +288,15 @@ function onCheckboxChange(ev: Event, node: SpecNode) {
   const target = ev.target as HTMLInputElement;
   const idx = flatLeafIndex.value.indexOf(node.path);
   if ((ev as MouseEvent).shiftKey && lastCheckedIndex.value >= 0 && idx >= 0) {
-    const start = Math.min(lastCheckedIndex.value, idx);
-    const end = Math.max(lastCheckedIndex.value, idx);
-    for (let i = start; i <= end; i++) {
-      const path = flatLeafIndex.value[i];
+    // Only sweep specs that are themselves checkable and unblocked, matching
+    // the checkbox template gating; otherwise shift-range inflates the count
+    // and triggers dispatch failures on non-validated/blocked specs.
+    const byPath = new Map<string, SpecNode>();
+    for (const n of tree.value) byPath.set(n.path, n);
+    const range = selectableRange(
+      flatLeafIndex.value, byPath, lastCheckedIndex.value, idx,
+    );
+    for (const path of range) {
       if (target.checked) selectedPaths.value.add(path);
       else selectedPaths.value.delete(path);
     }
