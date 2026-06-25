@@ -124,6 +124,34 @@ func TestConnectorTearsDownOnOptOut(t *testing.T) {
 	waitFor(t, func() bool { return reg.Len() == 0 }, "connector to tear down on opt-out")
 }
 
+// TestConnectorFlagsAuthRejection covers the silent-failure that hid the
+// coordination "503 / invalid audience" bug: a coordinator that refuses the
+// token with 401 must leave AuthRejected() set (and never Connected()), so the
+// status surface can show a fixable auth error instead of an endless spinner.
+func TestConnectorFlagsAuthRejection(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "invalid audience", http.StatusUnauthorized)
+	}))
+	t.Cleanup(srv.Close)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+
+	c := NewConnector(Config{
+		URL:         wsURL,
+		Token:       func() (string, bool) { return "tok", true },
+		OptedIn:     func() bool { return true },
+		Manifest:    manifestFor("inst_client"),
+		BaseBackoff: 10 * time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go c.Run(ctx)
+
+	waitFor(t, c.AuthRejected, "connector to flag auth rejection")
+	if c.Connected() {
+		t.Fatal("Connected() = true after a 401 dial")
+	}
+}
+
 func TestNextBackoff(t *testing.T) {
 	base := 1 * time.Second
 	limit := 30 * time.Second

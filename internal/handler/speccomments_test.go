@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -231,5 +232,53 @@ func TestGitObjectSHAs(t *testing.T) {
 	}
 	if commit2 != commit {
 		t.Fatal("HEAD commit should not change on an uncommitted edit")
+	}
+}
+
+// stubToggle is a CoordinationToggle whose state the test sets directly.
+type stubToggle struct {
+	optedIn, signedIn, connected, authRejected bool
+}
+
+func (s *stubToggle) OptedIn() bool      { return s.optedIn }
+func (s *stubToggle) SetOptedIn(v bool)  { s.optedIn = v }
+func (s *stubToggle) Connected() bool    { return s.connected }
+func (s *stubToggle) SignedIn() bool     { return s.signedIn }
+func (s *stubToggle) AuthRejected() bool { return s.authRejected }
+
+// TestCoordinationStatusUnauthorized covers the surfaced auth-rejection state:
+// signed in and opted in, but the coordinator refuses the token, must report
+// state "unauthorized" (not an endless "connecting") so the failure is visible.
+func TestCoordinationStatusUnauthorized(t *testing.T) {
+	cases := []struct {
+		name      string
+		toggle    *stubToggle
+		wantState string
+	}{
+		{"unauthorized", &stubToggle{optedIn: true, signedIn: true, authRejected: true}, "unauthorized"},
+		{"connecting", &stubToggle{optedIn: true, signedIn: true}, "connecting"},
+		{"connected wins over auth flag", &stubToggle{optedIn: true, signedIn: true, connected: true, authRejected: true}, "connected"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &Handler{}
+			h.SetCoordinationToggle(tc.toggle)
+			w := httptest.NewRecorder()
+			h.GetCoordinationStatus(w, httptest.NewRequest(http.MethodGet, "/api/coordination/status", nil))
+
+			var got struct {
+				State        string `json:"state"`
+				AuthRejected bool   `json:"auth_rejected"`
+			}
+			if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got.State != tc.wantState {
+				t.Fatalf("state = %q, want %q", got.State, tc.wantState)
+			}
+			if got.AuthRejected != tc.toggle.authRejected {
+				t.Fatalf("auth_rejected = %v, want %v", got.AuthRejected, tc.toggle.authRejected)
+			}
+		})
 	}
 }

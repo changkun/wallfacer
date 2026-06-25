@@ -30,8 +30,9 @@ func (h *Handler) SetCommentRelay(r *CommentRelay) {
 type CoordinationToggle interface {
 	OptedIn() bool
 	SetOptedIn(bool)
-	Connected() bool // the outbound WebSocket to the coordinator is live
-	SignedIn() bool  // a usable token exists for the connection
+	Connected() bool    // the outbound WebSocket to the coordinator is live
+	SignedIn() bool     // a usable token exists for the connection
+	AuthRejected() bool // the coordinator is refusing the token (401/403)
 }
 
 // SetCoordinationToggle attaches the coordination opt-in gate.
@@ -66,15 +67,21 @@ func (h *Handler) GetCoordinationStatus(w http.ResponseWriter, _ *http.Request) 
 		state = "opted-out"
 	case t.Connected():
 		state = "connected"
+	case t.AuthRejected():
+		// Opted in and a token exists, but the coordinator refuses it (expired or
+		// wrong audience). Distinct from "connecting" so the UI shows a fixable
+		// auth error instead of an endless spinner.
+		state = "unauthorized"
 	default:
 		state = "connecting"
 	}
 	writeCommentJSON(w, map[string]any{
-		"available": true,
-		"opted_in":  t.OptedIn(),
-		"signed_in": t.SignedIn(),
-		"connected": t.Connected(),
-		"state":     state,
+		"available":     true,
+		"opted_in":      t.OptedIn(),
+		"signed_in":     t.SignedIn(),
+		"connected":     t.Connected(),
+		"auth_rejected": t.AuthRejected(),
+		"state":         state,
 	})
 }
 
