@@ -412,6 +412,69 @@ func (h *Handler) ValidateSpecTransition(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// ForceCompleteSpec is the "Mark Complete Without Drift Check" override for a
+// spec stuck at testing after the drift tester failed. It transitions
+// testing → complete, clears the testing markers, and records the override in
+// the Outcome section so history shows the skipped check.
+func (h *Handler) ForceCompleteSpec(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	s, err := spec.ParseFile(absPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("parse error: %v", err), http.StatusBadRequest)
+		return
+	}
+	if s.Status != spec.StatusTesting {
+		http.Error(w, fmt.Sprintf("spec status is %q; only a spec in testing can be force-completed", s.Status),
+			http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+		"status":                string(spec.StatusComplete),
+		"implementation_commit": nil,
+		"testing_pending":       nil,
+		"updated":               time.Now(),
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := spec.SetOutcome(absPath, "**Drift: skipped** (override)\n\nMarked complete without a drift check."); err != nil {
+		slog.Warn("force-complete: write outcome", "path", req.Path, "err", err)
+	}
+	if err := commitSpecChanges(r.Context(), workspaces, absPath, []string{req.Path},
+		fmt.Sprintf("%s: mark complete (drift check skipped)", req.Path)); err != nil {
+		slog.Warn("force-complete commit failed", "path", req.Path, "err", err)
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(spec.StatusComplete),
+	})
+}
+
 // MarkStaleTransition accepts a stale candidate, transitioning the spec to
 // stale (e.g. complete → stale) so the explorer surfaces it for re-refinement.
 // The state machine rejects illegal sources (vague, archived) with 422.

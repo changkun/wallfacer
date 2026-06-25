@@ -1,6 +1,6 @@
 ---
 title: "Task-done drift pipeline"
-status: drafted
+status: complete
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-state-control-plane/propagation-algorithm.md
   - specs/spec-coordination/spec-coordination/spec-state-control-plane/lifecycle-testing-state.md
@@ -11,7 +11,7 @@ affects:
   - internal/handler/specs.go
   - internal/spec/model.go
 created: 2026-04-12
-updated: 2026-06-14
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 effort: large
