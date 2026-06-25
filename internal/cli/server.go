@@ -238,7 +238,10 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
-		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces)
+		// Drift pipeline tester is not wired yet; with a nil tester the hook
+		// preserves the historical complete-on-done behavior regardless of the
+		// WALLFACER_DRIFT_TESTER flag.
+		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces, nil, nil)
 	}
 	// Safety valve: disable autopilot if any task hits the max_tokens limit,
 	// which indicates context window exhaustion — continuing blindly would
