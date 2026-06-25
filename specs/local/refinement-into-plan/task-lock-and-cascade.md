@@ -1,6 +1,6 @@
 ---
 title: Task Movement Lock and Thread Cascade
-status: complete
+status: archived
 depends_on:
   - specs/local/refinement-into-plan/update-task-prompt-tool.md
 affects:
@@ -11,7 +11,7 @@ affects:
   - internal/handler/planning_threads.go
 effort: medium
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: 70a69655-79fb-4405-9f9e-e227c6cdb9b3
 ---

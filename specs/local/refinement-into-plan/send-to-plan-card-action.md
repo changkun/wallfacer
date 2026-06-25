@@ -1,6 +1,6 @@
 ---
 title: Task Card Send to Plan Action
-status: complete
+status: archived
 depends_on:
   - specs/local/refinement-into-plan/explorer-task-prompts-section.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - ui/js/tasks.js
 effort: small
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: eaad28c7-8434-4cec-b437-223a6cc0464c
 ---

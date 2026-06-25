@@ -1,6 +1,6 @@
 ---
 title: Explorer Task Prompts Virtual Section
-status: complete
+status: archived
 depends_on:
   - specs/local/refinement-into-plan/message-schema-task-mode.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - ui/js/spec-mode.js
 effort: medium
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: 19bcfecf-9528-4cbb-b7fd-d032f08f94e1
 ---
