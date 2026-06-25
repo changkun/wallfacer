@@ -27,11 +27,9 @@ type identityCtxKey struct{}
 // explicitly. Issuer validation is optional and only applied when an
 // explicit issuer is passed or AUTH_ISSUER is set — fosite-issued JWT
 // access tokens don't always carry iss that matches the discovery
-// document. Audience validation is deliberately omitted: we're
-// validating tokens received in our own callback from an auth service
-// we trust by JWKS signature; any token that signs under the auth
-// service's key was issued by it. Returns nil when cfg.AuthURL is
-// empty.
+// document. Audience validation uses cfg.ClientID when configured so
+// tokens minted for other relying parties are rejected. Returns nil
+// when cfg.AuthURL is empty.
 //
 // jwksURL and issuer override the derived defaults; pass "" for either
 // to keep the default (empty issuer = skip iss check). The CLI boot
@@ -47,6 +45,9 @@ func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
 	jc := jwtauth.Config{
 		JWKSURL: jwksURL,
 		Issuer:  issuer, // empty = skip iss check; operator sets AUTH_ISSUER to opt in
+	}
+	if cfg.ClientID != "" {
+		jc.Audiences = []string{cfg.ClientID}
 	}
 	return jwtauth.New(jc)
 }
