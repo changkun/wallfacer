@@ -18,7 +18,7 @@ type containerJSON struct {
 	Image     string            `json:"Image"`
 	State     string            `json:"State"`
 	Status    string            `json:"Status"`
-	Created   any               `json:"Created"`   // float64 (Podman unix ts) or json.Number
+	Created   any               `json:"Created"`   // float64 (Podman unix ts)
 	CreatedAt string            `json:"CreatedAt"` // human-readable, not always present
 	Labels    map[string]string `json:"Labels"`
 }
@@ -45,19 +45,12 @@ func (c *containerJSON) name() (string, error) {
 }
 
 // createdUnix extracts the container creation time as a Unix timestamp.
-// The Created field varies by runtime: Podman emits a numeric Unix timestamp
-// (decoded as float64 by encoding/json), while Docker may emit a json.Number.
-// Returns 0 if the field is absent or has an unexpected type.
+// Podman emits a numeric Unix timestamp, decoded as float64 by encoding/json
+// (the package never uses a json.Decoder with UseNumber, so an any-typed number
+// is always float64). Returns 0 if the field is absent or has an unexpected type.
 func (c *containerJSON) createdUnix() int64 {
-	if c.Created != nil {
-		switch v := c.Created.(type) {
-		case float64:
-			return int64(v)
-		case json.Number:
-			if n, err := v.Int64(); err == nil {
-				return n
-			}
-		}
+	if v, ok := c.Created.(float64); ok {
+		return int64(v)
 	}
 	return 0
 }
