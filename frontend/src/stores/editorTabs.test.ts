@@ -6,6 +6,7 @@
 // (the store outlives BoardPage, so this stands in for surviving a route nav).
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { watch, nextTick } from 'vue';
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
 vi.mock('../api/client', () => ({
@@ -42,6 +43,22 @@ describe('editorTabs store', () => {
     expect(t.content).toBe('hello world');
     expect(t.baseline).toBe('hello world');
     expect(s.isDirty('src/a.ts')).toBe(false);
+  });
+
+  it('clears loading reactively once content arrives', async () => {
+    // Regression: openFile must mutate the reactive tab (via find), not the raw
+    // pushed object. Writing the raw object changes the value but fires no
+    // reactivity, so the editor stays stuck on "Loading…". Assert the watcher
+    // observes the true→false transition, which a raw mutation would skip.
+    mockRead('content');
+    const s = useEditorTabsStore();
+    const seen: (boolean | undefined)[] = [];
+    const p = s.openFile('/ws', 'a.ts'); // pushes tab (loading=true), then awaits
+    watch(() => s.find('a.ts')?.loading, (v) => { seen.push(v); }, { flush: 'sync' });
+    await p;
+    await nextTick();
+    expect(s.find('a.ts')!.loading).toBe(false);
+    expect(seen).toContain(false); // the reactive transition actually fired
   });
 
   it('focuses an already-open file instead of duplicating it', async () => {
