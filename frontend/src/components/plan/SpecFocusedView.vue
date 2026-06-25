@@ -34,6 +34,20 @@ const staleCandidate = computed(() =>
 
 const testingPending = computed(() => focusedNode.value?.spec?.testing_pending ?? '');
 
+// Dependency + coupling metadata from the tree (the inline frontmatter parser
+// skips list values, so read these structured off the tree node).
+const dependsOn = computed(() => focusedNode.value?.spec?.depends_on ?? []);
+const affects = computed(() => focusedNode.value?.spec?.affects ?? []);
+// affects paths flagged as changed by the stale-candidate scan, for highlight.
+const changedAffects = computed(() => new Set(staleCandidate.value?.files ?? []));
+
+function focusRelated(path: string) {
+  planning.focusSpec(path);
+}
+function shortSpecPath(p: string): string {
+  return p.replace(/^specs\//, '').replace(/\.md$/, '');
+}
+
 const specText = ref<string>('');
 const loading = ref(false);
 const loadEpoch = ref(0);
@@ -543,6 +557,30 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
     <div v-if="metaParts" class="sf-meta">{{ metaParts }}</div>
 
+    <div v-if="dependsOn.length || affects.length" class="sf-relations">
+      <div v-if="dependsOn.length" class="sf-rel-group">
+        <span class="sf-rel-label">Depends on</span>
+        <button
+          v-for="d in dependsOn"
+          :key="d"
+          type="button"
+          class="sf-rel-chip sf-rel-chip--dep"
+          :title="'Open ' + d"
+          @click="focusRelated(d)"
+        >{{ shortSpecPath(d) }}</button>
+      </div>
+      <div v-if="affects.length" class="sf-rel-group">
+        <span class="sf-rel-label">Affects</span>
+        <span
+          v-for="a in affects"
+          :key="a"
+          class="sf-rel-chip sf-rel-chip--affect"
+          :class="{ 'sf-rel-chip--changed': changedAffects.has(a) }"
+          :title="changedAffects.has(a) ? a + ' — changed since this spec was last updated' : a"
+        >{{ a }}<span v-if="changedAffects.has(a)" aria-hidden="true"> ⚠</span></span>
+      </div>
+    </div>
+
     <div v-if="isArchived" class="sf-archived-banner" role="status">
       <span aria-hidden="true">⊘</span>
       <span>Archived — read-only. Hidden from the live graph and drift checks.</span>
@@ -789,6 +827,55 @@ defineExpose({ dispatchFocused, breakdownFocused });
   font-size: 11px;
   color: var(--ink-3);
   border-bottom: 1px solid var(--rule);
+}
+
+.sf-relations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 20px 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sf-rel-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sf-rel-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  min-width: 5.5em;
+}
+
+.sf-rel-chip {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+}
+
+.sf-rel-chip--dep {
+  cursor: pointer;
+  color: var(--tint-blue-ink);
+  border-color: var(--tint-blue-ink);
+}
+
+.sf-rel-chip--dep:hover {
+  background: var(--tint-blue);
+}
+
+.sf-rel-chip--changed {
+  color: var(--tint-amber-ink);
+  background: var(--tint-amber);
+  border-color: var(--tint-amber-ink);
 }
 
 .sf-archived-banner {
