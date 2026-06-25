@@ -7,6 +7,37 @@ import (
 	"testing"
 )
 
+// TestSpecFilePath verifies the path resolution tolerates both conventions: the
+// frontend's focusedSpecPath carries the leading "specs/" while the spec-tree
+// node path omits it. A mismatch here is what made every comment POST 400.
+func TestSpecFilePath(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "specs", "cloud"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "specs", "cloud", "x.md")
+	if err := os.WriteFile(want, []byte("# X\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The frontend sends the path WITH the specs/ prefix.
+	if got, ok := specFilePath(root, "specs/cloud/x.md"); !ok || got != want {
+		t.Fatalf("prefixed path: got %q ok=%v, want %q true", got, ok, want)
+	}
+	// The spec-tree node path omits it.
+	if got, ok := specFilePath(root, "cloud/x.md"); !ok || got != want {
+		t.Fatalf("bare path: got %q ok=%v, want %q true", got, ok, want)
+	}
+	// A path that does not exist resolves to nothing (not a false 400/match).
+	if _, ok := specFilePath(root, "cloud/missing.md"); ok {
+		t.Fatal("nonexistent spec should not resolve")
+	}
+	// A directory is not a spec file.
+	if _, ok := specFilePath(root, "specs/cloud"); ok {
+		t.Fatal("a directory should not resolve as a spec file")
+	}
+}
+
 // TestGitObjectSHAs verifies the advisory anchor metadata: a committed spec
 // yields a non-empty commit and blob, and the blob changes after an edit (the
 // signal the outdated/out-of-sync banner is built on).
