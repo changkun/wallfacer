@@ -132,3 +132,36 @@ push-once:
 # (.github/workflows/release.yml) builds the binaries, pushes the image,
 # deploys to k8s, and publishes the GitHub release with generated notes:
 #   git tag v0.0.7 && git push origin v0.0.7
+
+# ── Local production release ────────────────────────────────────────────────
+# Build natively (avoids the qemu bun/go crash when building Dockerfile.wallfacerd
+# on an arm64 host), push the image, and roll it out to the live cluster via
+# kubectl. The automated release.yml pipeline (latere-ai/ci reusable workflow) is
+# the canonical path; this is the local fallback while that is unavailable.
+#
+#   make release-prod                 # tag = short git sha
+#   make release-prod VERSION=0.0.7-alpha.24
+CONTAINER          ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
+RELEASE_IMAGE      ?= ghcr.io/changkun/wallfacerd
+RELEASE_NS         ?= latere
+RELEASE_DEPLOYMENT ?= wallfacerd
+RELEASE_URL        ?= https://wf.latere.ai
+
+.PHONY: release-prod
+release-prod: REL_VER := $(if $(VERSION),$(VERSION),$(shell git rev-parse --short HEAD))
+release-prod:
+	@test -n "$(CONTAINER)" || { echo "release-prod: no podman/docker found"; exit 1; }
+	@echo ">> [1/5] building frontend (native)"
+	cd frontend && bun run build
+	rm -rf internal/webserver/spa/dist && cp -r frontend/dist internal/webserver/spa/dist
+	@echo ">> [2/5] cross-compiling linux/amd64 binary ($(REL_VER))"
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+		-ldflags "-s -w -X latere.ai/x/wallfacer/internal/cli.Version=$(REL_VER)" \
+		-o deploy/prebuilt/wallfacer .
+	@echo ">> [3/5] building + pushing $(RELEASE_IMAGE):$(REL_VER)"
+	cd deploy/prebuilt && $(CONTAINER) build --platform linux/amd64 -t $(RELEASE_IMAGE):$(REL_VER) .
+	$(CONTAINER) push $(RELEASE_IMAGE):$(REL_VER)
+	@echo ">> [4/5] rolling out to $(RELEASE_NS)/$(RELEASE_DEPLOYMENT) (watch)"
+	kubectl set image deployment/$(RELEASE_DEPLOYMENT) $(RELEASE_DEPLOYMENT)=$(RELEASE_IMAGE):$(REL_VER) -n $(RELEASE_NS)
+	kubectl rollout status deployment/$(RELEASE_DEPLOYMENT) -n $(RELEASE_NS) --timeout=200s
+	@echo ">> [5/5] smoke" && curl -fsS $(RELEASE_URL)/healthz && echo " <- healthz ok ($(REL_VER) live)"

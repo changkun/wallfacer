@@ -21,3 +21,4 @@ frontend/dist/
 .playwright-mcp/
 frontend/test-results/
 release-evidence/
+deploy/prebuilt/wallfacer
