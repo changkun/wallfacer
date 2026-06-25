@@ -116,6 +116,19 @@ func TestParseHostBinaryOverrides(t *testing.T) {
 	}
 }
 
+// TestParseHostPiBinaryOverride verifies WALLFACER_HOST_PI_BINARY is plumbed
+// into HostPiBinary, mirroring the other host binary overrides.
+func TestParseHostPiBinaryOverride(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_HOST_PI_BINARY=/custom/pi\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.HostPiBinary != "/custom/pi" {
+		t.Errorf("HostPiBinary = %q, want /custom/pi", cfg.HostPiBinary)
+	}
+}
+
 // TestParseHostBinaryOverrides_Empty verifies that absent keys yield zero-value fields.
 func TestParseHostBinaryOverrides_Empty(t *testing.T) {
 	path := writeEnvFile(t, "# nothing here\n")

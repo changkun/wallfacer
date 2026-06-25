@@ -147,6 +147,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		HostCodexBinary:    envCfg.HostCodexBinary,
 		HostCursorBinary:   envCfg.HostCursorBinary,
 		HostOpenCodeBinary: envCfg.HostOpenCodeBinary,
+		HostPiBinary:       envCfg.HostPiBinary,
 		Prompts:            prompts.NewManager(promptsDir),
 		WorkspaceManager:   wsMgr,
 		Reg:                reg,

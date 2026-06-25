@@ -9,6 +9,21 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
+// TestKnownKeysIncludesHostPiBinary verifies WALLFACER_HOST_PI_BINARY is in the
+// managed-keys allowlist so Update round-trips it.
+func TestKnownKeysIncludesHostPiBinary(t *testing.T) {
+	found := false
+	for _, k := range knownKeys {
+		if k == "WALLFACER_HOST_PI_BINARY" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("knownKeys missing WALLFACER_HOST_PI_BINARY")
+	}
+}
+
 // TestParseEnvLinePreservesHashesInsideQuotes verifies that # characters inside
 // double or single quotes are not treated as inline comments.
 func TestParseEnvLinePreservesHashesInsideQuotes(t *testing.T) {
