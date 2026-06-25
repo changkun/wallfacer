@@ -7,9 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ScaffoldOptions controls the frontmatter fields of a new spec. Zero
@@ -201,7 +204,7 @@ func renderFrontmatter(title string, status Status, effort Effort, author string
 	date := now.Format("2006-01-02")
 	var b strings.Builder
 	b.WriteString("---\n")
-	b.WriteString("title: " + title + "\n")
+	b.WriteString("title: " + yamlScalar(title) + "\n")
 	b.WriteString("status: " + string(status) + "\n")
 	if len(dependsOn) == 0 {
 		b.WriteString("depends_on: []\n")
@@ -215,10 +218,25 @@ func renderFrontmatter(title string, status Status, effort Effort, author string
 	b.WriteString("effort: " + string(effort) + "\n")
 	b.WriteString("created: " + date + "\n")
 	b.WriteString("updated: " + date + "\n")
-	b.WriteString("author: " + author + "\n")
+	b.WriteString("author: " + yamlScalar(author) + "\n")
 	b.WriteString("dispatched_task_id: null\n")
 	b.WriteString("---\n")
 	return b.String()
+}
+
+// yamlScalar encodes s as a YAML scalar safe to inline into frontmatter.
+// Plain scalars (e.g. filename-derived titles like "Add login form") pass
+// through byte-identical; values that would break parsing (colon-space,
+// leading flow indicators like "[", etc.) get quoted by yaml.v3. This
+// prevents agent-controlled titles/authors from producing frontmatter that
+// fails ParseBytes and silently drops the spec from the tree.
+func yamlScalar(s string) string {
+	out, err := yaml.Marshal(s)
+	if err != nil {
+		// Fallback: should not happen for a plain string. Double-quote.
+		return strconv.Quote(s)
+	}
+	return strings.TrimRight(string(out), "\n")
 }
 
 // statusStrings returns all valid Status values as strings, for use in
