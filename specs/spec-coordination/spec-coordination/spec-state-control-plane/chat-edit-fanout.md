@@ -1,12 +1,12 @@
 ---
 title: "Chat-edit fan-out"
-status: drafted
+status: complete
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-state-control-plane/propagation-algorithm.md
 affects:
   - internal/handler/planning_git.go
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 effort: small

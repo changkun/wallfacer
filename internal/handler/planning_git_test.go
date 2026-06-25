@@ -6,12 +6,53 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/spec"
 )
+
+// writeFanoutSpec writes a fully-formed spec file with the given lifecycle
+// fields, for exercising chat-edit fan-out.
+func writeFanoutSpec(t *testing.T, ws, name, status, body string, dependsOn, affects []string) {
+	t.Helper()
+	var sb strings.Builder
+	sb.WriteString("---\ntitle: " + name + "\nstatus: " + status + "\n")
+	sb.WriteString("depends_on:")
+	if len(dependsOn) == 0 {
+		sb.WriteString(" []\n")
+	} else {
+		sb.WriteString("\n")
+		for _, d := range dependsOn {
+			sb.WriteString("  - " + d + "\n")
+		}
+	}
+	sb.WriteString("affects:")
+	if len(affects) == 0 {
+		sb.WriteString(" []\n")
+	} else {
+		sb.WriteString("\n")
+		for _, a := range affects {
+			sb.WriteString("  - " + a + "\n")
+		}
+	}
+	sb.WriteString("effort: small\ncreated: 2026-01-01\nupdated: 2026-01-02\nauthor: test\n---\n\n")
+	sb.WriteString("# " + name + "\n\n" + body + "\n")
+	writeSpec(t, ws, name, sb.String())
+}
+
+func readSpecStatus(t *testing.T, ws, relPath string) string {
+	t.Helper()
+	s, err := spec.ParseFile(filepath.Join(ws, relPath))
+	if err != nil {
+		t.Fatalf("parse %s: %v", relPath, err)
+	}
+	return string(s.Status)
+}
 
 // initPlanningTestRepo creates a temp git repo with one initial commit so
 // HEAD exists and `git log` returns without error.
@@ -627,5 +668,71 @@ func TestCommitPlanningRound_IgnoresPollutedLocalIdentity(t *testing.T) {
 	want := "Host User <host@example.com>"
 	if got != want {
 		t.Errorf("commit author = %q, want %q (polluted local identity leaked through)", got, want)
+	}
+}
+
+func TestCommitPlanningRound_FansOutStale(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	// A is depended on by B (channel 1) and shares an affects dir with C
+	// (channel 2). D is unrelated.
+	writeFanoutSpec(t, ws, "a.md", "validated", "original", nil, []string{"internal/x/"})
+	writeFanoutSpec(t, ws, "b.md", "validated", "b", []string{"specs/a.md"}, nil)
+	writeFanoutSpec(t, ws, "c.md", "validated", "c", nil, []string{"internal/x/sub/file.go"})
+	writeFanoutSpec(t, ws, "d.md", "validated", "d", nil, []string{"internal/other/"})
+	runGit(t, ws, "add", "specs/")
+	runGit(t, ws, "commit", "-m", "seed specs")
+
+	// A real semantic edit to A's body.
+	writeFanoutSpec(t, ws, "a.md", "validated", "EDITED", nil, []string{"internal/x/"})
+
+	if _, err := commitPlanningRound(context.Background(), ws, "edit A", "edited A", nil, ""); err != nil {
+		t.Fatalf("commitPlanningRound: %v", err)
+	}
+
+	if got := readSpecStatus(t, ws, "specs/b.md"); got != "stale" {
+		t.Errorf("b.md = %q, want stale (depends_on A)", got)
+	}
+	if got := readSpecStatus(t, ws, "specs/c.md"); got != "stale" {
+		t.Errorf("c.md = %q, want stale (affects overlap)", got)
+	}
+	if got := readSpecStatus(t, ws, "specs/d.md"); got != "validated" {
+		t.Errorf("d.md = %q, want validated (unrelated)", got)
+	}
+	if got := readSpecStatus(t, ws, "specs/a.md"); got != "validated" {
+		t.Errorf("a.md = %q, want validated (edited source not self-staled)", got)
+	}
+
+	// The edits and the cascade land in one commit.
+	out, _ := exec.Command("git", "-C", ws, "show", "--name-only", "--format=", "HEAD").Output()
+	files := strings.Fields(strings.TrimSpace(string(out)))
+	for _, want := range []string{"specs/a.md", "specs/b.md", "specs/c.md"} {
+		if !slices.Contains(files, want) {
+			t.Errorf("commit missing %s; files=%v", want, files)
+		}
+	}
+	if slices.Contains(files, "specs/d.md") {
+		t.Errorf("unrelated d.md must not be in the commit; files=%v", files)
+	}
+}
+
+func TestCommitPlanningRound_UpdatedOnlyBumpNoFanout(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	writeFanoutSpec(t, ws, "a.md", "validated", "body", nil, []string{"internal/x/"})
+	writeFanoutSpec(t, ws, "b.md", "validated", "b", []string{"specs/a.md"}, nil)
+	runGit(t, ws, "add", "specs/")
+	runGit(t, ws, "commit", "-m", "seed specs")
+
+	// Bump only A's updated timestamp — no body or semantic frontmatter change.
+	if err := spec.UpdateFrontmatter(filepath.Join(ws, "specs/a.md"), map[string]any{
+		"updated": time.Date(2026, 6, 25, 0, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("bump updated: %v", err)
+	}
+
+	if _, err := commitPlanningRound(context.Background(), ws, "touch A", "touched A", nil, ""); err != nil {
+		t.Fatalf("commitPlanningRound: %v", err)
+	}
+	if got := readSpecStatus(t, ws, "specs/b.md"); got != "validated" {
+		t.Errorf("b.md = %q, want validated (updated-only bump must not fan out)", got)
 	}
 }
