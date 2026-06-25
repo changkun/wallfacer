@@ -336,3 +336,44 @@ func TestRenderSkeleton_FrontmatterShape(t *testing.T) {
 		t.Errorf("skeleton missing body heading")
 	}
 }
+
+// TestRenderSkeleton_UnsafeTitleRoundTrips guards against agent-controlled
+// titles/authors breaking the frontmatter YAML. A title containing colon-space
+// or a leading flow indicator must still parse and round-trip via ParseBytes,
+// otherwise the scaffolded spec silently drops from the tree on next load.
+func TestRenderSkeleton_UnsafeTitleRoundTrips(t *testing.T) {
+	cases := []struct {
+		name  string
+		title string
+	}{
+		{"colon space", "Foo: Bar"},
+		{"leading flow indicator", "[foo] do the thing"},
+		{"leading brace", "{inline}"},
+		{"leading ampersand", "&anchor"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RenderSkeleton(tc.title, StatusVague, EffortMedium, "Test User", nil, fixedNow)
+			s, err := ParseBytes([]byte(got), "specs/local/x.md")
+			if err != nil {
+				t.Fatalf("ParseBytes returned error for title %q: %v\nrendered:\n%s", tc.title, err, got)
+			}
+			if s.Title != tc.title {
+				t.Errorf("Title = %q; want %q", s.Title, tc.title)
+			}
+		})
+	}
+}
+
+// TestRenderSkeleton_PlainTitleNoQuotingChurn confirms safe filename-derived
+// titles and authors render byte-identically (no unconditional quoting that
+// would churn golden fixtures).
+func TestRenderSkeleton_PlainTitleNoQuotingChurn(t *testing.T) {
+	got := RenderSkeleton("Add login form", StatusVague, EffortMedium, "Test User", nil, fixedNow)
+	if !strings.Contains(got, "title: Add login form\n") {
+		t.Errorf("plain title was quoted; want bare\nrendered:\n%s", got)
+	}
+	if !strings.Contains(got, "author: Test User\n") {
+		t.Errorf("plain author was quoted; want bare\nrendered:\n%s", got)
+	}
+}
