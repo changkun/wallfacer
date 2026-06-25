@@ -623,16 +623,22 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 		mode, apiKey, version,
 	)
 	indexHTML := strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1)
-	if !cloudMode {
-		// Strip SSG pre-rendered content so Vue does a fresh client-side
-		// render instead of hydrating the wrong page component.
-		indexHTML = stripSSGContent(indexHTML)
-	}
+	// The SSG-prerendered index.html bakes in the "/" route (ProductPage in
+	// cloud). Serving it verbatim for any other path flashes the landing page
+	// before Vue swaps in the real route, so we strip the stale markup there.
+	// Only cloud "/" keeps the prerender intact, where ProductPage hydration
+	// legitimately matches; everything else (local routes, cloud deep links
+	// like /dashboard) mounts from a blank #app.
+	strippedHTML := stripSSGContent(indexHTML)
 
-	serveVueIndex := func(w http.ResponseWriter, _ *http.Request) {
+	serveVueIndex := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_, _ = w.Write([]byte(indexHTML))
+		if cloudMode && r.URL.Path == "/" {
+			_, _ = w.Write([]byte(indexHTML))
+			return
+		}
+		_, _ = w.Write([]byte(strippedHTML))
 	}
 
 	files := http.FS(dist)

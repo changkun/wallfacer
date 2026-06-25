@@ -1008,3 +1008,51 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
 	}
 }
+
+// TestMountVueSPA_NoLandingFlashOnDeepRoutes pins the SSG-strip behavior that
+// keeps a logged-in user from seeing the ProductPage landing flash before Vue
+// swaps in the real route on a deep-link refresh. The prerendered index.html
+// bakes in the "/" route (ProductPage in cloud); serving it verbatim for any
+// other path paints the landing markup for a frame. Only cloud "/" keeps the
+// prerender; every other path mounts from a blank #app.
+func TestMountVueSPA_NoLandingFlashOnDeepRoutes(t *testing.T) {
+	const indexHTML = `<html><head></head><body>` +
+		`<div id="app" data-server-rendered="true"><section class="product-hero">landing</section></div>` +
+		`<script type="module" src="/assets/app.js"></script></body></html>`
+	dist := fstest.MapFS{
+		"frontend/dist/index.html": {Data: []byte(indexHTML)},
+	}
+
+	get := func(cloudMode bool, path string) string {
+		mux := http.NewServeMux()
+		mountVueSPA(mux, dist, "k", cloudMode)
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("GET %s (cloud=%v): status %d, want 200", path, cloudMode, rr.Code)
+		}
+		return rr.Body.String()
+	}
+
+	const cleared = `e.textContent=""` // stripSSGContent's clear script
+
+	// Cloud "/" keeps the prerender: ProductPage hydration legitimately matches.
+	if body := get(true, "/"); !strings.Contains(body, "data-server-rendered") ||
+		!strings.Contains(body, "product-hero") || strings.Contains(body, cleared) {
+		t.Errorf("cloud /: want intact SSG ProductPage, got %q", body)
+	}
+
+	// Cloud deep route (e.g. /dashboard) must NOT serve the landing markup as
+	// server-rendered content, or it flashes. #app is cleared before mount.
+	if body := get(true, "/dashboard"); strings.Contains(body, "data-server-rendered") ||
+		!strings.Contains(body, cleared) {
+		t.Errorf("cloud /dashboard: want stripped shell (no flash), got %q", body)
+	}
+
+	// Local mode strips for every route, including "/", since local routes are
+	// not prerendered (the SSG index.html is the cloud ProductPage).
+	if body := get(false, "/"); strings.Contains(body, "data-server-rendered") ||
+		!strings.Contains(body, cleared) || !strings.Contains(body, `mode:"local"`) {
+		t.Errorf("local /: want stripped shell, got %q", body)
+	}
+}
