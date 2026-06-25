@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"sync"
 	"time"
 
@@ -35,8 +34,6 @@ type DeviceAuth struct {
 	OIDC      *oidc.Client
 	Store     authkit.TokenStore
 	NewClient func() *oidc.Client // optional override for tests
-	ClientID  string              // default: AUTH_CLIENT_ID or "wallfacer-local"
-	Scopes    []string            // default: ["openid", "email", "profile", "offline_access"]
 
 	mu   sync.Mutex
 	flow *deviceFlowState
@@ -46,7 +43,6 @@ type deviceFlowState struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	done      chan struct{}
-	startedAt time.Time
 	expiresAt time.Time
 
 	// Populated by the device-auth call.
@@ -162,7 +158,6 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 		ctx:             ctx,
 		cancel:          cancel,
 		done:            make(chan struct{}),
-		startedAt:       time.Now(),
 		expiresAt:       time.Now().Add(time.Duration(time.Until(da.Expiry).Seconds()) * time.Second),
 		verificationURI: verify,
 		userCode:        da.UserCode,
@@ -256,14 +251,3 @@ func (d *DeviceAuth) cancel(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// inferLocalClientID is a small env-with-fallback helper for the device-auth
-// route's client_id selection. Kept separate from the existing config layer
-// because the local-mode device flow is intentionally side-channel: it does
-// not require the rest of the auth wiring (HandleLogin, /api/me, etc.) and
-// so should not pull the same env block in.
-func inferLocalClientID() string {
-	if v := os.Getenv("AUTH_CLIENT_ID"); v != "" {
-		return v
-	}
-	return "wallfacer-local"
-}

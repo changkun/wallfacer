@@ -160,16 +160,3 @@ func TestDeviceAuth_Cancel(t *testing.T) {
 	}
 }
 
-func TestInferLocalClientID_Default(t *testing.T) {
-	t.Setenv("AUTH_CLIENT_ID", "")
-	if got := inferLocalClientID(); got != "wallfacer-local" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-func TestInferLocalClientID_Env(t *testing.T) {
-	t.Setenv("AUTH_CLIENT_ID", "from-env")
-	if got := inferLocalClientID(); got != "from-env" {
-		t.Fatalf("got %q", got)
-	}
-}
