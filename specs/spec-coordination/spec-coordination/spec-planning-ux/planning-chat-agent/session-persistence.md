@@ -1,6 +1,6 @@
 ---
 title: Planning Session Persistence and Recovery
-status: drafted
+status: stale
 depends_on: []
 affects:
   - internal/planner/planner.go
@@ -11,7 +11,7 @@ affects:
   - frontend/src/components/plan/PlanningChatPanel.vue
 effort: large
 created: 2026-04-04
-updated: 2026-06-14
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
