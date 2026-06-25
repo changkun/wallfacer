@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 )
 
 // parseOutput tries to parse raw as a single JSON object first; if that fails
@@ -19,33 +21,16 @@ func parseOutput(raw string) (*agentOutput, error) {
 		normalizeConversationID(&output, raw)
 		return &output, nil
 	}
-	lines := strings.Split(raw, "\n")
-	var fallback *agentOutput
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if len(line) == 0 || line[0] != '{' {
-			continue
-		}
-		var candidate agentOutput
-		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
-			continue
-		}
-		if fallback == nil {
-			c := candidate
-			fallback = &c
-		}
-		// Prefer the message that has stop_reason set — that is the "result"
-		// message emitted by the agent at the end of every run.
-		if candidate.StopReason != "" {
-			normalizeConversationID(&candidate, raw)
-			return &candidate, nil
-		}
+	// Scan NDJSON backwards for the terminal result line (non-empty
+	// stop_reason), falling back to the last valid JSON object. Every line is a
+	// candidate here — unlike the planner, runner output carries no type gate.
+	out, ok := ndjson.PreferResultLine(raw, true, nil,
+		func(o *agentOutput) bool { return o.StopReason != "" })
+	if !ok {
+		return nil, fmt.Errorf("no valid JSON object found in output")
 	}
-	if fallback != nil {
-		normalizeConversationID(fallback, raw)
-		return fallback, nil
-	}
-	return nil, fmt.Errorf("no valid JSON object found in output")
+	normalizeConversationID(&out, raw)
+	return &out, nil
 }
 
 // normalizeConversationID ensures output.SessionID is populated. It prefers the
