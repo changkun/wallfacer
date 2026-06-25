@@ -23,6 +23,7 @@ function stubSession() {
     commitRename: () => {}, cancelRename: () => {}, archiveThread: () => {},
     unarchiveThread: () => {}, deleteThread: () => {},
     renamingId: ref(''), renameDraft: ref(''), archiveMenuOpen: ref(false),
+    draft: ref(false),
   };
 }
 

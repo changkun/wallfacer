@@ -58,6 +58,9 @@ export interface ChatSession {
   cancelQueueEdit: () => void;
 
   // ── Threads (sessions) ──
+  // True while a "New chat" draft is open: no server thread exists yet, the
+  // conversation shows blank, and the thread is created on the first send.
+  draft: Ref<boolean>;
   createThread: () => Promise<void>;
   switchToThread: (id: string) => Promise<void>;
   archiveThread: (id: string) => Promise<void>;
@@ -97,12 +100,33 @@ export function useChatSession(): ChatSession {
   // Id of the in-flight streaming bubble, if any. loadHistory uses it to carry
   // the live (not-yet-persisted) turn across a history reload.
   let activeStreamBubbleId: string | null = null;
+  // Set true to make the next watch(activeThreadId) firing skip its loadHistory.
+  // promoteDraft loads history itself (awaited) right after activating the new
+  // thread; without this guard the watcher's fire-and-forget loadHistory races
+  // the optimistic user bubble and can wipe it.
+  let suppressNextHistoryLoad = false;
+  // Pending poll that refreshes the thread list until the backend auto-titler
+  // replaces a freshly-created thread's "Chat N" name. Cancelled on unmount.
+  let titleTimer: ReturnType<typeof setTimeout> | null = null;
 
   function clearRetryTimer() {
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
       retryTimer = null;
     }
+  }
+
+  // Detach our local reader from the in-flight stream. The turn keeps running
+  // server-side (tracked by busyThreadId), so this only stops us listening —
+  // used when leaving a streaming thread for a draft or another thread.
+  function detachStream() {
+    if (!streaming.value) return;
+    clearRetryTimer();
+    if (streamHandle) {
+      streamHandle.abort();
+      streamHandle = null;
+    }
+    streaming.value = false;
   }
 
   function scrollToBottom(force = false) {
@@ -284,11 +308,42 @@ export function useChatSession(): ChatSession {
         // plan_round (per-message undo button).
         void loadHistory();
       }
+      if (finishedThread) refreshTitleSoon(finishedThread);
     }
   }
 
+  // After a thread's first turn the backend auto-titles it, replacing the
+  // default "Chat N" name. Title generation runs async server-side and may land
+  // after the turn finishes, so poll the thread list a few times until the name
+  // changes (or give up). No-op once the thread already has a non-default name.
+  function refreshTitleSoon(threadID: string) {
+    const t = threads.value[threadID];
+    if (t && !/^Chat \d+$/.test(t.name)) return;
+    if (titleTimer !== null) clearTimeout(titleTimer);
+    let tries = 0;
+    const tick = async () => {
+      tries++;
+      await planning.loadThreads();
+      const cur = threads.value[threadID];
+      if (!cur || !/^Chat \d+$/.test(cur.name) || tries >= 10) {
+        titleTimer = null;
+        return;
+      }
+      titleTimer = setTimeout(() => void tick(), 3000);
+    };
+    titleTimer = setTimeout(() => void tick(), 1500);
+  }
+
   async function sendMessage(text: string, opts?: { threadID?: string }): Promise<void> {
-    const targetId = opts?.threadID ?? activeThreadId.value;
+    let targetId = opts?.threadID ?? activeThreadId.value;
+    // First message of a "New chat" draft: create the server thread now and
+    // send to it. The backend auto-titles it from this message. Queue drains
+    // pass an explicit threadID, so they never hit this path.
+    if (draft.value && !opts?.threadID) {
+      const id = await promoteDraft();
+      if (!id) return;
+      targetId = id;
+    }
     if (!targetId) {
       appendSystem('No active thread — create one first.');
       return;
@@ -455,21 +510,59 @@ export function useChatSession(): ChatSession {
   const renamingId = ref<string>('');
   const renameDraft = ref<string>('');
   const archiveMenuOpen = ref(false);
+  const draft = ref(false);
 
+  // "New chat" no longer persists a thread. It opens a blank draft: detach from
+  // any in-flight stream, clear the active selection (the watcher blanks the
+  // conversation), and wait for the first message. promoteDraft creates the
+  // server thread on that first send, and the backend auto-titles it — so an
+  // unused "New chat" never leaves a phantom "Chat N" behind.
   async function createThread() {
+    detachStream();
+    if (activeThreadId.value) {
+      const outgoing = threads.value[activeThreadId.value];
+      if (outgoing && messagesEl.value) outgoing.scrollTop = messagesEl.value.scrollTop;
+    }
+    draft.value = true;
+    activeThreadId.value = '';
+  }
+
+  // promoteDraft turns the open draft into a real server thread on first send.
+  // Returns the new thread id, or null if creation failed (error surfaced).
+  async function promoteDraft(): Promise<string | null> {
+    let created: PlanningThread | null = null;
     try {
-      const t = await api<PlanningThread>('POST', '/api/planning/threads', {});
-      if (t?.id) {
-        await planning.loadThreads();
-        await switchToThread(t.id);
-      }
+      created = await api<PlanningThread>('POST', '/api/planning/threads', {});
     } catch (e) {
       appendSystem('Failed to create thread: ' + (e instanceof Error ? e.message : String(e)));
+      return null;
     }
+    if (!created?.id) {
+      appendSystem('Failed to create thread.');
+      return null;
+    }
+    const id = created.id;
+    draft.value = false;
+    await planning.loadThreads();
+    // Activate the new thread and load its (empty) history ourselves, with the
+    // watcher suppressed, so the blank load settles before sendMessage pushes
+    // the optimistic user bubble — otherwise a racing load would wipe it.
+    const t = threads.value[id];
+    if (t) {
+      t.unread = false;
+      t.lastViewedAt = Date.now();
+    }
+    suppressNextHistoryLoad = true;
+    activeThreadId.value = id;
+    api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
+    await loadHistory();
+    return id;
   }
 
   async function switchToThread(id: string) {
     if (!id || id === activeThreadId.value) return;
+    // Leaving any open draft for a real thread.
+    draft.value = false;
     // Save scroll position of outgoing thread.
     const outgoing = activeThreadId.value ? threads.value[activeThreadId.value] : null;
     if (outgoing && messagesEl.value) outgoing.scrollTop = messagesEl.value.scrollTop;
@@ -657,6 +750,10 @@ export function useChatSession(): ChatSession {
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   watch(activeThreadId, () => {
+    if (suppressNextHistoryLoad) {
+      suppressNextHistoryLoad = false;
+      return;
+    }
     void loadHistory();
   });
 
@@ -720,6 +817,7 @@ export function useChatSession(): ChatSession {
 
   onUnmounted(() => {
     clearRetryTimer();
+    if (titleTimer !== null) clearTimeout(titleTimer);
     if (streamHandle) streamHandle.abort();
   });
 
@@ -727,7 +825,7 @@ export function useChatSession(): ChatSession {
     renderedMessages, streaming, interruptedAt, messagesEl, userScrolledUp, latestRound,
     loadHistory, sendMessage, onInterrupt, clearHistory, appendSystem, onScroll, undoRound,
     currentQueue, editingQueueId, editQueueDraft, removeFromQueue, startQueueEdit, commitQueueEdit, cancelQueueEdit,
-    createThread, switchToThread, archiveThread, unarchiveThread, deleteThread,
+    draft, createThread, switchToThread, archiveThread, unarchiveThread, deleteThread,
     renamingId, renameDraft, startRename, commitRename, cancelRename, archiveMenuOpen,
   };
 }
