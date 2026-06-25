@@ -55,13 +55,16 @@ func (g *coordinationGate) SetOptedIn(v bool) {
 	}
 }
 
-// loadOptIn seeds the gate: the persisted flag file wins if present, else the
-// server-side env default (off).
+// loadOptIn seeds the gate: a persisted in-app choice wins if present, else the
+// server-side default. The default is ON for a signed-in instance (a product
+// decision: collaboration on by default once signed in), overridable to off with
+// WALLFACER_COORDINATION=0. The connection still requires sign-in, so an
+// anonymous instance phones home nothing regardless (the data-boundary floor).
 func loadOptIn(path string) bool {
 	if b, err := os.ReadFile(path); err == nil {
 		return strings.TrimSpace(string(b)) == "1"
 	}
-	return envCoordinationOptIn()
+	return coordinationDefault()
 }
 
 // startCoordinationClient wires and runs the outbound coordination connector in
@@ -215,14 +218,16 @@ func hashLocalKey(groupKey string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// envCoordinationOptIn reads the server-side default for the coordination
-// opt-in. The default is off (the data boundary): coordination only engages
-// when explicitly enabled via WALLFACER_COORDINATION or the settings toggle.
-func envCoordinationOptIn() bool {
+// coordinationDefault reads the server-side default for a signed-in instance.
+// It defaults ON; WALLFACER_COORDINATION explicitly forces it on or off. The
+// in-app toggle persists per instance and overrides this default (see loadOptIn).
+// Anonymous instances never connect regardless, so this only governs signed-in
+// instances that have not made an explicit in-app choice.
+func coordinationDefault() bool {
 	switch os.Getenv("WALLFACER_COORDINATION") {
-	case "1", "true", "TRUE", "yes", "on":
-		return true
-	default:
+	case "0", "false", "FALSE", "no", "off":
 		return false
+	default:
+		return true
 	}
 }
