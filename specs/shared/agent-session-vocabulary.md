@@ -254,23 +254,36 @@ Shipped on `main` (each commit build + lint + tests green; pinned at
   `/sessions`; routes.go + frontend URLs + test mocks + docs path refs;
   api-contract.json regenerated.
 
-Remaining (own focused commits; migration is contract-/state-touching):
+- ✅ **CSS companion** - `PlanningChatPanel.css` -> `AgentChatPanel.css`
+  (the `<style src>` import had been updated without the file; caught by a
+  full vite build).
+- ✅ **Storage + env migration (4a/4b)** - `WALLFACER_PLANNING_WINDOW_DAYS`
+  -> `WALLFACER_AGENT_SESSION_WINDOW_DAYS` (deprecated alias kept), field
+  `AgentSessionWindowDays`, config key `agent_session_window_days`; on-disk
+  `<configDir>/planning/<fp>/` -> `agent-sessions/` via
+  `store.MigrateAgentSessionsDir` (first-boot, idempotent, no-clobber) +
+  tests.
+- ✅ **Stats / activity (4c)** - store usage API (`AgentSessionGroupKey`,
+  `AgentSessionUsageDir/Path`, `Append/ReadAgentSessionUsage`);
+  `SandboxActivityPlanning` -> `SandboxActivityAgentSession` (value
+  `planning` -> `agent-session`) + container label; `PlanningGroupStat`
+  -> `AgentSessionGroupStat`, `StatsResponse.AgentSessions`
+  json `agent_sessions`; frontend `data.agent_sessions`, "Agent Sessions"
+  cost label, usage-tab `AGENT_LABELS`. `by_sub_agent` re-buckets by the
+  live constant, so no historical-data loss.
 
-- ◐ **Storage + env + stats migration (Phase 4)** -
-  `<configDir>/planning/<fp>/` -> `agent-sessions/` with a first-boot
-  shim; `WALLFACER_PLANNING_WINDOW_DAYS` -> `..._AGENT_SESSION_WINDOW_DAYS`
-  (old-name fallback); config key `planning_window_days`; stats
-  `PlanningGroupStat` / `"planning"` JSON key / `BySubAgent["planning"]`;
-  analytics cost label + `planningWindowDays`; container activity label
-  and `agentSessionTaskID` value `"planning-sandbox"`; route `Tags`;
-  prompt `planning.tmpl`. Coupled to the analytics subsystem and persisted
-  user data — needs the shim + regression tests, and `stats.go`/`config.go`
-  overlap the concurrent session.
+Remaining (small, cosmetic):
+
 - ○ **Internal handler helpers (Phase 2b)** -
   `selectPlanningSystemPrompt`, `assemblePlanningPrompt`,
-  `persistPlanningRoundUsage`, `mergePlanningUsage`, etc. (cosmetic).
+  `persistPlanningRoundUsage`, etc. (private; cosmetic).
+- ○ **Prompt template** - `internal/prompts/planning.tmpl` and its
+  `"planning"` registry name (the spec-mode system prompt; bucket-2-ish).
 - ○ **Docs sweep (Phase 8)** - remaining prose in `docs/` and `AGENTS.md`;
   rename `docs/internals/plan-mode.md` if desired; spec wrap-up.
+- ○ **Kept by design** - `Plan-Round:`/`Plan-Thread:`/`(plan)` git
+  trailers (frozen), `UndoPlanningRound`, spec-plan helpers,
+  `store.TaskKindPlanning` (unused legacy), the `/plan` tab.
 
 ## Acceptance Criteria
 
