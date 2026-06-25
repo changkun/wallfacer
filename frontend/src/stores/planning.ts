@@ -19,6 +19,10 @@ export interface SpecMeta {
   updated?: string;
   author?: string;
   dispatched_task_id?: string | null;
+  // doc marks a free-form, frontmatter-less file surfaced as a render-only
+  // node: no status, no lifecycle. The backend sets it; migrating the file
+  // (adopting frontmatter) turns it into a normal managed spec.
+  doc?: boolean;
 }
 
 export interface SpecNode {
