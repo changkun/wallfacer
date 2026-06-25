@@ -199,18 +199,34 @@ function newSession() {
 }
 
 onMounted(() => window.addEventListener('resize', reclamp));
-onUnmounted(() => window.removeEventListener('resize', reclamp));
+onUnmounted(() => {
+  window.removeEventListener('resize', reclamp);
+  removeSwitcherOutsideHandler();
+});
 
-// Close the switcher dropdown on any outside click while it's open.
+// Close the switcher dropdown on any outside click while it's open. Track the
+// handler so it is torn down on a programmatic close (pickSession/newSession set
+// switcherOpen=false) and on unmount, not only on an outside click — otherwise
+// repeated open/close cycles stack document listeners.
+let switcherOutsideHandler: ((e: MouseEvent) => void) | null = null;
+function removeSwitcherOutsideHandler() {
+  if (switcherOutsideHandler) {
+    document.removeEventListener('mousedown', switcherOutsideHandler);
+    switcherOutsideHandler = null;
+  }
+}
 watch(switcherOpen, (isOpen) => {
+  removeSwitcherOutsideHandler();
   if (!isOpen) return;
   const handler = (e: MouseEvent) => {
     if (!(e.target as HTMLElement).closest('.scp-session')) {
-      switcherOpen.value = false;
-      document.removeEventListener('mousedown', handler);
+      switcherOpen.value = false; // the watcher's close branch removes the listener
     }
   };
-  setTimeout(() => document.addEventListener('mousedown', handler), 0);
+  switcherOutsideHandler = handler;
+  setTimeout(() => {
+    if (switcherOutsideHandler === handler) document.addEventListener('mousedown', handler);
+  }, 0);
 });
 
 defineExpose({
