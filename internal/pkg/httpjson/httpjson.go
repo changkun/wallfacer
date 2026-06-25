@@ -28,8 +28,7 @@ func DecodeBody[T any](w http.ResponseWriter, r *http.Request) (*T, bool) {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return nil, false
 	}
-	if dec.More() {
-		http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
+	if !finishDecode(w, dec) {
 		return nil, false
 	}
 	return v, true
@@ -58,11 +57,29 @@ func DecodeOptionalBody[T any](w http.ResponseWriter, r *http.Request) (*T, bool
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return nil, false
 	}
-	if dec.More() {
-		http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
+	if !finishDecode(w, dec) {
 		return nil, false
 	}
 	return v, true
+}
+
+func finishDecode(w http.ResponseWriter, dec *json.Decoder) bool {
+	var extra any
+	err := dec.Decode(&extra)
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	var maxErr *http.MaxBytesError
+	if errors.As(err, &maxErr) {
+		Write(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+		return false
+	}
+	if err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return false
+	}
+	http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
+	return false
 }
 
 // Write serialises v as JSON and writes it with the given HTTP status code.
