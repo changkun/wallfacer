@@ -101,7 +101,7 @@ Auth-by-default is the active convergence work. Multi-user collaboration is the 
 
 ## Spec Coordination
 
-Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automation. Promoted to its own track (`specs/spec-coordination/`): it is the largest self-contained body of work in the project. Most subtrees are complete; the state control plane remains.
+Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automation. Promoted to its own track (`specs/spec-coordination/`): it is the largest self-contained body of work in the project. All four subtrees are implemented; the only follow-up is wiring the drift pipeline's concrete agent tester (gated off by default).
 
 | Spec | Status | Delivers |
 |------|--------|----------|
@@ -113,7 +113,7 @@ Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automat
 | ↳↳ [planning-chat-threads.md](spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md) | **Complete** | Multi-tab planning chat: independent conversation threads sharing the single planner, per-thread session/history/unread, inline rename, archive-only deletion, `git revert` thread-scoped undo, crash-safe migration. Shipped (ThreadManager, `/api/planning/threads`, PlanningChatPanel.vue). |
 | ↳↳ [dedicated-chat-ui.md](spec-coordination/spec-coordination/spec-planning-ux/dedicated-chat-ui.md) | **Complete** | Chat promoted to a first-class Claude-style surface: sidebar leads with Chat/Plan/Board, a dedicated `/chat` view (`ChatPage.vue`) with a session sub-sidebar and entry screen (supersedes chat-first), and a floating draggable popup (`SpecChatPopup.vue`) in plan mode, now enabled. Frontend-only, reusing the thread model; one extracted chat core (`useChatSession`, `ChatMessageList`/`ChatComposer`/`SessionList`) mounted by both surfaces. |
 | ↳↳ [session-persistence.md](spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/session-persistence.md) | Stale | Faithful planning-conversation resume. The lossy `BuildHistoryContext` fallback is still the live behavior, so the degraded-resume problem remains; needs re-scoping against the host-process planner or archiving. |
-| ↳ [spec-state-control-plane.md](spec-coordination/spec-coordination/spec-state-control-plane.md) | Not started | Server-managed lifecycle transitions: chat-edit fan-out → `stale`, dispatch → `validated`, task done → tester-mediated drift verdict → `complete` or `stale`, periodic staleness scan, downstream propagation. `SpecCompletionHook` still writes `complete` unconditionally today; the drift gate is unbuilt. |
+| ↳ [spec-state-control-plane.md](spec-coordination/spec-coordination/spec-state-control-plane.md) | **Complete** | Server-managed lifecycle transitions: 7th `testing` state with completion gate, two-channel stale propagation, chat-edit fan-out, dispatch → `validated` + folder dispatch, explicit-validate/mark-stale/dismiss/force-complete actions, advisory staleness scan, and the task-done drift pipeline (`validated → testing → complete`/`stale` with fan-out, `testing_pending` on tester failure, per-workspace commit mutex). Concrete agent-backed drift tester gated behind `WALLFACER_DRIFT_TESTER` and not yet wired — the hook preserves complete-on-done by default. |
 
 ---
 
@@ -286,7 +286,7 @@ Revert and PR are independent and shippable; intent-commits is mostly realized w
 - Multi-user collaboration should be broken down (rbac-matrix first); steps 1-2 already shipped.
 
 **Within local product:**
-- Spec coordination is in progress (document model, planning UX, archival, chat-first mode, and planning threads complete; the state control plane / drift detection remains).
+- Spec coordination is largely complete (document model, planning UX, archival, chat-first mode, planning threads, and the state control plane / drift detection all shipped; only the drift pipeline's concrete agent tester remains to be wired).
 - Editor tabs (inline-file-panel) shipped. The remaining file/diff/attachment work (task-prompt-attachments, diff-review-comments) plus test-criteria are clean and ready to dispatch.
 
 **Within cloud platform:**
