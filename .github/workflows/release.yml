@@ -1,17 +1,10 @@
 name: Release
 
-# Tag-triggered release via the central reusable pipeline (latere-ai/ci).
-# wallfacer is dual-shape: a CLI and the wallfacerd service. The service image
-# (Dockerfile.wallfacerd) is built in dockerfile mode, deployed to the shared
-# `latere` namespace, and smoked live; the CLI binaries are built by
-# tools/release/build-cli.sh and attached to the GitHub release. The release
-# publishes only after the live smoke passes.
-#
-# Registry stays ghcr.io/changkun/wallfacerd for now; the move to
-# ghcr.io/latere-ai is a separate, watched change (touches live pods +
-# terraform/ghcr_cleanup.py).
-#
-# Pinned at the central pipeline's @v1 moving major tag.
+# Unified release pipeline. Pushing a version tag (v*) verifies the build,
+# produces the CLI binaries, builds and pushes the wallfacerd image, deploys
+# it to the shared `latere` k8s namespace, smokes the live surface, and only
+# then publishes the GitHub release (with auto-generated notes) carrying the
+# binaries. The release is the last step so prod must be green before it ships.
 
 on:
   push:
@@ -20,20 +13,160 @@ on:
 permissions:
   contents: write
   packages: write
-  actions: read
 
 jobs:
-  release:
-    uses: latere-ai/ci/.github/workflows/service-release.yml@v1
-    with:
-      service: wallfacerd
-      image: ghcr.io/changkun/wallfacerd
-      namespace: latere
+  # Gate: tag pushes are not covered by test.yml (main/PR only), so the
+  # build/deploy must not run unchecked.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd frontend && bun install --frozen-lockfile
+      - run: cd frontend && bunx --bun vue-tsc --noEmit
+      - run: cd frontend && bunx --bun vite-ssg build
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: |
+          rm -rf internal/webserver/spa/dist
+          cp -r frontend/dist internal/webserver/spa/dist
+      - run: go build -o /dev/null .
+      - run: go vet ./internal/webserver/...
+
+  binary:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: oven-sh/setup-bun@v2
+      - name: Build Vue frontend
+        run: bun install --frozen-lockfile && bun run build
+        working-directory: frontend
+      - name: Resolve sandbox image tag
+        id: sandbox_tag
+        run: |
+          # Source of truth: latest release of github.com/latere-ai/images.
+          # Fall back to the highest vMAJOR.MINOR.PATCH git tag if the
+          # releases API is unavailable (rate limit, transient failure).
+          tag=$(curl -sf https://api.github.com/repos/latere-ai/images/releases/latest 2>/dev/null | jq -r '.tag_name // empty')
+          if [ -z "$tag" ]; then
+            tag=$(git ls-remote --tags https://github.com/latere-ai/images 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          if [ -z "$tag" ]; then
+            echo "Could not resolve latere-ai/images tag" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+          SANDBOX_TAG: ${{ steps.sandbox_tag.outputs.tag }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          go build -trimpath -ldflags "-s -w -X latere.ai/x/wallfacer/internal/cli.Version=${VERSION} -X latere.ai/x/wallfacer/internal/cli.SandboxTag=${SANDBOX_TAG}" \
+            -o wallfacer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wallfacer-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: wallfacer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          if-no-files-found: error
+
+  image:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/changkun/wallfacerd
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.wallfacerd
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    environment:
+      name: production
       url: https://wf.latere.ai
-      title: Wallfacer
-      build_mode: dockerfile
-      dockerfile: Dockerfile.wallfacerd
-      has_frontend: false
-      build_cli: true
-      cli_build_cmd: tools/release/build-cli.sh
-    secrets: inherit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_TOKEN }}
+      # --expiry-seconds makes doctl use the ephemeral /credentials
+      # endpoint; the default behavior mints a persistent PAT per run.
+      - run: doctl kubernetes cluster kubeconfig save latere-k8s --expiry-seconds 3600
+      - name: Deploy to production
+        run: |
+          # docker/metadata-action publishes the semver tag without the leading v.
+          TAG="${GITHUB_REF_NAME#v}"
+          kubectl apply -f deploy/prod/
+          kubectl -n latere set image deployment/wallfacerd \
+            wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
+          kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
+      - name: Smoke production
+        run: BASE_URL=https://wf.latere.ai tools/smoke/release.sh
+
+  release:
+    needs: [binary, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wallfacer-*
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Pre-releases: any tag with a -suffix (v0.0.7-alpha.6, v1.0.0-rc.1).
+          prerelease=""
+          [[ "$TAG" == *-* ]] && prerelease="--prerelease"
+          gh release create "$TAG" $prerelease \
+            --generate-notes \
+            --title "Wallfacer $TAG" \
+            dist/*
