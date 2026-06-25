@@ -6,6 +6,31 @@
   flex: 1;
   min-height: 0;
 }
+/* Collapsed rail: persistent left-edge affordance to reopen the explorer when
+   it is hidden. Occupies the same left slot the panel would, so the reopen
+   control always lives where the panel lives. */
+.explorer-rail {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 0;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--bg-sunk, var(--bg-raised, var(--bg)));
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.explorer-rail:hover {
+  color: var(--accent);
+  background: var(--accent-tint, var(--bg-hover));
+}
+.explorer-rail__chevron {
+  opacity: 0.55;
+}
+
 .board-with-explorer > .board-grid,
 .board-with-explorer > .spec-mode-container,
 .board-with-explorer > .depgraph-mode-container,
