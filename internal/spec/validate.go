@@ -161,7 +161,56 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 	results = append(results, checkStalePropagation(tree)...)
 	results = append(results, checkArchivedDependencies(tree)...)
 	results = append(results, checkUniqueDispatches(tree)...)
+	results = append(results, checkAffectsTooBroad(tree)...)
 
+	return results
+}
+
+// affectsTooBroadThreshold is the number of other specs a single affects entry
+// may overlap before it is flagged as likely too broad. Legitimate for
+// umbrella refactors, but usually a smell. Tunable as live data accrues.
+const affectsTooBroadThreshold = 20
+
+// checkAffectsTooBroad warns when a single affects entry overlaps more than
+// affectsTooBroadThreshold other specs. Stale propagation through such an entry
+// would mark a large swath of the tree stale on every touch.
+func checkAffectsTooBroad(tree *Tree) []Result {
+	idx := affectsToSpecs(tree)
+	var results []Result
+	for path, node := range tree.All {
+		if node.Value == nil || node.Value.Doc || node.Value.Status == StatusArchived {
+			continue
+		}
+		seen := make(map[string]bool, len(node.Value.Affects))
+		for _, raw := range node.Value.Affects {
+			e := normalizeAffect(raw)
+			if e == "" || seen[e] {
+				continue
+			}
+			seen[e] = true
+			others := make(map[string]bool)
+			for entry, specs := range idx {
+				if !affectsOverlap(e, entry) {
+					continue
+				}
+				for _, p := range specs {
+					if p != path {
+						others[p] = true
+					}
+				}
+			}
+			if len(others) > affectsTooBroadThreshold {
+				results = append(results, Result{
+					Path:     path,
+					Severity: SeverityWarning,
+					Rule:     "affects-too-broad",
+					Message: fmt.Sprintf(
+						"affects entry %q overlaps %d other specs — likely too broad for stale propagation",
+						raw, len(others)),
+				})
+			}
+		}
+	}
 	return results
 }
 
