@@ -171,7 +171,7 @@ function copyInstall() {
           <p class="harness-sub" v-html="t('wf.harness.sub')"></p>
           <div class="harness-row">
             <div v-for="h in harnesses" :key="h" class="harness-card">
-              <HarnessLogo :harness="h" :size="34" />
+              <HarnessLogo :harness="h" :size="34" color />
               <span class="harness-card__name">{{ harnessLabel(h) }}</span>
             </div>
           </div>
