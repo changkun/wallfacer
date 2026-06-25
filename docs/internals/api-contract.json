@@ -362,7 +362,7 @@
       "name": "GetAgentSessionStatus",
       "description": "Get planning sandbox status.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -371,7 +371,7 @@
       "name": "StartAgentSession",
       "description": "Start the planning sandbox.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -380,7 +380,7 @@
       "name": "StopAgentSession",
       "description": "Stop the planning sandbox.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -389,7 +389,7 @@
       "name": "GetAgentMessages",
       "description": "Retrieve conversation history.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -398,7 +398,7 @@
       "name": "SendAgentMessage",
       "description": "Send a user message, triggers agent exec.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -407,7 +407,7 @@
       "name": "ClearAgentMessages",
       "description": "Clear conversation history.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -416,7 +416,7 @@
       "name": "StreamAgentMessages",
       "description": "Stream the agent's response tokens.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -425,7 +425,7 @@
       "name": "InterruptAgentMessage",
       "description": "Interrupt the current agent turn.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -434,7 +434,7 @@
       "name": "UndoPlanningRound",
       "description": "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -443,7 +443,7 @@
       "name": "GetAgentCommands",
       "description": "List available slash commands.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -452,7 +452,7 @@
       "name": "UpdateTaskPromptTool",
       "description": "Tool endpoint: update a task's prompt from a task-mode planning thread.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -461,7 +461,7 @@
       "name": "ListAgentSessions",
       "description": "List planning chat threads for the current workspace group.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -470,7 +470,7 @@
       "name": "CreateAgentSession",
       "description": "Create a new planning chat thread.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -479,7 +479,7 @@
       "name": "PatchAgentSession",
       "description": "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
@@ -488,7 +488,7 @@
       "name": "DeleteAgentSession",
       "description": "Permanently delete an archived planning chat thread and its stored conversation.",
       "tags": [
-        "planning"
+        "agent"
       ]
     },
     {
