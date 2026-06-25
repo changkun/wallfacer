@@ -313,14 +313,20 @@ func Reposition(body string, a speccomment.Anchor) (speccomment.Anchor, int, boo
 	}
 	headings := parseHeadings(lines)
 
-	// Find every line whose normalized hash matches the anchor's LineHash.
-	// (Single-line match: a multi-line anchor's range hash will simply not
-	// match any single line and fall through to the fuzzy path, which is the
-	// safe behavior — we never partially reattach a range.)
-	var matches []int
-	for i := range lines {
-		if LineHash(normalizeLine(lines[i])) == a.LineHash {
-			matches = append(matches, i+1)
+	// Match the anchored RANGE, not single lines. ComputeAnchor hashes the joined
+	// normalized lines [start,end], so a multi-line selection must be matched as a
+	// sliding window of the same height; matching line-by-line orphaned every
+	// multi-line comment. The window height is recovered from the ExactText
+	// snapshot (its line count). rangeLen == 1 is the single-line case, identical
+	// to the old behavior.
+	rangeLen := 1
+	if a.ExactText != "" {
+		rangeLen = strings.Count(a.ExactText, "\n") + 1
+	}
+	var matches []int // 1-based start line of each window whose range hash matches
+	for i := 1; i+rangeLen-1 <= len(lines); i++ {
+		if LineHash(normalizeRange(lines, i, i+rangeLen-1)) == a.LineHash {
+			matches = append(matches, i)
 		}
 	}
 

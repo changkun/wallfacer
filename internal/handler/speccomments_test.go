@@ -4,7 +4,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"latere.ai/x/wallfacer/internal/spec"
+	"latere.ai/x/wallfacer/internal/speccomment"
 )
 
 // TestSpecFilePath verifies the path resolution tolerates both conventions: the
@@ -35,6 +39,52 @@ func TestSpecFilePath(t *testing.T) {
 	// A directory is not a spec file.
 	if _, ok := specFilePath(root, "specs/cloud"); ok {
 		t.Fatal("a directory should not resolve as a spec file")
+	}
+}
+
+// TestRepositionThreadMultiLineNotOrphaned reproduces the user-facing bug: a
+// multi-line comment created on a real spec must reattach INLINE on the next
+// load, not land in triage as orphaned. It drives the exact instance-side path
+// (specFilePath -> ParseBytes -> ComputeAnchor on create, then repositionThread
+// on GET) with the "specs/"-prefixed path the frontend actually sends.
+func TestRepositionThreadMultiLineNotOrphaned(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "specs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\ntitle: T\n---\n\n# Heading\n\nFirst line of a paragraph.\nSecond line continues.\nThird line ends it.\n"
+	if err := os.WriteFile(filepath.Join(root, "specs", "x.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create: compute a multi-line anchor exactly as SubmitSpecComment does.
+	parsed, err := spec.ParseBytes([]byte(content), "x.md")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	bodyLines := strings.Split(parsed.Body, "\n")
+	start, end := 0, 0
+	for i, l := range bodyLines {
+		if strings.HasPrefix(l, "First line") {
+			start = i + 1
+		}
+		if strings.HasPrefix(l, "Third line") {
+			end = i + 1
+		}
+	}
+	if start == 0 || end <= start {
+		t.Fatalf("fixture lines not found: start=%d end=%d", start, end)
+	}
+	anchor := spec.ComputeAnchor(parsed.Body, start, end)
+
+	// GET: the frontend sends spec_path WITH the leading specs/ prefix.
+	thread := speccomment.Thread{SpecPath: "specs/x.md", Anchor: anchor, Status: speccomment.StatusActive}
+	got := repositionThread(thread, root)
+	if got.Orphaned {
+		t.Fatal("multi-line comment orphaned on display (the triage bug)")
+	}
+	if got.Line != start {
+		t.Fatalf("reattached to line %d, want the range start %d", got.Line, start)
 	}
 }
 
