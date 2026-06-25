@@ -45,8 +45,8 @@ Shared Design - 4 complete
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
-    ○ Coordination Plane (anchor)  ○ Connection + Presence
-    ○ Metadata Projection          ○ Spec Comments
+    ◐ Coordination Plane (anchor)  ◐ Connection + Presence
+    ○ Metadata Projection          ✅ Spec Comments
     ○ Remote Control (re-homed)    ○ Data Boundary (widened)
   Axis B: Remote execution (Cloud v2+, demand-gated, blocked on Executor seam)
     ○ Latere Integration (umbrella)  ○ Runtime → Cella
