@@ -183,6 +183,22 @@ describe('editorTabs store', () => {
     expect(s.find('a.ts')!.content).toBe('edited');
   });
 
+  it('pins a clean tab on save without a PUT', async () => {
+    // Cmd/Ctrl+S on a freshly opened (clean) preview must promote it to a kept
+    // tab without writing — re-PUTing unchanged content touches mtime and trips
+    // the file-watch reload.
+    mockRead('orig');
+    const s = useEditorTabsStore();
+    await s.openFile('/ws', 'a.ts');
+    expect(s.find('a.ts')!.preview).toBe(true);
+    expect(s.isDirty('a.ts')).toBe(false);
+
+    apiMock.mockClear();
+    await s.save('a.ts');
+    expect(apiMock).not.toHaveBeenCalled(); // no write for a clean buffer
+    expect(s.find('a.ts')!.preview).toBe(false); // still pinned
+  });
+
   it('promotes the preview tab on save', async () => {
     mockRead('orig');
     const s = useEditorTabsStore();

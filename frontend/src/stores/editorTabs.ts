@@ -139,6 +139,13 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
   async function save(path: string): Promise<void> {
     const t = find(path);
     if (!t || t.saving || t.loading) return;
+    // A clean tab has nothing to write: just pin it (Cmd/Ctrl+S on a freshly
+    // opened preview). Skipping the PUT avoids touching the file's mtime and
+    // tripping the file-watch stream into a spurious reload.
+    if (t.content === t.baseline) {
+      t.preview = false;
+      return;
+    }
     t.saving = true;
     t.saveError = null;
     try {
