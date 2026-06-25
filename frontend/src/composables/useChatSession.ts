@@ -100,11 +100,14 @@ export function useChatSession(): ChatSession {
   // Id of the in-flight streaming bubble, if any. loadHistory uses it to carry
   // the live (not-yet-persisted) turn across a history reload.
   let activeStreamBubbleId: string | null = null;
-  // Set true to make the next watch(activeThreadId) firing skip its loadHistory.
-  // promoteDraft loads history itself (awaited) right after activating the new
-  // thread; without this guard the watcher's fire-and-forget loadHistory races
-  // the optimistic user bubble and can wipe it.
-  let suppressNextHistoryLoad = false;
+  // Monotonic guard against stale history loads clobbering newer state.
+  // loadHistory captures the token at call time and only commits if it is still
+  // current; an optimistic user-bubble push bumps it. Without this, a
+  // fire-and-forget loadHistory (e.g. the watcher's, or one triggered by
+  // loadThreads during draft promotion) can resolve after the just-sent message
+  // is pushed and wipe it — the active-thread id is the same, so the id check
+  // alone does not catch it.
+  let historyToken = 0;
   // Pending poll that refreshes the thread list until the backend auto-titler
   // replaces a freshly-created thread's "Chat N" name. Cancelled on unmount.
   let titleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -160,6 +163,7 @@ export function useChatSession(): ChatSession {
   }
 
   async function loadHistory() {
+    const token = ++historyToken;
     if (!activeThreadId.value) {
       renderedMessages.value = [];
       return;
@@ -170,7 +174,10 @@ export function useChatSession(): ChatSession {
         'GET',
         '/api/planning/messages?thread=' + encodeURIComponent(fetched),
       );
-      if (fetched !== activeThreadId.value) return;
+      // Bail if a newer load started or an optimistic push bumped the token, or
+      // the active thread changed under us; committing a stale list would wipe
+      // the live bubble (e.g. a freshly promoted draft's just-sent message).
+      if (token !== historyToken || fetched !== activeThreadId.value) return;
       const next = (msgs ?? []).map(bubbleFromMessage);
       // An in-flight turn isn't persisted yet, so a reload would drop it. If we
       // are streaming this thread, carry the live bubble across the reload.
@@ -182,7 +189,7 @@ export function useChatSession(): ChatSession {
       interruptedAt.value = -1;
       void scrollToBottom(true);
     } catch {
-      renderedMessages.value = [];
+      if (token === historyToken) renderedMessages.value = [];
     }
   }
 
@@ -358,6 +365,9 @@ export function useChatSession(): ChatSession {
     }
 
     if (targetId === activeThreadId.value) {
+      // Invalidate any in-flight loadHistory so it cannot land after and wipe
+      // this optimistic bubble (notably right after draft promotion).
+      historyToken++;
       renderedMessages.value.push(bubbleFromMessage({
         role: 'user',
         content: text,
@@ -548,15 +558,15 @@ export function useChatSession(): ChatSession {
     const id = created.id;
     draft.value = false;
     await planning.loadThreads();
-    // Activate the new thread and load its (empty) history ourselves, with the
-    // watcher suppressed, so the blank load settles before sendMessage pushes
-    // the optimistic user bubble — otherwise a racing load would wipe it.
+    // Activate the new thread and load its (empty) history. Any racing load —
+    // the watcher's, or one loadThreads above may have triggered — is made safe
+    // by historyToken: the optimistic push in sendMessage bumps it, so a late
+    // load bails instead of wiping the just-sent message.
     const t = threads.value[id];
     if (t) {
       t.unread = false;
       t.lastViewedAt = Date.now();
     }
-    suppressNextHistoryLoad = true;
     activeThreadId.value = id;
     api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
     await loadHistory();
@@ -754,10 +764,6 @@ export function useChatSession(): ChatSession {
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   watch(activeThreadId, () => {
-    if (suppressNextHistoryLoad) {
-      suppressNextHistoryLoad = false;
-      return;
-    }
     void loadHistory();
   });
 

@@ -188,7 +188,8 @@ function onResizeUp() {
 
 // ── Compact session switcher ───────────────────────────────────────
 const switcherOpen = ref(false);
-const activeName = computed(() => (activeThreadId.value && threads.value[activeThreadId.value]?.name) || 'Chat');
+const activeName = computed(() =>
+  chat.draft.value ? 'New chat' : ((activeThreadId.value && threads.value[activeThreadId.value]?.name) || 'Chat'));
 function pickSession(id: string) {
   switcherOpen.value = false;
   void chat.switchToThread(id);

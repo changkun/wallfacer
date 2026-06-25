@@ -41,6 +41,11 @@ function messagePostCount(): number {
 
 let app: App | null = null;
 let createSeq = 0;
+let createdThreads: Array<{ id: string; name: string; archived: boolean }> = [];
+// When set, the next history GET blocks on this promise so a test can force it
+// to resolve after a later send (reproducing the stale-load wipe).
+let messagesGate: Promise<void> | null = null;
+let releaseGate: (() => void) | null = null;
 
 async function flush() {
   await nextTick();
@@ -53,18 +58,26 @@ describe('useChatSession deferred chat creation', () => {
     vi.useFakeTimers();
     setActivePinia(createPinia());
     createSeq = 0;
+    createdThreads = [];
+    messagesGate = null;
+    releaseGate = null;
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = (init?.method ?? 'GET').toUpperCase();
       if (url.endsWith('/api/planning/threads') && method === 'POST') {
         createSeq++;
-        return new Response(JSON.stringify({ id: 'new-' + createSeq, name: 'Chat ' + createSeq, archived: false }), { status: 201 });
+        const t = { id: 'new-' + createSeq, name: 'Chat ' + createSeq, archived: false };
+        createdThreads.push(t);
+        return new Response(JSON.stringify(t), { status: 201 });
       }
       if (url.includes('/api/planning/threads') && method === 'PATCH') {
         return new Response(null, { status: 200 });
       }
       if (url.includes('/api/planning/threads')) {
-        return new Response(JSON.stringify({ threads: [], active_id: '' }), { status: 200 });
+        // Mirror the server: list reflects created threads. active_id stays ''
+        // (Create does not activate server-side), so loadThreads during promotion
+        // sets activeThreadId to the new thread itself — the harshest race path.
+        return new Response(JSON.stringify({ threads: createdThreads, active_id: '' }), { status: 200 });
       }
       if (url.includes('/api/planning/messages/stream')) {
         return new Response(null, { status: 204 });
@@ -74,6 +87,7 @@ describe('useChatSession deferred chat creation', () => {
       }
       if (url.startsWith('/api/planning/messages')) {
         // loadHistory: thread "a" has prior content; everything else is empty.
+        if (messagesGate) await messagesGate;
         if (url.includes('thread=a')) {
           return new Response(JSON.stringify([{ role: 'user', content: 'old', timestamp: '2026-06-25T00:00:00Z' }]), { status: 200 });
         }
@@ -152,5 +166,31 @@ describe('useChatSession deferred chat creation', () => {
     expect(threadCreateCount()).toBe(1);
     expect(messagePostCount()).toBe(1);
     expect(planning.threads['new-1']?.queue.length ?? 0).toBe(0);
+  });
+
+  it('a stale history load that resolves after a send does not wipe the message', async () => {
+    await mount();
+    const planning = usePlanningStore();
+    planning.threads = {
+      a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: 0 },
+    };
+    planning.threadOrder = ['a'];
+
+    // Block the history GET, then activate "a" so its load hangs in flight.
+    messagesGate = new Promise<void>((r) => { releaseGate = r; });
+    planning.activeThreadId = 'a';
+    await nextTick();
+
+    // Send while that load is still pending: bumps the history token.
+    await session.sendMessage('hello');
+    await nextTick();
+    expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'hello')).toBe(true);
+
+    // The stale load now resolves with the server's prior list. The token guard
+    // must drop it instead of replacing the just-sent message.
+    releaseGate!();
+    messagesGate = null;
+    await flush();
+    expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'hello')).toBe(true);
   });
 });
