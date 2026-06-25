@@ -24,9 +24,13 @@ const toast = useToastStore();
 const dialog = useDialogStore();
 const router = useRouter();
 const {
-  focusedSpecPath, focusedIsIndex, focusedNode, tree,
+  focusedSpecPath, focusedIsIndex, focusedNode, tree, staleCandidates,
   focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
 } = storeToRefs(planning);
+
+const staleCandidate = computed(() =>
+  focusedSpecPath.value ? staleCandidates.value[focusedSpecPath.value] : undefined,
+);
 
 const specText = ref<string>('');
 const loading = ref(false);
@@ -285,6 +289,21 @@ async function onValidate() {
   }
 }
 
+async function onStaleCandidateAction(action: 'stale' | 'dismiss-stale') {
+  if (!focusedSpecPath.value) return;
+  actionBusy.value = true;
+  try {
+    await api('POST', '/api/specs/transition', { action, path: focusedSpecPath.value });
+    await planning.fetchStaleCandidates();
+    await loadCurrent();
+    toast.push(action === 'stale' ? 'Spec marked stale' : 'Stale candidate dismissed', { kind: 'success' });
+  } catch (e) {
+    toast.push('Action failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+  } finally {
+    actionBusy.value = false;
+  }
+}
+
 interface ArchiveAction {
   action: 'archive' | 'unarchive';
   path: string;
@@ -509,6 +528,28 @@ defineExpose({ dispatchFocused, breakdownFocused });
       <button type="button" class="sf-action" @click="onUnarchive">Unarchive</button>
     </div>
 
+    <div v-if="staleCandidate && !isArchived" class="sf-stale-banner" role="status">
+      <span aria-hidden="true">⚠</span>
+      <span>
+        Stale candidate: {{ staleCandidate.reason }}.
+        <template v-if="staleCandidate.files.length">
+          Changed: {{ staleCandidate.files.join(', ') }}.
+        </template>
+      </span>
+      <button
+        type="button"
+        class="sf-action"
+        :disabled="actionBusy"
+        @click="onStaleCandidateAction('stale')"
+      >Mark Stale</button>
+      <button
+        type="button"
+        class="sf-action"
+        :disabled="actionBusy"
+        @click="onStaleCandidateAction('dismiss-stale')"
+      >Dismiss</button>
+    </div>
+
     <div
       class="sf-body"
       :class="{ 'sf-body--toc': tocReserve || commentsReserve }"
@@ -726,6 +767,17 @@ defineExpose({ dispatchFocused, breakdownFocused });
   background: var(--bg-sunk);
   font-size: 12px;
   color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sf-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: var(--tint-amber);
+  font-size: 12px;
+  color: var(--tint-amber-ink);
   border-bottom: 1px solid var(--rule);
 }
 

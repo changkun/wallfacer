@@ -90,6 +90,11 @@ export const usePlanningStore = defineStore('planning', () => {
   const treeIndex = ref<SpecIndexMeta | null>(null);
   const treeLoading = ref(true);
 
+  // Advisory stale-candidate scan results, keyed by spec path. Populated on
+  // demand (plan mount + manual rescan), not on every tree poll — the scan
+  // runs git log per complete spec.
+  const staleCandidates = ref<Record<string, { files: string[]; reason: string }>>({});
+
   const focusedSpecPath = ref<string>('');
   const focusedIsIndex = ref(false);
   const focusedTaskId = ref<string>('');
@@ -172,6 +177,23 @@ export const usePlanningStore = defineStore('planning', () => {
     } catch (e) {
       console.error('spec tree:', e);
       treeLoading.value = false;
+    }
+  }
+
+  interface StaleCandidatesResponse {
+    candidates: { path: string; files: string[]; reason: string }[];
+  }
+
+  async function fetchStaleCandidates() {
+    try {
+      const data = await api<StaleCandidatesResponse>('GET', '/api/specs/stale-candidates');
+      const map: Record<string, { files: string[]; reason: string }> = {};
+      for (const c of data.candidates ?? []) {
+        map[c.path] = { files: c.files, reason: c.reason };
+      }
+      staleCandidates.value = map;
+    } catch (e) {
+      console.error('stale candidates:', e);
     }
   }
 
@@ -331,12 +353,13 @@ export const usePlanningStore = defineStore('planning', () => {
 
   return {
     tree, treeProgress, treeIndex, treeLoading,
+    staleCandidates,
     focusedSpecPath, focusedIsIndex,
     focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
     threads, threadOrder, archivedThreads, activeThreadId,
     streaming, streamingThreadId, busyThreadId,
     sortedNodes, nodesByPath, focusedNode,
-    applyTree, fetchTree, focusSpec, focusIndex, clearFocus,
+    applyTree, fetchTree, fetchStaleCandidates, focusSpec, focusIndex, clearFocus,
     openPlanForTask,
     loadThreads, refreshBusy,
   };

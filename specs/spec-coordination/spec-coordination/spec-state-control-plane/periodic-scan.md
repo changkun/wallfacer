@@ -1,6 +1,6 @@
 ---
 title: "Periodic cross-tree staleness scan"
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/handler/tasks.go
@@ -8,7 +8,7 @@ affects:
   - frontend/src/components/plan/SpecTreePanel.vue
   - frontend/src/components/plan/SpecFocusedView.vue
 created: 2026-04-12
-updated: 2026-06-14
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 effort: small
