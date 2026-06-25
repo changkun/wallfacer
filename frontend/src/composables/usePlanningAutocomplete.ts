@@ -7,6 +7,7 @@
 // running their own Enter / send-mode logic in that case.
 import { ref, type Ref } from 'vue';
 import { api } from '../api/client';
+import { mentionQueryAt, filterMentionFiles } from '../lib/mentions';
 
 interface SlashCommand { name: string; description?: string }
 
@@ -95,15 +96,14 @@ export function usePlanningAutocomplete(opts: {
     }
     slashOpen.value = false;
 
-    // Mention detection: token starting with @.
-    const atMatch = before.match(/(^|\s)@([\w./-]*)$/);
-    if (atMatch) {
-      mentionStart.value = before.lastIndexOf('@');
-      const q = atMatch[2].toLowerCase();
+    // Mention detection + ranking via the shared lib/mentions helpers, so the
+    // planning composer ranks identically to the other @-mention surface
+    // (useMentions) instead of an unranked substring match.
+    const mq = mentionQueryAt(value, pos);
+    if (mq) {
+      mentionStart.value = mq.atIdx;
       if (mentionItems.value.length === 0) mentionItems.value = await fetchFiles();
-      mentionFiltered.value = mentionItems.value
-        .filter(f => f.toLowerCase().includes(q))
-        .slice(0, 50);
+      mentionFiltered.value = filterMentionFiles(mentionItems.value, mq.query);
       mentionIndex.value = 0;
       mentionOpen.value = mentionFiltered.value.length > 0;
       return;
