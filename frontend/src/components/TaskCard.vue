@@ -291,8 +291,10 @@ const titleHtml = computed(() => highlightMatch(props.task.title || '', taskStor
 // Dependency-state badge for backlog cards (blocked / ready / cancelled),
 // resolved against the live task list. Mirrors render.js renderDependencyBadge.
 const depBadge = computed(() => {
-  const byId = new Map(taskStore.tasks.map((t) => [t.id, t]));
-  return dependencyBadge(props.task, byId);
+  // Only backlog cards carry a dependency badge; skip the map lookup entirely
+  // for every other card so a tasks change does not touch them.
+  if (props.task.status !== 'backlog') return null;
+  return dependencyBadge(props.task, taskStore.tasksById);
 });
 const depBadgeClass = computed(() => {
   switch (depBadge.value?.kind) {

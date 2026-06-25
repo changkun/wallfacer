@@ -7,6 +7,8 @@ vi.mock('../api/client', () => ({
 }));
 
 import { useTaskStore } from './tasks';
+import { dependencyBadge } from '../lib/cardBadges';
+import type { Task } from '../api/types';
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -55,5 +57,32 @@ describe('tasks store create payloads', () => {
         { prompt: 'two', timeout: 45 },
       ],
     });
+  });
+});
+
+describe('tasks store tasksById', () => {
+  it('indexes tasks by id and rebuilds on change', () => {
+    const store = useTaskStore();
+    store.setTasks([
+      { id: 'a' } as Task,
+      { id: 'b' } as Task,
+    ]);
+    expect(store.tasksById.get('a')?.id).toBe('a');
+    expect(store.tasksById.get('b')?.id).toBe('b');
+
+    store.setTasks([{ id: 'c' } as Task]);
+    expect(store.tasksById.has('a')).toBe(false);
+    expect(store.tasksById.get('c')?.id).toBe('c');
+  });
+
+  it('resolves a backlog blocked badge via the shared map', () => {
+    const store = useTaskStore();
+    const dep = { id: 'dep', title: 'Build deps', status: 'in_progress' } as Task;
+    const card = { id: 'card', status: 'backlog', depends_on: ['dep'] } as Task;
+    store.setTasks([dep, card]);
+
+    const badge = dependencyBadge(card, store.tasksById);
+    expect(badge?.kind).toBe('blocked');
+    expect(badge?.blocking).toBe('Build deps');
   });
 });
