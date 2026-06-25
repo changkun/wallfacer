@@ -29,6 +29,26 @@ async function onRescanStaleness() {
   }
 }
 
+const staleCandidateCount = computed(() => Object.keys(staleCandidates.value).length);
+
+async function onDismissAllStaleness() {
+  const n = staleCandidateCount.value;
+  if (n === 0) return;
+  const ok = await dialog.confirm({
+    title: 'Dismiss all stale candidates',
+    message: `Mark ${n} flagged spec${n === 1 ? '' : 's'} as reviewed? This bumps each one's `
+      + `updated date (status unchanged), asserting the designs still match the code.`,
+    confirmLabel: 'Dismiss all',
+  });
+  if (!ok) return;
+  rescanning.value = true;
+  try {
+    await planning.dismissAllStaleCandidates();
+  } finally {
+    rescanning.value = false;
+  }
+}
+
 // ── Persisted UI state ─────────────────────────────────────────────
 const STATUS_KEY = 'wallfacer-spec-filter';
 const EXPANDED_KEY = 'wallfacer-spec-expanded';
@@ -444,6 +464,14 @@ onUnmounted(() => {
         title="Rescan completed specs for code drift in their affects files"
         @click="onRescanStaleness"
       >{{ rescanning ? 'Rescanning…' : 'Rescan staleness' }}</button>
+      <button
+        v-if="staleCandidateCount > 0"
+        type="button"
+        class="stp-rescan"
+        :disabled="rescanning"
+        title="Mark all flagged specs reviewed (bumps their updated date; status unchanged)"
+        @click="onDismissAllStaleness"
+      >Dismiss all ({{ staleCandidateCount }})</button>
     </div>
 
     <div v-if="docNodes.length > 0 && !migrateDismissed" class="stp-migrate-banner">

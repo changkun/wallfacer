@@ -996,10 +996,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateWorkspaces": h.UpdateWorkspaces,
 
 		// Spec tree.
-		"GetSpecTree":     h.GetSpecTree,
-		"SpecTreeStream":  h.SpecTreeStream,
-		"SpecTransition":  h.SpecTransition,
-		"StaleCandidates": h.StaleCandidates,
+		"GetSpecTree":               h.GetSpecTree,
+		"SpecTreeStream":            h.SpecTreeStream,
+		"SpecTransition":            h.SpecTransition,
+		"StaleCandidates":           h.StaleCandidates,
+		"DismissAllStaleCandidates": h.DismissAllStaleCandidates,
 
 		"ListSpecComments":      h.ListSpecComments,
 		"SubmitSpecComment":     h.SubmitSpecComment,
