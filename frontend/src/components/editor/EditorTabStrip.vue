@@ -4,11 +4,12 @@
 // open files from the editorTabs store. Single-click focuses; double-click pins
 // a preview tab; the active file tab closes via its ×, middle-click, or
 // Cmd/Ctrl+W.
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useEditorTabsStore, BOARD_TAB_ID, type FileTab } from '../../stores/editorTabs';
 import { useTaskStore } from '../../stores/tasks';
 import { fileIcon } from '../../lib/fileIcon';
 import { handleTabHotkey } from './editorTabHotkeys';
+import { scrollActiveTabIntoView } from './editorTabScroll';
 
 const tabs = useEditorTabsStore();
 const store = useTaskStore();
@@ -35,12 +36,22 @@ function onKeydown(e: KeyboardEvent) {
   handleTabHotkey(e, tabs);
 }
 
+// Reveal the active tab whenever it changes; see editorTabScroll for the why.
+const stripEl = ref<HTMLElement | null>(null);
+watch(
+  () => tabs.activeId,
+  async () => {
+    await nextTick();
+    scrollActiveTabIntoView(stripEl.value);
+  },
+);
+
 onMounted(() => window.addEventListener('keydown', onKeydown));
 onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>
 
 <template>
-  <div class="editor-tabs" role="tablist" aria-label="Open editors">
+  <div ref="stripEl" class="editor-tabs" role="tablist" aria-label="Open editors">
     <button
       type="button"
       class="editor-tab editor-tab--board"
