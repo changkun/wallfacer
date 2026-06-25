@@ -82,6 +82,70 @@ func TestUndoPlanningRound_Success(t *testing.T) {
 	}
 }
 
+// TestUndoPlanningRound_RepeatedUndo exercises the spec-mode (git-revert) undo
+// path across consecutive undos. Before findLatestThreadPlanCommit skipped
+// already-reverted rounds in its selection loop, the second undo re-selected
+// the round it had just reverted, so `git revert` of an already-reverted commit
+// aborted with a 409 conflict and spec-mode undo could never walk back past the
+// first round.
+func TestUndoPlanningRound_RepeatedUndo(t *testing.T) {
+	ws := initPlanningTestRepo(t)
+	writeSpec(t, ws, "foo.md", "# foo\n")
+	seedPlanningCommit(t, ws, 1, "drafted foo")
+	writeSpec(t, ws, "bar.md", "# bar\n")
+	seedPlanningCommit(t, ws, 2, "drafted bar")
+
+	h := newStaticWorkspaceHandler(t, []string{ws})
+	undo := func() *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/planning/undo", nil)
+		h.UndoPlanningRound(rec, req)
+		return rec
+	}
+
+	// First undo reverts round 2.
+	rec := undo()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("undo1 status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
+	}
+	var r1 undoResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &r1); err != nil {
+		t.Fatalf("undo1 decode: %v", err)
+	}
+	if r1.Round != 2 {
+		t.Errorf("undo1 round = %d, want 2", r1.Round)
+	}
+
+	// Second undo must reach back to round 1 (regression: previously 409).
+	rec = undo()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("undo2 status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
+	}
+	var r2 undoResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &r2); err != nil {
+		t.Fatalf("undo2 decode: %v", err)
+	}
+	if r2.Round != 1 {
+		t.Errorf("undo2 round = %d, want 1", r2.Round)
+	}
+
+	// Both specs are gone from the working tree.
+	for _, f := range []string{"foo.md", "bar.md"} {
+		if _, err := os.Stat(filepath.Join(ws, "specs", f)); !os.IsNotExist(err) {
+			t.Errorf("specs/%s still exists after undo: err=%v", f, err)
+		}
+	}
+
+	// Third undo finds nothing left to undo.
+	rec = undo()
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("undo3 status = %d, want 409\nbody: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "no planning commits to undo") {
+		t.Errorf("undo3 body = %q, want 'no planning commits to undo'", rec.Body.String())
+	}
+}
+
 func TestUndoPlanningRound_NoPlanningCommits(t *testing.T) {
 	ws := initPlanningTestRepo(t)
 

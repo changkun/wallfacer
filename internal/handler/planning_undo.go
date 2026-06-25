@@ -244,14 +244,19 @@ func findLatestThreadPlanCommit(ctx context.Context, ws, threadID string) (hash,
 			applied[e.round] = true
 		}
 	}
-	// Now pick the highest-round entry whose round is still applied.
+	// Now pick the highest-round entry whose round is still applied and
+	// not already reverted. Skipping reverted rounds is what lets
+	// consecutive undos walk back: a revert commit carries a HIGHER
+	// Plan-Round than the round it reverts, so without this check the
+	// loop would re-select the just-reverted round and `git revert` it
+	// again (a no-op patch that aborts with a 409 conflict).
 	var best entry
 	bestFound := false
 	for _, e := range entries {
 		if _, isRevert := revertedRoundFromSubject(e.subject); isRevert {
 			continue
 		}
-		if !applied[e.round] {
+		if !applied[e.round] || reverted[e.round] {
 			continue
 		}
 		if !bestFound || e.round > best.round {
