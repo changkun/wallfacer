@@ -465,12 +465,15 @@ function activityIcon(kind: ActivityRow['kind']): string {
   }
 }
 
+// activity is reassigned wholesale per chunk (activity.value = [...]), never
+// mutated in place, so a shallow watch already fires on every update. A deep
+// watch over up to ACTIVITY_MAX_ROWS objects would only add traversal cost.
 watch(activity, async () => {
   await nextTick();
   if (logContainer.value) {
     logContainer.value.scrollTop = logContainer.value.scrollHeight;
   }
-}, { deep: true });
+});
 
 watch(() => props.task.status, (s) => {
   if (s === 'in_progress' || s === 'committing') mainTab.value = 'activity';
