@@ -38,7 +38,9 @@ export function useTaskActivity(taskId: Ref<string | null>) {
     truncated.value = false;
     streaming.value = true;
     // Tail of the previous chunk, so a sentinel split across a chunk boundary
-    // is still detected without rescanning the whole buffer.
+    // is still detected without rescanning the whole buffer. Covers a 2-chunk
+    // split; the sentinel is 28 bytes and stream chunks are KB-sized, so a
+    // 3+-chunk split is effectively impossible.
     let sentinelTail = '';
     // Incremental parser: parse each NDJSON line once instead of re-parsing the
     // whole accumulated buffer on every chunk (which is O(n^2) in frames).
