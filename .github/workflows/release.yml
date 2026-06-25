@@ -28,9 +28,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: |
-          rm -rf internal/webserver/spa/dist
-          cp -r frontend/dist internal/webserver/spa/dist
       - run: go build -o /dev/null .
       - run: go vet ./internal/webserver/...
 
