@@ -6,10 +6,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"time"
+
+	"golang.org/x/oauth2"
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/oidc"
@@ -73,24 +77,17 @@ func loadOptIn(path string) bool {
 // a goroutine. It returns the gate so the settings layer can toggle opt-in. The
 // connector self-gates on sign-in (a stored token) and opt-in, so calling this
 // unconditionally is safe: nothing dials until both hold.
-func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
+func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, tokenStore authkit.TokenStore, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
 	gate := &coordinationGate{path: filepath.Join(configDir, "coordination-opt-in")}
 	gate.optedIn.Store(loadOptIn(gate.path))
 
+	if tokenStore == nil {
+		logger.Warn("coordination: token store unavailable; connector disabled")
+		return gate
+	}
 	instanceID, err := coordinator.LoadOrCreateInstanceID(configDir)
 	if err != nil {
 		logger.Warn("coordination: instance id unavailable; connector disabled", "err", err)
-		return gate
-	}
-
-	storePath, err := authkit.DefaultFileTokenStorePath()
-	if err != nil {
-		logger.Warn("coordination: token store unavailable; connector disabled", "err", err)
-		return gate
-	}
-	tokenStore, err := authkit.NewFileTokenStore(storePath)
-	if err != nil {
-		logger.Warn("coordination: token store unavailable; connector disabled", "err", err)
 		return gate
 	}
 
@@ -139,6 +136,78 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 	}
 	go connector.Run(ctx)
 	return gate
+}
+
+// newCoordinationTokenStore opens the persisted token store the connector reads
+// and the session bridge writes (the same path `wallfacer auth login` and the
+// latere CLI use). Returns nil on failure; the connector then stays disabled.
+func newCoordinationTokenStore() authkit.TokenStore {
+	p, err := authkit.DefaultFileTokenStorePath()
+	if err != nil {
+		return nil
+	}
+	store, err := authkit.NewFileTokenStore(p)
+	if err != nil {
+		return nil
+	}
+	return store
+}
+
+// sessionTokenBridge persists a browser cookie session's token into the
+// connector's token store. The UI "Sign in" uses the OIDC cookie flow, which
+// authenticates the browser but never writes the device-code token.json the
+// connector reads, so without this bridge a user who signed in via the UI would
+// still see "coordination unavailable". On any authenticated request the bridge
+// copies the session's (already-refreshed) access + refresh token to the store,
+// so signing in via the UI enables the outbound connection automatically.
+type sessionTokenBridge struct {
+	client *oidc.Client
+	store  authkit.TokenStore
+	last   atomic.Value // string: last access token written, to skip redundant saves
+}
+
+func newSessionTokenBridge(client *oidc.Client, store authkit.TokenStore) *sessionTokenBridge {
+	return &sessionTokenBridge{client: client, store: store}
+}
+
+// wrap returns middleware that mirrors the cookie session token into the store.
+// A nil client or store (auth not configured) returns next unchanged, and an
+// anonymous request (no decryptable session) is a no-op, so local-anonymous
+// behavior is byte-identical.
+func (b *sessionTokenBridge) wrap(next http.Handler) http.Handler {
+	if b == nil || b.client == nil || b.store == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b.capture(r)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (b *sessionTokenBridge) capture(r *http.Request) {
+	sess, err := b.client.GetSession(r)
+	if err != nil || sess == nil {
+		return
+	}
+	b.sync(sess.AccessToken, sess.RefreshToken, sess.Expiry)
+}
+
+// sync writes the session's token to the store, skipping the file I/O when the
+// access token is unchanged since the last write. Split from capture so the
+// dedup + save path is unit-testable without a real cookie session.
+func (b *sessionTokenBridge) sync(accessToken, refreshToken string, expiry time.Time) {
+	if accessToken == "" {
+		return
+	}
+	if last, ok := b.last.Load().(string); ok && last == accessToken {
+		return
+	}
+	_ = b.store.Save(&oauth2.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Expiry:       expiry,
+	})
+	b.last.Store(accessToken)
 }
 
 // authConfigForRefresh is the subset of auth config the connector needs to

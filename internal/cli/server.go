@@ -225,7 +225,12 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// opt-in are present.
 	commentRelay := handler.NewCommentRelay()
 	h.SetCommentRelay(commentRelay)
-	coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay,
+	// The connector reads its token from this store; the session bridge writes the
+	// UI cookie login's token into the SAME store, so signing in via the board
+	// enables coordination without a separate `wallfacer auth login`.
+	coordTokenStore := newCoordinationTokenStore()
+	coordBridge := newSessionTokenBridge(authClient, coordTokenStore)
+	coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay, coordTokenStore,
 		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID},
 		logger.Main)
 	h.SetCoordinationToggle(coordGate)
@@ -405,6 +410,9 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
 	srvHandler = auth.CookieAuth(authClient, srvHandler)
+	// Mirror the UI cookie login's token into the connector's store so signing in
+	// via the board enables the outbound coordination connection automatically.
+	srvHandler = coordBridge.wrap(srvHandler)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	srv := &http.Server{
 		Handler:     loggingMiddleware(srvHandler, reg),
@@ -1051,6 +1059,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ExplorerStream":      h.ExplorerStream,
 		"ExplorerReadFile":    h.ExplorerReadFile,
 		"ExplorerWriteFile":   h.ExplorerWriteFile,
+		"ExplorerFileStream":  h.ExplorerFileStream,
 		"ExplorerTaskPrompts": h.ExplorerTaskPrompts,
 
 		// Git workspace operations.
