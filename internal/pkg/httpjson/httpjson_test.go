@@ -79,6 +79,19 @@ func TestDecodeBody_TrailingContent(t *testing.T) {
 	}
 }
 
+func TestDecodeBody_ScalarTrailingContent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`true false`))
+	w := httptest.NewRecorder()
+
+	_, ok := DecodeBody[bool](w, r)
+	if ok {
+		t.Fatal("expected DecodeBody to reject trailing scalar content")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestDecodeBody_MaxBytesError(t *testing.T) {
 	// Build a valid JSON body that exceeds the limit so that the JSON
 	// decoder surfaces the MaxBytesError rather than a syntax error.
@@ -261,6 +274,19 @@ func TestDecodeOptionalBody_TrailingContent(t *testing.T) {
 	_, ok := DecodeOptionalBody[payload](w, r)
 	if ok {
 		t.Fatal("expected DecodeOptionalBody to reject trailing content")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestDecodeOptionalBody_ScalarTrailingContent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`1 2`))
+	w := httptest.NewRecorder()
+
+	_, ok := DecodeOptionalBody[int](w, r)
+	if ok {
+		t.Fatal("expected DecodeOptionalBody to reject trailing scalar content")
 	}
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
