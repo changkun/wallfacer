@@ -213,9 +213,14 @@ func (r *Runner) ContainerCircuitAllow() bool {
 }
 
 // ContainerCircuitOpen reports whether the container launch circuit breaker
-// is currently open (runtime considered unavailable). The inverse of ContainerCircuitAllow.
+// is currently open (runtime considered unavailable). It reads the breaker
+// state WITHOUT side effects — unlike ContainerCircuitAllow, it never consumes
+// the half-open probe or restarts the open window. Read-only callers such as
+// the Prometheus gauge (scraped on a fixed interval) must use this; calling the
+// mutating ContainerCircuitAllow on every scrape would steal the recovery probe
+// from a real launch and make the gauge flap.
 func (r *Runner) ContainerCircuitOpen() bool {
-	return !r.ContainerCircuitAllow()
+	return r.containerCB.State() != circuitbreaker.Closed
 }
 
 // RecordContainerFailure records a single container launch failure against
