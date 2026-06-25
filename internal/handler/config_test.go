@@ -1954,9 +1954,9 @@ func TestRenameWorkspace_RejectsPathTraversal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cases := []string{"..", "a/b"}
+	cases := []string{"..", "../escape", "..\\escape", "a/b", "a\\b"}
 	for _, name := range cases {
-		body := `{"path":` + jsonStr(src) + `,"name":"` + name + `"}`
+		body := `{"path":` + jsonStr(src) + `,"name":` + jsonStr(name) + `}`
 		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
 		w := httptest.NewRecorder()
 		h.RenameWorkspace(w, req)
