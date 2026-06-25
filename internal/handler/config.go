@@ -295,9 +295,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"autosubmit":               h.AutosubmitEnabled(),
 		"autosync":                 h.AutosyncEnabled(),
 		"autopush":                 h.AutopushEnabled(),
-		"ideation":                 h.IdeationEnabled(),
-		"ideation_running":         h.ideationRunning(ctx),
-		"ideation_interval":        int(h.IdeationInterval().Minutes()),
 		"ideation_exploit_ratio":   h.IdeationExploitRatio(),
 		"ideation_categories":      h.runner.IdeationCategories(),
 		"ideation_ignore_patterns": h.runner.IdeationIgnorePatterns(),
@@ -311,9 +308,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 	if h.authURL != "" {
 		resp["auth_url"] = h.authURL
-	}
-	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
-		resp["ideation_next_run"] = nextRun
 	}
 	if cfg == nil {
 		return resp
@@ -346,24 +340,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	return resp
 }
 
-// ideationRunning returns true if any idea-agent task is currently in_progress.
-func (h *Handler) ideationRunning(ctx context.Context) bool {
-	s, ok := h.currentStore()
-	if !ok || s == nil {
-		return false
-	}
-	tasks, err := s.ListTasks(ctx, false)
-	if err != nil {
-		return false
-	}
-	for _, t := range tasks {
-		if t.Kind == store.TaskKindIdeaAgent && t.Status == store.TaskStatusInProgress {
-			return true
-		}
-	}
-	return false
-}
-
 // GetConfig returns the server configuration (workspaces, instructions path).
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg *envconfig.Config
@@ -383,8 +359,8 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Autosubmit           *bool             `json:"autosubmit"`
 		Autosync             *bool             `json:"autosync"`
 		Autopush             *bool             `json:"autopush"`
-		Ideation             *bool             `json:"ideation"`
-		IdeationInterval     *int              `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
+		Ideation             *bool             `json:"ideation"`               // retired; accepted for old clients but ignored
+		IdeationInterval     *int              `json:"ideation_interval"`      // retired; accepted for old clients but ignored
 		IdeationExploitRatio *float64          `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
 		WorkspaceGroups      []workspace.Group `json:"workspace_groups"`
 	}](w, r)
@@ -430,32 +406,14 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if req.IdeationExploitRatio != nil {
 		h.SetIdeationExploitRatio(*req.IdeationExploitRatio)
 	}
-	if req.IdeationInterval != nil {
-		mins := *req.IdeationInterval
-		if mins < 0 {
-			mins = 0
-		}
-		// Writes land on the system:ideation routine; the engine's
-		// watcher reconciles the timer on the next store notification.
-		h.SetIdeationInterval(time.Duration(mins) * time.Minute)
-	}
-	if req.Ideation != nil {
-		h.SetIdeation(*req.Ideation)
-	}
 	resp := map[string]any{
 		"autopilot":              h.AutopilotEnabled(),
 		"autotest":               h.AutotestEnabled(),
 		"autosubmit":             h.AutosubmitEnabled(),
 		"autosync":               h.AutosyncEnabled(),
 		"autopush":               h.AutopushEnabled(),
-		"ideation":               h.IdeationEnabled(),
-		"ideation_running":       h.ideationRunning(r.Context()),
-		"ideation_interval":      int(h.IdeationInterval().Minutes()),
 		"ideation_exploit_ratio": h.IdeationExploitRatio(),
 		"ideation_categories":    h.runner.IdeationCategories(),
-	}
-	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
-		resp["ideation_next_run"] = nextRun
 	}
 	httpjson.Write(w, http.StatusOK, resp)
 }

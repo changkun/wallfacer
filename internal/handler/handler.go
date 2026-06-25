@@ -713,29 +713,6 @@ func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) 
 	return h.openWatcherBreaker(watcher, taskID, reason)
 }
 
-// IdeationEnabled always returns false. The toggle-based ideation flow
-// was retired when ideation moved to a regular task the user creates
-// from the composer. The accessor is retained so callers threading the
-// old config shape keep compiling.
-func (h *Handler) IdeationEnabled() bool { return false }
-
-// SetIdeation is a no-op. Kept for call-site compatibility while the
-// remaining references migrate off the legacy toggle.
-func (h *Handler) SetIdeation(bool) {}
-
-// IdeationInterval always returns zero. Recurring ideation is now
-// expressed as a user-created routine, not a global config knob.
-func (h *Handler) IdeationInterval() time.Duration { return 0 }
-
-// SetIdeationInterval is a no-op, retained for the same reason as the
-// other ideation shims above.
-func (h *Handler) SetIdeationInterval(time.Duration) {}
-
-// IdeationNextRun always returns the zero time. There is no longer a
-// system-wide pending ideation fire; each user-created idea-agent task
-// is scheduled individually.
-func (h *Handler) IdeationNextRun() time.Time { return time.Time{} }
-
 // IdeationExploitRatio returns the exploitation fraction (0.0–1.0).
 func (h *Handler) IdeationExploitRatio() float64 {
 	h.ideationMu.Lock()
