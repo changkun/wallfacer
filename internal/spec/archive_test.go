@@ -102,3 +102,26 @@ func TestBuildTree_ArchivePass(t *testing.T) {
 		t.Errorf("archived child status = %q, want archived", child.Value.Status)
 	}
 }
+
+func TestCheckDependsOnExist_ResolvesArchivedDep(t *testing.T) {
+	repo := t.TempDir()
+	// The dependency is an archived spec relocated under specs/.archive/.
+	archDep := filepath.Join(repo, "specs/.archive/local/dep.md")
+	if err := os.MkdirAll(filepath.Dir(archDep), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archDep, []byte("---\nstatus: archived\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := &Spec{Path: "specs/local/a.md", DependsOn: []string{"specs/local/dep.md"}}
+	if res := checkDependsOnExist(s, repo); len(res) != 0 {
+		t.Errorf("archived dependency should resolve via .archive, got %+v", res)
+	}
+
+	// A genuinely missing dependency still errors.
+	s2 := &Spec{Path: "specs/local/a.md", DependsOn: []string{"specs/local/missing.md"}}
+	if res := checkDependsOnExist(s2, repo); len(res) != 1 {
+		t.Errorf("missing dependency should error, got %+v", res)
+	}
+}
