@@ -16,7 +16,7 @@ vi.mock('./useStreamingFetch', () => ({
   },
 }));
 
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import { useTaskActivity } from './useTaskActivity';
 import { createActivityParser } from '../lib/prettyNdjson';
 
@@ -65,5 +65,47 @@ describe('useTaskActivity', () => {
     // re-parsed every prior frame on each chunk (~N^2/2 ≈ 820 calls for N=40);
     // incremental parsing is O(N). N*4 cleanly separates the two.
     expect(parseSpy.mock.calls.length).toBeLessThanOrEqual(N * 4);
+  });
+});
+
+const SENTINEL_LINE = JSON.stringify({ type: 'system', subtype: 'truncation_notice' }) + '\n';
+
+describe('useTaskActivity truncation flag', () => {
+  it('flips truncated true when a chunk carries the sentinel and stays sticky', () => {
+    const taskId = ref<string | null>('t1');
+    const { truncated } = useTaskActivity(taskId);
+    expect(truncated.value).toBe(false);
+
+    captured!.onChunk(frameLine(0));
+    expect(truncated.value).toBe(false);
+
+    captured!.onChunk(SENTINEL_LINE);
+    expect(truncated.value).toBe(true);
+
+    // A later chunk without the sentinel must not unset it.
+    captured!.onChunk(frameLine(1));
+    expect(truncated.value).toBe(true);
+  });
+
+  it('detects a sentinel split across a chunk boundary', () => {
+    const taskId = ref<string | null>('t1');
+    const { truncated } = useTaskActivity(taskId);
+    const mid = Math.floor(SENTINEL_LINE.length / 2);
+    captured!.onChunk(SENTINEL_LINE.slice(0, mid));
+    captured!.onChunk(SENTINEL_LINE.slice(mid));
+    expect(truncated.value).toBe(true);
+  });
+
+  it('clears the flag on task switch (start)', async () => {
+    const taskId = ref<string | null>('t1');
+    const { truncated } = useTaskActivity(taskId);
+    captured!.onChunk(SENTINEL_LINE);
+    expect(truncated.value).toBe(true);
+
+    // Switching tasks re-invokes start(), which resets the flag (watcher is
+    // async, so flush before asserting).
+    taskId.value = 't2';
+    await nextTick();
+    expect(truncated.value).toBe(false);
   });
 });

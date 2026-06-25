@@ -11,10 +11,18 @@ import type { Ref } from 'vue';
 import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFetch';
 import { createActivityParser, type ActivityRow } from '../lib/prettyNdjson';
 
+// The backend injects this sentinel once when a turn's output exceeds the 8MB
+// cap (see store SaveTurnOutput). It appears once and never disappears.
+const TRUNCATION_SENTINEL = '"subtype":"truncation_notice"';
+
 export function useTaskActivity(taskId: Ref<string | null>) {
   const raw = ref('');
   const activity = ref<ActivityRow[]>([]);
   const streaming = ref(false);
+  // Sticky truncation flag: flips true the first time a chunk carries the
+  // sentinel. Avoids rescanning the whole accumulated log (up to ~8MB) on
+  // every chunk (O(n^2)); the consumer reads this ref directly.
+  const truncated = ref(false);
   let handle: StreamingFetchHandle | null = null;
 
   function stop() {
@@ -27,7 +35,11 @@ export function useTaskActivity(taskId: Ref<string | null>) {
     stop();
     raw.value = '';
     activity.value = [];
+    truncated.value = false;
     streaming.value = true;
+    // Tail of the previous chunk, so a sentinel split across a chunk boundary
+    // is still detected without rescanning the whole buffer.
+    let sentinelTail = '';
     // Incremental parser: parse each NDJSON line once instead of re-parsing the
     // whole accumulated buffer on every chunk (which is O(n^2) in frames).
     const parser = createActivityParser();
@@ -35,6 +47,14 @@ export function useTaskActivity(taskId: Ref<string | null>) {
       url: `/api/tasks/${id}/logs`,
       onChunk: (chunk) => {
         raw.value += chunk;
+        if (!truncated.value) {
+          if ((sentinelTail + chunk).includes(TRUNCATION_SENTINEL)) {
+            truncated.value = true;
+            sentinelTail = '';
+          } else {
+            sentinelTail = chunk.slice(-TRUNCATION_SENTINEL.length);
+          }
+        }
         activity.value = [...parser.push(chunk)];
       },
       onDone: () => {
@@ -52,5 +72,5 @@ export function useTaskActivity(taskId: Ref<string | null>) {
 
   onUnmounted(stop);
 
-  return { raw, activity, streaming };
+  return { raw, activity, streaming, truncated };
 }
