@@ -1,6 +1,6 @@
 ---
 title: Inline Spec Comments
-status: drafted
+status: complete
 depends_on:
   - specs/cloud/latere-integration/coordination-plane.md
 affects:
@@ -282,18 +282,27 @@ cluttered by threads whose anchor is lost.
 ## Status lifecycle and the spec highlight
 
 `status` is the single field the UI keys on to decide whether a spec is "highlighted"
-(a gutter marker, a header count that says "this spec has open comments"):
+(the anchored text marked in the prose, a header count that says "this spec has open
+comments"):
 
-| Status | Set by | Inline marker? | Counts toward spec highlight? | In triage list? |
+| Status | Set by | Inline highlight? | Counts toward spec highlight? | In triage list? |
 |---|---|---|---|---|
-| `active` | reposition reattached the anchor | yes, on the anchored line | yes (when unresolved) | no |
-| `resolved` | a human resolved it (addressed) | muted, hidden until "Show resolved" | no | no |
+| `active` | reposition reattached the anchor | yes — the anchored text is wrapped in a `<mark>` on its line | yes (when unresolved) | no |
+| `resolved` | a human resolved it (addressed) | muted `<mark>`, hidden until "Show resolved" | no | no |
 | `orphaned` | reposition lost the anchor | no | **no** | yes |
 | `outdated` | a human triaged it as no-longer-relevant | no | no | no (terminal, archived) |
 
+The highlight is **on the anchored text itself** (an inline `<mark>`, the way
+ai-as-an-infrastructure marks commented prose), not a separate gutter badge. Clicking a
+mark opens its thread; the open thread's mark reads brighter. A gutter marker is a
+fallback only, for a thread whose text cannot be located inline (anchored to a stripped
+heading, or text inside a skipped code/mermaid block). Because each mark sits on its own
+text span, two comments on one paragraph both stay visible — there is no shared anchor
+position for a newer comment to stack over and hide.
+
 The load-bearing rule the user asked for: **a thread stops highlighting the spec the
 moment its anchor is lost.** An orphaned thread does not sit on the spec as a stale
-marker; it leaves the inline view entirely and surfaces only in the triage list. So
+mark; it leaves the inline view entirely and surfaces only in the triage list. So
 opening a spec is never flagged "has comments" because of a comment whose text is
 gone. The header badge counts only `active && !resolved` threads.
 
@@ -517,3 +526,18 @@ Divergences from the spec, deferred (not blocking the v1 goal):
 - The two-hop relay is presence-unaware (fans out to all org instances on the repo,
   not just those focused on the spec); the presence-aware optimization is a follow-up
   once the presence leaf lands.
+
+### Follow-up: inline highlight (2026-06-25)
+
+The v1 slice drew only a left-gutter marker; the anchored text was never marked in the
+prose, and two threads that snapped to the same source-line block were given the same
+gutter top, so a newer marker stacked on the older one and hid it. Fixed by highlighting
+the anchored text in place: `frontend/src/lib/specHighlight.ts` wraps each inline
+thread's `anchor.exact_text` in a clickable `<mark>` *within its source-line block*
+(block-scoped, so an `exact_text` that recurs in an unrelated code/mermaid block is not
+mis-highlighted), with `locateQuote` disambiguating duplicates by prefix/suffix. Inline
+marks are now the primary affordance; the gutter marker is a fallback for threads whose
+text cannot be located inline. This closed both bugs (no highlight; new comment hides
+others) and brings the design in line with the "highlight on the anchored text" intent
+above. `status` moved `drafted → complete`: the v1 capability shipped and the highlight
+gap is closed; the deferred divergences listed above remain their own follow-up leaves.
