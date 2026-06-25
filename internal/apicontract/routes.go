@@ -254,6 +254,11 @@ var Routes = []Route{
 		Tags:        []string{"specs"},
 	},
 	{
+		Method: http.MethodPost, Pattern: "/api/specs/dismiss-stale-candidates", Name: "DismissAllStaleCandidates",
+		Description: "Bulk-dismiss every stale candidate by bumping its updated timestamp (status unchanged), one commit per workspace. Returns {dismissed:N}.",
+		Tags:        []string{"specs"},
+	},
+	{
 		Method: http.MethodPost, Pattern: "/api/specs/transition", Name: "SpecTransition",
 		Description: "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive/validate/stale/dismiss-stale/force-complete take a single path and return {path, status}.",
 		Tags:        []string{"specs"},

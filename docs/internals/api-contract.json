@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 119,
+  "route_count": 120,
   "routes": [
     {
       "method": "GET",
@@ -288,6 +288,15 @@
       "pattern": "/api/specs/stale-candidates",
       "name": "StaleCandidates",
       "description": "Advisory scan: complete specs whose affects files changed since the spec's updated date. No mutation; returns {candidates:[{path,files,reason}]}.",
+      "tags": [
+        "specs"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/specs/dismiss-stale-candidates",
+      "name": "DismissAllStaleCandidates",
+      "description": "Bulk-dismiss every stale candidate by bumping its updated timestamp (status unchanged), one commit per workspace. Returns {dismissed:N}.",
       "tags": [
         "specs"
       ]

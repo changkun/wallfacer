@@ -200,6 +200,12 @@ export const usePlanningStore = defineStore('planning', () => {
     }
   }
 
+  async function dismissAllStaleCandidates(): Promise<number> {
+    const res = await api<{ dismissed: number }>('POST', '/api/specs/dismiss-stale-candidates');
+    await fetchStaleCandidates();
+    return res.dismissed ?? 0;
+  }
+
   function focusSpec(path: string) {
     focusedSpecPath.value = path;
     focusedIsIndex.value = false;
@@ -362,7 +368,7 @@ export const usePlanningStore = defineStore('planning', () => {
     threads, threadOrder, archivedThreads, activeThreadId,
     streaming, streamingThreadId, busyThreadId,
     sortedNodes, nodesByPath, focusedNode,
-    applyTree, fetchTree, fetchStaleCandidates, focusSpec, focusIndex, clearFocus,
+    applyTree, fetchTree, fetchStaleCandidates, dismissAllStaleCandidates, focusSpec, focusIndex, clearFocus,
     openPlanForTask,
     loadThreads, refreshBusy,
   };
