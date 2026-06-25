@@ -161,6 +161,10 @@ const markers = ref<Marker[]>([]);
 // anchorTops maps every inline thread to its anchor's vertical offset in the
 // scrolling body, so the margin rail can place each card next to its line.
 const anchorTops = ref<Map<string, number>>(new Map());
+// The content's top within the flex-column host: 0 normally, but the header bar
+// and banners sit above the prose (order:-1/-2), pushing the content down. The
+// rail and markers (anchored to the host) add this so cards stay line-aligned.
+const contentOffsetTop = ref(0);
 
 // Thread state (declared here so the highlight pass and its open-state watch can
 // reference them; the handlers live in the thread section).
@@ -172,6 +176,9 @@ const replyBody = ref('');
 function place() {
   const root = props.bodyEl;
   if (!root) { markers.value = []; anchorTops.value = new Map(); return; }
+  // Recompute the content's offset within the host (changes when the bar/banner
+  // appear or wrap) so the rail and markers stay aligned to the prose.
+  contentOffsetTop.value = root.offsetTop;
   const blocks: SourceBlock[] = collectSourceBlocks(root);
   const highlighted = highlightThreads(root, blocks, specThreads.value, {
     openId: openThreadId.value,
@@ -233,8 +240,9 @@ const narrow = computed(() => paneWidth.value < RAIL_MIN_PANE);
 const railFolded = computed(() => userFold.value ?? narrow.value);
 function toggleFold() { userFold.value = !railFolded.value; }
 // Drop the manual override when the pane crosses the breakpoint, so a rail shown
-// on a wide pane re-folds when the pane gets cramped (and vice versa).
-watch(narrow, () => { userFold.value = null; });
+// on a wide pane re-folds when the pane gets cramped (and vice versa). Skip mid-
+// compose so a resize never yanks the open composer and its typed-in text.
+watch(narrow, () => { if (!composing.value) userFold.value = null; });
 
 // Track the scrolling pane's width (the .sf-body), not the host content box:
 // the host's content width shrinks when the rail reserves its gutter, which
@@ -277,6 +285,9 @@ watch(
 let ro: ResizeObserver | undefined;
 const cardEls = new Map<string, HTMLElement>();
 function measure() {
+  // The header bar can wrap (changing the content's offset) without a threads
+  // change; refresh it alongside card heights so alignment never drifts.
+  if (props.bodyEl) contentOffsetTop.value = props.bodyEl.offsetTop;
   const next = new Map(cardHeights.value);
   let changed = false;
   for (const [id, el] of cardEls) {
@@ -528,7 +539,7 @@ defineExpose({ openCount, showResolved, available });
     </div>
 
     <!-- Inline gutter markers, positioned over the scrolling body content. -->
-    <div class="sc-markers">
+    <div class="sc-markers" :style="{ top: contentOffsetTop + 'px' }">
       <button
         v-for="m in markers"
         :key="m.thread.id"
@@ -558,7 +569,7 @@ defineExpose({ openCount, showResolved, available });
 
     <!-- Margin comment rail: a card per thread, aligned to its anchored line.
          Replaces the centered popover so comments read alongside the prose. -->
-    <div v-if="!railFolded" class="sc-rail">
+    <div v-if="!railFolded" class="sc-rail" :style="{ top: contentOffsetTop + 'px' }">
       <!-- New-thread composer: a card in the rail at the selection's line. -->
       <div
         v-if="selection && composing"
@@ -738,8 +749,10 @@ defineExpose({ openCount, showResolved, available });
 .sc-conn--opted-out,
 .sc-conn--signed-out { color: var(--color-text-muted, #9ca3af); }
 
-/* Header strip sits at the top of the body, before the prose. */
+/* Header strip sits at the top of the body, before the prose (order lifts it
+   above the content in the flex-column host; banners sit above it at order:-2). */
 .sc-bar {
+  order: -1;
   display: flex;
   align-items: center;
   gap: 12px;
