@@ -443,13 +443,24 @@ func (h *hostHandle) Kill() error {
 	return nil
 }
 
+// gracefulSig is the signal used to request a clean shutdown before the
+// SIGKILL escalation. It is a package var so tests can inject an unsupported
+// signal and exercise the immediate-escalation path on any platform.
+var gracefulSig os.Signal = syscall.SIGTERM
+
 // signalAndEscalate sends SIGTERM, waits 5 s, then SIGKILL if the process is
-// still running. Runs in a goroutine so Kill() stays non-blocking.
+// still running. Runs in a goroutine so Kill() stays non-blocking. When the
+// graceful signal cannot be delivered (Windows accepts only Kill, so Signal
+// returns an error) there is no point waiting out the grace period, so
+// escalate to a hard kill immediately.
 func (h *hostHandle) signalAndEscalate() {
 	if h.cmd.Process == nil {
 		return
 	}
-	_ = h.cmd.Process.Signal(syscall.SIGTERM)
+	if err := h.cmd.Process.Signal(gracefulSig); err != nil {
+		_ = h.cmd.Process.Kill()
+		return
+	}
 	go func() {
 		timer := time.NewTimer(5 * time.Second)
 		defer timer.Stop()
