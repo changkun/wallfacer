@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -80,6 +81,12 @@ type Connector struct {
 	conn    *websocket.Conn
 	connCtx context.Context
 	writeMu sync.Mutex
+
+	// authRejected is set when the last dial was refused with 401/403 (a bad or
+	// wrong-audience token), cleared on a successful dial. It lets the status
+	// surface distinguish "the token is being rejected" from "still connecting",
+	// so a hard auth misconfiguration is not hidden behind an endless spinner.
+	authRejected atomic.Bool
 }
 
 // NewConnector applies defaults and returns a connector. Run drives it.
@@ -157,14 +164,24 @@ func (c *Connector) connectOnce(ctx context.Context) bool {
 		return false
 	}
 	dctx, dcancel := context.WithTimeout(ctx, dialTimeout)
-	conn, _, err := websocket.Dial(dctx, c.cfg.URL, &websocket.DialOptions{
+	conn, resp, err := websocket.Dial(dctx, c.cfg.URL, &websocket.DialOptions{
 		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
 	})
 	dcancel()
 	if err != nil {
-		c.cfg.Logger.Debug("coordinator client: dial failed", "err", err)
+		// A 401/403 is a persistent auth rejection (bad/expired token, wrong
+		// audience): the socket will never come up until it is fixed, so log it
+		// loudly and flag it rather than letting it churn silently at Debug behind
+		// an eternal "connecting" status. Transient dial errors stay at Debug.
+		if resp != nil && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {
+			c.authRejected.Store(true)
+			c.cfg.Logger.Warn("coordinator client: authentication rejected", "status", resp.StatusCode, "url", c.cfg.URL)
+		} else {
+			c.cfg.Logger.Debug("coordinator client: dial failed", "err", err)
+		}
 		return false
 	}
+	c.authRejected.Store(false)
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "bye") }()
 
 	connCtx, cancel := context.WithCancel(ctx)
@@ -213,6 +230,14 @@ func (c *Connector) Connected() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.conn != nil
+}
+
+// AuthRejected reports whether the most recent dial was refused with 401/403,
+// i.e. the token is being rejected (bad, expired, or wrong audience) rather than
+// the connection merely still being established. Cleared on the next successful
+// dial. Used to surface a hard auth misconfiguration in the coordination status.
+func (c *Connector) AuthRejected() bool {
+	return c.authRejected.Load()
 }
 
 // Send writes a frame to the live coordinator connection. It is safe for

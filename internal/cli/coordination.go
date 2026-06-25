@@ -44,8 +44,9 @@ type coordinationGate struct {
 
 	// connected and signedIn report live state for the status surface, set once
 	// the connector exists. Nil-safe: a disabled connector reports false for both.
-	connected func() bool
-	signedIn  func() bool
+	connected    func() bool
+	signedIn     func() bool
+	authRejected func() bool
 }
 
 func (g *coordinationGate) OptedIn() bool { return g.optedIn.Load() }
@@ -55,6 +56,10 @@ func (g *coordinationGate) Connected() bool { return g.connected != nil && g.con
 
 // SignedIn reports whether a usable token exists for the coordination connection.
 func (g *coordinationGate) SignedIn() bool { return g.signedIn != nil && g.signedIn() }
+
+// AuthRejected reports whether the coordinator is rejecting the token (401/403)
+// rather than the connection still being established.
+func (g *coordinationGate) AuthRejected() bool { return g.authRejected != nil && g.authRejected() }
 
 // SetOptedIn flips the gate and persists the choice. Persistence failure is
 // logged, not fatal: the in-memory state still governs the connector.
@@ -137,6 +142,7 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 	}
 	connector := client.NewConnector(cfg)
 	gate.connected = connector.Connected
+	gate.authRejected = connector.AuthRejected
 	if relay != nil {
 		// Translate "no live connection" into the handler's transient-unavailable
 		// error so a browser op while disconnected surfaces as 503 (retry), not a
