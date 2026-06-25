@@ -7,13 +7,11 @@ import (
 	"net/http"
 	"path"
 	"strings"
-
-	spaembed "latere.ai/x/wallfacer/internal/webserver/spa"
 )
 
 // MountSPA registers handlers for static asset paths from the embedded SPA dist.
-func MountSPA(mux *http.ServeMux) bool {
-	dist, err := fs.Sub(spaembed.FS, "dist")
+func MountSPA(mux *http.ServeMux, frontendFS fs.FS) bool {
+	dist, err := fs.Sub(frontendFS, "frontend/dist")
 	if err != nil {
 		slog.Warn("spa: no dist embedded", "err", err)
 		return false
@@ -51,8 +49,8 @@ func MountSPA(mux *http.ServeMux) bool {
 }
 
 // SPAFallback registers a catch-all GET handler that serves index.html for client-side routing.
-func SPAFallback(mux *http.ServeMux) {
-	dist, err := fs.Sub(spaembed.FS, "dist")
+func SPAFallback(mux *http.ServeMux, frontendFS fs.FS) {
+	dist, err := fs.Sub(frontendFS, "frontend/dist")
 	if err != nil {
 		return
 	}

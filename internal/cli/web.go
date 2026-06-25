@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,14 +20,14 @@ import (
 )
 
 // RunWeb starts the wallfacer web frontend server with OIDC authentication.
-func RunWeb(args []string) {
-	if err := runWeb(args); err != nil {
+func RunWeb(args []string, frontendFS fs.FS) {
+	if err := runWeb(args, frontendFS); err != nil {
 		slog.Error("server error", "error", err)
 		os.Exit(1)
 	}
 }
 
-func runWeb(args []string) error {
+func runWeb(args []string, frontendFS fs.FS) error {
 	logger, shutdown, logsErr := otel.Bootstrap(context.Background(), otel.Config{ServiceName: "wallfacer-web"})
 	if logsErr != nil {
 		logger.Warn("otlp logs init failed; continuing on stdout", "err", logsErr)
@@ -112,8 +113,8 @@ func runWeb(args []string) error {
 		slog.Info("auth: disabled (no AUTH_CLIENT_ID)")
 	}
 
-	webserver.MountSPA(mux)
-	webserver.SPAFallback(mux)
+	webserver.MountSPA(mux, frontendFS)
+	webserver.SPAFallback(mux, frontendFS)
 
 	// otel.Handler wraps the mux with server-request tracing/metrics and the
 	// X-Trace-Id response header.

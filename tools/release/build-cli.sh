@@ -14,12 +14,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."   # repo root
 
-# Build the SSG frontend and embed it so the binary ships the real SPA.
-# go:embed all:dist in internal/webserver/spa reads internal/webserver/spa/dist.
+# Build the SSG frontend so main.go's go:embed all:frontend/dist ships the real SPA.
 ( cd frontend && bun install --frozen-lockfile && bun run build )
-rm -rf internal/webserver/spa/dist
-cp -r frontend/dist internal/webserver/spa/dist
-test -f internal/webserver/spa/dist/index.html
+test -f frontend/dist/index.html
 
 # Sandbox image tag baked into the CLI: latest release of latere-ai/images,
 # falling back to the highest semver tag if the releases API is unavailable.

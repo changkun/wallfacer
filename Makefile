@@ -6,8 +6,8 @@ export
 
 .PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once
 
-# Full build gate: fmt + lint + binary.
-build: fmt lint frontend-build build-binary
+# Full build gate: fmt + frontend assets + lint + binary.
+build: fmt frontend-build lint build-binary
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -17,7 +17,7 @@ ifneq ($(VERSION),)
 LDFLAGS += -X latere.ai/x/wallfacer/internal/cli.Version=$(VERSION)
 endif
 
-build-binary:
+build-binary: frontend-build
 	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .
 
 # Build and run the Go server natively.
@@ -47,7 +47,7 @@ fmt-go:
 lint: lint-go lint-js
 
 # Run Go linters (golangci-lint if available, otherwise go vet)
-lint-go:
+lint-go: frontend-build
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run ./...; \
 	else \
@@ -63,7 +63,7 @@ lint-js:
 test: fmt lint test-backend test-frontend
 
 # Run Go unit tests
-test-backend:
+test-backend: frontend-build
 	go test ./...
 
 # Run Vue SPA unit tests under frontend/.
@@ -92,10 +92,7 @@ endif
 
 # ---- wallfacerd (wf.latere.ai) ----
 
-web-frontend:                                                            ## Build wallfacerd frontend and copy dist for embedding
-	cd frontend && bun run build
-	rm -rf internal/webserver/spa/dist
-	cp -r frontend/dist internal/webserver/spa/dist
+web-frontend: frontend-build                                             ## Build wallfacerd frontend for embedding
 
 web-run: web-frontend                                                    ## Run wallfacerd locally (embedded SPA)
 	go run . web -addr :8080
@@ -152,8 +149,7 @@ release-prod: REL_VER := $(if $(VERSION),$(VERSION),$(shell git rev-parse --shor
 release-prod:
 	@test -n "$(CONTAINER)" || { echo "release-prod: no podman/docker found"; exit 1; }
 	@echo ">> [1/5] building frontend (native)"
-	cd frontend && bun run build
-	rm -rf internal/webserver/spa/dist && cp -r frontend/dist internal/webserver/spa/dist
+	$(MAKE) frontend-build
 	@echo ">> [2/5] cross-compiling linux/amd64 binary ($(REL_VER))"
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
 		-ldflags "-s -w -X latere.ai/x/wallfacer/internal/cli.Version=$(REL_VER)" \
