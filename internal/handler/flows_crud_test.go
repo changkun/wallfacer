@@ -74,6 +74,21 @@ func TestCreateFlow_RejectsSelfParallel(t *testing.T) {
 	}
 }
 
+func TestCreateFlow_RejectsDuplicateAgentSlug(t *testing.T) {
+	h, _ := newTestHandlerWithPrompts(t)
+	rec := postFlowJSON(t, h, map[string]any{
+		"slug": "dup",
+		"name": "Dup",
+		"steps": []map[string]any{
+			{"agent_slug": "impl"},
+			{"agent_slug": "impl", "input_from": "impl"},
+		},
+	})
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestUpdateFlow_BuiltinReturns409(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
 	body, _ := json.Marshal(map[string]any{

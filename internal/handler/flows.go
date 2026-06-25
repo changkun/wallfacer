@@ -170,6 +170,12 @@ func (h *Handler) validateFlowWrite(req flowWriteRequest) error {
 		if _, ok := aReg.Get(s.AgentSlug); !ok {
 			return fmt.Errorf("step %d: agent %q is not registered", i, s.AgentSlug)
 		}
+		// Reject before the seen[] overwrite below: AgentSlug is the unique key
+		// for result wiring and parallel grouping, so two steps on the same
+		// agent would silently corrupt the flow.
+		if _, dup := seen[s.AgentSlug]; dup {
+			return fmt.Errorf("step %d: duplicate agent_slug %q (each step must use a distinct agent)", i, s.AgentSlug)
+		}
 		seen[s.AgentSlug] = i
 	}
 	// Parallel-sibling references must resolve to a sibling in the

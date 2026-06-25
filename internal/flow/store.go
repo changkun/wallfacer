@@ -60,10 +60,17 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 			return nil, fmt.Errorf("parse %s: at least one step is required", path)
 		}
 		steps := make([]Step, 0, len(f.Steps))
+		seenSlugs := make(map[string]bool, len(f.Steps))
 		for i, s := range f.Steps {
 			if s.AgentSlug == "" {
 				return nil, fmt.Errorf("parse %s: step %d missing agent_slug", path, i)
 			}
+			// AgentSlug is the unique key for result wiring and parallel
+			// grouping in the engine; duplicates silently clobber each other.
+			if seenSlugs[s.AgentSlug] {
+				return nil, fmt.Errorf("parse %s: duplicate agent_slug %q at step %d", path, s.AgentSlug, i)
+			}
+			seenSlugs[s.AgentSlug] = true
 			//nolint:staticcheck // S1016: diskStep is the wire format, Step is the runtime shape; keep the literal copy explicit.
 			steps = append(steps, Step{
 				AgentSlug:         s.AgentSlug,
