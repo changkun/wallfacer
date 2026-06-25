@@ -1,6 +1,6 @@
 ---
 title: Dedicated Chat UI (Claude-style chat, sidebar chat/spec/board, floating spec-mode chat)
-status: drafted
+status: complete
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-planning-ux.md
   - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode.md
@@ -18,7 +18,7 @@ affects:
   - frontend/src/router/
 effort: large
 created: 2026-06-15
-updated: 2026-06-15
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
@@ -286,9 +286,10 @@ Shipped frontend-only, reusing the existing per-workspace thread model as the
 1. **"Plan", not "Spec".** The nav label and route stayed `Plan` / `/plan` for
    non-technical friendliness, dropping the planned `/spec` rename + redirect
    and all its deep-link churn. References to `/spec` above predate this.
-2. **Popup deactivated in Plan mode (for now).** `SpecChatPopup` is built and
-   tested, but `PlanPage` gates it behind `PLANNING_CHAT_ENABLED = false` — the
-   popup, its focused-view toggle button, and the `C` shortcut are off in the
-   three-pane view pending a product decision on whether chat belongs there or
-   only in the dedicated `/chat` surface. Flip the flag to restore it. The
-   chat-first empty-workspace onboarding is unaffected.
+2. **Popup shipped behind a flag, now enabled.** `SpecChatPopup` was gated off
+   at first (`PLANNING_CHAT_ENABLED = false`) pending a product call on whether
+   chat belongs in the three-pane Plan view or only in the dedicated `/chat`
+   surface. That call was made: `PlanPage` now sets `PLANNING_CHAT_ENABLED =
+   true` and renders the popup (`SpecChatPopup v-if="layout === 'three-pane' &&
+   PLANNING_CHAT_ENABLED"`), so the floating popup, its focused-view toggle
+   button, and the `C` shortcut are live in Plan mode.
