@@ -32,6 +32,29 @@ describe('ansiToHtml', () => {
     const html = ansiToHtml('\x1b[38;2;128;0;255mx\x1b[0m');
     expect(html).toContain('color:rgb(128,0,255)');
   });
+  it('consumes 256-colour fg operands without leaking SGR codes', () => {
+    // 38;5;1 must not surface the trailing 1 as bold.
+    const html = ansiToHtml('\x1b[38;5;1mx\x1b[0m');
+    expect(html).not.toContain('font-weight:bold');
+    expect(html).toContain('x');
+  });
+  it('consumes 256-colour bg operands without leaking SGR codes', () => {
+    // 48;5;1 leaked bold previously (48 + 5 fall through, 1 read as SGR 1).
+    const html = ansiToHtml('\x1b[48;5;1mx\x1b[0m');
+    expect(html).not.toContain('font-weight:bold');
+    expect(html).toContain('x');
+  });
+  it('consumes 24-bit bg operands without leaking SGR codes', () => {
+    const html = ansiToHtml('\x1b[48;2;1;2;3mx\x1b[0m');
+    expect(html).not.toContain('font-weight:bold');
+    expect(html).not.toContain('color:rgb(1,2,3)');
+    expect(html).toContain('x');
+  });
+  it('applies a real code following a consumed 256-colour run', () => {
+    // After consuming 38;5;2 the loop must land on the trailing 31.
+    const html = ansiToHtml('\x1b[38;5;2;31mx\x1b[0m');
+    expect(html).toContain('color:#ff7b72');
+  });
   it('drops non-SGR sequences', () => {
     // Cursor up CSI ignored, no span emitted.
     expect(ansiToHtml('\x1b[2Ax')).toBe('x');

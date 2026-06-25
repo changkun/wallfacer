@@ -59,9 +59,19 @@ export function ansiToHtml(rawText: string): string {
         else if (c === 4) style += 'text-decoration:underline;';
         else if (c >= 30 && c <= 37) style += `color:${ANSI_FG[c - 30]};`;
         else if (c >= 90 && c <= 97) style += `color:${ANSI_FG_BRIGHT[c - 90]};`;
-        else if (c === 38 && codes[i + 1] === 2 && i + 4 < codes.length) {
-          style += `color:rgb(${codes[i + 2]},${codes[i + 3]},${codes[i + 4]});`;
-          i += 4;
+        else if (c === 38 || c === 48) {
+          // Extended-colour operands: 38/48;5;n (256-colour) or 38/48;2;r;g;b
+          // (24-bit). Consume the operand run so it is not reparsed as
+          // standalone SGR codes. Only 24-bit foreground is rendered; the
+          // rest are consumed and dropped.
+          if (codes[i + 1] === 2) {
+            if (c === 38 && i + 4 < codes.length) {
+              style += `color:rgb(${codes[i + 2]},${codes[i + 3]},${codes[i + 4]});`;
+            }
+            i += 4;
+          } else if (codes[i + 1] === 5) {
+            i += 2;
+          }
         }
         i++;
       }
