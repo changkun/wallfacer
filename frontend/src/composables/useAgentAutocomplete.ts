@@ -48,7 +48,7 @@ export function useAgentAutocomplete(opts: {
   async function fetchCommands(): Promise<SlashCommand[]> {
     if (commandsCache) return commandsCache;
     try {
-      commandsCache = await api<SlashCommand[]>('GET', '/api/planning/commands');
+      commandsCache = await api<SlashCommand[]>('GET', '/api/agent/commands');
       return commandsCache ?? [];
     } catch {
       return [];

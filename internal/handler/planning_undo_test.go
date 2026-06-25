@@ -34,7 +34,7 @@ func TestUndoPlanningRound_Success(t *testing.T) {
 
 	h := newStaticWorkspaceHandler(t, []string{ws})
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo", nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -98,7 +98,7 @@ func TestUndoPlanningRound_RepeatedUndo(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{ws})
 	undo := func() *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/api/planning/undo", nil)
+		req := httptest.NewRequest(http.MethodPost, "/api/agent/undo", nil)
 		h.UndoPlanningRound(rec, req)
 		return rec
 	}
@@ -151,7 +151,7 @@ func TestUndoPlanningRound_NoPlanningCommits(t *testing.T) {
 
 	h := newStaticWorkspaceHandler(t, []string{ws})
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo", nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusConflict {
@@ -172,7 +172,7 @@ func TestUndoPlanningRound_WithDirtyWorkingTree(t *testing.T) {
 
 	h := newStaticWorkspaceHandler(t, []string{ws})
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo", nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -219,7 +219,7 @@ func TestUndoPlanningRound_DispatchAware(t *testing.T) {
 	seedPlanningCommit(t, ws, 1, "dispatch foo")
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo", nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -310,7 +310,7 @@ func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
 	seedPromptRound(t, h, tsk.ID, threadID, 2, "v2")
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo?thread="+threadID, nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -381,7 +381,7 @@ func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 
 	// First undo: reverts round 2.
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo?thread="+threadID, nil)
 	h.UndoPlanningRound(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("undo1 status = %d: %s", rec.Code, rec.Body.String())
@@ -389,7 +389,7 @@ func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 
 	// Second undo: reverts round 1.
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	req = httptest.NewRequest(http.MethodPost, "/api/agent/undo?thread="+threadID, nil)
 	h.UndoPlanningRound(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("undo2 status = %d: %s", rec.Code, rec.Body.String())
@@ -440,7 +440,7 @@ func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
 
 	// No prompt_round events written — undo should return 409.
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo?thread="+threadID, nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusConflict {
@@ -470,7 +470,7 @@ func TestUndo_FileMode_Unchanged(t *testing.T) {
 	// Do NOT set FocusedTask — this keeps the thread in spec-mode.
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+specThreadID, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo?thread="+specThreadID, nil)
 	h.UndoPlanningRound(rec, req)
 
 	// Should fall through to the git-revert path. Because the planning
@@ -517,7 +517,7 @@ func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
 	seedPromptRound(t, h, tsk.ID, threadID, 1, "v1")
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/undo?thread="+threadID, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo?thread="+threadID, nil)
 	h.UndoPlanningRound(rec, req)
 
 	if rec.Code != http.StatusOK {

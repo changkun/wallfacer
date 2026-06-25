@@ -217,7 +217,7 @@ The planner enforces a **global FIFO**: `IsBusy` is a single boolean guarding th
 
 ### Task-Mode Threads
 
-A thread is either **spec-mode** (pinned to a spec path via `FocusedSpec`) or **task-mode** (pinned to a board task via `FocusedTask`). Task-mode is the replacement for the old prompt-refinement flow: instead of dedicated `/api/tasks/{id}/refine*` routes, the user iterates a backlog task's prompt by chatting in a task-pinned thread, and the agent calls back into the server to write the prompt (see `POST /api/planning/tool/update_task_prompt` under Handler Plumbing).
+A thread is either **spec-mode** (pinned to a spec path via `FocusedSpec`) or **task-mode** (pinned to a board task via `FocusedTask`). Task-mode is the replacement for the old prompt-refinement flow: instead of dedicated `/api/tasks/{id}/refine*` routes, the user iterates a backlog task's prompt by chatting in a task-pinned thread, and the agent calls back into the server to write the prompt (see `POST /api/agent/tool/update_task_prompt` under Handler Plumbing).
 
 `ThreadManager.CascadeArchiveForTask(taskID)` auto-archives every non-archived task-mode thread pinned to a task once that task moves past backlog, stamping `AutoArchivedByTaskLifecycle` on the meta so the tool endpoint can return a precise error rather than a generic 404. The inverse, `CascadeUnarchiveForTask(taskID)`, unarchives those threads if the task returns to backlog.
 
@@ -300,7 +300,7 @@ Commits write scope-prefixed subjects `<primary-path>(plan): <imperative>` plus 
 
 ### Task Prompt Tool
 
-`internal/handler/planning_tool.go` exposes `POST /api/planning/tool/update_task_prompt`, the HTTP bridge the planning agent calls (in task-mode) to write a backlog task's prompt. It is the prompt-refinement path that replaced the removed `/api/tasks/{id}/refine*` routes.
+`internal/handler/planning_tool.go` exposes `POST /api/agent/tool/update_task_prompt`, the HTTP bridge the planning agent calls (in task-mode) to write a backlog task's prompt. It is the prompt-refinement path that replaced the removed `/api/tasks/{id}/refine*` routes.
 
 The request body is `{task_id, prompt, thread_id}`. The handler validates the chain before touching the store:
 
@@ -352,9 +352,9 @@ The Plan Mode UI lives in the Vue SPA under `frontend/src/`:
 - `views/PlanPage.vue` + `components/plan/SpecFocusedView.vue`, layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; preserves the focused spec across refresh via the `?spec=<path>` query string on the `/plan` route.
 - `components/plan/SpecTreePanel.vue`, tree rendering. Groups roots by track, pins the roadmap entry when `TreeResponse.Index` is present, and draws status badges and per-spec progress indicators using `TreeResponse.Progress`.
 - `views/MapPage.vue`, dependency DAG map. Renders the `depends_on` graph using the adjacency data from `TreeResponse`.
-- `components/plan/PlanningChatPanel.vue`, chat pane. Streams `GET /api/planning/messages/stream` responses, handles slash-command autocomplete against `GET /api/planning/commands`, renders the thread tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
+- `components/plan/PlanningChatPanel.vue`, chat pane. Streams `GET /api/agent/messages/stream` responses, handles slash-command autocomplete against `GET /api/agent/commands`, renders the thread tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
 
-These consume the two SSE streams (`/api/specs/stream` and `/api/planning/messages/stream`) and the thread CRUD endpoints (`/api/planning/threads`) to stay in sync with server-side state.
+These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/stream`) and the thread CRUD endpoints (`/api/agent/sessions`) to stay in sync with server-side state.
 
 ## See Also
 

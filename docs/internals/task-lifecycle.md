@@ -159,7 +159,7 @@ When a task is created, a background goroutine (`runner.GenerateTitle`) runs a l
 
 ## Prompt Refinement
 
-Prompt refinement is the Plan task-mode chat. There are no dedicated refine routes or background refinement jobs. The Plan agent converses with the user about the task, and when both agree on an improved prompt the agent calls the `update_task_prompt` tool, which the console forwards as `POST /api/planning/tool/update_task_prompt` (`internal/handler/planning_tool.go`). The handler moves the prior prompt into history and sets the task's prompt to the new text. See [Plan Mode](plan-mode.md) for the task-mode chat flow.
+Prompt refinement is the Plan task-mode chat. There are no dedicated refine routes or background refinement jobs. The Plan agent converses with the user about the task, and when both agree on an improved prompt the agent calls the `update_task_prompt` tool, which the console forwards as `POST /api/agent/tool/update_task_prompt` (`internal/handler/planning_tool.go`). The handler moves the prior prompt into history and sets the task's prompt to the new text. See [Plan Mode](plan-mode.md) for the task-mode chat flow.
 
 ## Test Verification
 

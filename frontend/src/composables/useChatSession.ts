@@ -172,7 +172,7 @@ export function useChatSession(): ChatSession {
     try {
       const msgs = await api<AgentMessage[]>(
         'GET',
-        '/api/planning/messages?thread=' + encodeURIComponent(fetched),
+        '/api/agent/messages?thread=' + encodeURIComponent(fetched),
       );
       // Bail if a newer load started or an optimistic push bumped the token, or
       // the active thread changed under us; committing a stale list would wipe
@@ -228,7 +228,7 @@ export function useChatSession(): ChatSession {
       receivedContent = false;
       parser = createNdjsonStreamParser();
       const url =
-        '/api/planning/messages/stream' +
+        '/api/agent/messages/stream' +
         (streamingThreadId.value
           ? '?thread=' + encodeURIComponent(streamingThreadId.value)
           : '');
@@ -386,7 +386,7 @@ export function useChatSession(): ChatSession {
     }
 
     try {
-      const res = await fetch('/api/planning/messages', {
+      const res = await fetch('/api/agent/messages', {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
@@ -419,7 +419,7 @@ export function useChatSession(): ChatSession {
   async function onInterrupt() {
     if (!streaming.value) return;
     const url =
-      '/api/planning/messages/interrupt' +
+      '/api/agent/messages/interrupt' +
       (streamingThreadId.value
         ? '?thread=' + encodeURIComponent(streamingThreadId.value)
         : '');
@@ -438,7 +438,7 @@ export function useChatSession(): ChatSession {
 
   async function clearHistory() {
     const url =
-      '/api/planning/messages' +
+      '/api/agent/messages' +
       (activeThreadId.value
         ? '?thread=' + encodeURIComponent(activeThreadId.value)
         : '');
@@ -546,7 +546,7 @@ export function useChatSession(): ChatSession {
   async function promoteDraft(): Promise<string | null> {
     let created: AgentSession | null = null;
     try {
-      created = await api<AgentSession>('POST', '/api/planning/threads', {});
+      created = await api<AgentSession>('POST', '/api/agent/sessions', {});
     } catch (e) {
       appendSystem('Failed to create thread: ' + (e instanceof Error ? e.message : String(e)));
       return null;
@@ -568,7 +568,7 @@ export function useChatSession(): ChatSession {
       t.lastViewedAt = Date.now();
     }
     activeThreadId.value = id;
-    api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
+    api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
     await loadHistory();
     return id;
   }
@@ -598,7 +598,7 @@ export function useChatSession(): ChatSession {
       t.lastViewedAt = Date.now();
     }
     // Server-side activate (fire and forget).
-    api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
+    api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
     await loadHistory();
   }
 
@@ -624,7 +624,7 @@ export function useChatSession(): ChatSession {
       return;
     }
     try {
-      await api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { name: newName });
+      await api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { name: newName });
       if (threads.value[id]) threads.value[id].name = newName;
     } catch { /* ignore */ }
     renamingId.value = '';
@@ -642,7 +642,7 @@ export function useChatSession(): ChatSession {
     });
     if (!ok) return;
     try {
-      const res = await fetch('/api/planning/threads/' + encodeURIComponent(id), {
+      const res = await fetch('/api/agent/sessions/' + encodeURIComponent(id), {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: {
@@ -670,7 +670,7 @@ export function useChatSession(): ChatSession {
 
   async function unarchiveThread(id: string) {
     try {
-      await api('PATCH', '/api/planning/threads/' + encodeURIComponent(id), { state: 'visible' });
+      await api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { state: 'visible' });
       await planning.loadThreads();
       await switchToThread(id);
       archiveMenuOpen.value = false;
@@ -688,7 +688,7 @@ export function useChatSession(): ChatSession {
     });
     if (!ok) return;
     try {
-      const res = await fetch('/api/planning/threads/' + encodeURIComponent(id), {
+      const res = await fetch('/api/agent/sessions/' + encodeURIComponent(id), {
         method: 'DELETE',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -720,7 +720,7 @@ export function useChatSession(): ChatSession {
   async function undoRound(bubble: RenderedBubble) {
     if (bubble.planRound <= 0 || bubble.planRound !== latestRound.value) return;
     const url =
-      '/api/planning/undo' +
+      '/api/agent/undo' +
       (activeThreadId.value
         ? '?thread=' + encodeURIComponent(activeThreadId.value)
         : '');

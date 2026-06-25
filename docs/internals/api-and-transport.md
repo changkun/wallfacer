@@ -118,21 +118,21 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |
 | **Planning chat** | |
-| `GET /api/planning` | Planning agent status (running or not) |
-| `POST /api/planning` | Start the planning agent (idempotent) |
-| `DELETE /api/planning` | Stop the planning agent |
-| `GET /api/planning/messages` | Retrieve conversation history. `?thread=<id>` selects the thread; defaults to the active thread. |
-| `POST /api/planning/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the thread. |
-| `DELETE /api/planning/messages` | Clear a thread's conversation history and session (`?thread=<id>`). |
-| `GET /api/planning/messages/stream` | Stream agent response tokens for the in-flight thread. Returns 204 when `?thread=<id>` does not match the thread that owns the exec. |
-| `POST /api/planning/messages/interrupt` | Interrupt current agent turn. `?thread=<id>` must match the in-flight thread or 409. |
-| `POST /api/planning/undo` | Undo the caller thread's most recent planning round via a forward `git revert` commit (original commit stays in history; revert commit carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread. Task-mode threads rewind via events instead of git. Cancels dispatched board tasks whose linkage was added by the reverted commit. 409 on revert conflict or when there is nothing to undo. |
-| `GET /api/planning/commands` | List available slash commands |
-| `POST /api/planning/tool/update_task_prompt` | Tool endpoint: update a task's prompt from a task-mode planning thread (the prompt-refinement path) |
+| `GET /api/agent` | Planning agent status (running or not) |
+| `POST /api/agent` | Start the planning agent (idempotent) |
+| `DELETE /api/agent` | Stop the planning agent |
+| `GET /api/agent/messages` | Retrieve conversation history. `?thread=<id>` selects the thread; defaults to the active thread. |
+| `POST /api/agent/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the thread. |
+| `DELETE /api/agent/messages` | Clear a thread's conversation history and session (`?thread=<id>`). |
+| `GET /api/agent/messages/stream` | Stream agent response tokens for the in-flight thread. Returns 204 when `?thread=<id>` does not match the thread that owns the exec. |
+| `POST /api/agent/messages/interrupt` | Interrupt current agent turn. `?thread=<id>` must match the in-flight thread or 409. |
+| `POST /api/agent/undo` | Undo the caller thread's most recent planning round via a forward `git revert` commit (original commit stays in history; revert commit carries `Plan-Thread: <id>` and an incremented `Plan-Round`). `?thread=<id>` selects the caller's thread. Task-mode threads rewind via events instead of git. Cancels dispatched board tasks whose linkage was added by the reverted commit. 409 on revert conflict or when there is nothing to undo. |
+| `GET /api/agent/commands` | List available slash commands |
+| `POST /api/agent/tool/update_task_prompt` | Tool endpoint: update a task's prompt from a task-mode planning thread (the prompt-refinement path) |
 | **Planning chat threads** | |
-| `GET /api/planning/threads` | List non-archived threads; `?includeArchived=true` includes archived ones. Returns `{threads, active_id}`. |
-| `POST /api/planning/threads` | Create a new thread. Body `{name?}`; omitted name auto-generates `Chat N`. |
-| `PATCH /api/planning/threads/{id}` | Mutate a thread. Body `{name}` renames; `{state}` transitions it; `archived` hides it from the tab bar (409 if in-flight), `visible` restores it, `active` records the UI's active thread. |
+| `GET /api/agent/sessions` | List non-archived threads; `?includeArchived=true` includes archived ones. Returns `{threads, active_id}`. |
+| `POST /api/agent/sessions` | Create a new thread. Body `{name?}`; omitted name auto-generates `Chat N`. |
+| `PATCH /api/agent/sessions/{id}` | Mutate a thread. Body `{name}` renames; `{state}` transitions it; `archived` hides it from the tab bar (409 if in-flight), `visible` restores it, `active` records the UI's active thread. |
 | **Principal & cloud sign-in** (hosted flow active when `WALLFACER_CLOUD=true`) | |
 | `GET /login` | Begin the hosted sign-in flow |
 | `GET /callback` | OAuth2 authorization-code callback; sets the session cookie |

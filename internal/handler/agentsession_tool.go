@@ -9,7 +9,7 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// UpdateTaskPromptTool handles POST /api/planning/tool/update_task_prompt.
+// UpdateTaskPromptTool handles POST /api/agent/tool/update_task_prompt.
 // It is the HTTP bridge that lets the planning agent (in task-mode) write
 // task.Prompt and append a prompt_round event.
 //

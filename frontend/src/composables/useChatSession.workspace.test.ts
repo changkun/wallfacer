@@ -10,7 +10,7 @@ import { useTaskStore } from '../stores/tasks';
 
 function threadsCalls(): number {
   const f = globalThis.fetch as unknown as { mock: { calls: unknown[][] } };
-  return f.mock.calls.filter((c) => String(c[0]).includes('/api/planning/threads')).length;
+  return f.mock.calls.filter((c) => String(c[0]).includes('/api/agent/sessions')).length;
 }
 
 const Harness = defineComponent({
@@ -27,7 +27,7 @@ describe('useChatSession workspace switch', () => {
     setActivePinia(createPinia());
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/api/planning/threads')) {
+      if (url.includes('/api/agent/sessions')) {
         return new Response(JSON.stringify({ threads: [], active_id: '' }), { status: 200 });
       }
       return new Response('[]', { status: 200 });

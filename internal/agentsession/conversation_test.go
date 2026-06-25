@@ -19,7 +19,7 @@ func newTestStore(t *testing.T) *ConversationStore {
 }
 
 // TestConversationStore_LargeRawOutput guards against the bufio.Scanner
-// token-too-long regression that made /api/planning/messages return 500
+// token-too-long regression that made /api/agent/messages return 500
 // once any single round's raw NDJSON output exceeded 64 KiB. Before the
 // fix, a 200 KiB raw_output terminated the scanner with an error and the
 // whole history became unreadable.

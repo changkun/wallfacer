@@ -106,7 +106,7 @@ func archivedSpecGuard(workspaces []string, focusedSpec string) string {
 
 // applyTaskPromptRound writes the assistant's output as the new task.Prompt
 // and records a prompt_round event. It mirrors the logic in the explicit
-// /api/planning/tool/update_task_prompt HTTP bridge so both entry points
+// /api/agent/tool/update_task_prompt HTTP bridge so both entry points
 // produce the same durable state, and is invoked automatically at the end
 // of a task-mode planning turn (the agent has no way to reach back and
 // call the HTTP bridge itself). Returns the round number assigned, or 0

@@ -11,7 +11,7 @@ import { useChatSession } from './useChatSession';
 
 function streamFetchCount(): number {
   const f = globalThis.fetch as unknown as { mock: { calls: unknown[][] } };
-  return f.mock.calls.filter((c) => String(c[0]).includes('/api/planning/messages/stream')).length;
+  return f.mock.calls.filter((c) => String(c[0]).includes('/api/agent/messages/stream')).length;
 }
 
 let session: ReturnType<typeof useChatSession> | null = null;
@@ -31,16 +31,16 @@ describe('useChatSession streaming retry timer', () => {
     setActivePinia(createPinia());
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes('/api/planning/threads')) {
+      if (url.includes('/api/agent/sessions')) {
         return new Response(JSON.stringify({ threads: [], active_id: '' }), { status: 200 });
       }
       // POST to start a message: accept so startStreaming() runs.
-      if (url.endsWith('/api/planning/messages') && init?.method === 'POST') {
+      if (url.endsWith('/api/agent/messages') && init?.method === 'POST') {
         return new Response('{}', { status: 200 });
       }
       // The stream endpoint replies 204 (no content), which drives
       // onDone(hadData=false) and schedules the single retry.
-      if (url.includes('/api/planning/messages/stream')) {
+      if (url.includes('/api/agent/messages/stream')) {
         return new Response(null, { status: 204 });
       }
       return new Response('[]', { status: 200 });
