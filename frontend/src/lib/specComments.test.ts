@@ -4,6 +4,7 @@ import {
   activeCount,
   blockForLine,
   buildReplyTree,
+  layoutCards,
   inlineThreads,
   initials,
   outOfSyncCount,
@@ -214,5 +215,46 @@ describe('initials', () => {
     expect(initials('jane.doe')).toBe('JD');
     expect(initials('alice')).toBe('AL');
     expect(initials('')).toBe('?');
+  });
+});
+
+describe('layoutCards', () => {
+  it('keeps cards at their anchor when they do not overlap', () => {
+    const tops = layoutCards([
+      { id: 'a', top: 0, height: 40 },
+      { id: 'b', top: 100, height: 40 },
+    ], 8);
+    expect(tops.get('a')).toBe(0);
+    expect(tops.get('b')).toBe(100);
+  });
+
+  it('pushes a later card down when its anchor lands inside the previous card', () => {
+    const tops = layoutCards([
+      { id: 'a', top: 0, height: 50 },
+      { id: 'b', top: 20, height: 30 }, // anchor at 20 < 0+50+8
+    ], 8);
+    expect(tops.get('a')).toBe(0);
+    expect(tops.get('b')).toBe(58); // prevBottom(50) + gap(8)
+  });
+
+  it('cascades a cluster so no two cards overlap, in anchor order', () => {
+    const tops = layoutCards([
+      { id: 'c', top: 10, height: 30 },
+      { id: 'a', top: 0, height: 30 },
+      { id: 'b', top: 5, height: 30 },
+    ], 10);
+    expect(tops.get('a')).toBe(0);
+    expect(tops.get('b')).toBe(40); // 0+30+10
+    expect(tops.get('c')).toBe(80); // 40+30+10
+  });
+
+  it('is independent of input order', () => {
+    const boxes = [
+      { id: 'a', top: 0, height: 30 },
+      { id: 'b', top: 5, height: 30 },
+    ];
+    const forward = layoutCards(boxes, 10);
+    const reversed = layoutCards([...boxes].reverse(), 10);
+    expect([...reversed]).toEqual([...forward]);
   });
 });

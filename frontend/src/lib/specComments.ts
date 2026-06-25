@@ -217,6 +217,33 @@ export function blockForLine(blocks: BlockLine[], target: number): BlockLine | n
   return best;
 }
 
+// A margin-rail card to lay out: its id, the desired top (its anchor's vertical
+// offset in the scrolling body) and its measured height. `top`/`height` are px.
+export interface CardBox {
+  id: string;
+  top: number;
+  height: number;
+}
+
+// layoutCards places margin cards so none overlap, keeping each as close to its
+// anchor as possible. It is the variable-height generalization of destack: sort
+// by desired top, then flow top-down, pushing a card to `prevBottom + gap` when
+// its anchor would land it inside the previous card. Clustered anchors therefore
+// push later cards below their exact line (accepted Overleaf/Confluence
+// behavior). Pure and input-order-independent; returns a map of id -> resolved
+// top so the caller positions each card without re-sorting its render list.
+export function layoutCards(cards: CardBox[], gap = 8): Map<string, number> {
+  const sorted = [...cards].sort((a, b) => a.top - b.top || a.id.localeCompare(b.id));
+  const out = new Map<string, number>();
+  let prevBottom = -Infinity;
+  for (const c of sorted) {
+    const top = c.top < prevBottom + gap ? prevBottom + gap : c.top;
+    out.set(c.id, top);
+    prevBottom = top + Math.max(0, c.height);
+  }
+  return out;
+}
+
 // initials derives a 2-char avatar fallback from an author identifier. Used for
 // authors other than the signed-in user (there is no members API yet, so a
 // sub to initials fallback is the display).
