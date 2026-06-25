@@ -1,6 +1,6 @@
 ---
 title: Shared Postgres Store and Migrations
-status: complete
+status: validated
 depends_on:
   - specs/cloud/latere-integration/coordination-plane/spec-comments.md
 affects:
@@ -144,11 +144,24 @@ reference version), with its `database/pgx5` and `source/iofs` drivers.
 
 ## Error Handling
 
-- Migration failure at startup is fatal: `New` returns the error, the caller
-  does not start with an unknown schema state. Matches the reference.
-- A dirty `schema_migrations` (a half-applied migration) surfaces as a
-  `New` error naming the dirty version; recovery is the standard golang-migrate
-  `force`, out of scope for automation here but noted so the failure is legible.
+- `postgres.New` returns an error on any migration or connection failure (it
+  never returns a half-open store). The reference treats that as fatal and
+  refuses to start. **Wallfacer's coordinator does not:** `newCommentStore`
+  catches the error and falls back to the in-memory comment store with a loud
+  Error log, because spec comments are best-effort infrastructure and a Postgres
+  problem must not take the web server down. This is the pre-existing behavior
+  (the inline-schema constructor failed the same way into the same fallback);
+  the migration step just becomes one more thing `New` can fail on. See the
+  Deviations note.
+- **Dirty `schema_migrations` is a sticky trap.** A migration that fails partway
+  marks the version dirty, and golang-migrate refuses a dirty database on every
+  subsequent boot. Combined with the fallback above, a single bad migration means
+  the coordinator runs on **in-memory comments indefinitely** (lost on restart,
+  not shared across replicas, so split-brain across a multi-replica deploy), with
+  only the error log as signal. Recovery is the standard golang-migrate `force`
+  to the last good version. Whether cloud mode should instead fail loud rather
+  than silently degrade is an open decision (see Follow-ups), deliberately not
+  changed here.
 - Existing-table upgrade (version 0 with tables present) must not error: that is
   exactly what the idempotent `000001` DDL guarantees and what the test below
   pins.
@@ -182,9 +195,14 @@ gate `commentstore_contract_test.go` already uses.
 
 ### Status
 
-Fully implemented on `main`, 2026-06-25. Commits `518ceb91` (package + migrations
-+ deps) and `c2fb54f2` (coordinator/CLI switch to the injected pool). Verified
-against a real Postgres 16 container; all tests pass.
+Implementation fully shipped on `main`, 2026-06-25. Commits `518ceb91` (package +
+migrations + deps) and `c2fb54f2` (coordinator/CLI switch to the injected pool).
+Verified against a real Postgres 16 container; all touched-package tests pass.
+Frontmatter stays `validated`, not `complete`: per the document model the
+`validated → complete` jump is rejected, `complete` is reachable only through the
+drift-pipeline `testing` gate (the pipeline is the sole writer of `testing`), so
+the code shipping does not by itself promote the spec. Promotion is left to that
+gate.
 
 ### What was done
 
@@ -222,9 +240,15 @@ against a real Postgres 16 container; all tests pass.
 
 ### Deviations from the spec
 
-None. The implementation matches the spec; `web.go` being a no-op change was
-anticipated in the spec body (it "keeps wiring the returned `CommentStore` ...
-unchanged").
+- **Migration failure is not fatal in wallfacer.** The spec's first draft
+  (following the agent-sandbox reference) said failure is fatal and the caller
+  does not start. The coordinator instead falls back to the in-memory store on a
+  `postgres.New` error, preserving the pre-existing best-effort behavior of
+  `newCommentStore` rather than taking the web server down. The Error Handling
+  section above was rewritten to describe the actual fallback (and the dirty-DB
+  consequence); this deviation is intentional, not an oversight.
+- `web.go` being a no-op change was anticipated in the spec body (it "keeps
+  wiring the returned `CommentStore` ... unchanged").
 
 ### Surprises / gotchas
 
@@ -234,9 +258,21 @@ unchanged").
   green only because a container was spun up locally for this verification. The
   durable path remains CI-unverified by design (matches the pre-existing
   contract-test gate).
+- **Dirty-DB trap (consequential).** A migration that fails partway leaves
+  `schema_migrations` dirty; golang-migrate then refuses every subsequent boot,
+  and the coordinator's fallback silently downgrades to in-memory comments
+  forever (split-brain across replicas) with only an error log. A green test run
+  cannot see this; it surfaces only on a real partial-migration failure. See
+  Error Handling and Follow-ups.
 
 ### Follow-ups
 
-None required for this framework. The next durable consumer
-([metadata-projection.md](metadata-projection.md) rollups) adds `000002_*.sql`
-and a constructor taking `*pgxpool.Pool`; no further infra work.
+- **Decide fail-loud vs silent-degrade for cloud mode.** Today a Postgres or
+  migration failure (including a sticky dirty DB) falls back to in-memory
+  comments with an error log. For data described as cloud-authoritative, the
+  team may prefer the coordinator to refuse to start in cloud mode rather than
+  serve split-brain comments. Not changed here (it is the pre-existing behavior
+  and a deliberate prior decision); flagged for an explicit call.
+- The next durable consumer ([metadata-projection.md](metadata-projection.md)
+  rollups) adds `000002_*.sql` and a constructor taking `*pgxpool.Pool`; no
+  further infra work for the framework itself.
