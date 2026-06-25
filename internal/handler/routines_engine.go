@@ -252,7 +252,7 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 	}
 
 	h.insertEventOrLog(ctx, instance.ID, store.EventTypeStateChange,
-		store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
+		store.NewStateChangeData("", store.TaskStatusInProgress, store.TriggerSystem, nil))
 	h.insertEventOrLog(ctx, routineID, store.EventTypeSystem, map[string]any{
 		"kind":     "routine:fired",
 		"instance": instance.ID.String(),

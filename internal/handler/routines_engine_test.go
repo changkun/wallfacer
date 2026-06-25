@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -141,6 +142,29 @@ func TestFireRoutine_CreatesAndRunsInstanceTask(t *testing.T) {
 	}
 	if instance.Timeout != 30 {
 		t.Fatalf("instance timeout = %d, want 30 (inherited)", instance.Timeout)
+	}
+	events, err := s.GetEvents(ctx, instance.ID)
+	if err != nil {
+		t.Fatalf("get instance events: %v", err)
+	}
+	var stateChange map[string]string
+	for _, e := range events {
+		if e.EventType != store.EventTypeStateChange {
+			continue
+		}
+		if err := json.Unmarshal(e.Data, &stateChange); err != nil {
+			t.Fatalf("unmarshal state_change: %v", err)
+		}
+		break
+	}
+	if stateChange == nil {
+		t.Fatalf("expected state_change event for routine instance, got %+v", events)
+	}
+	if stateChange["to"] != string(store.TaskStatusInProgress) {
+		t.Fatalf("state_change to = %q, want %q", stateChange["to"], store.TaskStatusInProgress)
+	}
+	if stateChange["trigger"] != string(store.TriggerSystem) {
+		t.Fatalf("state_change trigger = %q, want %q", stateChange["trigger"], store.TriggerSystem)
 	}
 
 	// RunBackground was invoked on the mock runner for this instance.
