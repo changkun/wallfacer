@@ -78,15 +78,15 @@ func TestCoordinationGate(t *testing.T) {
 func TestCoordinationGatePersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "coordination-opt-in")
 
-	// Default for a signed-in instance (no file, no env) is on.
+	// Default (no file, no env) is off, the data-boundary default.
 	t.Setenv("WALLFACER_COORDINATION", "")
-	if !loadOptIn(path) {
-		t.Fatal("loadOptIn should default on for a signed-in instance with no file/env")
-	}
-	// An explicit env opt-out wins over the default.
-	t.Setenv("WALLFACER_COORDINATION", "0")
 	if loadOptIn(path) {
-		t.Fatal("WALLFACER_COORDINATION=0 should force off")
+		t.Fatal("loadOptIn should default off with no file and no env")
+	}
+	// An explicit env opt-in is honored when no persisted choice exists.
+	t.Setenv("WALLFACER_COORDINATION", "1")
+	if !loadOptIn(path) {
+		t.Fatal("WALLFACER_COORDINATION=1 should opt in")
 	}
 	t.Setenv("WALLFACER_COORDINATION", "")
 
@@ -148,19 +148,17 @@ func TestManifestLocalKeyIsHashedNotPath(t *testing.T) {
 	}
 }
 
-func TestCoordinationDefault(t *testing.T) {
-	// Explicit opt-out values force off.
-	for _, v := range []string{"0", "false", "FALSE", "no", "off"} {
+func TestEnvCoordinationOptIn(t *testing.T) {
+	for _, v := range []string{"1", "true", "TRUE", "yes", "on"} {
 		t.Setenv("WALLFACER_COORDINATION", v)
-		if coordinationDefault() {
-			t.Fatalf("WALLFACER_COORDINATION=%q should force off", v)
+		if !envCoordinationOptIn() {
+			t.Fatalf("WALLFACER_COORDINATION=%q should opt in", v)
 		}
 	}
-	// Anything else (including unset) defaults on for a signed-in instance.
-	for _, v := range []string{"", "1", "true", "on", "garbage"} {
+	for _, v := range []string{"", "0", "false", "off", "garbage"} {
 		t.Setenv("WALLFACER_COORDINATION", v)
-		if !coordinationDefault() {
-			t.Fatalf("WALLFACER_COORDINATION=%q should default on", v)
+		if envCoordinationOptIn() {
+			t.Fatalf("WALLFACER_COORDINATION=%q should stay opted out (off by default)", v)
 		}
 	}
 }

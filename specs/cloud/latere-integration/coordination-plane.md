@@ -304,9 +304,9 @@ to `wf.latere.ai`, an org-scoped coordinator that is authoritative for comment
 threads (Postgres-durable), instance-side relay to browsers over SSE, content-hash
 anchoring with reposition/orphan handling, and the comment UI (select-to-comment,
 markers, popover, resolve, triage, out-of-sync banner). The opt-in is persisted
-and defaults **on for a signed-in instance** (product decision; anonymous
-instances still connect to nothing, the data-boundary floor; opt out with
-`WALLFACER_COORDINATION=0` or the in-app toggle). See `coordination-plane/spec-comments.md` Outcome for the
+and **off by default** (the data-boundary commitment); enable per instance with
+`WALLFACER_COORDINATION=1` or the in-app Enable toggle. Note the gate governs each
+user's `wallfacer run`, not the `wallfacer web` coordinator pod. See `coordination-plane/spec-comments.md` Outcome for the
 detail and divergences. **Presence, metadata projection, remote control, and the
 multi-replica Valkey `Directory`** remain unbuilt (the connection, registry, and
 `Directory` seam are in place for them); `replicas` stays at 1 (`memDirectory`).
