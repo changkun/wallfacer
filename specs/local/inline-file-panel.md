@@ -100,8 +100,22 @@ write (`PUT /api/explorer/file`) into `save`.
 `.app-header__spacer` in `BoardPage.vue` (left-aligned, `flex: 1`, horizontally
 scrollable on overflow). `SearchBar` + action buttons stay right-aligned. Tabs:
 the pinned **Board** tab first, then file tabs in open order. Each file tab shows
-the basename, a dirty dot when unsaved, and a `×` close (also middle-click and
-`Ctrl/Cmd+W` on the active tab). Active tab is visually distinct.
+a file-type icon, the basename, a dirty dot when unsaved, and a `×` close (also
+middle-click and `Ctrl/Cmd+W` on the active tab). Styling mirrors VS Code:
+square flush tabs filling the header band, separators between them, and an
+active tab with a top accent rule over the editor background.
+
+**Preview (temporary) tabs.** Single-clicking a file in the tree opens it in a
+*preview* tab (italic label); the next single-click reuses that slot rather than
+piling up tabs. A preview tab is promoted to a permanent (kept) tab on **save**
+(`Cmd/Ctrl+S`), on **double-click** (tree row or tab), or implicitly when it is
+dirty and another file is previewed (so edits are never discarded). Modeled by a
+`preview` flag on `FileTab` and a `promote(path)` store action.
+
+**Board tab status.** The Board tab surfaces task state without leaving a file:
+a small spinner when `tasks.inProgress` is non-empty (work running) and an amber
+dot when `tasks.waiting` is non-empty (tasks need feedback). Both can show at
+once; the spinner respects `prefers-reduced-motion`.
 
 ### Center-pane swap
 
@@ -178,8 +192,6 @@ Phase 2, CodeMirror editor:
 
 - No split panes, no tab drag-reorder, no diff view, no minimap.
 - No custom find/replace UI (CM's built-in search is enough).
-- No VS Code single-click-preview (italic) tab behavior; every open is a normal
-  tab in v1.
 - No URL-syncing of open files (active-tab-in-query is a possible later polish;
   file tabs do not belong in the URL).
 - No media rendering (image/video/audio/PDF/hex) or raw-bytes endpoint in scope.
@@ -190,5 +202,5 @@ Phase 2, CodeMirror editor:
 
 - Multi-modal rendering + a `GET /api/explorer/file/raw` endpoint with `Range`
   support (the prior revision of this spec), for image/video/audio/PDF/hex.
-- Preview vs pinned tabs (single vs double click), tab drag-reorder, split view.
+- Tab drag-reorder and split view.
 - Reusing the tab shell on Chat/Plan.

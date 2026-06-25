@@ -206,7 +206,9 @@ The file explorer panel lets you browse workspace files directly in the web UI w
 
 **Browsing files:** Each active workspace appears as a root folder in the tree. Click a folder to expand it -- contents are loaded one level at a time from the server. Click again to collapse. Dot-prefixed entries (`.git`, `.env`, etc.) appear dimmed. Directories are listed first, then files, both in case-insensitive alphabetical order.
 
-**Opening files in tabs:** Click any file to open it as a tab in the top bar, VS Code style. The board itself is the first, pinned tab; each file you open adds another, so you can keep several files and the board open at once and switch between them from the tab strip. Clicking a tab swaps the main area to that file (the board keeps its scroll and filter while you are away). Close a file tab with its **×**, a middle-click, or **Cmd/Ctrl+W**; the board tab cannot be closed.
+**Opening files in tabs:** Click any file to open it as a tab in the top bar, VS Code style. The board itself is the first, pinned tab; switching to a file tab swaps the main area to that file (the board keeps its scroll and filter while you are away). Close a file tab with its **×**, a middle-click, or **Cmd/Ctrl+W**; the board tab cannot be closed.
+
+**Preview vs kept tabs:** A single click opens the file in a *preview* tab (italic title) that the next single click reuses, so browsing through files does not pile up tabs. The tab becomes permanent (kept) when you save it (**Cmd/Ctrl+S**), double-click the file or its tab, or edit it and open another file. The board tab also shows task status at a glance: a spinner while tasks are running and an amber dot when tasks are waiting for your feedback.
 
 **Layout:** The explorer tree sits at a fixed width on the left; the active tab fills the rest. The board grid and the open editors share that area, only the active one is shown.
 
