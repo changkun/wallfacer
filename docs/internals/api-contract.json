@@ -358,7 +358,7 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/planning",
+      "pattern": "/api/agent",
       "name": "GetAgentSessionStatus",
       "description": "Get planning sandbox status.",
       "tags": [
@@ -367,7 +367,7 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/planning",
+      "pattern": "/api/agent",
       "name": "StartAgentSession",
       "description": "Start the planning sandbox.",
       "tags": [
@@ -376,7 +376,7 @@
     },
     {
       "method": "DELETE",
-      "pattern": "/api/planning",
+      "pattern": "/api/agent",
       "name": "StopAgentSession",
       "description": "Stop the planning sandbox.",
       "tags": [
@@ -385,7 +385,7 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/planning/messages",
+      "pattern": "/api/agent/messages",
       "name": "GetAgentMessages",
       "description": "Retrieve conversation history.",
       "tags": [
@@ -394,7 +394,7 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/planning/messages",
+      "pattern": "/api/agent/messages",
       "name": "SendAgentMessage",
       "description": "Send a user message, triggers agent exec.",
       "tags": [
@@ -403,7 +403,7 @@
     },
     {
       "method": "DELETE",
-      "pattern": "/api/planning/messages",
+      "pattern": "/api/agent/messages",
       "name": "ClearAgentMessages",
       "description": "Clear conversation history.",
       "tags": [
@@ -412,7 +412,7 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/planning/messages/stream",
+      "pattern": "/api/agent/messages/stream",
       "name": "StreamAgentMessages",
       "description": "Stream the agent's response tokens.",
       "tags": [
@@ -421,7 +421,7 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/planning/messages/interrupt",
+      "pattern": "/api/agent/messages/interrupt",
       "name": "InterruptAgentMessage",
       "description": "Interrupt the current agent turn.",
       "tags": [
@@ -430,7 +430,7 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/planning/undo",
+      "pattern": "/api/agent/undo",
       "name": "UndoPlanningRound",
       "description": "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
       "tags": [
@@ -439,7 +439,7 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/planning/commands",
+      "pattern": "/api/agent/commands",
       "name": "GetAgentCommands",
       "description": "List available slash commands.",
       "tags": [
@@ -448,7 +448,7 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/planning/tool/update_task_prompt",
+      "pattern": "/api/agent/tool/update_task_prompt",
       "name": "UpdateTaskPromptTool",
       "description": "Tool endpoint: update a task's prompt from a task-mode planning thread.",
       "tags": [
@@ -457,7 +457,7 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/planning/threads",
+      "pattern": "/api/agent/sessions",
       "name": "ListAgentSessions",
       "description": "List planning chat threads for the current workspace group.",
       "tags": [
@@ -466,7 +466,7 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/planning/threads",
+      "pattern": "/api/agent/sessions",
       "name": "CreateAgentSession",
       "description": "Create a new planning chat thread.",
       "tags": [
@@ -475,7 +475,7 @@
     },
     {
       "method": "PATCH",
-      "pattern": "/api/planning/threads/{id}",
+      "pattern": "/api/agent/sessions/{id}",
       "name": "PatchAgentSession",
       "description": "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
       "tags": [
@@ -484,7 +484,7 @@
     },
     {
       "method": "DELETE",
-      "pattern": "/api/planning/threads/{id}",
+      "pattern": "/api/agent/sessions/{id}",
       "name": "DeleteAgentSession",
       "description": "Permanently delete an archived planning chat thread and its stored conversation.",
       "tags": [

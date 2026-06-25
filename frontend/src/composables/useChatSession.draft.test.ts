@@ -26,14 +26,14 @@ function fetchCalls(): Array<[string, RequestInit | undefined]> {
 
 function threadCreateCount(): number {
   return fetchCalls().filter(
-    ([url, init]) => url.endsWith('/api/planning/threads') && (init?.method ?? 'GET').toUpperCase() === 'POST',
+    ([url, init]) => url.endsWith('/api/agent/sessions') && (init?.method ?? 'GET').toUpperCase() === 'POST',
   ).length;
 }
 
 function messagePostCount(): number {
   return fetchCalls().filter(
     ([url, init]) =>
-      url.startsWith('/api/planning/messages') &&
+      url.startsWith('/api/agent/messages') &&
       !url.includes('/stream') &&
       (init?.method ?? 'GET').toUpperCase() === 'POST',
   ).length;
@@ -64,28 +64,28 @@ describe('useChatSession deferred chat creation', () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = (init?.method ?? 'GET').toUpperCase();
-      if (url.endsWith('/api/planning/threads') && method === 'POST') {
+      if (url.endsWith('/api/agent/sessions') && method === 'POST') {
         createSeq++;
         const t = { id: 'new-' + createSeq, name: 'Chat ' + createSeq, archived: false };
         createdThreads.push(t);
         return new Response(JSON.stringify(t), { status: 201 });
       }
-      if (url.includes('/api/planning/threads') && method === 'PATCH') {
+      if (url.includes('/api/agent/sessions') && method === 'PATCH') {
         return new Response(null, { status: 200 });
       }
-      if (url.includes('/api/planning/threads')) {
+      if (url.includes('/api/agent/sessions')) {
         // Mirror the server: list reflects created threads. active_id stays ''
         // (Create does not activate server-side), so loadThreads during promotion
         // sets activeThreadId to the new thread itself — the harshest race path.
         return new Response(JSON.stringify({ threads: createdThreads, active_id: '' }), { status: 200 });
       }
-      if (url.includes('/api/planning/messages/stream')) {
+      if (url.includes('/api/agent/messages/stream')) {
         return new Response(null, { status: 204 });
       }
-      if (url.startsWith('/api/planning/messages') && method === 'POST') {
+      if (url.startsWith('/api/agent/messages') && method === 'POST') {
         return new Response(JSON.stringify({ status: 'accepted' }), { status: 202 });
       }
-      if (url.startsWith('/api/planning/messages')) {
+      if (url.startsWith('/api/agent/messages')) {
         // loadHistory: thread "a" has prior content; everything else is empty.
         if (messagesGate) await messagesGate;
         if (url.includes('thread=a')) {

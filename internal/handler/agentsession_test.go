@@ -21,7 +21,7 @@ func TestGetPlanningStatus_NilPlanner(t *testing.T) {
 	// h.planner is nil by default — should return running: false.
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent", nil)
 	h.GetAgentSessionStatus(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -42,7 +42,7 @@ func TestGetPlanningStatus_WithPlanner(t *testing.T) {
 	h.planner = agentsession.New(agentsession.Config{Command: "podman"})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent", nil)
 	h.GetAgentSessionStatus(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -63,7 +63,7 @@ func TestStartPlanning_NilPlanner(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent", nil)
 	h.StartAgentSession(rec, req)
 
 	if rec.Code != http.StatusServiceUnavailable {
@@ -75,7 +75,7 @@ func TestStopPlanning_NilPlanner(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/planning", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/agent", nil)
 	h.StopAgentSession(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -96,7 +96,7 @@ func TestStopPlanning_WithPlanner(t *testing.T) {
 	h.planner = agentsession.New(agentsession.Config{Command: "podman"})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/planning", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/agent", nil)
 	h.StopAgentSession(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -142,7 +142,7 @@ func TestGetPlanningMessages_Empty(t *testing.T) {
 	h.planner = newPlannerWithStore(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages", nil)
 	h.GetAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -168,7 +168,7 @@ func TestGetPlanningMessages_WithHistory(t *testing.T) {
 	_ = cs.AppendMessage(agentsession.Message{Role: "assistant", Content: "hi", Timestamp: time.Now().UTC()})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages", nil)
 	h.GetAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -205,7 +205,7 @@ func TestGetPlanningMessages_Pagination(t *testing.T) {
 
 	// Filter: only messages before t3.
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages?before="+t3.Format(time.RFC3339Nano), nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages?before="+t3.Format(time.RFC3339Nano), nil)
 	h.GetAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -225,7 +225,7 @@ func TestGetPlanningMessages_NilPlanner(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages", nil)
 	h.GetAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -243,7 +243,7 @@ func TestSendPlanningMessage_AutoStarts(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := strings.NewReader(`{"message":"hello"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages", body)
 	h.SendAgentMessage(rec, req)
 
 	if rec.Code != http.StatusAccepted {
@@ -260,7 +260,7 @@ func TestSendPlanningMessage_Busy(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := strings.NewReader(`{"message":"hello"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages", body)
 	h.SendAgentMessage(rec, req)
 
 	if rec.Code != http.StatusConflict {
@@ -284,7 +284,7 @@ func TestSendPlanningMessage_EmptyMessage(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := strings.NewReader(`{"message":"  "}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages", body)
 	h.SendAgentMessage(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
@@ -301,7 +301,7 @@ func TestClearPlanningMessages(t *testing.T) {
 	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/planning/messages", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/agent/messages", nil)
 	h.ClearAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -318,7 +318,7 @@ func TestClearPlanningMessages_NilPlanner(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/planning/messages", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/agent/messages", nil)
 	h.ClearAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -334,7 +334,7 @@ func TestStreamPlanningMessages_NotBusy(t *testing.T) {
 	h.planner = p
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages/stream", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages/stream", nil)
 	h.StreamAgentMessages(rec, req)
 
 	if rec.Code != http.StatusNoContent {
@@ -346,7 +346,7 @@ func TestStreamPlanningMessages_NilPlanner(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages/stream", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages/stream", nil)
 	h.StreamAgentMessages(rec, req)
 
 	if rec.Code != http.StatusNoContent {
@@ -365,7 +365,7 @@ func TestStreamPlanningMessages_LiveData(t *testing.T) {
 	ll.Close()
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/messages/stream", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages/stream", nil)
 	h.StreamAgentMessages(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -390,7 +390,7 @@ func TestGetPlanningCommands(t *testing.T) {
 	h.SetPlanner(p)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/commands", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/commands", nil)
 	h.GetAgentCommands(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -430,7 +430,7 @@ func TestGetPlanningCommands_NilRegistry(t *testing.T) {
 	// No planner set — commandRegistry is nil.
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/planning/commands", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/commands", nil)
 	h.GetAgentCommands(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -447,7 +447,7 @@ func TestInterruptPlanningMessage_NotBusy(t *testing.T) {
 	// Not busy — should return 409.
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages/interrupt", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages/interrupt", nil)
 	h.InterruptAgentMessage(rec, req)
 
 	if rec.Code != http.StatusConflict {
@@ -464,7 +464,7 @@ func TestInterruptPlanningMessage_Busy(t *testing.T) {
 	h.planner = p
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages/interrupt", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages/interrupt", nil)
 	h.InterruptAgentMessage(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -483,7 +483,7 @@ func TestInterruptPlanningMessage_NilPlanner(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages/interrupt", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages/interrupt", nil)
 	h.InterruptAgentMessage(rec, req)
 
 	if rec.Code != http.StatusServiceUnavailable {
@@ -672,7 +672,7 @@ func TestSendPlanningMessage_BothFocusedFields(t *testing.T) {
 
 	body := strings.NewReader(`{"message":"hi","focused_spec":"specs/foo.md","focused_task":"11111111-1111-1111-1111-111111111111"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages", body)
 	h.SendAgentMessage(rec, req)
 
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -687,7 +687,7 @@ func TestSendPlanningMessage_UnknownFocusedTask(t *testing.T) {
 
 	body := strings.NewReader(`{"message":"hi","focused_task":"00000000-0000-0000-0000-000000000001"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages", body)
 	h.SendAgentMessage(rec, req)
 
 	if rec.Code != http.StatusNotFound {
@@ -729,7 +729,7 @@ func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
 	// Sending a spec-mode message to a task-mode thread should yield 409.
 	body := strings.NewReader(`{"message":"hi","focused_spec":"specs/foo.md","thread":"` + threadID + `"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/messages", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/messages", body)
 	h.SendAgentMessage(rec, req)
 
 	if rec.Code != http.StatusConflict {
@@ -768,7 +768,7 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 
 	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"updated prompt","thread_id":"` + threadID + `"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/tool/update_task_prompt", body)
 	h2.UpdateTaskPromptTool(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -827,7 +827,7 @@ func TestUpdateTaskPromptTool_WrongThreadMode(t *testing.T) {
 
 	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"new","thread_id":"` + threadID + `"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/tool/update_task_prompt", body)
 	h.UpdateTaskPromptTool(rec, req)
 
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -864,7 +864,7 @@ func TestUpdateTaskPromptTool_MismatchedTaskID(t *testing.T) {
 	// Send request with task B's ID — should be rejected.
 	body := strings.NewReader(`{"task_id":"` + taskB.ID.String() + `","prompt":"new","thread_id":"` + threadID + `"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/tool/update_task_prompt", body)
 	h.UpdateTaskPromptTool(rec, req)
 
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -900,7 +900,7 @@ func TestUpdateTaskPromptTool_ResumeHintOnWaiting(t *testing.T) {
 
 	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"updated","thread_id":"` + threadID + `"}`)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/planning/tool/update_task_prompt", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/tool/update_task_prompt", body)
 	h.UpdateTaskPromptTool(rec, req)
 
 	if rec.Code != http.StatusOK {

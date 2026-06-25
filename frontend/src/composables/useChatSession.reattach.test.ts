@@ -11,7 +11,7 @@ import { useAgentStore } from '../stores/agentSession';
 
 function streamFetchCount(): number {
   const f = globalThis.fetch as unknown as { mock: { calls: unknown[][] } };
-  return f.mock.calls.filter((c) => String(c[0]).includes('/api/planning/messages/stream')).length;
+  return f.mock.calls.filter((c) => String(c[0]).includes('/api/agent/messages/stream')).length;
 }
 
 const Harness = defineComponent({
@@ -29,10 +29,10 @@ describe('useChatSession live-stream re-attach', () => {
     setActivePinia(createPinia());
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/api/planning/threads')) {
+      if (url.includes('/api/agent/sessions')) {
         return new Response(JSON.stringify({ threads: [], active_id: '' }), { status: 200 });
       }
-      if (url.includes('/api/planning/messages/stream')) {
+      if (url.includes('/api/agent/messages/stream')) {
         return new Response(null, { status: 204 });
       }
       return new Response('[]', { status: 200 });

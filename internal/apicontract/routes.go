@@ -299,19 +299,19 @@ var Routes = []Route{
 	// --- Planning sandbox ---
 
 	{
-		Method: http.MethodGet, Pattern: "/api/planning", Name: "GetAgentSessionStatus",
+		Method: http.MethodGet, Pattern: "/api/agent", Name: "GetAgentSessionStatus",
 		JSName:      "status",
 		Description: "Get planning sandbox status.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/planning", Name: "StartAgentSession",
+		Method: http.MethodPost, Pattern: "/api/agent", Name: "StartAgentSession",
 		JSName:      "start",
 		Description: "Start the planning sandbox.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodDelete, Pattern: "/api/planning", Name: "StopAgentSession",
+		Method: http.MethodDelete, Pattern: "/api/agent", Name: "StopAgentSession",
 		JSName:      "stop",
 		Description: "Stop the planning sandbox.",
 		Tags:        []string{"planning"},
@@ -320,49 +320,49 @@ var Routes = []Route{
 	// --- Planning messages ---
 
 	{
-		Method: http.MethodGet, Pattern: "/api/planning/messages", Name: "GetAgentMessages",
+		Method: http.MethodGet, Pattern: "/api/agent/messages", Name: "GetAgentMessages",
 		JSName:      "messages",
 		Description: "Retrieve conversation history.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/planning/messages", Name: "SendAgentMessage",
+		Method: http.MethodPost, Pattern: "/api/agent/messages", Name: "SendAgentMessage",
 		JSName:      "sendMessage",
 		Description: "Send a user message, triggers agent exec.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodDelete, Pattern: "/api/planning/messages", Name: "ClearAgentMessages",
+		Method: http.MethodDelete, Pattern: "/api/agent/messages", Name: "ClearAgentMessages",
 		JSName:      "clearMessages",
 		Description: "Clear conversation history.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/planning/messages/stream", Name: "StreamAgentMessages",
+		Method: http.MethodGet, Pattern: "/api/agent/messages/stream", Name: "StreamAgentMessages",
 		JSName:      "messageStream",
 		Description: "Stream the agent's response tokens.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/planning/messages/interrupt", Name: "InterruptAgentMessage",
+		Method: http.MethodPost, Pattern: "/api/agent/messages/interrupt", Name: "InterruptAgentMessage",
 		JSName:      "interruptMessage",
 		Description: "Interrupt the current agent turn.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/planning/undo", Name: "UndoPlanningRound",
+		Method: http.MethodPost, Pattern: "/api/agent/undo", Name: "UndoPlanningRound",
 		JSName:      "undo",
 		Description: "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/planning/commands", Name: "GetAgentCommands",
+		Method: http.MethodGet, Pattern: "/api/agent/commands", Name: "GetAgentCommands",
 		JSName:      "commands",
 		Description: "List available slash commands.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/planning/tool/update_task_prompt", Name: "UpdateTaskPromptTool",
+		Method: http.MethodPost, Pattern: "/api/agent/tool/update_task_prompt", Name: "UpdateTaskPromptTool",
 		JSName:      "updateTaskPromptTool",
 		Description: "Tool endpoint: update a task's prompt from a task-mode planning thread.",
 		Tags:        []string{"planning"},
@@ -371,25 +371,25 @@ var Routes = []Route{
 	// --- Planning chat threads ---
 
 	{
-		Method: http.MethodGet, Pattern: "/api/planning/threads", Name: "ListAgentSessions",
+		Method: http.MethodGet, Pattern: "/api/agent/sessions", Name: "ListAgentSessions",
 		JSName:      "listThreads",
 		Description: "List planning chat threads for the current workspace group.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/planning/threads", Name: "CreateAgentSession",
+		Method: http.MethodPost, Pattern: "/api/agent/sessions", Name: "CreateAgentSession",
 		JSName:      "createThread",
 		Description: "Create a new planning chat thread.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodPatch, Pattern: "/api/planning/threads/{id}", Name: "PatchAgentSession",
+		Method: http.MethodPatch, Pattern: "/api/agent/sessions/{id}", Name: "PatchAgentSession",
 		JSName:      "patchThread",
 		Description: "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
 		Tags:        []string{"planning"},
 	},
 	{
-		Method: http.MethodDelete, Pattern: "/api/planning/threads/{id}", Name: "DeleteAgentSession",
+		Method: http.MethodDelete, Pattern: "/api/agent/sessions/{id}", Name: "DeleteAgentSession",
 		JSName:      "deleteThread",
 		Description: "Permanently delete an archived planning chat thread and its stored conversation.",
 		Tags:        []string{"planning"},

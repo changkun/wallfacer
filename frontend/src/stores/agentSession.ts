@@ -254,7 +254,7 @@ export const useAgentStore = defineStore('agentSession', () => {
       activeThreadId.value = match.id;
       api(
         'PATCH',
-        '/api/planning/threads/' + encodeURIComponent(match.id),
+        '/api/agent/sessions/' + encodeURIComponent(match.id),
         { state: 'active' },
       ).catch(() => {});
       return;
@@ -262,14 +262,14 @@ export const useAgentStore = defineStore('agentSession', () => {
 
     // Create a new task-mode thread pinned to this task.
     try {
-      const created = await api<AgentSession>('POST', '/api/planning/threads', {
+      const created = await api<AgentSession>('POST', '/api/agent/sessions', {
         name: 'Task prompt: ' + (title || taskId),
         focused_task: taskId,
       });
       if (created?.id) {
         await api(
           'PATCH',
-          '/api/planning/threads/' + encodeURIComponent(created.id),
+          '/api/agent/sessions/' + encodeURIComponent(created.id),
           { state: 'active' },
         ).catch(() => {});
         await loadThreads();
@@ -304,7 +304,7 @@ export const useAgentStore = defineStore('agentSession', () => {
     try {
       const res = await api<ThreadListResponse>(
         'GET',
-        '/api/planning/threads?includeArchived=true',
+        '/api/agent/sessions?includeArchived=true',
       );
       busyThreadId.value = res.busy_thread_id ?? '';
       for (const t of res.threads ?? []) {
@@ -323,7 +323,7 @@ export const useAgentStore = defineStore('agentSession', () => {
     try {
       const res = await api<ThreadListResponse>(
         'GET',
-        '/api/planning/threads?includeArchived=true',
+        '/api/agent/sessions?includeArchived=true',
       );
       const all = res.threads ?? [];
       const next: Record<string, AgentSession> = {};
