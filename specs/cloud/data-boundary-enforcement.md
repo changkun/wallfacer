@@ -200,10 +200,13 @@ A frontend test (`frontend/src/telemetry.test.ts`) that:
   nothing.
 - Span attributes that leave the machine are a reviewed, scrubbed set with no
   raw identifiers or content.
-- The coordination channel opens only on sign-in plus explicit opt-in; a
-  local-anonymous or opted-out instance emits zero bytes to wf.latere.ai. What an
-  opted-in instance sends is a subset of the allow-list, with no source, diffs,
-  agent output, secrets, env vars, or repo paths.
+- The coordination channel opens only on sign-in; sign-in defaults a signed-in
+  instance to opted-in (a deliberate product decision, revising the earlier
+  off-by-default), and an explicit opt-out (`WALLFACER_COORDINATION=0` or the
+  in-app toggle) closes it. A local-anonymous or opted-out instance emits zero
+  bytes to wf.latere.ai. What a connected instance sends is a subset of the
+  allow-list, with no source, diffs, agent output, secrets, env vars, or repo
+  paths.
 - A CI test fails if either gate is removed, if the scrubber stops covering
   identifier-bearing URLs, or if an unlisted field starts crossing the
   coordination channel.
