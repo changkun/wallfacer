@@ -1,5 +1,5 @@
 // Slash command + @-file autocomplete for the planning-chat composer.
-// Extracted from PlanningChatPanel.vue so the bulky state + keyboard
+// Extracted from AgentChatPanel.vue so the bulky state + keyboard
 // matrix lives in one place; the SFC just wires events.
 //
 // Returned `handleKeydown` returns `true` when the autocomplete consumed
@@ -11,7 +11,7 @@ import { mentionQueryAt, filterMentionFiles } from '../lib/mentions';
 
 interface SlashCommand { name: string; description?: string }
 
-export interface PlanningAutocomplete {
+export interface AgentAutocomplete {
   slashOpen: Ref<boolean>;
   slashFiltered: Ref<SlashCommand[]>;
   slashIndex: Ref<number>;
@@ -26,10 +26,10 @@ export interface PlanningAutocomplete {
   autoGrow(): void;
 }
 
-export function usePlanningAutocomplete(opts: {
+export function useAgentAutocomplete(opts: {
   inputEl: Ref<HTMLTextAreaElement | null>;
   inputText: Ref<string>;
-}): PlanningAutocomplete {
+}): AgentAutocomplete {
   const { inputEl, inputText } = opts;
 
   const slashOpen = ref(false);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// PlanningChatPanel — the docked spec-mode chat column. Panel chrome (header +
+// AgentChatPanel — the docked spec-mode chat column. Panel chrome (header +
 // thread tabs) only; the conversation stream, composer, and all session logic
 // come from the shared chat core (useChatSession + ChatMessageList +
 // ChatComposer) so this surface stays in lockstep with the dedicated Chat view
@@ -26,7 +26,7 @@ defineExpose({
 </script>
 
 <template>
-  <aside v-show="visible" class="planning-chat-panel">
+  <aside v-show="visible" class="agent-chat-panel">
     <header class="pcp-header">
       <span class="pcp-title">Planning Chat</span>
       <div class="pcp-header-actions">
@@ -129,4 +129,4 @@ defineExpose({
   </aside>
 </template>
 
-<style scoped src="./PlanningChatPanel.css"></style>
+<style scoped src="./AgentChatPanel.css"></style>

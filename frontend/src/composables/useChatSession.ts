@@ -1,5 +1,5 @@
 // useChatSession — the planning-chat conversation lifecycle, extracted from
-// PlanningChatPanel so multiple surfaces (the dedicated Chat view, the spec-mode
+// AgentChatPanel so multiple surfaces (the dedicated Chat view, the spec-mode
 // floating popup, the legacy docked panel) drive identical behaviour from one
 // implementation. Owns the rendered message list, streaming, the per-thread send
 // queue, thread switching/rename/archive, and per-round undo. Reads and writes
@@ -16,7 +16,7 @@ import { api, authHeaders } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFetch';
 import { createNdjsonStreamParser } from '../lib/ndjsonStream';
-import { parseTurnUsage } from '../lib/planningUsage';
+import { parseTurnUsage } from '../lib/agentUsage';
 import { enhanceMermaid } from '../lib/mermaidRender';
 import { useAgentStore } from '../stores/agentSession';
 import { useTaskStore } from '../stores/tasks';
@@ -26,7 +26,7 @@ import {
   type RenderedBubble,
   bubbleFromMessage,
   applyStreamingUpdate,
-} from '../lib/planningBubble';
+} from '../lib/agentBubble';
 
 export interface QueueItem { id: number; text: string }
 

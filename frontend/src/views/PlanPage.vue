@@ -9,7 +9,7 @@ import { useSse } from '../composables/useSse';
 import { watchThemeReinit } from '../lib/mermaidRender';
 import SpecTreePanel from '../components/plan/SpecTreePanel.vue';
 import SpecFocusedView from '../components/plan/SpecFocusedView.vue';
-import PlanningChatPanel from '../components/plan/PlanningChatPanel.vue';
+import AgentChatPanel from '../components/plan/AgentChatPanel.vue';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 
 const route = useRoute();
@@ -41,14 +41,14 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
 // focused view (SpecChatPopup owns its own open/position/size persistence). The
 // page only needs a ref to toggle it (C shortcut, focused-view chat button) and
 // to forward Break Down sends. In chat-first mode the popup isn't mounted; the
-// full-width PlanningChatPanel covers the empty-workspace case.
+// full-width AgentChatPanel covers the empty-workspace case.
 //
 // Gates the three-pane planning chat: the floating popup, its focused-view
 // toggle button, and the C shortcut. Set false to hide chat in Plan mode
 // (the dedicated /chat surface is unaffected); true shows the popup launcher
 // in the bottom-right. The chat-first empty-workspace onboarding is unaffected
 // either way (it's the only content when there are no specs).
-const PLANNING_CHAT_ENABLED = true;
+const AGENT_CHAT_ENABLED = true;
 
 const popupRef = ref<{ toggle: () => void; open: () => void; isOpen: boolean; send: (t: string) => void } | null>(null);
 
@@ -209,7 +209,7 @@ function onKeydown(ev: KeyboardEvent) {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   // c = toggle chat, d = dispatch focused spec, b = break it down (spec mode).
   if (ev.key === 'c' || ev.key === 'C') {
-    if (!PLANNING_CHAT_ENABLED || layout.value === 'chat-first') return;
+    if (!AGENT_CHAT_ENABLED || layout.value === 'chat-first') return;
     ev.preventDefault();
     toggleChat();
   } else if (ev.key === 'd' || ev.key === 'D') {
@@ -242,17 +242,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
       v-if="layout === 'three-pane'"
       ref="focusedViewRef"
       :chat-visible="chatVisible"
-      :chat-enabled="PLANNING_CHAT_ENABLED"
+      :chat-enabled="AGENT_CHAT_ENABLED"
       @toggle-chat="toggleChat"
       @focus-sibling="focusSibling"
       @send-chat="sendChatFromHeader"
     />
     <!-- Three-pane: chat floats over the focused view (deactivated). -->
-    <SpecChatPopup v-if="layout === 'three-pane' && PLANNING_CHAT_ENABLED" ref="popupRef" />
+    <SpecChatPopup v-if="layout === 'three-pane' && AGENT_CHAT_ENABLED" ref="popupRef" />
     <!-- Chat-first: no specs yet, the full-width panel covers the workspace.
          Gated on the layout directly (not v-else) so deactivating the
          three-pane popup above doesn't pull this panel into the spec view. -->
-    <PlanningChatPanel
+    <AgentChatPanel
       v-if="layout === 'chat-first'"
       :visible="true"
       class="chat-first"
@@ -274,7 +274,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   justify-content: center;
 }
 
-.plan-page[data-layout='chat-first'] :deep(.planning-chat-panel) {
+.plan-page[data-layout='chat-first'] :deep(.agent-chat-panel) {
   border-left: none;
   width: 100%;
   max-width: 720px;

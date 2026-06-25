@@ -5,7 +5,7 @@
 // prop sizes it for the entry-screen hero, the docked conversation, the legacy
 // panel, or the compact spec popup.
 import { ref, computed } from 'vue';
-import { usePlanningAutocomplete } from '../../composables/usePlanningAutocomplete';
+import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
 
 const props = withDefaults(defineProps<{
   streaming: boolean;
@@ -39,7 +39,7 @@ function toggleSendMode() {
   }
 }
 
-const autocomplete = usePlanningAutocomplete({ inputEl, inputText });
+const autocomplete = useAgentAutocomplete({ inputEl, inputText });
 const {
   slashOpen, slashFiltered, slashIndex,
   mentionOpen, mentionFiltered, mentionIndex,

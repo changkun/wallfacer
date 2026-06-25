@@ -4,8 +4,8 @@
 // as full-width prose; user turns are right-aligned high-contrast pills. Pure
 // presentation over a ChatSession; mounted by the Chat view, the docked panel,
 // and the spec-mode popup alike.
-import { activityIcon, activitySummary } from '../../lib/planningBubble';
-import { formatTokens, formatCost } from '../../lib/planningUsage';
+import { activityIcon, activitySummary } from '../../lib/agentBubble';
+import { formatTokens, formatCost } from '../../lib/agentUsage';
 import BrandMark from '../BrandMark.vue';
 import type { ChatSession } from '../../composables/useChatSession';
 
