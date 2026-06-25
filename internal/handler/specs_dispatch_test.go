@@ -619,7 +619,7 @@ func TestCompletionHook_UpdatesSpecStatus(t *testing.T) {
 	_, ws := newDispatchTestHandler(t)
 	writeTestSpec(t, ws, "specs/local/hooktest.md", testSpecValidated)
 
-	hook := SpecCompletionHook(func() []string { return []string{ws} })
+	hook := SpecCompletionHook(func() []string { return []string{ws} }, nil, nil)
 	hook(store.Task{
 		SpecSourcePath: "specs/local/hooktest.md",
 	})
@@ -634,12 +634,12 @@ func TestCompletionHook_UpdatesSpecStatus(t *testing.T) {
 }
 
 func TestCompletionHook_NoSpecPath(t *testing.T) {
-	hook := SpecCompletionHook(func() []string { return []string{t.TempDir()} })
+	hook := SpecCompletionHook(func() []string { return []string{t.TempDir()} }, nil, nil)
 	hook(store.Task{}) // no-op, no crash
 }
 
 func TestCompletionHook_SpecFileNotFound(t *testing.T) {
-	hook := SpecCompletionHook(func() []string { return []string{t.TempDir()} })
+	hook := SpecCompletionHook(func() []string { return []string{t.TempDir()} }, nil, nil)
 	hook(store.Task{
 		SpecSourcePath: "specs/nonexistent.md",
 	}) // logs warning, no crash
@@ -742,7 +742,7 @@ func TestCompletionHook_AlreadyComplete(t *testing.T) {
 	completeSpec := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
 	writeTestSpec(t, ws, "specs/local/already.md", completeSpec)
 
-	hook := SpecCompletionHook(func() []string { return []string{ws} })
+	hook := SpecCompletionHook(func() []string { return []string{ws} }, nil, nil)
 	hook(store.Task{
 		SpecSourcePath: "specs/local/already.md",
 	})
