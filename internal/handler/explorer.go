@@ -20,6 +20,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
+	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -272,6 +273,30 @@ func isBinaryContent(data []byte) bool {
 	return slices.Contains(data, 0)
 }
 
+// resolveSpecArchiveFallback rewrites a spec path to its specs/.archive/
+// location when the live path is absent but the archived twin exists. Archived
+// specs are referenced by their logical path; their bytes live under .archive/.
+// Non-spec paths and existing files are returned unchanged.
+func resolveSpecArchiveFallback(path, workspace string) string {
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	rel, err := filepath.Rel(workspace, path)
+	if err != nil {
+		return path
+	}
+	relSlash := filepath.ToSlash(rel)
+	arch := spec.ArchivePath(relSlash)
+	if arch == relSlash {
+		return path // not a relocatable spec path
+	}
+	archAbs := filepath.Join(workspace, filepath.FromSlash(arch))
+	if _, err := os.Stat(archAbs); err == nil {
+		return archAbs
+	}
+	return path
+}
+
 // ExplorerReadFile returns file contents for preview, with binary detection
 // and size limits.
 func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
@@ -287,6 +312,8 @@ func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
+
+	path = resolveSpecArchiveFallback(path, workspace)
 
 	resolved, err := isWithinWorkspace(path, workspace)
 	if err != nil {
@@ -400,6 +427,7 @@ func (h *Handler) ExplorerFileStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
+	path = resolveSpecArchiveFallback(path, workspace)
 	resolved, err := isWithinWorkspace(path, workspace)
 	if err != nil {
 		// Distinguish a missing-but-contained path from a path-escape attempt,
