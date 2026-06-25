@@ -2,12 +2,9 @@ package handler
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -18,40 +15,6 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
-
-// ssrfHardenedTransport returns an http.Transport that re-checks the resolved
-// IP address against private/loopback/link-local ranges immediately before
-// opening the TCP connection. This is defense-in-depth against DNS-rebinding
-// attacks: even if validateBaseURL approved the hostname at configuration time,
-// a subsequent DNS change could point it to a private IP. By re-resolving and
-// checking at connect time, the attack window is closed.
-func ssrfHardenedTransport() *http.Transport {
-	dialer := &net.Dialer{
-		Timeout: 30 * time.Second,
-	}
-	return &http.Transport{
-		DisableKeepAlives: true,
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("ssrf guard: %w", err)
-			}
-			addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, fmt.Errorf("ssrf guard: resolve %q: %w", host, err)
-			}
-			if len(addrs) == 0 {
-				return nil, fmt.Errorf("ssrf guard: no addresses resolved for %s", host)
-			}
-			for _, a := range addrs {
-				if isPrivateIP(a.IP) {
-					return nil, fmt.Errorf("ssrf guard: connection to %s (%s) is blocked", host, a.IP)
-				}
-			}
-			return dialer.DialContext(ctx, network, net.JoinHostPort(addrs[0].IP.String(), port))
-		},
-	}
-}
 
 // availableSandboxes returns all sandbox types the UI should display,
 // combining the built-in (registered) harnesses with any user-configured

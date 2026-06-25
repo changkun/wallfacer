@@ -1769,45 +1769,6 @@ func TestUpdateConfig_RejectsTrailingContent(t *testing.T) {
 	}
 }
 
-// --- ssrfHardenedTransport ---
-
-// TestSsrfHardenedTransport_ReturnsNonNil verifies that ssrfHardenedTransport
-// returns a non-nil transport.
-func TestSsrfHardenedTransport_ReturnsNonNil(t *testing.T) {
-	transport := ssrfHardenedTransport()
-	if transport == nil {
-		t.Error("expected non-nil transport")
-	}
-}
-
-// TestSsrfHardenedTransport_BlocksLocalhostRequests verifies that the hardened
-// transport blocks requests to loopback addresses.
-func TestSsrfHardenedTransport_BlocksLocalhostRequests(t *testing.T) {
-	transport := ssrfHardenedTransport()
-	if transport == nil {
-		t.Fatal("nil transport")
-	}
-	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
-	_, err := client.Get("http://localhost/test")
-	if err == nil {
-		t.Error("expected ssrfHardenedTransport to block localhost requests")
-	}
-}
-
-// TestSsrfHardenedTransport_BlocksPrivateIPRequests verifies that the hardened
-// transport blocks requests to RFC-1918 private addresses.
-func TestSsrfHardenedTransport_BlocksPrivateIPRequests(t *testing.T) {
-	transport := ssrfHardenedTransport()
-	if transport == nil {
-		t.Fatal("nil transport")
-	}
-	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
-	_, err := client.Get("http://192.168.1.1/test")
-	if err == nil {
-		t.Error("expected ssrfHardenedTransport to block private IP requests")
-	}
-}
-
 // --- defaultSandbox ---
 
 // TestDefaultSandbox_ExplicitSandboxReturned verifies that an explicitly
