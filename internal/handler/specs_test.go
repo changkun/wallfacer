@@ -153,6 +153,46 @@ func TestValidateSpec_NotFound(t *testing.T) {
 	}
 }
 
+func TestMarkStale_FromComplete(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	complete := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
+	writeTestSpec(t, ws, "specs/local/done.md", complete)
+
+	w := doTransition(t, h.MarkStaleTransition, "specs/local/done.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/done.md"); got != spec.StatusStale {
+		t.Errorf("status = %q, want %q", got, spec.StatusStale)
+	}
+}
+
+func TestMarkStale_RejectsVague(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	vague := strings.Replace(testSpecValidated, "status: validated", "status: vague", 1)
+	writeTestSpec(t, ws, "specs/local/idea.md", vague)
+
+	w := doTransition(t, h.MarkStaleTransition, "specs/local/idea.md")
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+}
+
+func TestDismissStaleCandidate_BumpsUpdatedKeepsStatus(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	complete := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
+	writeTestSpec(t, ws, "specs/local/done.md", complete)
+
+	w := doTransition(t, h.DismissStaleCandidate, "specs/local/done.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	// Status is unchanged; only updated is bumped.
+	if got := readStatus(t, ws, "specs/local/done.md"); got != spec.StatusComplete {
+		t.Errorf("status = %q, want %q (dismiss must not change status)", got, spec.StatusComplete)
+	}
+}
+
 // writeDispatchedSpec writes a drafted spec wired to taskID and returns its path.
 func writeDispatchedSpec(t *testing.T, ws, relPath, taskID string) {
 	t.Helper()

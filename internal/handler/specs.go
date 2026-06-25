@@ -408,6 +408,112 @@ func (h *Handler) ValidateSpecTransition(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// MarkStaleTransition accepts a stale candidate, transitioning the spec to
+// stale (e.g. complete → stale) so the explorer surfaces it for re-refinement.
+// The state machine rejects illegal sources (vague, archived) with 422.
+func (h *Handler) MarkStaleTransition(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	s, err := spec.ParseFile(absPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("parse error: %v", err), http.StatusBadRequest)
+		return
+	}
+	if err := spec.StatusMachine.Validate(s.Status, spec.StatusStale); err != nil {
+		http.Error(w, fmt.Sprintf("cannot mark spec at status %q stale", s.Status),
+			http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+		"status":  string(spec.StatusStale),
+		"updated": time.Now(),
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := commitSpecTransition(r.Context(), workspaces, absPath, req.Path, spec.StatusStale); err != nil {
+		slog.Warn("mark-stale transition commit failed", "path", req.Path, "err", err)
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(spec.StatusStale),
+	})
+}
+
+// DismissStaleCandidate bumps a spec's updated timestamp without changing its
+// status — the "I looked, it's fine" action for a stale candidate. The next
+// scan ignores commits older than the new timestamp.
+func (h *Handler) DismissStaleCandidate(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	s, err := spec.ParseFile(absPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("parse error: %v", err), http.StatusBadRequest)
+		return
+	}
+	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+		"updated": time.Now(),
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
+		return
+	}
+	subject := fmt.Sprintf("%s: dismiss stale candidate", req.Path)
+	if err := commitSpecChanges(r.Context(), workspaces, absPath, []string{req.Path}, subject); err != nil {
+		slog.Warn("dismiss-stale commit failed", "path", req.Path, "err", err)
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(s.Status),
+	})
+}
+
 // MigrateSpec converts a free-form, frontmatter-less spec file into a
 // lifecycle-managed spec by injecting a frontmatter block (status drafted,
 // title from the first H1). The prose body is preserved byte-for-byte. The

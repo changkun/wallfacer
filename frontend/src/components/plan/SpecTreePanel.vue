@@ -16,8 +16,18 @@ const ui = useUiStore();
 const dialog = useDialogStore();
 const {
   tree, treeProgress, treeIndex, treeLoading,
-  focusedSpecPath, focusedIsIndex, focusedTaskId,
+  focusedSpecPath, focusedIsIndex, focusedTaskId, staleCandidates,
 } = storeToRefs(planning);
+
+const rescanning = ref(false);
+async function onRescanStaleness() {
+  rescanning.value = true;
+  try {
+    await planning.fetchStaleCandidates();
+  } finally {
+    rescanning.value = false;
+  }
+}
 
 // ── Persisted UI state ─────────────────────────────────────────────
 const STATUS_KEY = 'wallfacer-spec-filter';
@@ -390,6 +400,7 @@ async function adoptDocNodes() {
 
 onMounted(() => {
   void loadTaskPrompts();
+  void planning.fetchStaleCandidates();
 });
 
 // Keep the Task Prompts list fresh against the SSE-synced task store: reload
@@ -426,6 +437,13 @@ onUnmounted(() => {
         <input type="checkbox" :checked="showArchived" @change="toggleShowArchived" />
         Show archived
       </label>
+      <button
+        type="button"
+        class="stp-rescan"
+        :disabled="rescanning"
+        title="Rescan completed specs for code drift in their affects files"
+        @click="onRescanStaleness"
+      >{{ rescanning ? 'Rescanning…' : 'Rescan staleness' }}</button>
     </div>
 
     <div v-if="docNodes.length > 0 && !migrateDismissed" class="stp-migrate-banner">
@@ -545,6 +563,11 @@ onUnmounted(() => {
               <span class="stp-icon">{{ rn.node.spec?.doc ? '📄' : (STATUS_ICONS[rn.node.spec?.status ?? ''] ?? '') }}</span>
               <span class="stp-title">{{ rn.node.spec?.title || rn.node.path }}</span>
               <span
+                v-if="staleCandidates[rn.node.path]"
+                class="stp-stale-candidate"
+                :title="staleCandidates[rn.node.path].reason"
+              >⚠ stale candidate</span>
+              <span
                 v-if="!rn.node.is_leaf && treeProgress[rn.node.path]"
                 class="stp-progress"
               >{{ treeProgress[rn.node.path].Complete }}/{{ treeProgress[rn.node.path].Total }}</span>
@@ -618,6 +641,30 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   cursor: pointer;
+}
+
+.stp-rescan {
+  font-size: 11px;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+
+.stp-rescan:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.stp-stale-candidate {
+  font-size: 10px;
+  color: var(--tint-amber-ink);
+  background: var(--tint-amber);
+  border-radius: 4px;
+  padding: 0 5px;
+  white-space: nowrap;
 }
 
 .stp-migrate-banner {
