@@ -57,6 +57,14 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 // finished — an immediate retry would otherwise bundle new-session events into
 // the previous session's compact file. The caller must hold s.mu.
 func (s *Store) scheduleTerminalCompaction(id uuid.UUID) {
+	// Don't start new background work once Close has published the closed
+	// flag: WaitCompaction may already be draining, and a late Add(1) would
+	// race the Wait. Close publishes closed under s.mu and this runs under
+	// s.mu, so the check and the publish are serialized. Skipping compaction
+	// at shutdown only leaves trace events uncompacted; they load fine.
+	if s.closed.Load() {
+		return
+	}
 	maxSeq := int64(s.nextSeq[id] - 1)
 	s.compactWg.Add(1)
 	go func(taskID uuid.UUID, maxSeq int64) {

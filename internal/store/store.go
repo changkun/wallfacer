@@ -142,9 +142,23 @@ func NewFileStore(dir string) (*Store, error) {
 	return s, nil
 }
 
-// Close marks the store as closed. It sets an internal flag that callers can
-// query via IsClosed; it does not interrupt any in-flight operations.
-func (s *Store) Close() { s.closed.Store(true) }
+// Close marks the store as closed and drains any in-flight background
+// compaction before returning, so callers can remove the data directory (a
+// test's t.TempDir, a workspace swap) without racing a compaction write.
+//
+// Ordering matters and is the reason Close is not just a flag set:
+//   - s.mu is taken to publish the closed flag. scheduleTerminalCompaction
+//     runs under s.mu and checks the flag before compactWg.Add, so once Close
+//     has published it no new compaction can start. This is what prevents a
+//     late Add(1) from racing the Wait below.
+//   - s.mu is released BEFORE WaitCompaction. The compaction goroutine takes
+//     s.mu.RLock while running, so waiting under the write lock would deadlock.
+func (s *Store) Close() {
+	s.mu.Lock()
+	s.closed.Store(true)
+	s.mu.Unlock()
+	s.compactWg.Wait()
+}
 
 // IsClosed reports whether Close has been called on this store.
 func (s *Store) IsClosed() bool { return s.closed.Load() }
