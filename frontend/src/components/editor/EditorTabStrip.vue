@@ -133,9 +133,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   display: flex;
   align-items: stretch;
   /* Fill the header band and bleed past its vertical padding so tabs read as a
-     VS Code tab bar rather than floating pills. */
-  height: calc(100% + 12px);
-  margin: -6px 0;
+     VS Code tab bar rather than floating pills. The bleed matches .app-header's
+     3px vertical padding. */
+  height: calc(100% + 6px);
+  margin: -3px 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
