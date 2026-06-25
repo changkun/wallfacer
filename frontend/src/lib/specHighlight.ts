@@ -175,6 +175,22 @@ export function highlightThreads(
   return highlighted;
 }
 
+// destack pushes markers that snapped to the same (or near-same) vertical
+// position apart by `step` px, so fallback gutter markers anchored to one block
+// cascade down the gutter instead of stacking on an identical `top` and hiding
+// each other. Returns a new, top-sorted list; inputs are not mutated.
+export function destack<T extends { top: number }>(markers: T[], step = 20): T[] {
+  const sorted = [...markers].sort((a, b) => a.top - b.top);
+  const out: T[] = [];
+  let prev = -Infinity;
+  for (const m of sorted) {
+    const top = m.top < prev + step ? prev + step : m.top;
+    out.push({ ...m, top });
+    prev = top;
+  }
+  return out;
+}
+
 // syncOpenMark reflects the open thread onto already-rendered marks without a
 // full rewrap (cheap; runs on every open/close).
 export function syncOpenMark(root: HTMLElement, openId: string | null): void {
