@@ -270,8 +270,12 @@ let explorerStream: EventSource | null = null;
 function startExplorerStream() {
   if (typeof EventSource === 'undefined') return;
   explorerStream?.close();
-  const url = withAuthToken('/api/explorer/stream');
-  explorerStream = new EventSource(url);
+  // Send the currently-expanded directory paths so the server fingerprints
+  // them too, not just the workspace roots. Without this, content edits and
+  // changes more than one level deep never trigger a refresh.
+  const paths = [...expanded.value].join(',');
+  const base = `/api/explorer/stream${paths ? `?paths=${encodeURIComponent(paths)}` : ''}`;
+  explorerStream = new EventSource(withAuthToken(base));
   explorerStream.addEventListener('refresh', async () => {
     // Re-fetch the root + every currently-expanded directory. Children are
     // keyed by path; collapsed nodes intentionally stay stale until the
@@ -307,6 +311,12 @@ onUnmounted(() => {
 
 watch(() => store.config?.workspaces?.[0], (ws) => {
   if (ws) loadRoot();
+});
+
+// Re-open the stream when the expanded set changes so the server fingerprints
+// the newly visible directories (an EventSource URL is fixed once opened).
+watch(() => [...expanded.value].sort().join(','), () => {
+  if (explorerStream) startExplorerStream();
 });
 </script>
 
