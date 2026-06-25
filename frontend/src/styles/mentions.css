@@ -2,10 +2,12 @@
 .mention-dropdown {
   position: fixed;
   z-index: 1000;
-  background: var(--bg-card);
+  background: var(--glass-elevated);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--hairline-top), var(--shadow-lg);
   max-height: 240px;
   overflow-y: auto;
   padding: 4px 0;
