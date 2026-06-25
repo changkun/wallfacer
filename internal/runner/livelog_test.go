@@ -6,10 +6,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 )
 
 func TestLiveLogWriteAndRead(t *testing.T) {
-	ll := newLiveLog()
+	ll := livelog.New()
 
 	// Write some data before creating a reader.
 	if _, err := ll.Write([]byte("hello ")); err != nil {
@@ -48,7 +50,7 @@ func TestLiveLogWriteAndRead(t *testing.T) {
 }
 
 func TestLiveLogMultipleReaders(t *testing.T) {
-	ll := newLiveLog()
+	ll := livelog.New()
 	_, _ = ll.Write([]byte("data"))
 
 	r1 := ll.NewReader()
@@ -65,7 +67,7 @@ func TestLiveLogMultipleReaders(t *testing.T) {
 }
 
 func TestLiveLogContextCancellation(t *testing.T) {
-	ll := newLiveLog()
+	ll := livelog.New()
 	r := ll.NewReader()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -82,7 +84,7 @@ func isContextErr(err error) bool {
 }
 
 func TestLiveLogConcurrentWriteAndRead(t *testing.T) {
-	ll := newLiveLog()
+	ll := livelog.New()
 	r := ll.NewReader()
 	ctx := context.Background()
 
@@ -121,7 +123,7 @@ func TestLiveLogConcurrentWriteAndRead(t *testing.T) {
 }
 
 func TestLiveLogDoubleClose(_ *testing.T) {
-	ll := newLiveLog()
+	ll := livelog.New()
 	ll.Close()
 	ll.Close() // should not panic
 }

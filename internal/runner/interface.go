@@ -8,6 +8,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -30,7 +31,7 @@ type Interface interface {
 	// Container management.
 	ListContainers() ([]executor.ContainerInfo, error)
 	ContainerName(taskID uuid.UUID) string
-	TaskLogReader(taskID uuid.UUID) *LiveLogReader
+	TaskLogReader(taskID uuid.UUID) *livelog.Reader
 	KillContainer(taskID uuid.UUID)
 	StopTaskWorker(taskID uuid.UUID)
 	WorkerStats() executor.WorkerStatsInfo

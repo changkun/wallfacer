@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
-	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -225,7 +225,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 // streamLiveLog streams output from the in-process live log buffer for the
 // currently running turn. It first sends any stored turn outputs (completed
 // turns from earlier in the execution), then streams the live turn data.
-func (h *Handler) streamLiveLog(w http.ResponseWriter, r *http.Request, flusher http.Flusher, id uuid.UUID, lr *runner.LiveLogReader) {
+func (h *Handler) streamLiveLog(w http.ResponseWriter, r *http.Request, flusher http.Flusher, id uuid.UUID, lr *livelog.Reader) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")

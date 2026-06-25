@@ -21,6 +21,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
 	"latere.ai/x/wallfacer/internal/pkg/envutil"
 	"latere.ai/x/wallfacer/internal/pkg/keyedmu"
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/pkg/pubsub"
 	"latere.ai/x/wallfacer/internal/pkg/syncmap"
 	"latere.ai/x/wallfacer/internal/pkg/trackedwg"
@@ -62,7 +63,7 @@ func (r *Runner) ContainerName(taskID uuid.UUID) string {
 // of the given task. Returns nil when no live log is active (the task is
 // between turns or not running). Each call returns an independent reader
 // positioned at the start of the current turn's output.
-func (r *Runner) TaskLogReader(taskID uuid.UUID) *LiveLogReader {
+func (r *Runner) TaskLogReader(taskID uuid.UUID) *livelog.Reader {
 	ll, ok := r.liveLogs.Load(taskID)
 	if !ok {
 		return nil
@@ -148,16 +149,16 @@ type Runner struct {
 	tmpDir                 string
 	workspaceManager       *workspace.Manager
 	codexAuthPath          string
-	promptsMgr             *prompts.Manager                 // prompt template manager
-	worktreeMu             sync.Mutex                       // serializes all worktree filesystem operations on worktreesDir
-	repoMu                 keyedmu.Map[string]              // per-repo mutex for serializing rebase+merge
-	taskContainers         *containerRegistry               // taskID → container name
-	ideateContainer        *containerRegistry               // singleton: ideation container name
-	liveLogs               syncmap.Map[uuid.UUID, *liveLog] // live log buffers for in-progress turns
-	oversightMu            keyedmu.Map[string]              // per-task mutex for serializing oversight generation
-	containerCB            *circuitbreaker.Breaker          // circuit breaker for container launch operations
-	backend                executor.Backend                 // pluggable sandbox backend (local podman/docker, host, future: k8s)
-	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
+	promptsMgr             *prompts.Manager                     // prompt template manager
+	worktreeMu             sync.Mutex                           // serializes all worktree filesystem operations on worktreesDir
+	repoMu                 keyedmu.Map[string]                  // per-repo mutex for serializing rebase+merge
+	taskContainers         *containerRegistry                   // taskID → container name
+	ideateContainer        *containerRegistry                   // singleton: ideation container name
+	liveLogs               syncmap.Map[uuid.UUID, *livelog.Log] // live log buffers for in-progress turns
+	oversightMu            keyedmu.Map[string]                  // per-task mutex for serializing oversight generation
+	containerCB            *circuitbreaker.Breaker              // circuit breaker for container launch operations
+	backend                executor.Backend                     // pluggable sandbox backend (local podman/docker, host, future: k8s)
+	backgroundWg           trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
 	autosubmitFn           func() bool      // returns true when auto-submit is enabled
