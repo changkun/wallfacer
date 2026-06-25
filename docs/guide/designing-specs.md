@@ -138,6 +138,12 @@ dispatched_task_id: null  # null or UUID (leaf specs only)
 
 The spec document model (`specs/spec-coordination/spec-coordination/spec-document-model.md`) defines the full schema and validation rules.
 
+### Free-form specs
+
+A `specs/` directory full of plain markdown design docs (no YAML frontmatter) still renders. Each frontmatter-less file appears in the explorer as a read-only **doc node** (marked with a 📄 icon and a muted title): its body is shown like any other spec, but it has no lifecycle status and no dispatch, archive, or progress controls, since those need frontmatter. This lets you point Plan mode at an existing repo of design docs without converting anything first.
+
+When doc nodes are present, the explorer shows a dismissible banner offering to **Adopt frontmatter**: this prepends a frontmatter block (status `drafted`, title from the file's first `# heading`) to each free-form file, preserving the prose, and commits the change, turning the doc node into a fully lifecycle-managed spec. The suggestion is optional; dismiss it to keep working in render-only mode.
+
 ### Dependency DAG
 
 Specs declare dependencies via the `depends_on` field, which lists paths to prerequisite specs. The resulting dependency graph must be a directed acyclic graph (DAG) -- circular dependencies are rejected.
