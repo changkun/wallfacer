@@ -183,6 +183,43 @@ func TestCommentCrossTenantCannotResolve(t *testing.T) {
 	}
 }
 
+// TestCommentPersonalScope is the regression for the 202-then-empty bug: a
+// signed-in user with no org (personal scope) must be able to create and see
+// their own comments, and a different personal user must be isolated.
+func TestCommentPersonalScope(t *testing.T) {
+	reg := NewRegistry()
+	store := NewMemCommentStore()
+	svc := NewCommentService(store, reg)
+
+	// Alice, personal (no org), on her own instance serving the repo.
+	alice := joinInst(reg, "inst_alice", "u_alice", "") // empty org = personal
+	p := Principal{Sub: "u_alice", OrgID: ""}
+	if err := svc.Apply(context.Background(), p, createEvent("specs/x.md", "personal note", "")); err != nil {
+		t.Fatalf("personal create rejected: %v", err)
+	}
+	// It fans back to Alice's own instance (this is what GET reads from).
+	if got := len(alice.opsFor(speccomment.OpCreate)); got != 1 {
+		t.Fatalf("personal author received %d create events, want 1 (was the 202-then-empty bug)", got)
+	}
+	ev := alice.opsFor(speccomment.OpCreate)[0]
+	if ev.Thread.OrgID != "u:u_alice" {
+		t.Fatalf("personal thread tenant = %q, want u:u_alice", ev.Thread.OrgID)
+	}
+
+	// A different personal user (Bob) serving the same repo is isolated: he does
+	// not receive Alice's personal comment, and a sync gives him nothing.
+	bob := &captureSender{}
+	svc.SyncTo(context.Background(), Instance{
+		Principal: Principal{Sub: "u_bob", OrgID: ""},
+		Manifest:  NewManifest("inst_bob", "host", "dev", []WorkspaceRef{{Remote: testRepo}}, nil),
+		Conn:      bob,
+	})
+	sync := bob.opsFor(speccomment.OpSync)
+	if len(sync) != 1 || len(sync[0].Threads) != 0 {
+		t.Fatalf("a different personal user saw %v, want an empty sync (isolation)", sync)
+	}
+}
+
 func TestCommentSyncOnJoin(t *testing.T) {
 	reg := NewRegistry()
 	store := NewMemCommentStore()

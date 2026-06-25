@@ -37,8 +37,8 @@ var errInvalid = errors.New("invalid comment op")
 // error for a malformed op or a permission denial; the caller relays it back to
 // the originating browser.
 func (s *CommentService) Apply(ctx context.Context, p Principal, ev speccomment.Event) error {
-	if ev.Repo == "" || p.OrgID == "" {
-		return fmt.Errorf("%w: missing repo or org", errInvalid)
+	if ev.Repo == "" || p.Sub == "" {
+		return fmt.Errorf("%w: missing repo or principal", errInvalid)
 	}
 	switch ev.Op {
 	case speccomment.OpCreate:
@@ -65,7 +65,7 @@ func (s *CommentService) create(ctx context.Context, p Principal, ev speccomment
 	now := s.now()
 	t := speccomment.Thread{
 		ID:          speccomment.NewID(),
-		OrgID:       p.OrgID,
+		OrgID:       tenantKey(p),
 		WorkspaceID: ev.Repo,
 		SpecPath:    ev.Thread.SpecPath,
 		Anchor:      ev.Thread.Anchor,
@@ -83,7 +83,7 @@ func (s *CommentService) create(ctx context.Context, p Principal, ev speccomment
 	if err := s.store.PutThread(ctx, t); err != nil {
 		return err
 	}
-	s.fanout(p.OrgID, ev.Repo, speccomment.OpCreate, t)
+	s.fanout(tenantKey(p), ev.Repo, speccomment.OpCreate, t)
 	return nil
 }
 
@@ -91,7 +91,7 @@ func (s *CommentService) reply(ctx context.Context, p Principal, ev speccomment.
 	if ev.Comment == nil || ev.Comment.ThreadID == "" || ev.Comment.Body == "" {
 		return fmt.Errorf("%w: reply needs a thread_id and body", errInvalid)
 	}
-	t, ok, err := s.store.GetThread(ctx, p.OrgID, ev.Comment.ThreadID)
+	t, ok, err := s.store.GetThread(ctx, tenantKey(p), ev.Comment.ThreadID)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (s *CommentService) reply(ctx context.Context, p Principal, ev speccomment.
 	if err := s.store.PutThread(ctx, t); err != nil {
 		return err
 	}
-	s.fanout(p.OrgID, t.WorkspaceID, speccomment.OpReply, t)
+	s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpReply, t)
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (s *CommentService) setResolved(ctx context.Context, p Principal, ev specco
 	if ev.Thread == nil || ev.Thread.ID == "" {
 		return fmt.Errorf("%w: resolve/reopen needs a thread id", errInvalid)
 	}
-	t, ok, err := s.store.GetThread(ctx, p.OrgID, ev.Thread.ID)
+	t, ok, err := s.store.GetThread(ctx, tenantKey(p), ev.Thread.ID)
 	if err != nil {
 		return err
 	}
@@ -134,34 +134,45 @@ func (s *CommentService) setResolved(ctx context.Context, p Principal, ev specco
 		t.ResolvedBy = p.Sub
 		t.ResolvedAt = now
 		t.Status = speccomment.StatusResolved
-		s.fanout(p.OrgID, t.WorkspaceID, speccomment.OpResolve, t)
+		s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpResolve, t)
 	} else {
 		t.Resolved = false
 		t.ResolvedBy = ""
 		t.ResolvedAt = time.Time{}
 		t.Status = speccomment.StatusActive
-		s.fanout(p.OrgID, t.WorkspaceID, speccomment.OpReopen, t)
+		s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpReopen, t)
 	}
 	return s.store.PutThread(ctx, t)
 }
 
-// canResolve gates resolve/reopen. v1: any member of the owning org may resolve
-// (collaboration default), enforced structurally by the org boundary. Per-role
-// gating (viewers read-only) re-homes from multi-user-collaboration's RBAC and
-// is a follow-up; the seam is here so it slots in without touching callers.
+// tenantKey is the isolation key for a principal: the org when present, else the
+// user (a personal-scope tenant). It keys the store and the fan-out so personal
+// comments stay private to one user's own instances while org comments are shared
+// across the org. Cross-tenant access is structurally impossible either way.
+func tenantKey(p Principal) string {
+	if p.OrgID != "" {
+		return p.OrgID
+	}
+	return "u:" + p.Sub
+}
+
+// canResolve gates resolve/reopen. v1: any member of the owning tenant may
+// resolve (collaboration default), enforced structurally by the tenant boundary.
+// Per-role gating (viewers read-only) re-homes from multi-user-collaboration's
+// RBAC and is a follow-up; the seam is here so it slots in without touching callers.
 func canResolve(p Principal, t speccomment.Thread) bool {
-	return p.OrgID == t.OrgID
+	return tenantKey(p) == t.OrgID
 }
 
 // fanout pushes the authoritative thread to every instance serving repo in the
-// SAME org, including the originator (which adopts the coordinator's ids). The
-// org filter is the tenant boundary: InstancesForRemote spans orgs, so a thread
-// must never reach an instance outside its org.
-func (s *CommentService) fanout(org, repo, op string, t speccomment.Thread) {
+// SAME tenant, including the originator (which adopts the coordinator's ids). The
+// tenant filter is the boundary: InstancesForRemote spans tenants, so a thread
+// must never reach an instance outside its tenant. `tenant` is tenantKey(p).
+func (s *CommentService) fanout(tenant, repo, op string, t speccomment.Thread) {
 	thread := t
 	ev := speccomment.Event{Type: FrameSpecComment, Op: op, Repo: repo, Thread: &thread}
 	for _, inst := range s.reg.InstancesForRemote(repo) {
-		if inst.Principal.OrgID != org || inst.Conn == nil {
+		if tenantKey(inst.Principal) != tenant || inst.Conn == nil {
 			continue
 		}
 		if err := inst.Conn.Send(ev); err != nil {
@@ -178,7 +189,7 @@ func (s *CommentService) SyncTo(ctx context.Context, inst Instance) {
 		return
 	}
 	for _, repo := range inst.Manifest.Remotes() {
-		threads, err := s.store.ThreadsForRepo(ctx, inst.Principal.OrgID, repo)
+		threads, err := s.store.ThreadsForRepo(ctx, tenantKey(inst.Principal), repo)
 		if err != nil {
 			s.log.Warn("coordinator: comment sync query failed", "repo", repo, "err", err)
 			continue
