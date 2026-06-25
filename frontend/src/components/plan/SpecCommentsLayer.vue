@@ -345,9 +345,21 @@ function onSelectionChangeDebounced() {
   selTimer = setTimeout(onSelectionChange, 250);
 }
 
+// composeTop is where the compose card sits in the rail: the anchor top of the
+// selection's start line, the same coordinate space as the thread cards.
+const composeTop = ref(0);
+
 function startCompose() {
   composing.value = true;
   newBody.value = '';
+  // The composer lives in the rail, so make sure the rail is showing.
+  if (railFolded.value) userFold.value = false;
+  const root = props.bodyEl;
+  const sel = selection.value;
+  if (root && sel) {
+    const block = blockForLine(collectSourceBlocks(root), sel.startLine);
+    composeTop.value = block ? block.top : 0;
+  }
 }
 
 async function submitNew() {
@@ -364,6 +376,7 @@ async function submitNew() {
   selection.value = null;
   composing.value = false;
   newBody.value = '';
+  userFold.value = null;
   window.getSelection()?.removeAllRanges();
 }
 
@@ -371,6 +384,7 @@ function cancelCompose() {
   selection.value = null;
   composing.value = false;
   newBody.value = '';
+  userFold.value = null;
 }
 
 // ── Thread popover ─────────────────────────────────────────────────
@@ -542,31 +556,31 @@ defineExpose({ openCount, showResolved, available });
       <button type="button" class="sc-float-btn" @click="startCompose">Comment</button>
     </div>
 
-    <!-- New-thread composer popover. -->
-    <div
-      v-if="selection && composing"
-      class="sc-popover sc-popover--compose"
-      :style="{ left: Math.min(selection.x, 9999) + 'px', top: (selection.y + 12) + 'px' }"
-    >
-      <blockquote class="sc-quote">{{ selection.exact }}</blockquote>
-      <textarea
-        v-model="newBody"
-        class="sc-textarea"
-        rows="3"
-        placeholder="Add a comment. Markdown supported."
-        autofocus
-        @keydown.meta.enter="submitNew"
-        @keydown.ctrl.enter="submitNew"
-      />
-      <div class="sc-actions">
-        <button type="button" class="sc-btn sc-btn--primary" :disabled="!newBody.trim()" @click="submitNew">Comment</button>
-        <button type="button" class="sc-btn" @click="cancelCompose">Cancel</button>
-      </div>
-    </div>
-
     <!-- Margin comment rail: a card per thread, aligned to its anchored line.
          Replaces the centered popover so comments read alongside the prose. -->
     <div v-if="!railFolded" class="sc-rail">
+      <!-- New-thread composer: a card in the rail at the selection's line. -->
+      <div
+        v-if="selection && composing"
+        class="sc-card sc-card--open sc-card--compose"
+        :style="{ top: composeTop + 'px' }"
+      >
+        <blockquote class="sc-quote">{{ selection.exact }}</blockquote>
+        <textarea
+          v-model="newBody"
+          class="sc-textarea"
+          rows="3"
+          placeholder="Add a comment. Markdown supported."
+          autofocus
+          @keydown.meta.enter="submitNew"
+          @keydown.ctrl.enter="submitNew"
+        />
+        <div class="sc-actions">
+          <button type="button" class="sc-btn sc-btn--primary" :disabled="!newBody.trim()" @click="submitNew">Comment</button>
+          <button type="button" class="sc-btn" @click="cancelCompose">Cancel</button>
+        </div>
+      </div>
+
       <article
         v-for="c in railCards"
         :key="c.thread.id"
@@ -843,18 +857,15 @@ defineExpose({ openCount, showResolved, available });
 .sc-popover {
   font-size: 13px;
 }
-.sc-popover--compose {
-  position: fixed;
-  transform: translateX(-50%);
-  width: 320px;
-  max-width: calc(100vw - 24px);
-  z-index: 51;
-  padding: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+/* The composer reuses the card chrome; it sits above sibling cards so it never
+   hides behind one that the layout flowed onto the same line. */
+.sc-card--compose {
+  z-index: 4;
+  padding: 10px;
+  border-color: var(--accent);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
+.sc-card--compose .sc-quote { margin-top: 0; }
 .sc-popover--triage {
   position: fixed;
   inset: 0;
