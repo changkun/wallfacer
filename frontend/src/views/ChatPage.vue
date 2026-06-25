@@ -91,12 +91,6 @@ function applyQuick(insert: string) {
               <span v-if="usage.cacheReadTokens" class="chat-usage-item chat-usage-cache">♻ {{ formatPercent(usage.cacheHitRatio) }} cached</span>
               <span class="chat-usage-item chat-usage-cost">{{ formatCost(usage.costUSD) }}</span>
             </div>
-            <button
-              type="button"
-              class="chat-conversation-clear"
-              title="Clear conversation"
-              @click="chat.clearHistory"
-            >Clear</button>
           </header>
           <ChatMessageList :session="chat" />
           <div class="chat-conversation-composer">
@@ -249,21 +243,6 @@ function applyQuick(insert: string) {
 .chat-conversation-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
-}
-
-.chat-conversation-clear {
-  font-size: 11px;
-  padding: 2px 8px;
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.chat-conversation-clear:hover {
-  background: var(--bg-hover);
   color: var(--ink);
 }
 
