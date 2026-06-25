@@ -1,12 +1,12 @@
 ---
 title: Stale propagation algorithm
-status: drafted
+status: complete
 depends_on: []
 affects:
-  - internal/spec/impact.go
+  - internal/spec/propagation.go
   - internal/spec/validate.go
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 effort: medium
