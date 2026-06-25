@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,6 +87,75 @@ func TestRepositionThreadMultiLineNotOrphaned(t *testing.T) {
 	}
 	if got.Line != start {
 		t.Fatalf("reattached to line %d, want the range start %d", got.Line, start)
+	}
+}
+
+// TestSubmitSpecComment_FreeFormSpec reproduces the user-facing 422: creating a
+// comment on a free-form spec (no YAML frontmatter, rendered as a read-only doc
+// node) returned "spec parse failed" because the create path treated a missing
+// frontmatter as a fatal parse error. For such files the whole document is the
+// anchoring body. The created anchor must also round-trip through
+// repositionThread without orphaning, the property the shared body helper
+// guarantees by computing the same body on both paths.
+func TestSubmitSpecComment_FreeFormSpec(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	specsDir := filepath.Join(root, "specs")
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A free-form spec: no "---" frontmatter, just markdown. Mirrors the user's
+	// specs/00-overview.md. Line 3 is the paragraph text.
+	content := "# Overview\n\nThis is a free-form spec.\nNo frontmatter here.\n"
+	if err := os.WriteFile(filepath.Join(specsDir, "00-overview.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// resolveSpecRepo needs a git remote, else it 400s before the parse runs.
+	for _, args := range [][]string{
+		{"init"}, {"remote", "add", "origin", "https://github.com/acme/widgets.git"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+
+	var captured speccomment.Event
+	relay := NewCommentRelay()
+	relay.SetSendUp(func(ev speccomment.Event) error { captured = ev; return nil })
+	h := &Handler{workspaces: []string{root}}
+	h.SetCommentRelay(relay)
+
+	// The exact POST the browser sent: select line 3, comment "ok".
+	body := `{"op":"create","spec":"specs/00-overview.md","body":"ok","start_line":3,"end_line":3}`
+	req := httptest.NewRequest(http.MethodPost, "/api/spec-comments", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.SubmitSpecComment(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d (%s), want 202; a free-form spec must not parse-fail",
+			w.Code, strings.TrimSpace(w.Body.String()))
+	}
+	if captured.Thread == nil {
+		t.Fatal("no event forwarded to the coordinator")
+	}
+
+	// Round-trip: the anchor created above must reattach inline on the next load,
+	// not orphan, because reposition reads the same free-form body.
+	thread := speccomment.Thread{
+		SpecPath: "specs/00-overview.md",
+		Anchor:   captured.Thread.Anchor,
+		Status:   speccomment.StatusActive,
+	}
+	got := repositionThread(thread, root)
+	if got.Orphaned {
+		t.Fatal("free-form comment orphaned on reload (anchor body mismatch)")
+	}
+	if got.Line != 3 {
+		t.Fatalf("reattached to line %d, want 3 (the selected line)", got.Line)
 	}
 }
 

@@ -233,6 +233,32 @@ func TestParseFile_MissingFrontmatter(t *testing.T) {
 	}
 }
 
+// TestBodyForAnchoring pins the contract the comment create and reposition paths
+// both depend on: a frontmatter spec yields its post-frontmatter body, a
+// free-form (frontmatter-less) file yields the whole document with no error, and
+// only a genuine parse failure errors so callers keep rejecting malformed YAML.
+func TestBodyForAnchoring(t *testing.T) {
+	// Frontmatter spec: body is the post-frontmatter markdown.
+	if got, err := BodyForAnchoring([]byte("---\ntitle: T\n---\n\n# H\n\nbody line\n"), "x.md"); err != nil || got != "# H\n\nbody line\n" {
+		t.Fatalf("frontmatter: got %q err %v, want %q nil", got, err, "# H\n\nbody line\n")
+	}
+	// Free-form spec: the whole file is the body, no error.
+	free := "# Just markdown\n\nNo frontmatter.\n"
+	if got, err := BodyForAnchoring([]byte(free), "x.md"); err != nil || got != free {
+		t.Fatalf("free-form: got %q err %v, want the whole file with no error", got, err)
+	}
+	// CRLF free-form: normalized to LF so its hashes match the frontmatter path.
+	if got, err := BodyForAnchoring([]byte("# A\r\n\r\nB\r\n"), "x.md"); err != nil || got != "# A\n\nB\n" {
+		t.Fatalf("crlf free-form: got %q err %v, want LF-normalized", got, err)
+	}
+	// Genuine parse failure (opened frontmatter, no closing delimiter) still
+	// errors so the create path keeps returning 422 and reposition keeps
+	// orphaning, rather than silently swallowing a malformed spec.
+	if _, err := BodyForAnchoring([]byte("---\ntitle: T\nstatus: drafted\n"), "x.md"); err == nil {
+		t.Fatal("malformed frontmatter must return an error")
+	}
+}
+
 func TestParseFile_EmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := writeSpec(t, dir, "empty.md", "")

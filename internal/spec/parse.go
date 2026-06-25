@@ -78,6 +78,30 @@ func ParseBytes(data []byte, path string) (*Spec, error) {
 	return &s, nil
 }
 
+// BodyForAnchoring returns the markdown body that comment anchoring operates on.
+// For a spec with YAML frontmatter it is the post-frontmatter body; for a
+// free-form (frontmatter-less) document the whole file is the body, because such
+// files render as read-only doc nodes (see [ErrMissingFrontmatter]) yet still
+// accept comments. Only a genuine parse failure (malformed YAML, unterminated
+// frontmatter) returns an error, so callers keep rejecting those while
+// tolerating free-form specs. The create and reposition paths MUST share this:
+// an anchor computed on one body must resolve against the same body on the next
+// load, or every free-form comment orphans the moment it is reloaded.
+func BodyForAnchoring(data []byte, path string) (string, error) {
+	parsed, err := ParseBytes(data, path)
+	switch {
+	case err == nil:
+		return parsed.Body, nil
+	case errors.Is(err, ErrMissingFrontmatter):
+		// The whole file is the body. Normalize CRLF so it (and every hash
+		// derived from it) matches the frontmatter path, which ParseBytes
+		// already normalizes before extracting the body.
+		return strings.ReplaceAll(string(data), "\r\n", "\n"), nil
+	default:
+		return "", err
+	}
+}
+
 // trackFromPath extracts the track (second directory component) from a
 // spec's relative path. E.g., "specs/local/foo/bar.md" → "local".
 // The leading "specs/" prefix is stripped before extracting the track.
