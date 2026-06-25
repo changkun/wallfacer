@@ -357,6 +357,40 @@ func TestPatchTask_AllowsCodexWithHostAuthCache(t *testing.T) {
 	}
 }
 
+// TestPatchTask_RejectsWaitingToInProgress verifies that a bare PATCH moving a
+// waiting task to in_progress is rejected with 400 rather than flipping the
+// status (which would consume a concurrency slot without launching a worker,
+// leaving the task stuck in_progress). Resuming must go through resume/test.
+func TestPatchTask_RejectsWaitingToInProgress(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "build a thing", Timeout: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	patch := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(),
+		strings.NewReader(`{"status":"in_progress"}`))
+	rec := httptest.NewRecorder()
+	h.UpdateTask(rec, patch, task.ID)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	updated, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if updated.Status != store.TaskStatusWaiting {
+		t.Errorf("status flipped despite rejection: got %q, want waiting", updated.Status)
+	}
+}
+
 // TestUpdateTask_NotFound verifies that updating a non-existent task returns 404.
 func TestUpdateTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
