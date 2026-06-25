@@ -171,7 +171,7 @@ function copyInstall() {
           <p class="harness-sub" v-html="t('wf.harness.sub')"></p>
           <div class="harness-row">
             <div v-for="h in harnesses" :key="h" class="harness-card">
-              <HarnessLogo :harness="h" :size="34" color />
+              <HarnessLogo :harness="h" :size="42" color />
               <span class="harness-card__name">{{ harnessLabel(h) }}</span>
             </div>
           </div>
@@ -214,40 +214,93 @@ function copyInstall() {
 </template>
 
 <style scoped>
+/* Free-form, Apple-leaning landing: airy rhythm, big type, frameless
+   imagery, and harness logos that float as a row instead of sitting in
+   bordered cards. Scoped to .wallfacer-page so other pages keep the
+   shared section/hero styles. */
+
+/* Generous vertical rhythm */
+.section {
+  padding: 80px 0;
+}
+.product-hero {
+  padding: 72px 0 28px;
+}
+
+/* Bigger, calmer hero headline */
+.product-hero-text {
+  margin-bottom: 44px;
+}
+.product-hero-text :deep(h1) {
+  font-size: clamp(2.2rem, 5.5vw, 3.6rem);
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+.product-hero-text :deep(p) {
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  color: var(--text-secondary);
+  max-width: 42ch;
+  margin: 16px auto 0;
+  line-height: 1.5;
+}
+
+/* Frameless, floating product imagery (no border) */
+.product-hero-img,
+.tour-screenshot :deep(img) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 40px 90px -28px var(--accent-glow-strong, rgba(0, 0, 0, 0.28)),
+    0 10px 28px rgba(0, 0, 0, 0.08);
+}
+
+/* Borderless install line */
+.install-block {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+/* Larger section headlines */
 .harness-heading {
-  margin: 10px 0 6px;
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  font-weight: 700;
+  margin: 12px 0 8px;
+  font-size: clamp(1.9rem, 3.5vw, 2.6rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-align: center;
 }
 .harness-sub {
-  margin: 0 0 28px;
-  max-width: 52ch;
+  margin: 0 auto 44px;
+  max-width: 48ch;
+  text-align: center;
   color: var(--text-secondary, #555);
   line-height: 1.6;
 }
+
+/* Logos float in a row — no cards, no borders */
 .harness-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 36px 56px;
 }
 .harness-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  min-width: 116px;
-  padding: 22px 18px;
-  border: 1px solid var(--border, #e3e3e3);
-  border-radius: 12px;
-  background: var(--bg-card, #fff);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  gap: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  transition: transform 0.2s ease;
 }
 .harness-card:hover {
-  border-color: var(--accent, #6b6b6b);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
 }
 .harness-card__name {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
 }
 </style>
