@@ -249,6 +249,11 @@ var Routes = []Route{
 		Tags:        []string{"specs", "sse"},
 	},
 	{
+		Method: http.MethodGet, Pattern: "/api/specs/stale-candidates", Name: "StaleCandidates",
+		Description: "Advisory scan: complete specs whose affects files changed since the spec's updated date. No mutation; returns {candidates:[{path,files,reason}]}.",
+		Tags:        []string{"specs"},
+	},
+	{
 		Method: http.MethodPost, Pattern: "/api/specs/transition", Name: "SpecTransition",
 		Description: "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive/validate take a single path and return {path, status}.",
 		Tags:        []string{"specs"},
