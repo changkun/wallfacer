@@ -111,6 +111,8 @@
   z-index: 50;
   display: flex;
   background: var(--terminal-bg);
+  /* Maximized panel eclipses the workspace — float it with a deep shadow. */
+  box-shadow: var(--sh-pop);
 }
 
 /* A docked panel body fills its region/overlay (no fixed height like the old
