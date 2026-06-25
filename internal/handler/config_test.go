@@ -397,6 +397,22 @@ func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
 	}
 }
 
+func TestGetConfig_OmitsRetiredIdeationSchedulerFields(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	var resp map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
+	for _, key := range []string{"ideation", "ideation_running", "ideation_interval", "ideation_next_run"} {
+		if _, ok := resp[key]; ok {
+			t.Fatalf("config response included retired key %q", key)
+		}
+	}
+}
+
 func TestGetConfig_ExposesIdeationExploitRatio(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
@@ -412,6 +428,25 @@ func TestGetConfig_ExposesIdeationExploitRatio(t *testing.T) {
 	}
 	if ratio != 0.8 {
 		t.Errorf("expected default exploit ratio 0.8, got %f", ratio)
+	}
+}
+
+func TestUpdateConfig_AcceptsRetiredIdeationSchedulerFields(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	body := strings.NewReader(`{"ideation": true, "ideation_interval": 15}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/config", body)
+	w := httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	for _, key := range []string{"ideation", "ideation_running", "ideation_interval", "ideation_next_run"} {
+		if _, ok := resp[key]; ok {
+			t.Fatalf("update response included retired key %q", key)
+		}
 	}
 }
 
