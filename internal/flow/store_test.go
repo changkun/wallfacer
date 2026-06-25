@@ -56,6 +56,19 @@ func TestLoadUserFlows_RejectsMissingSteps(t *testing.T) {
 	}
 }
 
+func TestLoadUserFlows_RejectsDuplicateAgentSlug(t *testing.T) {
+	dir := t.TempDir()
+	// AgentSlug is the engine's unique key for result wiring and parallel
+	// grouping; two steps on the same agent must be rejected at load.
+	body := "slug: dup-flow\nname: Dup\nsteps:\n  - agent_slug: impl\n  - agent_slug: impl\n"
+	if err := os.WriteFile(filepath.Join(dir, "dup.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := LoadUserFlows(dir); err == nil {
+		t.Fatal("expected error for duplicate agent_slug across steps")
+	}
+}
+
 func TestLoadUserFlows_RejectsStepWithoutAgentSlug(t *testing.T) {
 	dir := t.TempDir()
 	body := "slug: bad-step\nname: Bad\nsteps:\n  - optional: true\n"
