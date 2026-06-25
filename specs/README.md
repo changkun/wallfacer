@@ -54,9 +54,9 @@ Cloud Platform - two axes (consume Latere services, don't absorb)
     ○ Tenant API
   archived: Multi-Tenant, Billing Idempotency (now owned by Cella / Identity)
 
-Git Workflow - two shippable features + a residual
-  ○ Pull Request Creation          ○ Task Revert
-  ○ Intent-Driven Commits (mostly shipped; residual: explorer auto-commit)
+Git Workflow - GitHub integration umbrella + two shippable features
+  ○ GitHub Integration (OAuth umbrella) ○ Task Revert
+  ○ Pull Request Creation (→ umbrella)  ○ Intent-Driven Commits (mostly shipped)
 ```
 
 The hot area is **Local Product** polish (the file/diff/attachment trio). Spec
@@ -260,23 +260,27 @@ Why no wallfacer-owned K8s control plane? Cella already owns sandbox runtime, li
 
 ## Git Workflow
 
-Git and GitHub workflow as a product surface: revert, PR creation, and attribution over the commit graph. Pull-request is the GitHub-integration member (collects `git log`/`git diff` host-side, shells `gh pr create`); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec. GitHub *identity* (canonical `host/owner/repo`) is owned by the cloud coordination plane ([repo-identity](cloud/latere-integration/coordination-plane/repo-identity.md)); the PR feature consumes it rather than redefining it.
+Git and GitHub workflow as a product surface: GitHub integration, revert, PR creation, and attribution over the commit graph. [github-integration](intent/github-integration.md) is the umbrella that makes GitHub a first-class surface via a real OAuth App (Codex-style, not host `gh`): connect, pick a repo, read PRs/issues + comments, create PRs and comment through the API, with cloud clone + remote-fix as a gated later phase on the Axis B Executor seam. PR creation folds into it (its `gh` mechanism is superseded by the API path); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec. GitHub *identity* (canonical `host/owner/repo`) is owned by the cloud coordination plane ([repo-identity](cloud/latere-integration/coordination-plane/repo-identity.md)); the PR feature consumes it rather than redefining it.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [pull-request.md](intent/pull-request.md) | Drafted | Agent-generated GitHub PR from the current branch via a lightweight sandbox; collects `git log`/`git diff` host-side and shells `gh pr create`. Self-contained, all infra exists. |
+| [github-integration.md](intent/github-integration.md) | Drafted | **Umbrella.** OAuth-App-backed GitHub surface (Codex-style, not host `gh`): connect via OAuth + server-side token store, select a repo, read PRs/issues + comments, create PRs and comment via the API. Consumes [repo-identity](cloud/latere-integration/coordination-plane/repo-identity.md); supersedes pull-request's `gh` mechanism (folds it in as the PR-write child). Cloud clone + remote-fix is a gated later phase on the Axis B Executor seam. |
+| ↳ [pull-request.md](intent/pull-request.md) | Drafted | Agent-generated PR from the current branch via a lightweight sandbox; collects `git log`/`git diff` host-side. Re-homing under github-integration: its `gh pr create` mechanism is superseded by the OAuth-App API path, the sandbox title/body pipeline is reused. |
 | [task-revert.md](intent/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution. Consumes the existing `task.CommitHashes` to know which commits belong to a task. Self-contained. |
 | [intent-commits.md](intent/intent-commits.md) | Vague | The thesis largely shipped (planning/spec commits with trailers, git-revert undo). Residual: explorer-edit auto-commit. Candidate to downgrade to a small leaf or archive. |
 
 ```mermaid
 graph LR
-  PR[Pull Request Creation]
+  RI[repo-identity ◐] --> GHI[GitHub Integration<br/>OAuth umbrella]
+  GHI --> PR[Pull Request Creation<br/>folds in]
+  EX[Axis B Executor seam] -.gated.-> GHI
   TR[Task Revert]
   IC[Intent-Driven Commits<br/>mostly shipped]
   style IC fill:#eee,stroke:#999
+  style EX stroke-dasharray: 5 5
 ```
 
-Revert and PR are independent and shippable; intent-commits is mostly realized with only the explorer-commit gap remaining.
+GitHub Integration is the OAuth umbrella; PR creation folds into it and cloud clone + remote-fix is gated on the Axis B Executor seam. Revert is independent and shippable; intent-commits is mostly realized with only the explorer-commit gap remaining.
 
 ---
 
