@@ -64,6 +64,59 @@ func TestBuildTree_TopLevelLooseSpec(t *testing.T) {
 	}
 }
 
+func TestBuildTree_FreeFormDocNodes(t *testing.T) {
+	specsDir := filepath.Join(t.TempDir(), "specs")
+	// A frontmatter-less file with an H1 → doc node titled from the H1.
+	writeTestSpec(t, specsDir, "00-overview.md", "# 00 — Overview\n\nProse, no frontmatter.\n")
+	// A frontmatter-less file with no H1 → title falls back to the filename.
+	writeTestSpec(t, specsDir, "raw-notes.md", "just some text, no heading\n")
+	// A normal spec still parses as a lifecycle node.
+	writeTestSpec(t, specsDir, "local/foo.md", makeSpec("Foo", "local"))
+	// A genuinely malformed file (frontmatter opened, broken YAML) stays an error.
+	writeTestSpec(t, specsDir, "broken.md", "---\ntitle: [unterminated\n---\n\nbody\n")
+
+	tree, err := BuildTree(specsDir)
+	if err != nil {
+		t.Fatalf("BuildTree: %v", err)
+	}
+
+	overview, ok := tree.NodeAt("specs/00-overview.md")
+	if !ok {
+		t.Fatal("frontmatter-less file missing from tree (should be a doc node)")
+	}
+	if !overview.Value.Doc {
+		t.Error("00-overview.md should be marked Doc")
+	}
+	if overview.Value.Title != "00 — Overview" {
+		t.Errorf("doc node Title = %q, want %q", overview.Value.Title, "00 — Overview")
+	}
+	if overview.Value.Status != "" {
+		t.Errorf("doc node Status = %q, want empty", overview.Value.Status)
+	}
+
+	notes, ok := tree.NodeAt("specs/raw-notes.md")
+	if !ok {
+		t.Fatal("frontmatter-less, H1-less file missing from tree")
+	}
+	if notes.Value.Title != "Raw Notes" {
+		t.Errorf("doc node Title = %q, want filename fallback %q", notes.Value.Title, "Raw Notes")
+	}
+
+	if foo, ok := tree.NodeAt("specs/local/foo.md"); !ok {
+		t.Error("normal spec specs/local/foo.md is missing")
+	} else if foo.Value.Doc {
+		t.Error("normal spec must not be marked Doc")
+	}
+
+	// The malformed file must NOT become a doc node; it stays in tree.Errs.
+	if _, ok := tree.NodeAt("specs/broken.md"); ok {
+		t.Error("malformed-YAML file must not be added as a doc node")
+	}
+	if len(tree.Errs) == 0 {
+		t.Error("expected a parse error for the malformed file")
+	}
+}
+
 func TestBuildTree_SingleSpec(t *testing.T) {
 	specsDir := filepath.Join(t.TempDir(), "specs")
 	writeTestSpec(t, specsDir, "local/solo.md", makeSpec("Solo", "local"))

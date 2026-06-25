@@ -25,6 +25,25 @@ func TestNodeProgress_Leaf_Incomplete(t *testing.T) {
 	}
 }
 
+func TestNodeProgress_DocLeafExcluded(t *testing.T) {
+	doc := &Node{Value: &Spec{Doc: true}, IsLeaf: true}
+	if p := NodeProgress(doc); p.Total != 0 {
+		t.Errorf("doc leaf got %v, want zero progress", p)
+	}
+	// A doc node mixed with real leaves must not inflate the denominator.
+	parent := &Node{
+		Value:  &Spec{Status: StatusValidated},
+		IsLeaf: false,
+		Children: []*Node{
+			leafNode(StatusComplete),
+			{Value: &Spec{Doc: true}, IsLeaf: true},
+		},
+	}
+	if p := NodeProgress(parent); p.Complete != 1 || p.Total != 1 {
+		t.Errorf("got %v, want {1, 1} (doc leaf excluded)", p)
+	}
+}
+
 func TestNodeProgress_NonLeaf_AllComplete(t *testing.T) {
 	parent := &Node{
 		Value:  &Spec{Status: StatusValidated},

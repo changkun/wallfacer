@@ -74,4 +74,10 @@ type Spec struct {
 	Path  string `yaml:"-" json:"path"`
 	Track string `yaml:"-" json:"track"`
 	Body  string `yaml:"-" json:"-"` // excluded from API responses (large)
+
+	// Doc marks a free-form node synthesized from a frontmatter-less markdown
+	// file: render-only, no lifecycle, no status. Never parsed from YAML, so a
+	// real spec cannot set it; BuildTree sets it for files that fail parsing
+	// with [ErrMissingFrontmatter].
+	Doc bool `yaml:"-" json:"doc"`
 }

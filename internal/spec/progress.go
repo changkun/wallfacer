@@ -34,6 +34,11 @@ func NodeProgress(node *Node) Progress {
 		if node.Value == nil {
 			return Progress{}
 		}
+		// Doc nodes (frontmatter-less files) have no lifecycle, so they
+		// neither count toward nor against subtree progress.
+		if node.Value.Doc {
+			return Progress{}
+		}
 		if node.Value.Status == StatusComplete {
 			return Progress{Complete: 1, Total: 1}
 		}

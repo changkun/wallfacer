@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -224,6 +225,11 @@ func TestParseFile_MissingFrontmatter(t *testing.T) {
 	_, err := ParseFile(path)
 	if err == nil {
 		t.Fatal("expected error for missing frontmatter")
+	}
+	// The error must be the sentinel so BuildTree can distinguish a
+	// frontmatter-less file (render as a doc node) from malformed YAML.
+	if !errors.Is(err, ErrMissingFrontmatter) {
+		t.Errorf("err = %v, want ErrMissingFrontmatter", err)
 	}
 }
 
