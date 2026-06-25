@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
-import { api, authHeaders } from '../../api/client';
+import { api, authHeaders, withAuthToken } from '../../api/client';
 import { renderMarkdown, renderMarkdownWithSourceLines } from '../../lib/markdown';
 import { enhanceMermaid } from '../../lib/mermaidRender';
 import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
@@ -31,7 +31,7 @@ const {
 const specText = ref<string>('');
 const loading = ref(false);
 const loadEpoch = ref(0);
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let fileStream: EventSource | null = null;
 
 const workspace = computed(() => {
   const ws = tasks.config?.workspaces ?? [];
@@ -67,33 +67,44 @@ async function loadCurrent() {
   }
 }
 
-function startPoll() {
-  stopPoll();
-  pollTimer = setInterval(loadCurrent, 2000);
+// Live spec updates: subscribe to the focused file's SSE stream and refetch on
+// the server's "changed" event (fsnotify-backed, sub-second), replacing the old
+// 2 s poll. EventSource auto-reconnects; we just close it on path/workspace
+// change and unmount.
+function startStream() {
+  stopStream();
+  if (typeof EventSource === 'undefined') return;
+  const ws = workspace.value;
+  if (!ws || !focusedSpecPath.value) return;
+  const absPath = ws + '/' + focusedSpecPath.value;
+  const url = withAuthToken(
+    '/api/explorer/file/stream?path=' + encodeURIComponent(absPath) +
+    '&workspace=' + encodeURIComponent(ws),
+  );
+  fileStream = new EventSource(url);
+  fileStream.addEventListener('changed', () => { void loadCurrent(); });
 }
 
-function stopPoll() {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+function stopStream() {
+  fileStream?.close();
+  fileStream = null;
 }
 
 watch([focusedSpecPath, focusedIsIndex, focusedTaskId, workspace], () => {
   // Task-mode focus owns the body; spec poller must stand down so it
   // doesn't overwrite the task prompt with stale spec content.
   if (focusedTaskId.value) {
-    stopPoll();
+    stopStream();
     specText.value = '';
     return;
   }
   specText.value = '';
   void loadCurrent();
-  if (focusedSpecPath.value && !focusedIsIndex.value) startPoll();
-  else stopPoll();
+  if (focusedSpecPath.value && !focusedIsIndex.value) startStream();
+  else stopStream();
 }, { immediate: true });
 
-onUnmounted(stopPoll);
+onUnmounted(stopStream);
 
 // ── Parsed view ────────────────────────────────────────────────────
 
