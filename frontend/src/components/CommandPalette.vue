@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
-import { usePlanningStore, type SpecNode } from '../stores/planning';
+import { useAgentStore, type SpecNode } from '../stores/agentSession';
 import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
 import { commandPaletteActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
@@ -19,7 +19,7 @@ const emit = defineEmits<{
 const router = useRouter();
 const route = useRoute();
 const taskStore = useTaskStore();
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const ui = useUiStore();
 
 const query = ref('');

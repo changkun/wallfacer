@@ -4,7 +4,7 @@
 import { renderMarkdown } from './markdown';
 import { parseTurn, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
 import { parseTurnUsage, type TurnUsage } from './planningUsage';
-import type { PlanningMessage } from '../stores/planning';
+import type { AgentMessage } from '../stores/agentSession';
 
 export interface RenderedBubble {
   role: 'user' | 'assistant' | 'system';
@@ -128,7 +128,7 @@ export function activitySummary(activity: ActivityRow[]): string {
   return shown.length ? `${stepLabel} · ${shown.join(', ')}` : stepLabel;
 }
 
-export function bubbleFromMessage(m: PlanningMessage): RenderedBubble {
+export function bubbleFromMessage(m: AgentMessage): RenderedBubble {
   if (m.role === 'assistant') {
     if (m.raw_output) {
       const { rows, answer } = parseTurn(m.raw_output);

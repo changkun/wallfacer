@@ -54,7 +54,7 @@ export interface SpecTreeData {
   progress: Record<string, SpecProgress>;
 }
 
-export interface PlanningThread {
+export interface AgentSession {
   id: string;
   name: string;
   archived: boolean;
@@ -71,7 +71,7 @@ export interface PlanningThread {
   updated: number;
 }
 
-export interface PlanningMessage {
+export interface AgentMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
@@ -87,7 +87,7 @@ function parseTime(s: string | undefined): number {
   return Number.isNaN(ms) ? 0 : ms;
 }
 
-export const usePlanningStore = defineStore('planning', () => {
+export const useAgentStore = defineStore('agentSession', () => {
   const tree = ref<SpecNode[]>([]);
   const treeProgress = ref<Record<string, SpecProgress>>({});
   const treeIndex = ref<SpecIndexMeta | null>(null);
@@ -104,9 +104,9 @@ export const usePlanningStore = defineStore('planning', () => {
   const focusedTaskTitle = ref<string>('');
   const focusedTaskPrompt = ref<string>('');
 
-  const threads = ref<Record<string, PlanningThread>>({});
+  const threads = ref<Record<string, AgentSession>>({});
   const threadOrder = ref<string[]>([]);
-  const archivedThreads = ref<PlanningThread[]>([]);
+  const archivedThreads = ref<AgentSession[]>([]);
   const activeThreadId = ref<string>('');
 
   const streaming = ref(false);
@@ -242,7 +242,7 @@ export const usePlanningStore = defineStore('planning', () => {
     focusedTaskPrompt.value = prompt;
 
     // Reuse an existing non-archived task-mode thread for this task.
-    let match: PlanningThread | null = null;
+    let match: AgentSession | null = null;
     for (const id of threadOrder.value) {
       const t = threads.value[id];
       if (t && t.mode === 'task' && t.task_id === taskId) {
@@ -262,7 +262,7 @@ export const usePlanningStore = defineStore('planning', () => {
 
     // Create a new task-mode thread pinned to this task.
     try {
-      const created = await api<PlanningThread>('POST', '/api/planning/threads', {
+      const created = await api<AgentSession>('POST', '/api/planning/threads', {
         name: 'Task prompt: ' + (title || taskId),
         focused_task: taskId,
       });
@@ -326,16 +326,16 @@ export const usePlanningStore = defineStore('planning', () => {
         '/api/planning/threads?includeArchived=true',
       );
       const all = res.threads ?? [];
-      const next: Record<string, PlanningThread> = {};
+      const next: Record<string, AgentSession> = {};
       const order: string[] = [];
-      const archived: PlanningThread[] = [];
+      const archived: AgentSession[] = [];
       for (const t of all) {
         const prev = threads.value[t.id];
-        const rec: PlanningThread = {
+        const rec: AgentSession = {
           id: t.id,
           name: t.name,
           archived: !!t.archived,
-          mode: (t.mode as PlanningThread['mode']) ?? prev?.mode ?? '',
+          mode: (t.mode as AgentSession['mode']) ?? prev?.mode ?? '',
           task_id: t.task_id ?? prev?.task_id ?? '',
           unread: prev?.unread ?? false,
           scrollTop: prev?.scrollTop ?? 0,

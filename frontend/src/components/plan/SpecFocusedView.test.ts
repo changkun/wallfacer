@@ -19,7 +19,7 @@ import { createApp, nextTick, type App } from 'vue';
 import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import SpecFocusedView from './SpecFocusedView.vue';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 
 // vi.hoisted so the spy exists when the hoisted vi.mock factory runs.
 const { enhanceMermaid } = vi.hoisted(() => ({ enhanceMermaid: vi.fn() }));
@@ -64,7 +64,7 @@ describe('SpecFocusedView mermaid rendering', () => {
   it('enhances mermaid placeholders already rendered at mount', async () => {
     // Focused-task prompt populated before mount: renderedTaskPrompt is
     // non-empty at watcher registration and never changes afterward.
-    const planning = usePlanningStore();
+    const planning = useAgentStore();
     planning.focusedTaskId = 't1';
     planning.focusedTaskTitle = 'Task';
     planning.focusedTaskPrompt = PROMPT;

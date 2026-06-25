@@ -18,10 +18,10 @@ import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFe
 import { createNdjsonStreamParser } from '../lib/ndjsonStream';
 import { parseTurnUsage } from '../lib/planningUsage';
 import { enhanceMermaid } from '../lib/mermaidRender';
-import { usePlanningStore } from '../stores/planning';
+import { useAgentStore } from '../stores/agentSession';
 import { useTaskStore } from '../stores/tasks';
 import { useDialogStore } from '../stores/dialog';
-import type { PlanningMessage, PlanningThread } from '../stores/planning';
+import type { AgentMessage, AgentSession } from '../stores/agentSession';
 import {
   type RenderedBubble,
   bubbleFromMessage,
@@ -75,7 +75,7 @@ export interface ChatSession {
 }
 
 export function useChatSession(): ChatSession {
-  const planning = usePlanningStore();
+  const planning = useAgentStore();
   const tasks = useTaskStore();
   const dialog = useDialogStore();
   const {
@@ -170,7 +170,7 @@ export function useChatSession(): ChatSession {
     }
     const fetched = activeThreadId.value;
     try {
-      const msgs = await api<PlanningMessage[]>(
+      const msgs = await api<AgentMessage[]>(
         'GET',
         '/api/planning/messages?thread=' + encodeURIComponent(fetched),
       );
@@ -544,9 +544,9 @@ export function useChatSession(): ChatSession {
   // promoteDraft turns the open draft into a real server thread on first send.
   // Returns the new thread id, or null if creation failed (error surfaced).
   async function promoteDraft(): Promise<string | null> {
-    let created: PlanningThread | null = null;
+    let created: AgentSession | null = null;
     try {
-      created = await api<PlanningThread>('POST', '/api/planning/threads', {});
+      created = await api<AgentSession>('POST', '/api/planning/threads', {});
     } catch (e) {
       appendSystem('Failed to create thread: ' + (e instanceof Error ? e.message : String(e)));
       return null;

@@ -6,7 +6,7 @@
 // archived overflow.
 import { computed, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
-import { usePlanningStore } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
 import { useNow } from '../../composables/useNow';
 import { bucketForUpdated, SESSION_BUCKETS } from './sessionBuckets';
 import type { ChatSession } from '../../composables/useChatSession';
@@ -14,7 +14,7 @@ import type { ChatSession } from '../../composables/useChatSession';
 const props = defineProps<{ session: ChatSession }>();
 const s = props.session;
 
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const {
   threads, threadOrder, archivedThreads, activeThreadId,
   streaming, streamingThreadId, busyThreadId,

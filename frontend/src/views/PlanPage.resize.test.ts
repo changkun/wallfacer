@@ -50,7 +50,7 @@ vi.stubGlobal('localStorage', {
 });
 
 import PlanPage from './PlanPage.vue';
-import { usePlanningStore } from '../stores/planning';
+import { useAgentStore } from '../stores/agentSession';
 import { useTaskStore } from '../stores/tasks';
 
 interface Mounted {
@@ -63,7 +63,7 @@ async function mountPage(): Promise<Mounted> {
   setActivePinia(createPinia());
   // Give the planning store a tree so the layout resolves to three-pane
   // (which is what renders the splitter and SpecTreePanel).
-  const planning = usePlanningStore();
+  const planning = useAgentStore();
   planning.applyTree({
     nodes: [{ path: 'a', is_leaf: true, spec: { title: 'A', status: 'drafted' } } as never],
     index: null,

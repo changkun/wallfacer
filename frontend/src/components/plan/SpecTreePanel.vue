@@ -2,15 +2,15 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { api } from '../../api/client';
-import { usePlanningStore } from '../../stores/planning';
-import type { SpecNode } from '../../stores/planning';
+import { useAgentStore } from '../../stores/agentSession';
+import type { SpecNode } from '../../stores/agentSession';
 import { isNodeCheckable, nodeUnmetDeps, selectableRange } from './specTreeSelect';
 import { useTaskStore } from '../../stores/tasks';
 import { useUiStore } from '../../stores/ui';
 import { useDialogStore } from '../../stores/dialog';
 import AppSelect from '../AppSelect.vue';
 
-const planning = usePlanningStore();
+const planning = useAgentStore();
 const taskStore = useTaskStore();
 const ui = useUiStore();
 const dialog = useDialogStore();
