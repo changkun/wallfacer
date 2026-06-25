@@ -393,6 +393,7 @@ When this spec is later dispatched as an implementation task, the following must
 | [explorer-ux.md](spec-archival/explorer-ux.md) | core-model | medium | complete |
 | [focused-view-ux.md](spec-archival/focused-view-ux.md) | archive-api, explorer-ux | medium | complete |
 | [skills-and-readme.md](spec-archival/skills-and-readme.md) | — | small | complete |
+| [archive-relocation.md](spec-archival/archive-relocation.md) | archive-api | large | drafted |
 
 ```mermaid
 graph LR
@@ -404,7 +405,13 @@ graph LR
   E --> G[focused-view-ux]
   F --> G
   H[skills-and-readme]
+  E --> R[archive-relocation]
 ```
+
+**Follow-up extension:** `archive-relocation` (added 2026-06-25, after the
+original archival shipped) relocates archived specs into a parallel
+`specs/.archive/` tree while keeping every reference and the UI on logical
+paths. The original eight tasks are complete; this is new work on top.
 
 **Parallelism:** After `core-model`, tasks `validation`, `impact-progress`, `dispatch-handler`,
 `archive-api`, and `explorer-ux` are all independent and can run in parallel. `focused-view-ux`
