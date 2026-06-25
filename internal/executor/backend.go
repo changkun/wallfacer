@@ -16,7 +16,7 @@ type BackendState int
 const (
 	StateCreating  BackendState = iota // Backend is provisioning the container.
 	StateRunning                       // Container process is alive but has not yet produced output.
-	StateStreaming                     // Container is alive and output is being read.
+	StateStreaming                     // Reserved: never entered under host execution (transition() is never called with it). Kept as exported API and a valid StateMachine edge.
 	StateStopping                      // Kill() has been called; waiting for exit.
 	StateStopped                       // Container exited (success or non-zero). Terminal.
 	StateFailed                        // Container could not be created or crashed. Terminal.
