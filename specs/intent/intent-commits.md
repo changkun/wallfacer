@@ -8,7 +8,7 @@ affects:
   - internal/handler/planning_undo.go
 effort: small
 created: 2026-04-03
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
