@@ -18,9 +18,11 @@ import {
   buildReplyTree,
   initials,
   inlineThreads,
+  layoutCards,
   outOfSyncCount,
   threadPreview,
   triageThreads,
+  type CardBox,
   type SpecCommentThread,
 } from '../../lib/specComments';
 import {
@@ -41,6 +43,12 @@ const props = defineProps<{
   // The focused spec id (workspace-relative, no leading specs/). Empty when no
   // spec is focused; the POST `spec` field is this value as-is.
   specPath: string;
+}>();
+
+const emit = defineEmits<{
+  // True while the margin rail occupies the right gutter, so the parent reserves
+  // padding (shared with the floating TOC) to keep prose clear of it.
+  (e: 'reserve', value: boolean): void;
 }>();
 
 const auth = useAuthStore();
@@ -150,28 +158,35 @@ async function enableCoordination() {
 
 interface Marker { thread: SpecCommentThread; top: number }
 const markers = ref<Marker[]>([]);
+// anchorTops maps every inline thread to its anchor's vertical offset in the
+// scrolling body, so the margin rail can place each card next to its line.
+const anchorTops = ref<Map<string, number>>(new Map());
 
-// Thread-popover state (declared here so the highlight pass and its open-state
-// watch can reference them; the popover handlers live in the popover section).
+// Thread state (declared here so the highlight pass and its open-state watch can
+// reference them; the handlers live in the thread section).
 const openThreadId = ref<string | null>(null);
 const replyBody = ref('');
 
-// place runs one combined pass: highlight inline, then gutter-mark the leftovers.
+// place runs one combined pass: highlight inline, record each thread's anchor
+// top for the rail, then gutter-mark the threads with no inline mark.
 function place() {
   const root = props.bodyEl;
-  if (!root) { markers.value = []; return; }
+  if (!root) { markers.value = []; anchorTops.value = new Map(); return; }
   const blocks: SourceBlock[] = collectSourceBlocks(root);
   const highlighted = highlightThreads(root, blocks, specThreads.value, {
     openId: openThreadId.value,
     onOpen: toggleThread,
   });
   const out: Marker[] = [];
+  const tops = new Map<string, number>();
   for (const t of specThreads.value) {
-    if (highlighted.has(t.id)) continue;
     const block = blockForLine(blocks, t.line);
     if (!block) continue;
+    tops.set(t.id, block.top);
+    if (highlighted.has(t.id)) continue;
     out.push({ thread: t, top: block.top });
   }
+  anchorTops.value = tops;
   // Fallback markers that snapped to the same block share a top; cascade them
   // so a newer one never sits exactly on (and hides) an older one.
   markers.value = destack(out);
@@ -191,6 +206,64 @@ watch(openThreadId, () => {
 onUnmounted(() => {
   if (props.bodyEl) clearHighlights(props.bodyEl);
 });
+
+// ── Margin comment rail ────────────────────────────────────────────
+// Every inline thread renders as a card in the right gutter, aligned to its
+// anchor line. layoutCards flows them top-down so they never overlap; the active
+// card expands (full thread + reply), the rest collapse to author + preview.
+// Heights are measured per card so a streamed reply or late render re-flows.
+
+// Estimated collapsed-card height, used before the ResizeObserver measures so a
+// fresh card lands near its anchor instead of stacking at the top.
+const RAIL_FALLBACK_H = 60;
+const RAIL_GAP = 10;
+
+const railFolded = ref(false);
+const cardHeights = ref<Map<string, number>>(new Map());
+
+const railCards = computed(() => {
+  const list = specThreads.value.filter((t) => anchorTops.value.has(t.id));
+  const boxes: CardBox[] = list.map((t) => ({
+    id: t.id,
+    top: anchorTops.value.get(t.id) ?? 0,
+    height: cardHeights.value.get(t.id) ?? RAIL_FALLBACK_H,
+  }));
+  const tops = layoutCards(boxes, RAIL_GAP);
+  return list.map((t) => ({ thread: t, top: tops.get(t.id) ?? 0 }));
+});
+
+// Reserve the gutter while the rail shows cards (mirrors FloatingToc's reserve).
+watch(
+  () => railCards.value.length > 0 && !railFolded.value,
+  (occupies) => emit('reserve', occupies),
+  { immediate: true },
+);
+
+// Per-card height measurement. The observer feeds offsetHeight into a reactive
+// map; railCards re-runs layoutCards on any change (expand/collapse, streamed
+// reply, late markdown/mermaid render). The `changed` guard stops the
+// measure→layout→render→measure loop once heights settle.
+let ro: ResizeObserver | undefined;
+const cardEls = new Map<string, HTMLElement>();
+function measure() {
+  const next = new Map(cardHeights.value);
+  let changed = false;
+  for (const [id, el] of cardEls) {
+    const h = el.offsetHeight;
+    if (next.get(id) !== h) { next.set(id, h); changed = true; }
+  }
+  if (changed) cardHeights.value = next;
+}
+// el is the Vue template-ref union (Element | component instance | null); we
+// only ever attach this ref to a plain <article>, so the HTMLElement check both
+// narrows the type and ignores the null-on-unmount case.
+function setCardEl(id: string, el: unknown) {
+  const prev = cardEls.get(id);
+  if (prev && prev !== el) { ro?.unobserve(prev); cardEls.delete(id); }
+  if (el instanceof HTMLElement) { cardEls.set(id, el); ro?.observe(el); }
+}
+onMounted(() => { ro = new ResizeObserver(() => measure()); });
+onUnmounted(() => ro?.disconnect());
 
 // ── Selection → new thread ─────────────────────────────────────────
 
@@ -451,60 +524,85 @@ defineExpose({ openCount, showResolved, available });
       </div>
     </div>
 
-    <!-- Thread popover (comment list + reply + resolve). -->
-    <div
-      v-if="openThread"
-      class="sc-popover sc-popover--thread"
-      @click.self="openThreadId = null"
-    >
-      <div class="sc-popover-inner">
-        <div class="sc-thread-head">
-          <span class="sc-thread-title">
-            {{ openThread.resolved || openThread.status === 'resolved' ? 'Resolved thread' : 'Comment thread' }}
+    <!-- Margin comment rail: a card per thread, aligned to its anchored line.
+         Replaces the centered popover so comments read alongside the prose. -->
+    <div v-if="!railFolded" class="sc-rail">
+      <article
+        v-for="c in railCards"
+        :key="c.thread.id"
+        :ref="(el) => setCardEl(c.thread.id, el)"
+        class="sc-card"
+        :class="{
+          'sc-card--open': openThreadId === c.thread.id,
+          'sc-card--resolved': c.thread.resolved || c.thread.status === 'resolved',
+        }"
+        :style="{ top: c.top + 'px' }"
+      >
+        <!-- Collapsed: author + preview; click to expand the thread. -->
+        <button
+          v-if="openThreadId !== c.thread.id"
+          type="button"
+          class="sc-card-collapsed"
+          @click="toggleThread(c.thread.id)"
+        >
+          <span class="sc-avatar" :class="{ 'sc-avatar--me': isMe(c.thread.author_sub) }">{{ authorInitials(c.thread.author_sub) }}</span>
+          <span class="sc-card-text">
+            <span class="sc-author" :class="{ 'sc-author--muted': !isMe(c.thread.author_sub) }">{{ authorName(c.thread.author_sub) }}</span>
+            <span class="sc-card-preview">{{ threadPreview(c.thread) }}</span>
           </span>
-          <button
-            type="button"
-            class="sc-btn sc-btn--ghost"
-            @click="resolveThread(openThread)"
-          >{{ openThread.resolved || openThread.status === 'resolved' ? 'Reopen' : 'Resolve' }}</button>
-          <button type="button" class="sc-close" aria-label="Close" @click="openThreadId = null">✕</button>
-        </div>
-        <div class="sc-comments">
-          <div v-for="node in openTree" :key="node.comment.id" class="sc-comment-group">
-            <div class="sc-comment">
-              <span class="sc-avatar" :class="{ 'sc-avatar--me': isMe(node.comment.author_sub) }">{{ authorInitials(node.comment.author_sub) }}</span>
-              <div class="sc-comment-main">
-                <div class="sc-comment-meta">
-                  <span class="sc-author" :class="{ 'sc-author--muted': !isMe(node.comment.author_sub) }">{{ authorName(node.comment.author_sub) }}</span>
+          <span v-if="c.thread.comments.length > 1" class="sc-card-n">{{ c.thread.comments.length }}</span>
+        </button>
+
+        <!-- Expanded: the full thread, reply box, and resolve/reopen. -->
+        <div v-else class="sc-card-open">
+          <div class="sc-thread-head">
+            <span class="sc-thread-title">
+              {{ c.thread.resolved || c.thread.status === 'resolved' ? 'Resolved' : 'Thread' }}
+            </span>
+            <button
+              type="button"
+              class="sc-btn sc-btn--ghost sc-btn--sm"
+              @click="resolveThread(c.thread)"
+            >{{ c.thread.resolved || c.thread.status === 'resolved' ? 'Reopen' : 'Resolve' }}</button>
+            <button type="button" class="sc-close" aria-label="Close" @click="openThreadId = null">✕</button>
+          </div>
+          <div class="sc-comments">
+            <div v-for="node in openTree" :key="node.comment.id" class="sc-comment-group">
+              <div class="sc-comment">
+                <span class="sc-avatar" :class="{ 'sc-avatar--me': isMe(node.comment.author_sub) }">{{ authorInitials(node.comment.author_sub) }}</span>
+                <div class="sc-comment-main">
+                  <div class="sc-comment-meta">
+                    <span class="sc-author" :class="{ 'sc-author--muted': !isMe(node.comment.author_sub) }">{{ authorName(node.comment.author_sub) }}</span>
+                  </div>
+                  <div class="sc-comment-body prose-content" v-html="renderBody(node.comment.body)" />
                 </div>
-                <div class="sc-comment-body prose-content" v-html="renderBody(node.comment.body)" />
               </div>
-            </div>
-            <div v-for="r in node.replies" :key="r.id" class="sc-comment sc-comment--reply">
-              <span class="sc-avatar" :class="{ 'sc-avatar--me': isMe(r.author_sub) }">{{ authorInitials(r.author_sub) }}</span>
-              <div class="sc-comment-main">
-                <div class="sc-comment-meta">
-                  <span class="sc-author" :class="{ 'sc-author--muted': !isMe(r.author_sub) }">{{ authorName(r.author_sub) }}</span>
+              <div v-for="r in node.replies" :key="r.id" class="sc-comment sc-comment--reply">
+                <span class="sc-avatar" :class="{ 'sc-avatar--me': isMe(r.author_sub) }">{{ authorInitials(r.author_sub) }}</span>
+                <div class="sc-comment-main">
+                  <div class="sc-comment-meta">
+                    <span class="sc-author" :class="{ 'sc-author--muted': !isMe(r.author_sub) }">{{ authorName(r.author_sub) }}</span>
+                  </div>
+                  <div class="sc-comment-body prose-content" v-html="renderBody(r.body)" />
                 </div>
-                <div class="sc-comment-body prose-content" v-html="renderBody(r.body)" />
               </div>
             </div>
           </div>
-        </div>
-        <div class="sc-reply">
-          <textarea
-            v-model="replyBody"
-            class="sc-textarea"
-            rows="2"
-            placeholder="Reply. Markdown supported."
-            @keydown.meta.enter="submitReply"
-            @keydown.ctrl.enter="submitReply"
-          />
-          <div class="sc-actions">
-            <button type="button" class="sc-btn sc-btn--primary" :disabled="!replyBody.trim()" @click="submitReply">Reply</button>
+          <div class="sc-reply">
+            <textarea
+              v-model="replyBody"
+              class="sc-textarea"
+              rows="2"
+              placeholder="Reply. Markdown supported."
+              @keydown.meta.enter="submitReply"
+              @keydown.ctrl.enter="submitReply"
+            />
+            <div class="sc-actions">
+              <button type="button" class="sc-btn sc-btn--primary" :disabled="!replyBody.trim()" @click="submitReply">Reply</button>
+            </div>
           </div>
         </div>
-      </div>
+      </article>
     </div>
 
     <!-- Triage panel: orphaned/outdated threads for the repo. -->
@@ -707,7 +805,6 @@ defineExpose({ openCount, showResolved, available });
   border-radius: var(--r-md);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
 }
-.sc-popover--thread,
 .sc-popover--triage {
   position: fixed;
   inset: 0;
@@ -718,6 +815,74 @@ defineExpose({ openCount, showResolved, available });
   padding: 60px 16px 16px;
   background: rgba(0, 0, 0, 0.18);
 }
+
+/* Margin comment rail: cards float in the right gutter of the scrolling body,
+   each absolutely positioned at its anchor's resolved top (see layoutCards). It
+   sits left of the floating TOC; the body reserves the gutter via 'reserve'. */
+.sc-rail {
+  position: absolute;
+  top: 0;
+  /* Inset from the host edge so the rail clears the floating TOC, whose padding
+     and border (~18px) the shared gutter reserve does not count. */
+  right: 16px;
+  width: var(--sc-rail-w, 280px);
+  height: 0;
+  pointer-events: none;
+}
+.sc-card {
+  position: absolute;
+  right: 0;
+  width: var(--sc-rail-w, 280px);
+  pointer-events: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: top 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.sc-card--open {
+  border-color: var(--accent);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  z-index: 3;
+}
+.sc-card--resolved { opacity: 0.78; }
+
+.sc-card-collapsed {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.sc-card-collapsed:hover { background: var(--bg-hover); border-radius: var(--r-md); }
+.sc-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sc-card-preview {
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sc-card-n {
+  flex: none;
+  align-self: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.sc-card-open { display: flex; flex-direction: column; max-height: 60vh; }
+.sc-card-open .sc-comments { max-height: 40vh; }
 .sc-popover-inner {
   width: 420px;
   max-width: 100%;

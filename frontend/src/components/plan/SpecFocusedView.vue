@@ -308,6 +308,9 @@ async function undoToast(toast: { id: number; action: ArchiveAction }) {
 const bodyRef = ref<HTMLElement | null>(null);
 // True while the pinned TOC occupies the top-right; reserves a body gutter.
 const tocReserve = ref(false);
+// True while the margin comment rail occupies the right gutter; shares the same
+// reserve so the rail (left of the TOC) and TOC both clear the prose.
+const commentsReserve = ref(false);
 
 function isSpecLink(href: string): boolean {
   if (!href) return false;
@@ -455,7 +458,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
     <div
       class="sf-body"
-      :class="{ 'sf-body--toc': tocReserve }"
+      :class="{ 'sf-body--toc': tocReserve || commentsReserve }"
       :key="(focusedTaskId || focusedSpecPath) + ':' + (focusedIsIndex ? '1' : '0')"
     >
       <div v-if="focusedTaskId">
@@ -486,6 +489,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
             :body-el="bodyRef"
             :content-key="renderedBody"
             :spec-path="focusedSpecPath || ''"
+            @reserve="commentsReserve = $event"
           />
         </div>
         <div v-else-if="!loading && !parsed.warning" class="sf-loading">Select a spec from the tree.</div>
