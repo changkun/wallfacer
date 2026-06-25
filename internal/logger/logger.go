@@ -90,9 +90,14 @@ const (
 
 // prettyHandler formats log records for human consumption with alignment and color.
 type prettyHandler struct {
-	w        io.Writer
-	opts     *slog.HandlerOptions
-	mu       sync.Mutex
+	w    io.Writer
+	opts *slog.HandlerOptions
+	// mu is a pointer so every handler derived via clone() (i.e. WithAttrs /
+	// WithGroup) shares one write lock with the base handler. Otherwise each
+	// named logger would get its own mutex and concurrent writes from sibling
+	// loggers to a shared (non-stdout) writer would race. Mirrors how stdlib
+	// slog's commonHandler shares a *sync.Mutex across clones.
+	mu       *sync.Mutex
 	preAttrs []slog.Attr
 	color    bool
 }
@@ -103,6 +108,7 @@ func newPrettyHandler(w io.Writer, opts *slog.HandlerOptions) *prettyHandler {
 	return &prettyHandler{
 		w:     w,
 		opts:  opts,
+		mu:    &sync.Mutex{},
 		color: isColorEnabled(w),
 	}
 }
@@ -133,6 +139,7 @@ func (h *prettyHandler) clone() *prettyHandler {
 	return &prettyHandler{
 		w:        h.w,
 		opts:     h.opts,
+		mu:       h.mu,
 		preAttrs: h.preAttrs[:len(h.preAttrs):len(h.preAttrs)],
 		color:    h.color,
 	}

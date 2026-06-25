@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -142,6 +143,9 @@ func TestPrettyHandlerClone(t *testing.T) {
 	if cp.opts != h.opts {
 		t.Error("clone should share the same opts")
 	}
+	if cp.mu != h.mu {
+		t.Error("clone should share the same write-lock mutex")
+	}
 	if len(cp.preAttrs) != 1 {
 		t.Errorf("expected 1 preAttr in clone, got %d", len(cp.preAttrs))
 	}
@@ -150,6 +154,29 @@ func TestPrettyHandlerClone(t *testing.T) {
 	cp.preAttrs = append(cp.preAttrs, slog.String("k2", "v2"))
 	if len(h.preAttrs) != 1 {
 		t.Errorf("original preAttrs unexpectedly modified: got %d attrs", len(h.preAttrs))
+	}
+}
+
+// TestPrettyHandler_ConcurrentDerivedLoggersShareLock verifies that loggers
+// derived from a common base via WithAttrs serialize their writes through one
+// shared mutex. Run under -race: with a per-clone mutex, concurrent writes from
+// sibling loggers to the shared (non-stdout) writer race.
+func TestPrettyHandler_ConcurrentDerivedLoggersShareLock(t *testing.T) {
+	var buf bytes.Buffer
+	base := newPrettyHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
+	a := slog.New(base.WithAttrs([]slog.Attr{slog.String("logger", "a")}))
+	b := slog.New(base.WithAttrs([]slog.Attr{slog.String("logger", "b")}))
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(2)
+		go func() { defer wg.Done(); a.Info("from a") }()
+		go func() { defer wg.Done(); b.Info("from b") }()
+	}
+	wg.Wait()
+
+	if buf.Len() == 0 {
+		t.Fatal("expected log output in the shared buffer")
 	}
 }
 
