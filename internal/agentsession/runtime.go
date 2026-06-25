@@ -16,10 +16,17 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 )
 
-// agentSessionTaskID is a fixed synthetic task ID stamped onto every planning
-// launch via the "wallfacer.task.id" label, so the process monitor and
-// usage attribution can tell planning runs apart from task runs.
+// agentSessionTaskID is a fixed synthetic task ID stamped onto every
+// agent-session launch via the "wallfacer.task.id" label, so the process
+// monitor and usage attribution can tell agent-session runs apart from task
+// runs.
 const agentSessionTaskID = "planning-sandbox"
+
+// sessionsDirName is the per-config-dir directory holding agent-session state
+// (chat threads). Must match store.agentSessionsDirName; this package stays
+// free of a store dependency, so the constant is duplicated by design and
+// store.MigrateAgentSessionsDir handles the one-time rename from "planning".
+const sessionsDirName = "agent-sessions"
 
 // Config holds the configuration for a Planner.
 type Config struct {
@@ -45,7 +52,7 @@ type Runtime struct {
 	busy         bool            // true while a chat exec is in flight
 	busyThreadID string          // thread ID of the in-flight exec (empty when !busy)
 	liveLog      *livelog.Log    // live output buffer for the current exec (nil when idle)
-	threads      *Manager  // multi-thread chat persistence (nil if configDir empty)
+	threads      *Manager        // multi-thread chat persistence (nil if configDir empty)
 
 	configDir string // root config directory; kept so UpdateWorkspaces can open a new ThreadManager
 }
@@ -64,7 +71,7 @@ func New(cfg Config) *Runtime {
 		configDir:   cfg.ConfigDir,
 	}
 	if cfg.ConfigDir != "" && cfg.Fingerprint != "" {
-		tm, err := NewThreadManager(filepath.Join(cfg.ConfigDir, "planning", cfg.Fingerprint))
+		tm, err := NewThreadManager(filepath.Join(cfg.ConfigDir, sessionsDirName, cfg.Fingerprint))
 		if err == nil {
 			p.threads = tm
 		}
@@ -296,7 +303,7 @@ func (p *Runtime) UpdateWorkspaces(workspaces []string, fingerprint string) {
 	p.workspaces = workspaces
 	p.fingerprint = fingerprint
 	if p.configDir != "" && fingerprint != "" {
-		tm, err := NewThreadManager(filepath.Join(p.configDir, "planning", fingerprint))
+		tm, err := NewThreadManager(filepath.Join(p.configDir, sessionsDirName, fingerprint))
 		if err == nil {
 			p.threads = tm
 		}
