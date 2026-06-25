@@ -15,10 +15,10 @@ Identity - the live edge (auth + platform convergence)
   ○ Multi-User Collaboration       ○ Third-Party OIDC
   ◐ Remote Control (→ cloud plane) ○ Agent Token Exchange
 
-Spec Coordination - in progress (its own track; spec tree, planning, dispatch)
+Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
   ✅ Planning UX                   ✅ Chat-First Mode
-  ✅ Planning Chat Threads         ○ Spec State Control Plane
+  ✅ Planning Chat Threads         ✅ Spec State Control Plane
 
 Local Product - 11 shipped, rest pending
   ⊘ Desktop App (code removed)     ✅ Terminal Sessions
@@ -59,10 +59,11 @@ Git Workflow - two shippable features + a residual
   ○ Intent-Driven Commits (mostly shipped; residual: explorer auto-commit)
 ```
 
-The hot area is **Local Product** polish (spec state control plane, the
-file/diff/attachment trio). Identity / platform convergence (auth-by-default and
-the latere-ui console shell) has shipped and is archived. Cloud Platform is
-drafted and demand-gated; Git Workflow is two independently-shippable features.
+The hot area is **Local Product** polish (the file/diff/attachment trio). Spec
+Coordination is complete (the state control plane shipped). Identity / platform
+convergence (auth-by-default and the latere-ui console shell) has shipped and is
+archived. Cloud Platform is drafted and demand-gated; Git Workflow is two
+independently-shippable features.
 
 ---
 
@@ -104,7 +105,7 @@ Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automat
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [spec-coordination.md](spec-coordination/spec-coordination.md) | In progress | Umbrella: recursive spec tree model, dispatch workflow, cross-task context |
+| [spec-coordination.md](spec-coordination/spec-coordination.md) | **Complete** | Umbrella: recursive spec tree model, dispatch workflow, cross-task context, lifecycle automation. All four subtrees shipped; two residual stale leaves (lossy planning resume, codex compat re-scope) tracked as follow-ups. |
 | ↳ [spec-document-model.md](spec-coordination/spec-coordination/spec-document-model.md) | **Complete** | Spec frontmatter schema, filesystem-derived tree, `depends_on` DAG, six-state lifecycle (including `archived`), per-spec and cross-spec validation, recursive progress tracking, impact analysis. Extracted `internal/pkg/dag/`, `internal/pkg/tree/`, `internal/pkg/statemachine/` |
 | ↳ [spec-archival.md](spec-coordination/spec-coordination/spec-archival.md) | **Complete** | Sixth lifecycle state (`archived`), hidden by default, read-only, excluded from impact / progress / drift / stale-propagation. Cascades over non-leaf subtrees on archive; unarchive reverses via `git revert`. Muted rendering in explorer and minimap; archived banner with stacked undo toasts. |
 | ↳ [spec-planning-ux.md](spec-coordination/spec-coordination/spec-planning-ux.md) | **Complete** | Three-pane spec mode (explorer, focused markdown view, chat stream), planning sandbox, chat-driven spec iteration, dispatch & board integration, undo snapshots, planning cost tracking. |

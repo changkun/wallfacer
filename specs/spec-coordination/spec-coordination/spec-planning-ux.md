@@ -442,7 +442,7 @@ The planning UX shipped as a complete spec-driven workflow environment integrate
 
 1. **Dispatch workflow table entry was stale.** The Design Breakdown table above originally showed dispatch-workflow as `drafted`; it shipped complete during implementation without the parent table being updated.
 
-2. **Codex compatibility deferred.** Item 8 (Planning Codex Compatibility) was listed as `vague` at design time. It was subsequently refined into a full design spec (`planning-codex-compat.md`, now `drafted`) covering CLI flag translation, `--resume` skip, AGENTS.md mounting, and Codex auth mounting — but implementation was deferred. The planning agent runs Claude Code only.
+2. **Codex compatibility deferred.** Item 8 (Planning Codex Compatibility) was listed as `vague` at design time. It was subsequently refined into a full design spec (`planning-codex-compat.md`, now `stale` — re-scoped onto the harness abstraction) covering CLI flag translation, `--resume` skip, AGENTS.md mounting, and Codex auth mounting — but implementation was deferred. The planning agent runs Claude Code only.
 
 3. **Session persistence shipped at basic fidelity only.** The original spec envisioned full per-turn NDJSON storage (`turns/` directory), a `ReconstructContext()` function with a 30K-token budget, and a dedicated `claude-planning-config` volume to isolate planning sessions from task workers. What shipped is the simpler fallback: JSONL message log, session ID file, and `BuildHistoryContext()` with a lossy 20-message text summary. The enhanced design is captured in `planning-chat-agent/session-persistence.md` for future implementation.
 
@@ -463,7 +463,7 @@ The planning UX shipped as a complete spec-driven workflow environment integrate
 | 5 | [Dispatch & Board Integration](spec-planning-ux/dispatch-workflow.md) | Translating validated leaf specs into board tasks with bidirectional links and dependency wiring | spec-mode-ui-shell | medium | complete |
 | 6 | [Undo & Snapshot System](spec-planning-ux/undo-snapshots.md) | Per-round implicit snapshots for reversible agent writes | planning-sandbox | medium | complete |
 | 7 | [Planning Cost Tracking](spec-planning-ux/progress-cost-tracking.md) | Per-round planning cost capture, per-group aggregation, and surfacing in the existing usage analytics (recursive progress was already shipped separately) | planning-sandbox | medium | complete |
-| 8 | [Planning Codex Compatibility](spec-planning-ux/planning-codex-compat.md) | Codex sandbox support for the planning chat agent (CLI flags, session resumption, output format) | planning-chat-agent | medium | drafted — deferred |
+| 8 | [Planning Codex Compatibility](spec-planning-ux/planning-codex-compat.md) | Codex sandbox support for the planning chat agent (CLI flags, session resumption, output format) | planning-chat-agent | medium | stale — deferred, re-scoped |
 
 ```mermaid
 graph LR
