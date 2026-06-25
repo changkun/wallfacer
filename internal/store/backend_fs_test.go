@@ -453,4 +453,3 @@ func TestFilesystemBackend_LoadEvents_MissingTask(t *testing.T) {
 		t.Errorf("got %d events, maxSeq=%d; want 0, 0", len(events), maxSeq)
 	}
 }
-

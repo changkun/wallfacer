@@ -124,4 +124,3 @@ func canonicalizeDependsOn(deps []string) []string {
 	}
 	return out
 }
-
