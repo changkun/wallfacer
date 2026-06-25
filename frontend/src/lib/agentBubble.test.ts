@@ -8,7 +8,7 @@ import {
   bubbleFromMessage,
   applyStreamingUpdate,
   type RenderedBubble,
-} from './planningBubble';
+} from './agentBubble';
 import type { ActivityRow } from './prettyNdjson';
 
 describe('applyStreamingUpdate', () => {

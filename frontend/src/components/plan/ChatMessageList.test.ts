@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createApp, ref, h, type App } from 'vue';
 import ChatMessageList from './ChatMessageList.vue';
-import type { RenderedBubble } from '../../lib/planningBubble';
+import type { RenderedBubble } from '../../lib/agentBubble';
 
 let app: App | null = null;
 let host: HTMLElement;

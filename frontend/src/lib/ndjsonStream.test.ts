@@ -4,7 +4,7 @@
 // byte stream is chunked.
 import { describe, it, expect } from 'vitest';
 import { createNdjsonStreamParser } from './ndjsonStream';
-import { extractError } from './planningBubble';
+import { extractError } from './agentBubble';
 import { parseTurn } from './prettyNdjson';
 
 function frames(): string[] {

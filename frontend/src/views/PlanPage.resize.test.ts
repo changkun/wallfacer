@@ -32,8 +32,8 @@ vi.mock('../components/plan/SpecTreePanel.vue', () => ({
 vi.mock('../components/plan/SpecFocusedView.vue', () => ({
   default: { name: 'SpecFocusedView', template: '<div></div>' },
 }));
-vi.mock('../components/plan/PlanningChatPanel.vue', () => ({
-  default: { name: 'PlanningChatPanel', template: '<div></div>' },
+vi.mock('../components/plan/AgentChatPanel.vue', () => ({
+  default: { name: 'AgentChatPanel', template: '<div></div>' },
 }));
 vi.mock('../components/plan/SpecChatPopup.vue', () => ({
   default: { name: 'SpecChatPopup', template: '<div></div>' },

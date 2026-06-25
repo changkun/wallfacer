@@ -10,7 +10,7 @@
 // It reuses the exact per-frame helpers used by the one-shot functions, so the
 // final state is identical to running those functions over the full buffer.
 
-import { frameError } from './planningBubble';
+import { frameError } from './agentBubble';
 import {
   parseFrameLine,
   accumulateFrame,

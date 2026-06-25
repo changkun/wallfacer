@@ -1,9 +1,9 @@
 // Pure helpers for rendering planning-chat message bubbles. Extracted from
-// PlanningChatPanel.vue so they can be unit-tested in isolation and reused
+// AgentChatPanel.vue so they can be unit-tested in isolation and reused
 // by the streaming code path (which also needs to parse incoming NDJSON).
 import { renderMarkdown } from './markdown';
 import { parseTurn, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
-import { parseTurnUsage, type TurnUsage } from './planningUsage';
+import { parseTurnUsage, type TurnUsage } from './agentUsage';
 import type { AgentMessage } from '../stores/agentSession';
 
 export interface RenderedBubble {

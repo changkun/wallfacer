@@ -6,7 +6,7 @@
 // state. All conversation behaviour comes from the shared chat core.
 import { ref, computed } from 'vue';
 import { useChatSession } from '../composables/useChatSession';
-import { aggregateUsage, formatTokens, formatCost, formatPercent } from '../lib/planningUsage';
+import { aggregateUsage, formatTokens, formatCost, formatPercent } from '../lib/agentUsage';
 import BrandMark from '../components/BrandMark.vue';
 import SessionList from '../components/plan/SessionList.vue';
 import ChatMessageList from '../components/plan/ChatMessageList.vue';

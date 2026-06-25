@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTurnUsage, aggregateUsage, formatTokens, formatCost, formatPercent } from './planningUsage';
+import { parseTurnUsage, aggregateUsage, formatTokens, formatCost, formatPercent } from './agentUsage';
 
 function ndjson(...frames: unknown[]): string {
   return frames.map((f) => JSON.stringify(f)).join('\n');

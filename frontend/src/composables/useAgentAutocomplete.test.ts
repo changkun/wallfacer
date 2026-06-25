@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ref } from 'vue';
-import { usePlanningAutocomplete } from './usePlanningAutocomplete';
+import { useAgentAutocomplete } from './useAgentAutocomplete';
 
 let originalFetch: typeof globalThis.fetch;
 let files: string[] = [];
@@ -26,7 +26,7 @@ afterEach(() => {
   files = [];
 });
 
-describe('usePlanningAutocomplete @-mention', () => {
+describe('useAgentAutocomplete @-mention', () => {
   it('ranks basename-prefix matches above substring matches', async () => {
     // Original array order puts the weaker (substring) match first; ranking must
     // float the basename-prefix match to the top. The old unranked includes()
@@ -39,7 +39,7 @@ describe('usePlanningAutocomplete @-mention', () => {
     const inputEl = ref<HTMLTextAreaElement | null>(el);
     const inputText = ref('@alpha');
 
-    const ac = usePlanningAutocomplete({ inputEl, inputText });
+    const ac = useAgentAutocomplete({ inputEl, inputText });
     await ac.onInput();
 
     expect(ac.mentionOpen.value).toBe(true);
@@ -58,7 +58,7 @@ describe('usePlanningAutocomplete @-mention', () => {
     const inputEl = ref<HTMLTextAreaElement | null>(el);
     const inputText = ref('@foo:bar');
 
-    const ac = usePlanningAutocomplete({ inputEl, inputText });
+    const ac = useAgentAutocomplete({ inputEl, inputText });
     await ac.onInput();
 
     expect(ac.mentionOpen.value).toBe(true);
