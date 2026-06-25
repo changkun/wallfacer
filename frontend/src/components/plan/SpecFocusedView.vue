@@ -823,6 +823,27 @@ defineExpose({ dispatchFocused, breakdownFocused });
   margin: 1em 0;
   color: var(--ink-3);
 }
+
+/* Inline spec-comment highlight: the anchored text is marked in place (the
+   SpecCommentsLayer wraps it in <mark class="sc-mark">), so a comment is visible
+   on the prose it annotates, not only as a gutter badge. Tinted background plus
+   an accent underline; the open thread reads brighter; resolved is muted. */
+.sf-content :deep(mark.sc-mark) {
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.sf-content :deep(mark.sc-mark:hover),
+.sf-content :deep(mark.sc-mark.sc-mark--open) {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.sf-content :deep(mark.sc-mark.sc-mark--resolved) {
+  background: color-mix(in oklab, var(--ink-4) 14%, transparent);
+  border-bottom-color: color-mix(in oklab, var(--ink-4) 45%, transparent);
+}
 .sf-content :deep(table) {
   border-collapse: collapse;
   margin: 1em 0;

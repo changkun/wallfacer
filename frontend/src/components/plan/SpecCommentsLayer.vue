@@ -21,9 +21,15 @@ import {
   outOfSyncCount,
   threadPreview,
   triageThreads,
-  type BlockLine,
   type SpecCommentThread,
 } from '../../lib/specComments';
+import {
+  clearHighlights,
+  collectSourceBlocks,
+  highlightThreads,
+  syncOpenMark,
+  type SourceBlock,
+} from '../../lib/specHighlight';
 
 const props = defineProps<{
   // The rendered spec body element (source-line stamped). Replaced on spec
@@ -133,35 +139,34 @@ async function enableCoordination() {
   }
 }
 
-// ── Source-line block index ────────────────────────────────────────
-// Collect every data-source-line element with its offset relative to the body's
-// scroll content, so a thread line snaps to the enclosing block's vertical
-// position (markers) and a selection endpoint reads its line (create).
+// ── Inline highlights + fallback gutter markers ────────────────────
+// The primary affordance is an inline <mark> on the anchored text (see
+// specHighlight). A gutter marker is rendered only for an inline thread whose
+// text could not be located inline (anchored to a stripped heading, or text in
+// a skipped code/mermaid block), so it still has a visible click target. Inline
+// marks at distinct spans never overlap, so two comments on one paragraph both
+// stay visible — the stacking that hid sibling gutter markers is gone.
 
 interface Marker { thread: SpecCommentThread; top: number }
 const markers = ref<Marker[]>([]);
 
-function collectBlocks(): { blocks: BlockLine[]; byLine: Map<number, HTMLElement> } {
-  const byLine = new Map<number, HTMLElement>();
-  const blocks: BlockLine[] = [];
-  const root = props.bodyEl;
-  if (!root) return { blocks, byLine };
-  const rootRect = root.getBoundingClientRect();
-  const els = root.querySelectorAll<HTMLElement>('[data-source-line]');
-  els.forEach((el) => {
-    const line = Number.parseInt(el.getAttribute('data-source-line') || '', 10);
-    if (!Number.isFinite(line)) return;
-    const top = el.getBoundingClientRect().top - rootRect.top + root.scrollTop;
-    blocks.push({ line, top });
-    byLine.set(line, el);
-  });
-  return { blocks, byLine };
-}
+// Thread-popover state (declared here so the highlight pass and its open-state
+// watch can reference them; the popover handlers live in the popover section).
+const openThreadId = ref<string | null>(null);
+const replyBody = ref('');
 
-function placeMarkers() {
-  const { blocks } = collectBlocks();
+// place runs one combined pass: highlight inline, then gutter-mark the leftovers.
+function place() {
+  const root = props.bodyEl;
+  if (!root) { markers.value = []; return; }
+  const blocks: SourceBlock[] = collectSourceBlocks(root);
+  const highlighted = highlightThreads(root, blocks, specThreads.value, {
+    openId: openThreadId.value,
+    onOpen: toggleThread,
+  });
   const out: Marker[] = [];
   for (const t of specThreads.value) {
+    if (highlighted.has(t.id)) continue;
     const block = blockForLine(blocks, t.line);
     if (!block) continue;
     out.push({ thread: t, top: block.top });
@@ -171,9 +176,18 @@ function placeMarkers() {
 
 watch(
   () => [props.bodyEl, props.contentKey, specThreads.value] as const,
-  () => { void nextTick(placeMarkers); },
+  () => { void nextTick(place); },
   { immediate: true },
 );
+
+// Reflect the open thread onto inline marks without a full rewrap.
+watch(openThreadId, () => {
+  if (props.bodyEl) syncOpenMark(props.bodyEl, openThreadId.value);
+});
+
+onUnmounted(() => {
+  if (props.bodyEl) clearHighlights(props.bodyEl);
+});
 
 // ── Selection → new thread ─────────────────────────────────────────
 
@@ -253,9 +267,6 @@ function cancelCompose() {
 }
 
 // ── Thread popover ─────────────────────────────────────────────────
-
-const openThreadId = ref<string | null>(null);
-const replyBody = ref('');
 
 const openThread = computed<SpecCommentThread | null>(() =>
   threads.value.find((t) => t.id === openThreadId.value) ?? null,
