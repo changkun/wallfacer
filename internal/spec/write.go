@@ -11,6 +11,60 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
+// ErrAlreadyHasFrontmatter is returned by [InjectFrontmatter] when the target
+// file already begins with a frontmatter block, so there is nothing to inject.
+var ErrAlreadyHasFrontmatter = errors.New("file already has frontmatter")
+
+// InjectFrontmatter prepends a YAML frontmatter block to a frontmatter-less
+// markdown file, preserving the existing body byte-for-byte. It is the migration
+// path that converts a free-form doc node (see [docNode]) into a lifecycle-
+// managed spec. Defaults fill any zero option: Title from the first `# H1` (else
+// the filename), Status drafted, Effort medium, Author the local git user, Now
+// the current time. Returns [ErrAlreadyHasFrontmatter] when the file already has
+// a frontmatter block. The write is atomic (temp file + rename).
+func InjectFrontmatter(path string, opts ScaffoldOptions) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read spec %s: %w", path, err)
+	}
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
+	if strings.HasPrefix(content, "---\n") {
+		return ErrAlreadyHasFrontmatter
+	}
+
+	title := opts.Title
+	if title == "" {
+		title, _ = readFirstH1(path, TitleFromFilename(path))
+	}
+	status := opts.Status
+	if status == "" {
+		status = StatusDrafted
+	}
+	effort := opts.Effort
+	if effort == "" {
+		effort = EffortMedium
+	}
+	author := opts.Author
+	if author == "" {
+		author = ResolveAuthor()
+	}
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	out := renderFrontmatter(title, status, effort, author, opts.DependsOn, now) + "\n" + content
+
+	perm := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode()
+	}
+	if err := atomicfile.Write(path, []byte(out), perm); err != nil {
+		return fmt.Errorf("write spec file: %w", err)
+	}
+	return nil
+}
+
 // UpdateFrontmatter updates specific fields in a spec file's YAML frontmatter
 // without disturbing the markdown body or field ordering. The updates map keys
 // are YAML field names (e.g., "status", "dispatched_task_id", "updated").

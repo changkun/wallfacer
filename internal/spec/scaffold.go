@@ -180,6 +180,24 @@ func ResolveAuthor() string {
 // renderer. dependsOn nil/empty renders as `depends_on: []`; non-empty
 // renders as a YAML list.
 func RenderSkeleton(title string, status Status, effort Effort, author string, dependsOn []string, now time.Time) string {
+	var b strings.Builder
+	b.WriteString(renderFrontmatter(title, status, effort, author, dependsOn, now))
+	b.WriteString("\n")
+	b.WriteString("# " + title + "\n\n")
+	b.WriteString("## Problem\n\n")
+	b.WriteString("<!-- What problem does this spec address? Why now? -->\n\n")
+	b.WriteString("## Design\n\n")
+	b.WriteString("<!-- High-level approach. Key decisions and trade-offs. -->\n\n")
+	b.WriteString("## Acceptance\n\n")
+	b.WriteString("<!-- How will we know this is done? Tests, behaviour changes, files touched. -->\n")
+	return b.String()
+}
+
+// renderFrontmatter produces just the `---`-delimited YAML frontmatter block
+// (ending in "---\n", no trailing blank line). Shared by [RenderSkeleton] (new
+// specs) and [InjectFrontmatter] (migrating frontmatter-less files), so both
+// emit byte-identical frontmatter. dependsOn nil/empty renders `depends_on: []`.
+func renderFrontmatter(title string, status Status, effort Effort, author string, dependsOn []string, now time.Time) string {
 	date := now.Format("2006-01-02")
 	var b strings.Builder
 	b.WriteString("---\n")
@@ -199,14 +217,7 @@ func RenderSkeleton(title string, status Status, effort Effort, author string, d
 	b.WriteString("updated: " + date + "\n")
 	b.WriteString("author: " + author + "\n")
 	b.WriteString("dispatched_task_id: null\n")
-	b.WriteString("---\n\n")
-	b.WriteString("# " + title + "\n\n")
-	b.WriteString("## Problem\n\n")
-	b.WriteString("<!-- What problem does this spec address? Why now? -->\n\n")
-	b.WriteString("## Design\n\n")
-	b.WriteString("<!-- High-level approach. Key decisions and trade-offs. -->\n\n")
-	b.WriteString("## Acceptance\n\n")
-	b.WriteString("<!-- How will we know this is done? Tests, behaviour changes, files touched. -->\n")
+	b.WriteString("---\n")
 	return b.String()
 }
 
