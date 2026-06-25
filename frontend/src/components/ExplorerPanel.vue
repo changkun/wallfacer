@@ -229,9 +229,15 @@ function focusTreeRow(path: string) {
 function selectFile(entry: TreeEntry) {
   const ws = workspace();
   if (!ws) return;
-  // Open (or focus) the file as an editor tab; the board's tab strip swaps the
-  // center pane to show it. The store fetches and holds the content.
+  // Single-click opens (or focuses) the file as a preview tab; the board's tab
+  // strip swaps the center pane to show it. The store fetches and holds content.
   void editorTabs.openFile(ws, entry.path);
+}
+
+// Double-click opens the file as a permanent (kept) tab, like VS Code.
+function openFilePinned(entry: TreeEntry) {
+  const ws = workspace();
+  if (ws) void editorTabs.openFile(ws, entry.path, { preview: false });
 }
 
 function visibleEntries(): { entry: TreeEntry; depth: number }[] {
@@ -370,6 +376,7 @@ watch(() => store.config?.workspaces?.[0], (ws) => {
           role="treeitem"
           :aria-expanded="entry.is_dir ? expanded.has(entry.path) : undefined"
           @click="entry.is_dir ? toggleDir(entry) : selectFile(entry)"
+          @dblclick="!entry.is_dir && openFilePinned(entry)"
           @keydown="(e) => onTreeKeydown(e, entry)"
         >
           <span
