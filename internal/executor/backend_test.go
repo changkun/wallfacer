@@ -34,6 +34,28 @@ func TestStateMachineRejectsCreatingToCreating(t *testing.T) {
 	}
 }
 
+// TestBackendStateString verifies the human-readable name for each backend
+// lifecycle state, including the "unknown" fallback for out-of-range values.
+func TestBackendStateString(t *testing.T) {
+	tests := []struct {
+		state BackendState
+		want  string
+	}{
+		{StateCreating, "creating"},
+		{StateRunning, "running"},
+		{StateStreaming, "streaming"},
+		{StateStopping, "stopping"},
+		{StateStopped, "stopped"},
+		{StateFailed, "failed"},
+		{BackendState(99), "unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.state.String(); got != tt.want {
+			t.Errorf("BackendState(%d).String() = %q, want %q", tt.state, got, tt.want)
+		}
+	}
+}
+
 // Note: tests that exercised the localHandle Kill/Wait state-transition
 // guards lived here before host-default removed the container backend.
 // Equivalent coverage for hostHandle should land alongside the harness

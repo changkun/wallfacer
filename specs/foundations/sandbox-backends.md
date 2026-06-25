@@ -86,7 +86,6 @@ internal/sandbox/
   backend.go      — Backend, Handle, BackendState, ContainerInfo
   spec.go         — ContainerSpec, VolumeMount, Build()
   local.go        — LocalBackend, localHandle (podman/docker via os/exec)
-  parse.go        — ParseContainerList, IsUUID (JSON format handling)
 ```
 
 ### Runner Integration
