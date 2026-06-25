@@ -106,6 +106,53 @@ func TestArchiveSpec_InvalidTransition(t *testing.T) {
 	}
 }
 
+func TestValidateSpec_Success(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	drafted := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
+	writeTestSpec(t, ws, "specs/local/draft.md", drafted)
+
+	w := doTransition(t, h.ValidateSpecTransition, "specs/local/draft.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/draft.md"); got != spec.StatusValidated {
+		t.Errorf("status = %q, want %q", got, spec.StatusValidated)
+	}
+}
+
+func TestValidateSpec_InvalidFromComplete(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	complete := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
+	writeTestSpec(t, ws, "specs/local/done.md", complete)
+
+	w := doTransition(t, h.ValidateSpecTransition, "specs/local/done.md")
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/done.md"); got != spec.StatusComplete {
+		t.Errorf("status mutated to %q, want unchanged complete", got)
+	}
+}
+
+func TestValidateSpec_InvalidFromVague(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	vague := strings.Replace(testSpecValidated, "status: validated", "status: vague", 1)
+	writeTestSpec(t, ws, "specs/local/idea.md", vague)
+
+	w := doTransition(t, h.ValidateSpecTransition, "specs/local/idea.md")
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+}
+
+func TestValidateSpec_NotFound(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	w := doTransition(t, h.ValidateSpecTransition, "specs/local/missing.md")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusNotFound, w.Body.String())
+	}
+}
+
 // writeDispatchedSpec writes a drafted spec wired to taskID and returns its path.
 func writeDispatchedSpec(t *testing.T, ws, relPath, taskID string) {
 	t.Helper()

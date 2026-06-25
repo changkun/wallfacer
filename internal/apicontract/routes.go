@@ -250,7 +250,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/specs/transition", Name: "SpecTransition",
-		Description: "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive take a single path and return {path, status}.",
+		Description: "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive/validate take a single path and return {path, status}.",
 		Tags:        []string{"specs"},
 	},
 

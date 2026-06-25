@@ -58,10 +58,12 @@ func (h *Handler) SpecTransition(w http.ResponseWriter, r *http.Request) {
 		h.ArchiveSpec(w, r)
 	case "unarchive":
 		h.UnarchiveSpec(w, r)
+	case "validate":
+		h.ValidateSpecTransition(w, r)
 	case "migrate":
 		h.MigrateSpec(w, r)
 	default:
-		http.Error(w, "action must be one of: dispatch, undispatch, archive, unarchive, migrate", http.StatusBadRequest)
+		http.Error(w, "action must be one of: dispatch, undispatch, archive, unarchive, validate, migrate", http.StatusBadRequest)
 	}
 }
 

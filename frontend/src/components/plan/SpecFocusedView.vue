@@ -176,6 +176,9 @@ const showDispatch = computed(
 const showBreakdown = computed(
   () => !focusedIsIndex.value && (status.value === 'validated' || status.value === 'drafted') && !isArchived.value,
 );
+const showValidate = computed(
+  () => !focusedIsIndex.value && status.value === 'drafted' && !isArchived.value,
+);
 const canArchive = computed(
   () =>
     !focusedIsIndex.value &&
@@ -238,6 +241,23 @@ async function onDispatch() {
 
 function onBreakdown() {
   emit('sendChat', '/break-down');
+}
+
+async function onValidate() {
+  if (!focusedSpecPath.value) return;
+  actionBusy.value = true;
+  try {
+    await api('POST', '/api/specs/transition', {
+      action: 'validate',
+      path: focusedSpecPath.value,
+    });
+    await loadCurrent();
+    toast.push('Spec marked validated', { kind: 'success' });
+  } catch (e) {
+    toast.push('Validate failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+  } finally {
+    actionBusy.value = false;
+  }
 }
 
 interface ArchiveAction {
@@ -437,6 +457,14 @@ defineExpose({ dispatchFocused, breakdownFocused });
           :title="chatVisible ? 'Hide chat pane (C)' : 'Show chat pane (C)'"
           @click="emit('toggleChat')"
         >Chat</button>
+        <button
+          v-if="showValidate"
+          type="button"
+          class="sf-action"
+          :disabled="actionBusy"
+          title="Mark this spec validated (design settled, ready to execute)"
+          @click="onValidate"
+        >Validate</button>
         <button
           v-if="showDispatch"
           type="button"

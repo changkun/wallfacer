@@ -350,6 +350,64 @@ func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ValidateSpecTransition transitions a spec to validated — the explicit
+// "this design is settled" signal. It is the only lifecycle edge that
+// otherwise has no server-driven trigger. There is no review gate: validation
+// is an intent signal, not a process. The state machine rejects every source
+// status but drafted and stale (complete/archived/vague → 422).
+func (h *Handler) ValidateSpecTransition(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	s, err := spec.ParseFile(absPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("parse error: %v", err), http.StatusBadRequest)
+		return
+	}
+	if err := spec.StatusMachine.Validate(s.Status, spec.StatusValidated); err != nil {
+		http.Error(w, fmt.Sprintf("cannot validate spec at status %q (must be drafted)", s.Status),
+			http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+		"status":  string(spec.StatusValidated),
+		"updated": time.Now(),
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := commitSpecTransition(r.Context(), workspaces, absPath, req.Path, spec.StatusValidated); err != nil {
+		slog.Warn("validate transition commit failed", "path", req.Path, "err", err)
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(spec.StatusValidated),
+	})
+}
+
 // MigrateSpec converts a free-form, frontmatter-less spec file into a
 // lifecycle-managed spec by injecting a frontmatter block (status drafted,
 // title from the first H1). The prose body is preserved byte-for-byte. The
