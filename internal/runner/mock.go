@@ -10,6 +10,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -125,7 +126,7 @@ func (m *MockRunner) ContainerName(taskID uuid.UUID) string {
 }
 
 // TaskLogReader returns nil in the mock (no live logs).
-func (m *MockRunner) TaskLogReader(_ uuid.UUID) *LiveLogReader { return nil }
+func (m *MockRunner) TaskLogReader(_ uuid.UUID) *livelog.Reader { return nil }
 
 // KillContainer records a kill-container call.
 func (m *MockRunner) KillContainer(taskID uuid.UUID) {

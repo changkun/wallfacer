@@ -13,6 +13,7 @@ import (
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -404,7 +405,7 @@ func (r *Runner) runContainer(
 	// Set up the live-log buffer that StreamLogs attaches to while the
 	// container is running. The tee is wired via LiveLogWriter so
 	// runAgent drains both streams through it.
-	ll := newLiveLog()
+	ll := livelog.New()
 	r.liveLogs.Store(taskID, ll)
 	defer func() {
 		ll.Close()
@@ -489,7 +490,7 @@ func (r *Runner) runContainerOnSandbox(
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
-	ll *liveLog,
+	ll *livelog.Log,
 	sb harness.ID,
 ) (*agentOutput, []byte, []byte, error) {
 	// Override the per-activity sandbox resolution by temporarily
