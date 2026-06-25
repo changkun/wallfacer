@@ -262,6 +262,48 @@ func TestRepositionFuzzyWithinSection(t *testing.T) {
 	}
 }
 
+// TestRepositionMultiLineFuzzyUsesSuffixAfterRange exercises the off-by-(rangeLen-1)
+// suffix-window bug in contextSimilarity. A 2-line anchor has its first line edited
+// (so the range hash no longer matches), forcing the fuzzy Step 3 path. The
+// candidate's true context still surrounds it, so it must reattach. With the old
+// suffix window (line+1 .. line+contextWindow) the window overlapped the inside of
+// the range and stopped short, depressing suffix similarity below fuzzyThreshold
+// and orphaning the anchor.
+func TestRepositionMultiLineFuzzyUsesSuffixAfterRange(t *testing.T) {
+	body := `# Doc
+
+## Section
+
+prefix alpha one
+prefix bravo two
+prefix charlie three
+range first line delta
+range second line echo
+suffix foxtrot one
+suffix golf two
+suffix hotel three
+trailing india filler
+`
+	start := lineOf(t, body, "range first line delta")
+	end := lineOf(t, body, "range second line echo")
+	if end != start+1 {
+		t.Fatalf("expected a 2-line range, got [%d,%d]", start, end)
+	}
+	a := ComputeAnchor(body, start, end)
+
+	// Edit the FIRST range line so the 2-line hash no longer matches, forcing
+	// the fuzzy path. Prefix and suffix context are unchanged.
+	edited := replace(body, "range first line delta", "range first line delta CHANGED")
+
+	_, line, ok := Reposition(edited, a)
+	if !ok {
+		t.Fatal("multi-line anchor orphaned in fuzzy path (suffix window off by rangeLen-1)")
+	}
+	if want := lineOf(t, edited, "range first line delta CHANGED"); line != want {
+		t.Errorf("reattached to line %d, want %d", line, want)
+	}
+}
+
 func TestRepositionAmbiguousDisambiguatedByContext(t *testing.T) {
 	// Two identical anchored lines in different contexts; the anchor's stored
 	// context should pick the right one.

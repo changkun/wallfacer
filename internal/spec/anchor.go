@@ -344,7 +344,7 @@ func Reposition(body string, a speccomment.Anchor) (speccomment.Anchor, int, boo
 		best := -1
 		var bestScore, secondScore float64
 		for _, line := range matches {
-			score := contextSimilarity(a, lines, line)
+			score := contextSimilarity(a, lines, line, rangeLen)
 			switch {
 			case score > bestScore:
 				secondScore = bestScore
@@ -368,7 +368,7 @@ func Reposition(body string, a speccomment.Anchor) (speccomment.Anchor, int, boo
 	best := -1
 	var bestScore float64
 	for line := lo; line <= hi; line++ {
-		score := contextSimilarity(a, lines, line)
+		score := contextSimilarity(a, lines, line, rangeLen)
 		if score > bestScore {
 			best, bestScore = line, score
 		}
@@ -471,17 +471,25 @@ func slugify(s string) string {
 // (averaged) token-level Jaccard similarity of the prefix window and the suffix
 // window, computed on frozen-normalized lines so cloud and the future
 // git-export path score identically.
-func contextSimilarity(a speccomment.Anchor, lines []string, line int) float64 {
+func contextSimilarity(a speccomment.Anchor, lines []string, line, rangeLen int) float64 {
 	prefixStart := line - contextWindow
 	if prefixStart < 1 {
 		prefixStart = 1
 	}
-	suffixEnd := line + contextWindow
+	// The suffix window starts AFTER the anchored range. ComputeAnchor stores
+	// Suffix as [endLine+1, endLine+contextWindow] where endLine = line +
+	// rangeLen - 1. Anchoring the candidate suffix at line+1 would overlap the
+	// inside of a multi-line range and stop short, so the stored and candidate
+	// suffixes cover different physical regions and similarity is systematically
+	// depressed, over-orphaning multi-line anchors. For rangeLen == 1 this is
+	// identical to the previous line+1..line+contextWindow window.
+	endLine := line + rangeLen - 1
+	suffixEnd := endLine + contextWindow
 	if suffixEnd > len(lines) {
 		suffixEnd = len(lines)
 	}
 	curPrefix := normalizeRange(lines, prefixStart, line-1)
-	curSuffix := normalizeRange(lines, line+1, suffixEnd)
+	curSuffix := normalizeRange(lines, endLine+1, suffixEnd)
 
 	return (jaccard(a.Prefix, curPrefix) + jaccard(a.Suffix, curSuffix)) / 2
 }
