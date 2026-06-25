@@ -48,7 +48,7 @@ func mergePlanningUsage(resp *usageResponse, configDir string, cutoff time.Time)
 		if !e.IsDir() {
 			continue
 		}
-		recs, err := store.ReadPlanningUsage(configDir, e.Name(), cutoff)
+		recs, err := store.ReadAgentSessionUsage(configDir, e.Name(), cutoff)
 		if err != nil {
 			continue
 		}

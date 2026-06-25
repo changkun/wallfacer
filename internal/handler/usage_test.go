@@ -264,14 +264,14 @@ func TestUsage_NoPlanningRecords(t *testing.T) {
 
 func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
 	h := newTestHandler(t)
-	key := store.PlanningGroupKey([]string{"/repo/a"})
+	key := store.AgentSessionGroupKey([]string{"/repo/a"})
 	now := time.Now().UTC()
 
 	for _, rec := range []store.TurnUsageRecord{
 		{Turn: 1, Timestamp: now, InputTokens: 100, OutputTokens: 40, CostUSD: 0.05},
 		{Turn: 2, Timestamp: now.Add(time.Minute), InputTokens: 60, OutputTokens: 25, CacheReadInputTokens: 10, CostUSD: 0.03},
 	} {
-		if err := store.AppendPlanningUsage(h.configDir, key, rec); err != nil {
+		if err := store.AppendAgentSessionUsage(h.configDir, key, rec); err != nil {
 			t.Fatalf("append: %v", err)
 		}
 	}
@@ -295,16 +295,16 @@ func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
 
 func TestUsage_PlanningRespectsDaysWindow(t *testing.T) {
 	h := newTestHandler(t)
-	key := store.PlanningGroupKey([]string{"/repo/a"})
+	key := store.AgentSessionGroupKey([]string{"/repo/a"})
 	now := time.Now().UTC()
 
 	// An "old" record 10 days back and a "new" record now.
-	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: now.AddDate(0, 0, -10), InputTokens: 999, OutputTokens: 999, CostUSD: 9.99,
 	}); err != nil {
 		t.Fatalf("append old: %v", err)
 	}
-	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 2, Timestamp: now, InputTokens: 10, OutputTokens: 5, CostUSD: 0.01,
 	}); err != nil {
 		t.Fatalf("append new: %v", err)
@@ -323,16 +323,16 @@ func TestUsage_PlanningRespectsDaysWindow(t *testing.T) {
 
 func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
 	h := newTestHandler(t)
-	keyA := store.PlanningGroupKey([]string{"/repo/a"})
-	keyB := store.PlanningGroupKey([]string{"/repo/b"})
+	keyA := store.AgentSessionGroupKey([]string{"/repo/a"})
+	keyB := store.AgentSessionGroupKey([]string{"/repo/b"})
 	now := time.Now().UTC()
 
-	if err := store.AppendPlanningUsage(h.configDir, keyA, store.TurnUsageRecord{
+	if err := store.AppendAgentSessionUsage(h.configDir, keyA, store.TurnUsageRecord{
 		Turn: 1, Timestamp: now, InputTokens: 30, OutputTokens: 10, CostUSD: 0.02,
 	}); err != nil {
 		t.Fatalf("append A: %v", err)
 	}
-	if err := store.AppendPlanningUsage(h.configDir, keyB, store.TurnUsageRecord{
+	if err := store.AppendAgentSessionUsage(h.configDir, keyB, store.TurnUsageRecord{
 		Turn: 1, Timestamp: now, InputTokens: 70, OutputTokens: 20, CostUSD: 0.04,
 	}); err != nil {
 		t.Fatalf("append B: %v", err)
@@ -350,8 +350,8 @@ func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
 
 func TestUsage_TaskCountUnchangedByPlanning(t *testing.T) {
 	h := newTestHandler(t)
-	key := store.PlanningGroupKey([]string{"/repo/a"})
-	if err := store.AppendPlanningUsage(h.configDir, key, store.TurnUsageRecord{
+	key := store.AgentSessionGroupKey([]string{"/repo/a"})
+	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, CostUSD: 0.01,
 	}); err != nil {
 		t.Fatalf("append: %v", err)

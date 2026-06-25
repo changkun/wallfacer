@@ -521,10 +521,10 @@ func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
 	raw := planningSuccessStdout(120, 40, 15, 5, 0.0123)
 	h.persistPlanningRoundUsage(raw)
 
-	key := store.PlanningGroupKey([]string{ws})
-	recs, err := store.ReadPlanningUsage(h.configDir, key, time.Time{})
+	key := store.AgentSessionGroupKey([]string{ws})
+	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
 	if err != nil {
-		t.Fatalf("ReadPlanningUsage: %v", err)
+		t.Fatalf("ReadAgentSessionUsage: %v", err)
 	}
 	if len(recs) != 1 {
 		t.Fatalf("want 1 record, got %d", len(recs))
@@ -560,10 +560,10 @@ func TestPlanningHandler_IncrementsTurn(t *testing.T) {
 	h.persistPlanningRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
 	h.persistPlanningRoundUsage(planningSuccessStdout(20, 8, 0, 0, 0.002))
 
-	key := store.PlanningGroupKey([]string{ws})
-	recs, err := store.ReadPlanningUsage(h.configDir, key, time.Time{})
+	key := store.AgentSessionGroupKey([]string{ws})
+	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
 	if err != nil {
-		t.Fatalf("ReadPlanningUsage: %v", err)
+		t.Fatalf("ReadAgentSessionUsage: %v", err)
 	}
 	if len(recs) != 2 {
 		t.Fatalf("want 2 records, got %d", len(recs))
@@ -580,10 +580,10 @@ func TestPlanningHandler_FailedExecDoesNotPersist(t *testing.T) {
 	errLine := []byte(`{"type":"result","stop_reason":"end_turn","result":"boom","session_id":"s1","is_error":true,"total_cost_usd":0.001}`)
 	h.persistPlanningRoundUsage(errLine)
 
-	key := store.PlanningGroupKey([]string{ws})
-	recs, err := store.ReadPlanningUsage(h.configDir, key, time.Time{})
+	key := store.AgentSessionGroupKey([]string{ws})
+	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
 	if err != nil {
-		t.Fatalf("ReadPlanningUsage: %v", err)
+		t.Fatalf("ReadAgentSessionUsage: %v", err)
 	}
 	if len(recs) != 0 {
 		t.Errorf("want 0 records on failed round, got %d", len(recs))
@@ -653,7 +653,7 @@ func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	// Replace configDir with a path that cannot host a directory: point to a
-	// regular file so MkdirAll inside AppendPlanningUsage fails. The helper
+	// regular file so MkdirAll inside AppendAgentSessionUsage fails. The helper
 	// must log-and-continue, never panic.
 	blocker := h.configDir + "-blocker"
 	if err := os.WriteFile(blocker, []byte("not a dir"), 0644); err != nil {
