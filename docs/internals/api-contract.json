@@ -359,7 +359,7 @@
     {
       "method": "GET",
       "pattern": "/api/planning",
-      "name": "GetPlanningStatus",
+      "name": "GetAgentSessionStatus",
       "description": "Get planning sandbox status.",
       "tags": [
         "planning"
@@ -368,7 +368,7 @@
     {
       "method": "POST",
       "pattern": "/api/planning",
-      "name": "StartPlanning",
+      "name": "StartAgentSession",
       "description": "Start the planning sandbox.",
       "tags": [
         "planning"
@@ -377,7 +377,7 @@
     {
       "method": "DELETE",
       "pattern": "/api/planning",
-      "name": "StopPlanning",
+      "name": "StopAgentSession",
       "description": "Stop the planning sandbox.",
       "tags": [
         "planning"
@@ -386,7 +386,7 @@
     {
       "method": "GET",
       "pattern": "/api/planning/messages",
-      "name": "GetPlanningMessages",
+      "name": "GetAgentMessages",
       "description": "Retrieve conversation history.",
       "tags": [
         "planning"
@@ -395,7 +395,7 @@
     {
       "method": "POST",
       "pattern": "/api/planning/messages",
-      "name": "SendPlanningMessage",
+      "name": "SendAgentMessage",
       "description": "Send a user message, triggers agent exec.",
       "tags": [
         "planning"
@@ -404,7 +404,7 @@
     {
       "method": "DELETE",
       "pattern": "/api/planning/messages",
-      "name": "ClearPlanningMessages",
+      "name": "ClearAgentMessages",
       "description": "Clear conversation history.",
       "tags": [
         "planning"
@@ -413,7 +413,7 @@
     {
       "method": "GET",
       "pattern": "/api/planning/messages/stream",
-      "name": "StreamPlanningMessages",
+      "name": "StreamAgentMessages",
       "description": "Stream the agent's response tokens.",
       "tags": [
         "planning"
@@ -422,7 +422,7 @@
     {
       "method": "POST",
       "pattern": "/api/planning/messages/interrupt",
-      "name": "InterruptPlanningMessage",
+      "name": "InterruptAgentMessage",
       "description": "Interrupt the current agent turn.",
       "tags": [
         "planning"
@@ -440,7 +440,7 @@
     {
       "method": "GET",
       "pattern": "/api/planning/commands",
-      "name": "GetPlanningCommands",
+      "name": "GetAgentCommands",
       "description": "List available slash commands.",
       "tags": [
         "planning"
@@ -458,7 +458,7 @@
     {
       "method": "GET",
       "pattern": "/api/planning/threads",
-      "name": "ListPlanningThreads",
+      "name": "ListAgentSessions",
       "description": "List planning chat threads for the current workspace group.",
       "tags": [
         "planning"
@@ -467,7 +467,7 @@
     {
       "method": "POST",
       "pattern": "/api/planning/threads",
-      "name": "CreatePlanningThread",
+      "name": "CreateAgentSession",
       "description": "Create a new planning chat thread.",
       "tags": [
         "planning"
@@ -476,7 +476,7 @@
     {
       "method": "PATCH",
       "pattern": "/api/planning/threads/{id}",
-      "name": "PatchPlanningThread",
+      "name": "PatchAgentSession",
       "description": "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
       "tags": [
         "planning"
@@ -485,7 +485,7 @@
     {
       "method": "DELETE",
       "pattern": "/api/planning/threads/{id}",
-      "name": "DeletePlanningThread",
+      "name": "DeleteAgentSession",
       "description": "Permanently delete an archived planning chat thread and its stored conversation.",
       "tags": [
         "planning"

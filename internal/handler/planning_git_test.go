@@ -575,7 +575,7 @@ func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {
 
 	mock := &runner.MockRunner{}
 
-	// Simulate the per-workspace loop inside SendPlanningMessage.
+	// Simulate the per-workspace loop inside SendAgentMessage.
 	ctx := context.Background()
 	n, err := commitPlanningRound(ctx, ws, "draft foo spec", "drafted foo", nil, "")
 	if err != nil {

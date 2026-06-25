@@ -84,7 +84,7 @@ func TestListPlanningThreads_DefaultChat1(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
-	h.ListPlanningThreads(rec, req)
+	h.ListAgentSessions(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -113,7 +113,7 @@ func TestListPlanningThreads_BusyThreadID(t *testing.T) {
 	get := func() string {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
-		h.ListPlanningThreads(rec, req)
+		h.ListAgentSessions(rec, req)
 		var resp struct {
 			BusyThreadID string `json:"busy_thread_id"`
 		}
@@ -138,7 +138,7 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
 		strings.NewReader(`{"name":"Auth"}`))
-	h.CreatePlanningThread(rec, req)
+	h.CreateAgentSession(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -154,7 +154,7 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{"name":"Auth refactor"}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("rename status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -164,7 +164,7 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{"state":"archived"}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("archive status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -172,7 +172,7 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	// List without archived should no longer include it.
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
-	h.ListPlanningThreads(rec, req)
+	h.ListAgentSessions(rec, req)
 	if strings.Contains(rec.Body.String(), id) {
 		t.Errorf("archived thread still in non-archived list: %s", rec.Body.String())
 	}
@@ -180,7 +180,7 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	// List with archived includes it.
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/planning/threads?includeArchived=true", nil)
-	h.ListPlanningThreads(rec, req)
+	h.ListAgentSessions(rec, req)
 	if !strings.Contains(rec.Body.String(), id) {
 		t.Errorf("archived thread missing from includeArchived list: %s", rec.Body.String())
 	}
@@ -190,7 +190,7 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{"state":"visible"}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("unarchive status = %d", rec.Code)
 	}
@@ -203,7 +203,7 @@ func TestDeletePlanningThread(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
 		strings.NewReader(`{"name":"Doomed"}`))
-	h.CreatePlanningThread(rec, req)
+	h.CreateAgentSession(rec, req)
 	var created map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	id := created["id"].(string)
@@ -212,7 +212,7 @@ func TestDeletePlanningThread(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodDelete, "/api/planning/threads/"+id, nil)
 		req.SetPathValue("id", id)
-		h.DeletePlanningThread(rec, req)
+		h.DeleteAgentSession(rec, req)
 		return rec
 	}
 
@@ -226,7 +226,7 @@ func TestDeletePlanningThread(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{"state":"archived"}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("archive status = %d", rec.Code)
 	}
@@ -237,7 +237,7 @@ func TestDeletePlanningThread(t *testing.T) {
 	// Gone even from the includeArchived listing.
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/planning/threads?includeArchived=true", nil)
-	h.ListPlanningThreads(rec, req)
+	h.ListAgentSessions(rec, req)
 	if strings.Contains(rec.Body.String(), id) {
 		t.Errorf("deleted thread still listed: %s", rec.Body.String())
 	}
@@ -254,7 +254,7 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
 		strings.NewReader(`{"name":"Busy"}`))
-	h.CreatePlanningThread(rec, req)
+	h.CreateAgentSession(rec, req)
 	var created map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	id := created["id"].(string)
@@ -267,7 +267,7 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodDelete, "/api/planning/threads/"+id, nil)
 	req.SetPathValue("id", id)
-	h.DeletePlanningThread(rec, req)
+	h.DeleteAgentSession(rec, req)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409 (busy)", rec.Code)
 	}
@@ -285,7 +285,7 @@ func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch,
 		"/api/planning/threads/"+id, strings.NewReader(`{"state":"archived"}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409 (busy)", rec.Code)
 	}
@@ -300,7 +300,7 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads",
 		strings.NewReader(`{"name":"Second"}`))
-	h.CreatePlanningThread(rec, req)
+	h.CreateAgentSession(rec, req)
 	var created map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	id := created["id"].(string)
@@ -309,7 +309,7 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{"state":"active"}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("activate status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -328,7 +328,7 @@ func TestPatchPlanningThread_RejectsEmptyBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/planning/threads/"+id,
 		strings.NewReader(`{}`))
 	req.SetPathValue("id", id)
-	h.PatchPlanningThread(rec, req)
+	h.PatchAgentSession(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
 	}
@@ -406,7 +406,7 @@ func TestCreateThread_TaskMode(t *testing.T) {
 	body := strings.NewReader(`{"name":"Task Thread","focused_task":"` + taskID + `"}`)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads", body)
-	h.CreatePlanningThread(rec, req)
+	h.CreateAgentSession(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -426,7 +426,7 @@ func TestCreateThread_TaskMode(t *testing.T) {
 	// List threads and verify mode is preserved.
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
-	h.ListPlanningThreads(rec, req)
+	h.ListAgentSessions(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -462,7 +462,7 @@ func TestCreateThread_TaskMode_UnknownTask(t *testing.T) {
 	body := strings.NewReader(`{"name":"Orphan","focused_task":"00000000-0000-0000-0000-000000000001"}`)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/planning/threads", body)
-	h.CreatePlanningThread(rec, req)
+	h.CreateAgentSession(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d (unknown task)", rec.Code, http.StatusNotFound)
 	}
@@ -475,7 +475,7 @@ func TestListPlanningThreads_DefaultMode(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/planning/threads", nil)
-	h.ListPlanningThreads(rec, req)
+	h.ListAgentSessions(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
 	}
