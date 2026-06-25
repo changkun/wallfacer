@@ -1,6 +1,6 @@
 ---
 title: Editor Tabs (VS Code-Style File Tabs in the Board)
-status: complete
+status: archived
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
