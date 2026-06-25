@@ -250,6 +250,42 @@ func TestRebaseOntoDefault(t *testing.T) {
 	})
 }
 
+// TestHasRebaseOrMergeState_ExecStop covers a rebase stopped by a failed
+// `--exec` step: .git/rebase-merge exists but REBASE_HEAD is absent. The old
+// REBASE_HEAD probe wrongly returned false here, so recoverRebaseState skipped
+// cleanup and the next rebase failed with leftover state.
+func TestHasRebaseOrMergeState_ExecStop(t *testing.T) {
+	repo := setupRepo(t)
+	// Second commit so HEAD~1 names a range with one commit to replay.
+	writeFile(t, filepath.Join(repo, "file.txt"), "second\n")
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "second")
+
+	// `--exec false` stops the rebase after replaying the commit because the
+	// exec command exits non-zero. This run is expected to fail.
+	cmd := exec.Command("git", "-C", repo, "rebase", "--exec", "false", "HEAD~1")
+	if err := cmd.Run(); err == nil {
+		t.Fatal("expected `git rebase --exec false` to stop with a non-zero exit")
+	}
+	t.Cleanup(func() { _ = exec.Command("git", "-C", repo, "rebase", "--abort").Run() })
+
+	// Sanity-check the premise: rebase-merge present, REBASE_HEAD absent.
+	if _, err := os.Stat(filepath.Join(repo, ".git", "rebase-merge")); err != nil {
+		t.Fatalf("expected .git/rebase-merge to exist: %v", err)
+	}
+	if exec.Command("git", "-C", repo, "rev-parse", "--verify", "-q", "REBASE_HEAD").Run() == nil {
+		t.Skip("REBASE_HEAD present on this git version; bug premise does not hold")
+	}
+
+	got, err := hasRebaseOrMergeState(repo)
+	if err != nil {
+		t.Fatalf("hasRebaseOrMergeState: %v", err)
+	}
+	if !got {
+		t.Error("hasRebaseOrMergeState = false; want true (rebase-merge dir present)")
+	}
+}
+
 // TestParseConflictedFiles validates extraction of file paths from git conflict output.
 func TestParseConflictedFiles(t *testing.T) {
 	input := "CONFLICT (content): Merge conflict in foo/bar.go\n" +
