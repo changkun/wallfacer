@@ -1,6 +1,6 @@
 ---
 title: Free-Form Specs
-status: complete
+status: archived
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-document-model.md
 affects:
