@@ -44,6 +44,35 @@ func TestSpecFilePath(t *testing.T) {
 	}
 }
 
+// TestSpecFilePathRejectsWorkspaceEscape verifies that a browser-supplied spec
+// path cannot traverse out of the workspace. SubmitSpecComment reads the
+// resolved file (os.ReadFile) and resolveSpecRepo stats it, so an unguarded
+// "../" would let a comment op read or anchor against files outside the tree.
+// findSpecFile already rejects such escapes; specFilePath must match.
+func TestSpecFilePathRejectsWorkspaceEscape(t *testing.T) {
+	root := t.TempDir()
+	ws := filepath.Join(root, "repo")
+	if err := os.MkdirAll(filepath.Join(ws, "specs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A real, readable file outside the workspace that a traversal would target.
+	outside := filepath.Join(root, "secret.md")
+	if err := os.WriteFile(outside, []byte("# secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	escapes := []string{
+		"../secret.md",
+		"../../secret.md",
+		"specs/../../secret.md",
+	}
+	for _, p := range escapes {
+		if got, ok := specFilePath(ws, p); ok {
+			t.Errorf("escape %q resolved to %q, want rejected", p, got)
+		}
+	}
+}
+
 // TestRepositionThreadMultiLineNotOrphaned reproduces the user-facing bug: a
 // multi-line comment created on a real spec must reattach INLINE on the next
 // load, not land in triage as orphaned. It drives the exact instance-side path

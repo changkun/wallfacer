@@ -332,13 +332,26 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 // omits it ("cloud/x.md"). Try the path as-is first, then under specs/. Returns
 // ok=false when neither exists.
 func specFilePath(root, specPath string) (string, bool) {
-	if p := filepath.Join(root, specPath); fileExists(p) {
+	if p, ok := containedJoin(root, specPath); ok && fileExists(p) {
 		return p, true
 	}
-	if p := filepath.Join(root, "specs", specPath); fileExists(p) {
+	if p, ok := containedJoin(root, "specs", specPath); ok && fileExists(p) {
 		return p, true
 	}
 	return "", false
+}
+
+// containedJoin joins root with parts and returns the cleaned path only when it
+// stays within root. A browser-supplied spec path is attacker-controlled, so a
+// "../" escape must not resolve to a file outside the workspace tree (matching
+// findSpecFile's guard); SubmitSpecComment reads the resolved file directly.
+func containedJoin(root string, parts ...string) (string, bool) {
+	p := filepath.Join(append([]string{root}, parts...)...)
+	rel, err := filepath.Rel(root, p)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return p, true
 }
 
 func fileExists(p string) bool {
