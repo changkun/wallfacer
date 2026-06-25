@@ -314,8 +314,12 @@ export function useChatSession(): ChatSession {
 
   // After a thread's first turn the backend auto-titles it, replacing the
   // default "Chat N" name. Title generation runs async server-side and may land
-  // after the turn finishes, so poll the thread list a few times until the name
-  // changes (or give up). No-op once the thread already has a non-default name.
+  // after the turn finishes, so poll a few times until the name changes (or give
+  // up). Uses refreshBusy, which picks up in-place renames without reassigning
+  // activeThreadId or reloading history (loadThreads would yank the active
+  // selection). No-op once the thread already has a non-default name. The Chat
+  // view's session list polls refreshBusy on its own; this also covers the tab
+  // surface, which does not.
   function refreshTitleSoon(threadID: string) {
     const t = threads.value[threadID];
     if (t && !/^Chat \d+$/.test(t.name)) return;
@@ -323,7 +327,7 @@ export function useChatSession(): ChatSession {
     let tries = 0;
     const tick = async () => {
       tries++;
-      await planning.loadThreads();
+      await planning.refreshBusy();
       const cur = threads.value[threadID];
       if (!cur || !/^Chat \d+$/.test(cur.name) || tries >= 10) {
         titleTimer = null;
