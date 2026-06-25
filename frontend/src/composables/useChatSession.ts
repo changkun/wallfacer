@@ -266,6 +266,9 @@ export function useChatSession(): ChatSession {
     }
     streaming.value = false;
     activeStreamBubbleId = null;
+    // Enhance mermaid once now that the turn has settled (the watcher skips
+    // while streaming was true).
+    runMermaid();
     const finishedThread = streamingThreadId.value;
     streamingThreadId.value = '';
     if (interrupted) {
@@ -673,12 +676,20 @@ export function useChatSession(): ChatSession {
     }
   });
 
-  // Whenever the rendered list changes, run the mermaid enhancer over the
-  // chat scroller. It's a no-op if there are no `.mermaid-block` placeholders.
-  watch(renderedMessages, () => {
+  function runMermaid() {
     void nextTick(() => {
       if (messagesEl.value) void enhanceMermaid(messagesEl.value);
     });
+  }
+
+  // Run the mermaid enhancer over the chat scroller when the rendered list
+  // changes. Skip while streaming: applyStreamingUpdate mutates the in-flight
+  // bubble per NDJSON chunk, so enhancing on the hot path runs it per chunk
+  // and may try to render incomplete diagram syntax mid-stream. finishStreaming
+  // runs it once when the turn settles. No-op without `.mermaid-block`.
+  watch(renderedMessages, () => {
+    if (streaming.value) return;
+    runMermaid();
   }, { deep: true });
 
   watch(messagesEl, (el) => {
