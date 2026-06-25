@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia';
 import { api } from '../../api/client';
 import { usePlanningStore } from '../../stores/planning';
 import type { SpecNode } from '../../stores/planning';
-import { selectableRange } from './specTreeSelect';
+import { isNodeCheckable, nodeUnmetDeps, selectableRange } from './specTreeSelect';
 import { useTaskStore } from '../../stores/tasks';
 import { useUiStore } from '../../stores/ui';
 import { useDialogStore } from '../../stores/dialog';
@@ -153,10 +153,16 @@ interface RenderedTrack {
   nodes: RenderedNode[];
 }
 
-const renderedTracks = computed<RenderedTrack[]>(() => {
-  const byPath = new Map<string, SpecNode>();
-  for (const n of tree.value) byPath.set(n.path, n);
+// Shared path->node index over the whole tree. Reused by renderedTracks,
+// unmetDeps and the shift-range selection sweep so the map is built once per
+// tree change rather than per call.
+const byPath = computed(() => {
+  const m = new Map<string, SpecNode>();
+  for (const n of tree.value) m.set(n.path, n);
+  return m;
+});
 
+const renderedTracks = computed<RenderedTrack[]>(() => {
   // Group root nodes by track.
   const trackOrder: string[] = [];
   const groups: Record<string, SpecNode[]> = {};
@@ -179,13 +185,13 @@ const renderedTracks = computed<RenderedTrack[]>(() => {
     const nodes: RenderedNode[] = [];
 
     function walk(node: SpecNode, depth: number) {
-      if (!nodeMatches(node, byPath)) return;
+      if (!nodeMatches(node, byPath.value)) return;
       const hasChildren = (node.children?.length ?? 0) > 0;
       const isExpanded = expandedPaths.value.has(node.path) || !!textFilter.value;
       nodes.push({ node, depth, hasChildren, expanded: isExpanded });
       if (hasChildren && isExpanded) {
         for (const childPath of node.children ?? []) {
-          const child = byPath.get(childPath);
+          const child = byPath.value.get(childPath);
           if (child) walk(child, depth + 1);
         }
       }
@@ -260,22 +266,11 @@ function toggleShowArchived() {
 // ── Multi-select dispatch ──────────────────────────────────────────
 
 function unmetDeps(node: SpecNode): string[] {
-  const deps = node.spec?.depends_on ?? [];
-  if (deps.length === 0) return [];
-  const byPath = new Map<string, SpecNode>();
-  for (const n of tree.value) byPath.set(n.path, n);
-  const out: string[] = [];
-  for (const dp of deps) {
-    const dn = byPath.get(dp);
-    if (!dn || dn.spec?.status !== 'complete') {
-      out.push(dn?.spec?.title ?? dp);
-    }
-  }
-  return out;
+  return nodeUnmetDeps(node, byPath.value);
 }
 
 function isCheckable(node: SpecNode): boolean {
-  return node.spec?.status === 'validated';
+  return isNodeCheckable(node);
 }
 
 const flatLeafIndex = computed(() => {
@@ -291,10 +286,8 @@ function onCheckboxChange(ev: Event, node: SpecNode) {
     // Only sweep specs that are themselves checkable and unblocked, matching
     // the checkbox template gating; otherwise shift-range inflates the count
     // and triggers dispatch failures on non-validated/blocked specs.
-    const byPath = new Map<string, SpecNode>();
-    for (const n of tree.value) byPath.set(n.path, n);
     const range = selectableRange(
-      flatLeafIndex.value, byPath, lastCheckedIndex.value, idx,
+      flatLeafIndex.value, byPath.value, lastCheckedIndex.value, idx,
     );
     for (const path of range) {
       if (target.checked) selectedPaths.value.add(path);
