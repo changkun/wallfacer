@@ -1,6 +1,6 @@
 ---
 title: Free-Form Specs
-status: drafted
+status: complete
 depends_on:
   - specs/spec-coordination/spec-coordination/spec-document-model.md
 affects:
@@ -207,3 +207,76 @@ lifecycle-managed `Spec` (the doc node is replaced by a real node).
   not parse `**Status**: planned` into a real lifecycle status. Per-repo prose
   conventions are fragile and out of scope.
 - **No loosening of `ParseFile`.** Tolerance lives only in `BuildTree`.
+
+## Implementation notes
+
+### Status
+
+Fully implemented 2026-06-25 across four commits on `main`:
+`54c306fe` (parser tolerance), `56959692` (InjectFrontmatter), `97bf4ed7`
+(migrate handler), `4abf4ea4` (frontend). `make build` passes (golangci-lint
+2.11.3: 0 issues; vue-tsc clean; 498 frontend tests pass). Verified end-to-end in
+a real browser against `com.sixt.service.revenue-engine`.
+
+### What was done
+
+- **Backend (`internal/spec`)**: `ParseFile`/`ParseBytes` now return a sentinel
+  `ErrMissingFrontmatter`. `BuildTree` (`tree.go`) catches it via `errors.Is` and
+  synthesizes a render-only doc node (`docNode`, title from first H1 via the
+  shared `readFirstH1`, else `TitleFromFilename`); malformed YAML still drops to
+  `tree.Errs`. New `Spec.Doc bool` (`yaml:"-" json:"doc"`). `NodeProgress`
+  excludes doc leaves. New `InjectFrontmatter` (`write.go`) prepends a frontmatter
+  block preserving the prose body byte-for-byte, via an extracted
+  `renderFrontmatter` shared with `RenderSkeleton`.
+- **Backend (`internal/handler`)**: `MigrateSpec` wired into the existing
+  `SpecTransition` dispatcher as `action: "migrate"` (no new route); injects
+  frontmatter, commits via `commitSpecChanges`, returns status `drafted`. 422 on
+  already-managed, 404 on missing.
+- **Frontend**: `SpecMeta.doc?: boolean` (`planning.ts`). `SpecTreePanel.vue`
+  renders doc nodes with a 📄 icon + muted italic title and a dismissible
+  "Adopt frontmatter" banner (localStorage `wallfacer-spec-migrate-dismissed`)
+  that migrates all doc nodes.
+- **Tests**: spec-package unit tests (doc nodes, malformed-YAML still errors,
+  sentinel via `errors.Is`, progress exclusion, `InjectFrontmatter` round-trip +
+  already-has-frontmatter); handler tests (migrate success / 422 / 404).
+
+### Decisions made during implementation
+
+- **`migrate` as a transition action, not a new `/api/specs/migrate` route.** The
+  spec proposed a dedicated route; the existing `SpecTransition` dispatcher
+  already multiplexes archive/unarchive, so reusing it avoided an apicontract
+  route + JS regen. Deviation from the spec's API Surface section.
+- **`SpecFocusedView.vue` needed no changes.** It derives status from the file's
+  own parsed frontmatter (`parseSpecFrontmatter`), which yields empty status for a
+  frontmatter-less file, so the status badge and every lifecycle control
+  (`showDispatch`/`canArchive`/`isArchived`) are already suppressed and the body
+  renders as plain markdown. This was also the user's concurrently-edited file, so
+  not touching it avoided a conflict. Control suppression is therefore implicit
+  (empty status) rather than an explicit `doc` guard; the `doc` flag drives only
+  the tree icon and the migration banner.
+- **Batch "Adopt frontmatter" rather than per-node.** Simplest affordance that
+  satisfies the nudge; after migration the SSE/`fetchTree` refresh removes the now
+  -managed nodes and the banner self-hides. Dismissal persists (no nag).
+- **Spec status set `complete` directly** (drafted → complete) by editing
+  frontmatter, bypassing the validated step, since this was implemented inline
+  rather than dispatched through the lifecycle state machine.
+
+### Surprises / gotchas
+
+- **Real-browser verification was essential and cheap here.** The doc node
+  renders its body (incl. a mermaid diagram) via the focused view, and in-DOM
+  assertions confirmed `.sf-status` count 0, no dispatch/archive buttons, 9 📄
+  icons, body prose present, zero page errors. jsdom would not have proven the
+  focused-view render path.
+- **Playwright must not be installed in `frontend/`** (reverts latere-ui via the
+  gitignored lock). Installed in `/tmp/wf-pw` and ran a copy of `snap.mjs` there
+  (ESM ignores `NODE_PATH`).
+- A free-form file that begins with `---\n` but has no closing delimiter still
+  hits the "no closing delimiter" error and is dropped (not a doc node). Rare;
+  acceptable.
+
+### Follow-ups
+
+- Per-spec migrate affordance (vs. batch only) if users want finer control.
+- Confirm-then-board: the spec deliberately keeps doc nodes off the task board;
+  revisit only if requested.
