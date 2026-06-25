@@ -338,6 +338,49 @@ async function dispatchSelected() {
   }
 }
 
+// ── Free-form spec migration ───────────────────────────────────────
+// Frontmatter-less files render as read-only "doc" nodes. Offer a
+// dismissible nudge to adopt wallfacer frontmatter (one POST per file).
+// Dismissal persists so we don't nag a user who is happy with render-only.
+const MIGRATE_DISMISSED_KEY = 'wallfacer-spec-migrate-dismissed';
+const migrateDismissed = ref<boolean>(localStorage.getItem(MIGRATE_DISMISSED_KEY) === 'true');
+const migratePending = ref(false);
+
+const docNodes = computed(() => tree.value.filter((n) => n.spec?.doc));
+
+function dismissMigrate() {
+  migrateDismissed.value = true;
+  localStorage.setItem(MIGRATE_DISMISSED_KEY, 'true');
+}
+
+async function adoptDocNodes() {
+  const paths = docNodes.value.map((n) => n.path);
+  if (paths.length === 0) return;
+  if (!(await dialog.confirm({
+    title: 'Adopt spec frontmatter',
+    message: `Add wallfacer frontmatter to ${paths.length} free-form spec${paths.length === 1 ? '' : 's'}? `
+      + 'Each becomes a lifecycle-managed spec (status: drafted); the prose is preserved.',
+    confirmLabel: 'Adopt',
+  }))) return;
+  migratePending.value = true;
+  const errors: string[] = [];
+  try {
+    for (const path of paths) {
+      try {
+        await api('POST', '/api/specs/transition', { action: 'migrate', path });
+      } catch (e) {
+        errors.push(`${path}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    await planning.fetchTree();
+    if (errors.length > 0) {
+      await dialog.alert(`Adopted ${paths.length - errors.length}. ${errors.length} failed:\n${errors.join('\n')}`);
+    }
+  } finally {
+    migratePending.value = false;
+  }
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────────
 // The spec-tree fetch and SSE subscription are owned by the parent
 // PlanPage so they run regardless of which layout (chat-first vs
@@ -382,6 +425,28 @@ onUnmounted(() => {
         <input type="checkbox" :checked="showArchived" @change="toggleShowArchived" />
         Show archived
       </label>
+    </div>
+
+    <div v-if="docNodes.length > 0 && !migrateDismissed" class="stp-migrate-banner">
+      <span class="stp-migrate-text">
+        {{ docNodes.length }} spec{{ docNodes.length === 1 ? '' : 's' }}
+        {{ docNodes.length === 1 ? 'has' : 'have' }} no frontmatter and aren't lifecycle-managed.
+      </span>
+      <div class="stp-migrate-actions">
+        <button
+          type="button"
+          class="stp-migrate-adopt"
+          :disabled="migratePending"
+          @click="adoptDocNodes"
+        >{{ migratePending ? 'Adopting…' : 'Adopt frontmatter' }}</button>
+        <button
+          type="button"
+          class="stp-migrate-dismiss"
+          title="Dismiss"
+          aria-label="Dismiss"
+          @click="dismissMigrate"
+        >✕</button>
+      </div>
     </div>
 
     <div class="stp-body">
@@ -453,6 +518,7 @@ onUnmounted(() => {
               :class="{
                 'stp-node--leaf': rn.node.is_leaf,
                 'stp-node--archived': rn.node.spec?.status === 'archived',
+                'stp-node--doc': rn.node.spec?.doc,
                 'stp-node--focused': focusedSpecPath === rn.node.path && !focusedIsIndex,
               }"
               :style="{ paddingLeft: 8 + rn.depth * 14 + 'px' }"
@@ -475,7 +541,7 @@ onUnmounted(() => {
                 @click.stop
                 @change="onCheckboxChange($event, rn.node)"
               />
-              <span class="stp-icon">{{ STATUS_ICONS[rn.node.spec?.status ?? ''] ?? '' }}</span>
+              <span class="stp-icon">{{ rn.node.spec?.doc ? '📄' : (STATUS_ICONS[rn.node.spec?.status ?? ''] ?? '') }}</span>
               <span class="stp-title">{{ rn.node.spec?.title || rn.node.path }}</span>
               <span
                 v-if="!rn.node.is_leaf && treeProgress[rn.node.path]"
@@ -550,6 +616,55 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 5px;
+  cursor: pointer;
+}
+
+.stp-migrate-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.stp-migrate-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.stp-migrate-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.stp-migrate-adopt {
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+  cursor: pointer;
+}
+
+.stp-migrate-adopt:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.stp-migrate-dismiss {
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--ink-3);
   cursor: pointer;
 }
 
@@ -628,6 +743,13 @@ onUnmounted(() => {
 
 .stp-node--archived {
   opacity: 0.55;
+}
+
+/* Doc nodes are free-form, frontmatter-less files: render-only, slightly
+   muted to signal they have no lifecycle status. */
+.stp-node--doc .stp-title {
+  font-style: italic;
+  color: var(--ink-2);
 }
 
 .stp-chev,
