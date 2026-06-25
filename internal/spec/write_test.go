@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +9,44 @@ import (
 	"testing"
 	"time"
 )
+
+func TestInjectFrontmatter_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	body := "# 00 — Overview\n\nProse body with **markdown**.\n\n- a list item\n"
+	path := writeSpec(t, dir, "00-overview.md", body)
+
+	now := time.Date(2026, 6, 25, 0, 0, 0, 0, time.UTC)
+	err := InjectFrontmatter(path, ScaffoldOptions{Author: "tester", Now: now})
+	if err != nil {
+		t.Fatalf("InjectFrontmatter: %v", err)
+	}
+
+	// The result must now parse as a real spec.
+	s, err := ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile after inject: %v", err)
+	}
+	if s.Title != "00 — Overview" {
+		t.Errorf("Title = %q, want title from H1", s.Title)
+	}
+	if s.Status != StatusDrafted {
+		t.Errorf("Status = %q, want default %q", s.Status, StatusDrafted)
+	}
+	// The prose body must be preserved byte-for-byte.
+	if s.Body != body {
+		t.Errorf("body not preserved:\ngot:  %q\nwant: %q", s.Body, body)
+	}
+}
+
+func TestInjectFrontmatter_AlreadyHasFrontmatter(t *testing.T) {
+	dir := t.TempDir()
+	path := writeSpec(t, dir, "managed.md", validSpec)
+
+	err := InjectFrontmatter(path, ScaffoldOptions{})
+	if !errors.Is(err, ErrAlreadyHasFrontmatter) {
+		t.Fatalf("err = %v, want ErrAlreadyHasFrontmatter", err)
+	}
+}
 
 func TestUpdateFrontmatter_SingleField(t *testing.T) {
 	dir := t.TempDir()
