@@ -123,7 +123,7 @@ token, not an `AgentSession`).
 | Now | Proposed |
 |-----|----------|
 | package `planner` | package `agentsession` |
-| `Planner` (live process manager) | `Runner` |
+| `Planner` (live process manager) | `Runtime` (not `Runner` — collides with `runner.Runner`) |
 | `ThreadManager` (owns the session set) | `Manager` |
 | `ThreadMeta` | `SessionMeta` |
 | `ConversationStore` | `ConversationStore` (keep - already generic) |
@@ -180,17 +180,23 @@ one-time shim so no existing state is orphaned.
 - **localStorage** thread/tab keys: read old key, write new key, delete
   old, once per browser.
 
-## Open Sub-Decisions (resolve during breakdown)
+## Resolved Sub-Decisions
 
-1. **Route shape** - `/api/sessions/*` (proposed) vs `/api/agent/*`. The
-   former avoids confusion with `/api/agents`; the latter matches
-   `useAgentStore` more literally.
-2. **Controller name** - `useAgentChat` returning `AgentChat` (proposed,
-   keeps the controller distinct from the `AgentSession` data model) vs
-   reusing `AgentSession` for both (clashes).
-3. **Greeting strings** - "What should we plan?" / "Message the planning
-   agent..." -> generic ("Message the agent...") vs context-aware per
-   surface. i18n keys in `wf.tour.*` / `wf.cap.*` likewise.
+1. **Noun** - **Agent** / **AgentSession** (user's call, over the earlier
+   Chat\* proposal). The conversation container is `AgentSession`; the
+   store is `useAgentStore`. `agents.Role` and harness `SessionID` keep
+   their meanings; `SessionInfo` -> `ResumeInfo` frees "session".
+2. **Route shape** - **`/api/agent/*`** (matches `useAgentStore`; singular
+   distinguishes it from the `/api/agents` role catalog), and the
+   `/threads` subpath -> `/sessions` to match `AgentSession`.
+3. **Controller name** - **keep `useChatSession` / `ChatSession`** as
+   Chat\*. The surface-vs-actor split: presentation stays Chat\*
+   (`ChatComposer`, `ChatMessageList`, `ChatPage`, `SessionList`,
+   `useChatSession`); domain/state/persistence becomes Agent\*. This
+   avoids a worse Agent\*/Chat\* mix and saves churn.
+4. **Greeting strings** - generic ("Message the agent...", "What should we
+   work on?"). Spec-design product copy (tour / capabilities / docs i18n,
+   the analytics "Planning" cost label) left as legitimate planning copy.
 
 ## Implementation Plan
 
@@ -220,6 +226,51 @@ each (it is what catches symbols a rename leaves unused). Prefer
    sub-decision 3.
 8. **Docs sweep** - `AGENTS.md`, `docs/`, and `specs/README.md` status
    table; mark this spec complete.
+
+## Progress (2026-06-25)
+
+Shipped on `main` (each commit build + lint + tests green; pinned at
+`wip/agent-session`). Migration reordered to last per review.
+
+- ✅ **Backend package** - `internal/planner/` -> `internal/agentsession/`
+  (package, imports, qualifiers; field accesses preserved).
+- ✅ **Backend types** - `Planner`->`Runtime`, `ThreadManager`->`Manager`,
+  `ThreadMeta`->`SessionMeta`, `SessionInfo`->`ResumeInfo`,
+  `Threads()`->`Sessions()`, `planningTaskID`->`agentSessionTaskID`
+  (value unchanged); files `planner.go`/`threads.go` ->
+  `runtime.go`/`sessions.go`.
+- ✅ **Backend handlers** - 13 exported chat handlers + `Route.Name` /
+  handler-map keys renamed to Agent\*; `planning*.go` -> `agentsession*.go`
+  (bucket-1 only). `UndoPlanningRound` + spec-plan helpers kept.
+- ✅ **Frontend store/types** - `stores/planning.ts` ->
+  `stores/agentSession.ts`, `useAgentStore`, `AgentSession`,
+  `AgentMessage`, Pinia id `agentSession`.
+- ✅ **Frontend components/composables/lib** - `AgentChatPanel`,
+  `useAgentAutocomplete`/`AgentAutocomplete`, `lib/agentBubble`,
+  `lib/agentUsage`, `AGENT_CHAT_ENABLED`. Chat\* presentation kept.
+- ✅ **UI strings** - "Planning Chat"->"Chat", "Message the planning
+  agent…"->"Message the agent…", greeting, aria-labels.
+- ✅ **Route flip** - `/api/planning/*` -> `/api/agent/*`, `/threads` ->
+  `/sessions`; routes.go + frontend URLs + test mocks + docs path refs;
+  api-contract.json regenerated.
+
+Remaining (own focused commits; migration is contract-/state-touching):
+
+- ◐ **Storage + env + stats migration (Phase 4)** -
+  `<configDir>/planning/<fp>/` -> `agent-sessions/` with a first-boot
+  shim; `WALLFACER_PLANNING_WINDOW_DAYS` -> `..._AGENT_SESSION_WINDOW_DAYS`
+  (old-name fallback); config key `planning_window_days`; stats
+  `PlanningGroupStat` / `"planning"` JSON key / `BySubAgent["planning"]`;
+  analytics cost label + `planningWindowDays`; container activity label
+  and `agentSessionTaskID` value `"planning-sandbox"`; route `Tags`;
+  prompt `planning.tmpl`. Coupled to the analytics subsystem and persisted
+  user data — needs the shim + regression tests, and `stats.go`/`config.go`
+  overlap the concurrent session.
+- ○ **Internal handler helpers (Phase 2b)** -
+  `selectPlanningSystemPrompt`, `assemblePlanningPrompt`,
+  `persistPlanningRoundUsage`, `mergePlanningUsage`, etc. (cosmetic).
+- ○ **Docs sweep (Phase 8)** - remaining prose in `docs/` and `AGENTS.md`;
+  rename `docs/internals/plan-mode.md` if desired; spec wrap-up.
 
 ## Acceptance Criteria
 
