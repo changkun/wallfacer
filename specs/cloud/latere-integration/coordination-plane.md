@@ -303,8 +303,10 @@ end-to-end as a vertical slice: one outbound WSS per signed-in, opted-in instanc
 to `wf.latere.ai`, an org-scoped coordinator that is authoritative for comment
 threads (Postgres-durable), instance-side relay to browsers over SSE, content-hash
 anchoring with reposition/orphan handling, and the comment UI (select-to-comment,
-markers, popover, resolve, triage, out-of-sync banner). The opt-in gate is off by
-default and persisted. See `coordination-plane/spec-comments.md` Outcome for the
+markers, popover, resolve, triage, out-of-sync banner). The opt-in is persisted
+and defaults **on for a signed-in instance** (product decision; anonymous
+instances still connect to nothing, the data-boundary floor; opt out with
+`WALLFACER_COORDINATION=0` or the in-app toggle). See `coordination-plane/spec-comments.md` Outcome for the
 detail and divergences. **Presence, metadata projection, remote control, and the
 multi-replica Valkey `Directory`** remain unbuilt (the connection, registry, and
 `Directory` seam are in place for them); `replicas` stays at 1 (`memDirectory`).
