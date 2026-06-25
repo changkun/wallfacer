@@ -26,6 +26,7 @@ import {
 import {
   clearHighlights,
   collectSourceBlocks,
+  destack,
   highlightThreads,
   syncOpenMark,
   type SourceBlock,
@@ -171,7 +172,9 @@ function place() {
     if (!block) continue;
     out.push({ thread: t, top: block.top });
   }
-  markers.value = out;
+  // Fallback markers that snapped to the same block share a top; cascade them
+  // so a newer one never sits exactly on (and hides) an older one.
+  markers.value = destack(out);
 }
 
 watch(

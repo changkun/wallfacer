@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   clearHighlights,
   collectSourceBlocks,
+  destack,
   highlightThreads,
   locateQuote,
   syncOpenMark,
@@ -46,6 +47,22 @@ describe('locateQuote', () => {
     const text = 'set A and set B';
     expect(locateQuote(text, 'set', '', ' A')).toEqual([0, 3]);
     expect(locateQuote(text, 'set', 'and ', '')).toEqual([10, 13]);
+  });
+});
+
+describe('destack', () => {
+  it('cascades markers sharing a top apart by step, leaving distinct ones alone', () => {
+    expect(destack([{ top: 100 }, { top: 100 }, { top: 100 }], 20)).toEqual([
+      { top: 100 }, { top: 120 }, { top: 140 },
+    ]);
+    expect(destack([{ top: 100 }, { top: 300 }], 20)).toEqual([{ top: 100 }, { top: 300 }]);
+  });
+
+  it('sorts by top and does not mutate the input', () => {
+    const input = [{ top: 200 }, { top: 100 }];
+    const out = destack(input, 20);
+    expect(out).toEqual([{ top: 100 }, { top: 200 }]);
+    expect(input).toEqual([{ top: 200 }, { top: 100 }]);
   });
 });
 
