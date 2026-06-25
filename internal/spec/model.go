@@ -86,6 +86,12 @@ type Spec struct {
 	Track string `yaml:"-" json:"track"`
 	Body  string `yaml:"-" json:"-"` // excluded from API responses (large)
 
+	// PhysicalPath is the on-disk location relative to the workspace. It equals
+	// Path for live specs, but for an archived spec relocated under
+	// specs/.archive/ it carries the physical location while Path stays the
+	// logical key every reference uses. Empty means "same as Path".
+	PhysicalPath string `yaml:"-" json:"-"`
+
 	// Doc marks a free-form node synthesized from a frontmatter-less markdown
 	// file: render-only, no lifecycle, no status. Never parsed from YAML, so a
 	// real spec cannot set it; BuildTree sets it for files that fail parsing

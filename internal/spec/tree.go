@@ -3,7 +3,9 @@ package spec
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -50,10 +52,93 @@ func BuildTree(specsDir string) (*Tree, error) {
 	}
 
 	// Scan specs/ as a single directory: scanDir handles loose .md files,
-	// matching child folders, and orphan track folders uniformly.
+	// matching child folders, and orphan track folders uniformly. The
+	// .archive/ subtree is skipped here and scanned separately so its specs
+	// surface at their logical (un-archived) paths.
 	tree.Errs = append(tree.Errs, scanDir(tree, specsDir, specsDir, nil)...)
 
+	// Second pass: relocated archived specs under specs/.archive/. They are
+	// keyed by their logical path (the .archive/ segment stripped) so every
+	// reference and the UI keep working; their status is forced archived.
+	archiveDir := filepath.Join(specsDir, archiveSegment)
+	if info, err := os.Stat(archiveDir); err == nil && info.IsDir() {
+		tree.Errs = append(tree.Errs, scanArchiveDir(tree, archiveDir, specsDir)...)
+	}
+
 	return tree, nil
+}
+
+// scanArchiveDir walks specs/.archive/ and adds each archived spec to the tree
+// at its logical path (physical .archive/ location stripped), forcing archived
+// status and recording the physical path. Specs are added parent-before-child
+// (sorted by logical path) so an archived child attaches to its parent —
+// which may itself be live (already in the tree) or archived.
+func scanArchiveDir(tree *Tree, archiveDir, specsDir string) []error {
+	var errs []error
+	var mdPaths []string
+	walkErr := filepath.WalkDir(archiveDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".md") || d.Name() == "README.md" {
+			return nil
+		}
+		mdPaths = append(mdPaths, p)
+		return nil
+	})
+	if walkErr != nil {
+		errs = append(errs, fmt.Errorf("scan archive dir %s: %w", archiveDir, walkErr))
+	}
+
+	type archEntry struct{ mdPath, physRel, logical string }
+	entries := make([]archEntry, 0, len(mdPaths))
+	for _, mdPath := range mdPaths {
+		rel, _ := filepath.Rel(specsDir, mdPath)
+		physRel := "specs/" + filepath.ToSlash(rel)
+		entries = append(entries, archEntry{mdPath, physRel, LogicalPath(physRel)})
+	}
+	slices.SortFunc(entries, func(a, b archEntry) int { return strings.Compare(a.logical, b.logical) })
+
+	for _, e := range entries {
+		if _, exists := tree.All[e.logical]; exists {
+			errs = append(errs, fmt.Errorf("archived spec %s collides with a live spec at %s", e.physRel, e.logical))
+			continue
+		}
+		s, parseErr := ParseFile(e.mdPath)
+		if parseErr != nil {
+			if errors.Is(parseErr, ErrMissingFrontmatter) {
+				s = docNode(e.mdPath)
+			} else {
+				errs = append(errs, fmt.Errorf("parse %s: %w", e.physRel, parseErr))
+				continue
+			}
+		}
+		s.Path = e.logical
+		s.PhysicalPath = e.physRel
+		s.Track = trackFromPath(e.logical)
+		if !s.Doc {
+			s.Status = StatusArchived // physical location is authoritative
+		}
+
+		if parentKey := archiveLogicalParent(e.logical); parentKey != "" {
+			if _, ok := tree.All[parentKey]; ok {
+				tree.Add(e.logical, s, &parentKey)
+				continue
+			}
+		}
+		tree.Add(e.logical, s, nil)
+	}
+	return errs
+}
+
+// archiveLogicalParent returns the logical parent key for a logical spec path,
+// or "" when the spec sits at the track root. specs/a/b/c.md -> specs/a/b.md.
+func archiveLogicalParent(logical string) string {
+	dir := path.Dir(logical)
+	if dir == "specs" || dir == "." || dir == "/" {
+		return ""
+	}
+	return dir + ".md"
 }
 
 // docNode synthesizes a render-only node for a frontmatter-less markdown file.
@@ -140,6 +225,9 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
+		}
+		if e.Name() == archiveSegment {
+			continue // relocated archived specs are scanned separately
 		}
 		if _, hasMD := mdFiles[e.Name()]; hasMD {
 			continue
