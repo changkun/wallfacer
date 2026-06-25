@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/registry"
 	"latere.ai/x/wallfacer/internal/pkg/slugutil"
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 
@@ -115,18 +116,9 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool, len(BuiltinAgents))
-	all := make([]Role, 0, len(BuiltinAgents)+len(user))
-	for _, b := range BuiltinAgents {
-		seen[b.Slug] = true
-		all = append(all, b)
-	}
-	for _, u := range user {
-		if seen[u.Slug] {
-			return nil, fmt.Errorf("user agent %q shadows a built-in slug; rename the file", u.Slug)
-		}
-		seen[u.Slug] = true
-		all = append(all, u)
+	all, err := registry.MergeUnique("agent", BuiltinAgents, user, func(r Role) string { return r.Slug }, nil)
+	if err != nil {
+		return nil, err
 	}
 	return NewRegistry(all...), nil
 }
@@ -134,10 +126,5 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 // IsBuiltin reports whether slug names a built-in agent. Used by
 // PUT/DELETE handlers to reject mutations targeting shipped roles.
 func IsBuiltin(slug string) bool {
-	for i := range BuiltinAgents {
-		if BuiltinAgents[i].Slug == slug {
-			return true
-		}
-	}
-	return false
+	return registry.ContainsSlug(BuiltinAgents, slug, func(r Role) string { return r.Slug })
 }

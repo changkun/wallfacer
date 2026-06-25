@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/registry"
 	"latere.ai/x/wallfacer/internal/pkg/slugutil"
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 	"latere.ai/x/wallfacer/internal/store"
@@ -142,29 +143,16 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool, len(builtins))
-	all := make([]Flow, 0, len(builtins)+len(user))
-	for _, b := range builtins {
-		b.Builtin = true
-		seen[b.Slug] = true
-		all = append(all, b)
-	}
-	for _, u := range user {
-		if seen[u.Slug] {
-			return nil, fmt.Errorf("user flow %q shadows a built-in slug; rename the file", u.Slug)
-		}
-		seen[u.Slug] = true
-		all = append(all, u)
+	all, err := registry.MergeUnique("flow", builtins, user,
+		func(f Flow) string { return f.Slug },
+		func(f *Flow) { f.Builtin = true })
+	if err != nil {
+		return nil, err
 	}
 	return NewRegistry(all...), nil
 }
 
 // IsBuiltin reports whether slug names a built-in flow.
 func IsBuiltin(slug string) bool {
-	for i := range builtins {
-		if builtins[i].Slug == slug {
-			return true
-		}
-	}
-	return false
+	return registry.ContainsSlug(builtins, slug, func(f Flow) string { return f.Slug })
 }
