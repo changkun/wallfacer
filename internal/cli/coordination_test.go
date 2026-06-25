@@ -3,12 +3,16 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/oauth2"
+
+	"latere.ai/x/pkg/oidc"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -58,6 +62,100 @@ func TestCoordinationTokenFunc(t *testing.T) {
 			t.Fatal("expired token without refresh must report signed out")
 		}
 	})
+}
+
+func TestSessionTokenBridgeSync(t *testing.T) {
+	store := &fakeTokenStore{}
+	b := newSessionTokenBridge(nil, store) // client nil is fine; sync is exercised directly
+	exp := time.Now().Add(time.Hour)
+
+	// First session token is written through to the store.
+	b.sync("at1", "rt1", exp)
+	if store.tok == nil || store.tok.AccessToken != "at1" || store.tok.RefreshToken != "rt1" {
+		t.Fatalf("bridge did not persist the session token: %+v", store.tok)
+	}
+
+	// An unchanged access token is a no-op (no redundant save).
+	store.tok = nil
+	b.sync("at1", "rt1", exp)
+	if store.tok != nil {
+		t.Fatal("bridge re-saved an unchanged token")
+	}
+
+	// A new access token (refresh) is written through.
+	b.sync("at2", "rt2", exp)
+	if store.tok == nil || store.tok.AccessToken != "at2" {
+		t.Fatalf("bridge did not persist the rotated token: %+v", store.tok)
+	}
+
+	// An empty access token (anonymous / no session) writes nothing.
+	store.tok = nil
+	b.sync("", "", exp)
+	if store.tok != nil {
+		t.Fatal("bridge persisted an empty token")
+	}
+}
+
+// TestSessionTokenBridgeCapturesCookie proves the full path: a real encrypted
+// OIDC session cookie (what the UI login sets) is decrypted by the bridge and
+// its token persisted to the connector's store, so a UI sign-in enables the
+// outbound connection without a separate `wallfacer auth login`.
+func TestSessionTokenBridgeCapturesCookie(t *testing.T) {
+	client := oidc.New(oidc.Config{
+		AuthURL:    "https://auth.latere.ai",
+		ClientID:   "wallfacer",
+		CookieKey:  "0123456789abcdef0123456789abcdef",
+		CookieName: "test-session", // avoid the __Host- Secure/HTTPS requirement
+	})
+	if client == nil {
+		t.Skip("oidc client unavailable")
+	}
+	store := &fakeTokenStore{}
+	bridge := newSessionTokenBridge(client, store)
+
+	// Build and encrypt a session cookie as the UI login would.
+	sess := oidc.SessionFromToken(&oauth2.Token{
+		AccessToken:  "live-at",
+		RefreshToken: "live-rt",
+		Expiry:       time.Now().Add(time.Hour),
+	}, 0)
+	rec := httptest.NewRecorder()
+	if err := client.SetSession(rec, sess); err != nil {
+		t.Fatalf("set session: %v", err)
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("no session cookie was set")
+	}
+
+	// A request carrying that cookie, routed through the bridge, persists the token.
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	bridge.wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).
+		ServeHTTP(httptest.NewRecorder(), req)
+
+	if store.tok == nil || store.tok.AccessToken != "live-at" || store.tok.RefreshToken != "live-rt" {
+		t.Fatalf("bridge did not capture the UI cookie session token: %+v", store.tok)
+	}
+}
+
+// wrap with a nil client or store must pass the handler through unchanged
+// (auth not configured / local-anonymous stays byte-identical).
+func TestSessionTokenBridgeWrapNil(t *testing.T) {
+	var b *sessionTokenBridge
+	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	if got := b.wrap(h); got == nil {
+		t.Fatal("nil bridge wrap returned nil handler")
+	}
+	b2 := newSessionTokenBridge(nil, nil)
+	called := false
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })
+	b2.wrap(next).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	if !called {
+		t.Fatal("wrap with nil store did not pass through to next")
+	}
 }
 
 func TestCoordinationGate(t *testing.T) {
