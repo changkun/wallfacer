@@ -7,6 +7,8 @@
 import { computed, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlanningStore } from '../../stores/planning';
+import { useNow } from '../../composables/useNow';
+import { bucketForUpdated, SESSION_BUCKETS } from './sessionBuckets';
 import type { ChatSession } from '../../composables/useChatSession';
 
 const props = defineProps<{ session: ChatSession }>();
@@ -26,28 +28,30 @@ function isRunning(id: string): boolean {
   return id === busyThreadId.value || (streaming.value && id === streamingThreadId.value);
 }
 
-// Group sessions by status so a busy or unanswered session is easy to find:
-//  - In progress: an agent turn is running, or messages are queued to send.
-//  - Needs feedback: a finished response you haven't read yet (the agent is
-//    waiting on you). The session you're viewing is never "unread".
-//  - Sessions: everything else, idle.
-// Only non-empty groups render, preserving the thread order within each.
+// Group sessions by recency of last activity (the server's `updated` time):
+// Today / Previous 7 days / Previous 30 days / Older. Within each bucket the
+// most recently active session comes first. Running/unread state still shows
+// per-row (spinner, unread dot); a running session is being touched now, so it
+// naturally floats to the top of Today. Only non-empty buckets render.
+//
+// `now` ticks each second so buckets re-settle across a day boundary without a
+// reload (cheap: only re-renders when a session actually changes bucket).
+const now = useNow();
 const sessionGroups = computed(() => {
-  const inProgress: string[] = [];
-  const needsFeedback: string[] = [];
-  const idle: string[] = [];
-  for (const id of threadOrder.value) {
+  const sorted = [...threadOrder.value].sort(
+    (a, b) => (threads.value[b]?.updated ?? 0) - (threads.value[a]?.updated ?? 0),
+  );
+  const byBucket = new Map<string, string[]>();
+  for (const id of sorted) {
     const t = threads.value[id];
     if (!t) continue;
-    if (isRunning(id) || (t.queue?.length ?? 0) > 0) inProgress.push(id);
-    else if (id !== activeThreadId.value && t.unread) needsFeedback.push(id);
-    else idle.push(id);
+    const key = bucketForUpdated(now.value, t.updated || 0);
+    (byBucket.get(key) ?? byBucket.set(key, []).get(key)!).push(id);
   }
-  const groups: { key: string; label: string; ids: string[] }[] = [];
-  if (inProgress.length) groups.push({ key: 'progress', label: 'In progress', ids: inProgress });
-  if (needsFeedback.length) groups.push({ key: 'feedback', label: 'Needs feedback', ids: needsFeedback });
-  if (idle.length) groups.push({ key: 'idle', label: 'Sessions', ids: idle });
-  return groups;
+  return SESSION_BUCKETS.flatMap(({ key, label }) => {
+    const ids = byBucket.get(key);
+    return ids?.length ? [{ key, label, ids }] : [];
+  });
 });
 
 // Poll the server's busy thread on a light interval so background activity is
@@ -235,25 +239,6 @@ onUnmounted(() => {
   min-width: 16px;
   text-align: center;
 }
-
-/* Actionable groups read warmer; a leading dot makes them scannable. */
-.chat-sessions-head--progress .chat-sessions-title,
-.chat-sessions-head--feedback .chat-sessions-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.chat-sessions-head--progress .chat-sessions-title::before,
-.chat-sessions-head--feedback .chat-sessions-title::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-.chat-sessions-head--progress .chat-sessions-title { color: var(--accent); }
-.chat-sessions-head--progress .chat-sessions-title::before { background: var(--accent); }
-.chat-sessions-head--feedback .chat-sessions-title { color: var(--warn, #a56a12); }
-.chat-sessions-head--feedback .chat-sessions-title::before { background: var(--warn, #a56a12); }
 
 .chat-session-scroll {
   flex: 1;
