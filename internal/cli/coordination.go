@@ -292,16 +292,39 @@ func coordinationManifestFunc(instanceID, hostLabel, version string, wsMgr *work
 // (single-replica dev, byte-identical for one process). A Postgres failure
 // falls back to memory rather than taking the web server down, since comments
 // are best-effort infrastructure.
+//
+// Any fallback to memory is logged at Error: an in-memory store loses comments
+// on restart and shares nothing across replicas, so a misconfigured cloud
+// coordinator must be loud, not silent. The unset-DSN path once reached prod
+// unnoticed precisely because it logged nothing.
 func newCommentStore(ctx context.Context) coordinator.CommentStore {
-	if dsn := os.Getenv("WALLFACER_DATABASE_URL"); dsn != "" {
+	dsn := os.Getenv("WALLFACER_DATABASE_URL")
+	var openErr error
+	if dsn != "" {
 		st, err := coordinator.NewPostgresCommentStore(ctx, dsn)
 		if err == nil {
 			logger.Main.Info("coordination: using Postgres comment store")
 			return st
 		}
-		logger.Main.Error("coordination: Postgres comment store unavailable; using memory", "err", err)
+		openErr = err
 	}
+	logger.Main.Error("coordination: spec comments NON-DURABLE (in-memory store)",
+		"reason", commentStoreFallbackReason(dsn, openErr))
 	return coordinator.NewMemCommentStore()
+}
+
+// commentStoreFallbackReason explains why the coordinator runs without a durable
+// comment store, or "" when it has one. A non-empty result means spec comments
+// are in-memory only: lost on restart and not shared across replicas.
+func commentStoreFallbackReason(dsn string, openErr error) string {
+	switch {
+	case dsn == "":
+		return "WALLFACER_DATABASE_URL unset: comments are in-memory only (lost on restart, not shared across replicas)"
+	case openErr != nil:
+		return "Postgres comment store unavailable, using in-memory: " + openErr.Error()
+	default:
+		return ""
+	}
 }
 
 // hashLocalKey turns the path-bearing workspace.GroupKey into an opaque hex
