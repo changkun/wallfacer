@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -81,19 +80,6 @@ func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) 
 		// cancelled/archived (worktrees cleaned up).
 		return false
 	}
-}
-
-// countWriter wraps an io.Writer and counts the total bytes written.
-type countWriter struct {
-	w io.Writer
-	n int64
-}
-
-// Write delegates to the wrapped writer and accumulates the byte count.
-func (cw *countWriter) Write(p []byte) (int, error) {
-	n, err := cw.w.Write(p)
-	cw.n += int64(n)
-	return n, err
 }
 
 // generateBoardContextAndMounts is the fused board-context generator.
@@ -329,147 +315,4 @@ func writeBoardDir(data []byte, baseDir string) (string, error) {
 		return "", err
 	}
 	return dir, nil
-}
-
-// streamBoardJSON creates a temp directory, opens board.json inside it, and
-// writes the board manifest in a single streaming pass without constructing an
-// intermediate BoardManifest value. It returns the directory path and the
-// number of bytes written. The caller must defer os.RemoveAll(dir) on success.
-// This streaming approach avoids allocating the full JSON byte slice in memory
-// for boards with many tasks, keeping heap pressure proportional to one task.
-func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID, mountWorktrees bool) (dir string, written int64, err error) {
-	dir, err = os.MkdirTemp("", "wallfacer-board-*")
-	if err != nil {
-		return "", 0, err
-	}
-
-	f, ferr := os.Create(filepath.Join(dir, "board.json"))
-	if ferr != nil {
-		_ = os.RemoveAll(dir)
-
-		return "", 0, ferr
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("close board.json: %w", closeErr)
-			_ = os.RemoveAll(dir)
-
-			dir = ""
-			written = 0
-		}
-	}()
-
-	cw := &countWriter{w: f}
-
-	if _, err = fmt.Fprintf(cw, "{\"generated_at\":%q,\"self_task_id\":%q,\"tasks\":[\n",
-		time.Now().UTC().Format(time.RFC3339Nano), selfTaskID.String()); err != nil {
-		_ = os.RemoveAll(dir)
-
-		return "", 0, err
-	}
-
-	tasks, err := st.ListTasks(ctx, false)
-	if err != nil {
-		_ = os.RemoveAll(dir)
-
-		return "", 0, err
-	}
-
-	taskSizes := make([]struct {
-		id    string
-		bytes int
-	}, 0, len(tasks))
-
-	for i, t := range tasks {
-		isSelf := t.ID == selfTaskID
-		shortID := t.ID.String()[:8]
-
-		var worktreeMount *string
-		if mountWorktrees && !isSelf && canMountWorktree(t.Status, t.WorktreePaths) && len(t.WorktreePaths) > 0 {
-			for repoPath := range t.WorktreePaths {
-				basename := filepath.Base(repoPath)
-				p := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
-				worktreeMount = &p
-				break
-			}
-		}
-
-		prompt := t.Prompt
-		result := t.Result
-		turns := t.Turns
-
-		if !isSelf {
-			prompt = truncate(t.Prompt, 500)
-			if result != nil {
-				s := truncate(*result, 1000)
-				result = &s
-			}
-			turns = 0
-		}
-
-		bt := BoardTask{
-			ID:            t.ID.String(),
-			ShortID:       shortID,
-			Title:         t.Title,
-			Prompt:        prompt,
-			Status:        t.Status,
-			IsSelf:        isSelf,
-			Turns:         turns,
-			Result:        result,
-			StopReason:    t.StopReason,
-			Usage:         t.Usage,
-			BranchName:    t.BranchName,
-			WorktreeMount: worktreeMount,
-			CreatedAt:     t.CreatedAt,
-			UpdatedAt:     t.UpdatedAt,
-		}
-
-		b, merr := json.Marshal(bt)
-		if merr != nil {
-			_ = os.RemoveAll(dir)
-
-			return "", 0, merr
-		}
-
-		taskSizes = append(taskSizes, struct {
-			id    string
-			bytes int
-		}{id: shortID, bytes: len(b)})
-
-		if i > 0 {
-			if _, werr := fmt.Fprint(cw, ",\n"); werr != nil {
-				_ = os.RemoveAll(dir)
-
-				return "", 0, werr
-			}
-		}
-		if _, werr := cw.Write(b); werr != nil {
-			_ = os.RemoveAll(dir)
-
-			return "", 0, werr
-		}
-	}
-
-	if _, werr := fmt.Fprint(cw, "]\n}"); werr != nil {
-		_ = os.RemoveAll(dir)
-
-		return "", 0, werr
-	}
-
-	if cw.n > int64(constants.MaxBoardManifestBytes) {
-		logBoardManifestSizeWarning(taskSizes, int(cw.n))
-	}
-
-	return dir, cw.n, nil
-}
-
-// prepareBoardContext writes board.json to a temp directory and returns the
-// directory path. The caller must defer os.RemoveAll(dir).
-func (r *Runner) prepareBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (string, error) {
-	s := r.currentStore()
-	if s == nil {
-		return "", nil
-	}
-	dir, _, err := streamBoardJSON(ctx, s, selfTaskID, mountWorktrees)
-	return dir, err
 }
