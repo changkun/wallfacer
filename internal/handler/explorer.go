@@ -508,6 +508,10 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 		}
 		resolved = filepath.Join(parentResolved, filepath.Base(cleaned))
 	}
+	if isGitPath(resolved) {
+		http.Error(w, "writing to .git directories is not allowed", http.StatusBadRequest)
+		return
+	}
 
 	// Verify parent directory exists — do not create missing directories.
 	dir := filepath.Dir(resolved)
