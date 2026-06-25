@@ -10,12 +10,21 @@ affects:
   - internal/store/
 effort: medium
 created: 2026-04-19
-updated: 2026-06-14
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
 
 # Agent Token Exchange
+
+> **Dormant (demand-gated).** The trust plane this spec needed already shipped
+> as the `sandbox_proxy.go` server-side proxy, and the one open decision is
+> resolved (extend the proxy). The remaining per-task token-mint path
+> (`ExchangeForAgentToken`, `LATERE_AI_TOKEN` env, `AgentDelegationID`) is not
+> built and not yet needed: it is consumed only once we call latere.ai backend
+> services (fs.latere.ai, telemetry) from inside running tasks, and those
+> services don't exist yet. Kept as the record of the resolved design and the
+> future need; reopen when the first such backend service lands.
 
 ## Problem
 

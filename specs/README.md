@@ -59,43 +59,42 @@ Git Workflow - two shippable features + a residual
   ○ Intent-Driven Commits (mostly shipped; residual: explorer auto-commit)
 ```
 
-The two hot areas are **Identity / platform convergence** (auth-by-default and the
-latere-ui console shell, actively landing in `main`) and **Local Product** polish
-(spec state control plane, the file/diff/attachment trio). Cloud Platform is
+The hot area is **Local Product** polish (spec state control plane, the
+file/diff/attachment trio). Identity / platform convergence (auth-by-default and
+the latere-ui console shell) has shipped and is archived. Cloud Platform is
 drafted and demand-gated; Git Workflow is two independently-shippable features.
 
 ---
 
 ## Identity
 
-Everything about principals, sessions, delegation, and what data crosses the machine boundary. Authentication is the anchor; the rest build on the principal context it establishes. This is the live edge of the project right now: `wallfacer run` defaults into the Latere account experience and the web UI is converging on the shared latere-ui console shell.
+Everything about principals, sessions, delegation, and what data crosses the machine boundary. Authentication is the anchor; the rest build on the principal context it establishes. The auth-by-default convergence (`wallfacer run` defaulting into the Latere account experience, latere-ui console shell) has shipped and is archived below; remaining work is collaboration and delegation.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [authentication.md](identity/authentication.md) | **Complete** | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Follow-up auth-unification (authkit.Identity, HTTP device-code login) shipped and is archived under `identity/authentication/`. |
-| [auth-by-default.md](identity/auth-by-default.md) | In progress | `wallfacer run` offers zero-config browser sign-in against auth.latere.ai via a secret-less public client (`resolveAuthConfig`), authkit.Identity on the principal path, headless device-code login, and latere-ui console-shell adoption (AccountMenu, org switcher, Sidebar). Sign-in ambient, not mandatory. Captures the live convergence work; documents what shipped and what remains. |
 | [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Drafted | Umbrella: org-scoped collaboration on the shipped identity plumbing (actor fields, org scoping). Adds RBAC, presence/focus, optimistic concurrency, private planning threads. Steps 1-2 (actor fields, migration) already shipped; breakdown started. Gate for cloud team hosting. |
 | ↳ [rbac-matrix.md](identity/multi-user-collaboration/rbac-matrix.md) | Drafted | Lead child: the canonical scope-to-permission matrix (admin/editor/viewer mapped onto `Identity.Scopes`, since there is no role claim), wiring `RequireScope`/`RequireSuperadmin` onto mutating routes. Anonymous mode unchanged. |
 | [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Self-hosted non-latere.ai deployments log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. by configuring/extending the platform `pkg/oidc` RP rather than forking a local package. |
 | [remote-control.md](identity/remote-control.md) | Drafted | Re-homed onto the cloud coordination plane: now the command-router capability (control UI, instance picker, offline handling, per-action auth + audit, opt-out scope) riding the one coordination connection, not its own wire. Transport lives in [coordination-plane.md](cloud/latere-integration/coordination-plane.md). |
-| [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | RFC 8693 delegation so per-task agents call latere.ai services on behalf of the dispatching user. A server-side trust plane already shipped (`sandbox_proxy.go` act.sub delegation); the open decision is proxy-substitution vs short-lived-token env injection. |
+| [agent-token-exchange.md](identity/agent-token-exchange.md) | Dormant | RFC 8693 delegation so per-task agents call latere.ai services on behalf of the dispatching user. Trust plane already shipped as the `sandbox_proxy.go` server-side proxy (`act.sub` delegation + credential substitution); the proxy-vs-env-injection decision is resolved (extend the proxy). The remaining per-task token-mint path is demand-gated on latere.ai backend services (fs.latere.ai, telemetry) that don't exist yet. |
 
 ### Identity dependencies
 
 ```mermaid
 graph LR
-  AUTH[Authentication ✅] --> ABD[Auth by Default ◐]
+  AUTH[Authentication ✅] --> ABD[Auth by Default ✅]
   AUTH --> TPO[Third-Party OIDC]
   AUTH --> RC[Remote Control]
-  AUTH --> ATE[Agent Token Exchange]
+  AUTH --> ATE[Agent Token Exchange ◌]
   AUTH --> MUC[Multi-User Collaboration]
   MUC --> CH[Cloud team hosting]
 
   style AUTH fill:#d4edda,stroke:#28a745
-  style ABD fill:#fff3cd,stroke:#ffc107
+  style ABD fill:#d4edda,stroke:#28a745
 ```
 
-Auth-by-default is the active convergence work. Multi-user collaboration is the gate for cloud *team* hosting (org-scoped shared boards).
+Auth-by-default has shipped (archived). Agent token exchange (◌) is dormant: its trust plane shipped as the `sandbox_proxy.go` server-side proxy, and the remaining mint path is demand-gated on latere.ai backend services. Multi-user collaboration is the gate for cloud *team* hosting (org-scoped shared boards).
 
 ---
 
@@ -281,8 +280,8 @@ Revert and PR are independent and shippable; intent-commits is mostly realized w
 
 ## Ordering Rationale
 
-**Identity / platform convergence (hot):**
-- Auth-by-default and the latere-ui console shell are actively landing. Capture the end-state in [auth-by-default.md](identity/auth-by-default.md) so UI work targets it instead of reacting commit-by-commit.
+**Identity / platform convergence:**
+- Auth-by-default and the latere-ui console shell have shipped; [auth-by-default.md](identity/auth-by-default.md) is archived as the system of record. Further console work lands by bumping the `latere-ui` pin.
 - Multi-user collaboration should be broken down (rbac-matrix first); steps 1-2 already shipped.
 
 **Within local product:**
@@ -317,6 +316,12 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 | [file-explorer.md](foundations/file-explorer.md) | Browse + edit workspace files in the web UI |
 | [host-terminal.md](foundations/host-terminal.md) | Interactive shell in the web UI (WebSocket + PTY) |
 | [windows-support.md](foundations/windows-support.md) | Tier 2 Windows host support |
+
+### Identity - Completed
+
+| Spec | Delivers |
+|------|----------|
+| [auth-by-default.md](identity/auth-by-default.md) | Zero-config browser sign-in in `wallfacer run` (secret-less public client via `resolveAuthConfig`, silent-available first run, anonymous still first-class), `authkit.Identity` on the principal path, headless RFC 8628 device-code login, and latere-ui console-shell adoption (`AccountMenu`, org switcher, `Sidebar`) via thin wrappers. Adoption spec; further console work lands by bumping the `latere-ui` pin. |
 
 ### Local - Completed
 
