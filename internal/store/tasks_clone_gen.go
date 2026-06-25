@@ -67,6 +67,14 @@ func deepCloneTask(t *Task) Task {
 		lastFetchErrorAt := *t.LastFetchErrorAt
 		cp.LastFetchErrorAt = &lastFetchErrorAt
 	}
+	if t.RoutineNextRun != nil {
+		routineNextRun := *t.RoutineNextRun
+		cp.RoutineNextRun = &routineNextRun
+	}
+	if t.RoutineLastFiredAt != nil {
+		routineLastFiredAt := *t.RoutineLastFiredAt
+		cp.RoutineLastFiredAt = &routineLastFiredAt
+	}
 
 	return cp
 }
