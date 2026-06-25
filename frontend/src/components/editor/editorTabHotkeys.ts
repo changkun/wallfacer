@@ -13,8 +13,13 @@ interface TabHotkeyTarget {
 
 // Returns true when the key was handled. Cmd/Ctrl+S pins (and, if dirty, saves)
 // the active file tab; the key is always swallowed so the browser dialog never
-// appears, even on the pinned board where it no-ops. Cmd/Ctrl+W closes the
-// active file tab (the board is pinned and ignored).
+// appears, even on the pinned board where it no-ops.
+//
+// Cmd/Ctrl+W tries to close the active file tab, but this is best-effort only:
+// browsers reserve Cmd/Ctrl+W to close the whole tab and ignore preventDefault
+// from page scripts, so in practice the page unloads. Accidental loss is
+// instead made recoverable by persisting/restoring the open tabs (see
+// editorTabs store) and guarding unsaved edits via beforeunload.
 export function handleTabHotkey(e: KeyboardEvent, tabs: TabHotkeyTarget): boolean {
   if (!(e.metaKey || e.ctrlKey)) return false;
   const k = e.key.toLowerCase();

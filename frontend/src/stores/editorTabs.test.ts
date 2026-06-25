@@ -15,7 +15,17 @@ vi.mock('../api/client', () => ({
   withAuthToken: (u: string) => u,
 }));
 
-import { useEditorTabsStore, BOARD_TAB_ID } from './editorTabs';
+// happy-dom ships only a partial localStorage stub, so install an in-memory one
+// the session persistence can rely on (mirrors dock.test.ts).
+const memStore = new Map<string, string>();
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => (memStore.has(k) ? memStore.get(k)! : null),
+  setItem: (k: string, v: string) => { memStore.set(k, String(v)); },
+  removeItem: (k: string) => { memStore.delete(k); },
+  clear: () => { memStore.clear(); },
+});
+
+import { useEditorTabsStore, BOARD_TAB_ID, beforeUnloadGuard } from './editorTabs';
 import { useDialogStore } from './dialog';
 
 function mockRead(content: string) {
@@ -27,6 +37,7 @@ function mockRead(content: string) {
 beforeEach(() => {
   setActivePinia(createPinia());
   apiMock.mockReset();
+  memStore.clear();
 });
 
 describe('editorTabs store', () => {
@@ -220,5 +231,60 @@ describe('editorTabs store', () => {
     expect(s.labelFor(s.find('src/index.ts')!)).toBe('src/index.ts');
     expect(s.labelFor(s.find('lib/index.ts')!)).toBe('lib/index.ts');
     expect(s.labelFor(s.find('README.md')!)).toBe('README.md');
+  });
+
+  it('persists open tabs and restores the session in a fresh page', async () => {
+    // Cmd/Ctrl+W closes the whole browser tab (a web page cannot intercept it),
+    // so recovery hinges on persistence: the open tabs must come back when the
+    // board is reopened. Re-fetched content stands in for re-reading from disk.
+    mockRead('body');
+    const s = useEditorTabsStore();
+    await s.openFile('/ws', 'a.ts', { preview: false });
+    await s.openFile('/ws', 'b.ts'); // preview tab, active = b
+    await nextTick(); // let the persist watcher flush
+    expect(localStorage.getItem('wallfacer-editor-tabs')).toBeTruthy();
+
+    // A fresh page: new pinia, new store, nothing open until restore() runs.
+    setActivePinia(createPinia());
+    const s2 = useEditorTabsStore();
+    expect(s2.tabs.length).toBe(0);
+    s2.restore();
+    expect(s2.tabs.map((t) => t.path)).toEqual(['a.ts', 'b.ts']);
+    expect(s2.activeId).toBe('b.ts');
+    expect(s2.find('a.ts')!.preview).toBe(false); // pinned tab stays pinned
+    expect(s2.find('b.ts')!.preview).toBe(true); // preview tab stays preview
+    await new Promise((r) => setTimeout(r)); // drain the re-fetch
+    expect(s2.find('b.ts')!.content).toBe('body');
+
+    s2.restore(); // idempotent: a repeat board mount must not duplicate tabs
+    expect(s2.tabs.length).toBe(2);
+  });
+
+  it('clears the persisted session when the last tab closes', async () => {
+    mockRead('x');
+    const s = useEditorTabsStore();
+    await s.openFile('/ws', 'a.ts', { preview: false });
+    await nextTick();
+    expect(localStorage.getItem('wallfacer-editor-tabs')).toBeTruthy();
+
+    await s.close('a.ts');
+    await nextTick();
+    expect(localStorage.getItem('wallfacer-editor-tabs')).toBeNull();
+  });
+});
+
+describe('beforeUnloadGuard', () => {
+  // The browser confirm dialog is the only supported protection against losing
+  // unsaved edits on an unload (Cmd/Ctrl+W, refresh, navigation). Dispatch a
+  // real cancelable event so defaultPrevented reflects actual browser semantics,
+  // not a happy-dom stand-in — preventDefault must fire only when dirty.
+  it('prompts only when there are unsaved edits', () => {
+    const dirty = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    beforeUnloadGuard(dirty, true);
+    expect(dirty.defaultPrevented).toBe(true);
+
+    const clean = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    beforeUnloadGuard(clean, false);
+    expect(clean.defaultPrevented).toBe(false);
   });
 });
