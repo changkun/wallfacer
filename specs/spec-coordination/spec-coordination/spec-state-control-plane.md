@@ -233,16 +233,21 @@ tests and `make build` green:
   fan-out in one commit, and `testing_pending` + override on tester failure.
 - **Per-workspace commit mutex** in the shared spec-commit helpers.
 
-**Deferred / follow-up.** Two pieces are intentionally not wired:
+**Drift tester now wired.** The agent-backed `DriftTester` is implemented
+(`runner.AssessDrift` runs a one-shot container with the `drift.tmpl` prompt and
+parses the verdict JSON via `parseDriftVerdict`) and wired into the completion
+hook through `NewRunnerDriftTester`. It stays gated behind
+`WALLFACER_DRIFT_TESTER` (off by default per OQ2): with the flag off the hook
+preserves complete-on-done; with it on, a completed task runs the tester before
+the spec lands. The server recomputes the authoritative drift level from the
+verdict fields (`spec.ClassifyDrift`), so the agent's self-reported level is
+advisory only.
 
-1. **Concrete agent-backed `DriftTester`.** The pipeline takes an injectable
-   tester and is gated behind `WALLFACER_DRIFT_TESTER`; with no tester wired
-   (the default) the hook preserves the historical complete-on-done behavior.
-   Wiring an agent that reads spec + diff and returns the verdict JSON is the
-   remaining integration (OQ2: default on once stable).
-2. **Structured drift sidecar** (`store.SaveDriftReport` + `GET .../drift`) and
-   the **Retry Test** action — both depend on (1). The inline `## Outcome`
-   section is the git-tracked verdict persistence and is implemented.
+**Deferred / follow-up.** The **structured drift sidecar**
+(`store.SaveDriftReport` + `GET .../drift`) and the **Retry Test** action remain
+optional: the inline `## Outcome` section is the git-tracked verdict
+persistence and is implemented, and `force-complete` already covers the
+tester-failure escape hatch. Both can be added if a richer review UI is wanted.
 
 ## Acceptance
 

@@ -10,6 +10,7 @@ import (
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -54,6 +55,11 @@ type Interface interface {
 	// Commit-message generation (task-free flavor). Used by callers that do
 	// not have a task ID in scope, e.g. the planning commit pipeline.
 	GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error)
+
+	// Drift assessment (task-free flavor). Runs a one-shot agent comparing a
+	// spec against a task's actual changes; the drift pipeline consumes the
+	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
+	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
 	// Planning-thread title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.

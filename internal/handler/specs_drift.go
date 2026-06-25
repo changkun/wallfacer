@@ -10,9 +10,27 @@ import (
 
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
 )
+
+// runnerDriftTester adapts the runner's one-shot drift agent to the DriftTester
+// interface the completion hook consumes.
+type runnerDriftTester struct{ r runner.Interface }
+
+// NewRunnerDriftTester wraps the runner as a DriftTester. Returns nil for a nil
+// runner so the hook falls back to complete-on-done.
+func NewRunnerDriftTester(r runner.Interface) DriftTester {
+	if r == nil {
+		return nil
+	}
+	return runnerDriftTester{r: r}
+}
+
+func (t runnerDriftTester) AssessDrift(ctx context.Context, in DriftTestInput) (spec.DriftVerdict, error) {
+	return t.r.AssessDrift(ctx, in.SpecBody, in.Affects, in.ChangedFiles, in.Diff)
+}
 
 // DriftTestInput is the context handed to the drift tester: the spec it is
 // judging plus the task's actual changes.

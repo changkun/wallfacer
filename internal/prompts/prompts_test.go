@@ -322,6 +322,27 @@ func TestCommitMessage_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
+func TestDriftAssessment_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.DriftAssessment(prompts.DriftData{
+		SpecBody:     "# Spec\n\nImplement X.",
+		Affects:      "internal/x/",
+		ChangedFiles: "internal/x/foo.go",
+		Diff:         "+ added a line",
+	})
+	if strings.TrimSpace(got) == "" {
+		t.Error("DriftAssessment returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("unreplaced template syntax: %q", got)
+	}
+	for _, want := range []string{"Implement X.", "internal/x/foo.go", "drift_level", "JSON"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered prompt missing %q", want)
+		}
+	}
+}
+
 // TestConflictResolution_ReturnsNonEmptyRendered verifies that the conflict
 // resolution template renders with container path and default branch populated.
 func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
