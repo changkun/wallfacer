@@ -44,7 +44,7 @@ func main() {
 	case "auth":
 		cli.RunAuth(configDir, args)
 	case "web":
-		cli.RunWeb(args)
+		cli.RunWeb(args, vueDist)
 	case "-help", "--help", "-h":
 		cli.PrintUsage()
 	default:
