@@ -310,10 +310,6 @@ export const usePlanningStore = defineStore('planning', () => {
     }
   }
 
-  function activeThread() {
-    return activeThreadId.value ? threads.value[activeThreadId.value] ?? null : null;
-  }
-
   return {
     tree, treeProgress, treeIndex, treeLoading,
     focusedSpecPath, focusedIsIndex,
@@ -323,6 +319,6 @@ export const usePlanningStore = defineStore('planning', () => {
     sortedNodes, nodesByPath, focusedNode,
     applyTree, fetchTree, focusSpec, focusIndex, clearFocus,
     openPlanForTask,
-    loadThreads, refreshBusy, activeThread,
+    loadThreads, refreshBusy,
   };
 });
