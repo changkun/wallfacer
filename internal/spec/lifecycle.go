@@ -5,10 +5,16 @@ import (
 )
 
 // StatusMachine is the spec lifecycle state machine.
+//
+// The completion gate: validated → complete is not a legal edge. A spec
+// reaches complete only through testing, where the drift pipeline renders a
+// verdict. validated → stale stays legal because stale propagation
+// (FanOutStale) marks validated dependents stale when an upstream changes.
 var StatusMachine = statemachine.New(map[Status][]Status{
 	StatusVague:     {StatusDrafted, StatusArchived},
 	StatusDrafted:   {StatusValidated, StatusStale, StatusArchived},
-	StatusValidated: {StatusComplete, StatusStale},
+	StatusValidated: {StatusTesting, StatusStale},
+	StatusTesting:   {StatusComplete, StatusStale, StatusArchived},
 	StatusComplete:  {StatusStale, StatusArchived},
 	StatusStale:     {StatusDrafted, StatusValidated, StatusArchived},
 	StatusArchived:  {StatusDrafted},
@@ -16,7 +22,10 @@ var StatusMachine = statemachine.New(map[Status][]Status{
 
 // ValidStatuses returns all valid spec status values.
 func ValidStatuses() []Status {
-	return []Status{StatusVague, StatusDrafted, StatusValidated, StatusComplete, StatusStale, StatusArchived}
+	return []Status{
+		StatusVague, StatusDrafted, StatusValidated, StatusTesting,
+		StatusComplete, StatusStale, StatusArchived,
+	}
 }
 
 // ValidEfforts returns all valid spec effort values.

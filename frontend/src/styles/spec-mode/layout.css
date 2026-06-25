@@ -356,6 +356,11 @@
   color: var(--tint-blue-ink);
 }
 
+.spec-status--testing {
+  background: var(--tint-plum);
+  color: var(--tint-plum-ink);
+}
+
 .spec-status--drafted {
   background: var(--tint-amber);
   color: var(--tint-amber-ink);

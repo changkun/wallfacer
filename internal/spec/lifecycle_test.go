@@ -14,8 +14,11 @@ func TestStatusMachine_AllValid(t *testing.T) {
 		{StatusVague, StatusDrafted},
 		{StatusDrafted, StatusValidated},
 		{StatusDrafted, StatusStale},
-		{StatusValidated, StatusComplete},
+		{StatusValidated, StatusTesting},
 		{StatusValidated, StatusStale},
+		{StatusTesting, StatusComplete},
+		{StatusTesting, StatusStale},
+		{StatusTesting, StatusArchived},
 		{StatusComplete, StatusStale},
 		{StatusStale, StatusDrafted},
 		{StatusStale, StatusValidated},
@@ -41,16 +44,24 @@ func TestStatusMachine_AllInvalid(t *testing.T) {
 		{StatusVague, StatusStale},
 		{StatusDrafted, StatusVague},
 		{StatusDrafted, StatusComplete},
+		{StatusDrafted, StatusTesting},
 		{StatusValidated, StatusVague},
 		{StatusValidated, StatusDrafted},
+		{StatusValidated, StatusComplete}, // completion gate: must go through testing
+		{StatusTesting, StatusVague},
+		{StatusTesting, StatusDrafted},
+		{StatusTesting, StatusValidated},
 		{StatusComplete, StatusVague},
 		{StatusComplete, StatusDrafted},
 		{StatusComplete, StatusValidated},
+		{StatusComplete, StatusTesting},
 		{StatusStale, StatusVague},
 		{StatusStale, StatusComplete},
+		{StatusStale, StatusTesting},
 		{StatusValidated, StatusArchived},
 		{StatusArchived, StatusComplete},
 		{StatusArchived, StatusValidated},
+		{StatusArchived, StatusTesting},
 		{StatusArchived, StatusStale},
 	}
 	for _, tc := range invalid {
@@ -77,12 +88,13 @@ func TestStatusMachine_ErrorWrapping(t *testing.T) {
 
 func TestValidStatuses(t *testing.T) {
 	statuses := ValidStatuses()
-	if len(statuses) != 6 {
-		t.Fatalf("len(ValidStatuses()) = %d, want 6", len(statuses))
+	if len(statuses) != 7 {
+		t.Fatalf("len(ValidStatuses()) = %d, want 7", len(statuses))
 	}
 	want := map[Status]bool{
 		StatusVague: true, StatusDrafted: true, StatusValidated: true,
-		StatusComplete: true, StatusStale: true, StatusArchived: true,
+		StatusTesting: true, StatusComplete: true, StatusStale: true,
+		StatusArchived: true,
 	}
 	for _, s := range statuses {
 		if !want[s] {
