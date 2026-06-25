@@ -19,9 +19,9 @@ type usageResponse struct {
 	PeriodDays int                                       `json:"period_days"`
 }
 
-// planningRecordAsUsage projects a TurnUsageRecord into the TaskUsage shape
+// agentSessionRecordAsUsage projects a TurnUsageRecord into the TaskUsage shape
 // so it can flow through the same TaskUsage.Add path as task-side data.
-func planningRecordAsUsage(rec store.TurnUsageRecord) store.TaskUsage {
+func agentSessionRecordAsUsage(rec store.TurnUsageRecord) store.TaskUsage {
 	return store.TaskUsage{
 		InputTokens:          rec.InputTokens,
 		OutputTokens:         rec.OutputTokens,
@@ -31,12 +31,12 @@ func planningRecordAsUsage(rec store.TurnUsageRecord) store.TaskUsage {
 	}
 }
 
-// mergePlanningUsage scans <configDir>/planning/<group>/usage.jsonl files
-// and merges records into BySubAgent["planning"] and Total, honoring the
-// caller's cutoff. It is a no-op when configDir is empty or the planning
+// mergeAgentSessionUsage scans <configDir>/agent-sessions/<group>/usage.jsonl files
+// and merges records into BySubAgent["agent-session"] and Total, honoring the
+// caller's cutoff. It is a no-op when configDir is empty or the agent-sessions
 // directory does not exist. TaskCount is deliberately untouched — it counts
-// tasks, not planning rounds.
-func mergePlanningUsage(resp *usageResponse, configDir string, cutoff time.Time) {
+// tasks, not agent-session rounds.
+func mergeAgentSessionUsage(resp *usageResponse, configDir string, cutoff time.Time) {
 	if configDir == "" {
 		return
 	}
@@ -53,10 +53,10 @@ func mergePlanningUsage(resp *usageResponse, configDir string, cutoff time.Time)
 			continue
 		}
 		for _, rec := range recs {
-			u := planningRecordAsUsage(rec)
-			a := resp.BySubAgent[store.SandboxActivityPlanning]
+			u := agentSessionRecordAsUsage(rec)
+			a := resp.BySubAgent[store.SandboxActivityAgentSession]
 			a.Add(u)
-			resp.BySubAgent[store.SandboxActivityPlanning] = a
+			resp.BySubAgent[store.SandboxActivityAgentSession] = a
 			resp.Total.Add(u)
 		}
 	}
@@ -114,7 +114,7 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	mergePlanningUsage(&resp, h.configDir, cutoff)
+	mergeAgentSessionUsage(&resp, h.configDir, cutoff)
 
 	httpjson.Write(w, http.StatusOK, resp)
 }

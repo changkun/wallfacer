@@ -545,7 +545,7 @@ func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
 	if got.Sandbox != harness.Claude {
 		t.Errorf("sandbox: got %q, want claude", got.Sandbox)
 	}
-	if got.SubAgent != store.SandboxActivityPlanning {
+	if got.SubAgent != store.SandboxActivityAgentSession {
 		t.Errorf("sub_agent: got %q, want planning", got.SubAgent)
 	}
 	if got.Turn != 1 {

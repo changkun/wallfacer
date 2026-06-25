@@ -24,7 +24,7 @@ func TestAppendPlanningUsage_RoundtripsRecord(t *testing.T) {
 		CacheCreationTokens:  8,
 		CostUSD:              0.0123,
 		StopReason:           "end_turn",
-		SubAgent:             SandboxActivityPlanning,
+		SubAgent:             SandboxActivityAgentSession,
 	}
 	if err := AppendAgentSessionUsage(root, key, want); err != nil {
 		t.Fatalf("AppendAgentSessionUsage: %v", err)

@@ -15,7 +15,7 @@ func (p *Runtime) buildSpec(name string, sb harness.ID) executor.ContainerSpec {
 		Name: name,
 		Labels: map[string]string{
 			"wallfacer.task.id":       agentSessionTaskID,
-			"wallfacer.task.activity": "planning",
+			"wallfacer.task.activity": "agent-session",
 		},
 		// The host backend dispatches to the right CLI based on
 		// WALLFACER_AGENT. The planner is Claude-only today; the parameter

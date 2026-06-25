@@ -796,7 +796,7 @@ func (h *Handler) persistPlanningRoundUsage(raw []byte) {
 		CostUSD:              usage.CostUSD,
 		StopReason:           usage.StopReason,
 		Sandbox:              harness.Claude,
-		SubAgent:             store.SandboxActivityPlanning,
+		SubAgent:             store.SandboxActivityAgentSession,
 	}
 	if err := store.AppendAgentSessionUsage(h.configDir, groupKey, rec); err != nil {
 		slog.Warn("planning: failed to append round usage", "error", err)

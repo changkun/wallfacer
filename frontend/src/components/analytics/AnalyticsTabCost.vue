@@ -30,7 +30,7 @@ interface DailyEntry { date: string; cost_usd: number }
 
 interface PlanningTimelineEntry { date: string; cost_usd: number }
 
-interface PlanningGroup {
+interface AgentSessionGroup {
   label?: string;
   paths?: string[];
   round_count?: number;
@@ -49,7 +49,7 @@ interface StatsResponse {
   by_activity?: Record<string, Bucket>;
   by_workspace?: Record<string, WorkspaceBucket>;
   daily_usage?: DailyEntry[];
-  planning?: Record<string, PlanningGroup>;
+  agent_sessions?: Record<string, AgentSessionGroup>;
   top_tasks?: TopTask[];
 }
 
@@ -96,7 +96,7 @@ function workspaceLabel(p: string) {
 }
 
 function sortedPlanningKeys() {
-  const m = data.value?.planning || {};
+  const m = data.value?.agent_sessions || {};
   return Object.keys(m).sort((a, b) =>
     ((m[b].usage?.cost_usd) || 0) - ((m[a].usage?.cost_usd) || 0));
 }
@@ -339,7 +339,7 @@ watch(agentSessionWindowDays, () => fetchAndRender());
 
         <div v-if="sortedPlanningKeys().length" style="margin-bottom: 20px">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Planning</div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Agent Sessions</div>
             <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
               Window
               <AppSelect
@@ -365,17 +365,17 @@ watch(agentSessionWindowDays, () => fetchAndRender());
                 <tr v-for="key in sortedPlanningKeys()" :key="key">
                   <td style="padding: 6px 10px; font-weight: 500;">
                     <span
-                      :title="((data.planning || {})[key].paths || []).join('\n') || key"
+                      :title="((data.agent_sessions || {})[key].paths || []).join('\n') || key"
                       style="cursor: default;"
-                    >{{ (data.planning || {})[key].label || key }}</span>
+                    >{{ (data.agent_sessions || {})[key].label || key }}</span>
                   </td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.planning || {})[key].round_count) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.planning || {})[key].usage?.input_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.planning || {})[key].usage?.output_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; font-weight: 500;">{{ fmtCost((data.planning || {})[key].usage?.cost_usd) }}</td>
+                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.agent_sessions || {})[key].round_count) }}</td>
+                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.agent_sessions || {})[key].usage?.input_tokens) }}</td>
+                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.agent_sessions || {})[key].usage?.output_tokens) }}</td>
+                  <td style="padding: 6px 10px; text-align: right; font-weight: 500;">{{ fmtCost((data.agent_sessions || {})[key].usage?.cost_usd) }}</td>
                   <td style="padding: 6px 10px; text-align: right;">
                     <svg
-                      v-if="((data.planning || {})[key].timeline || []).length"
+                      v-if="((data.agent_sessions || {})[key].timeline || []).length"
                       width="80"
                       height="20"
                       viewBox="0 0 80 20"
@@ -385,7 +385,7 @@ watch(agentSessionWindowDays, () => fetchAndRender());
                         fill="none"
                         stroke="var(--accent,#3b82f6)"
                         stroke-width="1.5"
-                        :points="sparklinePoints((data.planning || {})[key].timeline)"
+                        :points="sparklinePoints((data.agent_sessions || {})[key].timeline)"
                       />
                     </svg>
                   </td>

@@ -600,7 +600,7 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 
 func TestAggregatePlanningStats_EmptyDir(t *testing.T) {
 	configDir := t.TempDir()
-	got := aggregatePlanningStats(configDir, nil, time.Time{})
+	got := aggregateAgentSessionStats(configDir, nil, time.Time{})
 	if got == nil {
 		t.Fatal("got nil, want non-nil empty map")
 	}
@@ -632,7 +632,7 @@ func TestAggregatePlanningStats_Aggregation(t *testing.T) {
 		t.Fatalf("append B: %v", err)
 	}
 
-	got := aggregatePlanningStats(configDir, wsA, time.Time{})
+	got := aggregateAgentSessionStats(configDir, wsA, time.Time{})
 
 	if len(got) != 2 {
 		t.Fatalf("want 2 groups, got %d", len(got))
@@ -686,7 +686,7 @@ func TestAggregatePlanningStats_RespectsSince(t *testing.T) {
 	}
 
 	since := base.Add(-30 * time.Minute)
-	got := aggregatePlanningStats(configDir, ws, since)
+	got := aggregateAgentSessionStats(configDir, ws, since)
 
 	stat, ok := got[key]
 	if !ok {
@@ -720,7 +720,7 @@ func TestAggregatePlanningStats_TimelineOrdered(t *testing.T) {
 		}
 	}
 
-	got := aggregatePlanningStats(configDir, ws, time.Time{})
+	got := aggregateAgentSessionStats(configDir, ws, time.Time{})
 	tl := got[key].Timeline
 	if len(tl) != 3 {
 		t.Fatalf("Timeline length = %d, want 3", len(tl))
@@ -759,12 +759,12 @@ func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed planning: %v", err)
 	}
-	withPlanning.Planning = aggregatePlanningStats(configDir, ws, time.Time{})
+	withPlanning.AgentSessions = aggregateAgentSessionStats(configDir, ws, time.Time{})
 
 	// Zero out the Planning field on both sides, then compare the rest
 	// via JSON round-trip to catch any silent drift in execution buckets.
-	baseline.Planning = nil
-	withPlanning.Planning = nil
+	baseline.AgentSessions = nil
+	withPlanning.AgentSessions = nil
 	wantJSON, _ := json.Marshal(baseline)
 	gotJSON, _ := json.Marshal(withPlanning)
 	if string(wantJSON) != string(gotJSON) {
@@ -797,10 +797,10 @@ func TestGetStats_PlanningEndpoint(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.Planning == nil {
+	if resp.AgentSessions == nil {
 		t.Fatal("Planning should not be nil")
 	}
-	stat, ok := resp.Planning[key]
+	stat, ok := resp.AgentSessions[key]
 	if !ok {
 		t.Fatalf("no planning entry for active group key %q", key)
 	}

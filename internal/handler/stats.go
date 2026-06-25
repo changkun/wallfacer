@@ -27,14 +27,14 @@ type StatsResponse struct {
 	ByFailureCategory map[store.FailureCategory]UsageStat `json:"by_failure_category"`
 	TopTasks          []TaskCostEntry                     `json:"top_tasks"`
 	DailyUsage        []DayStat                           `json:"daily_usage"`
-	Planning          map[string]PlanningGroupStat        `json:"planning"`
+	AgentSessions          map[string]AgentSessionGroupStat        `json:"agent_sessions"`
 }
 
-// PlanningGroupStat aggregates planning round usage for one workspace group.
+// AgentSessionGroupStat aggregates agent-session round usage for one workspace group.
 // The server resolves Paths and Label for the currently active group; stale
 // group keys (past groups no longer in use) are surfaced with Label == key
 // and Paths == nil so the UI can still render totals.
-type PlanningGroupStat struct {
+type AgentSessionGroupStat struct {
 	Label      string       `json:"label"`
 	Paths      []string     `json:"paths"`
 	Usage      UsageStat    `json:"usage"`
@@ -42,7 +42,7 @@ type PlanningGroupStat struct {
 	Timeline   []RoundPoint `json:"timeline"`
 }
 
-// RoundPoint is a single point on the per-group planning-cost sparkline.
+// RoundPoint is a single point on the per-group agent-session cost sparkline.
 type RoundPoint struct {
 	Timestamp time.Time `json:"timestamp"`
 	CostUSD   float64   `json:"cost_usd"`
@@ -101,7 +101,7 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		ByActivity:        make(map[store.SandboxActivity]UsageStat),
 		ByWorkspace:       make(map[string]UsageStat),
 		ByFailureCategory: make(map[store.FailureCategory]UsageStat),
-		Planning:          make(map[string]PlanningGroupStat),
+		AgentSessions:          make(map[string]AgentSessionGroupStat),
 	}
 
 	dailyMap := make(map[string]*DayStat)
@@ -228,17 +228,17 @@ func filterTasksByWorkspace(tasks []store.Task, ws string) ([]store.Task, bool) 
 	return filtered, len(filtered) > 0
 }
 
-// aggregatePlanningStats scans `<configDir>/planning/*/usage.jsonl` for per-
-// group planning round records and folds them into PlanningGroupStat values.
+// aggregateAgentSessionStats scans `<configDir>/planning/*/usage.jsonl` for per-
+// group planning round records and folds them into AgentSessionGroupStat values.
 // Only records whose Timestamp is strictly after since are included (zero
 // since means all records). The currently active workspace group is resolved
 // to a friendly label and path list; stale group keys are returned with
 // Label == key and Paths == nil.
 //
 // An empty or missing planning directory yields an empty map (never nil) so
-// the JSON response serializes as "planning":{} rather than "planning":null.
-func aggregatePlanningStats(configDir string, activeWorkspaces []string, since time.Time) map[string]PlanningGroupStat {
-	result := make(map[string]PlanningGroupStat)
+// the JSON response serializes as "agent_sessions":{} rather than "agent_sessions":null.
+func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, since time.Time) map[string]AgentSessionGroupStat {
+	result := make(map[string]AgentSessionGroupStat)
 	if configDir == "" {
 		return result
 	}
@@ -262,7 +262,7 @@ func aggregatePlanningStats(configDir string, activeWorkspaces []string, since t
 		if err != nil || len(recs) == 0 {
 			continue
 		}
-		stat := PlanningGroupStat{RoundCount: len(recs)}
+		stat := AgentSessionGroupStat{RoundCount: len(recs)}
 		timeline := make([]RoundPoint, 0, len(recs))
 		for _, rec := range recs {
 			stat.Usage.CostUSD += rec.CostUSD
@@ -342,7 +342,7 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 			since = time.Now().UTC().AddDate(0, 0, -n)
 		}
 	}
-	resp.Planning = aggregatePlanningStats(h.configDir, h.visibleWorkspaces(r.Context()), since)
+	resp.AgentSessions = aggregateAgentSessionStats(h.configDir, h.visibleWorkspaces(r.Context()), since)
 
 	httpjson.Write(w, http.StatusOK, resp)
 }

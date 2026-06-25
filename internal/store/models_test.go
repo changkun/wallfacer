@@ -200,16 +200,16 @@ func TestTaskBudgetFieldsRoundTrip(t *testing.T) {
 func TestSandboxActivityPlanning(t *testing.T) {
 	found := false
 	for _, a := range SandboxActivities {
-		if a == SandboxActivityPlanning {
+		if a == SandboxActivityAgentSession {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("SandboxActivityPlanning not in SandboxActivities slice")
+		t.Error("SandboxActivityAgentSession not in SandboxActivities slice")
 	}
-	if SandboxActivityPlanning != "planning" {
-		t.Errorf("SandboxActivityPlanning = %q, want %q", SandboxActivityPlanning, "planning")
+	if SandboxActivityAgentSession != "agent-session" {
+		t.Errorf("SandboxActivityAgentSession = %q, want %q", SandboxActivityAgentSession, "agent-session")
 	}
 }
 

@@ -156,8 +156,8 @@ const (
 	SandboxActivityCommitMessage SandboxActivity = "commit_message"
 	// SandboxActivityIdeaAgent is the brainstorm/ideation phase.
 	SandboxActivityIdeaAgent SandboxActivity = "idea_agent"
-	// SandboxActivityPlanning is the spec planning/iteration phase.
-	SandboxActivityPlanning SandboxActivity = "planning"
+	// SandboxActivityAgentSession is the interactive agent-session (chat) phase.
+	SandboxActivityAgentSession SandboxActivity = "agent-session"
 
 	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
 	SandboxActivityTest SandboxActivity = "test"
@@ -174,7 +174,7 @@ var SandboxActivities = []SandboxActivity{
 	SandboxActivityOversight,
 	SandboxActivityCommitMessage,
 	SandboxActivityIdeaAgent,
-	SandboxActivityPlanning,
+	SandboxActivityAgentSession,
 }
 
 // TaskStatus represents the lifecycle state of a task.
