@@ -8,12 +8,24 @@ affects:
   - internal/store/
 effort: xlarge
 created: 2026-03-29
-updated: 2026-04-12
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
 
 # Spec Coordination Layer
+
+> **Progress (2026-06-25): 3 of 4 child subtrees complete.**
+> [spec-document-model.md](spec-coordination/spec-document-model.md),
+> [spec-planning-ux.md](spec-coordination/spec-planning-ux.md), and
+> [spec-archival.md](spec-coordination/spec-archival.md) have all shipped — the
+> structured spec tree, the three-pane planning UX, chat-driven iteration,
+> dispatch workflow, undo snapshots, planning cost tracking, and the `archived`
+> lifecycle state are live. The remaining work is
+> [spec-state-control-plane.md](spec-coordination/spec-state-control-plane.md)
+> (drafted, 7 leaves): server-managed lifecycle transitions and drift
+> detection. `SpecCompletionHook` still writes `complete` unconditionally with
+> no tester verdict. The umbrella stays non-complete until that subtree lands.
 
 ## Problem
 
