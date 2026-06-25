@@ -9,6 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ErrMissingFrontmatter is returned by [ParseBytes]/[ParseFile] when a file
+// does not begin with a `---` frontmatter block. It is a sentinel so callers
+// can distinguish a frontmatter-less file (tolerable: render as a free-form
+// doc node) from a malformed-YAML parse failure (a genuine error).
+var ErrMissingFrontmatter = errors.New("missing frontmatter: file must start with ---")
+
 // ParseFile reads a spec file from disk and parses its YAML frontmatter
 // and markdown body. The path is stored on the returned Spec as-is.
 func ParseFile(path string) (*Spec, error) {
@@ -32,7 +38,7 @@ func ParseBytes(data []byte, path string) (*Spec, error) {
 
 	// Frontmatter must start with "---\n".
 	if !strings.HasPrefix(content, "---\n") {
-		return nil, errors.New("missing frontmatter: file must start with ---")
+		return nil, ErrMissingFrontmatter
 	}
 
 	// Find the closing "---\n" delimiter after the opening one.

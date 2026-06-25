@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,6 +56,20 @@ func BuildTree(specsDir string) (*Tree, error) {
 	return tree, nil
 }
 
+// docNode synthesizes a render-only node for a frontmatter-less markdown file.
+// It has no status and no lifecycle; the title is the file's first `# H1`,
+// falling back to a title-cased filename. Slices are non-nil to match the
+// shape ParseBytes guarantees for real specs.
+func docNode(mdPath string) *Spec {
+	title, _ := readFirstH1(mdPath, TitleFromFilename(mdPath))
+	return &Spec{
+		Title:     title,
+		Doc:       true,
+		DependsOn: []string{},
+		Affects:   []string{},
+	}
+}
+
 // scanDir scans a directory for .md spec files, recursing into matching
 // subdirectories for child specs.
 func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
@@ -93,8 +108,15 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 
 		s, parseErr := ParseFile(mdPath)
 		if parseErr != nil {
-			errs = append(errs, fmt.Errorf("parse %s: %w", relPath, parseErr))
-			continue
+			// A frontmatter-less file is not an error: surface it as a
+			// render-only doc node instead of dropping it silently. Genuine
+			// parse failures (malformed YAML) still go to tree.Errs.
+			if errors.Is(parseErr, ErrMissingFrontmatter) {
+				s = docNode(mdPath)
+			} else {
+				errs = append(errs, fmt.Errorf("parse %s: %w", relPath, parseErr))
+				continue
+			}
 		}
 		s.Path = relPath
 		s.Track = trackFromPath(relPath)
