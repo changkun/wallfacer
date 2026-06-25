@@ -208,6 +208,40 @@ func TestOptionalAuth_AudienceMismatchPassesThroughAnonymous(t *testing.T) {
 	}
 }
 
+// TestOptionalAuth_IssuerAudienceAccepted is the regression for the
+// coordination-plane "503 / invalid audience" bug: the auth server mints tokens
+// whose aud is the issuer (AuthURL), not the client id, because a public
+// client's allowed_audiences is just the issuer. The validator must admit such a
+// token, or every coordination dial (and Bearer-JWT API call) is rejected.
+func TestOptionalAuth_IssuerAudienceAccepted(t *testing.T) {
+	key := genKey(t)
+	srv := serveJWKS(t, key)
+	// AuthURL is the issuer; the token's iss must match the validator's issuer.
+	v := auth.BuildValidator(auth.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL)
+
+	payload := defaultPayload(time.Now().Add(time.Hour))
+	payload["iss"] = srv.URL
+	payload["aud"] = srv.URL // issuer audience, NOT the client id
+	tok := signToken(t, key, defaultHeader(key), payload)
+
+	capt := &claimsCapture{}
+	h := auth.OptionalAuth(v, capt.handler())
+	r := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	if !capt.ok {
+		t.Fatal("issuer-audience token rejected; PrincipalFromContext returned !ok")
+	}
+	if capt.seen.Sub != "user-abc" {
+		t.Errorf("claims.Sub = %q, want user-abc", capt.seen.Sub)
+	}
+}
+
 func TestOptionalAuth_MalformedHeaderPassesThrough(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)

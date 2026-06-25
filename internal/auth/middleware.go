@@ -47,7 +47,20 @@ func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
 		Issuer:  issuer, // empty = skip iss check; operator sets AUTH_ISSUER to opt in
 	}
 	if cfg.ClientID != "" {
-		jc.Audiences = []string{cfg.ClientID}
+		// Accept both the client id and the issuer (AuthURL) as audiences. The
+		// auth server stamps the issuer into every access token's aud
+		// unconditionally as the universal "valid at our own resource servers"
+		// marker, and a public client's allowed_audiences is just the issuer, so
+		// a token minted for this client carries aud=[issuer], not aud=[clientID].
+		// Without the issuer in this set the coordination connection (and any
+		// Bearer-JWT API call) is rejected with "invalid audience" even though the
+		// token is genuine. audMatch is OR, so accepting either keeps the
+		// other-relying-party rejection while admitting our own tokens.
+		auds := []string{cfg.ClientID}
+		if iss := strings.TrimRight(cfg.AuthURL, "/"); iss != "" && iss != cfg.ClientID {
+			auds = append(auds, iss)
+		}
+		jc.Audiences = auds
 	}
 	return jwtauth.New(jc)
 }
