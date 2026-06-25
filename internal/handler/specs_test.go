@@ -35,6 +35,49 @@ func readStatus(t *testing.T, ws, relPath string) spec.Status {
 	return s.Status
 }
 
+func TestMigrateSpec_Success(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	// A frontmatter-less file: renders as a doc node, eligible for migration.
+	writeTestSpec(t, ws, "specs/local/overview.md", "# Overview\n\nProse, no frontmatter.\n")
+
+	w := doTransition(t, h.MigrateSpec, "specs/local/overview.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	// The file now parses as a lifecycle-managed spec.
+	s, err := spec.ParseFile(filepath.Join(ws, "specs/local/overview.md"))
+	if err != nil {
+		t.Fatalf("ParseFile after migrate: %v", err)
+	}
+	if s.Status != spec.StatusDrafted {
+		t.Errorf("status = %q, want %q", s.Status, spec.StatusDrafted)
+	}
+	if s.Title != "Overview" {
+		t.Errorf("title = %q, want title from H1", s.Title)
+	}
+	if !strings.Contains(s.Body, "Prose, no frontmatter.") {
+		t.Errorf("body not preserved: %q", s.Body)
+	}
+}
+
+func TestMigrateSpec_AlreadyHasFrontmatter(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	writeTestSpec(t, ws, "specs/local/managed.md", testSpecValidated)
+
+	w := doTransition(t, h.MigrateSpec, "specs/local/managed.md")
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+}
+
+func TestMigrateSpec_NotFound(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	w := doTransition(t, h.MigrateSpec, "specs/local/missing.md")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusNotFound, w.Body.String())
+	}
+}
+
 func TestArchiveSpec_Success(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 	drafted := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
