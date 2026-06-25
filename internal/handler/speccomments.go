@@ -193,12 +193,12 @@ func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "spec not found", http.StatusNotFound)
 			return
 		}
-		parsed, err := spec.ParseBytes(body, req.Spec)
+		specBody, err := spec.BodyForAnchoring(body, req.Spec)
 		if err != nil {
 			http.Error(w, "spec parse failed", http.StatusUnprocessableEntity)
 			return
 		}
-		anchor := spec.ComputeAnchor(parsed.Body, req.StartLine, req.EndLine)
+		anchor := spec.ComputeAnchor(specBody, req.StartLine, req.EndLine)
 		// Advisory git metadata: the commit the body was at and the file's blob,
 		// for "view as of" and the outdated signal. Empty when not in git (the
 		// anchor still resolves on content hash).
@@ -306,11 +306,11 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 	if err != nil {
 		return specCommentThread{Thread: t, Orphaned: true}
 	}
-	parsed, err := spec.ParseBytes(body, t.SpecPath)
+	specBody, err := spec.BodyForAnchoring(body, t.SpecPath)
 	if err != nil {
 		return specCommentThread{Thread: t, Orphaned: true}
 	}
-	newAnchor, line, ok := spec.Reposition(parsed.Body, t.Anchor)
+	newAnchor, line, ok := spec.Reposition(specBody, t.Anchor)
 	if !ok {
 		return specCommentThread{Thread: t, Orphaned: true}
 	}
