@@ -16,6 +16,8 @@ LDFLAGS := -s -w
 ifneq ($(VERSION),)
 LDFLAGS += -X latere.ai/x/wallfacer/internal/cli.Version=$(VERSION)
 endif
+GOLANGCI_LINT ?= golangci-lint
+GOLANGCI_LINT_VERSION ?= 2.11.3
 
 build-binary: frontend-build
 	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .
@@ -46,14 +48,18 @@ fmt-go:
 # Run all linters (Go + frontend)
 lint: lint-go lint-js
 
-# Run Go linters (golangci-lint if available, otherwise go vet)
+# Run Go linters with the repo-pinned golangci-lint version.
 lint-go: frontend-build
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run ./...; \
-	else \
-		echo "golangci-lint not found, falling back to go vet"; \
-		go vet ./...; \
+	@if ! command -v $(GOLANGCI_LINT) >/dev/null 2>&1; then \
+		echo "golangci-lint $(GOLANGCI_LINT_VERSION) is required; install it or set GOLANGCI_LINT=/path/to/golangci-lint"; \
+		exit 1; \
 	fi
+	@actual="$$($(GOLANGCI_LINT) --version | sed -n 's/.* version \([^ ]*\).*/\1/p')"; \
+	if [ "$$actual" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+		echo "golangci-lint $$actual found, but $(GOLANGCI_LINT_VERSION) is required"; \
+		exit 1; \
+	fi
+	$(GOLANGCI_LINT) run ./...
 
 # Type-check the Vue frontend (vue-tsc --noEmit).
 lint-js:

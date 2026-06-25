@@ -122,3 +122,31 @@ func TestGenerateCodeVerifier_UsesRandReader(t *testing.T) {
 		t.Errorf("verifier length = %d; want 43", len(v))
 	}
 }
+
+func TestGenerateCodeVerifier_UsesInjectedRandReaderBytes(t *testing.T) {
+	old := randReader
+	defer func() { randReader = old }()
+
+	wantBytes := make([]byte, 32)
+	for i := range wantBytes {
+		wantBytes[i] = byte(i)
+	}
+	randReader = singleReadReader{data: wantBytes}
+
+	got, err := GenerateCodeVerifier()
+	if err != nil {
+		t.Fatalf("GenerateCodeVerifier: %v", err)
+	}
+	want := base64.RawURLEncoding.EncodeToString(wantBytes)
+	if got != want {
+		t.Fatalf("GenerateCodeVerifier = %q, want %q", got, want)
+	}
+}
+
+type singleReadReader struct {
+	data []byte
+}
+
+func (r singleReadReader) Read(p []byte) (int, error) {
+	return copy(p, r.data), nil
+}
