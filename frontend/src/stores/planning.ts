@@ -62,6 +62,10 @@ export interface PlanningThread {
   queue: { id: number; text: string }[];
   enqueuedAt: number;
   lastViewedAt: number;
+  // Server timestamps (epoch ms). `updated` tracks last activity (touched on
+  // every message), so the session list buckets and sorts by it.
+  created: number;
+  updated: number;
 }
 
 export interface PlanningMessage {
@@ -70,6 +74,14 @@ export interface PlanningMessage {
   timestamp?: string;
   raw_output?: string;
   plan_round?: number;
+}
+
+// parseTime turns an RFC3339 server timestamp into epoch ms, or 0 if absent or
+// unparseable (so callers can fall back to a previous value).
+function parseTime(s: string | undefined): number {
+  if (!s) return 0;
+  const ms = Date.parse(s);
+  return Number.isNaN(ms) ? 0 : ms;
 }
 
 export const usePlanningStore = defineStore('planning', () => {
@@ -246,6 +258,8 @@ export const usePlanningStore = defineStore('planning', () => {
       archived: boolean;
       mode?: 'spec' | 'task';
       task_id?: string;
+      created?: string;
+      updated?: string;
     }>;
     active_id?: string;
     busy_thread_id?: string;
@@ -264,7 +278,10 @@ export const usePlanningStore = defineStore('planning', () => {
       busyThreadId.value = res.busy_thread_id ?? '';
       for (const t of res.threads ?? []) {
         const cur = threads.value[t.id];
-        if (cur && cur.name !== t.name) cur.name = t.name;
+        if (!cur) continue;
+        if (cur.name !== t.name) cur.name = t.name;
+        const updated = parseTime(t.updated);
+        if (updated && updated !== cur.updated) cur.updated = updated;
       }
     } catch {
       /* ignore transient poll failures */
@@ -294,6 +311,8 @@ export const usePlanningStore = defineStore('planning', () => {
           queue: prev?.queue ?? [],
           enqueuedAt: prev?.enqueuedAt ?? 0,
           lastViewedAt: prev?.lastViewedAt ?? 0,
+          created: parseTime(t.created) || prev?.created || 0,
+          updated: parseTime(t.updated) || prev?.updated || 0,
         };
         next[t.id] = rec;
         if (rec.archived) archived.push(rec);

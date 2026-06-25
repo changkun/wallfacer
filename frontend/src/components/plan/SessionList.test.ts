@@ -26,12 +26,14 @@ function stubSession() {
   };
 }
 
-async function mount() {
+const DAY = 86_400_000;
+
+async function mount(updatedA = Date.now(), updatedB = Date.now()) {
   setActivePinia(createPinia());
   const planning = usePlanningStore();
   planning.threads = {
-    a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0 },
-    b: { id: 'b', name: 'Beta', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0 },
+    a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: updatedA },
+    b: { id: 'b', name: 'Beta', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: updatedB },
   };
   planning.threadOrder = ['a', 'b'];
   planning.activeThreadId = 'a';
@@ -72,24 +74,21 @@ describe('SessionList running spinner', () => {
   });
 });
 
-describe('SessionList status groups', () => {
-  it('groups the busy session under "In progress" and idle ones under "Sessions"', async () => {
-    await mount(); // busy_thread_id = 'b' (Beta)
+describe('SessionList date groups', () => {
+  it('buckets sessions by last-activity date, recent bucket first', async () => {
+    // Alpha touched just now -> Today; Beta touched 10 days ago -> Previous 30 days.
+    await mount(Date.now(), Date.now() - 10 * DAY);
     const headings = [...host.querySelectorAll('.chat-sessions-title')].map((h) => h.textContent);
-    expect(headings).toContain('In progress');
-    expect(headings).toContain('Sessions');
-    // "In progress" group comes first and contains the busy session.
+    expect(headings).toContain('Today');
+    expect(headings).toContain('Previous 30 days');
     const heads = [...host.querySelectorAll('.chat-sessions-head')];
-    expect(heads[0].querySelector('.chat-sessions-title')?.textContent).toBe('In progress');
+    expect(heads[0].querySelector('.chat-sessions-title')?.textContent).toBe('Today');
   });
 
-  it('groups an unread session under "Needs feedback"', async () => {
-    const planning = await mount();
-    // Make a non-active, non-busy thread unread.
-    planning.busyThreadId = '';
-    planning.threads.b.unread = true;
-    await nextTick();
-    const headings = [...host.querySelectorAll('.chat-sessions-title')].map((h) => h.textContent);
-    expect(headings).toContain('Needs feedback');
+  it('sorts most recently active first within a bucket', async () => {
+    // Both today: Beta more recent than Alpha, so Beta renders above Alpha.
+    await mount(Date.now() - 60_000, Date.now());
+    const names = [...host.querySelectorAll('.chat-session-name')].map((n) => n.textContent);
+    expect(names).toEqual(['Beta', 'Alpha']);
   });
 });
