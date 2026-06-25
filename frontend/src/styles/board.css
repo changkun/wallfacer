@@ -49,7 +49,7 @@
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-4);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--hairline-top), var(--sh-1);
   position: relative;
   transition:
     box-shadow 0.12s,
@@ -59,7 +59,7 @@
   contain-intrinsic-size: 240px;
 }
 .card:hover {
-  box-shadow: var(--sh-2);
+  box-shadow: var(--hairline-top), var(--sh-2);
   border-color: var(--rule-2);
 }
 .card:active {

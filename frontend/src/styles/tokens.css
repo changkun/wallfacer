@@ -95,11 +95,28 @@
   --col-waiting: #a56a12;
   --col-done: #3f7a4a;
 
-  /* Shadows */
-  --sh-1: 0 1px 0 rgba(27, 25, 22, 0.04);
-  --sh-2: 0 1px 2px rgba(27, 25, 22, 0.06), 0 1px 0 rgba(27, 25, 22, 0.03);
+  /* Elevation ladder — layered ambient + key light, warm-tinted from the
+     paper-ink shadow color. Each rung adds a softer, wider penumbra so
+     surfaces read as physically stacked rather than outlined. */
+  --sh-1: 0 1px 1px rgba(27, 25, 22, 0.04), 0 1px 2px rgba(27, 25, 22, 0.05);
+  --sh-2:
+    0 1px 2px rgba(27, 25, 22, 0.05), 0 3px 8px -1px rgba(27, 25, 22, 0.09);
+  --sh-3:
+    0 2px 4px rgba(27, 25, 22, 0.05), 0 10px 24px -6px rgba(27, 25, 22, 0.14);
   --sh-pop:
-    0 12px 40px -12px rgba(27, 25, 22, 0.18), 0 2px 6px rgba(27, 25, 22, 0.06);
+    0 4px 10px rgba(27, 25, 22, 0.07), 0 22px 50px -12px rgba(27, 25, 22, 0.24);
+
+  /* Inset well — recessed trays/inputs read as carved into the surface. */
+  --sh-inset: inset 0 1px 2px rgba(27, 25, 22, 0.05);
+  /* Top-edge highlight — the macOS "light from above" bevel on raised chrome. */
+  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+  /* Translucent chrome — frosted material over scrolling content. Needs the
+     blur filter to read; falls back to a near-opaque tint without it. */
+  --glass-bg: rgba(244, 241, 234, 0.72);
+  --glass-sidebar: rgba(236, 232, 222, 0.7);
+  --glass-elevated: rgba(250, 248, 243, 0.78);
+  --glass-blur: saturate(180%) blur(20px);
 
   /* Chart / badge tints */
   --tint-blue: #e4eaf4;
@@ -192,9 +209,21 @@
   --col-waiting: #d4a050;
   --col-done: #6fb37f;
 
-  --sh-1: 0 1px 0 rgba(0, 0, 0, 0.4);
-  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --sh-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+  /* Dark elevation: shadows nearly vanish on near-black, so depth leans on
+     the top-edge highlight + lighter elevated surfaces. Shadows still anchor
+     floating chrome. */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 10px -2px rgba(0, 0, 0, 0.5);
+  --sh-3: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 0, 0, 0.6);
+  --sh-pop: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 56px -12px rgba(0, 0, 0, 0.75);
+
+  --sh-inset: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  --glass-bg: rgba(21, 20, 15, 0.7);
+  --glass-sidebar: rgba(16, 15, 12, 0.72);
+  --glass-elevated: rgba(30, 28, 23, 0.8);
+  --glass-blur: saturate(160%) blur(20px);
 
   --tint-blue: #1a2638;
   --tint-blue-ink: #9bbce8;

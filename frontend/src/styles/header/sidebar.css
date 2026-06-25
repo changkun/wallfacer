@@ -5,7 +5,12 @@
   flex-shrink: 0;
   width: var(--sb-w);
   border-right: 1px solid var(--rule);
-  background: var(--bg-sidebar);
+  /* Frosted sidebar chrome — translucent + blurred, a touch of inner
+     highlight on the right edge so it reads as a raised rail beside the board. */
+  background: var(--glass-sidebar);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
   padding: var(--sp-3) 0;
   transition:
     width 0.18s ease,
@@ -346,7 +351,7 @@ button.sb-nav-item { appearance: none; }
   background: var(--bg-card);
   color: var(--ink);
   font-weight: 500;
-  box-shadow: var(--sh-1);
+  box-shadow: var(--hairline-top), var(--sh-1);
 }
 .sb-nav-item.active .sb-icon {
   color: var(--accent);

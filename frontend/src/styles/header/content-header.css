@@ -7,7 +7,12 @@
      editor tab strip reads compact rather than full-height. */
   padding: 3px 16px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
+  /* Frosted toolbar: translucent over the board canvas, blurred like a
+     native macOS title/toolbar band. Hairline highlight catches the top edge. */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--hairline-top);
 }
 
 /* Spacer holds the editor tab strip (and keeps the search + action buttons
@@ -405,9 +410,11 @@
    column rather than empty canvas. */
 .col-bg {
   background: var(--bg-sunk);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-3) var(--sp-3);
   gap: var(--sp-2);
+  /* Recessed well: cards sit visibly above the tray floor. */
+  box-shadow: var(--sh-inset);
 }
 .col-list {
   display: flex;
