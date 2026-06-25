@@ -250,4 +250,3 @@ func (d *DeviceAuth) cancel(w http.ResponseWriter, _ *http.Request) {
 	d.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
-

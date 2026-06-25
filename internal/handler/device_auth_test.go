@@ -159,4 +159,3 @@ func TestDeviceAuth_Cancel(t *testing.T) {
 		t.Fatalf("post-cancel poll = %q", presp.Status)
 	}
 }
-
