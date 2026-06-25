@@ -1829,8 +1829,8 @@ func TestResetTaskForRetry_PreservesRetryHistory(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry me", Timeout: 5})
 
 	// Move to failed.
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                    //nolint:errcheck
-	s.UpdateTaskResult(bg(), task.ID, "failed result", "sess-1", "end_turn", 3) //nolint:errcheck
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                                         //nolint:errcheck
+	s.UpdateTaskResult(bg(), task.ID, "failed result", "sess-1", "end_turn", 3)                      //nolint:errcheck
 	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, TaskUsage{CostUSD: 1.5}) //nolint:errcheck
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
