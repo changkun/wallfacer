@@ -27,7 +27,7 @@ Local Product - 10 shipped, rest pending
   ✅ Agents & Flows                ✅ Refinement Into Plan
   ✅ Vue Frontend Migration        ✅ Rebrand Module Path
   ✅ Backend Redundancy Cleanup
-  ○ Task Prompt Attachments        ○ Inline File Panel
+  ○ Task Prompt Attachments        ◐ Editor Tabs
   ○ Diff Review Comments           ○ Test Criteria
   ○ Visual Verification            ○ Scoped Command Registry
   ○ Host Path References           ○ Live Serve
@@ -150,7 +150,7 @@ graph LR
   FE[File Explorer ✅] --> SC[Spec Coordination ◐]
   FE --> TPA[Task Prompt Attachments]
   FE --> HPR[Host Path References]
-  FE --> IFP[Inline File Panel]
+  FE --> IFP[Editor Tabs]
   HT[Host Terminal ✅] --> TS[Terminal Sessions ✅] --> CE[Container Exec ✅]
 
   EW[Excalidraw Whiteboard]
