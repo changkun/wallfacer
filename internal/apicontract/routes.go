@@ -409,7 +409,7 @@ var Routes = []Route{
 	{
 		Method: http.MethodGet, Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
 		JSName:      "list",
-		Description: "List all 8 built-in system prompt templates with override status and content.",
+		Description: "List all built-in system prompt templates with override status and content.",
 		Tags:        []string{"system-prompts"},
 	},
 	{

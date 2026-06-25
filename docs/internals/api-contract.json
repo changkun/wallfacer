@@ -504,7 +504,7 @@
       "method": "GET",
       "pattern": "/api/system-prompts",
       "name": "ListSystemPrompts",
-      "description": "List all 8 built-in system prompt templates with override status and content.",
+      "description": "List all built-in system prompt templates with override status and content.",
       "tags": [
         "system-prompts"
       ]
