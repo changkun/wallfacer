@@ -1,13 +1,13 @@
 ---
 title: Archive Guard Only Blocks Active Dispatched Tasks
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/handler/specs.go
   - internal/handler/specs_test.go
 effort: small
 created: 2026-06-15
-updated: 2026-06-15
+updated: 2026-06-25
 author: changkun
 dispatched_task_id: null
 ---
