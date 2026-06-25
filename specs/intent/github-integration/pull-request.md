@@ -1,10 +1,13 @@
 ---
-title: "Pull Request Creation: Agent-Generated PR from Current Branch"
+title: "Pull Request Creation and Commenting (Write Surface)"
 status: drafted
-depends_on: []
+depends_on:
+  - specs/intent/github-integration/oauth-token-store.md
+  - specs/intent/github-integration/repo-selection.md
 affects:
   - internal/runner/pullrequest.go
-  - internal/handler/git.go
+  - internal/github/write.go
+  - internal/handler/github.go
   - internal/apicontract/routes.go
   - internal/prompts/pullrequest.tmpl
   - internal/store/models.go
@@ -12,12 +15,46 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-04-01
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
 
-# Pull Request Creation: Agent-Generated PR from Current Branch
+# Pull Request Creation and Commenting (Write Surface)
+
+Child of [github-integration](../github-integration.md), re-homed here from
+`specs/intent/pull-request.md`.
+
+---
+
+## Re-home note: gh CLI superseded by the GitHub API
+
+This was originally specced as a host-side `gh pr create` flow. Under the
+[github-integration](../github-integration.md) umbrella the auth model is a real
+GitHub OAuth App, so the **create mechanism changes from the `gh` CLI to a
+GitHub API call** using the token from
+[oauth-token-store](oauth-token-store.md). What is **reused unchanged**: the
+host-side branch-context collection (`git log` / `git diff`), the lightweight
+sandbox that generates the PR title and body, the push-if-needed step, and the
+existing-PR detection. What is **dropped**: the `gh installed`/`gh authenticated`
+prerequisite checks (replaced by GitHub-token auth status) and the doctor `gh`
+check. The sections below still describe the original `gh` design; treat
+`gh pr create` as "create via the GitHub API" and `gh` auth as "GitHub token
+present" when reading them.
+
+This child also adds **commenting**: posting a comment to a PR or issue
+(`POST /api/github/comments`), pairing the read surface's comment threads with a
+reply path. PR merge/close stay out of scope (unchanged boundary).
+
+### Open questions (write path)
+
+1. Create PR via REST (`POST /repos/{owner}/{repo}/pulls`) is straightforward;
+   does commenting need both PR review comments (line-anchored) and issue-style
+   conversation comments, or just conversation comments for v1?
+2. Where does the create action live now: still StatusBar (branch-local), the
+   new GitHub panel, or both?
+3. Does existing-PR detection move from `gh pr view` to a list/search API call,
+   and is it cached with the read surface?
 
 ---
 
