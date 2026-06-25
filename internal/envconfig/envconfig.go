@@ -57,6 +57,7 @@ type Config struct {
 	HostCodexBinary    string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
 	HostCursorBinary   string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
 	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
+	HostPiBinary       string // WALLFACER_HOST_PI_BINARY, optional override of $PATH lookup
 	TerminalEnabled    bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
@@ -103,6 +104,7 @@ var knownKeys = []string{
 	"WALLFACER_HOST_CODEX_BINARY",
 	"WALLFACER_HOST_CURSOR_BINARY",
 	"WALLFACER_HOST_OPENCODE_BINARY",
+	"WALLFACER_HOST_PI_BINARY",
 	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
 	"WALLFACER_CLOUD",
@@ -208,6 +210,8 @@ func Parse(path string) (Config, error) {
 			cfg.HostCursorBinary = v
 		case "WALLFACER_HOST_OPENCODE_BINARY":
 			cfg.HostOpenCodeBinary = v
+		case "WALLFACER_HOST_PI_BINARY":
+			cfg.HostPiBinary = v
 		case "WALLFACER_TERMINAL_ENABLED":
 			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":

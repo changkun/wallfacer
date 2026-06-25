@@ -91,6 +91,7 @@ type RunnerConfig struct {
 	HostCodexBinary    string           // optional override for the `codex` binary path
 	HostCursorBinary   string           // optional override for the `cursor-agent` binary path
 	HostOpenCodeBinary string           // optional override for the `opencode` binary path
+	HostPiBinary       string           // optional override for the `pi` binary path
 	TmpDir             string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	Prompts            *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager   *workspace.Manager
@@ -497,6 +498,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		CodexBinary:    cfg.HostCodexBinary,
 		CursorBinary:   cfg.HostCursorBinary,
 		OpenCodeBinary: cfg.HostOpenCodeBinary,
+		PiBinary:       cfg.HostPiBinary,
 	})
 	r.backend = hb
 	r.reg = cfg.Reg
