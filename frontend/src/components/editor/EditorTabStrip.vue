@@ -8,6 +8,7 @@ import { onMounted, onUnmounted } from 'vue';
 import { useEditorTabsStore, BOARD_TAB_ID, type FileTab } from '../../stores/editorTabs';
 import { useTaskStore } from '../../stores/tasks';
 import { fileIcon } from '../../lib/fileIcon';
+import { handleTabHotkey } from './editorTabHotkeys';
 
 const tabs = useEditorTabsStore();
 const store = useTaskStore();
@@ -28,12 +29,10 @@ function onAuxClick(e: MouseEvent, path: string) {
   }
 }
 
-// Cmd/Ctrl+W closes the active file tab (the board tab is pinned).
+// Cmd/Ctrl+S pins (and saves) the active file tab; Cmd/Ctrl+W closes it. Run on
+// the window so they work even when CodeMirror isn't focused.
 function onKeydown(e: KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w' && tabs.activeId !== BOARD_TAB_ID) {
-    e.preventDefault();
-    void tabs.close(tabs.activeId);
-  }
+  handleTabHotkey(e, tabs);
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown));
