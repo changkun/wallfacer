@@ -1,6 +1,6 @@
 ---
 title: Shared Postgres Store and Migrations
-status: drafted
+status: complete
 depends_on:
   - specs/cloud/latere-integration/coordination-plane/spec-comments.md
 affects:
@@ -177,3 +177,66 @@ gate `commentstore_contract_test.go` already uses.
   unchanged.
 - **`make build`** is the gate (lint catches unused code the go toolchain
   misses): run it after the new imports land.
+
+## Implementation notes
+
+### Status
+
+Fully implemented on `main`, 2026-06-25. Commits `518ceb91` (package + migrations
++ deps) and `c2fb54f2` (coordinator/CLI switch to the injected pool). Verified
+against a real Postgres 16 container; all tests pass.
+
+### What was done
+
+- **New package `internal/store/postgres`** (`postgres.go`): owns the wallfacer
+  pool, runs embedded golang-migrate migrations at `New()` before the pool is
+  returned, `pgxScheme` rewrites `postgres://` to `pgx5://`, `Pool()` shares the
+  pool, `Close()` is the sole owner. Pinned `github.com/golang-migrate/migrate/v4
+  v4.19.1`.
+- **Migrations** (`migrations/000001_spec_comments.{up,down}.sql`): the up file
+  is the previous inline schema verbatim (idempotent `IF NOT EXISTS`); the down
+  drops `spec_comments` then `spec_comment_threads`.
+- **Coordinator** (`pgstore.go`): deleted the `pgSchema` const and the inline
+  `Exec`; `NewPostgresCommentStore(pool *pgxpool.Pool)` borrows the pool and no
+  longer owns `Close()`.
+- **CLI** (`coordination.go` `newCommentStore`): opens `postgres.New(ctx, dsn)`
+  once and passes `st.Pool()` to the comment store; the memory fallback is
+  unchanged. `web.go` needed no change (it never closed the store).
+- **Tests**: `postgres_test.go` (empty-DB, existing-tables upgrade, idempotent
+  re-run, down) and the updated comment-store contract branch, both env-gated on
+  `WALLFACER_TEST_DATABASE_URL`. Verified against Postgres 16: the load-bearing
+  `TestNew_ExistingTablesUpgrade` and the `postgres` contract subtest pass.
+
+### Decisions made during implementation
+
+- **`web.go` untouched, pool lives for the process.** The comment store was
+  never `Close()`d before (the web server runs for the process lifetime), so
+  `newCommentStore` drops the `*postgres.Store` handle rather than threading it
+  to a shutdown path. The shared `Close()` exists for tests and future callers.
+  Revisit when a graceful-shutdown path is introduced.
+- **Down migration tested by building a `migrate` instance in-package.** `New()`
+  only goes up, so the down test constructs `migrate.NewWithSourceInstance` from
+  the package-private `migrationsFS`/`pgxScheme` to exercise the real `.down.sql`.
+- **`to_regclass` for table-existence assertions** in the test, the simplest
+  schema-agnostic check.
+
+### Deviations from the spec
+
+None. The implementation matches the spec; `web.go` being a no-op change was
+anticipated in the spec body (it "keeps wiring the returned `CommentStore` ...
+unchanged").
+
+### Surprises / gotchas
+
+- `go mod tidy` pulled `github.com/jackc/pgerrcode` as a new indirect dep of
+  golang-migrate's pgx5 driver. Expected, not a concern.
+- CI still provisions no Postgres, so the pg-touching tests skip there; they ran
+  green only because a container was spun up locally for this verification. The
+  durable path remains CI-unverified by design (matches the pre-existing
+  contract-test gate).
+
+### Follow-ups
+
+None required for this framework. The next durable consumer
+([metadata-projection.md](metadata-projection.md) rollups) adds `000002_*.sql`
+and a constructor taking `*pgxpool.Pool`; no further infra work.
