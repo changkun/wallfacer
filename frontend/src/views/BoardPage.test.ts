@@ -80,10 +80,24 @@ async function mountBoard(): Promise<Mounted> {
 
 let originalFetch: typeof globalThis.fetch;
 let activePinia: Pinia;
+let storage: Map<string, string>;
 
 beforeEach(() => {
   activePinia = createPinia();
   setActivePinia(activePinia);
+  storage = new Map();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      storage.set(key, value);
+    },
+    removeItem: (key: string) => storage.delete(key),
+    clear: () => storage.clear(),
+    key: (index: number) => Array.from(storage.keys())[index] ?? null,
+    get length() {
+      return storage.size;
+    },
+  });
   // happy-dom lacks IntersectionObserver, which BoardPage's column observer
   // constructs on mount.
   (globalThis as unknown as Record<string, unknown>).IntersectionObserver = class {
@@ -103,6 +117,7 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  vi.unstubAllGlobals();
 });
 
 describe('BoardPage Open Explorer toggle', () => {
