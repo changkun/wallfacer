@@ -68,10 +68,15 @@ useSse({
   onStaleRestart() { void refresh(); },
 });
 
+let statusTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   void refresh();
   void fetchStatus();
+  // Poll the connection state so the indicator reflects sign-in and the
+  // connector dialing/reconnecting without a page reload.
+  statusTimer = setInterval(() => void fetchStatus(), 5000);
 });
+onUnmounted(() => clearInterval(statusTimer));
 
 // ── Derived sets ───────────────────────────────────────────────────
 
@@ -92,14 +97,24 @@ const outOfSync = computed(() => outOfSyncCount(threads.value));
 const optedIn = ref(false);
 const coordToggleAvailable = ref(false);
 const enabling = ref(false);
+// signedIn gates the whole comment surface: when the user is not signed in, no
+// comment chrome appears at all. coordState drives the connection indicator.
+const signedIn = ref(false);
+const coordState = ref<string>('');
 
 async function fetchStatus() {
   try {
-    const s = await api<{ opted_in?: boolean; available?: boolean }>('GET', '/api/coordination/status');
+    const s = await api<{
+      opted_in?: boolean; available?: boolean; signed_in?: boolean; connected?: boolean; state?: string;
+    }>('GET', '/api/coordination/status');
     optedIn.value = !!s.opted_in;
     coordToggleAvailable.value = !!s.available;
+    signedIn.value = !!s.signed_in;
+    coordState.value = s.state || '';
   } catch {
     coordToggleAvailable.value = false;
+    signedIn.value = false;
+    coordState.value = '';
   }
 }
 
@@ -319,7 +334,9 @@ defineExpose({ openCount, showResolved, available });
 </script>
 
 <template>
-  <template v-if="available">
+  <!-- Gated on sign-in: when the user is not signed in, no comment surface
+       appears at all (you cannot comment, so it should not show). -->
+  <template v-if="available && signedIn">
     <!-- Opt-in prompt: coordination is off by default (the data boundary). -->
     <div v-if="coordToggleAvailable && !optedIn" class="sc-banner sc-banner--optin">
       <span>Spec comments are off. Enable to comment and see your team's comments.</span>
@@ -361,6 +378,12 @@ defineExpose({ openCount, showResolved, available });
         class="sc-triage-btn"
         @click="triageOpen = !triageOpen"
       >Triage {{ triage.length }}</button>
+      <!-- Connection indicator so a stalled connection is never a silent 503. -->
+      <span
+        class="sc-conn"
+        :class="'sc-conn--' + coordState"
+        :title="'Coordination: ' + coordState"
+      >{{ coordState === 'connected' ? 'synced' : coordState === 'connecting' ? 'connecting…' : coordState }}</span>
     </div>
 
     <!-- Inline gutter markers, positioned over the scrolling body content. -->
@@ -538,6 +561,16 @@ defineExpose({ openCount, showResolved, available });
   font: inherit;
   text-decoration: underline;
 }
+/* Connection indicator: muted by default, amber while connecting, green synced. */
+.sc-conn {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #9ca3af);
+}
+.sc-conn--connected { color: #16a34a; }
+.sc-conn--connecting { color: #d97706; }
+.sc-conn--opted-out,
+.sc-conn--signed-out { color: var(--color-text-muted, #9ca3af); }
 
 /* Header strip sits at the top of the body, before the prose. */
 .sc-bar {

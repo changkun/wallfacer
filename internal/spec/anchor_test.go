@@ -78,7 +78,7 @@ func TestLineHashUnicodeNFC(t *testing.T) {
 	const want = "5a5b25a1d214cd6bdd0d1fb91ffaa37525021e5af737aa5653273ed807eeefe3"
 
 	decomposed := "caf" + "e" + "́" + " normalization" // e + U+0301
-	precomposed := "café normalization"                 // é
+	precomposed := "café normalization"                // é
 
 	gotD := LineHash(normalizeLine(decomposed))
 	gotP := LineHash(normalizeLine(precomposed))
@@ -208,6 +208,39 @@ func TestRepositionExactUniqueAfterUnrelatedEdit(t *testing.T) {
 	}
 }
 
+// TestRepositionMultiLineRoundTrip is the regression for the orphan-on-display
+// bug: a multi-line selection (a paragraph or several lines, the common case)
+// must reattach when repositioned against the same body, not orphan. Before the
+// fix, ComputeAnchor hashed the joined range while Reposition matched single
+// lines, so every multi-line comment landed in triage immediately.
+func TestRepositionMultiLineRoundTrip(t *testing.T) {
+	start := lineOf(t, sampleBody, "Field one is the section path.")
+	end := lineOf(t, sampleBody, "Field three is the prefix window.")
+	if end <= start {
+		t.Fatalf("expected a multi-line range, got [%d,%d]", start, end)
+	}
+	a := ComputeAnchor(sampleBody, start, end)
+
+	// Same body: must reattach exactly to the range start.
+	_, line, ok := Reposition(sampleBody, a)
+	if !ok {
+		t.Fatal("multi-line anchor orphaned against its own body (the bug)")
+	}
+	if line != start {
+		t.Errorf("reattached to line %d, want range start %d", line, start)
+	}
+
+	// After an unrelated edit above, the range shifts down but still reattaches.
+	edited := replace(sampleBody, "Intro paragraph one.", "Intro paragraph one.\nNEW line A.\nNEW line B.")
+	_, line2, ok2 := Reposition(edited, a)
+	if !ok2 {
+		t.Fatal("multi-line anchor orphaned after an unrelated edit")
+	}
+	if line2 != lineOf(t, edited, "Field one is the section path.") {
+		t.Errorf("reattached to wrong line %d after edit", line2)
+	}
+}
+
 func TestRepositionFuzzyWithinSection(t *testing.T) {
 	// Anchor on a line, then edit that very line slightly (so the hash no
 	// longer matches) but keep its prefix/suffix context, forcing the fuzzy
@@ -305,10 +338,10 @@ func TestRepositionRenamedLeafHeading(t *testing.T) {
 
 func TestSlugify(t *testing.T) {
 	tests := map[string]string{
-		"Anchor fields":               "anchor-fields",
-		"  Real-time relay  ":         "real-time-relay",
-		"Step 2 (exact-ambiguous)":    "step-2-exact-ambiguous",
-		"UPPER Case":                  "upper-case",
+		"Anchor fields":            "anchor-fields",
+		"  Real-time relay  ":      "real-time-relay",
+		"Step 2 (exact-ambiguous)": "step-2-exact-ambiguous",
+		"UPPER Case":               "upper-case",
 	}
 	for in, want := range tests {
 		if got := slugify(in); got != want {
