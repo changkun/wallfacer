@@ -8,6 +8,9 @@
   flex-shrink: 0;
   border-top: 1px solid var(--rule);
   background: var(--bg-sunk);
+  /* Top-edge bevel + a faint lift so the strip reads as chrome seated
+     beneath the content rather than part of the canvas. */
+  box-shadow: var(--hairline-top), 0 -1px 3px rgba(27, 25, 22, 0.04);
   font-size: var(--fs-9);
   color: var(--ink-3);
   user-select: none;

@@ -48,7 +48,11 @@
   min-width: 200px;
   max-width: 50vw;
   border-right: 1px solid var(--border);
-  background: var(--bg-sunk, var(--bg-raised, var(--bg)));
+  /* Frosted source-list chrome, matching the app sidebar; the board to its
+     right reads as the raised content surface. */
+  background: var(--glass-sidebar, var(--bg-sunk));
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   flex-shrink: 0;
   overflow: hidden;
 }
