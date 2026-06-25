@@ -217,9 +217,40 @@ onUnmounted(() => {
 // fresh card lands near its anchor instead of stacking at the top.
 const RAIL_FALLBACK_H = 60;
 const RAIL_GAP = 10;
+// Below this pane width the content column (52em ≈ 728px) + rail + the TOC
+// reserve no longer fit, so the rail would overlap the prose: fold it by
+// default (the inline marks stay the affordance). 28(pad) + 728 + 16(inset) +
+// 280(rail) + 208(toc reserve) ≈ 1260.
+const RAIL_MIN_PANE = 1260;
 
-const railFolded = ref(false);
 const cardHeights = ref<Map<string, number>>(new Map());
+
+// railFolded = the Overleaf-style fold. userFold is the manual override (null =
+// follow the width default); narrow folds automatically on a cramped pane.
+const paneWidth = ref(Infinity);
+const userFold = ref<boolean | null>(null);
+const narrow = computed(() => paneWidth.value < RAIL_MIN_PANE);
+const railFolded = computed(() => userFold.value ?? narrow.value);
+function toggleFold() { userFold.value = !railFolded.value; }
+// Drop the manual override when the pane crosses the breakpoint, so a rail shown
+// on a wide pane re-folds when the pane gets cramped (and vice versa).
+watch(narrow, () => { userFold.value = null; });
+
+// Track the scrolling pane's width (the .sf-body), not the host content box:
+// the host's content width shrinks when the rail reserves its gutter, which
+// would oscillate the fold decision; the pane width is stable across folds.
+let paneRo: ResizeObserver | undefined;
+function observePane() {
+  if (typeof ResizeObserver === 'undefined') return;
+  const pane = props.bodyEl?.closest<HTMLElement>('.sf-body');
+  paneRo?.disconnect();
+  if (!pane) return;
+  paneRo = new ResizeObserver(() => { paneWidth.value = pane.clientWidth; });
+  paneRo.observe(pane);
+  paneWidth.value = pane.clientWidth;
+}
+watch(() => props.bodyEl, observePane, { immediate: true });
+onUnmounted(() => paneRo?.disconnect());
 
 const railCards = computed(() => {
   const list = specThreads.value.filter((t) => anchorTops.value.has(t.id));
@@ -350,8 +381,11 @@ const openThread = computed<SpecCommentThread | null>(() =>
 const openTree = computed(() => openThread.value ? buildReplyTree(openThread.value.comments) : []);
 
 function toggleThread(id: string) {
-  openThreadId.value = openThreadId.value === id ? null : id;
+  const opening = openThreadId.value !== id;
+  openThreadId.value = opening ? id : null;
   replyBody.value = '';
+  // Clicking an inline mark while the rail is folded should reveal its card.
+  if (opening && railFolded.value) userFold.value = false;
 }
 
 async function submitReply() {
@@ -459,6 +493,12 @@ defineExpose({ openCount, showResolved, available });
         <input type="checkbox" v-model="showResolved" />
         Show resolved
       </label>
+      <button
+        type="button"
+        class="sc-fold"
+        :title="railFolded ? 'Show comments in the margin' : 'Hide the comment margin'"
+        @click="toggleFold"
+      >{{ railFolded ? 'Show comments' : 'Hide comments' }}</button>
       <button
         v-if="triage.length > 0"
         type="button"
@@ -719,6 +759,16 @@ defineExpose({ openCount, showResolved, available });
   cursor: pointer;
 }
 .sc-toggle input { cursor: pointer; }
+.sc-fold {
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg-card);
+  color: var(--ink-3);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sc-fold:hover { background: var(--bg-hover); color: var(--ink-2); }
 .sc-triage-btn {
   margin-left: auto;
   padding: 3px 10px;
