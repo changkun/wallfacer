@@ -171,7 +171,11 @@ const renderedBody = computed(() => {
 });
 
 const showDispatch = computed(
-  () => !focusedIsIndex.value && status.value === 'validated' && isLeaf.value && !isArchived.value,
+  () =>
+    !focusedIsIndex.value &&
+    status.value === 'validated' &&
+    !isArchived.value &&
+    (isLeaf.value || subtreeLeafCount() > 0),
 );
 const showBreakdown = computed(
   () => !focusedIsIndex.value && (status.value === 'validated' || status.value === 'drafted') && !isArchived.value,
@@ -209,11 +213,32 @@ function focusedChildCount(): number {
   return count;
 }
 
+// subtreeLeafCount counts the live (non-archived) leaf specs under the focused
+// node. Used to decide whether a non-leaf design spec can be folder-dispatched.
+function subtreeLeafCount(): number {
+  if (!focusedNode.value) return 0;
+  if (focusedNode.value.is_leaf) return 1;
+  let count = 0;
+  const queue = [...(focusedNode.value.children ?? [])];
+  while (queue.length > 0) {
+    const path = queue.shift()!;
+    const node = tree.value.find(n => n.path === path);
+    if (!node || node.spec?.status === 'archived') continue;
+    if (node.is_leaf) count++;
+    else if (node.children) queue.push(...node.children);
+  }
+  return count;
+}
+
 async function onDispatch() {
   if (!focusedSpecPath.value) return;
+  const leaves = isLeaf.value ? 1 : subtreeLeafCount();
+  const message = isLeaf.value
+    ? 'Dispatch this spec to the task board?'
+    : `Dispatch this design spec's ${leaves} leaf task${leaves === 1 ? '' : 's'} to the board?`;
   if (!(await dialog.confirm({
     title: 'Dispatch spec',
-    message: 'Dispatch this spec to the task board?',
+    message,
     confirmLabel: 'Dispatch',
   }))) return;
   actionBusy.value = true;
