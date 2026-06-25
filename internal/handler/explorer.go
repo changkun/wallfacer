@@ -163,8 +163,11 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 		return fmt.Sprintf("%x", hash.Sum(nil))
 	}
 
-	// Build initial fingerprints for all workspace roots.
-	workspaces := h.currentWorkspaces()
+	// Build initial fingerprints for all workspace roots. Use visibleWorkspaces
+	// (not currentWorkspaces) so a session that cannot see the active org-scoped
+	// group does not receive refresh events naming those workspace paths, matching
+	// GitStatusStream and the other explorer handlers' isAllowedWorkspace gate.
+	workspaces := h.visibleWorkspaces(r.Context())
 	prevFingerprints := make(map[string]string)
 	for _, ws := range workspaces {
 		prevFingerprints[ws] = fingerprint(ws)
@@ -189,8 +192,8 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-ticker.C:
-			// Re-read current workspaces in case they changed.
-			currentWS := h.currentWorkspaces()
+			// Re-read visible workspaces in case they changed.
+			currentWS := h.visibleWorkspaces(r.Context())
 			var changed []string
 			newFingerprints := make(map[string]string)
 			for _, ws := range currentWS {
