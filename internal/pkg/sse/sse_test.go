@@ -59,6 +59,19 @@ func TestEvent_Format(t *testing.T) {
 	}
 }
 
+func TestEvent_MultilineData(t *testing.T) {
+	rec := httptest.NewRecorder()
+	s := NewWriter(rec)
+	if err := s.Event("update", []byte("line one\nline two")); err != nil {
+		t.Fatalf("Event: %v", err)
+	}
+	got := rec.Body.String()
+	want := "event: update\ndata: line one\ndata: line two\n\n"
+	if got != want {
+		t.Errorf("frame = %q, want %q", got, want)
+	}
+}
+
 func TestEventID_Format(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s := NewWriter(rec)
@@ -67,6 +80,19 @@ func TestEventID_Format(t *testing.T) {
 	}
 	got := rec.Body.String()
 	want := "id: 42\nevent: delta\ndata: {}\n\n"
+	if got != want {
+		t.Errorf("frame = %q, want %q", got, want)
+	}
+}
+
+func TestEventID_MultilineData(t *testing.T) {
+	rec := httptest.NewRecorder()
+	s := NewWriter(rec)
+	if err := s.EventID("42", "delta", []byte("first\nsecond")); err != nil {
+		t.Fatalf("EventID: %v", err)
+	}
+	got := rec.Body.String()
+	want := "id: 42\nevent: delta\ndata: first\ndata: second\n\n"
 	if got != want {
 		t.Errorf("frame = %q, want %q", got, want)
 	}
@@ -98,6 +124,19 @@ func TestMessage_Format(t *testing.T) {
 	}
 	got := rec.Body.String()
 	want := "data: {\"hello\":\"world\"}\n\n"
+	if got != want {
+		t.Errorf("frame = %q, want %q", got, want)
+	}
+}
+
+func TestMessage_MultilineData(t *testing.T) {
+	rec := httptest.NewRecorder()
+	s := NewWriter(rec)
+	if err := s.Message([]byte("one\ntwo")); err != nil {
+		t.Fatalf("Message: %v", err)
+	}
+	got := rec.Body.String()
+	want := "data: one\ndata: two\n\n"
 	if got != want {
 		t.Errorf("frame = %q, want %q", got, want)
 	}

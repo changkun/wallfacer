@@ -9,6 +9,7 @@
 package sse
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -40,10 +41,16 @@ func NewWriter(w http.ResponseWriter) *Writer {
 }
 
 // Event writes a named SSE event with the given pre-encoded data
-// payload and flushes. data is written verbatim — pre-marshal JSON
-// yourself, or use JSON for the common case.
+// payload and flushes. Pre-marshal JSON yourself, or use JSON for the
+// common case.
 func (s *Writer) Event(name string, data []byte) error {
-	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", name, data); err != nil {
+	if _, err := fmt.Fprintf(s.w, "event: %s\n", name); err != nil {
+		return err
+	}
+	if err := s.writeData(data); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(s.w, "\n"); err != nil {
 		return err
 	}
 	s.flusher.Flush()
@@ -54,7 +61,13 @@ func (s *Writer) Event(name string, data []byte) error {
 // reconnect with Last-Event-ID for delta replay. id is written
 // verbatim; callers typically format an int64 sequence as decimal.
 func (s *Writer) EventID(id, name string, data []byte) error {
-	if _, err := fmt.Fprintf(s.w, "id: %s\nevent: %s\ndata: %s\n\n", id, name, data); err != nil {
+	if _, err := fmt.Fprintf(s.w, "id: %s\nevent: %s\n", id, name); err != nil {
+		return err
+	}
+	if err := s.writeData(data); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(s.w, "\n"); err != nil {
 		return err
 	}
 	s.flusher.Flush()
@@ -76,11 +89,27 @@ func (s *Writer) JSON(name string, v any) error {
 // by streams that never name their events, e.g. a single-purpose
 // status feed.
 func (s *Writer) Message(data []byte) error {
-	if _, err := fmt.Fprintf(s.w, "data: %s\n\n", data); err != nil {
+	if err := s.writeData(data); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(s.w, "\n"); err != nil {
 		return err
 	}
 	s.flusher.Flush()
 	return nil
+}
+
+func (s *Writer) writeData(data []byte) error {
+	for {
+		line, rest, found := bytes.Cut(data, []byte{'\n'})
+		if _, err := fmt.Fprintf(s.w, "data: %s\n", line); err != nil {
+			return err
+		}
+		if !found {
+			return nil
+		}
+		data = rest
+	}
 }
 
 // Heartbeat writes a "heartbeat" event with empty data. Sent as a real
