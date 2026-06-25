@@ -21,6 +21,8 @@ type Instance struct {
 	Principal Principal
 	Manifest  Manifest
 	Conn      Sender
+
+	generation uint64
 }
 
 // ID returns the instance's stable, persisted id (the registry key).
@@ -48,6 +50,14 @@ type Event struct {
 	InstanceID string
 }
 
+// Registration identifies the exact registry entry created by Join. It lets the
+// connection that joined later leave only its own generation, not a replacement
+// connection that reused the same persisted instance id.
+type Registration struct {
+	InstanceID string
+	generation uint64
+}
+
 // Registry is the coordinator-side, in-memory, ephemeral map of live instances.
 // It is rebuilt from reconnects and never persisted. It holds only registration
 // metadata (principal, org, instance id, host label, version, served workspace
@@ -70,6 +80,7 @@ type Registry struct {
 	byInstance map[string]Instance // instance_id -> instance
 	subs       map[int]chan Event
 	nextSub    int
+	nextGen    uint64
 }
 
 // NewRegistry returns an empty registry.
@@ -84,18 +95,22 @@ func NewRegistry() *Registry {
 // (stale) entry replaces it rather than adding a second, so a restart that
 // reconnects before the prior socket times out does not briefly show two
 // instances. The replace path emits EventManifest, a fresh id emits EventJoin.
-func (r *Registry) Join(inst Instance) {
+func (r *Registry) Join(inst Instance) Registration {
 	r.mu.Lock()
 	id := inst.ID()
 	_, existed := r.byInstance[id]
+	r.nextGen++
+	inst.generation = r.nextGen
 	r.byInstance[id] = inst
 	kind := EventJoin
 	if existed {
 		kind = EventManifest
 	}
 	ev := Event{Kind: kind, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: id}
+	reg := Registration{InstanceID: id, generation: inst.generation}
 	r.mu.Unlock()
 	r.broadcast(ev)
+	return reg
 }
 
 // UpdateManifest replaces the manifest for an existing instance (a reconnect or
@@ -124,6 +139,22 @@ func (r *Registry) Leave(instanceID string) {
 	}
 	delete(r.byInstance, instanceID)
 	ev := Event{Kind: EventLeave, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: instanceID}
+	r.mu.Unlock()
+	r.broadcast(ev)
+}
+
+// LeaveRegistration removes an instance only if the current registry entry still
+// matches the generation returned by Join. Stale sockets that were replaced by a
+// reconnect become no-ops.
+func (r *Registry) LeaveRegistration(reg Registration) {
+	r.mu.Lock()
+	inst, ok := r.byInstance[reg.InstanceID]
+	if !ok || inst.generation != reg.generation {
+		r.mu.Unlock()
+		return
+	}
+	delete(r.byInstance, reg.InstanceID)
+	ev := Event{Kind: EventLeave, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: reg.InstanceID}
 	r.mu.Unlock()
 	r.broadcast(ev)
 }
