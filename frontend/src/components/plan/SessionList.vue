@@ -71,6 +71,7 @@ onUnmounted(() => {
     <button
       type="button"
       class="chat-session-new"
+      :class="{ 'chat-session-new--active': s.draft.value }"
       @click="s.createThread"
     >
       <span class="chat-session-new-icon" aria-hidden="true">+</span>
@@ -204,6 +205,12 @@ onUnmounted(() => {
 
 .chat-session-new:hover {
   background: var(--bg-hover);
+}
+
+/* Active while an unsent "New chat" draft is open. */
+.chat-session-new--active {
+  background: var(--bg-active);
+  font-weight: 500;
 }
 
 .chat-session-new-icon {

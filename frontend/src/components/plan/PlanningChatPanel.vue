@@ -84,6 +84,13 @@ defineExpose({
           </template>
         </component>
       </template>
+      <div
+        v-if="chat.draft.value"
+        class="pcp-tab pcp-tab--active"
+        role="tab"
+      >
+        <span class="pcp-tab-label">New chat</span>
+      </div>
       <span class="pcp-tab-newwrap">
         <button
           type="button"
