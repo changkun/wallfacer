@@ -364,7 +364,7 @@ const logContainer = ref<HTMLElement | null>(null);
 // Stream output for every task (the endpoint replays saved turn outputs for
 // finished tasks and live output for running ones).
 const streamTaskId = computed(() => props.task.id || null);
-const { raw: rawOutput, activity, streaming } = useTaskActivity(streamTaskId);
+const { raw: rawOutput, activity, streaming, truncated: serverTruncated } = useTaskActivity(streamTaskId);
 
 // Activity search + truncation. Mirrors ui/js/modal-logs.js (line 142
 // search filter + line 117 MAX_LOG_LINES cap). Filter is case-insensitive
@@ -390,10 +390,9 @@ const activityTruncated = computed(() => {
   return activity.value.length > ACTIVITY_MAX_ROWS && len === ACTIVITY_MAX_ROWS;
 });
 
-// Server-side 8MB turn-output truncation: the backend injects a
-// truncation_notice sentinel into the NDJSON stream (see store SaveTurnOutput).
-// Mirrors ui/js/modal-logs.js's server truncation banner.
-const serverTruncated = computed(() => rawOutput.value.includes('"subtype":"truncation_notice"'));
+// Server-side 8MB turn-output truncation banner: useTaskActivity exposes a
+// sticky truncated flag (set once when the sentinel arrives, see store
+// SaveTurnOutput). Mirrors ui/js/modal-logs.js's server truncation banner.
 const logDownloadUrl = computed(() => `/api/tasks/${props.task.id}/logs`);
 
 interface OversightPhase {
