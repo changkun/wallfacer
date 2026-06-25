@@ -140,6 +140,15 @@ watch(
   () => rerender(),
 );
 watch(specTree, () => rerender(), { deep: false });
+
+// Reload the spec tree when the active workspace changes. The workspace
+// switcher refreshes tasks (whose fingerprint watch re-renders), but the spec
+// tree is fetched once on mount; without this the map keeps the previous
+// workspace's specs until a full page reload.
+watch(
+  () => (store.config?.workspaces ?? []).join('\n'),
+  () => { void loadSpecTree(); },
+);
 </script>
 
 <template>

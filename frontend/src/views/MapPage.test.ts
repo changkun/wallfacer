@@ -206,6 +206,34 @@ describe('MapPage', () => {
     host.remove();
   });
 
+  it('reloads the spec tree when the active workspace changes', async () => {
+    const store = useTaskStore();
+    store.config = {
+      workspaces: ['/ws/a'],
+    } as unknown as typeof store.config;
+    const { app, host } = await mountMapPage();
+
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const treeCalls = () =>
+      fetchMock.mock.calls.filter(([input]) =>
+        (typeof input === 'string' ? input : String(input)).includes('/api/specs/tree'),
+      ).length;
+    const before = treeCalls();
+
+    // Switching workspace updates store.config.workspaces; the map must refetch
+    // the spec tree so it doesn't keep showing the previous workspace's specs.
+    store.config = {
+      workspaces: ['/ws/b'],
+    } as unknown as typeof store.config;
+    await nextTick();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(treeCalls()).toBeGreaterThan(before);
+
+    app.unmount();
+    host.remove();
+  });
+
   it('keeps the same specModeState reference across spec-tree refreshes', async () => {
     const { app, host } = await mountMapPage();
     const stateRef = window.specModeState!;
