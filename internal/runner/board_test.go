@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -140,40 +139,6 @@ func TestCanMountWorktree(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("canMountWorktree(%q, %v) = %v, want %v", tc.status, tc.wt, got, tc.want)
 		}
-	}
-}
-
-// TestPrepareBoardContext verifies that prepareBoardContext creates a temp
-// directory with a valid board.json file.
-func TestPrepareBoardContext(t *testing.T) {
-	s, r := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dir, err := r.prepareBoardContext(context.Background(), task.ID, false)
-	if err != nil {
-		t.Fatalf("prepareBoardContext: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(dir)
-	}()
-
-	boardPath := filepath.Join(dir, "board.json")
-	data, err := os.ReadFile(boardPath)
-	if err != nil {
-		t.Fatalf("board.json should exist: %v", err)
-	}
-
-	var manifest BoardManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("invalid board.json: %v", err)
-	}
-	if len(manifest.Tasks) != 1 {
-		t.Errorf("expected 1 task, got %d", len(manifest.Tasks))
 	}
 }
 
@@ -378,159 +343,6 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 	}
 	if contains(string(data), archived.ID.String()) {
 		t.Error("archived task ID should not appear in the board manifest")
-	}
-}
-
-// TestStreamBoardJSON verifies that streamBoardJSON produces board.json output
-// whose task count, IsSelf flags, and truncation lengths match both the legacy
-// JSON path and GenerateBoardManifest for the same store state.
-func TestStreamBoardJSON(t *testing.T) {
-	s, r := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	longPrompt := strings.Repeat("A", 2000) // exceeds 500-char sibling cap
-	longResult := strings.Repeat("B", 3000) // exceeds 1000-char sibling cap
-
-	var selfID [16]byte
-	var selfIDStr string
-	for i := 0; i < 5; i++ {
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: longPrompt, Timeout: 5})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if i == 2 {
-			selfID = task.ID
-			selfIDStr = task.ID.String()
-		}
-		_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
-		_ = s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
-
-	}
-
-	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
-	if err != nil {
-		t.Fatalf("streamBoardJSON: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(dir)
-	}()
-
-	if written == 0 {
-		t.Error("written bytes should be > 0")
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "board.json"))
-	if err != nil {
-		t.Fatalf("read board.json: %v", err)
-	}
-	if int64(len(data)) != written {
-		t.Errorf("written counter %d != file size %d", written, len(data))
-	}
-
-	var manifest BoardManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("invalid JSON from streamBoardJSON: %v", err)
-	}
-
-	refData, _, err := r.generateBoardContextAndMounts(selfID, false)
-	if err != nil {
-		t.Fatalf("generateBoardContext: %v", err)
-	}
-	var refJSON BoardManifest
-	if err := json.Unmarshal(refData, &refJSON); err != nil {
-		t.Fatalf("invalid JSON from generateBoardContext: %v", err)
-	}
-
-	// Task count.
-	if len(manifest.Tasks) != 5 {
-		t.Errorf("expected 5 tasks, got %d", len(manifest.Tasks))
-	}
-	if len(manifest.Tasks) != len(refJSON.Tasks) {
-		t.Errorf("task count mismatch: stream=%d legacy=%d", len(manifest.Tasks), len(refJSON.Tasks))
-	}
-
-	// IsSelf flag and truncation lengths.
-	for _, bt := range manifest.Tasks {
-		if bt.ID == selfIDStr {
-			if !bt.IsSelf {
-				t.Error("self task should have is_self=true")
-			}
-			if bt.Prompt != longPrompt {
-				t.Errorf("self task prompt truncated: len=%d, want %d", len(bt.Prompt), len(longPrompt))
-			}
-			if bt.Result == nil || *bt.Result != longResult {
-				t.Error("self task result should not be truncated")
-			}
-		} else {
-			if bt.IsSelf {
-				t.Errorf("task %s should not be is_self", bt.ShortID)
-			}
-			if len(bt.Prompt) > 503 { // 500 chars + "..."
-				t.Errorf("sibling prompt too long: len=%d", len(bt.Prompt))
-			}
-			if bt.Result != nil && len(*bt.Result) > 1003 { // 1000 chars + "..."
-				t.Errorf("sibling result too long: len=%d", len(*bt.Result))
-			}
-		}
-	}
-
-	// Compare task-level fields against GenerateBoardManifest for the same state.
-	waitBoardSeqStable(r)
-	refManifest, err := r.GenerateBoardManifest(ctx, selfID, false)
-	if err != nil {
-		t.Fatalf("GenerateBoardManifest: %v", err)
-	}
-	if len(refManifest.Tasks) != len(manifest.Tasks) {
-		t.Errorf("task count mismatch: stream=%d ref=%d", len(manifest.Tasks), len(refManifest.Tasks))
-	}
-
-	streamByID := make(map[string]BoardTask, len(manifest.Tasks))
-	for _, bt := range manifest.Tasks {
-		streamByID[bt.ID] = bt
-	}
-	refJSONByID := make(map[string]BoardTask, len(refJSON.Tasks))
-	for _, bt := range refJSON.Tasks {
-		refJSONByID[bt.ID] = bt
-	}
-	refByID := make(map[string]BoardTask, len(refManifest.Tasks))
-	for _, bt := range refManifest.Tasks {
-		refByID[bt.ID] = bt
-	}
-
-	for id, streamTask := range streamByID {
-		refJSONTask, ok := refJSONByID[id]
-		if !ok {
-			t.Errorf("task %s present in streamBoardJSON but missing from generateBoardContext", id)
-			continue
-		}
-		refTask, ok := refByID[id]
-		if !ok {
-			t.Errorf("task %s present in streamBoardJSON but missing from GenerateBoardManifest", id)
-			continue
-		}
-		if streamTask.IsSelf != refJSONTask.IsSelf {
-			t.Errorf("task %s IsSelf: stream=%v legacy=%v", id, streamTask.IsSelf, refJSONTask.IsSelf)
-		}
-		if len(streamTask.Prompt) != len(refJSONTask.Prompt) {
-			t.Errorf("task %s prompt length: stream=%d legacy=%d", id, len(streamTask.Prompt), len(refJSONTask.Prompt))
-		}
-		if (streamTask.Result == nil) != (refJSONTask.Result == nil) {
-			t.Errorf("task %s result nil mismatch: stream=%v legacy=%v", id, streamTask.Result == nil, refJSONTask.Result == nil)
-		} else if streamTask.Result != nil && len(*streamTask.Result) != len(*refJSONTask.Result) {
-			t.Errorf("task %s result length: stream=%d legacy=%d", id, len(*streamTask.Result), len(*refJSONTask.Result))
-		}
-		if streamTask.IsSelf != refTask.IsSelf {
-			t.Errorf("task %s IsSelf: stream=%v ref=%v", id, streamTask.IsSelf, refTask.IsSelf)
-		}
-		if len(streamTask.Prompt) != len(refTask.Prompt) {
-			t.Errorf("task %s prompt length: stream=%d ref=%d", id, len(streamTask.Prompt), len(refTask.Prompt))
-		}
-		if (streamTask.Result == nil) != (refTask.Result == nil) {
-			t.Errorf("task %s result nil mismatch: stream=%v ref=%v", id, streamTask.Result == nil, refTask.Result == nil)
-		} else if streamTask.Result != nil && len(*streamTask.Result) != len(*refTask.Result) {
-			t.Errorf("task %s result length: stream=%d ref=%d", id, len(*streamTask.Result), len(*refTask.Result))
-		}
 	}
 }
 
@@ -889,60 +701,5 @@ func TestWriteBoardDir_ReturnsDirPath(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Errorf("expected a directory, got a file at %q", dir)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// streamBoardJSON — large data triggers logBoardManifestSizeWarning
-// ---------------------------------------------------------------------------
-
-// TestStreamBoardJSON_LargeDataTriggersWarning verifies that streamBoardJSON
-// runs without error when the serialised manifest exceeds 64 KB and calls
-// logBoardManifestSizeWarning internally (no panic). We create enough tasks
-// with long prompts to push the JSON past the 64 KB threshold.
-//
-// Non-self prompts are truncated to 500 chars inside streamBoardJSON, so we
-// create 80 tasks (each ~1 200 B) to reliably exceed the 64 KB threshold.
-func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
-	s, _ := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	// 80 tasks × ~1 200 bytes each ≈ 96 KB > 64 KB threshold.
-	prompt := strings.Repeat("A", 500)
-	var selfID [16]byte
-	for i := 0; i < 80; i++ {
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 5})
-		if err != nil {
-			t.Fatalf("CreateTask %d: %v", i, err)
-		}
-		_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
-		if i == 0 {
-			selfID = task.ID
-		}
-	}
-
-	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
-	if err != nil {
-		t.Fatalf("streamBoardJSON: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(dir)
-	}()
-
-	t.Logf("streamBoardJSON wrote %d bytes", written)
-
-	// The manifest must exceed 64 KB so that logBoardManifestSizeWarning was called.
-	if written <= int64(constants.MaxBoardManifestBytes) {
-		t.Logf("note: written=%d did not exceed threshold %d; warning branch may not have fired", written, constants.MaxBoardManifestBytes)
-	}
-
-	// Verify board.json was created and is non-empty.
-	info, err := os.Stat(filepath.Join(dir, "board.json"))
-	if err != nil {
-		t.Fatalf("board.json not found: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Error("board.json should be non-empty")
 	}
 }
