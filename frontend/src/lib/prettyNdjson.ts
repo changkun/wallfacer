@@ -269,24 +269,6 @@ export function parseTurn(raw: string): ParsedTurn {
   return { rows: acc.rows, answer: acc.pending.trim() };
 }
 
-// frameHasActivity reports whether a single parsed frame contributes any
-// tool/thinking/tool_result activity. Shared by the one-shot hasActivity and
-// the incremental stream parser.
-export function frameHasActivity(frame: Frame): boolean {
-  if (frame.type === 'assistant' && frame.message?.content) {
-    for (const block of frame.message.content) {
-      if (block.type === 'tool_use' || block.type === 'thinking') return true;
-    }
-  }
-  if (frame.type === 'user' && frame.message?.content) {
-    for (const block of frame.message.content) {
-      // Only failed tool results render (success is folded into the answer).
-      if (block.type === 'tool_result' && block.is_error) return true;
-    }
-  }
-  return false;
-}
-
 // parseLine trims and JSON-parses one NDJSON line into a Frame, or null when
 // the line is blank, not a JSON object, or malformed. Shared by the one-shot
 // parsers and the incremental stream parser so they skip identical lines.
@@ -350,12 +332,4 @@ export function createActivityParser(): ActivityParser {
       return out;
     },
   };
-}
-
-export function hasActivity(raw: string): boolean {
-  for (const line of raw.split('\n')) {
-    const frame = parseFrameLine(line);
-    if (frame && frameHasActivity(frame)) return true;
-  }
-  return false;
 }
