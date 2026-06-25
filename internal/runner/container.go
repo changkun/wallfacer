@@ -428,6 +428,12 @@ func (r *Runner) runContainer(
 		LiveLogWriter:     ll,
 		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
+		// Upgrade the name-only registration to a handle entry so
+		// KillContainer can actually signal the running agent when the
+		// user cancels the task mid-run.
+		OnLaunch: func(_ string, handle executor.Handle) {
+			r.taskContainers.SetHandle(taskID, handle, nil)
+		},
 		// Heavyweight turn invocations rebind the activity bucket
 		// for each turn's usage ledger — implementation or testing.
 		ActivityOverride: activity,
@@ -440,11 +446,6 @@ func (r *Runner) runContainer(
 		output = res.Output
 		rawStdout = res.RawStdout
 		rawStderr = res.RawStderr
-		if handle := r.taskContainers.GetHandle(taskID); handle != nil {
-			// Upgrade to the handle registration so callers mid-run
-			// can still reach the container.
-			_ = handle
-		}
 	}
 	if err != nil {
 		// Retry with codex on a token/rate limit. The first launch
@@ -459,7 +460,7 @@ func (r *Runner) runContainer(
 			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
-			return r.runContainerOnSandbox(ctx, role, task, containerName, prompt, sessionID,
+			return r.runContainerOnSandbox(ctx, role, taskID, task, containerName, prompt, sessionID,
 				modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, harness.Codex)
 		}
 		return nil, rawStdout, rawStderr, err
@@ -471,7 +472,7 @@ func (r *Runner) runContainer(
 		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
-		return r.runContainerOnSandbox(ctx, role, task, containerName, prompt, sessionID,
+		return r.runContainerOnSandbox(ctx, role, taskID, task, containerName, prompt, sessionID,
 			modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, harness.Codex)
 	}
 
@@ -485,6 +486,7 @@ func (r *Runner) runContainer(
 func (r *Runner) runContainerOnSandbox(
 	ctx context.Context,
 	role AgentRole,
+	taskID uuid.UUID,
 	task *store.Task,
 	containerName, prompt, sessionID, modelOverride string,
 	worktreeOverrides map[string]string,
@@ -513,6 +515,11 @@ func (r *Runner) runContainerOnSandbox(
 		LiveLogWriter:     ll,
 		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
+		// Register the fallback launch's handle too, so a cancel during
+		// the codex-fallback turn can still kill the running agent.
+		OnLaunch: func(_ string, handle executor.Handle) {
+			r.taskContainers.SetHandle(taskID, handle, nil)
+		},
 	})
 	if res == nil {
 		return nil, nil, nil, err

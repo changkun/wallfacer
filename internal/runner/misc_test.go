@@ -544,6 +544,43 @@ func TestRunContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 	}
 }
 
+// TestRunContainerRegistersHandleForKill verifies that a heavyweight task
+// container registers its launch handle so KillContainer can actually signal
+// the running agent. Before OnLaunch was wired into runContainer the
+// registration was name-only, GetHandle returned nil, and KillContainer was a
+// permanent no-op — so a user cancel never stopped the running agent.
+func TestRunContainerRegistersHandleForKill(t *testing.T) {
+	cmd := fakeBlockingCmd(t)
+	r := runnerWithCmd(t, cmd)
+
+	taskID := uuid.New()
+	done := make(chan error, 1)
+	go func() {
+		_, _, _, err := r.runContainer(context.Background(), taskID, "prompt", "", nil, "", nil, "", "")
+		done <- err
+	}()
+
+	// OnLaunch fires after the process starts and upgrades the name-only entry
+	// to a handle entry. Before the fix GetHandle stays nil forever.
+	deadline := time.Now().Add(3 * time.Second)
+	for r.taskContainers.GetHandle(taskID) == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("launch handle was never registered; KillContainer would be a no-op")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// KillContainer must now terminate the blocking agent.
+	r.KillContainer(taskID)
+
+	select {
+	case <-done:
+		// runContainer returned after the kill — success.
+	case <-time.After(3 * time.Second):
+		t.Fatal("KillContainer did not terminate the running container")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // buildContainerArgs extras (paths not covered by runner_test.go)
 // ---------------------------------------------------------------------------
