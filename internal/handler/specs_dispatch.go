@@ -256,6 +256,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		taskIDStr := createdTaskIDs[i].String()
 		err := spec.UpdateFrontmatter(rs.absPath, map[string]any{
 			"dispatched_task_id": &taskIDStr,
+			"status":             string(spec.StatusValidated),
 			"updated":            time.Now(),
 		})
 		if err != nil {

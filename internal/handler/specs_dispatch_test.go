@@ -193,6 +193,10 @@ func TestDispatchSpecs_SingleSpec(t *testing.T) {
 	if *s.DispatchedTaskID != resp.Dispatched[0].TaskID {
 		t.Errorf("dispatched_task_id = %q, want %q", *s.DispatchedTaskID, resp.Dispatched[0].TaskID)
 	}
+	// Dispatch writes status: validated alongside the task link.
+	if s.Status != spec.StatusValidated {
+		t.Errorf("status = %q after dispatch, want %q", s.Status, spec.StatusValidated)
+	}
 }
 
 func TestDispatchSpecs_BatchWithDependencies(t *testing.T) {
