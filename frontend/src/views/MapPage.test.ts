@@ -185,6 +185,27 @@ describe('MapPage', () => {
     host.remove();
   });
 
+  it('re-renders when a task is updated in place (incremental SSE update)', async () => {
+    const store = useTaskStore();
+    store.setTasks([makeTask('t-1', { status: 'backlog' })]);
+    const { app, host } = await mountMapPage();
+
+    const render = window.renderDependencyGraph as unknown as ReturnType<typeof vi.fn>;
+    const before = render.mock.calls.length;
+
+    // The SSE 'task-updated' path: updateTask replaces the element in place
+    // (tasks.value[idx] = updated) without reassigning the array. A deep:false
+    // watch on store.tasks would miss this; the fingerprint watch must catch it.
+    store.updateTask(makeTask('t-1', { status: 'in_progress' }));
+    await nextTick();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(render.mock.calls.length).toBeGreaterThan(before);
+
+    app.unmount();
+    host.remove();
+  });
+
   it('keeps the same specModeState reference across spec-tree refreshes', async () => {
     const { app, host } = await mountMapPage();
     const stateRef = window.specModeState!;

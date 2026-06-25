@@ -126,10 +126,19 @@ onBeforeUnmount(() => {
   restoreShims();
 });
 
-// Re-render whenever the task list or spec tree changes. The legacy
-// renderer fingerprints the input and short-circuits when nothing has
-// actually changed, so calling on every store mutation is cheap.
-watch(() => store.tasks, () => rerender(), { deep: false });
+// Re-render whenever the drawn task graph changes. Watch a fingerprint of the
+// draw-relevant fields rather than the array reference: store.updateTask mutates
+// an element in place (tasks.value[idx] = updated) without reassigning the
+// array, so a deep:false watch on store.tasks itself never fires for the most
+// common SSE event (a status transition), leaving the map stale. The fingerprint
+// recomputes only on fields the graph draws, avoiding relayout thrash on
+// high-frequency usage-token updates during a run.
+watch(
+  () => store.tasks
+    .map((t) => `${t.id}:${t.status}:${t.archived ? 1 : 0}:${(t.depends_on || []).join('|')}`)
+    .join(','),
+  () => rerender(),
+);
 watch(specTree, () => rerender(), { deep: false });
 </script>
 
