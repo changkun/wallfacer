@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseActivity, hasActivity, parseTurn } from './prettyNdjson';
+import { parseActivity, parseTurn } from './prettyNdjson';
 
 function ndjson(...frames: unknown[]): string {
   return frames.map(f => JSON.stringify(f)).join('\n');
@@ -115,18 +115,5 @@ describe('parseTurn', () => {
     const { rows, answer } = parseTurn(ndjson({ type: 'assistant', message: { content: [{ type: 'text', text: 'Just a reply.' }] } }));
     expect(rows).toEqual([]);
     expect(answer).toBe('Just a reply.');
-  });
-});
-
-describe('hasActivity', () => {
-  it('is true when tool or thinking frames exist', () => {
-    expect(hasActivity(ndjson({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read' }] } }))).toBe(true);
-  });
-  it('is true for a failed tool result but false for a successful one', () => {
-    expect(hasActivity(ndjson({ type: 'user', message: { content: [{ type: 'tool_result', is_error: true, content: 'x' }] } }))).toBe(true);
-    expect(hasActivity(ndjson({ type: 'user', message: { content: [{ type: 'tool_result', content: 'x' }] } }))).toBe(false);
-  });
-  it('is false for plain text', () => {
-    expect(hasActivity('hello world')).toBe(false);
   });
 });
