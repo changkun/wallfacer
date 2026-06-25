@@ -112,7 +112,8 @@ export const useTaskStore = defineStore('tasks', () => {
       maxInputTokens?: number;
     },
   ) {
-    const body: Record<string, unknown> = { prompt, timeout: opts?.timeout ?? 900 };
+    const body: Record<string, unknown> = { prompt };
+    if (opts?.timeout !== undefined) body.timeout = opts.timeout;
     if (opts?.flow) body.flow = opts.flow;
     if (opts?.tags?.length) body.tags = opts.tags;
     if (opts?.model) body.model = opts.model;
@@ -137,7 +138,8 @@ export const useTaskStore = defineStore('tasks', () => {
     },
   ) {
     const tasks = prompts.map((prompt) => {
-      const t: Record<string, unknown> = { prompt, timeout: opts?.timeout ?? 900 };
+      const t: Record<string, unknown> = { prompt };
+      if (opts?.timeout !== undefined) t.timeout = opts.timeout;
       if (opts?.flow) t.flow = opts.flow;
       if (opts?.tags?.length) t.tags = opts.tags;
       if (opts?.model) t.model = opts.model;
