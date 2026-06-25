@@ -20,14 +20,14 @@ Spec Coordination - in progress (its own track; spec tree, planning, dispatch)
   ✅ Planning UX                   ✅ Chat-First Mode
   ✅ Planning Chat Threads         ○ Spec State Control Plane
 
-Local Product - 10 shipped, rest pending
+Local Product - 11 shipped, rest pending
   ⊘ Desktop App (code removed)     ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ✅ Routine Tasks
   ✅ Agents & Flows                ✅ Refinement Into Plan
   ✅ Vue Frontend Migration        ✅ Rebrand Module Path
   ✅ Backend Redundancy Cleanup
-  ○ Task Prompt Attachments        ◐ Editor Tabs
+  ○ Task Prompt Attachments        ✅ Editor Tabs
   ○ Diff Review Comments           ○ Test Criteria
   ○ Visual Verification            ○ Scoped Command Registry
   ○ Host Path References           ○ Live Serve
@@ -123,7 +123,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. |
-| [inline-file-panel.md](local/inline-file-panel.md) | Drafted | Inline tabbed file panel with multi-modal preview (image/video/audio/PDF/hex) over `ExplorerPanel.vue` + a raw-content endpoint. Supersedes the archived file-panel-viewer. |
+| [inline-file-panel.md](local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
 | [diff-review-comments.md](local/diff-review-comments.md) | Drafted | Code-review-style inline comments anchored to diff lines, batched into the existing feedback channel. Supersedes the archived inline-diff-feedback. |
 | [dockable-panel-workspace.md](local/dockable-panel-workspace.md) | Drafted | VS Code-style dockable panel workspace: terminal (later explorer/file panel) docks to any edge, maximizes to fullscreen, and splits via drag-and-drop, persisted to localStorage. Editor-center model wrapping the RouterView in `AppLayout`; custom split-tree (no docking library). |
 | [test-criteria.md](local/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task (`Task.Criteria`) so the auto-tester checks them, threaded into the existing `buildTestPrompt` / `tryAutoTest` path. Closes a live hole: autopilot test runs currently pass empty criteria. Supersedes the archived validation-barrier. |
@@ -284,7 +284,7 @@ Revert and PR are independent and shippable; intent-commits is mostly realized w
 
 **Within local product:**
 - Spec coordination is in progress (document model, planning UX, archival, chat-first mode, and planning threads complete; the state control plane / drift detection remains).
-- The file/diff/attachment trio (task-prompt-attachments, inline-file-panel, diff-review-comments) plus test-criteria are clean and ready to dispatch.
+- Editor tabs (inline-file-panel) shipped. The remaining file/diff/attachment work (task-prompt-attachments, diff-review-comments) plus test-criteria are clean and ready to dispatch.
 
 **Within cloud platform:**
 - [latere-integration.md](cloud/latere-integration.md) is the umbrella; read it first. The executor sub-cluster (cella-runtime, topos, antigravity, managed-agents) is blocked on the `Executor` seam from harness-abstraction.

@@ -1,6 +1,6 @@
 ---
 title: Editor Tabs (VS Code-Style File Tabs in the Board)
-status: drafted
+status: complete
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
@@ -18,6 +18,28 @@ dispatched_task_id: null
 ---
 
 # Editor Tabs (VS Code-Style File Tabs in the Board)
+
+## Outcome (2026-06-25)
+
+Shipped. Both phases landed directly on `main`:
+
+- `stores/editorTabs.ts` is the source of truth (`d782b381`), with store tests
+  (`editorTabs.test.ts`) covering open/focus/close, board-uncloseable,
+  dirty-guard, and buffer survival.
+- `EditorTabStrip.vue` renders the VS Code-style tab band in the header spacer,
+  with board task-status indicators (`e9a4a736`), compacted to a ~36px band
+  (`5ba26a41`).
+- `FileEditor.vue` uses CodeMirror 6 (`1d368f47`); the CM6 deps are pinned in
+  `package.json` with the lockfile regenerated (`a71a2531`).
+- Preview (temporary) tabs: single-click previews, save/double-click pins
+  (`fd442bf7`); `Cmd/Ctrl+S` pins the tab instead of the browser save dialog
+  (`b6377dc4`); `editorTabHotkeys.ts` handles `Cmd/Ctrl+W` close.
+- `ExplorerPanel.vue` opens files into tabs via `openFile`; the
+  `.explorer-preview-backdrop` modal and its dead CSS are removed
+  (`19e51b27`, `c86c1d43`). Board docs updated (`ace40275`).
+
+Non-goals held: no split panes, drag-reorder, diff view, media rendering, or
+raw-bytes endpoint. The [Future](#future) items remain unstarted.
 
 ## Design Revision (2026-06-25)
 
