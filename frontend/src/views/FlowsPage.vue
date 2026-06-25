@@ -23,6 +23,9 @@ interface Flow {
 }
 interface AgentRow { slug: string; title: string }
 interface DraftStep {
+  // Stable client-only id used as the draggable list key. Server payloads never
+  // carry it (saveDraft/saveEdit map only the explicit fields below).
+  id: string;
   agent_slug: string;
   optional: boolean;
   input_from: string;
@@ -117,12 +120,16 @@ async function selectFlow(f: Flow) {
   }
 }
 
+function newStep(): DraftStep {
+  return { id: crypto.randomUUID(), agent_slug: '', optional: false, input_from: '', run_in_parallel_with: [] };
+}
+
 function openNewEditor() {
   draft.value = {
     slug: 'my-flow',
     name: '',
     description: '',
-    steps: [{ agent_slug: '', optional: false, input_from: '', run_in_parallel_with: [] }],
+    steps: [newStep()],
   };
   selectedSlug.value = null;
   saveError.value = '';
@@ -142,6 +149,7 @@ async function startClone(flow: Flow) {
     name: (flow.name || '') + ' (copy)',
     description: source.description || '',
     steps: (source.steps || []).map((s) => ({
+      id: crypto.randomUUID(),
       agent_slug: s.agent_slug || '',
       optional: !!s.optional,
       input_from: s.input_from || '',
@@ -149,7 +157,7 @@ async function startClone(flow: Flow) {
     })),
   };
   if (draft.value.steps.length === 0) {
-    draft.value.steps.push({ agent_slug: '', optional: false, input_from: '', run_in_parallel_with: [] });
+    draft.value.steps.push(newStep());
   }
   selectedSlug.value = null;
   saveError.value = '';
@@ -169,6 +177,7 @@ function startEdit() {
     name: src.name || '',
     description: src.description || '',
     steps: (src.steps || []).map((s) => ({
+      id: crypto.randomUUID(),
       agent_slug: s.agent_slug || '',
       optional: !!s.optional,
       input_from: s.input_from || '',
@@ -176,7 +185,7 @@ function startEdit() {
     })),
   };
   if (editingDraft.value.steps.length === 0) {
-    editingDraft.value.steps.push({ agent_slug: '', optional: false, input_from: '', run_in_parallel_with: [] });
+    editingDraft.value.steps.push(newStep());
   }
   void ensureAgents();
 }
@@ -188,7 +197,7 @@ function cancelEdit() {
 }
 
 function addStep(target: Draft) {
-  target.steps.push({ agent_slug: '', optional: false, input_from: '', run_in_parallel_with: [] });
+  target.steps.push(newStep());
 }
 function removeStep(target: Draft, idx: number) {
   if (target.steps.length <= 1) return;
@@ -455,7 +464,7 @@ onMounted(async () => {
                   :animation="120"
                   ghost-class="sortable-ghost"
                   handle=".flows-detail__step-drag"
-                  item-key="__idx"
+                  item-key="id"
                 >
                   <template #item="{ element: step, index: i }">
                     <div class="flows-detail__step">
@@ -564,7 +573,7 @@ onMounted(async () => {
                   :animation="120"
                   ghost-class="sortable-ghost"
                   handle=".flows-detail__step-drag"
-                  item-key="__idx"
+                  item-key="id"
                 >
                   <template #item="{ element: step, index: i }">
                     <div class="flows-detail__step">
