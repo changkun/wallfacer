@@ -81,6 +81,14 @@ associates with local workspace state, and how the org boundary is enforced.
 5. How is the org boundary enforced on the list call so a repo outside the
    signed-in org never appears (filter server-side, reuse repo-identity's
    perimeter check)?
+6. Does local v1 actually need repo-identity's **server registry** (org->repos
+   Postgres, part of the unbuilt coordination plane), or only the already
+   shipped `NormalizeRemoteURL` plus repo-identity's **local-credential-proof
+   tier** (`git ls-remote`)? If the latter, this child ships without the cloud
+   plane, and the `repo-identity` dependency is "consume the identity model and
+   local tier", not "the server registry must exist first". Resolve this so the
+   umbrella's "components 1-4 ship independently of remote execution" claim
+   holds.
 
 ## Affects
 
