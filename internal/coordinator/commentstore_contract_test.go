@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/speccomment"
+	"latere.ai/x/wallfacer/internal/store/postgres"
 )
 
 // storeFactory builds a fresh CommentStore for one subtest run.
@@ -27,18 +28,18 @@ func commentStores(_ *testing.T) []storeFactory {
 		out = append(out, storeFactory{
 			name: "postgres",
 			make: func(t *testing.T) CommentStore {
-				st, err := NewPostgresCommentStore(context.Background(), dsn)
+				// The shared store owns the pool and runs the migrations; the
+				// comment store borrows the pool.
+				st, err := postgres.New(context.Background(), dsn)
 				if err != nil {
 					t.Fatalf("open pg store: %v", err)
 				}
 				// Isolate each run by clearing the tables.
-				if pg, ok := st.(*pgStore); ok {
-					if _, err := pg.pool.Exec(context.Background(),
-						"TRUNCATE spec_comments, spec_comment_threads"); err != nil {
-						t.Fatalf("truncate: %v", err)
-					}
+				if _, err := st.Pool().Exec(context.Background(),
+					"TRUNCATE spec_comments, spec_comment_threads"); err != nil {
+					t.Fatalf("truncate: %v", err)
 				}
-				return st
+				return NewPostgresCommentStore(st.Pool())
 			},
 		})
 	}
