@@ -135,10 +135,12 @@
   z-index: 60;
   max-height: 50vh;
   overflow-y: auto;
-  background: var(--bg-card);
+  background: var(--glass-elevated);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
-  box-shadow: var(--sh-pop);
+  box-shadow: var(--hairline-top), var(--sh-pop);
   padding: 4px;
 }
 /* Inline variant anchored beneath the trigger — used when the popover

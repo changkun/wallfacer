@@ -7,8 +7,9 @@
   align-items: flex-start;
   justify-content: center;
   padding: 10vh 12px 12px;
-  background: rgb(0 0 0 / 0.25);
-  backdrop-filter: blur(4px);
+  background: rgb(0 0 0 / 0.22);
+  -webkit-backdrop-filter: saturate(120%) blur(8px);
+  backdrop-filter: saturate(120%) blur(8px);
 }
 
 .command-palette.hidden {
@@ -19,10 +20,13 @@
 .command-palette-panel {
   width: min(940px, 100%);
   max-width: 940px;
-  background: var(--bg-card);
+  /* Frosted command panel floating over the blurred app behind it. */
+  background: var(--glass-elevated);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--hairline-top), var(--shadow-lg);
   padding: 10px;
   overflow: hidden;
   display: flex;

@@ -60,8 +60,10 @@
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg-card);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  background: var(--glass-elevated);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--hairline-top), var(--sh-pop);
   z-index: 30;
 }
 
