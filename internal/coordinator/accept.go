@@ -84,8 +84,8 @@ func (c *Coordinator) serve(ctx context.Context, cancel context.CancelFunc, conn
 	}
 
 	inst := Instance{Principal: p, Manifest: m, Conn: &wsSender{conn: conn, ctx: ctx}}
-	c.reg.Join(inst)
-	defer c.reg.Leave(m.InstanceID)
+	reg := c.reg.Join(inst)
+	defer c.reg.LeaveRegistration(reg)
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "bye") }()
 
 	go c.pinger(ctx, cancel, conn)

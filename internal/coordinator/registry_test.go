@@ -49,6 +49,22 @@ func TestRegistryReconnectReplacesSlot(t *testing.T) {
 	}
 }
 
+func TestRegistryStaleLeaveDoesNotRemoveReplacement(t *testing.T) {
+	r := NewRegistry()
+	oldReg := r.Join(inst("i1", "alice", "org1", "github.com/a/b"))
+	newReg := r.Join(inst("i1", "alice", "org1", "github.com/a/b"))
+
+	r.LeaveRegistration(oldReg)
+	if r.Len() != 1 {
+		t.Fatalf("stale leave removed replacement: Len = %d, want 1", r.Len())
+	}
+
+	r.LeaveRegistration(newReg)
+	if r.Len() != 0 {
+		t.Fatalf("current leave left instance registered: Len = %d, want 0", r.Len())
+	}
+}
+
 func TestRegistryPrincipalsInOrgDedup(t *testing.T) {
 	// One person on two machines is one principal in the org.
 	r := NewRegistry()
