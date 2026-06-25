@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -715,20 +716,76 @@ func TestExplorerStream_SendsRefreshOnChange(t *testing.T) {
 	scanner := bufio.NewScanner(strings.NewReader(body))
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "data: ") && strings.Contains(line, "workspaces") {
+		if strings.HasPrefix(line, "data: ") && strings.Contains(line, "paths") {
 			var payload struct {
-				Workspaces []string `json:"workspaces"`
+				Paths []string `json:"paths"`
 			}
 			if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &payload); err != nil {
 				t.Fatalf("failed to parse refresh data: %v", err)
 			}
-			if len(payload.Workspaces) == 0 {
-				t.Error("expected at least one workspace in refresh event")
+			if len(payload.Paths) == 0 {
+				t.Error("expected at least one path in refresh event")
 			}
 			return
 		}
 	}
 	t.Error("refresh event data not found in response body")
+}
+
+// TestExplorerStream_DetectsDeepChangeInExpandedDir verifies that a change two
+// levels below the workspace root, inside a directory the client reports as
+// expanded via "paths", triggers a refresh. Fingerprinting only the workspace
+// roots misses it (the root listing is unaffected), so this fails without the
+// expanded-paths fingerprinting.
+func TestExplorerStream_DetectsDeepChangeInExpandedDir(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	deepDir := filepath.Join(ws, "a", "b")
+	if err := os.MkdirAll(deepDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/stream?paths="+url.QueryEscape(deepDir), nil).WithContext(ctx)
+	w := newSyncResponseWriter()
+
+	done := make(chan struct{})
+	go func() { defer close(done); h.ExplorerStream(w, req) }()
+
+	deadline := time.After(5 * time.Second)
+	for !strings.Contains(w.bodyString(), "event: connected") {
+		select {
+		case <-deadline:
+			cancel()
+			<-done
+			t.Fatal("timed out waiting for connected event")
+		default:
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Change a file two levels below the root, inside the expanded dir. The root
+	// listing is unaffected (ws/a's mtime does not change), so only fingerprinting
+	// the expanded dir can detect this.
+	if err := os.WriteFile(filepath.Join(deepDir, "deep.txt"), []byte("x"), 0o644); err != nil {
+		cancel()
+		<-done
+		t.Fatal(err)
+	}
+
+	deadline = time.After(10 * time.Second)
+	for !strings.Contains(w.bodyString(), "event: refresh") {
+		select {
+		case <-deadline:
+			cancel()
+			<-done
+			t.Fatal("timed out waiting for refresh event for deep change")
+		default:
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	cancel()
+	<-done
 }
 
 // TestExplorerStream_HiddenWorkspaceNoLeak verifies that in cloud mode a session

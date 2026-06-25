@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -135,11 +136,11 @@ func (h *Handler) ExplorerTree(w http.ResponseWriter, r *http.Request) {
 }
 
 // ExplorerStream sends SSE notifications when workspace directory contents
-// change. The client provides a comma-separated list of expanded directory
-// paths via the "paths" query param and the workspace via "workspace".
-// The server polls those directories every 3 seconds and sends a "refresh"
-// event whenever the content fingerprint changes, so the client can re-fetch
-// only the affected nodes.
+// change. The client provides a comma-separated list of its expanded directory
+// paths via the "paths" query param. The server polls the visible workspace
+// roots plus those expanded directories every 3 seconds and sends a "refresh"
+// event (data: {"paths": [...]}) whenever a content fingerprint changes, so the
+// client can re-fetch the affected nodes.
 func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 	stream := sse.NewWriter(w)
 	if stream == nil {
@@ -163,14 +164,27 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 		return fmt.Sprintf("%x", hash.Sum(nil))
 	}
 
-	// Build initial fingerprints for all workspace roots. Use visibleWorkspaces
-	// (not currentWorkspaces) so a session that cannot see the active org-scoped
-	// group does not receive refresh events naming those workspace paths, matching
-	// GitStatusStream and the other explorer handlers' isAllowedWorkspace gate.
-	workspaces := h.visibleWorkspaces(r.Context())
+	// The client passes its currently-expanded directory paths via "paths"
+	// (comma-separated, absolute). Fingerprinting only the workspace roots
+	// would miss content edits and structural changes more than one level deep,
+	// so the dirs whose contents are actually rendered (root + expanded) are all
+	// watched. The expanded set is fixed for the life of the stream; the client
+	// re-opens the stream when it expands or collapses a directory.
+	expandedRaw := r.URL.Query().Get("paths")
+
+	// targets returns the dirs to fingerprint this tick: the visible workspace
+	// roots plus the client's validated expanded dirs. visibleWorkspaces (not
+	// currentWorkspaces) and per-tick re-validation ensure a session that cannot
+	// see the active org-scoped group never receives refresh events naming those
+	// paths, matching GitStatusStream and the other explorer handlers' gate.
+	targets := func() []string {
+		dirs := h.visibleWorkspaces(r.Context())
+		return append(dirs, h.validatedExpandedDirs(r.Context(), expandedRaw)...)
+	}
+
 	prevFingerprints := make(map[string]string)
-	for _, ws := range workspaces {
-		prevFingerprints[ws] = fingerprint(ws)
+	for _, d := range targets() {
+		prevFingerprints[d] = fingerprint(d)
 	}
 
 	if err := stream.Event("connected", []byte("{}")); err != nil {
@@ -192,26 +206,64 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-ticker.C:
-			// Re-read visible workspaces in case they changed.
-			currentWS := h.visibleWorkspaces(r.Context())
 			var changed []string
 			newFingerprints := make(map[string]string)
-			for _, ws := range currentWS {
-				fp := fingerprint(ws)
-				newFingerprints[ws] = fp
-				if fp != prevFingerprints[ws] {
-					changed = append(changed, ws)
+			for _, d := range targets() {
+				fp := fingerprint(d)
+				newFingerprints[d] = fp
+				if fp != prevFingerprints[d] {
+					changed = append(changed, d)
 				}
 			}
 			prevFingerprints = newFingerprints
 
 			if len(changed) > 0 {
-				if err := stream.JSON("refresh", map[string]any{"workspaces": changed}); err != nil {
+				if err := stream.JSON("refresh", map[string]any{"paths": changed}); err != nil {
 					return
 				}
 			}
 		}
 	}
+}
+
+// maxExpandedDirs bounds how many client-supplied expanded directories the
+// stream will fingerprint each tick, so a client cannot drive unbounded stat
+// load.
+const maxExpandedDirs = 256
+
+// validatedExpandedDirs parses the comma-separated absolute directory paths the
+// explorer client reports as expanded and returns those that resolve inside a
+// currently-visible workspace, de-duplicated and capped at maxExpandedDirs.
+// Paths that escape every visible workspace (or no longer exist) are dropped;
+// their parent root or expanded ancestor still catches structural changes.
+func (h *Handler) validatedExpandedDirs(ctx context.Context, raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	workspaces := h.visibleWorkspaces(ctx)
+	seen := make(map[string]bool)
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		for _, ws := range workspaces {
+			resolved, err := isWithinWorkspace(p, ws)
+			if err != nil {
+				continue
+			}
+			if !seen[resolved] {
+				seen[resolved] = true
+				out = append(out, resolved)
+			}
+			break
+		}
+		if len(out) >= maxExpandedDirs {
+			break
+		}
+	}
+	return out
 }
 
 // isBinaryContent reports whether data contains a null byte, indicating
