@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"log/slog"
 	"path"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // commitMessageGenerator is the task-free commit-message entry point from
@@ -125,6 +129,10 @@ func commitPlanningRound(
 	stagedOut, _ := cmdexec.Git(ws, "diff", "--cached", "--name-only", "--", "specs/").WithContext(ctx).Output()
 	primary := primaryPlanPath(stagedOut)
 
+	// Mark live dependents of the edited specs stale, staged into this same
+	// commit so `git revert` reverses the edits and the cascade together.
+	fanOutPlanningStaleness(ctx, ws, stagedOut)
+
 	n := 1
 	logOut, logErr := cmdexec.Git(ws, "log", "--format=%H", "--grep=^"+planRoundTrailerPrefix).WithContext(ctx).Output()
 	if logErr == nil && logOut != "" {
@@ -164,6 +172,135 @@ func commitPlanningRound(
 		return 0, fmt.Errorf("git commit: %w", err)
 	}
 	return n, nil
+}
+
+// planFanOutBroadThreshold logs a notice when a single planning round marks
+// more than this many specs stale — a signal that an edited spec's coupling
+// (depends_on or affects) may be too broad.
+const planFanOutBroadThreshold = 20
+
+// fanOutPlanningStaleness marks the live dependents of specs edited in this
+// planning round as stale, staging the writes so they land in the same commit.
+// A spec whose only change is its updated timestamp does not fan out. The whole
+// operation is best-effort: any failure is logged and the planning commit
+// proceeds.
+func fanOutPlanningStaleness(ctx context.Context, ws, stagedNameList string) {
+	modified := planModifiedSpecs(stagedNameList)
+	if len(modified) == 0 {
+		return
+	}
+	tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
+	if err != nil {
+		slog.Warn("plan fan-out: build spec tree failed", "ws", ws, "err", err)
+		return
+	}
+
+	modifiedSet := make(map[string]bool, len(modified))
+	for _, m := range modified {
+		modifiedSet[m] = true
+	}
+
+	impacted := make(map[string]bool)
+	for _, src := range modified {
+		if planEditUpdatedOnly(ctx, ws, src) {
+			continue // updated-only bump: no fan-out
+		}
+		for _, p := range spec.DependsOnImpact(tree, src) {
+			impacted[p] = true
+		}
+		for _, p := range spec.AffectsImpactFromSpec(tree, src) {
+			impacted[p] = true
+		}
+	}
+
+	// Authors edited the modified specs themselves; never fan out onto them.
+	var targets []string
+	for p := range impacted {
+		if !modifiedSet[p] {
+			targets = append(targets, p)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	resolve := func(rel string) string { return filepath.Join(ws, filepath.FromSlash(rel)) }
+	applied, ferr := spec.FanOutStale(tree, targets, resolve, time.Now())
+	if ferr != nil {
+		slog.Warn("plan fan-out: some stale writes failed", "ws", ws, "err", ferr)
+	}
+	if len(applied) == 0 {
+		return
+	}
+	if len(applied) > planFanOutBroadThreshold {
+		slog.Warn("plan fan-out: broad cascade", "ws", ws, "count", len(applied))
+	}
+	if err := cmdexec.Git(ws, "add", "specs/").WithContext(ctx).Run(); err != nil {
+		slog.Warn("plan fan-out: re-stage failed", "ws", ws, "err", err)
+	}
+}
+
+// planModifiedSpecs extracts the spec markdown paths from a staged name list
+// (`git diff --cached --name-only -- specs/`), dropping README.md and
+// non-markdown entries. Paths are repo-relative with forward slashes, matching
+// spec tree keys.
+func planModifiedSpecs(stagedNameList string) []string {
+	var out []string
+	for _, line := range strings.Split(strings.TrimSpace(stagedNameList), "\n") {
+		p := strings.TrimSpace(line)
+		if p == "" || !strings.HasSuffix(p, ".md") || path.Base(p) == "README.md" {
+			continue
+		}
+		out = append(out, filepath.ToSlash(p))
+	}
+	return out
+}
+
+// planEditUpdatedOnly reports whether the staged change to relPath touches only
+// the `updated` frontmatter field (no body or other frontmatter change). Such a
+// bump should not fan out. A new file (absent at HEAD) or any parse failure is
+// treated as a real change so fan-out runs.
+func planEditUpdatedOnly(ctx context.Context, ws, relPath string) bool {
+	pre, err := cmdexec.Git(ws, "show", "HEAD:"+relPath).WithContext(ctx).Output()
+	if err != nil {
+		return false
+	}
+	preSpec, err := spec.ParseBytes([]byte(pre), relPath)
+	if err != nil {
+		return false
+	}
+	postSpec, err := spec.ParseFile(filepath.Join(ws, filepath.FromSlash(relPath)))
+	if err != nil {
+		return false
+	}
+	return specSemanticEqual(preSpec, postSpec)
+}
+
+// specSemanticEqual compares two specs on everything except the updated
+// timestamp and derived fields (path, track). Body counts as semantic.
+func specSemanticEqual(a, b *spec.Spec) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Title != b.Title || a.Status != b.Status || a.Effort != b.Effort || a.Author != b.Author {
+		return false
+	}
+	if !a.Created.Equal(b.Created.Time) {
+		return false
+	}
+	if !slices.Equal(a.DependsOn, b.DependsOn) || !slices.Equal(a.Affects, b.Affects) {
+		return false
+	}
+	if (a.DispatchedTaskID == nil) != (b.DispatchedTaskID == nil) {
+		return false
+	}
+	if a.DispatchedTaskID != nil && *a.DispatchedTaskID != *b.DispatchedTaskID {
+		return false
+	}
+	// Compare bodies trimmed: the pre-image comes from `git show`, whose output
+	// is trailing-newline-trimmed, while the post-image is read from disk.
+	// Trailing whitespace is not a semantic change.
+	return strings.TrimSpace(a.Body) == strings.TrimSpace(b.Body)
 }
 
 // buildPlanCommitMessage assembles the final commit message from either the
