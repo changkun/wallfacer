@@ -170,6 +170,7 @@ function setupColObserver() {
 }
 
 onMounted(async () => {
+  editorTabs.restore(); // rebuild any open-file tabs from a prior page (once)
   if (!store.tasks.length) await store.fetchTasks({ includeArchived: ui.showArchived });
   if (!store.config) await store.fetchConfig();
   try {

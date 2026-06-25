@@ -7,11 +7,44 @@
 // always the implicit first tab; file tabs key off their workspace-relative
 // path. See specs/local/inline-file-panel.md.
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { api } from '../api/client';
 import { useDialogStore } from './dialog';
 
 export const BOARD_TAB_ID = 'board';
+
+// Open tabs are persisted here so an accidental Cmd/Ctrl+W — which the browser
+// reserves to close the whole tab and a web page cannot intercept — is
+// recoverable: reopening the board restores the session. Only the tab identity
+// (path/workspace/preview) and the active tab are stored; content is re-fetched
+// from disk on restore, and unsaved edits are guarded separately by
+// beforeUnloadGuard (see below).
+const STORAGE_KEY = 'wallfacer-editor-tabs';
+
+interface PersistedTab {
+  path: string;
+  workspace: string;
+  preview: boolean;
+}
+interface PersistedSession {
+  tabs: PersistedTab[];
+  activeId: string;
+}
+
+function hasStorage(): boolean {
+  try { return typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'; }
+  catch { return false; }
+}
+
+// beforeunload fires for every page-leave (Cmd/Ctrl+W, refresh, navigation).
+// Warn only when there are unsaved edits — a clean board is fully restored on
+// reopen, so nagging there would be noise. Returning a value (and setting the
+// deprecated returnValue) is what triggers the browser's native confirm dialog.
+export function beforeUnloadGuard(e: BeforeUnloadEvent, anyDirty: boolean): void {
+  if (!anyDirty) return;
+  e.preventDefault();
+  e.returnValue = '';
+}
 
 export interface FileTab {
   path: string;        // workspace-relative path; tab identity
@@ -102,13 +135,18 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
       saveError: null,
     });
     activeId.value = path;
-    // Mutate through the reactive proxy (find), not the pushed raw object — Vue
-    // wraps array elements in a proxy, so writing the raw reference changes the
-    // value without firing reactivity, leaving the editor stuck on "Loading…".
+    await loadContent(path);
+  }
+
+  // Fetch a tab's content from disk into its live buffer. Mutates through the
+  // reactive proxy (find), not the pushed raw object — Vue wraps array elements
+  // in a proxy, so writing the raw reference changes the value without firing
+  // reactivity, leaving the editor stuck on "Loading…".
+  async function loadContent(path: string): Promise<void> {
     const live = find(path);
     if (!live) return;
     try {
-      const url = `/api/explorer/file?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`;
+      const url = `/api/explorer/file?workspace=${encodeURIComponent(live.workspace)}&path=${encodeURIComponent(live.path)}`;
       const res = await api<{ content: string }>('GET', url);
       const text = typeof res === 'string' ? res : (res.content ?? JSON.stringify(res, null, 2));
       live.content = text;
@@ -186,6 +224,76 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     }
   }
 
+  // --- Session persistence: survive an accidental browser-tab close ---
+
+  function persist(): void {
+    if (!hasStorage()) return;
+    try {
+      if (tabs.value.length === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      const session: PersistedSession = {
+        tabs: tabs.value.map((t) => ({ path: t.path, workspace: t.workspace, preview: t.preview })),
+        activeId: activeId.value,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    } catch { /* quota or serialization — best-effort */ }
+  }
+
+  // Persist on structural changes only. The getter reads path/workspace/preview
+  // and activeId, so editing a buffer (content) does not trigger a write.
+  watch(
+    () =>
+      tabs.value.map((t) => `${t.path} ${t.workspace} ${t.preview ? 1 : 0}`).join('') +
+      '|' +
+      activeId.value,
+    persist,
+  );
+
+  let restored = false;
+  // Rebuild the open-tab session saved by a prior page (re-fetching content from
+  // disk). Once per app lifetime — the store outlives BoardPage, so repeat mounts
+  // must not re-restore over the live set.
+  function restore(): void {
+    if (restored) return;
+    restored = true;
+    if (!hasStorage()) return;
+    let session: PersistedSession | null = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) session = JSON.parse(raw) as PersistedSession;
+    } catch { return; }
+    if (!session || !Array.isArray(session.tabs)) return;
+    for (const s of session.tabs) {
+      if (!s || typeof s.path !== 'string' || typeof s.workspace !== 'string') continue;
+      if (find(s.path)) continue;
+      tabs.value.push({
+        path: s.path,
+        workspace: s.workspace,
+        name: basename(s.path),
+        content: '',
+        baseline: '',
+        preview: !!s.preview,
+        loading: true,
+        loadError: null,
+        saving: false,
+        saveError: null,
+      });
+      void loadContent(s.path);
+    }
+    if (session.activeId === BOARD_TAB_ID || find(session.activeId)) {
+      activeId.value = session.activeId;
+    }
+  }
+
+  // Native confirm before unloading with unsaved edits. Long-lived so it guards
+  // any route (a dirty buffer survives navigating to /chat), unlike the board's
+  // own mount-scoped listeners.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', (e) => beforeUnloadGuard(e, anyDirty.value));
+  }
+
   return {
     tabs,
     activeId,
@@ -199,5 +307,6 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
     setContent,
     save,
     close,
+    restore,
   };
 });
