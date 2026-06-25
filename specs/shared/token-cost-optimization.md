@@ -5,16 +5,22 @@ depends_on: []
 affects: [internal/runner/, internal/store/, internal/executor/, internal/envconfig/, internal/handler/, internal/cli/, internal/metrics/, internal/prompts/, frontend/src/components/analytics/]
 effort: xlarge
 created: 2026-04-01
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
 
 # Token & Cost Optimization
 
+## Status (2026-06-26)
+
+Still a live roadmap of unbuilt work, not abandoned. The baseline cost-visibility layer shipped (per-turn/per-task usage recording, `/api/usage`, `/api/stats`, the analytics tabs, reactive `MaxCostUSD`/`MaxInputTokens` enforcement, board-manifest size warning). Everything past that baseline is unimplemented: derived cache metrics, cache-break detection, the `--resume` audit, RTK compression, the regression/anomaly model, and all of Part 4's budget intelligence (threshold warnings, per-turn deltas, pacing, ledger, peak/off-peak, enterprise discount). See per-part `Status` notes below.
+
+Speculative / lowest-signal items to weigh for cutting before implementation begins: RTK shell-output compression (§2.1), peak/off-peak throttling (§4.7), enterprise discount (§4.8).
+
 ## Problem
 
-Wallfacer launches Claude Code (and Codex) as host processes in per-task git worktrees, accumulating significant token costs across tasks. Two orthogonal problems exist:
+Wallfacer launches agent CLIs (Claude Code, Codex, opencode, Cursor; see `internal/harness/`) as host processes in per-task git worktrees, accumulating significant token costs across tasks. Caching mechanics differ per harness; the cache analysis below is Claude-Code-specific (the static/dynamic boundary, sentinel bug, MCP schema injection, and `--resume` behavior all describe Claude Code). The cost-recording, budgeting, and pacing work is harness-agnostic. Two orthogonal problems exist:
 
 1. **Cache correctness under wallfacer's execution model.** Claude Code's prompt caching system relies on a static/dynamic boundary in system prompts. Wallfacer's per-turn invocation model (each turn is a fresh `claude`/`codex` exec in the worktree) especially `--resume` for feedback loops and multi-turn continuations, may not be exploiting caching optimally or may be triggering cache invalidation unknowingly. There is no visibility into whether cache hits are actually occurring.
 
@@ -60,7 +66,7 @@ Additionally, `--resume` has been reported to always break cache in some version
 
 ### What Wallfacer Controls vs What It Doesn't
 
-Wallfacer runs the agent CLI directly on the host via `HostBackend` (`internal/executor/host.go`), resolving `claude`/`codex` from `$PATH`, in a per-task git worktree as the working directory. There is no sandbox image; everything below is a host-process / host-PATH concern.
+Wallfacer runs the agent CLI directly on the host via `HostBackend` (`internal/executor/host.go`, with per-harness variants `host_codex.go` / `host_cursor.go` / `host_opencode.go`), resolving the harness binary (`claude`/`codex`/`opencode`/`cursor-agent`) from `$PATH`, in a per-task git worktree as the working directory. There is no sandbox image; everything below is a host-process / host-PATH concern.
 
 | Layer | Wallfacer controls | Claude Code controls |
 |-------|-------------------|---------------------|
@@ -139,7 +145,7 @@ When a cache break is detected (cache reads drop >5% AND >2,000 tokens between c
 
 **Real-time signal via hooks**: If Claude Code lifecycle hooks are enabled, `PreCompact`/`PostCompact` hook events provide an immediate signal that context compaction occurred, a leading indicator of cache pressure. These events can supplement the heuristic detection above with ground-truth compaction data.
 
-This requires capturing some inputs alongside outputs. Candidate approach: hash the AGENTS.md (delivered via `WALLFACER_INSTRUCTIONS_PATH`), board.json, and model string before each turn's exec, store in the turn record, and diff against the previous turn.
+This requires capturing some inputs alongside outputs. Candidate approach: hash the composed instructions (AGENTS.md / CLAUDE.md, delivered via `--append-system-prompt` as `Request.SystemPrompt`, see `internal/harness/harness.go` and `internal/prompts/instructions.go`), board.json, and model string before each turn's exec, store in the turn record, and diff against the previous turn. Note: an earlier `ExecutionEnvironment.InstructionsHash` field was removed (the instructions file it pointed at no longer exists, so the hash was always empty); this work would reintroduce hashing against the current delivery path.
 
 ```go
 type TurnContext struct {
@@ -157,7 +163,7 @@ type TurnContext struct {
 
 Claude Code's `--resume` reloads a prior session's message history. The cache key is the API request prefix (system prompt + tools + message history). If the session file is loaded byte-identically and the system prompt hasn't changed, cache should hit. But:
 
-- Wallfacer composes AGENTS.md instructions before each turn (delivered via `--append-system-prompt` / `WALLFACER_INSTRUCTIONS_PATH`, see `internal/runner/container.go`). If the composed instructions change between turns, the dynamic region changes and cache is invalidated.
+- Wallfacer composes AGENTS.md / CLAUDE.md instructions before each turn (delivered via `--append-system-prompt` as `Request.SystemPrompt`, composed in `internal/runner/agent.go` and `internal/prompts/instructions.go`). If the composed instructions change between turns, the dynamic region changes and cache is invalidated.
 - Wallfacer refreshes board.json before each turn. If board.json is read by the agent and ends up in conversation history, subsequent turns have different conversation prefixes.
 - The host-installed Claude Code may be a different version than the one that created the session (after a host upgrade).
 
@@ -224,7 +230,7 @@ Because tasks run as host processes in a worktree (no image), RTK is a host PATH
 
 ### 2.2 Board Context Optimization
 
-**Status**: Partly shipped. `internal/runner/board.go` already limits sibling task text fields in the manifest and warns on oversized manifests (`logBoardManifestSizeWarning`). Remaining work is conditional generation and hash-based regeneration below.
+**Status**: Partly shipped. `internal/runner/board.go` already limits sibling task text fields in the manifest, warns on oversized manifests (`logBoardManifestSizeWarning`), and caches the generated manifest keyed by `(boardChangeSeq, selfTaskID)` so it only regenerates when the board sequence advances. Remaining work is conditional (lazy) generation and content-hash regeneration below.
 
 Wallfacer generates `board.json` before each turn containing board state (sibling tasks, statuses, branch names, worktree paths). It is written to a temp dir and surfaced to the agent.
 
@@ -233,15 +239,15 @@ Wallfacer generates `board.json` before each turn containing board state (siblin
 **Optimizations** (remaining):
 
 1. **Lazy board generation**: Don't generate/surface board.json by default. Only generate it when the task has `mount_worktrees` enabled or the task prompt references sibling tasks.
-2. **Stable board hashing**: Only regenerate board.json if the content actually changed (hash comparison). Avoid unnecessary file writes that change mtime.
+2. **Stable board hashing**: Tighten the existing `boardChangeSeq` cache to a content hash, so a sequence bump that produces byte-identical board.json skips the file write entirely. Avoid unnecessary writes that change mtime.
 
 ### 2.3 AGENTS.md Size Management
 
-AGENTS.md is composed into every turn's system context (via `--append-system-prompt` / `WALLFACER_INSTRUCTIONS_PATH`). Larger AGENTS.md means more dynamic tokens, hence more cost per turn.
+AGENTS.md is composed into every turn's system context (via `--append-system-prompt` as `Request.SystemPrompt`). Larger AGENTS.md means more dynamic tokens, hence more cost per turn.
 
 **Optimizations**:
 
-1. **Size tracking**: Log AGENTS.md size in bytes alongside turn usage. Surface in cache telemetry. (The composed-instructions hash is already recorded as `InstructionsHash` in `ExecutionEnvironment`; extend with a byte size.)
+1. **Size tracking**: Log composed-instructions size in bytes alongside turn usage. Surface in cache telemetry. (Pairs with the instructions-hash work in §1.2; record hash and byte size together.)
 2. **Size warning**: Warn in the UI when AGENTS.md exceeds a threshold (e.g., 10KB) with estimated per-turn cost impact. (Mirrors the existing board-size warning pattern.)
 3. **Per-task instruction subset**: Allow tasks to specify which sections of AGENTS.md they need (via tags or sections), and compose a filtered version.
 
@@ -257,7 +263,7 @@ Build an internal regression model that predicts expected token consumption for 
 - Turn number within session (later turns have more context)
 - AGENTS.md size (tokens)
 - Number of worktrees mounted
-- Harness (Claude vs Codex)
+- Harness (claude / codex / opencode / cursor; cache mechanics differ per harness)
 - Model (Sonnet vs Opus, different context windows and pricing)
 - Whether this is a `--resume` turn
 - Task prompt length
@@ -356,7 +362,7 @@ For multi-task workflows (batch creation, dependency chains), track aggregate co
 
 Track costs across all tasks aggregated by day and month (inspired by cc-budget's daily/monthly ledger). This goes beyond per-task tracking to give workspace-level spend visibility. Note `/api/stats` already exposes a per-day cost timeline; the ledger formalizes and persists this with longer retention and trend projection.
 
-- **Daily ledger**: Total cost per day, broken down by harness (Claude vs Codex) and model.
+- **Daily ledger**: Total cost per day, broken down by harness (claude / codex / opencode / cursor) and model.
 - **Monthly ledger**: Running monthly total with trend projection ("on pace for $X this month").
 - **Retention**: Daily entries retained for 90 days, monthly entries indefinitely.
 - **Storage**: Append to a workspace-level `usage-ledger.jsonl` file (separate from per-task turn-usage files) in `internal/store/`.
@@ -426,4 +432,4 @@ When set, all cost displays (per-turn, per-task, daily/monthly ledger, prospecti
 6. Are Anthropic's peak hours (5-11 AM PT weekdays, per cc-budget) stable enough to hardcode, or should wallfacer detect them dynamically from rate-limit response headers?
 7. Should budget threshold warnings be injected as system messages or appended to the user prompt? System messages may be more reliable but depend on Claude Code's prompt assembly order.
 8. What ledger retention policy balances storage cost vs analytics value? cc-budget uses 48h snapshots / 31d ledger; wallfacer may want longer retention given its multi-task nature.
-9. The cloud/executor specs replace `--backend` selection with `--executor`. This spec frames everything around the single host `HostBackend`; if a future executor (cloud worker) reintroduces an image, the RTK delivery and binary-variant questions (§2.1, §1.3) need to be revisited for that path. Coordinate the executor terminology with those specs rather than relabeling here.
+9. The `--executor` terminology has partly landed (`internal/executor/` now holds `backend.go` plus per-harness host variants `host_codex.go` / `host_cursor.go` / `host_opencode.go`), but execution is still the single host path with no image. If a future executor (cloud worker) reintroduces an image, the RTK delivery and binary-variant questions (§2.1, §1.3) need to be revisited for that path. Coordinate the executor terminology with the cloud/executor specs rather than relabeling here.
