@@ -121,7 +121,9 @@ func (m *Manager) Start(_ context.Context, provider Provider) (string, error) {
 	m.mu.Unlock()
 
 	// Background goroutine: wait for callback, exchange token, update status.
-	go m.runFlow(flow, redirectURI)
+	// flowCtx carries the 5-minute deadline so token exchange cannot hang
+	// the goroutine forever.
+	go m.runFlow(flowCtx, flow, redirectURI)
 
 	return authorizeURL, nil
 }
@@ -154,7 +156,7 @@ func (m *Manager) Cancel(providerName string) {
 	}
 }
 
-func (m *Manager) runFlow(flow *Flow, redirectURI string) {
+func (m *Manager) runFlow(ctx context.Context, flow *Flow, redirectURI string) {
 	// Release the 5-minute WithTimeout context on every terminal outcome so its
 	// timer is stopped. On the success path nothing else calls flow.cancel()
 	// until the next Start for this provider, leaving the timer armed.
@@ -187,7 +189,7 @@ func (m *Manager) runFlow(flow *Flow, redirectURI string) {
 		client = http.DefaultClient
 	}
 
-	token, err := exchangeToken(client, flow.provider, result.Code, flow.verifier, redirectURI, flow.state)
+	token, err := exchangeToken(ctx, client, flow.provider, result.Code, flow.verifier, redirectURI, flow.state)
 	if err != nil {
 		flow.mu.Lock()
 		flow.status = FlowStatus{State: FlowError, Error: "token exchange failed: " + err.Error()}
@@ -211,8 +213,10 @@ func (m *Manager) runFlow(flow *Flow, redirectURI string) {
 }
 
 // exchangeToken sends the authorization code to the token endpoint and
-// returns the access token (or api_key) from the response.
-func exchangeToken(client *http.Client, provider Provider, code, verifier, redirectURI, state string) (string, error) {
+// returns the access token (or api_key) from the response. ctx carries the
+// flow deadline so a hung token endpoint cannot block the flow goroutine
+// forever.
+func exchangeToken(ctx context.Context, client *http.Client, provider Provider, code, verifier, redirectURI, state string) (string, error) {
 	var resp *http.Response
 	var err error
 
@@ -235,7 +239,7 @@ func exchangeToken(client *http.Client, provider Provider, code, verifier, redir
 			"code_len", len(code),
 			"verifier_len", len(verifier),
 		)
-		req, _ := http.NewRequest("POST", provider.TokenURL, bytes.NewReader(payload))
+		req, _ := http.NewRequestWithContext(ctx, "POST", provider.TokenURL, bytes.NewReader(payload))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		resp, err = client.Do(req)
@@ -247,7 +251,9 @@ func exchangeToken(client *http.Client, provider Provider, code, verifier, redir
 			"code_verifier": {verifier},
 			"client_id":     {provider.ClientID},
 		}
-		resp, err = client.PostForm(provider.TokenURL, data)
+		req, _ := http.NewRequestWithContext(ctx, "POST", provider.TokenURL, strings.NewReader(data.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err = client.Do(req)
 	}
 	if err != nil {
 		return "", fmt.Errorf("POST %s: %w", provider.TokenURL, err)

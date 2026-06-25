@@ -195,7 +195,7 @@ func TestExchangeToken(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	token, err := exchangeToken(http.DefaultClient, p, "test-code", "test-verifier", "http://localhost:9999/callback", "test-state")
+	token, err := exchangeToken(context.Background(), http.DefaultClient, p, "test-code", "test-verifier", "http://localhost:9999/callback", "test-state")
 	if err != nil {
 		t.Fatalf("exchangeToken: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestExchangeToken_ErrorResponse(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	_, err := exchangeToken(http.DefaultClient, p, "bad-code", "verifier", "http://localhost:9999/callback", "state")
+	_, err := exchangeToken(context.Background(), http.DefaultClient, p, "bad-code", "verifier", "http://localhost:9999/callback", "state")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -491,7 +491,7 @@ func TestExchangeToken_JSON(t *testing.T) {
 	p.TokenURL = ts.URL
 	p.JSONTokenReq = true
 
-	token, err := exchangeToken(http.DefaultClient, p, "test-code", "test-verifier", "http://localhost:9999/callback", "test-state")
+	token, err := exchangeToken(context.Background(), http.DefaultClient, p, "test-code", "test-verifier", "http://localhost:9999/callback", "test-state")
 	if err != nil {
 		t.Fatalf("exchangeToken: %v", err)
 	}
@@ -518,7 +518,7 @@ func TestExchangeToken_JSONEmptyState(t *testing.T) {
 	p.TokenURL = ts.URL
 	p.JSONTokenReq = true
 
-	_, err := exchangeToken(http.DefaultClient, p, "code", "verifier", "http://localhost:9999/cb", "")
+	_, err := exchangeToken(context.Background(), http.DefaultClient, p, "code", "verifier", "http://localhost:9999/cb", "")
 	if err != nil {
 		t.Fatalf("exchangeToken: %v", err)
 	}
@@ -534,7 +534,7 @@ func TestExchangeToken_APIKey(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	token, err := exchangeToken(http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
+	token, err := exchangeToken(context.Background(), http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
 	if err != nil {
 		t.Fatalf("exchangeToken: %v", err)
 	}
@@ -553,7 +553,7 @@ func TestExchangeToken_NoToken(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	_, err := exchangeToken(http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
+	_, err := exchangeToken(context.Background(), http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
 	if err == nil {
 		t.Fatal("expected error for missing token")
 	}
@@ -572,7 +572,7 @@ func TestExchangeToken_InvalidJSON(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	_, err := exchangeToken(http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
+	_, err := exchangeToken(context.Background(), http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -585,10 +585,61 @@ func TestExchangeToken_NetworkError(t *testing.T) {
 	p := testProvider
 	p.TokenURL = "http://127.0.0.1:1/token" // nothing listening
 
-	_, err := exchangeToken(http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
+	_, err := exchangeToken(context.Background(), http.DefaultClient, p, "code", "verifier", "http://localhost:9999/callback", "state")
 	if err == nil {
 		t.Fatal("expected error for unreachable server")
 	}
+}
+
+// TestExchangeToken_HungEndpointHonorsContext stands up a token endpoint that
+// accepts the connection but never responds. Without a context deadline,
+// client.Do blocks forever and leaks the flow goroutine. The test runs
+// exchangeToken in a goroutine and reports failure (rather than hanging the
+// suite) if it does not return promptly after the short deadline elapses.
+func TestExchangeToken_HungEndpointHonorsContext(t *testing.T) {
+	stop := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		// Block until the client gives up (its context deadline) or the
+		// test tears down. Releasing on stop lets ts.Close() return.
+		select {
+		case <-r.Context().Done():
+		case <-stop:
+		}
+	}))
+	defer ts.Close()
+	defer close(stop)
+
+	run := func(t *testing.T, jsonReq bool) {
+		t.Helper()
+		p := testProvider
+		p.TokenURL = ts.URL
+		p.JSONTokenReq = jsonReq
+
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+
+		type result struct {
+			tok string
+			err error
+		}
+		done := make(chan result, 1)
+		go func() {
+			tok, err := exchangeToken(ctx, http.DefaultClient, p, "code", "verifier", "http://localhost:9999/cb", "state")
+			done <- result{tok, err}
+		}()
+
+		select {
+		case res := <-done:
+			if res.err == nil {
+				t.Fatalf("exchangeToken returned nil error for hung endpoint; tok=%q", res.tok)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("exchangeToken did not return after context deadline (goroutine leak)")
+		}
+	}
+
+	t.Run("form", func(t *testing.T) { run(t, false) })
+	t.Run("json", func(t *testing.T) { run(t, true) })
 }
 
 func TestManager_StartCallbackServerError(t *testing.T) {
@@ -632,7 +683,7 @@ func TestExchangeToken_ReadBodyError(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	_, err := exchangeToken(client, p, "code", "verifier", "http://localhost:9999/cb", "state")
+	_, err := exchangeToken(context.Background(), client, p, "code", "verifier", "http://localhost:9999/cb", "state")
 	if err == nil {
 		t.Fatal("expected error from body read failure")
 	}
@@ -751,7 +802,7 @@ func TestManager_RunFlowCancelsContextOnSuccess(t *testing.T) {
 
 	m := NewManager()
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", cb.Port())
-	go m.runFlow(flow, redirectURI)
+	go m.runFlow(context.Background(), flow, redirectURI)
 
 	// Deliver a valid callback so the flow reaches FlowSuccess.
 	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?code=auth-code&state=%s", cb.Port(), state))
