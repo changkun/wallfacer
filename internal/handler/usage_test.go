@@ -250,7 +250,7 @@ func usageResponseFromHandler(t *testing.T, h *Handler, url string) usageRespons
 	return resp
 }
 
-func TestUsage_NoPlanningRecords(t *testing.T) {
+func TestUsage_NoAgentSessionRecords(t *testing.T) {
 	h := newTestHandler(t)
 	// No agent-session dir on disk — response must not include an agent-session key.
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
@@ -262,7 +262,7 @@ func TestUsage_NoPlanningRecords(t *testing.T) {
 	}
 }
 
-func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
+func TestUsage_AgentSessionMergedIntoBySubAgent(t *testing.T) {
 	h := newTestHandler(t)
 	key := store.AgentSessionGroupKey([]string{"/repo/a"})
 	now := time.Now().UTC()
@@ -293,7 +293,7 @@ func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
 	}
 }
 
-func TestUsage_PlanningRespectsDaysWindow(t *testing.T) {
+func TestUsage_AgentSessionRespectsDaysWindow(t *testing.T) {
 	h := newTestHandler(t)
 	key := store.AgentSessionGroupKey([]string{"/repo/a"})
 	now := time.Now().UTC()
@@ -321,7 +321,7 @@ func TestUsage_PlanningRespectsDaysWindow(t *testing.T) {
 	}
 }
 
-func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
+func TestUsage_AgentSessionAcrossMultipleGroups(t *testing.T) {
 	h := newTestHandler(t)
 	keyA := store.AgentSessionGroupKey([]string{"/repo/a"})
 	keyB := store.AgentSessionGroupKey([]string{"/repo/b"})
@@ -348,7 +348,7 @@ func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
 	}
 }
 
-func TestUsage_TaskCountUnchangedByPlanning(t *testing.T) {
+func TestUsage_TaskCountUnchangedByAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 	key := store.AgentSessionGroupKey([]string{"/repo/a"})
 	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
