@@ -146,6 +146,13 @@ type Handler struct {
 	// once in NewHandler and never mutated; AgonEnabled() is the runtime gate.
 	verifier adversarial.Verifier
 
+	// agonInFlight tracks tasks with an agon run currently executing, so a
+	// task that takes minutes to verify is not re-launched on every watcher
+	// tick (AgonUnresolved is only written when the run finishes). Guarded by
+	// agonMu, which also enforces the maxConcurrentAgon cap atomically.
+	agonMu       sync.Mutex
+	agonInFlight map[uuid.UUID]struct{}
+
 	// breakers holds per-watcher circuit breakers. Keyed by watcher name
 	// (e.g. "auto-promote"). These are transient and auto-heal; they do not
 	// affect the user-controlled toggle flags.
@@ -259,6 +266,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			"auto-submit":  newWatcherBreaker(),
 			"auto-sync":    newWatcherBreaker(),
 		},
+		agonInFlight: make(map[uuid.UUID]struct{}),
 	}
 	oauthMgr := oauth.NewManager()
 	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)

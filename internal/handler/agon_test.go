@@ -2,8 +2,11 @@ package handler
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"latere.ai/x/agon/pkg/adversarial"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -114,5 +117,107 @@ func TestTryAutoAgon_SkipsTaskWithAgonAlreadyRun(t *testing.T) {
 	h.tryAutoAgon(ctx)
 	if v.called != 0 {
 		t.Errorf("verifier called %d times for already-run task, want 0", v.called)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// In-flight dedup + concurrency cap (beginAgon / endAgon)
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestBeginAgon_DedupAndCap(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	id1, id2, id3 := uuid.New(), uuid.New(), uuid.New()
+
+	if !h.beginAgon(id1) {
+		t.Fatal("first reservation should succeed")
+	}
+	if h.beginAgon(id1) {
+		t.Fatal("duplicate reservation for the same task must fail")
+	}
+	if !h.beginAgon(id2) {
+		t.Fatal("second distinct task within cap should succeed")
+	}
+	if h.beginAgon(id3) {
+		t.Fatal("third task exceeds maxConcurrentAgon, reservation must fail")
+	}
+	h.endAgon(id1)
+	if !h.beginAgon(id3) {
+		t.Fatal("after a slot is released, reservation should succeed")
+	}
+}
+
+// blockingVerifier counts Verify calls and parks inside Verify until released,
+// so a test can observe a run in flight and assert no duplicate is launched.
+type blockingVerifier struct {
+	mu      sync.Mutex
+	called  int
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (v *blockingVerifier) Verify(_ context.Context, _ adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
+	v.mu.Lock()
+	v.called++
+	v.mu.Unlock()
+	v.entered <- struct{}{}
+	<-v.release
+	return &adversarial.VerifyResult{Unresolved: 0}, nil
+}
+
+// TestTryAutoAgon_DedupesConcurrentTicks proves a waiting task whose agon run is
+// still in flight is not re-launched on the next watcher tick. Without the
+// beginAgon guard, AgonUnresolved stays nil for the whole multi-minute run, so
+// every tick fires another duplicate run for the same task.
+func TestTryAutoAgon_DedupesConcurrentTicks(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	v := &blockingVerifier{entered: make(chan struct{}, 4), release: make(chan struct{})}
+	h.verifier = v
+	h.SetAgon(true)
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dedup", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	if err := s.UpdateTaskResult(ctx, task.ID, "done", "sess-1", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult: %v", err)
+	}
+	// A non-git worktree path is enough: generateWorktreeDiff skips it and
+	// returns "", and runAgon still reaches the verifier.
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{t.TempDir(): t.TempDir()}, "branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	// First tick: launch a run and wait until it is parked inside Verify so the
+	// in-flight slot is held.
+	h.tryAutoAgon(ctx)
+	select {
+	case <-v.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first agon run never reached the verifier")
+	}
+
+	// Second tick while the first run is still in flight: must dedup.
+	h.tryAutoAgon(ctx)
+	select {
+	case <-v.entered:
+		t.Fatal("second agon run started for an in-flight task; dedup failed")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(v.release) // let the first run finish
+
+	v.mu.Lock()
+	got := v.called
+	v.mu.Unlock()
+	if got != 1 {
+		t.Errorf("verifier called %d times, want 1", got)
 	}
 }

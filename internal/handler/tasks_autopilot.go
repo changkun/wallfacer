@@ -1082,9 +1082,41 @@ func (h *Handler) StartAutoAgon(ctx context.Context) {
 	})
 }
 
+// maxConcurrentAgon caps how many agon verification runs may execute at once
+// across all tasks. Agon runs are multi-round, multi-agent, and untracked by
+// the regular task concurrency limits, so they get their own conservative cap.
+const maxConcurrentAgon = 2
+
+// beginAgon reserves an in-flight slot for an agon run on the given task. It
+// returns false when the task already has a run in flight or the global
+// maxConcurrentAgon cap is reached. The dedup is essential: AgonUnresolved is
+// only written when a run finishes, so without this guard a multi-minute run
+// would be re-launched on every watcher tick. Callers that get true MUST call
+// endAgon when the run completes.
+func (h *Handler) beginAgon(id uuid.UUID) bool {
+	h.agonMu.Lock()
+	defer h.agonMu.Unlock()
+	if _, running := h.agonInFlight[id]; running {
+		return false
+	}
+	if len(h.agonInFlight) >= maxConcurrentAgon {
+		return false
+	}
+	h.agonInFlight[id] = struct{}{}
+	return true
+}
+
+// endAgon releases the in-flight slot reserved by beginAgon.
+func (h *Handler) endAgon(id uuid.UUID) {
+	h.agonMu.Lock()
+	delete(h.agonInFlight, id)
+	h.agonMu.Unlock()
+}
+
 // tryAutoAgon scans all waiting tasks that have a SessionID and have not yet
 // been verified by agon (AgonUnresolved == nil), then fires a goroutine for
-// each. Does nothing when agon is disabled.
+// each that is not already running and fits within maxConcurrentAgon. Does
+// nothing when agon is disabled.
 func (h *Handler) tryAutoAgon(ctx context.Context) {
 	if !h.AgonEnabled() {
 		return
@@ -1096,8 +1128,12 @@ func (h *Handler) tryAutoAgon(ctx context.Context) {
 	})
 
 	for _, t := range candidates {
+		if !h.beginAgon(t.ID) {
+			continue
+		}
 		t := t // capture loop variable
 		go func() {
+			defer h.endAgon(t.ID)
 			if err := h.runAgon(ctx, t); err != nil {
 				logger.Handler.Warn("agon: verification run failed",
 					"task", t.ID, "error", err)
