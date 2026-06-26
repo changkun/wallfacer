@@ -13,7 +13,7 @@ import (
 // place under the write lock; run with -race this reported a data race.
 func TestRebuildSearchIndex_RaceWithMutations(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}

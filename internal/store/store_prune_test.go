@@ -22,7 +22,7 @@ import (
 //     because it reads the already-pruned on-disk file.
 func TestPruneTaskPayload(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestPruneTaskPayload(t *testing.T) {
 	}
 
 	// ── Step 6: reload from same dir – loaded task has pruned counts ─────────
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestPruneTaskPayload_LoadTimeMigration(t *testing.T) {
 	}
 
 	// Load the store – loadAll should prune the in-memory task.
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestPruneTaskPayload_LoadTimeMigration(t *testing.T) {
 func TestPruneTaskPayload_ZeroLimitDisablesPruning(t *testing.T) {
 	t.Setenv("WALLFACER_RETRY_HISTORY_LIMIT", "0")
 
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestGetPayloadLimits_EnvOverride(t *testing.T) {
 	t.Setenv("WALLFACER_REFINE_SESSIONS_LIMIT", "2")
 	t.Setenv("WALLFACER_PROMPT_HISTORY_LIMIT", "7")
 
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestGetPayloadLimits_EnvOverride(t *testing.T) {
 func TestGetPayloadLimits_InvalidEnvFallsBackToDefault(t *testing.T) {
 	t.Setenv("WALLFACER_RETRY_HISTORY_LIMIT", "not-a-number")
 
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

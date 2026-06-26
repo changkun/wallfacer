@@ -89,7 +89,7 @@ func TestNewStateChangeData_WithExtra(t *testing.T) {
 
 func TestStore_DataDir(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1075,7 +1075,7 @@ func TestNewFileStore_InvalidPath(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "file.txt")
 	os.WriteFile(tmpFile, []byte("x"), 0644) //nolint:errcheck
 
-	_, err := NewFileStore(filepath.Join(tmpFile, "subdir"))
+	_, err := newTestFileStore(t, filepath.Join(tmpFile, "subdir"))
 	if err == nil {
 		t.Error("expected error from NewFileStore with invalid path")
 	}
@@ -1974,7 +1974,7 @@ func TestLoadAll_SkipsInvalidDirectories(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755)                             //nolint:errcheck
 	os.WriteFile(filepath.Join(dir, "not-a-uuid", "task.json"), []byte("{}"), 0644) //nolint:errcheck
 
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -1989,7 +1989,7 @@ func TestLoadAll_SkipsInvalidDirectories(t *testing.T) {
 func TestLoadAll_SkipsNonDirEntries(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "stray-file.txt"), []byte("x"), 0644) //nolint:errcheck
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -2002,7 +2002,7 @@ func TestLoadAll_SkipsNonDirEntries(t *testing.T) {
 func TestLoadAll_SkipsMissingTaskJSON(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, uuid.New().String()), 0755) //nolint:errcheck
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -2017,7 +2017,7 @@ func TestLoadAll_SkipsInvalidTaskJSON(t *testing.T) {
 	taskDir := filepath.Join(dir, uuid.New().String())
 	os.MkdirAll(taskDir, 0755)                                             //nolint:errcheck
 	os.WriteFile(filepath.Join(taskDir, "task.json"), []byte("bad"), 0644) //nolint:errcheck
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -2031,7 +2031,7 @@ func TestLoadAll_LoadsTombstonedTasks(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "tombstone load", Timeout: 5})
 	s.DeleteTask(bg(), task.ID, "test") //nolint:errcheck
-	s2, err := NewFileStore(s.DataDir())
+	s2, err := newTestFileStore(t, s.DataDir())
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
