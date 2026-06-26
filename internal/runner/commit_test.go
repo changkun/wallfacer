@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // resolveTestCmd maps a non-absolute cmd (e.g. "echo") to its $PATH location
@@ -32,7 +33,7 @@ func resolveTestCmd(cmd string) string {
 func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +257,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0)
 
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +309,7 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1) // always fails
 
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +400,7 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +471,7 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0) // for commit message generation
 
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +603,7 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -671,7 +672,7 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
 	repo := setupTestRepo(t)
 	worktreesDir := t.TempDir()
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -720,7 +721,7 @@ func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
 func TestHostStageAndCommitCleansUpNonEmptyInstructionsFiles(t *testing.T) {
 	repo := setupTestRepo(t)
 	worktreesDir := t.TempDir()
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,7 +780,7 @@ func TestHostStageAndCommitPreservesTrackedInstructionsFiles(t *testing.T) {
 	}
 
 	worktreesDir := t.TempDir()
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +895,7 @@ func TestLocalFallbackCommitMessage_WhitespaceOnlyPromptUsesDiff(t *testing.T) {
 // TestMaybeAutoPush_NoEnvFile verifies that maybeAutoPush is a no-op when
 // envFile is not configured.
 func TestMaybeAutoPush_NoEnvFile(t *testing.T) {
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -916,7 +917,7 @@ func TestMaybeAutoPush_AutoPushDisabled(t *testing.T) {
 	if err := os.WriteFile(envFile, []byte("WALLFACER_AUTO_PUSH=false\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -939,7 +940,7 @@ func TestMaybeAutoPush_NonGitDir(t *testing.T) {
 	if err := os.WriteFile(envFile, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -965,7 +966,7 @@ func TestMaybeAutoPush_NonGitDir(t *testing.T) {
 // when the env file path is set but the file does not exist.
 func TestMaybeAutoPush_MissingEnvFile(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), "nonexistent.env")
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -990,7 +991,7 @@ func newRunnerWithEnvFile(t *testing.T, envContent string) *Runner {
 	if err := os.WriteFile(envFile, []byte(envContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1006,7 +1007,7 @@ func newRunnerWithEnvFile(t *testing.T, envContent string) *Runner {
 
 // TestMaybeAutoPushWorkspace_NoEnvFile verifies no-op when envFile is empty.
 func TestMaybeAutoPushWorkspace_NoEnvFile(t *testing.T) {
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

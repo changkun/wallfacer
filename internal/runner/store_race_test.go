@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -26,7 +26,7 @@ func TestStoreAccessorsRaceWithSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(otherDir) })
-	other, err := store.NewFileStore(otherDir)
+	other, err := storetest.NewFileStore(t, otherDir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // TestNewManagerWithoutWorkspacesCreatesScopedStore verifies that even with no
@@ -382,7 +383,7 @@ func TestSubscribe_MultipleSubscribersAllReceive(t *testing.T) {
 
 func TestNewStatic_SnapshotReflectsInputs(t *testing.T) {
 	storeDir := t.TempDir()
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -560,7 +561,7 @@ func TestActiveGroupsInitialization(t *testing.T) {
 // activeGroups with exactly one entry.
 func TestActiveGroupsInitializationStatic(t *testing.T) {
 	storeDir := t.TempDir()
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -579,7 +580,7 @@ func TestIncrementDecrementTaskCount(t *testing.T) {
 
 	// Insert a second active group to simulate a background group.
 	bgStoreDir := t.TempDir()
-	bgStore, err := store.NewFileStore(bgStoreDir)
+	bgStore, err := storetest.NewFileStore(t, bgStoreDir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -641,7 +642,7 @@ func TestAllActiveSnapshots(t *testing.T) {
 
 	// Insert a second active group.
 	bgStoreDir := t.TempDir()
-	bgStore, err := store.NewFileStore(bgStoreDir)
+	bgStore, err := storetest.NewFileStore(t, bgStoreDir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}

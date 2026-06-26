@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -34,13 +34,13 @@ func TestCurrentWSKey(t *testing.T) {
 // TestTaskStoreResolution verifies that taskStore returns the correct store
 // when a task-to-group mapping exists and the group is active in the manager.
 func TestTaskStoreResolution(t *testing.T) {
-	storeA, err := store.NewFileStore(t.TempDir())
+	storeA, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { storeA.Close() })
 
-	storeB, err := store.NewFileStore(t.TempDir())
+	storeB, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestTaskStoreResolution(t *testing.T) {
 // TestTaskStoreFallback verifies that taskStore falls back to currentStore
 // when no task-to-group mapping exists.
 func TestTaskStoreFallback(t *testing.T) {
-	storeA, err := store.NewFileStore(t.TempDir())
+	storeA, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestTaskStoreFallback(t *testing.T) {
 // workspace key in taskWSKey before Run() starts.
 func TestRunBackgroundCapturesWSKey(t *testing.T) {
 	storeDir := t.TempDir()
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestRunBackgroundCapturesWSKey(t *testing.T) {
 // IncrementTaskCount on the workspace manager.
 func TestRunBackgroundIncrementsTaskCount(t *testing.T) {
 	storeDir := t.TempDir()
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestRunBackgroundIncrementsTaskCount(t *testing.T) {
 // TestRunBackgroundCleansUpOnCompletion verifies that after Run() returns,
 // both the taskWSKey entry is deleted and DecrementAndCleanup is called.
 func TestRunBackgroundCleansUpOnCompletion(t *testing.T) {
-	storeA, err := store.NewFileStore(t.TempDir())
+	storeA, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestRunBackgroundCleansUpOnCompletion(t *testing.T) {
 // TestTaskStoreFallbackOnMissingGroup verifies that taskStore falls back to
 // currentStore when the mapped group is no longer active in the manager.
 func TestTaskStoreFallbackOnMissingGroup(t *testing.T) {
-	storeA, err := store.NewFileStore(t.TempDir())
+	storeA, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newRunnerForArgTest creates a Runner for testing arg-building functions.
@@ -14,7 +14,7 @@ import (
 func newRunnerForArgTest(t *testing.T, cfg RunnerConfig) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

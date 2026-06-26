@@ -13,6 +13,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // testRunnerForPrompts returns a minimal Runner suitable for prompt-rendering
@@ -1083,7 +1084,7 @@ func TestBuildIdeationPromptIncludesRejectedTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatal(err)
 	}

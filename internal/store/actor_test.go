@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // TestInsertEvent_StampsActorFromContext covers the main contract:
@@ -14,7 +15,7 @@ import (
 // ActorSub and ActorType match.
 func TestInsertEvent_StampsActorFromContext(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestInsertEvent_StampsActorFromContext(t *testing.T) {
 // should surface as ActorType="system", empty ActorSub.
 func TestInsertEvent_SystemActor(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +80,7 @@ func TestInsertEvent_SystemActor(t *testing.T) {
 // disk from pre-Phase-2 records.
 func TestInsertEvent_NoActorCtx(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
