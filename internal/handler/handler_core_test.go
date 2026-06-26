@@ -557,6 +557,27 @@ func TestRequirePrincipalMiddleware_LocalMode(t *testing.T) {
 	}
 }
 
+// TestLogout_ClearsCoordinationToken verifies that both Logout and LogoutNotify
+// invoke the coordination sign-out hook, so signing out stops the connector
+// (nothing pulled while signed out), not just the browser cookie.
+func TestLogout_ClearsCoordinationToken(t *testing.T) {
+	h := &Handler{} // auth nil: exercises the bare cookie-clear path
+	called := 0
+	h.SetCoordinationLogout(func() { called++ })
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/auth/logout", nil)
+	h.Logout(httptest.NewRecorder(), req)
+	if called != 1 {
+		t.Fatalf("Logout: hook called %d times, want 1", called)
+	}
+
+	req2, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/auth/logout-notify", nil)
+	h.LogoutNotify(httptest.NewRecorder(), req2)
+	if called != 2 {
+		t.Fatalf("LogoutNotify: hook called %d times, want 2", called)
+	}
+}
+
 // TestSetAutopush_Toggle verifies that SetAutopush toggles the autopush state.
 func TestSetAutopush_Toggle(t *testing.T) {
 	h := newTestHandler(t)

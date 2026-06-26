@@ -243,6 +243,17 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID},
 		logger.Main)
 	h.SetCoordinationToggle(coordGate)
+	// Signing out clears the coordination token: the connector's gate then drops
+	// the live WebSocket and stops re-dialing, so nothing is pulled while signed
+	// out. The token store is shared with `wallfacer auth login`, so this also
+	// ends a CLI session on this machine (single-user instance).
+	if coordTokenStore != nil {
+		h.SetCoordinationLogout(func() {
+			if err := coordTokenStore.Clear(); err != nil {
+				logger.Main.Warn("coordination: clear token on logout failed", "err", err)
+			}
+		})
+	}
 
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {

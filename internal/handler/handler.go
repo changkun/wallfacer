@@ -128,6 +128,10 @@ type Handler struct {
 	// coordToggle is the coordination opt-in gate. Nil until SetCoordinationToggle.
 	// Guarded by snapshotMu.
 	coordToggle CoordinationToggle
+	// coordLogout clears the coordination token on sign-out so the connector
+	// stops dialing and drops its live connection (nothing pulled while signed
+	// out). Nil until SetCoordinationLogout. Guarded by snapshotMu.
+	coordLogout func()
 
 	autopilot  atomic.Bool
 	autotest   atomic.Bool
