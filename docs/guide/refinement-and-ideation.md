@@ -10,7 +10,7 @@ Wallfacer includes two AI-powered features that help you shape tasks before they
 
 Prompt iteration happens inside the Plan panel, pinned to a specific task. The agent reads your workspaces, discusses the prompt with you in chat, and writes rewrites straight to the task's prompt field through the `update_task_prompt` tool. There is no separate "Refine" modal and no before/apply preview step: every round is a commit that you can undo.
 
-Task-mode planning is available for tasks in the **Backlog** or **Waiting** columns. Once a task moves to In Progress, locking kicks in (see [Automation, Task lock and cascade](automation.md)) and the thread shows the live state without offering further writes.
+Task-mode chat is available for tasks in the **Backlog** or **Waiting** columns. Once a task moves to In Progress, locking kicks in (see [Automation, Task lock and cascade](automation.md)) and the thread shows the live state without offering further writes.
 
 #### Opening Plan for a Task
 
@@ -107,7 +107,7 @@ This stops the running ideate process and marks the brainstorm instance task as 
 
 ### Plan task-mode thread lifecycle
 
-Task-mode threads are distinct from the general planning threads. They are pinned to a specific task ID, rendered with a dedicated system prompt (`task_prompt_refine.tmpl`), and surface the task's current metadata (prompt, status, age) to the agent on every turn.
+Task-mode threads are distinct from the general threads. They are pinned to a specific task ID, rendered with a dedicated system prompt (`task_prompt_refine.tmpl`), and surface the task's current metadata (prompt, status, age) to the agent on every turn.
 
 Thread tabs persist across sessions; archive a thread to hide it while keeping its files on disk. Creating a thread from a card that already has an active task-mode thread reuses the existing thread rather than spawning a duplicate.
 
@@ -119,11 +119,11 @@ The ideation agent defaults to the Claude harness. Route it globally with the `W
 
 ### System Prompt Customization
 
-Ideation and task-mode planning use built-in system prompt templates:
+Ideation and task-mode chat use built-in system prompt templates:
 
 | Template | Purpose |
 |---|---|
-| `task_prompt_refine.tmpl` | Instructs the task-mode planning agent how to iterate on a pinned task's prompt, including when to call `update_task_prompt`. |
+| `task_prompt_refine.tmpl` | Instructs the task-mode agent how to iterate on a pinned task's prompt, including when to call `update_task_prompt`. |
 | `ideation.tmpl` | Instructs the brainstorm agent to explore the workspace, generate candidates, self-critique, and output ranked ideas. |
 
 To customize either template:
@@ -156,7 +156,7 @@ Configure the interval from the routine card's interval picker on the board.
 
 ### Configuration Variables
 
-Harness routing for the ideation agent is controlled by `WALLFACER_SANDBOX_IDEA_AGENT` (inheriting from `WALLFACER_DEFAULT_SANDBOX`). Task-mode planning inherits the harness pinned on the surrounding planning thread. See [Configuration, Sandbox Routing](configuration.md#sandbox-routing) for the full routing table.
+Harness routing for the ideation agent is controlled by `WALLFACER_SANDBOX_IDEA_AGENT` (inheriting from `WALLFACER_DEFAULT_SANDBOX`). Task-mode chat inherits the harness pinned on the surrounding thread. See [Configuration, Sandbox Routing](configuration.md#sandbox-routing) for the full routing table.
 
 Automation toggles (set via `PUT /api/config`):
 
@@ -165,11 +165,11 @@ Automation toggles (set via `PUT /api/config`):
 | `ideation` | Retained no-op shim. `PUT /api/config` still parses it, but `SetIdeation` does nothing and `IdeationEnabled` always returns `false`; periodic ideation is now a user-created routine. |
 | `ideation_interval` | Retained no-op shim. Parsed but discarded; `IdeationInterval` always returns 0. |
 
-There is no `autorefine` config field: task-mode planning is user-driven and does not have an auto-promoted refine step.
+There is no `autorefine` config field: task-mode chat is user-driven and does not have an auto-promoted refine step.
 
-### Planning Chat for Spec Iteration
+### Agent Chat for Spec Iteration
 
-For spec-level iteration (as opposed to task-level), see the Planning Chat in Plan Mode (press **P** to switch, then **C** for chat). The planning agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
+For spec-level iteration (as opposed to task-level), see the Agent Chat in Plan Mode (press **P** to switch, then **C** for chat). The agent supports slash commands like `/summarize`, `/break-down`, `/create`, `/status`, `/validate`, `/impact`, and `/dispatch`.
 
 ---
 

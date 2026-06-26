@@ -5,7 +5,7 @@ Plan mode is where you browse, author, and dispatch spec files from inside the a
 ```mermaid
 graph LR
   explorer["Explorer<br/>spec tree"] --- focused["Focused View<br/>rendered markdown"]
-  focused --- chat["Planning Chat<br/>agent + slash commands"]
+  focused --- chat["Agent Chat<br/>agent + slash commands"]
 ```
 
 Specs are structured design documents that bridge ideas and executable tasks. Each spec is a markdown file with YAML frontmatter that tracks lifecycle state, dependencies, affected code paths, and effort estimates. Specs live in `specs/` and are organized by track.
@@ -27,10 +27,10 @@ Plan mode picks one of two layouts based on the workspace's spec tree:
 - **Three-pane** (default), when any spec exists or a `specs/README.md` Roadmap is present:
   - **Left pane**: spec explorer (file tree)
   - **Center pane**: focused spec view (rendered content)
-  - **Right pane**: planning chat (toggleable with **C**)
+  - **Right pane**: agent chat (toggleable with **C**)
 - **Chat-first**, when the workspace has no specs and no Roadmap. The chat renders as a centered card (max-width ~720px) with a prominent empty-state hint, `Try /create <title> to save this thread as a spec`, above the composer, and the composer placeholder invites free-form planning ("Describe what you'd like to plan, or /create <title>…"). The spatial position mirrors the empty-Board composer so switching modes on a fresh workspace reads as visually continuous. The hint disappears as soon as the thread has its first message. The **C** shortcut is a no-op in this layout because the chat pane is already the only visible surface. The layout flips automatically once specs appear (via the spec tree SSE stream).
 
-![Plan mode three-pane layout with spec tree, rendered spec, and planning chat](images/plan.png)
+![Plan mode three-pane layout with spec tree, rendered spec, and agent chat](images/plan.png)
 
 ### Spec Explorer
 
@@ -51,17 +51,17 @@ Clicking a spec in the explorer opens it in the center pane. The content is rend
 - Table of contents navigation
 - YAML frontmatter displayed as a structured header
 
-### Planning Chat Threads
+### Agent Chat Threads
 
-The planning chat supports multiple named threads per workspace group, shown as tabs above the chat stream. Click **+** to start a new thread, double-click a tab (or use the pencil icon) to rename it, and **×** to archive it. Archiving hides the thread from the tab bar but keeps its files on disk; unarchive from the thread manager to restore it.
+The agent chat supports multiple named threads per workspace group, shown as tabs above the chat stream. Click **+** to start a new thread, double-click a tab (or use the pencil icon) to rename it, and **×** to archive it. Archiving hides the thread from the tab bar but keeps its files on disk; unarchive from the thread manager to restore it.
 
-Each thread keeps its own Claude Code session and its own message history, so parallel lines of design inquiry do not contaminate each other. Only one agent turn runs at a time across all threads: every thread shares the single planner process. Messages sent to a background thread while another turn is in-flight are queued locally and flushed when the planner is free.
+Each thread keeps its own Claude Code session and its own message history, so parallel lines of design inquiry do not contaminate each other. Only one agent turn runs at a time across all threads: every thread shares the single agent runtime process. Messages sent to a background thread while another turn is in-flight are queued locally and flushed when the agent is free.
 
 `/undo` targets the caller thread's most recent round and is implemented via `git revert`: the original commit and its revert both stay in history, so you retain a full audit trail. Dispatched tasks whose linkage was introduced in the reverted commit are automatically cancelled.
 
 ### Spec Workflow
 
-Specs follow a structured lifecycle driven by slash commands in the planning chat. Each command maps to a step in the workflow:
+Specs follow a structured lifecycle driven by slash commands in the agent chat. Each command maps to a step in the workflow:
 
 ```mermaid
 flowchart LR
@@ -90,7 +90,7 @@ You don't need to follow every step linearly. Small specs can skip from `/create
 
 ### Breaking Down Specs
 
-Large specs can be decomposed into smaller child specs. Press **B** or use `/break-down` in the planning chat. The agent analyzes the parent spec and creates child specs in a subdirectory named after the parent file. Each child gets its own frontmatter, dependencies, and acceptance criteria.
+Large specs can be decomposed into smaller child specs. Press **B** or use `/break-down` in the agent chat. The agent analyzes the parent spec and creates child specs in a subdirectory named after the parent file. Each child gets its own frontmatter, dependencies, and acceptance criteria.
 
 The agent automatically determines the breakdown mode from the spec's lifecycle state: **design mode** (creates sub-design specs with Options and Open Questions) for `vague` or `drafted` specs, or **tasks mode** (creates implementation-ready leaf specs with Goal, What to do, Tests, Boundaries) for `validated` specs. Override with `/break-down design` or `/break-down tasks`.
 
@@ -198,7 +198,7 @@ The archive handler rejects the cascade if any target has a live `dispatched_tas
 
 Unarchive prefers a lossless path: it locates the archive commit in git history and runs `git revert` on it, which restores every descendant's pre-archive status exactly. If the archive commit cannot be found, or the revert conflicts, it falls back to a single-spec transition from `archived` back to `drafted`.
 
-Archived specs remain on disk but are filtered out of the spec tree by default, and they are skipped when the planning system prompt decides whether the workspace is "empty" versus "non-empty", so archiving a workspace's only spec will flip Plan mode back into chat-first layout.
+Archived specs remain on disk but are filtered out of the spec tree by default, and they are skipped when the agent's system prompt decides whether the workspace is "empty" versus "non-empty", so archiving a workspace's only spec will flip Plan mode back into chat-first layout.
 
 ### Progress Tracking
 
@@ -227,7 +227,7 @@ Plan mode uses `P`, `E`, `C`, `D`, and `B`. The full shortcut reference -- inclu
 ## See Also
 
 - [The Autonomy Spectrum](autonomy-spectrum.md) -- where specs fit in the overall workflow
-- [Exploring Ideas](exploring-ideas.md) -- the planning chat for conversational exploration
+- [Exploring Ideas](exploring-ideas.md) -- the agent chat for conversational exploration
 - [Board & Tasks](board-and-tasks.md) -- the task board where dispatched specs are executed
 - [Configuration](configuration.md) -- keyboard shortcuts and settings
 - [Plan Mode internals](../internals/plan-mode.md) -- architecture, lifecycle state machine, dispatch/archive/undo implementation

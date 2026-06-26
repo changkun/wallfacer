@@ -55,7 +55,7 @@ Wallfacer organizes work into four levels, from highest autonomy to most direct 
 
 You describe what you want in natural language. The agent shapes ideas, explores trade-offs, and proposes directions. This is the entry point for greenfield work -- when you do not yet know what to build.
 
-The planning chat (accessible in Plan mode) is a persistent conversation that runs as a host process in the task's git worktree. It can read your codebase, create files, and execute commands while you steer the direction. The worktree is what isolates the work, so changes stay contained in their own branch until you accept them.
+The agent chat (accessible in Plan mode) is a persistent conversation that runs as a host process in the task's git worktree. It can read your codebase, create files, and execute commands while you steer the direction. The worktree is what isolates the work, so changes stay contained in their own branch until you accept them.
 
 ### Spec (Structured Design)
 
@@ -116,7 +116,7 @@ These modes are not discrete settings but composable toggles. Enable auto-test w
 You do not have to start at chat and work down. Jump to any level based on what you know:
 
 - **Got a clear spec?** Dispatch it directly to the task board.
-- **Want to explore a vague idea?** Start in the planning chat.
+- **Want to explore a vague idea?** Start in the agent chat.
 - **Know exactly what to fix?** Create a task with a concrete prompt.
 - **Need to edit one line?** Open the file explorer or terminal.
 
@@ -137,7 +137,7 @@ The value of the spectrum is that you spend your attention where it matters and 
 
 ## Self-Development
 
-Wallfacer builds itself using this spectrum. Most recent features -- the spec explorer, planning chat, file editor, dependency graph -- were designed as specs, broken into tasks, and implemented by Wallfacer's own agents running on its own task board.
+Wallfacer builds itself using this spectrum. Most recent features -- the spec explorer, agent chat, file editor, dependency graph -- were designed as specs, broken into tasks, and implemented by Wallfacer's own agents running on its own task board.
 
 The workflow you use is the same workflow the project uses to evolve itself.
 
@@ -145,7 +145,7 @@ The workflow you use is the same workflow the project uses to evolve itself.
 
 ## See Also
 
-- [Exploring Ideas](exploring-ideas.md) -- the planning chat (Chat level)
+- [Exploring Ideas](exploring-ideas.md) -- the agent chat (Chat level)
 - [Designing Specs](designing-specs.md) -- structured design (Spec level)
 - [Board & Tasks](board-and-tasks.md) -- managed execution (Task level)
 - [Configuration](configuration.md) -- automation toggles for the autonomy dial

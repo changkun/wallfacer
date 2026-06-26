@@ -17,7 +17,7 @@ Start here for the full reading order.
 
 ### Use Wallfacer
 
-- [Exploring Ideas](exploring-ideas.md). Planning chat, slash commands, @mentions, threads, the planning agent.
+- [Exploring Ideas](exploring-ideas.md). Agent chat, slash commands, @mentions, threads, the agent.
 - [Designing Specs](designing-specs.md). Plan mode layout, spec lifecycle (six states), dispatch workflow, archive/unarchive, dependency minimap.
 - [Agents & Flows](agents-and-flows.md). The four primitives (agent, flow, task, routine), how they compose, how to clone and customize built-ins, harness pinning, recipes.
 - [Board & Tasks](board-and-tasks.md). Task board, lifecycle, dependencies, batch creation, search.
@@ -35,7 +35,7 @@ Start here for the full reading order.
 
 ### Plan mode workflow
 
-1. Sketch the idea in the planning chat (Plan mode, press **P**).
+1. Sketch the idea in the agent chat (Plan mode, press **P**).
 2. Issue `/create` (or let the agent emit `/spec-new`) to scaffold a first draft.
 3. Refine with `/refine`, `/impact`, then `/validate`.
 4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.
