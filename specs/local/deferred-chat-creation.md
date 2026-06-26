@@ -146,3 +146,21 @@ followed the frontend-only plan but diverged in a few details worth recording.
 
 - **Out of scope held:** `migrateOrInit` still seeds an empty `Chat 1` on a
   brand-new workspace — accepted as before.
+
+### Follow-up (2026-06-26): provisional title from the first message
+
+`feat(chat): show first message as provisional thread title until auto-title
+lands` (`4409b3d6`). The transient `Chat N` was still visible in the gap between
+promotion and the AI title landing. Now `promoteDraft` sets the new thread's name
+to the user's first message (whitespace-collapsed, ellipsized past 48 chars via
+`truncateTitle`) and marks `titlePending`. The AI title still replaces it.
+
+Because a provisional name looks non-default, "what we display" and "are we still
+awaiting a title?" had to be decoupled from the `Chat N` regex onto the
+`titlePending` flag: `refreshBusy` adopts a server name only when it's non-default
+(so a server `Chat N` can never clobber the provisional) and clears the flag on
+adopt; `loadThreads` preserves the provisional across rebuilds while the server
+name is still default; `refreshTitleSoon` polls on `titlePending`; a manual rename
+clears it. Frontend-only — a hard reload or second tab before the AI title lands
+falls back to the server's `Chat N`, and if auto-titling fails the provisional
+prompt simply persists (a better fallback than `Chat N`).
