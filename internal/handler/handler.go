@@ -166,6 +166,12 @@ type Handler struct {
 	fileIndex          *fileIndex
 	spanCache          spanStatsCache
 
+	// explorerCommitMu serializes explorer auto-commits per workspace so a
+	// burst of rapid saves queues on the git index instead of colliding on
+	// index.lock and silently dropping a commit. Keyed by resolved workspace
+	// path; values are *sync.Mutex.
+	explorerCommitMu sync.Map
+
 	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
 	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
 	// re-parse the env file on every call. Invalidate on env config update.
