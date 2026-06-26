@@ -598,7 +598,7 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 
 // --- Agent-session section ---
 
-func TestAggregatePlanningStats_EmptyDir(t *testing.T) {
+func TestAggregateAgentSessionStats_EmptyDir(t *testing.T) {
 	configDir := t.TempDir()
 	got := aggregateAgentSessionStats(configDir, nil, time.Time{})
 	if got == nil {
@@ -609,7 +609,7 @@ func TestAggregatePlanningStats_EmptyDir(t *testing.T) {
 	}
 }
 
-func TestAggregatePlanningStats_Aggregation(t *testing.T) {
+func TestAggregateAgentSessionStats_Aggregation(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 
@@ -668,7 +668,7 @@ func TestAggregatePlanningStats_Aggregation(t *testing.T) {
 	}
 }
 
-func TestAggregatePlanningStats_RespectsSince(t *testing.T) {
+func TestAggregateAgentSessionStats_RespectsSince(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 	ws := []string{"/repo/a"}
@@ -703,7 +703,7 @@ func TestAggregatePlanningStats_RespectsSince(t *testing.T) {
 	}
 }
 
-func TestAggregatePlanningStats_TimelineOrdered(t *testing.T) {
+func TestAggregateAgentSessionStats_TimelineOrdered(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 	ws := []string{"/repo/a"}
@@ -732,7 +732,7 @@ func TestAggregatePlanningStats_TimelineOrdered(t *testing.T) {
 	}
 }
 
-func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
+func TestGetStats_ExecutionUnchangedByAgentSession(t *testing.T) {
 	// Seed a task set and compute a baseline response via aggregateStats.
 	now := time.Now().UTC()
 	tasks := []store.Task{{
@@ -750,7 +750,7 @@ func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
 
 	// Now aggregate again with agent-session records present. Execution buckets
 	// must be byte-for-byte equal to the baseline (after clearing AgentSessions).
-	withPlanning := aggregateStats(tasks, noSummary)
+	withAgentSession := aggregateStats(tasks, noSummary)
 	configDir := t.TempDir()
 	ws := []string{"/repo/x"}
 	key := store.AgentSessionGroupKey(ws)
@@ -759,20 +759,20 @@ func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed agent-session: %v", err)
 	}
-	withPlanning.AgentSessions = aggregateAgentSessionStats(configDir, ws, time.Time{})
+	withAgentSession.AgentSessions = aggregateAgentSessionStats(configDir, ws, time.Time{})
 
 	// Zero out the AgentSessions field on both sides, then compare the rest
 	// via JSON round-trip to catch any silent drift in execution buckets.
 	baseline.AgentSessions = nil
-	withPlanning.AgentSessions = nil
+	withAgentSession.AgentSessions = nil
 	wantJSON, _ := json.Marshal(baseline)
-	gotJSON, _ := json.Marshal(withPlanning)
+	gotJSON, _ := json.Marshal(withAgentSession)
 	if string(wantJSON) != string(gotJSON) {
 		t.Errorf("execution buckets drifted when agent-session data is present\nbaseline: %s\n     got: %s", wantJSON, gotJSON)
 	}
 }
 
-func TestGetStats_PlanningEndpoint(t *testing.T) {
+func TestGetStats_AgentSessionEndpoint(t *testing.T) {
 	// Integration-flavored: seed agent-session records under the handler's configDir,
 	// call GetStats over HTTP, and assert the AgentSessions section appears in the
 	// JSON response.
