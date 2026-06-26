@@ -366,10 +366,18 @@
 }
 .pcp-step--thinking > summary::-webkit-details-marker { display: none; }
 .pcp-step--thinking .pcp-step-text { white-space: pre-wrap; }
-.pcp-step-thought {
-  margin-top: 4px;
-  white-space: pre-wrap;
-  color: var(--ink-4);
+/* Collapsed: clamp the full thought to a two-line teaser; expanded: show it all.
+   Clamping the inner span (not the list-item <summary>) keeps the toggle intact
+   and renders the thought exactly once in both states. */
+.pcp-step--thinking > summary > .pcp-step-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.pcp-step--thinking[open] > summary > .pcp-step-text {
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 /* Failure: clear and open by default. */
