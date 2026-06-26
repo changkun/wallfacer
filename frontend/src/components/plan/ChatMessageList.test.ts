@@ -95,4 +95,18 @@ describe('ChatMessageList — trajectory placement', () => {
     const details = host.querySelector('details.pcp-activity')!;
     expect(details.classList.contains('pcp-activity--live')).toBe(false);
   });
+
+  it('renders an expandable thought once, not a teaser stacked over the full copy', () => {
+    // A long thought carries both a truncated summary and the full detail. The
+    // turn must render the thought a single time; rendering the summary teaser
+    // and the full detail separately duplicates the leading text on expand.
+    const full = 'UNIQUE_THOUGHT_MARKER ' + 'x'.repeat(400);
+    mount([assistant({
+      contentHtml: '',
+      activity: [{ kind: 'thinking', label: 'Thinking', summary: full.slice(0, 220) + '…', detail: full }],
+    })]);
+    const thinking = host.querySelector('.pcp-step--thinking')!;
+    const occurrences = thinking.textContent!.split('UNIQUE_THOUGHT_MARKER').length - 1;
+    expect(occurrences).toBe(1);
+  });
 });
