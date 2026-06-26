@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -117,6 +118,44 @@ func TestTryAutoAgon_SkipsTaskWithAgonAlreadyRun(t *testing.T) {
 	h.tryAutoAgon(ctx)
 	if v.called != 0 {
 		t.Errorf("verifier called %d times for already-run task, want 0", v.called)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State dir placement + deterministic cwd
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestAgonStateDir_OutsideWorktree(t *testing.T) {
+	wt := "/data/worktrees/abc123/myrepo"
+	got := agonStateDir(wt)
+	want := "/data/worktrees/abc123/.agon"
+	if got != want {
+		t.Errorf("agonStateDir = %q, want %q", got, want)
+	}
+	// The state dir must not live inside the worktree, or git add -A would
+	// stage it and generateWorktreeDiff would surface it as task changes.
+	if strings.HasPrefix(got, wt+"/") {
+		t.Errorf("agonStateDir %q is inside the worktree %q", got, wt)
+	}
+	if agonStateDir("") != "" {
+		t.Error("agonStateDir(\"\") should return \"\"")
+	}
+}
+
+func TestPrimaryWorktree_Deterministic(t *testing.T) {
+	m := map[string]string{
+		"repoB": "/wt/zeta",
+		"repoA": "/wt/alpha",
+		"repoC": "/wt/mid",
+	}
+	// Run several times: map iteration is randomized, the result must not be.
+	for range 8 {
+		if got := primaryWorktree(m); got != "/wt/alpha" {
+			t.Fatalf("primaryWorktree = %q, want /wt/alpha (deterministic)", got)
+		}
+	}
+	if primaryWorktree(map[string]string{}) != "" {
+		t.Error("primaryWorktree of empty map should return \"\"")
 	}
 }
 

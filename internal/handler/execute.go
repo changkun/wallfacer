@@ -783,12 +783,9 @@ func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 	// Compute the planned state directory for the response. The engine will
 	// create a session subdirectory inside it; the exact path is set on the
-	// task after the run completes via UpdateTaskAgon.
-	var stateDir string
-	for _, p := range task.WorktreePaths {
-		stateDir = filepath.Join(p, ".agon")
-		break
-	}
+	// task after the run completes via UpdateTaskAgon. It lives beside the
+	// worktree (not inside it) so it is never committed — see agonStateDir.
+	stateDir := agonStateDir(primaryWorktree(task.WorktreePaths))
 
 	go func() {
 		defer h.endAgon(id)

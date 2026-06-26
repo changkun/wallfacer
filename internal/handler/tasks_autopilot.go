@@ -1165,6 +1165,32 @@ const (
 	agonCostCap   = 50000
 )
 
+// primaryWorktree returns the task's worktree path chosen deterministically
+// (lexicographically smallest), so a multi-repo run picks the same cwd on
+// every tick instead of a random map-iteration entry.
+func primaryWorktree(worktreePaths map[string]string) string {
+	paths := make([]string, 0, len(worktreePaths))
+	for _, p := range worktreePaths {
+		paths = append(paths, p)
+	}
+	if len(paths) == 0 {
+		return ""
+	}
+	slices.Sort(paths)
+	return paths[0]
+}
+
+// agonStateDir returns the .agon state directory for a run. It lives beside the
+// worktree in the shared per-task dir (<worktreesDir>/<taskID>/.agon), not
+// inside it, so debate scratch is never staged by `git add -A`, never appears
+// in generateWorktreeDiff, and is cleaned up with the task's worktree dir.
+func agonStateDir(worktreePath string) string {
+	if worktreePath == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(worktreePath), ".agon")
+}
+
 // runAgon executes one agon adversarial verification run for a task and
 // persists the result onto the given store (captured at scan time so a group
 // switch mid-run cannot redirect the write). The task must have a non-nil
@@ -1178,14 +1204,7 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		return nil
 	}
 
-	// Use the first worktree as cwd. Most tasks have one; multi-repo tasks
-	// will use the first alphabetically (consistent with other automation paths).
-	var cwd string
-	for _, p := range t.WorktreePaths {
-		cwd = p
-		break
-	}
-
+	cwd := primaryWorktree(t.WorktreePaths)
 	diff := generateWorktreeDiff(t.WorktreePaths)
 
 	input := adversarial.VerifyInput{
@@ -1194,7 +1213,7 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		SessionID:     *t.SessionID,
 		DiffPatch:     diff,
 		Cwd:           cwd,
-		StateDir:      filepath.Join(cwd, ".agon"),
+		StateDir:      agonStateDir(cwd),
 		ForkCount:     agonForkCount,
 		MaxRounds:     agonMaxRounds,
 		CostCapTokens: agonCostCap,
