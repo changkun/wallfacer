@@ -296,28 +296,28 @@ var Routes = []Route{
 		Tags:        []string{"spec-comments"},
 	},
 
-	// --- Planning sandbox ---
+	// --- Agent session ---
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agent", Name: "GetAgentSessionStatus",
 		JSName:      "status",
-		Description: "Get planning sandbox status.",
+		Description: "Get agent session status.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent", Name: "StartAgentSession",
 		JSName:      "start",
-		Description: "Start the planning sandbox.",
+		Description: "Start the agent session.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/agent", Name: "StopAgentSession",
 		JSName:      "stop",
-		Description: "Stop the planning sandbox.",
+		Description: "Stop the agent session.",
 		Tags:        []string{"agent"},
 	},
 
-	// --- Planning messages ---
+	// --- Agent messages ---
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agent/messages", Name: "GetAgentMessages",
@@ -352,7 +352,7 @@ var Routes = []Route{
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/undo", Name: "UndoPlanningRound",
 		JSName:      "undo",
-		Description: "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
+		Description: "Undo the last agent-session round (git reset --hard on the last commit carrying the Plan-Round trailer).",
 		Tags:        []string{"agent"},
 	},
 	{
@@ -364,16 +364,16 @@ var Routes = []Route{
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/tool/update_task_prompt", Name: "UpdateTaskPromptTool",
 		JSName:      "updateTaskPromptTool",
-		Description: "Tool endpoint: update a task's prompt from a task-mode planning thread.",
+		Description: "Tool endpoint: update a task's prompt from a task-mode agent session.",
 		Tags:        []string{"agent"},
 	},
 
-	// --- Planning chat threads ---
+	// --- Agent sessions ---
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agent/sessions", Name: "ListAgentSessions",
 		JSName:      "listThreads",
-		Description: "List planning chat threads for the current workspace group.",
+		Description: "List agent sessions for the current workspace group.",
 		Tags:        []string{"agent"},
 	},
 	{

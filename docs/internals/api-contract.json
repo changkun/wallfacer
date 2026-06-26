@@ -360,7 +360,7 @@
       "method": "GET",
       "pattern": "/api/agent",
       "name": "GetAgentSessionStatus",
-      "description": "Get planning sandbox status.",
+      "description": "Get agent session status.",
       "tags": [
         "agent"
       ]
@@ -369,7 +369,7 @@
       "method": "POST",
       "pattern": "/api/agent",
       "name": "StartAgentSession",
-      "description": "Start the planning sandbox.",
+      "description": "Start the agent session.",
       "tags": [
         "agent"
       ]
@@ -378,7 +378,7 @@
       "method": "DELETE",
       "pattern": "/api/agent",
       "name": "StopAgentSession",
-      "description": "Stop the planning sandbox.",
+      "description": "Stop the agent session.",
       "tags": [
         "agent"
       ]
@@ -432,7 +432,7 @@
       "method": "POST",
       "pattern": "/api/agent/undo",
       "name": "UndoPlanningRound",
-      "description": "Undo the last planning round (git reset --hard on the last commit carrying the Plan-Round trailer).",
+      "description": "Undo the last agent-session round (git reset --hard on the last commit carrying the Plan-Round trailer).",
       "tags": [
         "agent"
       ]
@@ -450,7 +450,7 @@
       "method": "POST",
       "pattern": "/api/agent/tool/update_task_prompt",
       "name": "UpdateTaskPromptTool",
-      "description": "Tool endpoint: update a task's prompt from a task-mode planning thread.",
+      "description": "Tool endpoint: update a task's prompt from a task-mode agent session.",
       "tags": [
         "agent"
       ]
@@ -459,7 +459,7 @@
       "method": "GET",
       "pattern": "/api/agent/sessions",
       "name": "ListAgentSessions",
-      "description": "List planning chat threads for the current workspace group.",
+      "description": "List agent sessions for the current workspace group.",
       "tags": [
         "agent"
       ]

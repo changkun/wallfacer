@@ -10,9 +10,9 @@ import (
 )
 
 // AgentSessionGroupKey returns the path-safe fingerprint used to scope a
-// planning usage log to a workspace group. It matches the scheme used by
+// agent-session usage log to a workspace group. It matches the scheme used by
 // workspace AGENTS.md (internal/prompts) so the same set of workspaces
-// always resolves to the same planning directory regardless of order.
+// always resolves to the same agent-session directory regardless of order.
 func AgentSessionGroupKey(workspaces []string) string {
 	return prompts.InstructionsKey(workspaces)
 }
@@ -63,12 +63,12 @@ func MigrateAgentSessionsDir(root string) (bool, error) {
 }
 
 // AgentSessionUsagePath returns the NDJSON file path that records per-round
-// planning usage for the given group key.
+// agent-session usage for the given group key.
 func AgentSessionUsagePath(root, groupKey string) string {
 	return filepath.Join(AgentSessionUsageDir(root, groupKey), "usage.jsonl")
 }
 
-// AppendAgentSessionUsage appends a single TurnUsageRecord to the planning
+// AppendAgentSessionUsage appends a single TurnUsageRecord to the agent-session
 // usage log for the given group key. The enclosing directory is created
 // on demand. Each append is a single small write and is atomic on common
 // Linux filesystems.
@@ -79,7 +79,7 @@ func AppendAgentSessionUsage(root, groupKey string, rec TurnUsageRecord) error {
 	return ndjson.AppendFile(AgentSessionUsagePath(root, groupKey), rec)
 }
 
-// ReadAgentSessionUsage returns the planning usage records for the given
+// ReadAgentSessionUsage returns the agent-session usage records for the given
 // group key whose Timestamp is strictly after since. When since is the
 // zero time all records are returned. A missing log yields (nil, nil).
 func ReadAgentSessionUsage(root, groupKey string, since time.Time) ([]TurnUsageRecord, error) {

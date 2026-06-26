@@ -1,7 +1,7 @@
 // Chunked-text fetch reader. Mirrors the original ui/js/transport.js
 // startStreamingFetch helper: reads the response body as text chunks,
 // invokes onChunk for each, and reports whether any data arrived in onDone.
-// Used by the planning chat where the server emits raw NDJSON over plain
+// Used by the agent-session chat where the server emits raw NDJSON over plain
 // HTTP (not SSE), so EventSource cannot be used.
 
 export interface StreamingFetchOptions {
