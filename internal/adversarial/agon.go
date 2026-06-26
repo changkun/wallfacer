@@ -13,14 +13,33 @@ import (
 // It wires a Claude SessionProposer (fork-session) and a HarnessCritic
 // (wallfacer runner one-shot) into adversarial.Engine and calls Run.
 type AgonVerifier struct {
-	runner runner.Interface
-	sb     harness.ID
+	runner          runner.Interface
+	criticHarnesses []harness.ID // rotated per fork for perspective diversity
 }
 
-// NewAgonVerifier creates a verifier that uses the given runner and harness
-// for critic invocations. The proposer always uses Claude fork-session.
-func NewAgonVerifier(r runner.Interface, sb harness.ID) adversarial.Verifier {
-	return &AgonVerifier{runner: r, sb: sb}
+// NewAgonVerifier creates a verifier whose critics rotate across the given
+// harnesses by fork index (e.g. Claude on fork 1, Codex on fork 2) for genuine
+// perspective diversity — different models with different blind spots, which is
+// the point of adversarial debate. Defaults to Claude-only when none are given.
+// The proposer is always Claude (fork-session is Claude-native).
+func NewAgonVerifier(r runner.Interface, criticHarnesses ...harness.ID) adversarial.Verifier {
+	if len(criticHarnesses) == 0 {
+		criticHarnesses = []harness.ID{harness.Claude}
+	}
+	return &AgonVerifier{runner: r, criticHarnesses: criticHarnesses}
+}
+
+// criticHarnessForFork maps a 1-based fork index onto the configured critic
+// harness rotation.
+func (v *AgonVerifier) criticHarnessForFork(forkIdx int) harness.ID {
+	n := len(v.criticHarnesses)
+	if n == 0 {
+		return harness.Claude
+	}
+	if forkIdx < 1 {
+		forkIdx = 1
+	}
+	return v.criticHarnesses[(forkIdx-1)%n]
 }
 
 // Verify runs adversarial verification on a completed task's implementation.
@@ -32,11 +51,13 @@ func (v *AgonVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (
 	proposer := NewSessionProposer(in.SessionID, in.Cwd)
 
 	engine := &adversarial.Engine{
-		StateDir:    in.StateDir,
-		Cwd:         in.Cwd,
-		ForkCount:   in.ForkCount,
-		Proposer:    proposer,
-		NewCritic:   func(_ int) adversarial.Critic { return NewHarnessCritic(v.runner, v.sb) },
+		StateDir:  in.StateDir,
+		Cwd:       in.Cwd,
+		ForkCount: in.ForkCount,
+		Proposer:  proposer,
+		NewCritic: func(forkIdx int) adversarial.Critic {
+			return NewHarnessCritic(v.runner, v.criticHarnessForFork(forkIdx))
+		},
 		MaxRounds:   in.MaxRounds,
 		CostCap:     in.CostCapTokens,
 		TaskContext: buildTaskContext(in.TaskPrompt, in.Criteria),

@@ -56,6 +56,10 @@ type MockRunner struct {
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
+	// RunCriticRoundFn lets tests stub agon critic invocations and assert the
+	// working directory the critic is run in.
+	RunCriticRoundFn func(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error)
+
 	// GenerateAgentSessionTitleFn lets tests stub the task-free agent-session
 	// thread title generation. When nil, the method returns ("", nil).
 	GenerateAgentSessionTitleFn func(ctx context.Context, firstUserMessage string) (string, error)
@@ -240,9 +244,12 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 	return spec.DriftVerdict{}, nil
 }
 
-// RunCriticRound returns ("", nil) for the mock; tests that need critic output
-// should set a custom RunCriticRoundFn.
-func (m *MockRunner) RunCriticRound(_ context.Context, _ string, _ harness.ID, _ time.Duration) (string, error) {
+// RunCriticRound delegates to RunCriticRoundFn when set; otherwise it returns
+// ("", nil) so callers that do not exercise the critic path are unaffected.
+func (m *MockRunner) RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error) {
+	if m.RunCriticRoundFn != nil {
+		return m.RunCriticRoundFn(ctx, prompt, sb, cwd, deadline)
+	}
 	return "", nil
 }
 

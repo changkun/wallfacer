@@ -423,10 +423,25 @@ func (r *Runner) runCommitContainer(
 	sb harness.ID,
 	labels map[string]string,
 ) (*agentOutput, error) {
+	return r.runOneShotContainer(ctx, containerName, commitPrompt, sb, "", labels)
+}
+
+// runOneShotContainer is runCommitContainer with an explicit working directory.
+// cwd sets the agent process's WorkDir (empty = the server's cwd, the
+// commit-message default); the agon critic passes the task worktree so the
+// critic can read the codebase, not just the diff patch.
+func (r *Runner) runOneShotContainer(
+	ctx context.Context,
+	containerName, commitPrompt string,
+	sb harness.ID,
+	cwd string,
+	labels map[string]string,
+) (*agentOutput, error) {
 	model := r.modelFromEnvForSandbox(sb)
 
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 	spec.Labels = labels
+	spec.WorkDir = cwd
 	spec.Cmd = buildAgentCmd(commitPrompt, model)
 
 	handle, launchErr := r.backend.Launch(ctx, spec)
