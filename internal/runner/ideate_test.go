@@ -1201,10 +1201,10 @@ func TestIdeationHistoryRound(t *testing.T) {
 // Agent-session-based ideation
 // ---------------------------------------------------------------------------
 
-// TestIdeationViaPlanner verifies that when an agent session is set on the runner,
-// RunIdeation routes through runIdeationViaPlanner and the agent session is
+// TestIdeationViaAgentSession verifies that when an agent session is set on the runner,
+// RunIdeation routes through runIdeationViaAgentSession and the agent session is
 // auto-started.
-func TestIdeationViaPlanner(t *testing.T) {
+func TestIdeationViaAgentSession(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Add tests", Prompt: "Write unit tests.", ImpactScore: 80},
 	}
@@ -1252,9 +1252,9 @@ func TestIdeationViaPlanner(t *testing.T) {
 	}
 }
 
-// TestIdeationViaPlannerCodexFallbackSkipped verifies that when running
+// TestIdeationViaAgentSessionCodexFallbackSkipped verifies that when running
 // through the agent session, Codex fallback is skipped (logged, not retried).
-func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
+func TestIdeationViaAgentSessionCodexFallbackSkipped(t *testing.T) {
 	// Simulate a token limit error output.
 	tokenLimitOutput := `{"result":"Error: token limit exceeded","session_id":"ideate-sess","stop_reason":"end_turn","is_error":true,"subtype":"token_limit","total_cost_usd":0.001}`
 	cmd := fakeCmdScript(t, tokenLimitOutput, 0)
@@ -1280,9 +1280,9 @@ func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
 	}
 }
 
-// TestIdeationFallsBackToEphemeralWithoutPlanner verifies that RunIdeation
+// TestIdeationFallsBackToEphemeralWithoutAgentSession verifies that RunIdeation
 // uses the ephemeral container path when no agent session is set.
-func TestIdeationFallsBackToEphemeralWithoutPlanner(t *testing.T) {
+func TestIdeationFallsBackToEphemeralWithoutAgentSession(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Improve docs", Prompt: "Update README.", ImpactScore: 75},
 	}
