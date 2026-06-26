@@ -3963,7 +3963,7 @@ func TestWatcherBreaker_RecordSuccessResets(t *testing.T) {
 }
 
 // TestGetConfig_IncludesWatcherHealth verifies that GET /api/config includes
-// a watcher_health array with all six watcher entries.
+// a watcher_health array with all watcher entries.
 func TestGetConfig_IncludesWatcherHealth(t *testing.T) {
 	h := newTestHandler(t)
 
@@ -3988,7 +3988,7 @@ func TestGetConfig_IncludesWatcherHealth(t *testing.T) {
 		t.Fatalf("expected watcher_health to be an array, got %T", healthRaw)
 	}
 
-	wantNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync"}
+	wantNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-agon"}
 	if len(health) != len(wantNames) {
 		t.Fatalf("expected %d watcher health entries, got %d", len(wantNames), len(health))
 	}
