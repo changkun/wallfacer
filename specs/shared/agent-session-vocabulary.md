@@ -272,18 +272,49 @@ Shipped on `main` (each commit build + lint + tests green; pinned at
   cost label, usage-tab `AGENT_LABELS`. `by_sub_agent` re-buckets by the
   live constant, so no historical-data loss.
 
-Remaining (small, cosmetic):
+Complete-everywhere sweep (goal: "migrate completely everywhere"):
 
-- ○ **Internal handler helpers (Phase 2b)** -
-  `selectPlanningSystemPrompt`, `assemblePlanningPrompt`,
-  `persistPlanningRoundUsage`, etc. (private; cosmetic).
-- ○ **Prompt template** - `internal/prompts/planning.tmpl` and its
-  `"planning"` registry name (the spec-mode system prompt; bucket-2-ish).
-- ○ **Docs sweep (Phase 8)** - remaining prose in `docs/` and `AGENTS.md`;
-  rename `docs/internals/plan-mode.md` if desired; spec wrap-up.
-- ○ **Kept by design** - `Plan-Round:`/`Plan-Thread:`/`(plan)` git
-  trailers (frozen), `UndoPlanningRound`, spec-plan helpers,
-  `store.TaskKindPlanning` (unused legacy), the `/plan` tab.
+- ✅ **Prompts** - `planning.tmpl`/`Planning()` -> `spec.tmpl`/`Spec()`,
+  `PlanningSystem{Empty,Nonempty}` -> `SpecSystem*`,
+  `selectPlanningSystemPrompt` -> `selectSpecSystemPrompt`.
+- ✅ **Handler helpers + prose** - `assembleAgentPrompt`,
+  `mutateAgentSession`, `isTaskLockedByAgent`, `persistAgentRoundUsage`;
+  comments, log prefixes, error strings.
+- ✅ **agentsession package prose** - comments/errors to runtime/agent
+  session; `agentSessionTaskID` value -> `agent-session`; process prefix
+  `wallfacer-agent-`.
+- ✅ **Field/method rename** - `planner` field -> `agentSession`,
+  `SetAgentSession`, `GenerateAgentSessionTitle`,
+  `runIdeationViaAgentSession` across handler/runner/cli.
+- ✅ **Frontend prose/vars** - `planning` local var -> `agentStore`
+  everywhere (CommandPalette, PlanPage, plan components, tests); composable
+  / lib / layout / store comments; aria-label "Agent session cost window";
+  dead `.planning-chat-*` CSS -> `.agent-chat-*`.
+- ✅ **Test prose + names** - all `Test*Planning*` / `newPlanner*` helpers
+  renamed across the suites.
+- ✅ **Docs** - `docs/guide/`, `docs/internals/` (incl. Mermaid diagrams),
+  `origin.md` updated to new code names; release notes left as historical.
+- ✅ **Route descriptions + doc tags** - `/api/agent/*` descriptions and
+  `Tags: "agent"`.
+
+Verified: a repo-wide scan leaves only documented keepers (this spec,
+release notes, frozen plan-commit code, legacy `TaskKindPlanning`,
+plan-commit pipeline prose, and the user-facing Plan Mode surface).
+
+## Kept by Design (not "planning" machinery)
+
+- Frozen git history: `Plan-Round:` / `Plan-Thread:` / `(plan)` trailers,
+  `commitPlanningRound`, `UndoPlanningRound`, and the
+  `planning_git.go` / `planning_undo.go` / `planning_directive.go` files
+  that read/write them.
+- The spec-design product surface: **Plan Mode**, the **Plan** tab, the
+  `/plan` route, "Send to Plan", and i18n tour/capability copy describing
+  the planning conversation.
+- `store.TaskKindPlanning` (unused legacy enum value `"planning"`) and the
+  `commit_message_planning` / `title_planning` plan-round attribution
+  labels.
+- The spec-mode prompt **template content** (it legitimately instructs the
+  agent on planning specs).
 
 ## Acceptance Criteria
 
