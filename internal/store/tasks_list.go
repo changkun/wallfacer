@@ -191,6 +191,28 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 	return page, total, hasMoreBefore, hasMoreAfter, nil
 }
 
+// ListWaitingTasksWithSession returns all waiting tasks that have a non-nil
+// SessionID and have not yet been run through agon (AgonUnresolved == nil).
+// Used by tryAutoAgon to find tasks eligible for adversarial verification.
+func (s *Store) ListWaitingTasksWithSession(_ context.Context) []Task {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []Task
+	for id := range s.tasksByStatus[TaskStatusWaiting] {
+		t := s.tasks[id]
+		if t == nil || t.SessionID == nil || *t.SessionID == "" {
+			continue
+		}
+		if t.AgonUnresolved != nil {
+			continue
+		}
+		result = append(result, cloneTask(t))
+	}
+	slices.SortFunc(result, cmpTaskPositionCreatedAt)
+	return result
+}
+
 // TasksDependingOn returns all non-terminal tasks whose DependsOn contains
 // taskID. Non-terminal statuses are backlog, in_progress, waiting, and failed.
 // The returned slice contains deep copies safe for use outside the lock.
