@@ -29,6 +29,9 @@ type Config struct {
 	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
 	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
+	AgonForkCount          int    // WALLFACER_AGON_FORKS (0 means use default)
+	AgonMaxRounds          int    // WALLFACER_AGON_ROUNDS (0 means use default)
+	AgonCostCap            int    // WALLFACER_AGON_COST_CAP in tokens (0 means use default)
 	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
@@ -92,6 +95,9 @@ var knownKeys = []string{
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
+	"WALLFACER_AGON_FORKS",
+	"WALLFACER_AGON_ROUNDS",
+	"WALLFACER_AGON_COST_CAP",
 	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
 	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
@@ -170,6 +176,18 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_AUTO_PUSH_THRESHOLD":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.AutoPushThreshold = n
+			}
+		case "WALLFACER_AGON_FORKS":
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				cfg.AgonForkCount = n
+			}
+		case "WALLFACER_AGON_ROUNDS":
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				cfg.AgonMaxRounds = n
+			}
+		case "WALLFACER_AGON_COST_CAP":
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				cfg.AgonCostCap = n
 			}
 		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
 			// 0 means "all time"; negative values are rejected silently (keeps

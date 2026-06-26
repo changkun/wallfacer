@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/agon/pkg/adversarial"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
@@ -1158,12 +1159,35 @@ func (h *Handler) tryAutoAgon(ctx context.Context) {
 
 // agonForkCount is the number of independent critic forks per run.
 // agonMaxRounds is the per-fork round cap. agonCostCap is the soft token budget.
-// All are deliberately conservative defaults for initial rollout.
+// All are deliberately conservative defaults for initial rollout; each can be
+// overridden via env (WALLFACER_AGON_FORKS / _ROUNDS / _COST_CAP) — the token
+// dial for trading verification depth against cost.
 const (
 	agonForkCount = 2
 	agonMaxRounds = 4
 	agonCostCap   = 50000
 )
+
+// agonTuning returns the fork count, max rounds, and token cost cap for an agon
+// run, applying env overrides over the conservative defaults. A missing or
+// non-positive env value keeps the default.
+func (h *Handler) agonTuning() (forks, rounds, costCap int) {
+	forks, rounds, costCap = agonForkCount, agonMaxRounds, agonCostCap
+	cfg, err := envconfig.Parse(h.envFile)
+	if err != nil {
+		return forks, rounds, costCap
+	}
+	if cfg.AgonForkCount > 0 {
+		forks = cfg.AgonForkCount
+	}
+	if cfg.AgonMaxRounds > 0 {
+		rounds = cfg.AgonMaxRounds
+	}
+	if cfg.AgonCostCap > 0 {
+		costCap = cfg.AgonCostCap
+	}
+	return forks, rounds, costCap
+}
 
 // primaryWorktree returns the task's worktree path chosen deterministically
 // (lexicographically smallest), so a multi-repo run picks the same cwd on
@@ -1207,6 +1231,8 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	cwd := primaryWorktree(t.WorktreePaths)
 	diff := generateWorktreeDiff(t.WorktreePaths)
 
+	forks, rounds, costCap := h.agonTuning()
+
 	input := adversarial.VerifyInput{
 		TaskPrompt:    t.Prompt,
 		Criteria:      "", // populated from Task.Criteria when test-criteria spec lands
@@ -1214,9 +1240,9 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		DiffPatch:     diff,
 		Cwd:           cwd,
 		StateDir:      agonStateDir(cwd),
-		ForkCount:     agonForkCount,
-		MaxRounds:     agonMaxRounds,
-		CostCapTokens: agonCostCap,
+		ForkCount:     forks,
+		MaxRounds:     rounds,
+		CostCapTokens: costCap,
 	}
 
 	result, err := h.verifier.Verify(ctx, input)
