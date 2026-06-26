@@ -422,6 +422,15 @@ type Task struct {
 	// *flow.Registry (the store package cannot import flow without a
 	// cycle).
 	RoutineSpawnFlow string `json:"routine_spawn_flow,omitempty"`
+
+	// Agon adversarial-verification fields. Set by tryAutoAdon / the
+	// manual /api/tasks/{id}/agon trigger after a run completes.
+	// nil AgonUnresolved means agon has not run for this task.
+	// 0 means it ran and found no unresolved attacks (clean).
+	// >0 means open disputes remain; AgonHeadline holds the claim text.
+	AgonUnresolved  *int   `json:"agon_unresolved,omitempty"`
+	AgonHeadline    string `json:"agon_headline,omitempty"`
+	AgonSessionDir  string `json:"agon_session_dir,omitempty"`
 }
 
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry
