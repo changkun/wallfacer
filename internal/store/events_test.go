@@ -178,11 +178,11 @@ func TestInsertEvent_NotFound(t *testing.T) {
 
 func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "hello world")
 
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	events, _ := s2.GetEvents(bg(), task.ID)
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event after reload, got %d", len(events))
@@ -211,14 +211,14 @@ func TestGetEvents_ReturnsCopy(t *testing.T) {
 
 func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	for i := 0; i < 5; i++ {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	events, _ := s2.GetEvents(bg(), task.ID)
 	if len(events) != 5 {
 		t.Fatalf("expected 5 events, got %d", len(events))
@@ -232,13 +232,13 @@ func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 
 func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
 	_ = os.WriteFile(filepath.Join(tracesDir, "README.txt"), []byte("not json"), 0644)
 
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore after injecting non-JSON: %v", err)
 	}
@@ -250,14 +250,14 @@ func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 
 func TestLoadEvents_SkipsCorruptTraceFiles(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "good")
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
 	_ = os.WriteFile(filepath.Join(tracesDir, "0001.json"), []byte("{bad json}"), 0644)
 
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore with corrupt trace: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestForceUpdateTaskStatus_CompactsOnTerminal(t *testing.T) {
 
 func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 		t.Fatalf("compactTaskEvents: %v", err)
 	}
 
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -387,7 +387,7 @@ func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 
 func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -411,7 +411,7 @@ func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 		}
 	}
 
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -743,7 +743,7 @@ func TestGetEventsPage_EmptyTask(t *testing.T) {
 // new-session events into the previous session's compact.ndjson.
 func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -794,7 +794,7 @@ func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 	}
 
 	// A fresh store load must surface all 8 events in order.
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -855,7 +855,7 @@ func TestMaxEventSeqViaLoadEvents(t *testing.T) {
 
 func TestPromptRoundEvent_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	payload := NewPromptRoundEvent("thread-1", 3, "old prompt", "new prompt", false)
@@ -864,7 +864,7 @@ func TestPromptRoundEvent_RoundTrip(t *testing.T) {
 	}
 
 	// Reload from disk and verify payload survives.
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	events, err := s2.GetEvents(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetEvents: %v", err)
@@ -898,7 +898,7 @@ func TestPromptRoundEvent_RoundTrip(t *testing.T) {
 
 func TestPromptRoundRevertEvent_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	payload := NewPromptRoundRevertEvent("thread-2", 5)
@@ -906,7 +906,7 @@ func TestPromptRoundRevertEvent_RoundTrip(t *testing.T) {
 		t.Fatalf("InsertEvent: %v", err)
 	}
 
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	events, err := s2.GetEvents(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetEvents: %v", err)
@@ -931,7 +931,7 @@ func TestPromptRoundRevertEvent_RoundTrip(t *testing.T) {
 
 func TestPromptRoundEvent_ResumeHintFlag(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	// Default (false) case.
@@ -950,7 +950,7 @@ func TestPromptRoundEvent_ResumeHintFlag(t *testing.T) {
 	_ = s.InsertEvent(bg(), task.ID, EventTypePromptRound, defaultPayload)
 	_ = s.InsertEvent(bg(), task.ID, EventTypePromptRound, setPayload)
 
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	events, _ := s2.GetEvents(bg(), task.ID)
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))

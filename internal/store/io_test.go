@@ -13,7 +13,7 @@ import (
 
 func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	stdout := []byte(`{"hello":"world"}`)
@@ -39,7 +39,7 @@ func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 
 func TestSaveTurnOutput_WithStderr(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.SaveTurnOutput(task.ID, 2, []byte("stdout"), []byte("error output")); err != nil {
@@ -58,7 +58,7 @@ func TestSaveTurnOutput_WithStderr(t *testing.T) {
 
 func TestSaveTurnOutput_TurnNumberFormatted(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.SaveTurnOutput(task.ID, 42, []byte("data"), nil); err != nil {
@@ -96,7 +96,7 @@ func TestSaveTurnOutput_Truncation(t *testing.T) {
 	const turn = 7
 
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestSaveTurnOutput_Truncation(t *testing.T) {
 
 func TestSaveTurnOutput_NoTruncationUnderLimit(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	s.maxTurnOutputBytes = 4096
 
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
@@ -210,7 +210,7 @@ func TestSaveTurnOutput_NoTruncationUnderLimit(t *testing.T) {
 
 func TestSaveTurnOutput_UnlimitedWhenZero(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	s.maxTurnOutputBytes = 0 // 0 = unlimited
 
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})

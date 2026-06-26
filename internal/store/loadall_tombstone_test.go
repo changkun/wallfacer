@@ -14,7 +14,7 @@ func TestLoadAll_CorruptTombstoneKeepsTaskDeleted(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestLoadAll_CorruptTombstoneKeepsTaskDeleted(t *testing.T) {
 	s.Close()
 
 	// Reopen: loadAll runs against the on-disk state.
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("reopen NewFileStore: %v", err)
 	}

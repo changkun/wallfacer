@@ -11,7 +11,7 @@ import (
 // later would otherwise race a concurrent reader's maps.Clone.
 func TestUpdateTaskWorktrees_DefensiveCopy(t *testing.T) {
 	ctx := context.Background()
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}

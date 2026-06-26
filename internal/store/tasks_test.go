@@ -104,10 +104,10 @@ func TestCreateTask_TimeoutClampedMax(t *testing.T) {
 
 func TestCreateTask_PersistsToDisk(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist me", Timeout: 5})
 
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	got, err := s2.GetTask(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetTask after reload: %v", err)
@@ -336,7 +336,7 @@ func TestDeleteTask_Basic(t *testing.T) {
 
 func TestDeleteTask_RetainsDiskData(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete me", Timeout: 5})
 	taskDir := dir + "/" + task.ID.String()
 
@@ -1074,7 +1074,7 @@ func TestResetTaskForRetry_NotFound(t *testing.T) {
 
 func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1165,7 +1165,7 @@ func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	}
 
 	// Step 5: Reload store from disk and verify RetryHistory survived round-trip.
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore (reload): %v", err)
 	}
@@ -1464,7 +1464,7 @@ func TestUpdateTaskScheduledAt_SetAndClear(t *testing.T) {
 
 func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist-scheduled", Timeout: 5})
 	future := time.Now().Add(3 * time.Hour).Truncate(time.Second)
@@ -1473,7 +1473,7 @@ func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
 	}
 
 	// Reload from disk.
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	got, err := s2.GetTask(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetTask after reload: %v", err)
@@ -1637,7 +1637,7 @@ func TestPurgeExpired(t *testing.T) {
 
 func TestStorePersistsTombstone(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1648,7 +1648,7 @@ func TestStorePersistsTombstone(t *testing.T) {
 	}
 
 	// Reload the store from the same directory.
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -1725,7 +1725,7 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 
 func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewFileStore(dir)
+	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1746,7 +1746,7 @@ func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 	s.Close()
 
 	// Reload from disk.
-	s2, err := NewFileStore(dir)
+	s2, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewStore (reload): %v", err)
 	}
@@ -1777,7 +1777,7 @@ func TestUpdateTaskEnvironment_NotFound(t *testing.T) {
 
 func TestTaskSpecSourcePath_Persists(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewFileStore(dir)
+	s, _ := newTestFileStore(t, dir)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
 		Prompt:         "from spec",
 		Timeout:        5,
@@ -1791,7 +1791,7 @@ func TestTaskSpecSourcePath_Persists(t *testing.T) {
 	}
 
 	// Reload from disk.
-	s2, _ := NewFileStore(dir)
+	s2, _ := newTestFileStore(t, dir)
 	got, err := s2.GetTask(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetTask after reload: %v", err)
@@ -1848,7 +1848,7 @@ func TestTaskSpecSourcePath_OmittedFromJSONWhenEmpty(t *testing.T) {
 // TestCreateTaskWithFlow_PersistsFlowID asserts FlowID round-trips
 // through CreateTaskWithOptions and the JSON persistence layer.
 func TestCreateTaskWithFlow_PersistsFlowID(t *testing.T) {
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -1891,7 +1891,7 @@ func TestTaskFlowID_OmittedFromJSONWhenEmpty(t *testing.T) {
 // TestUpdateTaskFlow_WritesField guards the post-create writer so the
 // composer's "reflow" follow-up can swap a task's flow after creation.
 func TestUpdateTaskFlow_WritesField(t *testing.T) {
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}

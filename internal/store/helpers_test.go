@@ -17,11 +17,38 @@ func bg() context.Context {
 // newTestStore creates a Store backed by a fresh temporary directory.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	s, err := NewFileStore(t.TempDir())
+	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
 	return s
+}
+
+// newTestFileStore is a drop-in for NewFileStore that registers
+// tb.Cleanup(s.Close) so background trace compaction is drained before the
+// temp directory is removed. Without it a terminal-state transition schedules
+// a compaction goroutine that writes traces/ while cleanup deletes the dir,
+// failing intermittently with "directory not empty". The store package cannot
+// use internal/store/storetest (import cycle), so this mirrors it locally.
+// Use it instead of calling NewFileStore directly in tests.
+func newTestFileStore(tb testing.TB, dir string) (*Store, error) {
+	tb.Helper()
+	s, err := NewFileStore(dir)
+	if err == nil {
+		tb.Cleanup(s.Close)
+	}
+	return s, err
+}
+
+// newTestStoreBackend is the NewStore counterpart of newTestFileStore for
+// stores backed by a custom StorageBackend.
+func newTestStoreBackend(tb testing.TB, backend StorageBackend) (*Store, error) {
+	tb.Helper()
+	s, err := NewStore(backend)
+	if err == nil {
+		tb.Cleanup(s.Close)
+	}
+	return s, err
 }
 
 // setTaskCloneFixture populates all nested, pointer, slice, and map fields on

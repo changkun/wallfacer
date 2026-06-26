@@ -42,7 +42,7 @@ func TestClose_DrainsInFlightCompaction(t *testing.T) {
 		started:        make(chan struct{}),
 		release:        make(chan struct{}),
 	}
-	s, err := NewStore(bb)
+	s, err := newTestStoreBackend(t, bb)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestClose_SkipsCompactionAfterClose(t *testing.T) {
 		started:        make(chan struct{}),
 		release:        make(chan struct{}),
 	}
-	s, err := NewStore(bb)
+	s, err := newTestStoreBackend(t, bb)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

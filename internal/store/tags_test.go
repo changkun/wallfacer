@@ -17,7 +17,7 @@ func TestUpdateTaskTags_Persists(t *testing.T) {
 		t.Fatalf("UpdateTaskTags: %v", err)
 	}
 
-	s2, err := NewFileStore(s.dir)
+	s2, err := newTestFileStore(t, s.dir)
 	if err != nil {
 		t.Fatalf("reopen store: %v", err)
 	}
