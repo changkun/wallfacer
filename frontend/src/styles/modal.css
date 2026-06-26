@@ -381,6 +381,33 @@
   background: var(--bg-input);
   border-color: var(--border);
 }
+/* In-flight action: the clicked button keeps full opacity and swaps its icon
+   glyph for a spinner so the click reads as "working" rather than dead, while
+   the other (plain-disabled) action buttons dim. */
+.aside-action.is-busy {
+  opacity: 1;
+}
+.aside-action.is-busy .aside-action__icon {
+  position: relative;
+  font-size: 0;
+}
+.aside-action.is-busy .aside-action__icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: wf-spin 0.6s linear infinite;
+}
+@keyframes wf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .aside-action__icon {
   font-size: 14px;
   line-height: 1;
