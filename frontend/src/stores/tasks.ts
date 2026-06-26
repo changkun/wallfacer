@@ -47,11 +47,17 @@ export const useTaskStore = defineStore('tasks', () => {
     ),
   );
   const done = computed(() =>
-    tasks.value.filter(t =>
-      (t.status === 'done' || t.status === 'cancelled')
-      && (ui.showArchived || !t.archived)
-      && matchesFilter(t),
-    ),
+    tasks.value
+      .filter(t =>
+        (t.status === 'done' || t.status === 'cancelled')
+        && (ui.showArchived || !t.archived)
+        && matchesFilter(t),
+      )
+      .sort((a, b) => {
+        const at = new Date(a.updated_at || a.created_at || 0).getTime();
+        const bt = new Date(b.updated_at || b.created_at || 0).getTime();
+        return bt - at;
+      }),
   );
 
   function setTasks(list: Task[]) {
