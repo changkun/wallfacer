@@ -1,11 +1,11 @@
 ---
 title: Agent Session Vocabulary (Generalize "Planning")
-status: drafted
+status: complete
 depends_on: [shared/agent-abstraction.md, shared/harness-abstraction.md]
 affects: [internal/planner/, internal/handler/, internal/apicontract/, internal/envconfig/, frontend/src/stores/, frontend/src/components/plan/, frontend/src/composables/, frontend/src/lib/, docs/, AGENTS.md]
 effort: xlarge
 created: 2026-06-25
-updated: 2026-06-25
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
@@ -301,6 +301,39 @@ Verified: a repo-wide scan leaves only documented keepers (this spec,
 release notes, frozen plan-commit code, legacy `TaskKindPlanning`,
 plan-commit pipeline prose, and the user-facing Plan Mode surface).
 
+## Final Residual Sweep (2026-06-26)
+
+A comprehensive case-insensitive `grep -ni "planning\|planner"` (the gate
+the earlier sweep should have run, rather than targeted-identifier greps)
+surfaced a tail the "complete-everywhere" pass had missed. Closed it:
+
+- ✅ **Production residuals** - `stats.go` local var `planningDir` /
+  helper `planningGroupLabel` -> `agentSession*`; analytics cost tab
+  `PlanningTimelineEntry` / `sortedPlanningKeys` / `seedPlanningPeriod`
+  -> `AgentSession*` (the data layer was already `agent_sessions`).
+- ✅ **Stale comments** - `prompts_test.go` (`planning_system_*` ->
+  `spec_system_*`), `useChatSession.ts` (`StreamPlanningMessages` ->
+  `StreamAgentMessages`), `stats.go` doc path (`<configDir>/planning/`
+  -> `agent-sessions/`), `pinThreadToTask` ("actively planning" ->
+  "actively working", it is task mode).
+- ✅ **Test identifiers** - `Test*Planning*` / `withPlanning` across
+  `usage_test.go`, `stats_test.go`, `store/agent_session_usage_test.go`,
+  `cli/server_test.go`, `runner/ideate_test.go`,
+  `config_test.go`, `envconfig_test.go` -> `*AgentSession*`. The
+  window-days alias case became
+  `TestParse_AgentSessionWindowDays_DeprecatedAlias` to avoid colliding
+  with the canonical-var test; the `WALLFACER_PLANNING_WINDOW_DAYS` env
+  literals it exercises stay.
+- ✅ **Shared helper** - generic `initPlanningTestRepo` (just inits a temp
+  git repo, used by plan, spec, and agent-session tests) -> neutral
+  `initGitTestRepo`, plus its planning-flavoured git-identity fixtures.
+- ✅ **gofmt** - committed the struct/map realignments orphaned by the
+  earlier rename commits (HEAD was gofmt-dirty; a clean checkout would
+  have failed the build gate).
+
+Gate: `make build` green (golangci-lint 0 issues, vue-tsc clean, vite
+build + go build OK). Final scan leaves only the keepers below.
+
 ## Kept by Design (not "planning" machinery)
 
 - Frozen git history: `Plan-Round:` / `Plan-Thread:` / `(plan)` trailers,
@@ -315,6 +348,11 @@ plan-commit pipeline prose, and the user-facing Plan Mode surface).
   labels.
 - The spec-mode prompt **template content** (it legitimately instructs the
   agent on planning specs).
+- Historical "replaced by" breadcrumbs to the deleted pre-Vue UI
+  (`ui/js/planning-chat.js` in `stores/agentSession.ts` /
+  `useChatSession.ts`) and the reference to the archived
+  `planning-codex-compat.md` spec - both name removed/archived artifacts
+  by their real historical names, like release notes.
 
 ## Acceptance Criteria
 
