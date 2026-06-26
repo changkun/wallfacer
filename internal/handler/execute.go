@@ -750,6 +750,52 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
+// AgonTask triggers adversarial agon verification for a waiting task.
+// The task must be in waiting status and have a non-nil SessionID.
+// The run happens asynchronously; 202 Accepted is returned immediately with
+// the planned state directory path so callers can poll or watch .agon/.
+func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	s, ok := h.requireStore(w)
+	if !ok {
+		return
+	}
+
+	task, err := s.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if task.Status != store.TaskStatusWaiting {
+		http.Error(w, "only waiting tasks can be verified by agon", http.StatusConflict)
+		return
+	}
+	if task.SessionID == nil || *task.SessionID == "" {
+		http.Error(w, "task has no session ID (claude fork-session required)", http.StatusBadRequest)
+		return
+	}
+
+	// Compute the planned state directory for the response. The engine will
+	// create a session subdirectory inside it; the exact path is set on the
+	// task after the run completes via UpdateTaskAgon.
+	var stateDir string
+	for _, p := range task.WorktreePaths {
+		stateDir = filepath.Join(p, ".agon")
+		break
+	}
+
+	go func() {
+		if err := h.runAgon(context.Background(), *task); err != nil {
+			logger.Handler.Warn("agon: manual verification run failed",
+				"task", id, "error", err)
+		}
+	}()
+
+	httpjson.Write(w, http.StatusAccepted, map[string]string{
+		"status":    "running",
+		"state_dir": stateDir,
+	})
+}
+
 // buildTestPrompt constructs a prompt for the test verification agent.
 // implResult is the implementation agent's self-reported summary (may be empty).
 // diff is a git diff of the changes made (may be empty).

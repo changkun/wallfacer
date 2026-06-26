@@ -627,6 +627,11 @@ var Routes = []Route{
 		Description: "Trigger the test agent for a task.",
 		Tags:        []string{"tasks"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/agon", Name: "AgonTask",
+		Description: "Trigger adversarial agon verification for a task.",
+		Tags:        []string{"tasks"},
+	},
 
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/diff", Name: "TaskDiff",
