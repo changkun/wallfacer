@@ -155,3 +155,39 @@ describe('BoardPage Open Explorer toggle', () => {
     host.remove();
   });
 });
+
+describe('BoardPage detail panel reflects live SSE updates', () => {
+  // Regression: clicking "Start" (or any action) PATCHes the task and the new
+  // status arrives via the /api/tasks/stream `task-updated` SSE event, which
+  // calls store.updateTask(). The open TaskDetail panel must reflect the new
+  // status — badge swaps, the Start button disappears — otherwise the user
+  // gets zero visual feedback and can re-click stale actions forever.
+  it('updates the open task detail when the store task is replaced', async () => {
+    const store = useTaskStore();
+    const { app, router, host } = await mountBoard();
+
+    // Open the backlog task's detail panel via deep link (?task=).
+    await router.push('/?task=t-1');
+    await router.isReady();
+    for (let i = 0; i < 5; i++) await nextTick();
+
+    const labels = () =>
+      Array.from(host.querySelectorAll('.aside-action__label')).map((n) => n.textContent?.trim());
+    const badgeText = () => host.querySelector('#modal .badge')?.textContent?.trim();
+
+    // Backlog state: "Start task" action is offered, badge reads "backlog".
+    expect(labels()).toContain('Start task');
+    expect(badgeText()).toBe('backlog');
+
+    // Simulate the SSE `task-updated` delta moving the task to in_progress.
+    store.updateTask(makeTask('t-1', { status: 'in_progress' }));
+    for (let i = 0; i < 5; i++) await nextTick();
+
+    // Panel must now reflect in_progress: no Start action, badge updated.
+    expect(labels()).not.toContain('Start task');
+    expect(badgeText()).toBe('in_progress');
+
+    app.unmount();
+    host.remove();
+  });
+});
