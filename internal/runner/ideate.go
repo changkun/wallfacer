@@ -189,19 +189,19 @@ type IdeateResult struct {
 // prompt is the full ideation prompt to send to the container; callers should
 // generate it with buildIdeationPrompt() and persist it before calling here.
 func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) { //nolint:revive // ideaRejection is intentionally unexported
-	if r.planner != nil {
-		return r.runIdeationViaPlanner(ctx, taskID, prompt)
+	if r.agentSession != nil {
+		return r.runIdeationViaAgentSession(ctx, taskID, prompt)
 	}
 	return r.runIdeationEphemeral(ctx, taskID, prompt)
 }
 
-// runIdeationViaPlanner runs ideation through the long-lived planning worker
-// container. The planner is auto-started if not already running.
-func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
-	// Auto-start the planner if needed (first caller creates the container).
-	if !r.planner.IsRunning() {
-		if err := r.planner.Start(ctx); err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("auto-start planner for ideation: %w", err)
+// runIdeationViaAgentSession runs ideation through the long-lived agent-session worker
+// container. The agent session is auto-started if not already running.
+func (r *Runner) runIdeationViaAgentSession(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
+	// Auto-start the agent session if needed (first caller creates the container).
+	if !r.agentSession.IsRunning() {
+		if err := r.agentSession.Start(ctx); err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("auto-start agent session for ideation: %w", err)
 		}
 	}
 
@@ -215,17 +215,17 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 	model := r.modelFromEnvForSandbox(sb)
 	cmd := buildAgentCmd(prompt, model)
 
-	logger.Runner.Debug("ideate exec via planner", "sandbox", sb)
+	logger.Runner.Debug("ideate exec via agent session", "sandbox", sb)
 	if taskID != uuid.Nil {
 		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 	}
 
-	handle, launchErr := r.planner.Exec(ctx, cmd)
+	handle, launchErr := r.agentSession.Exec(ctx, cmd)
 	if launchErr != nil {
 		if taskID != uuid.Nil {
 			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 		}
-		return nil, nil, nil, nil, nil, fmt.Errorf("planner exec ideation: %w", launchErr)
+		return nil, nil, nil, nil, nil, fmt.Errorf("agent-session exec ideation: %w", launchErr)
 	}
 
 	// Register the handle so kill and log streaming work through standard paths.
@@ -267,11 +267,11 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 		return nil, nil, nil, rawStdout, rawStderr, fmt.Errorf("no result in ideation output")
 	}
 
-	// Skip Codex fallback when running through planner — the planner
+	// Skip Codex fallback when running through the agent session — it
 	// container uses the Claude sandbox. Codex support is deferred to
 	// planning-codex-compat.md.
 	if output.IsError && isLikelyTokenLimitError(output.Result, output.Subtype) {
-		logger.Runner.Warn("ideation: token limit hit via planner; codex fallback not available for planner containers", "task", taskID)
+		logger.Runner.Warn("ideation: token limit hit via agent session; codex fallback not available for agent-session containers", "task", taskID)
 	}
 
 	ideas, rejections, extractErr := extractIdeas(output.Result)
@@ -289,7 +289,7 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 }
 
 // roleIdeaAgentEphemeral is the inspector-tier descriptor used by the
-// ephemeral (non-planner) ideation path. The parsed result returned by
+// ephemeral (non-agent-session) ideation path. The parsed result returned by
 // the agent is the raw JSON-embedded list of ideas; the caller unpacks
 // it via extractIdeas so the rejection/recovery heuristics live close
 // to the ideation-specific parsing logic.
@@ -298,7 +298,7 @@ func (r *Runner) runIdeationViaPlanner(ctx context.Context, taskID uuid.UUID, pr
 var roleIdeaAgentEphemeral = agents.IdeaAgent
 
 // runIdeationEphemeral is the legacy path that launches an ephemeral container
-// per ideation run. Used when no planner is configured.
+// per ideation run. Used when no agent session is configured.
 func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
 	containerName := "wallfacer-ideate-" + uuid.NewString()[:8]
 
@@ -328,8 +328,8 @@ func (r *Runner) runIdeationEphemeral(ctx context.Context, taskID uuid.UUID, pro
 		ContainerName:  containerName,
 		EmitSpanEvents: taskID != uuid.Nil,
 		// Billing for ideation is done once by the caller (runIdeationTask),
-		// matching the planner path which bills only there. Letting runAgent
-		// also bill here would double-count usage/cost on the no-planner path.
+		// matching the agent-session path which bills only there. Letting runAgent
+		// also bill here would double-count usage/cost on the no-agent-session path.
 		TrackUsage: false,
 		Turn:       1,
 		OnLaunch:   onLaunch,

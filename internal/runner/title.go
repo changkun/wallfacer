@@ -60,11 +60,11 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	}
 }
 
-// GeneratePlanningThreadTitle produces a short (2–5 word) title for a planning
+// GenerateAgentSessionTitle produces a short (2–5 word) title for an agent session
 // chat thread from its opening user message, using the lightweight title model.
 // Task-free, like GenerateCommitMessage: it records no spans or usage. A blank
 // model response returns ("", nil) and should be treated as "no title".
-func (r *Runner) GeneratePlanningThreadTitle(ctx context.Context, firstUserMessage string) (string, error) {
+func (r *Runner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error) {
 	if strings.TrimSpace(firstUserMessage) == "" {
 		return "", nil
 	}
@@ -86,7 +86,7 @@ func (r *Runner) GeneratePlanningThreadTitle(ctx context.Context, firstUserMessa
 
 	handle, err := r.backend.Launch(ctx, spec)
 	if err != nil {
-		return "", fmt.Errorf("launch planning title container: %w", err)
+		return "", fmt.Errorf("launch agent-session title container: %w", err)
 	}
 	rawStdout, _ := io.ReadAll(handle.Stdout())
 	_, _ = io.ReadAll(handle.Stderr())

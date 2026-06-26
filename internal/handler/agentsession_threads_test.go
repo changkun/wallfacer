@@ -16,12 +16,12 @@ import (
 
 func TestMaybeAutoTitleThread(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	id := tm.List(false)[0].ID // default "Chat 1"
 
 	var gotMsg string
 	h.runner = &runner.MockRunner{
-		GeneratePlanningThreadTitleFn: func(_ context.Context, msg string) (string, error) {
+		GenerateAgentSessionTitleFn: func(_ context.Context, msg string) (string, error) {
 			gotMsg = msg
 			return "Auth Refactor", nil
 		},
@@ -46,12 +46,12 @@ func TestMaybeAutoTitleThread(t *testing.T) {
 
 func TestMaybeAutoTitleThread_Skips(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	id := tm.List(false)[0].ID
 
 	called := false
 	h.runner = &runner.MockRunner{
-		GeneratePlanningThreadTitleFn: func(_ context.Context, _ string) (string, error) {
+		GenerateAgentSessionTitleFn: func(_ context.Context, _ string) (string, error) {
 			called = true
 			return "", nil // blank model response
 		},
@@ -76,7 +76,7 @@ func newPlannerHandlerWithThreads(t *testing.T) *Handler {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	h.planner = p
+	h.agentSession = p
 	return h
 }
 
@@ -108,7 +108,7 @@ func TestListPlanningThreads_DefaultChat1(t *testing.T) {
 
 func TestListPlanningThreads_BusyThreadID(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	id := h.planner.Sessions().List(false)[0].ID
+	id := h.agentSession.Sessions().List(false)[0].ID
 
 	get := func() string {
 		rec := httptest.NewRecorder()
@@ -124,8 +124,8 @@ func TestListPlanningThreads_BusyThreadID(t *testing.T) {
 	if got := get(); got != "" {
 		t.Errorf("idle busy_thread_id = %q, want empty", got)
 	}
-	h.planner.SetBusy(true, id)
-	defer h.planner.SetBusy(false, "")
+	h.agentSession.SetBusy(true, id)
+	defer h.agentSession.SetBusy(false, "")
 	if got := get(); got != id {
 		t.Errorf("busy_thread_id = %q, want %q", got, id)
 	}
@@ -258,11 +258,11 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 	var created map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &created)
 	id := created["id"].(string)
-	if err := h.planner.Sessions().Archive(id); err != nil {
+	if err := h.agentSession.Sessions().Archive(id); err != nil {
 		t.Fatalf("archive: %v", err)
 	}
-	h.planner.SetBusy(true, id)
-	defer h.planner.SetBusy(false, "")
+	h.agentSession.SetBusy(true, id)
+	defer h.agentSession.SetBusy(false, "")
 
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodDelete, "/api/agent/sessions/"+id, nil)
@@ -275,11 +275,11 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 
 func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	threads := h.planner.Sessions().List(false)
+	threads := h.agentSession.Sessions().List(false)
 	id := threads[0].ID
 	// Simulate an exec in flight owned by this thread.
-	h.planner.SetBusy(true, id)
-	defer h.planner.SetBusy(false, "")
+	h.agentSession.SetBusy(true, id)
+	defer h.agentSession.SetBusy(false, "")
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPatch,
@@ -313,7 +313,7 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("activate status = %d: %s", rec.Code, rec.Body.String())
 	}
-	if got := h.planner.Sessions().ActiveID(); got != id {
+	if got := h.agentSession.Sessions().ActiveID(); got != id {
 		t.Errorf("active id = %q, want %q", got, id)
 	}
 }
@@ -322,7 +322,7 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 // name nor a recognized state returns 400.
 func TestPatchPlanningThread_RejectsEmptyBody(t *testing.T) {
 	h := newPlannerHandlerWithThreads(t)
-	id := h.planner.Sessions().List(false)[0].ID
+	id := h.agentSession.Sessions().List(false)[0].ID
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPatch, "/api/agent/sessions/"+id,
@@ -522,7 +522,7 @@ func TestCascade_ArchiveOnTaskLeavesBacklog(t *testing.T) {
 	}
 
 	// Pin the planner thread to this task.
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -567,7 +567,7 @@ func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
 	}
 
 	// Pin the planner thread to this task.
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -619,7 +619,7 @@ func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
 		t.Fatalf("ForceUpdateTaskStatus: %v", err)
 	}
 
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	pinThreadToTask(t, tm, threadID, task.ID.String())
@@ -667,7 +667,7 @@ func TestUpdateTaskPromptTool_FailsOnCascadeArchivedThread(t *testing.T) {
 	}
 
 	// Pin the thread to this task.
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	threadID := threads[0].ID
 	pinThreadToTask(t, tm, threadID, task.ID.String())

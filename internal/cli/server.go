@@ -55,7 +55,7 @@ type ServerComponents struct {
 	Srv     *http.Server
 	Ln      net.Listener
 	Runner  *runner.Runner
-	Planner *agentsession.Runtime
+	AgentSession *agentsession.Runtime
 	Ctx     context.Context
 	Stop    context.CancelFunc
 
@@ -75,9 +75,9 @@ func (sc *ServerComponents) Shutdown() {
 		logger.Main.Error("http server shutdown", "error", err)
 	}
 
-	if sc.Planner != nil && sc.Planner.IsRunning() {
-		logger.Main.Info("stopping planning sandbox")
-		sc.Planner.Stop()
+	if sc.AgentSession != nil && sc.AgentSession.IsRunning() {
+		logger.Main.Info("stopping agent session")
+		sc.AgentSession.Stop()
 	}
 
 	logger.Main.Info("shutting down runner")
@@ -263,7 +263,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	r.SetAutosubmitFunc(h.AutosubmitEnabled)
 	r.SetIdeationExploitRatioFunc(h.IdeationExploitRatio)
 
-	// Create and wire the planning sandbox manager.
+	// Create and wire the agent-session runtime.
 	p := agentsession.New(agentsession.Config{
 		Backend:     r.SandboxBackend(),
 		Workspaces:  snapshot.Workspaces,
@@ -271,8 +271,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		Fingerprint: snapshot.Key,
 		ConfigDir:   configDir,
 	})
-	h.SetPlanner(p)
-	r.SetPlanner(p)
+	h.SetAgentSession(p)
+	r.SetAgentSession(p)
 
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
@@ -436,7 +436,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		Srv:        srv,
 		Ln:         ln,
 		Runner:     r,
-		Planner:    p,
+		AgentSession:    p,
 		Ctx:        ctx,
 		Stop:       stop,
 		ActualPort: actualPort,
@@ -1041,7 +1041,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateRoutineSchedule": h.UpdateRoutineSchedule,
 		"TriggerRoutine":        h.TriggerRoutine,
 
-		// Planning sandbox.
+		// Agent session.
 		"GetAgentSessionStatus": h.GetAgentSessionStatus,
 		"StartAgentSession":     h.StartAgentSession,
 		"StopAgentSession":      h.StopAgentSession,
@@ -1054,7 +1054,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetAgentCommands":      h.GetAgentCommands,
 		"UpdateTaskPromptTool":  h.UpdateTaskPromptTool,
 
-		// Planning chat threads.
+		// Agent sessions.
 		"ListAgentSessions":  h.ListAgentSessions,
 		"CreateAgentSession": h.CreateAgentSession,
 		"PatchAgentSession":  h.PatchAgentSession,
@@ -1184,13 +1184,13 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateRoutineSchedule": handler.BodyLimitDefault,
 		"TriggerRoutine":        handler.BodyLimitDefault,
 
-		// Planning sandbox.
+		// Agent session.
 		"StartAgentSession":     handler.BodyLimitDefault,
 		"SendAgentMessage":      handler.BodyLimitDefault,
 		"InterruptAgentMessage": handler.BodyLimitDefault,
 		"UndoPlanningRound":     handler.BodyLimitDefault,
 
-		// Planning chat threads.
+		// Agent sessions.
 		"CreateAgentSession": handler.BodyLimitDefault,
 		"PatchAgentSession":  handler.BodyLimitDefault,
 

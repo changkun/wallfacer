@@ -16,10 +16,10 @@ import (
 // isTaskLockedByAgent reports whether any task-mode agent session currently
 // has an in-flight turn pinned to taskID. Returns (true, threadID) when locked.
 func (h *Handler) isTaskLockedByAgent(taskID string) (bool, string) {
-	if h.planner == nil {
+	if h.agentSession == nil {
 		return false, ""
 	}
-	return h.planner.IsTaskLocked(taskID)
+	return h.agentSession.IsTaskLocked(taskID)
 }
 
 // cascadeArchiveThreadsForTask archives all non-archived task-mode threads
@@ -54,10 +54,10 @@ func (h *Handler) cascadeUnarchiveThreadsForTask(taskID string) {
 // threadsManager returns the runtime's session manager if both are
 // configured, else nil.
 func (h *Handler) threadsManager() *agentsession.Manager {
-	if h.planner == nil {
+	if h.agentSession == nil {
 		return nil
 	}
-	return h.planner.Sessions()
+	return h.agentSession.Sessions()
 }
 
 // threadIDFromRequest returns the thread ID from the `?thread=` query
@@ -165,8 +165,8 @@ func (h *Handler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
 		out = append(out, toThreadSummary(m, activeID, mode, taskID))
 	}
 	busyID := ""
-	if h.planner != nil {
-		busyID = h.planner.BusyThreadID()
+	if h.agentSession != nil {
+		busyID = h.agentSession.BusyThreadID()
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{
 		"threads":        out,
@@ -295,7 +295,7 @@ func (h *Handler) DeleteAgentSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if h.planner != nil && h.planner.BusyThreadID() == id {
+	if h.agentSession != nil && h.agentSession.BusyThreadID() == id {
 		httpjson.Write(w, http.StatusConflict, map[string]any{"error": "thread is busy; interrupt or wait before deleting"})
 		return
 	}
@@ -334,7 +334,7 @@ func (h *Handler) mutateAgentSession(
 		return
 	}
 	id := r.PathValue("id")
-	if busyConflict != "" && h.planner != nil && h.planner.BusyThreadID() == id {
+	if busyConflict != "" && h.agentSession != nil && h.agentSession.BusyThreadID() == id {
 		httpjson.Write(w, http.StatusConflict, map[string]any{"error": busyConflict})
 		return
 	}
