@@ -296,7 +296,7 @@ GitHub Integration is the OAuth umbrella; PR creation folds into it and cloud cl
 
 **Within local product:**
 - Spec coordination is complete (document model, planning UX, archival, chat-first mode, planning threads, and the state control plane / drift detection all shipped; the drift pipeline's agent-backed tester is wired but gated behind `WALLFACER_DRIFT_TESTER`, off by default).
-- Editor tabs (inline-file-panel) shipped. The remaining file/diff/attachment work (task-prompt-attachments, diff-review-comments) plus test-criteria are clean and ready to dispatch.
+- Editor tabs (inline-file-panel) shipped. The remaining file/diff/attachment work (task-prompt-attachments, inline-diff-feedback) plus test-criteria are clean and ready to dispatch.
 
 **Within cloud platform:**
 - [latere-integration.md](cloud/latere-integration.md) is the umbrella; read it first. The executor sub-cluster (cella-runtime, topos, antigravity, managed-agents) is blocked on the `Executor` seam from harness-abstraction.
