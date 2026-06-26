@@ -229,13 +229,13 @@ func filterTasksByWorkspace(tasks []store.Task, ws string) ([]store.Task, bool) 
 }
 
 // aggregateAgentSessionStats scans `<configDir>/planning/*/usage.jsonl` for per-
-// group planning round records and folds them into AgentSessionGroupStat values.
+// group agent-session round records and folds them into AgentSessionGroupStat values.
 // Only records whose Timestamp is strictly after since are included (zero
 // since means all records). The currently active workspace group is resolved
 // to a friendly label and path list; stale group keys are returned with
 // Label == key and Paths == nil.
 //
-// An empty or missing planning directory yields an empty map (never nil) so
+// An empty or missing agent-session directory yields an empty map (never nil) so
 // the JSON response serializes as "agent_sessions":{} rather than "agent_sessions":null.
 func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, since time.Time) map[string]AgentSessionGroupStat {
 	result := make(map[string]AgentSessionGroupStat)
@@ -312,7 +312,7 @@ func planningGroupLabel(paths []string) string {
 //   - ?workspace=<repo-root-path> — restrict task aggregation to tasks that
 //     have that path as a WorktreePaths key. Returns 400 if present but no
 //     tasks match it.
-//   - ?days=N — restrict planning aggregation to rounds newer than N days
+//   - ?days=N — restrict agent-session aggregation to rounds newer than N days
 //     ago. Omitted or 0 means all time. Does not affect task buckets
 //     (execution analytics are unchanged).
 func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {

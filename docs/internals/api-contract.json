@@ -468,7 +468,7 @@
       "method": "POST",
       "pattern": "/api/agent/sessions",
       "name": "CreateAgentSession",
-      "description": "Create a new planning chat thread.",
+      "description": "Create a new agent session.",
       "tags": [
         "agent"
       ]
@@ -477,7 +477,7 @@
       "method": "PATCH",
       "pattern": "/api/agent/sessions/{id}",
       "name": "PatchAgentSession",
-      "description": "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
+      "description": "Mutate an agent session: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
       "tags": [
         "agent"
       ]
@@ -486,7 +486,7 @@
       "method": "DELETE",
       "pattern": "/api/agent/sessions/{id}",
       "name": "DeleteAgentSession",
-      "description": "Permanently delete an archived planning chat thread and its stored conversation.",
+      "description": "Permanently delete an archived agent session and its stored conversation.",
       "tags": [
         "agent"
       ]

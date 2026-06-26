@@ -379,19 +379,19 @@ var Routes = []Route{
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/sessions", Name: "CreateAgentSession",
 		JSName:      "createThread",
-		Description: "Create a new planning chat thread.",
+		Description: "Create a new agent session.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPatch, Pattern: "/api/agent/sessions/{id}", Name: "PatchAgentSession",
 		JSName:      "patchThread",
-		Description: "Mutate a planning chat thread: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
+		Description: "Mutate an agent session: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/agent/sessions/{id}", Name: "DeleteAgentSession",
 		JSName:      "deleteThread",
-		Description: "Permanently delete an archived planning chat thread and its stored conversation.",
+		Description: "Permanently delete an archived agent session and its stored conversation.",
 		Tags:        []string{"agent"},
 	},
 

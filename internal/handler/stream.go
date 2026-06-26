@@ -242,7 +242,7 @@ func (h *Handler) streamLiveLog(w http.ResponseWriter, r *http.Request, flusher 
 }
 
 // chunkReader is the minimal reader the live-chunk relay needs. Both the live
-// log reader and the planning log reader satisfy it.
+// log reader and the agent-session log reader satisfy it.
 type chunkReader interface {
 	ReadChunk(ctx context.Context) ([]byte, error)
 }
