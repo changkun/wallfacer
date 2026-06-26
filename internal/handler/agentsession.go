@@ -20,7 +20,7 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// selectPlanningSystemPrompt returns the planning-agent prompt prefix
+// selectSpecSystemPrompt returns the planning-agent prompt prefix
 // appropriate for the current workspace state: the "empty" variant when
 // no non-archived parseable specs exist across any mounted workspace,
 // the "nonempty" variant otherwise. Evaluated per-turn (not cached)
@@ -33,7 +33,7 @@ import (
 // Unparseable spec files (broken frontmatter) are silently dropped by
 // BuildTree and therefore also don't count, which matches the
 // chat-first-mode spec's definition of an "effectively empty" tree.
-func selectPlanningSystemPrompt(workspaces []string) string {
+func selectSpecSystemPrompt(workspaces []string) string {
 	for _, ws := range workspaces {
 		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
 		if err != nil {
@@ -45,7 +45,7 @@ func selectPlanningSystemPrompt(workspaces []string) string {
 			// safer to assume non-empty and surface the failure in logs.
 			slog.Warn("planning: spec tree read failed; defaulting to nonempty prompt",
 				"workspace", ws, "err", err)
-			return prompts.PlanningSystemNonempty()
+			return prompts.SpecSystemNonempty()
 		}
 		for _, node := range tree.All {
 			if node.Value == nil {
@@ -54,10 +54,10 @@ func selectPlanningSystemPrompt(workspaces []string) string {
 			if node.Value.Status == spec.StatusArchived {
 				continue
 			}
-			return prompts.PlanningSystemNonempty()
+			return prompts.SpecSystemNonempty()
 		}
 	}
-	return prompts.PlanningSystemEmpty()
+	return prompts.SpecSystemEmpty()
 }
 
 // assemblePlanningPrompt layers the per-turn system prompts on top of
@@ -75,7 +75,7 @@ func assemblePlanningPrompt(workspaces []string, focusedSpec, base string) strin
 	if guard := archivedSpecGuard(workspaces, focusedSpec); guard != "" {
 		out = guard + out
 	}
-	if prefix := selectPlanningSystemPrompt(workspaces); prefix != "" {
+	if prefix := selectSpecSystemPrompt(workspaces); prefix != "" {
 		out = prefix + "\n\n" + out
 	}
 	return out

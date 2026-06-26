@@ -78,9 +78,9 @@ var embeddedToAPI = map[string]string{
 	"commit.tmpl":                   "commit_message",
 	"conflict.tmpl":                 "conflict_resolution",
 	"test.tmpl":                     "test_verification",
-	"planning.tmpl":                 "planning",
-	"planning_system_empty.tmpl":    "planning_system_empty",
-	"planning_system_nonempty.tmpl": "planning_system_nonempty",
+	"spec.tmpl":                 "spec",
+	"spec_system_empty.tmpl":    "spec_system_empty",
+	"spec_system_nonempty.tmpl": "spec_system_nonempty",
 	"task_prompt_refine.tmpl":       "task_prompt_refine",
 }
 
@@ -92,9 +92,9 @@ var apiToEmbedded = map[string]string{
 	"commit_message":           "commit.tmpl",
 	"conflict_resolution":      "conflict.tmpl",
 	"test_verification":        "test.tmpl",
-	"planning":                 "planning.tmpl",
-	"planning_system_empty":    "planning_system_empty.tmpl",
-	"planning_system_nonempty": "planning_system_nonempty.tmpl",
+	"spec":                 "spec.tmpl",
+	"spec_system_empty":    "spec_system_empty.tmpl",
+	"spec_system_nonempty": "spec_system_nonempty.tmpl",
 	"task_prompt_refine":       "task_prompt_refine.tmpl",
 }
 
@@ -107,9 +107,9 @@ var knownNames = []string{
 	"commit_message",
 	"conflict_resolution",
 	"test_verification",
-	"planning",
-	"planning_system_empty",
-	"planning_system_nonempty",
+	"spec",
+	"spec_system_empty",
+	"spec_system_nonempty",
 }
 
 // Manager manages the built-in prompt templates (see knownNames for the
@@ -279,9 +279,9 @@ func mockContextFor(apiName string) (interface{}, bool) {
 		return struct{ ActivityLog string }{ActivityLog: "example activity log"}, true
 	case "title":
 		return struct{ Prompt string }{Prompt: "example task"}, true
-	case "planning":
+	case "spec":
 		return nil, true
-	case "planning_system_empty", "planning_system_nonempty":
+	case "spec_system_empty", "spec_system_nonempty":
 		return nil, true
 	default:
 		return nil, false
@@ -431,7 +431,7 @@ type TestData struct {
 
 // --- Manager methods ---
 
-// TaskPromptRefine renders the task-mode planning agent system prompt.
+// TaskPromptRefine renders the task-mode spec-mode agent system prompt.
 // Uses the same RefinementData fields as the task's pinned metadata.
 func (m *Manager) TaskPromptRefine(d RefinementData) string {
 	return m.render("task_prompt_refine.tmpl", d)
@@ -463,27 +463,27 @@ func (m *Manager) ConflictResolution(d ConflictData) string { return m.render("c
 // TestVerification renders the test verification agent prompt.
 func (m *Manager) TestVerification(d TestData) string { return m.render("test.tmpl", d) }
 
-// Planning renders the planning agent system prompt.
-func (m *Manager) Planning() string { return m.render("planning.tmpl", nil) }
+// Spec renders the spec-mode agent system prompt.
+func (m *Manager) Spec() string { return m.render("spec.tmpl", nil) }
 
-// PlanningSystemEmpty renders the planning-agent prompt prefix used
+// SpecSystemEmpty renders the spec-mode prompt prefix used
 // when the workspace spec tree is empty (no non-archived parseable
 // specs). Encourages the agent to emit a `/spec-new` directive for
-// substantive planning work.
-func (m *Manager) PlanningSystemEmpty() string {
-	return m.render("planning_system_empty.tmpl", nil)
+// substantive spec work.
+func (m *Manager) SpecSystemEmpty() string {
+	return m.render("spec_system_empty.tmpl", nil)
 }
 
-// PlanningSystemNonempty renders the planning-agent prompt prefix used
+// SpecSystemNonempty renders the spec-mode prompt prefix used
 // when at least one non-archived spec exists. Steers the agent toward
 // editing existing specs rather than creating new ones.
-func (m *Manager) PlanningSystemNonempty() string {
-	return m.render("planning_system_nonempty.tmpl", nil)
+func (m *Manager) SpecSystemNonempty() string {
+	return m.render("spec_system_nonempty.tmpl", nil)
 }
 
 // --- Package-level functions (delegate to Default for backward compatibility) ---
 
-// TaskPromptRefine renders the task-mode planning agent system prompt.
+// TaskPromptRefine renders the task-mode spec-mode agent system prompt.
 func TaskPromptRefine(d RefinementData) string { return Default.TaskPromptRefine(d) }
 
 // Ideation renders the brainstorm agent prompt.
@@ -508,13 +508,13 @@ func ConflictResolution(d ConflictData) string { return Default.ConflictResoluti
 // TestVerification renders the test verification agent prompt.
 func TestVerification(d TestData) string { return Default.TestVerification(d) }
 
-// Planning renders the planning agent system prompt.
-func Planning() string { return Default.Planning() }
+// Spec renders the spec-mode agent system prompt.
+func Spec() string { return Default.Spec() }
 
-// PlanningSystemEmpty renders the planning-agent prompt prefix used
+// SpecSystemEmpty renders the spec-mode prompt prefix used
 // when the workspace spec tree is empty.
-func PlanningSystemEmpty() string { return Default.PlanningSystemEmpty() }
+func SpecSystemEmpty() string { return Default.SpecSystemEmpty() }
 
-// PlanningSystemNonempty renders the planning-agent prompt prefix used
+// SpecSystemNonempty renders the spec-mode prompt prefix used
 // when at least one non-archived spec exists.
-func PlanningSystemNonempty() string { return Default.PlanningSystemNonempty() }
+func SpecSystemNonempty() string { return Default.SpecSystemNonempty() }

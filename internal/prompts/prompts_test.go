@@ -447,39 +447,39 @@ func TestTestVerification_NoCriteria(t *testing.T) {
 	}
 }
 
-// TestRenderPlanning verifies that the planning template renders without error
+// TestRenderSpec verifies that the planning template renders without error
 // and contains key phrases.
-func TestRenderPlanning(t *testing.T) {
+func TestRenderSpec(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
-	got := mgr.Planning()
+	got := mgr.Spec()
 	if strings.TrimSpace(got) == "" {
-		t.Error("Planning returned empty string")
+		t.Error("Spec returned empty string")
 	}
 	if strings.Contains(got, "{{") {
-		t.Errorf("Planning returned unreplaced template syntax: %q", got)
+		t.Errorf("Spec returned unreplaced template syntax: %q", got)
 	}
 	for _, phrase := range []string{"spec", "planning", "specs/"} {
 		if !strings.Contains(strings.ToLower(got), phrase) {
-			t.Errorf("Planning output missing expected phrase %q", phrase)
+			t.Errorf("Spec output missing expected phrase %q", phrase)
 		}
 	}
 }
 
-func TestPackageLevelPlanning_NonEmpty(t *testing.T) {
-	got := prompts.Planning()
+func TestPackageLevelSpec_NonEmpty(t *testing.T) {
+	got := prompts.Spec()
 	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.Planning() returned empty string")
+		t.Error("prompts.Spec() returned empty string")
 	}
 }
 
-// TestRenderPlanningSystemEmpty_ContainsDirective ensures the empty-tree
+// TestRenderSpecSystemEmpty_ContainsDirective ensures the empty-tree
 // variant actually mentions the /spec-new directive so the agent knows
 // how to bootstrap a scaffold.
-func TestRenderPlanningSystemEmpty_ContainsDirective(t *testing.T) {
+func TestRenderSpecSystemEmpty_ContainsDirective(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
-	got := mgr.PlanningSystemEmpty()
+	got := mgr.SpecSystemEmpty()
 	if strings.TrimSpace(got) == "" {
-		t.Fatal("PlanningSystemEmpty returned empty string")
+		t.Fatal("SpecSystemEmpty returned empty string")
 	}
 	if strings.Contains(got, "{{") {
 		t.Errorf("unreplaced template syntax: %q", got)
@@ -491,14 +491,14 @@ func TestRenderPlanningSystemEmpty_ContainsDirective(t *testing.T) {
 	}
 }
 
-// TestRenderPlanningSystemNonempty_PrefersExisting ensures the non-empty
+// TestRenderSpecSystemNonempty_PrefersExisting ensures the non-empty
 // variant steers the agent toward editing existing specs rather than
 // scaffolding new ones on every turn.
-func TestRenderPlanningSystemNonempty_PrefersExisting(t *testing.T) {
+func TestRenderSpecSystemNonempty_PrefersExisting(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
-	got := mgr.PlanningSystemNonempty()
+	got := mgr.SpecSystemNonempty()
 	if strings.TrimSpace(got) == "" {
-		t.Fatal("PlanningSystemNonempty returned empty string")
+		t.Fatal("SpecSystemNonempty returned empty string")
 	}
 	for _, phrase := range []string{"existing", "Edit"} {
 		if !strings.Contains(got, phrase) {
@@ -507,21 +507,21 @@ func TestRenderPlanningSystemNonempty_PrefersExisting(t *testing.T) {
 	}
 }
 
-func TestPackageLevelPlanningSystemPrompts(t *testing.T) {
-	if prompts.PlanningSystemEmpty() == "" {
-		t.Error("prompts.PlanningSystemEmpty() returned empty")
+func TestPackageLevelSpecSystemPrompts(t *testing.T) {
+	if prompts.SpecSystemEmpty() == "" {
+		t.Error("prompts.SpecSystemEmpty() returned empty")
 	}
-	if prompts.PlanningSystemNonempty() == "" {
-		t.Error("prompts.PlanningSystemNonempty() returned empty")
+	if prompts.SpecSystemNonempty() == "" {
+		t.Error("prompts.SpecSystemNonempty() returned empty")
 	}
 }
 
-// TestPromptRegistry_PlanningOverridable exercises the full
+// TestPromptRegistry_SpecOverridable exercises the full
 // write → render → delete → render cycle for both planning_system_*
 // templates. Required by agent-system-prompts.md so that users can
 // customize the planning agent's framing without forking the binary.
-func TestPromptRegistry_PlanningOverridable(t *testing.T) {
-	for _, name := range []string{"planning_system_empty", "planning_system_nonempty"} {
+func TestPromptRegistry_SpecOverridable(t *testing.T) {
+	for _, name := range []string{"spec_system_empty", "spec_system_nonempty"} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			mgr := prompts.NewManager(dir)
@@ -557,10 +557,10 @@ func TestPromptRegistry_PlanningOverridable(t *testing.T) {
 			// The render path must surface the override, not the embed.
 			var rendered string
 			switch name {
-			case "planning_system_empty":
-				rendered = mgr.PlanningSystemEmpty()
-			case "planning_system_nonempty":
-				rendered = mgr.PlanningSystemNonempty()
+			case "spec_system_empty":
+				rendered = mgr.SpecSystemEmpty()
+			case "spec_system_nonempty":
+				rendered = mgr.SpecSystemNonempty()
 			}
 			if !strings.Contains(rendered, "OVERRIDE-MARKER-12345") {
 				t.Errorf("rendered prompt did not pick up override; got: %q", rendered)
