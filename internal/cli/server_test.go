@@ -20,6 +20,7 @@ import (
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // TestInitServer verifies that initServer returns valid components with a
@@ -138,7 +139,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -205,7 +206,7 @@ func TestBuildMux_DocsEndpoints(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -266,7 +267,7 @@ func TestBuildMux_DocsAsset(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(workdir, "worktrees"), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -329,7 +330,7 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -359,7 +360,7 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -389,7 +390,7 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -422,7 +423,7 @@ func TestBuildMux_DocsInternals(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -454,7 +455,7 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -497,7 +498,7 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 // that counts failed tasks grouped by failure category.
 func TestGauge_FailedTasksByCategory(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -659,6 +660,30 @@ func TestRequiresStore(t *testing.T) {
 	for _, name := range storeRequired {
 		if !requiresStore(name) {
 			t.Errorf("requiresStore(%q) = false, want true", name)
+		}
+	}
+}
+
+// TestRequiresPrincipal verifies which routes are gated behind an authenticated
+// browser principal. The spec-comment surface and SubmitFeedback (the inline
+// diff-review batch lands on the feedback route) require a principal; ordinary
+// task routes do not.
+func TestRequiresPrincipal(t *testing.T) {
+	gated := []string{
+		"ListSpecComments", "SubmitSpecComment", "StreamSpecComments", "SubmitFeedback",
+	}
+	for _, name := range gated {
+		if !requiresPrincipal(name) {
+			t.Errorf("requiresPrincipal(%q) = false, want true", name)
+		}
+	}
+
+	open := []string{
+		"ListTasks", "CreateTask", "GetEvents", "CompleteTask", "ResumeTask", "GetConfig",
+	}
+	for _, name := range open {
+		if requiresPrincipal(name) {
+			t.Errorf("requiresPrincipal(%q) = true, want false", name)
 		}
 	}
 }
@@ -834,7 +859,7 @@ func TestShutdown_HttpShutdownError(t *testing.T) {
 // status and archived flag.
 func TestGauge_TasksTotal(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -884,7 +909,7 @@ func TestGauge_TasksTotal(t *testing.T) {
 // TestGauge_RunningContainers validates the running containers gauge collector.
 func TestGauge_RunningContainers(t *testing.T) {
 	workdir := t.TempDir()
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -916,7 +941,7 @@ func TestGauge_RunningContainers(t *testing.T) {
 // TestGauge_BackgroundGoroutines validates the pending goroutines gauge.
 func TestGauge_BackgroundGoroutines(t *testing.T) {
 	workdir := t.TempDir()
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -944,7 +969,7 @@ func TestGauge_BackgroundGoroutines(t *testing.T) {
 // TestGauge_StoreSubscribers validates the store subscribers gauge.
 func TestGauge_StoreSubscribers(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -966,7 +991,7 @@ func TestGauge_StoreSubscribers(t *testing.T) {
 // 0 (closed), then flips to 1 (open) after exceeding the failure threshold.
 func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	workdir := t.TempDir()
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
