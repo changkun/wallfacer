@@ -1,6 +1,6 @@
 ---
 title: Token & Cost Optimization
-status: drafted
+status: archived
 depends_on: []
 affects: [internal/runner/, internal/store/, internal/executor/, internal/envconfig/, internal/handler/, internal/cli/, internal/metrics/, internal/prompts/, frontend/src/components/analytics/]
 effort: xlarge
@@ -12,11 +12,11 @@ dispatched_task_id: null
 
 # Token & Cost Optimization
 
-## Status (2026-06-26)
+## Status (2026-06-26): Archived
 
-Still a live roadmap of unbuilt work, not abandoned. The baseline cost-visibility layer shipped (per-turn/per-task usage recording, `/api/usage`, `/api/stats`, the analytics tabs, reactive `MaxCostUSD`/`MaxInputTokens` enforcement, board-manifest size warning). Everything past that baseline is unimplemented: derived cache metrics, cache-break detection, the `--resume` audit, RTK compression, the regression/anomaly model, and all of Part 4's budget intelligence (threshold warnings, per-turn deltas, pacing, ledger, peak/off-peak, enterprise discount). See per-part `Status` notes below.
+Archived without implementation. The baseline cost-visibility layer shipped (per-turn/per-task usage recording, `/api/usage`, `/api/stats`, the analytics tabs, reactive `MaxCostUSD`/`MaxInputTokens` enforcement, board-manifest size warning) and stays in code regardless. Everything past that baseline is unbuilt and is no longer planned: derived cache metrics, cache-break detection, the `--resume` audit, RTK compression, the regression/anomaly model, and all of Part 4's budget intelligence (threshold warnings, per-turn deltas, pacing, ledger, peak/off-peak, enterprise discount).
 
-Speculative / lowest-signal items to weigh for cutting before implementation begins: RTK shell-output compression (§2.1), peak/off-peak throttling (§4.7), enterprise discount (§4.8).
+Why archived: Part 1 (cache correctness) is premised on influencing Claude Code's internal caching, which wallfacer does not control, the mitigations reduce to documentation or heuristic guesses. The rest is incremental UI polish on already-recorded data plus speculative items (RTK §2.1, peak/off-peak §4.7, enterprise discount §4.8). It sat `drafted` from April with zero of 14 acceptance criteria built. If the cheap slivers (derived cache metrics §1.1, budget warnings + per-turn deltas §4.2–4.3) ever become worth it, they belong in a small focused spec, not this xlarge umbrella. The content below is preserved for reference.
 
 ## Problem
 
