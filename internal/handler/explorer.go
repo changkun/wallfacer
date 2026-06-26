@@ -614,6 +614,12 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Best-effort auto-commit so the manual edit is attributed and revertible,
+	// mirroring the planning-round path. Runs before the response so the commit
+	// reflects exactly this save; failures never fail the save (the file is
+	// already on disk).
+	h.commitExplorerWrite(req.Workspace, resolved)
+
 	httpjson.Write(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"size":   len(data),
