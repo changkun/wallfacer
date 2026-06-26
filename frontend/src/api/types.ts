@@ -61,6 +61,9 @@ export interface Task {
   parent_task_id?: string | null;
   spec_source_path?: string;
   environment?: ExecutionEnvironment | null;
+  // Agon adversarial-verification results. Absent = not yet run.
+  agon_unresolved?: number;
+  agon_headline?: string;
 }
 
 // Runtime environment captured at the start of a task run (reproducibility

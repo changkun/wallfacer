@@ -608,6 +608,9 @@ async function testTask() {
   const body = criteria.trim() ? { criteria: criteria.trim() } : undefined;
   await api('POST', `/api/tasks/${props.task.id}/test`, body);
 }
+async function agonTask() {
+  await api('POST', `/api/tasks/${props.task.id}/agon`);
+}
 async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
 }
@@ -893,6 +896,8 @@ async function submitReview() {
           <div class="flex items-center gap-3">
             <span class="badge" :class="'badge-' + status">{{ status }}</span>
             <span v-if="task.sandbox" class="badge badge-priority">{{ task.sandbox }}</span>
+            <span v-if="task.agon_unresolved === 0" class="badge badge-pass" title="Agon: no unresolved attacks">Agon: clean</span>
+            <span v-else-if="task.agon_unresolved !== undefined" class="badge badge-fail" :title="task.agon_headline || ''" style="cursor: default;">Agon: {{ task.agon_unresolved }} unresolved</span>
             <span class="text-xs text-v-muted">{{ relativeTime(task.updated_at) }}</span>
             <span class="text-xs text-v-muted font-mono" title="Task ID">{{ task.id.slice(0, 8) }}</span>
           </div>
@@ -1467,6 +1472,16 @@ async function submitReview() {
                     <span class="aside-action__body">
                       <span class="aside-action__label">Test</span>
                       <span class="aside-action__hint">run test verification</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="isWaiting && task.session_id" class="aside-action-group">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'agon' }" :disabled="busy" @click="runAction('agon', agonTask)">
+                    <span class="aside-action__icon" aria-hidden="true">&#9878;</span>
+                    <span class="aside-action__body">
+                      <span class="aside-action__label">Agon</span>
+                      <span class="aside-action__hint">adversarial verification</span>
                     </span>
                   </button>
                 </div>
