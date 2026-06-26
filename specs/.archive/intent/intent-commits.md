@@ -1,6 +1,6 @@
 ---
 title: Intent-Driven Commit Tracking
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/handler/explorer.go
