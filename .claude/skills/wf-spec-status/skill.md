@@ -1,5 +1,5 @@
 ---
-name: status
+name: wf-spec-status
 description: Report current status across all specs — what's done, in progress, blocked, and what's next. Reads reality (spec files, task files, git history) instead of relying on manually maintained status tables.
 argument-hint: [spec-file.md]
 allowed-tools: Read, Grep, Glob, Agent, Bash(git log *), Bash(ls *)
@@ -22,7 +22,7 @@ Otherwise, report on the full project.
    Specs are organized by track: `specs/foundations/`, `specs/local/`,
    `specs/cloud/`, `specs/shared/`.
 2. For each spec, **parse YAML frontmatter** to extract `title`, `status`,
-   `track`, `depends_on`, `affects`, `effort`, `dispatched_task_id`.
+   `depends_on`, `affects`, `effort`, `dispatched_task_id`.
 3. Determine parent-child relationships from the filesystem: a spec at
    `specs/<track>/foo.md` with a directory `specs/<track>/foo/` is a non-leaf
    spec; its children are the specs inside that directory.
@@ -34,7 +34,10 @@ For each spec file, use the frontmatter `status` field as the primary source of
 truth:
 
 1. **Read the `status` from frontmatter**: `vague`, `drafted`, `validated`,
-   `complete`, `stale`, or `archived`. An `archived` spec is retired from the
+   `testing`, `complete`, `stale`, or `archived`. `testing` is the transient
+   drift-verdict state (implementation landed, awaiting the verdict) — report it as
+   "in testing", and surface `testing_pending` if set (the drift tester is stuck).
+   An `archived` spec is retired from the
    live graph — read-only, hidden by default, and excluded from progress,
    impact, drift, and dispatch.
 2. **For non-leaf specs** (those with a child directory), compute progress by
@@ -73,9 +76,15 @@ For each non-complete spec:
 
 From the actionable specs, determine the recommended next steps:
 
-- Specs with task breakdowns ready → can start `/wf-spec-implement`.
-- Specs without task breakdowns → need `/wf-spec-breakdown <spec> tasks` first.
+- Validated leaf specs (small enough to build in one pass) → `/wf-spec-implement`
+  directly; it builds and finalizes (delegating to `/wf-spec-wrapup`).
+- Large specs ready to decompose → `/wf-spec-breakdown <spec> tasks` first, then
+  dispatch the leaves.
+- Specs in `testing` (verdict pending) → `/wf-spec-wrapup` to render the drift
+  verdict (`testing → complete`/`stale`).
 - Specs that need updating → suggest `/wf-spec-refine` first.
+- To advance a spec hands-off through the whole lifecycle → `/wf-spec-drive
+  <spec>` (pair with a `/goal` to run it autonomously to `complete`).
 
 ## Step 5: Generate report
 

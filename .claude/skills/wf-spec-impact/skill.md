@@ -1,5 +1,5 @@
 ---
-name: check-impact
+name: wf-spec-impact
 description: Analyze what existing code and specs a proposed change will affect. Use before implementing a spec to understand blast radius, identify risks, and find specs that need updating.
 argument-hint: <spec-file.md>
 allowed-tools: Read, Grep, Glob, Agent, Bash(git log *), Bash(ls *)
@@ -17,7 +17,7 @@ Extract the spec file path from the first token.
 ## Step 1: Read the spec
 
 1. Read the spec file in full. **Parse YAML frontmatter** to extract `title`,
-   `status`, `track`, `depends_on`, `affects`, `effort`.
+   `status`, `depends_on`, `affects`, `effort`.
 2. Use the `affects` list from frontmatter as the primary set of code files and
    directories this spec touches.
 3. Extract additional file paths, package names, type names, function names, and

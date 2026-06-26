@@ -1,6 +1,6 @@
 ---
-name: validate-specs
-description: Validate all specs against the document model rules — check required frontmatter fields, valid status/track/effort values, DAG acyclicity, dispatch consistency, orphan detection, and status consistency. Use to catch structural issues across the spec tree.
+name: wf-spec-validate
+description: Validate all specs against the document model rules — check required frontmatter fields, valid status/effort values, track location (path-derived), DAG acyclicity, dispatch consistency, orphan detection, and status consistency. Use to catch structural issues across the spec tree.
 argument-hint: [spec-file.md]
 allowed-tools: Read, Grep, Glob, Bash(ls *)
 ---
@@ -22,7 +22,7 @@ Otherwise, validate all specs under `specs/`.
 1. Glob for all spec files recursively: `specs/**/*.md` (excluding README.md
    and any non-spec markdown files like changelogs).
 2. For each spec file, parse YAML frontmatter between `---` fences. Extract:
-   `title`, `status`, `track`, `depends_on`, `affects`, `effort`, `created`,
+   `title`, `status`, `depends_on`, `affects`, `effort`, `created`,
    `updated`, `author`, `dispatched_task_id`.
 3. Determine leaf vs non-leaf: a spec is non-leaf if a subdirectory with the
    same name (without `.md`) exists and contains at least one child spec.
@@ -35,16 +35,27 @@ For each spec, check these rules. Classify each finding as `error` or
 `warning` per the severity column.
 
 ### Required fields (error)
-`title`, `status`, `track`, `effort`, `created`, `updated`, `author` must all
-be present in the frontmatter. Report each missing field.
+`title`, `status`, `effort`, `created`, `updated`, `author` must all be present in
+the frontmatter. Report each missing field. (`track` is **not** a frontmatter
+field — in the model it is `yaml:"-"`, derived from the path; see Valid track.)
 
 ### Valid status (error)
-`status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale`, `archived`.
+`status` must be one of: `vague`, `drafted`, `validated`, `testing`, `complete`,
+`stale`, `archived` (the seven states in `internal/spec/lifecycle.go`). `testing`
+is the transient drift-verdict state between `validated` and `complete`; a spec in
+`testing` is valid (not an error), though a long-lived `testing` carrying a
+`testing_pending` reason is worth a warning. The server may also set the optional
+fields `implementation_commit` (`base..tip`, present during `testing`) and
+`testing_pending` (a reason string when the drift tester failed); both are valid.
 
-### Valid track (error)
-`track` must match the spec's filesystem location. A spec at
-`specs/foundations/foo.md` must have `track: foundations`. Extract the track
-from the path segment immediately after `specs/`.
+### Valid track (location, error)
+`track` is **derived from the path**, not a frontmatter field (the model marks it
+`yaml:"-"`): a spec at `specs/foundations/foo.md` is in track `foundations` (the
+segment immediately after `specs/`). So there is no `track:` value to cross-check —
+instead validate the *location*: every spec must live under a non-empty track
+directory (`specs/<track>/...`); flag any spec directly under `specs/` (no track
+segment) as an error. If a spec still carries a stale `track:` key in its
+frontmatter, flag it as a removable no-op (the loader ignores it).
 
 ### Valid effort (error)
 `effort` must be one of: `small`, `medium`, `large`, `xlarge`.
@@ -103,9 +114,11 @@ assumptions about the stale spec may no longer hold. Does not fire for
 `archived` dependencies — a validated spec depending on an archived spec
 receives a `dependency-is-archived` advisory note instead (see below).
 
-### Track consistency (warning)
-All specs under `specs/<track>/` (at any depth) should have `track: <track>`
-in their frontmatter.
+### Track location (warning)
+Track is the path segment after `specs/`, not a frontmatter value, so there is
+nothing to cross-check between a field and the path. Warn only if a spec sits
+directly under `specs/` with no track directory, or still carries a stale
+no-op `track:` key in its frontmatter.
 
 ### dependency-is-archived (warning)
 A live spec whose `depends_on` includes an archived spec. Advisory only —
@@ -134,7 +147,7 @@ Warnings: N
 - [error] depends_on target does not exist: specs/foundations/nonexistent.md
 
 #### specs/local/foo.md
-- [error] Invalid status: "wip" (must be vague|drafted|validated|complete|stale|archived)
+- [error] Invalid status: "wip" (must be vague|drafted|validated|testing|complete|stale|archived)
 
 ### Cross-Spec Errors
 - [error] Cycle detected: A.md -> B.md -> C.md -> A.md

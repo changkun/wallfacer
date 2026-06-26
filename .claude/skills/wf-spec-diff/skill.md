@@ -23,9 +23,18 @@ $ARGUMENTS has the form: `<spec-file.md> [commit-range]`
 
 1. Read the spec file in full. **Parse YAML frontmatter** — extract `title`,
    `status`, `depends_on`, `affects`, `effort`, `dispatched_task_id`.
-2. Verify `dispatched_task_id` is non-null. If null, the spec was never
-   dispatched — suggest `/wf-spec-review-impl` instead (which works without
-   a dispatch link).
+2. Verify `dispatched_task_id` is non-null. If null, the spec was not dispatched.
+   It may instead have been implemented directly in-session (no task UUID, but
+   real commits on the `affects` files). In that case:
+   - To **finalize** it (Outcome + status + README), use `/wf-spec-wrapup`, which
+     is lifecycle-aware and reconstructs the Outcome from the git history of the
+     `affects` files. That is the canonical Outcome writer for the direct path.
+   - To only **review** the implementation against the spec (no Outcome write),
+     use `/wf-spec-review-impl`, which works without a dispatch link.
+   - You may still run *this* skill's divergence analysis on a direct-implement
+     spec if the user passes an explicit `[commit-range]` (Step 2 then uses it
+     instead of the task UUID) — but do not also write `## Outcome` here if
+     wrap-up already owns it (see Step 6).
 3. Extract the acceptance criteria from the spec body:
    - Design specs: items from Options (chosen option), Components, Architecture
    - Task specs: items from "What to do", "Goal", "Tests"
@@ -97,8 +106,27 @@ Based on these numbers, determine the drift level:
 
 ## Step 6: Write the Outcome section
 
-Append or update an `## Outcome` section on the spec file (before any "Future
-Work" or "Open Questions" sections):
+`## Outcome` is the single canonical completion section, shared with
+`/wf-spec-wrapup`.
+
+**If you are running as wrap-up's analysis engine (wrap-up Step 2a):** stop here —
+do **not** write or update the Outcome, and do **not** touch frontmatter/status.
+Return the classified findings (Satisfied / Diverged / Not implemented /
+Superseded items, unspecified work, drift level, satisfaction rate) to wrap-up,
+which composes the one Outcome and sets status from the drift. Steps 7–8 below
+(tests, report) are wrap-up's job in that mode.
+
+**If you are running standalone,** you own the Outcome — but still don't blindly
+append a second one. Check whether the spec already has an `## Outcome`:
+- **None yet** — write the divergence-flavored Outcome below.
+- **Already present** (e.g. wrap-up finalized a direct-implement spec, or a prior
+  diff ran) — do not duplicate it. Merge your divergence findings into the
+  existing section (add/refresh the Divergences / Not Implemented / Unspecified
+  subsections) and leave its Summary/What-Shipped intact. The divergence analysis
+  augments the finalizer's Outcome; it does not replace it.
+
+When writing a fresh Outcome standalone, append it before any "Future Work" or
+"Open Questions" sections:
 
 ````markdown
 ## Outcome
@@ -119,15 +147,24 @@ Work" or "Open Questions" sections):
 - **<file/function>**: <classification and brief description>
 ````
 
-Update the spec's status based on drift level:
-- **Minimal**: set `status` to `complete` (promotes from `done`)
-- **Moderate**: set `status` to `complete`, but the Outcome section documents
-  divergences. Suggest `/wf-spec-refine` to update the spec text.
-- **Significant**: set `status` to `stale`. The spec no longer matches what
-  was built. The user should `/wf-spec-refine` to update the spec, then
-  optionally `/wf-spec-dispatch` again for remaining work.
+Update the spec's status — honoring the lifecycle gate (`validated → complete` is
+illegal; `complete` is reached only through `testing`) and the hybrid rule (prefer
+the `POST /api/specs/transition` API, which validates the edge; else legal-edge
+YAML). A dispatched task reaching `done` means the **server** already moved the
+spec along `validated → testing → complete/stale`, so usually you are only
+recording the verdict, not setting the status:
 
-Set `updated` to today's date in all cases.
+- **Minimal**: the server's `complete` stands; leave `status` as is.
+- **Moderate**: leave `complete`, but the Outcome documents the divergences;
+  suggest `/wf-spec-refine` to align the spec text.
+- **Significant**: your analysis overrides the server's optimistic complete — set
+  `status: stale` (`complete → stale` is legal). Recommend `/wf-spec-refine`, then
+  `/wf-spec-dispatch` again for the remaining work.
+- If the spec is unexpectedly still `validated` (no server hook ran) or `testing`
+  (verdict pending), do not jump to `complete`: hand off to `/wf-spec-wrapup`,
+  which walks the `testing` gate properly. Never write `validated → complete`.
+
+Set `updated` to today's date whenever you change the status.
 
 ## Step 7: Run tests
 
