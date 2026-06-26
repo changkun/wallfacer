@@ -122,7 +122,7 @@ The agent runtime is a singleton, workspace-scoped agent keyed by a fingerprint 
 
 Because threads share the single agent runtime, only one agent turn runs at a time globally. Messages sent to background threads while another is in flight are queued FIFO and fire automatically as the running round completes. When the active workspace group changes, `UpdateWorkspaces` re-scopes the agent runtime to the new workspace set; open threads keep their history intact.
 
-Stopping the agent from **Settings → Planning** ends any in-flight turn but does not touch conversation history; the next message simply starts a fresh process.
+Stopping the agent ends any in-flight turn but does not touch conversation history; the next message simply starts a fresh process.
 
 ### Send Mode Toggle
 
