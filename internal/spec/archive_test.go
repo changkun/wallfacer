@@ -59,7 +59,7 @@ func writeArchiveTestSpec(t *testing.T, specsDir, rel, status string) {
 func TestBuildTree_ArchivePass(t *testing.T) {
 	dir := t.TempDir()
 	// A live spec with a live and an archived structure beneath it.
-	writeArchiveTestSpec(t, dir, "local/foo.md", "validated")       // live non-leaf
+	writeArchiveTestSpec(t, dir, "local/foo.md", "validated") // live non-leaf
 	writeArchiveTestSpec(t, dir, "local/foo/live-child.md", "drafted")
 	// Archived: a standalone archived spec, and a cross-boundary archived child
 	// whose parent (local/foo.md) is live.

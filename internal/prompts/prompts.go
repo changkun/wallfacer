@@ -72,30 +72,30 @@ func templateFuncMap() template.FuncMap {
 
 // embeddedToAPI maps embedded template file names to user-facing API names.
 var embeddedToAPI = map[string]string{
-	"ideation.tmpl":                 "ideation",
-	"oversight.tmpl":                "oversight",
-	"title.tmpl":                    "title",
-	"commit.tmpl":                   "commit_message",
-	"conflict.tmpl":                 "conflict_resolution",
-	"test.tmpl":                     "test_verification",
+	"ideation.tmpl":             "ideation",
+	"oversight.tmpl":            "oversight",
+	"title.tmpl":                "title",
+	"commit.tmpl":               "commit_message",
+	"conflict.tmpl":             "conflict_resolution",
+	"test.tmpl":                 "test_verification",
 	"spec.tmpl":                 "spec",
 	"spec_system_empty.tmpl":    "spec_system_empty",
 	"spec_system_nonempty.tmpl": "spec_system_nonempty",
-	"task_prompt_refine.tmpl":       "task_prompt_refine",
+	"task_prompt_refine.tmpl":   "task_prompt_refine",
 }
 
 // apiToEmbedded maps user-facing API names to embedded template file names.
 var apiToEmbedded = map[string]string{
-	"ideation":                 "ideation.tmpl",
-	"oversight":                "oversight.tmpl",
-	"title":                    "title.tmpl",
-	"commit_message":           "commit.tmpl",
-	"conflict_resolution":      "conflict.tmpl",
-	"test_verification":        "test.tmpl",
+	"ideation":             "ideation.tmpl",
+	"oversight":            "oversight.tmpl",
+	"title":                "title.tmpl",
+	"commit_message":       "commit.tmpl",
+	"conflict_resolution":  "conflict.tmpl",
+	"test_verification":    "test.tmpl",
 	"spec":                 "spec.tmpl",
 	"spec_system_empty":    "spec_system_empty.tmpl",
 	"spec_system_nonempty": "spec_system_nonempty.tmpl",
-	"task_prompt_refine":       "task_prompt_refine.tmpl",
+	"task_prompt_refine":   "task_prompt_refine.tmpl",
 }
 
 // knownNames is the ordered list of all user-facing template API names.

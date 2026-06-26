@@ -16,19 +16,19 @@ import (
 
 // Config holds the known configuration values from the .env file.
 type Config struct {
-	OAuthToken           string // CLAUDE_CODE_OAUTH_TOKEN
-	APIKey               string // ANTHROPIC_API_KEY
-	AuthToken            string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
-	BaseURL              string // ANTHROPIC_BASE_URL
-	ServerAPIKey         string // WALLFACER_SERVER_API_KEY
-	DefaultModel         string // CLAUDE_DEFAULT_MODEL
-	TitleModel           string // CLAUDE_TITLE_MODEL
-	MaxParallelTasks     int    // WALLFACER_MAX_PARALLEL (0 means use default)
-	MaxTestParallelTasks int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
-	OversightInterval    int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
-	ArchivedTasksPerPage int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
-	AutoPushEnabled      bool   // WALLFACER_AUTO_PUSH ("true"/"false")
-	AutoPushThreshold    int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
+	OAuthToken             string // CLAUDE_CODE_OAUTH_TOKEN
+	APIKey                 string // ANTHROPIC_API_KEY
+	AuthToken              string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
+	BaseURL                string // ANTHROPIC_BASE_URL
+	ServerAPIKey           string // WALLFACER_SERVER_API_KEY
+	DefaultModel           string // CLAUDE_DEFAULT_MODEL
+	TitleModel             string // CLAUDE_TITLE_MODEL
+	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
+	MaxTestParallelTasks   int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
+	OversightInterval      int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
+	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
+	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
 	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
@@ -126,7 +126,7 @@ func Parse(path string) (Config, error) {
 	// picker opens on a sensible "last month" view when the user hasn't
 	// configured anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
-		TerminalEnabled:    true,
+		TerminalEnabled:        true,
 		AgentSessionWindowDays: 30,
 	}
 	for line := range strings.SplitSeq(string(raw), "\n") {
