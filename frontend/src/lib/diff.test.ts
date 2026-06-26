@@ -109,3 +109,81 @@ describe('parseDiffFiles', () => {
     ]);
   });
 });
+
+describe('parseDiffFiles line numbers', () => {
+  it('assigns new-file line numbers to added lines', () => {
+    const diff = [
+      'diff --git a/new.txt b/new.txt',
+      'new file mode 100644',
+      '--- /dev/null',
+      '+++ b/new.txt',
+      '@@ -0,0 +1,2 @@',
+      '+first',
+      '+second',
+    ].join('\n');
+    const add = parseDiffFiles(diff)[0].lines.filter(l => l.kind === 'add');
+    expect(add.map(l => [l.oldLine, l.newLine])).toEqual([
+      [null, 1],
+      [null, 2],
+    ]);
+  });
+
+  it('assigns old-file line numbers to deletions and both to context', () => {
+    const diff = [
+      'diff --git a/edit.txt b/edit.txt',
+      '--- a/edit.txt',
+      '+++ b/edit.txt',
+      '@@ -10,3 +10,3 @@',
+      ' ctx-a',
+      '-removed',
+      '+added',
+      ' ctx-b',
+    ].join('\n');
+    const lines = parseDiffFiles(diff)[0].lines;
+    const byKind = (k: string) => lines.filter(l => l.kind === k);
+    // context advances both counters
+    expect(byKind('ctx').map(l => [l.oldLine, l.newLine])).toEqual([
+      [10, 10],
+      [12, 12],
+    ]);
+    // deletion carries only oldLine, addition only newLine
+    expect(byKind('del').map(l => [l.oldLine, l.newLine])).toEqual([[11, null]]);
+    expect(byKind('add').map(l => [l.oldLine, l.newLine])).toEqual([[null, 11]]);
+  });
+
+  it('reseeds counters at each hunk header in a multi-hunk file', () => {
+    const diff = [
+      'diff --git a/multi.txt b/multi.txt',
+      '--- a/multi.txt',
+      '+++ b/multi.txt',
+      '@@ -1,1 +1,1 @@',
+      '-a1',
+      '+b1',
+      '@@ -50,1 +60,1 @@',
+      '-a50',
+      '+b60',
+    ].join('\n');
+    const lines = parseDiffFiles(diff)[0].lines;
+    const dels = lines.filter(l => l.kind === 'del');
+    const adds = lines.filter(l => l.kind === 'add');
+    expect(dels.map(l => l.oldLine)).toEqual([1, 50]);
+    expect(adds.map(l => l.newLine)).toEqual([1, 60]);
+  });
+
+  it('leaves hunk and header lines without line numbers', () => {
+    const diff = [
+      'diff --git a/h.txt b/h.txt',
+      '--- a/h.txt',
+      '+++ b/h.txt',
+      '@@ -1 +1 @@',
+      '+x',
+    ].join('\n');
+    const lines = parseDiffFiles(diff)[0].lines;
+    for (const l of lines) {
+      if (l.kind === 'hunk' || l.kind === 'header') {
+        expect(l.oldLine).toBeNull();
+        expect(l.newLine).toBeNull();
+      }
+    }
+  });
+});

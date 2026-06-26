@@ -8,6 +8,11 @@ export type DiffLineKind = 'add' | 'del' | 'hunk' | 'header' | 'ctx';
 export interface DiffLine {
   kind: DiffLineKind;
   text: string;
+  // Old/new file line numbers derived from the hunk headers, for anchoring
+  // inline comments and rendering meaningful line references. `add` carries only
+  // newLine, `del` only oldLine, `ctx` both; `hunk`/`header` carry neither.
+  oldLine: number | null;
+  newLine: number | null;
 }
 
 export interface DiffFile {
@@ -19,6 +24,7 @@ export interface DiffFile {
 }
 
 const WORKSPACE_RE = /^=== (.+) ===$/;
+const HUNK_RE = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
 export function classifyDiffLine(line: string): DiffLineKind {
   if (line.startsWith('+') && !line.startsWith('+++')) return 'add';
@@ -60,13 +66,32 @@ export function parseDiffFiles(diff: string): DiffFile[] {
     const filename = header[1];
     let adds = 0;
     let dels = 0;
+    // Old/new line counters, seeded by each hunk header and advanced per line.
+    let oldNo = 0;
+    let newNo = 0;
     const lines: DiffLine[] = [];
     for (const line of rawLines) {
       if (WORKSPACE_RE.test(line)) continue; // drop workspace separators from the body
       const kind = classifyDiffLine(line);
-      if (kind === 'add') adds++;
-      else if (kind === 'del') dels++;
-      lines.push({ kind, text: line });
+      let oldLine: number | null = null;
+      let newLine: number | null = null;
+      if (kind === 'hunk') {
+        const m = line.match(HUNK_RE);
+        if (m) {
+          oldNo = parseInt(m[1], 10);
+          newNo = parseInt(m[2], 10);
+        }
+      } else if (kind === 'add') {
+        adds++;
+        newLine = newNo++;
+      } else if (kind === 'del') {
+        dels++;
+        oldLine = oldNo++;
+      } else if (kind === 'ctx') {
+        oldLine = oldNo++;
+        newLine = newNo++;
+      }
+      lines.push({ kind, text: line, oldLine, newLine });
     }
     files.push({ filename, workspace: currentWorkspace, adds, dels, lines });
     // A separator at the tail of this block introduces the next workspace.
