@@ -293,6 +293,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	h.StartWaitingSyncWatcher(ctx)
 	h.StartAutoTester(ctx)
 	h.StartAutoSubmitter(ctx)
+	h.StartAutoAgon(ctx)
 
 	reg.Gauge(
 		"wallfacer_tasks_total",

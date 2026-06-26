@@ -1070,6 +1070,18 @@ func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCan
 	return true
 }
 
+// StartAutoAgon subscribes to store change notifications and fires tryAutoAgon
+// each tick so agon verification runs automatically for waiting tasks when the
+// toggle is enabled.
+func (h *Handler) StartAutoAgon(ctx context.Context) {
+	watcher.Start(ctx, watcher.Config{
+		Wake:        h.newResubscribingWakeSource(),
+		Interval:    constants.AutoTestInterval, // same cadence as the auto-tester
+		SettleDelay: constants.WatcherSettleDelay,
+		Action:      h.tryAutoAgon,
+	})
+}
+
 // tryAutoAgon scans all waiting tasks that have a SessionID and have not yet
 // been verified by agon (AgonUnresolved == nil), then fires a goroutine for
 // each. Does nothing when agon is disabled.
