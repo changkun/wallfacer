@@ -163,6 +163,7 @@ jobs:
     needs: [binary, deploy]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -183,12 +184,20 @@ jobs:
           # Pre-releases: any tag with a -suffix (v0.0.7-alpha.6, v1.0.0-rc.1).
           prerelease=""
           [[ "$TAG" == *-* ]] && prerelease="--prerelease"
-          # Body = GitHub's auto-generated changelog since the previous tag,
-          # followed by the deploy evidence captured by the smoke job. The
-          # evidence only exists because deploy was green, so its presence is
-          # itself proof prod shipped before the release published.
-          gh api "repos/${GH_REPO}/releases/generate-notes" \
-            -f tag_name="$TAG" --jq .body > notes.md
+          # Body: prefer the hand-written note for this tag (it can scope the
+          # changelog however the release warrants — e.g. rolling up a whole
+          # pre-release line). Fall back to GitHub's auto-generated changelog
+          # since the previous tag when no hand-written note exists.
+          note="docs/releases/${TAG}.md"
+          if [ -f "$note" ]; then
+            cp "$note" notes.md
+          else
+            gh api "repos/${GH_REPO}/releases/generate-notes" \
+              -f tag_name="$TAG" --jq .body > notes.md
+          fi
+          # Append the deploy evidence captured by the smoke job. It only exists
+          # because deploy was green, so its presence is itself proof prod
+          # shipped before the release published.
           printf '\n\n' >> notes.md
           cat evidence/release-evidence.md >> notes.md
           gh release create "$TAG" $prerelease \
