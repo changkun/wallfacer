@@ -16,6 +16,7 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // --- parseTurnNumber ---
@@ -678,7 +679,7 @@ func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handl
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 

@@ -15,7 +15,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // --------------------------------------------------------------------------
@@ -252,7 +252,7 @@ func newTestHandlerWithTwoWorkspaces(t *testing.T) (*Handler, string, string) {
 	ws2 := t.TempDir()
 	configDir := t.TempDir()
 
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

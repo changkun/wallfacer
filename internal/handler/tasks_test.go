@@ -25,6 +25,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // TestListTasks_Empty verifies that an empty store returns an empty JSON array.
@@ -2148,7 +2149,7 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3761,7 +3762,7 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 			t.Fatal(err)
 		}
 	}
-	s, storeErr := store.NewFileStore(dataDir)
+	s, storeErr := storetest.NewFileStore(t, dataDir)
 	if storeErr != nil {
 		_ = os.RemoveAll(dataDir)
 		t.Fatal(storeErr)

@@ -18,7 +18,7 @@ import (
 	"github.com/coder/websocket"
 	"latere.ai/x/wallfacer/internal/pkg/pty"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newTerminalTestServer creates a handler with terminal enabled and returns
@@ -31,7 +31,7 @@ func newTerminalTestServer(t *testing.T, apiKey string, terminalEnabled bool) (*
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}

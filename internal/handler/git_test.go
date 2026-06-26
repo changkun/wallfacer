@@ -18,6 +18,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/cache"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // patchTaskAction issues PATCH /api/tasks/{id} with the given JSON body
@@ -99,7 +100,7 @@ func newTestHandler(t *testing.T) *Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 
@@ -122,7 +123,7 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 

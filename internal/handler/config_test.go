@@ -19,6 +19,7 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -104,17 +105,13 @@ func newTestHandlerWithWorkspaces(t *testing.T) (*Handler, string) {
 	ws := t.TempDir()
 	configDir := t.TempDir()
 
-	s, err := store.NewFileStore(t.TempDir())
+	// storetest.NewFileStore registers s.Close so background trace compaction
+	// is drained before t.TempDir's RemoveAll runs (a terminal-state
+	// transition would otherwise race the cleanup with "directory not empty").
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Drain background trace compaction before t.TempDir's RemoveAll runs;
-	// otherwise a terminal-state transition (e.g. undispatch cancelling a
-	// backlog task) schedules a compaction goroutine that writes traces/
-	// while cleanup deletes the dir ("directory not empty"). Registered
-	// before r.WaitBackground so it runs after it (LIFO), draining any
-	// compaction the runner scheduled.
-	t.Cleanup(s.Close)
 
 	envPath := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(envPath, []byte{}, 0644); err != nil {
@@ -1281,7 +1278,7 @@ func TestGitRebaseOnMain_RejectsUnknownWorkspace(t *testing.T) {
 func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, string) {
 	t.Helper()
 	configDir := t.TempDir()
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1306,7 +1303,7 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2051,7 +2048,7 @@ func TestConfigResponse_IncludesAgentSessionWindowDays(t *testing.T) {
 	ws := t.TempDir()
 	configDir := t.TempDir()
 
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

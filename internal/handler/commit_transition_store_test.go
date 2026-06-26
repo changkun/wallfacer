@@ -9,6 +9,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -38,7 +39,7 @@ func TestRunCommitTransition_UsesCapturedStoreAcrossSnapshotSwap(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(otherDir) })
-	sB, err := store.NewFileStore(otherDir)
+	sB, err := storetest.NewFileStore(t, otherDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +97,7 @@ func TestRunCommitTransition_MissingWorktreesAndFailedRecoveryDoesNotCommit(t *t
 	if err != nil {
 		t.Fatalf("NewFilesystemBackend: %v", err)
 	}
-	s, err := store.NewStore(&failOnWaitingBackend{StorageBackend: fsBackend})
+	s, err := storetest.NewStore(t, &failOnWaitingBackend{StorageBackend: fsBackend})
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestResubscribingWakeSourceForwardsSignals verifies that wake signals from
 // the store are forwarded to the output channel.
 func TestResubscribingWakeSourceForwardsSignals(t *testing.T) {
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,13 +42,13 @@ func TestResubscribingWakeSourceForwardsSignals(t *testing.T) {
 // TestResubscribingWakeSourceResubscribes verifies that after a workspace
 // change, wake signals from the NEW store are forwarded.
 func TestResubscribingWakeSourceResubscribes(t *testing.T) {
-	storeA, err := store.NewFileStore(t.TempDir())
+	storeA, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { storeA.Close() })
 
-	storeB, err := store.NewFileStore(t.TempDir())
+	storeB, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func TestResubscribingWakeSourceResubscribes(t *testing.T) {
 // TestResubscribingWakeSourceCancelCleanup verifies that calling
 // UnsubscribeWake stops the goroutine without panic or deadlock.
 func TestResubscribingWakeSourceCancelCleanup(t *testing.T) {
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +104,7 @@ func TestResubscribingWakeSourceCancelCleanup(t *testing.T) {
 // TestResubscribingWakeSourceOldStoreClosed verifies that closing the old
 // store does not cause a panic in the forwarding goroutine.
 func TestResubscribingWakeSourceOldStoreClosed(t *testing.T) {
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +129,7 @@ func TestResubscribingWakeSourceOldStoreClosed(t *testing.T) {
 // works when the workspace manager is nil (no re-subscription, just forwards
 // from the initial store).
 func TestResubscribingWakeSourceNilWorkspaceManager(t *testing.T) {
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
