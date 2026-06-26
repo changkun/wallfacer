@@ -106,35 +106,26 @@ const outOfSync = computed(() => outOfSyncCount(threads.value));
 const optedIn = ref(false);
 const coordToggleAvailable = ref(false);
 const enabling = ref(false);
-// coordSignedIn reflects the COORDINATION connector's token (token.json on the
-// instance): true when a usable wire token exists. It is necessary but not
-// sufficient to show the comment surface. coordState drives the connection
-// indicator.
-const coordSignedIn = ref(false);
 const coordState = ref<string>('');
 
-// browserSignedIn is the BROWSER session principal (GET /api/me). The two auth
-// states diverge: a logged-out browser on a machine that still holds a token.json
-// would otherwise show a working comment box and submit as the token's owner
-// (the coordinator stamps the connector identity, not the browser's). Gate the
-// surface on the browser session too, so the comment chrome matches the
-// "Sign in" state and a logged-out user cannot comment.
-const browserSignedIn = computed(() => !!auth.me?.principal_id);
-// signedIn is the combined gate: both a wire token and a browser session.
-const signedIn = computed(() => coordSignedIn.value && browserSignedIn.value);
+// signedIn gates the comment surface on the BROWSER session (GET /api/me). The
+// backend is the security boundary: RequirePrincipalMiddleware 401s the comment
+// endpoints without a session, and sign-out clears the coordination token so the
+// connector stops pulling. This client-side mirror only makes the chrome and the
+// DOM-painted inline highlights clear immediately on logout instead of lingering
+// until the next fetch. coordState drives the connection indicator separately.
+const signedIn = computed(() => !!auth.me?.principal_id);
 
 async function fetchStatus() {
   try {
     const s = await api<{
-      opted_in?: boolean; available?: boolean; signed_in?: boolean; connected?: boolean; state?: string;
+      opted_in?: boolean; available?: boolean; state?: string;
     }>('GET', '/api/coordination/status');
     optedIn.value = !!s.opted_in;
     coordToggleAvailable.value = !!s.available;
-    coordSignedIn.value = !!s.signed_in;
     coordState.value = s.state || '';
   } catch {
     coordToggleAvailable.value = false;
-    coordSignedIn.value = false;
     coordState.value = '';
   }
 }
