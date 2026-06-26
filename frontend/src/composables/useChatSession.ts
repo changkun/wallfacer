@@ -18,7 +18,7 @@ import { startStreamingFetch, type StreamingFetchHandle } from './useStreamingFe
 import { createNdjsonStreamParser } from '../lib/ndjsonStream';
 import { parseTurnUsage } from '../lib/agentUsage';
 import { enhanceMermaid } from '../lib/mermaidRender';
-import { useAgentStore } from '../stores/agentSession';
+import { useAgentStore, isDefaultThreadName, truncateTitle } from '../stores/agentSession';
 import { useTaskStore } from '../stores/tasks';
 import { useDialogStore } from '../stores/dialog';
 import type { AgentMessage, AgentSession } from '../stores/agentSession';
@@ -329,14 +329,17 @@ export function useChatSession(): ChatSession {
   // surface, which does not.
   function refreshTitleSoon(threadID: string) {
     const t = threads.value[threadID];
-    if (t && !/^Chat \d+$/.test(t.name)) return;
+    // Poll while the thread still awaits its real title: either it carries a
+    // client-side provisional (titlePending) or it still shows the default
+    // "Chat N". A thread already bearing a real title needs no poll.
+    if (t && !t.titlePending && !isDefaultThreadName(t.name)) return;
     if (titleTimer !== null) clearTimeout(titleTimer);
     let tries = 0;
     const tick = async () => {
       tries++;
       await agentStore.refreshBusy();
       const cur = threads.value[threadID];
-      if (!cur || !/^Chat \d+$/.test(cur.name) || tries >= 10) {
+      if (!cur || (!cur.titlePending && !isDefaultThreadName(cur.name)) || tries >= 10) {
         titleTimer = null;
         return;
       }
@@ -351,7 +354,7 @@ export function useChatSession(): ChatSession {
     // send to it. The backend auto-titles it from this message. Queue drains
     // pass an explicit threadID, so they never hit this path.
     if (draft.value && !opts?.threadID) {
-      const id = await promoteDraft();
+      const id = await promoteDraft(text);
       if (!id) return;
       targetId = id;
     }
@@ -543,7 +546,9 @@ export function useChatSession(): ChatSession {
 
   // promoteDraft turns the open draft into a real server thread on first send.
   // Returns the new thread id, or null if creation failed (error surfaced).
-  async function promoteDraft(): Promise<string | null> {
+  // `firstMessage` becomes the provisional title shown until the backend
+  // auto-titler lands the real one.
+  async function promoteDraft(firstMessage: string): Promise<string | null> {
     let created: AgentSession | null = null;
     try {
       created = await api<AgentSession>('POST', '/api/agent/sessions', {});
@@ -566,6 +571,15 @@ export function useChatSession(): ChatSession {
     if (t) {
       t.unread = false;
       t.lastViewedAt = Date.now();
+      // Show the user's first message as a provisional title immediately, instead
+      // of the transient "Chat N". titlePending keeps refreshTitleSoon polling
+      // (the name no longer matches the default regex) until the backend
+      // auto-titler replaces it via refreshBusy.
+      const provisional = truncateTitle(firstMessage);
+      if (provisional) {
+        t.name = provisional;
+        t.titlePending = true;
+      }
     }
     activeThreadId.value = id;
     api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { state: 'active' }).catch(() => {});
@@ -625,7 +639,12 @@ export function useChatSession(): ChatSession {
     }
     try {
       await api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { name: newName });
-      if (threads.value[id]) threads.value[id].name = newName;
+      if (threads.value[id]) {
+        threads.value[id].name = newName;
+        // A deliberate name ends any provisional/auto-title wait so the poll and
+        // refreshBusy won't overwrite the user's choice.
+        threads.value[id].titlePending = false;
+      }
     } catch { /* ignore */ }
     renamingId.value = '';
   }

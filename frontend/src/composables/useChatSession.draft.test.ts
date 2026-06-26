@@ -148,6 +148,23 @@ describe('useChatSession deferred chat creation', () => {
     expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'hello there')).toBe(true);
   });
 
+  it('shows the first message as a provisional title instead of "Chat N"', async () => {
+    await mount();
+    const agentStore = useAgentStore();
+
+    await session.createThread();
+    await flush();
+
+    // The created server thread is named "Chat 1"; the user must instead see
+    // their prompt (truncated) until the backend auto-titler lands.
+    await session.sendMessage('help me wire up the billing webhook end to end please');
+    await flush();
+
+    const t = agentStore.threads['new-1'];
+    expect(t.name).toBe('help me wire up the billing webhook end to end…');
+    expect(t.titlePending).toBe(true);
+  });
+
   it('detaches a streaming thread on draft entry so the first message sends', async () => {
     await mount();
     const agentStore = useAgentStore();
