@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
@@ -490,6 +491,69 @@ func TestRequireStoreMiddleware_WithoutStore(t *testing.T) {
 		if resp["error"] == "" {
 			t.Error("expected non-empty error in response body")
 		}
+	}
+}
+
+// TestRequirePrincipalMiddleware_AuthConfigured verifies that with auth
+// configured the middleware rejects an anonymous request (no principal) with 401
+// and admits a request carrying an authenticated principal. This is the
+// data-layer gate that keeps a logged-out browser from reading/writing comments
+// even though the instance still holds a coordination token.
+func TestRequirePrincipalMiddleware_AuthConfigured(t *testing.T) {
+	h := &Handler{}
+	h.SetAuth(fakeAuthProvider{}) // HasAuth() == true
+
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := h.RequirePrincipalMiddleware(next)
+
+	// Anonymous: no principal in context -> 401, next not called.
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/spec-comments", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, req)
+	if called {
+		t.Error("expected next NOT called for an anonymous request")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous: status = %d, want 401", w.Code)
+	}
+
+	// Authenticated: principal injected -> next called, 200.
+	called = false
+	ctx := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "user-123"})
+	req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/api/spec-comments", nil)
+	w2 := httptest.NewRecorder()
+	mw.ServeHTTP(w2, req2)
+	if !called {
+		t.Error("expected next called for an authenticated request")
+	}
+	if w2.Code != http.StatusOK {
+		t.Errorf("authenticated: status = %d, want 200", w2.Code)
+	}
+}
+
+// TestRequirePrincipalMiddleware_LocalMode verifies that without auth configured
+// (local single-user mode) the middleware is a no-op: an anonymous request still
+// passes through, preserving permissive local behavior.
+func TestRequirePrincipalMiddleware_LocalMode(t *testing.T) {
+	h := &Handler{} // no auth -> HasAuth() == false
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := h.RequirePrincipalMiddleware(next)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/spec-comments", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, req)
+	if !called {
+		t.Error("expected next called in local mode (no auth configured)")
+	}
+	if w.Code != http.StatusOK {
+		t.Errorf("local mode: status = %d, want 200", w.Code)
 	}
 }
 

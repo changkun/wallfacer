@@ -1248,6 +1248,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		if requiresStore(route.Name) {
 			registered = h.RequireStoreMiddleware(registered)
 		}
+		if requiresPrincipal(route.Name) {
+			registered = h.RequirePrincipalMiddleware(registered)
+		}
 		mux.Handle(route.FullPattern(), registered)
 	}
 
@@ -1397,5 +1400,19 @@ func requiresStore(name string) bool {
 		return false
 	default:
 		return true
+	}
+}
+
+// requiresPrincipal lists the routes that require an authenticated browser
+// principal when auth is configured. The spec-comment surface reads and writes
+// the coordination relay, which serves the connector's cached threads regardless
+// of the browser session, so a logged-out browser must be rejected at the data
+// layer (not just hidden in the SPA). See RequirePrincipalMiddleware.
+func requiresPrincipal(name string) bool {
+	switch name {
+	case "ListSpecComments", "SubmitSpecComment", "StreamSpecComments":
+		return true
+	default:
+		return false
 	}
 }
