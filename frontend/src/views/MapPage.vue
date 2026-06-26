@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
@@ -23,7 +23,13 @@ interface SpecTreeResponse { nodes: SpecNode[] }
 const store = useTaskStore();
 const router = useRouter();
 
-const selectedTask = ref<Task | null>(null);
+// Track the open task by id, not by a held object reference, so a `task-updated`
+// SSE delta (stores/tasks.ts updateTask replaces the object) keeps the detail
+// panel live instead of pinning the stale status. See BoardPage for the same fix.
+const selectedTaskId = ref<string | null>(null);
+const selectedTask = computed<Task | null>(() =>
+  selectedTaskId.value ? store.tasks.find((t) => t.id === selectedTaskId.value) ?? null : null,
+);
 const specTree = ref<SpecNode[]>([]);
 const ready = ref(false);
 
@@ -91,8 +97,7 @@ onMounted(async () => {
   setShim('specModeState', sharedSpecState);
   setShim('depGraphEnabled', true);
   setShim('openTaskModal', (id: string) => {
-    const t = store.tasks.find(x => x.id === id);
-    if (t) selectedTask.value = t;
+    if (store.tasks.some(x => x.id === id)) selectedTaskId.value = id;
   });
   setShim('focusSpec', (path: string) => {
     void router.push({ path: '/plan', query: { spec: path } });
@@ -253,6 +258,6 @@ watch(
       </div>
     </div>
 
-    <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTask = null" />
+    <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTaskId = null" />
   </div>
 </template>
