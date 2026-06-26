@@ -8,7 +8,7 @@ Then the system kept growing into its own gaps. The execution engine gained proc
 
 Work is no longer one monolithic prompt per task. A dispatch layer composes specialized built-in agents (title, oversight, commit message, ideation, implementation, testing) into flows, so a single run can implement, test, then write a commit message, title, and oversight summary in one pass.
 
-As the projects grew in complexity, raw task prompts became insufficient. Design specs emerged as the thinking layer between ideas and executable tasks: structured documents with lifecycle states, dependency graphs, and recursive progress tracking. A planning chat agent made specs conversational: explore an idea in chat, iterate on the design, break it into tasks, dispatch to the board. The same chat handles prompt refinement, editing a task's instructions in place rather than through a separate flow.
+As the projects grew in complexity, raw task prompts became insufficient. Design specs emerged as the thinking layer between ideas and executable tasks: structured documents with lifecycle states, dependency graphs, and recursive progress tracking. An agent chat made specs conversational: explore an idea in chat, iterate on the design, break it into tasks, dispatch to the board. The same chat handles prompt refinement, editing a task's instructions in place rather than through a separate flow.
 
 The integrated development environment now includes a file explorer with editor, an interactive host terminal, system prompt customization, and prompt templates, all accessible from the browser.
 
