@@ -697,7 +697,7 @@ func TestSpecTreeStream_IncludesIndex(t *testing.T) {
 }
 
 func TestWorkspaceCommitLock_SerializesConcurrentCommits(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	ctx := context.Background()
 
 	const n = 8

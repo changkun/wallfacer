@@ -335,7 +335,7 @@ func TestPatchAgentSession_RejectsEmptyBody(t *testing.T) {
 }
 
 func TestUndoPlanningRound_ThreadScoped(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	// Thread A writes round 1.
@@ -370,7 +370,7 @@ func TestUndoPlanningRound_ThreadScoped(t *testing.T) {
 }
 
 func TestUndoPlanningRound_NoCommitsForThread(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	// A commit exists but it belongs to a different thread.

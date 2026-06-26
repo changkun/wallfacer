@@ -25,7 +25,7 @@ func (s stubTester) AssessDrift(_ context.Context, _ DriftTestInput) (spec.Drift
 // fires the completion hook (drift pipeline enabled) on sourceRel.
 func runDriftHook(t *testing.T, tester DriftTester, sourceRel string, seed func(ws string)) string {
 	t.Helper()
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	seed(ws)
 	runGit(t, ws, "add", "specs/")
 	runGit(t, ws, "commit", "-m", "seed specs")
@@ -148,7 +148,7 @@ func TestDriftPipeline_SkipsNonValidated(t *testing.T) {
 func TestDriftPipeline_ThroughRunnerAdapter(t *testing.T) {
 	// Exercises NewRunnerDriftTester: the hook runs the verdict via the runner
 	// interface, not a hand-rolled stub.
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeFanoutSpec(t, ws, "source.md", "validated", "Source", nil, []string{"internal/x/"})
 	runGit(t, ws, "add", "specs/")
 	runGit(t, ws, "commit", "-m", "seed")

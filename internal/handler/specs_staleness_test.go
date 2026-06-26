@@ -12,7 +12,7 @@ import (
 )
 
 func TestStaleCandidates_FlagsChangedAffects(t *testing.T) {
-	repo := initPlanningTestRepo(t)
+	repo := initGitTestRepo(t)
 	h, ws := newTestHandlerWithWorkspacesFromRepo(t, repo)
 
 	// A code file under internal/x/, committed now (commit date = today).
@@ -47,7 +47,7 @@ func TestStaleCandidates_FlagsChangedAffects(t *testing.T) {
 }
 
 func TestDismissAllStaleCandidates(t *testing.T) {
-	repo := initPlanningTestRepo(t)
+	repo := initGitTestRepo(t)
 	h, ws := newTestHandlerWithWorkspacesFromRepo(t, repo)
 
 	if err := os.MkdirAll(filepath.Join(ws, "internal/x"), 0o755); err != nil {
