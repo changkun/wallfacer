@@ -52,6 +52,37 @@ UNKNOWN_KEY=ignored
 	}
 }
 
+// TestParseAgonTuning verifies the agon token-dial knobs are read, and that a
+// non-positive value is ignored (leaving the field zero so the default applies).
+func TestParseAgonTuning(t *testing.T) {
+	content := `WALLFACER_AGON_FORKS=3
+WALLFACER_AGON_ROUNDS=6
+WALLFACER_AGON_COST_CAP=120000
+`
+	cfg, err := envconfig.Parse(writeEnvFile(t, content))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.AgonForkCount != 3 {
+		t.Errorf("AgonForkCount = %d; want 3", cfg.AgonForkCount)
+	}
+	if cfg.AgonMaxRounds != 6 {
+		t.Errorf("AgonMaxRounds = %d; want 6", cfg.AgonMaxRounds)
+	}
+	if cfg.AgonCostCap != 120000 {
+		t.Errorf("AgonCostCap = %d; want 120000", cfg.AgonCostCap)
+	}
+
+	// Non-positive values are rejected, leaving zero (default applies downstream).
+	cfg2, err := envconfig.Parse(writeEnvFile(t, "WALLFACER_AGON_FORKS=0\nWALLFACER_AGON_ROUNDS=-1\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg2.AgonForkCount != 0 || cfg2.AgonMaxRounds != 0 {
+		t.Errorf("non-positive values should be ignored, got forks=%d rounds=%d", cfg2.AgonForkCount, cfg2.AgonMaxRounds)
+	}
+}
+
 // TestParseExportedKeys verifies that the "export " prefix is stripped from key lines.
 func TestParseExportedKeys(t *testing.T) {
 	content := `export CLAUDE_CODE_OAUTH_TOKEN=exported-oauth

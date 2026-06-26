@@ -278,6 +278,9 @@ OpenCode manages provider credentials itself (`opencode auth login`), so no prov
 |---|---|---|
 | `WALLFACER_MAX_PARALLEL` | `1` | Maximum concurrent tasks auto-promoted to In Progress. The host runtime caps this to `1` unless you set an explicit value, because the `claude` and `codex` CLIs share state under `~/.claude` and `~/.codex` and can race when run in parallel. Set `WALLFACER_MAX_PARALLEL=N` to opt into more. |
 | `WALLFACER_MAX_TEST_PARALLEL` | `2` | Maximum concurrent test runs. Fixed default constant; it does not inherit from `WALLFACER_MAX_PARALLEL`. |
+| `WALLFACER_AGON_FORKS` | `2` | Number of independent critic forks per agon adversarial-verification run. Higher = more perspectives, more cost. |
+| `WALLFACER_AGON_ROUNDS` | `4` | Per-fork debate round cap for an agon run. |
+| `WALLFACER_AGON_COST_CAP` | `50000` | Soft token budget per agon run. The token dial: lower to cap cost, raise for deeper verification. |
 
 #### Agent binaries
 
