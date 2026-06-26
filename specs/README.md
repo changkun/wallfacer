@@ -125,7 +125,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 |------|--------|----------|
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. |
 | [inline-file-panel.md](local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
-| [diff-review-comments.md](local/diff-review-comments.md) | Drafted | Code-review-style inline comments anchored to diff lines, batched into the existing feedback channel. Supersedes the archived inline-diff-feedback. |
+| [inline-diff-feedback.md](local/inline-diff-feedback.md) | Drafted | Code-review-style inline comments anchored to Changes-tab diff lines, batched into the existing feedback channel, with the inline surface login-gated server-side like spec comments. Revived and canonical; folds in the archived diff-review-comments and owns the `submitFeedback` key-bug fix. |
 | [dockable-panel-workspace.md](local/dockable-panel-workspace.md) | Drafted | VS Code-style dockable panel workspace: terminal (later explorer/file panel) docks to any edge, maximizes to fullscreen, and splits via drag-and-drop, persisted to localStorage. Editor-center model wrapping the RouterView in `AppLayout`; custom split-tree (no docking library). |
 | [test-criteria.md](local/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task (`Task.Criteria`) so the auto-tester checks them, threaded into the existing `buildTestPrompt` / `tryAutoTest` path. Closes a live hole: autopilot test runs currently pass empty criteria. Supersedes the archived validation-barrier. |
 | [visual-verification.md](local/visual-verification.md) | Drafted | Post-execution visual regression check for UI changes, built on the existing `frontend/scripts/ui-shots` screenshot harness. Test/CI tooling, not a hard gate. |
@@ -352,7 +352,7 @@ Specs that were never implemented and whose designs target architecture since re
 |------|--------------|
 | [file-attachments.md](local/file-attachments.md) | Built on `ui/js/tasks.js` and container `-v` mounts (both removed). Replaced by [task-prompt-attachments.md](local/task-prompt-attachments.md). |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Built on `ui/js/explorer.js` (removed). Replaced by [inline-file-panel.md](local/inline-file-panel.md). |
-| [inline-diff-feedback.md](local/inline-diff-feedback.md) | Built on `ui/js/modal-diff.js` (removed). Replaced by [diff-review-comments.md](local/diff-review-comments.md). |
+| [diff-review-comments.md](.archive/local/diff-review-comments.md) | Vue-targeted redraft of the diff-comment feature. Folded back into the revived [inline-diff-feedback.md](local/inline-diff-feedback.md), which adds login-gating and owns the key-bug fix. |
 | [spatial-canvas.md](local/spatial-canvas.md) | Exploratory infinite-canvas view targeting `ui/js/` (removed). No replacement specced. |
 
 ### Cloud - Archived
