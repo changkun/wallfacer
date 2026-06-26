@@ -1,6 +1,6 @@
 # Plan Mode
 
-Plan Mode is the specification-coordination subsystem that turns free-form design discussions into structured, validated specs, and turns validated specs into board tasks. It is built around three components: the `internal/spec` package (the document model), the `internal/planner` package (the long-lived planning sandbox and per-thread chat persistence), and a set of `internal/handler` endpoints that wire them together and surface them through the UI.
+Plan Mode is the specification-coordination subsystem that turns free-form design discussions into structured, validated specs, and turns validated specs into board tasks. It is built around three components: the `internal/spec` package (the document model), the `internal/agentsession` package (the long-lived agent-session sandbox and per-session chat persistence), and a set of `internal/handler` endpoints that wire them together and surface them through the UI.
 
 ## System Overview
 
@@ -10,33 +10,33 @@ flowchart TB
     ModePlan["PlanPage.vue"]
     Explorer["SpecTreePanel.vue"]
     Minimap["MapPage.vue"]
-    Chat["PlanningChatPanel.vue"]
+    Chat["AgentChatPanel.vue"]
   end
   subgraph Server
     SpecsH["handler/specs.go<br/>handler/specs_dispatch.go"]
-    PlanH["handler/planning*.go"]
+    PlanH["handler/agentsession*.go"]
     Spec["internal/spec"]
-    Planner["internal/planner"]
+    Runtime["internal/agentsession"]
   end
   subgraph FS["Filesystem"]
     specsDir["workspace/specs/*.md"]
-    threadsDir["~/.wallfacer/planning/&lt;fp&gt;/threads/&lt;id&gt;/"]
+    threadsDir["~/.wallfacer/agent-sessions/&lt;fp&gt;/threads/&lt;id&gt;/"]
   end
   subgraph Sandbox
-    Box["Planning agent<br/>(host process per turn)"]
+    Box["Agent session<br/>(host process per turn)"]
   end
 
   UI -->|HTTP / SSE| SpecsH
   UI -->|HTTP / SSE| PlanH
   SpecsH --> Spec
   Spec --> specsDir
-  PlanH --> Planner
-  Planner --> Box
-  Planner --> threadsDir
+  PlanH --> Runtime
+  Runtime --> Box
+  Runtime --> threadsDir
   Box -->|reads/writes| specsDir
 ```
 
-Plan Mode layers strictly on top of the task board. The planning sandbox writes only to `specs/` in the active workspace; task dispatch is the hand-off point at which a validated spec becomes a first-class board task with its own worktree. Everything upstream of dispatch is the responsibility of this subsystem.
+Plan Mode layers strictly on top of the task board. The agent-session sandbox writes only to `specs/` in the active workspace; task dispatch is the hand-off point at which a validated spec becomes a first-class board task with its own worktree. Everything upstream of dispatch is the responsibility of this subsystem.
 
 ## Package: internal/spec
 
@@ -163,67 +163,67 @@ The write path uses `os.OpenFile(..., O_CREATE|O_EXCL|O_WRONLY, 0o644)` by defau
 
 `internal/spec/readme.go` keeps the roadmap fresh when new specs are scaffolded. `EnsureReadme(workspace, meta)` appends a row to the correct track table (creating the section when absent, or writing a minimal template when the file does not yet exist). Writes are atomic, the updated content is rendered to a sibling tempfile, fsynced, and renamed into place. User-authored prose outside track tables is preserved byte-for-byte.
 
-## Package: internal/planner
+## Package: internal/agentsession
 
-### Planner
+### Runtime
 
-`internal/planner/planner.go` manages a singleton planner per workspace group, keyed by the workspace **fingerprint** (sha256 of the sorted workspace paths, truncated to 12 chars in the spec name as `wallfacer-plan-<fp>`). Each chat message execs a fresh agent process via the host backend (`Exec`); continuity across messages comes from persisted thread history and session resume, not a reused process. A fixed synthetic task ID, `planningTaskID = "planning-sandbox"`, tags these execs via the `wallfacer.task.id` label.
+`internal/agentsession/runtime.go` manages a singleton runtime per workspace group, keyed by the workspace **fingerprint** (sha256 of the sorted workspace paths, truncated to 12 chars in the spec name as `wallfacer-agent-<fp>`). Each chat message execs a fresh agent process via the host backend (`Exec`); continuity across messages comes from persisted session history and session resume, not a reused process. A fixed synthetic task ID, `agentSessionTaskID = "agent-session"`, tags these execs via the `wallfacer.task.id` label.
 
 Key lifecycle methods:
 
 | Method                                      | Role                                                                                   |
 |---------------------------------------------|----------------------------------------------------------------------------------------|
-| `Start(ctx)`                                | Mark the planner active. A process is launched on the next `Exec`.                     |
-| `Stop()`                                    | Kill the current process handle and mark the planner inactive.                         |
+| `Start(ctx)`                                | Mark the runtime active. A process is launched on the next `Exec`.                     |
+| `Stop()`                                    | Kill the current process handle and mark the runtime inactive.                         |
 | `Exec(ctx, cmd)`                            | Exec `cmd` as a fresh host process via the backend; returns its handle.                |
-| `IsBusy / SetBusy / BusyThreadID`           | Single-turn-at-a-time constraint across all threads.                                   |
-| `StartLiveLog / CloseLiveLog / LogReader`   | Tee raw stdout into a `livelog.Log`; SSE consumers subscribe via per-thread readers.  |
+| `IsBusy / SetBusy / BusyThreadID`           | Single-turn-at-a-time constraint across all sessions.                                   |
+| `StartLiveLog / CloseLiveLog / LogReader`   | Tee raw stdout into a `livelog.Log`; SSE consumers subscribe via per-session readers.  |
 | `Interrupt()`                               | Kill the handle, close the live log, but keep the session ID so the next message `--resume`s. |
-| `UpdateWorkspaces(paths, fingerprint)`      | Stop the current process and re-open a `ThreadManager` rooted at the new fingerprint. |
+| `UpdateWorkspaces(paths, fingerprint)`      | Stop the current process and re-open a `Manager` rooted at the new fingerprint. |
 
 ### Conversation Store
 
-`internal/planner/conversation.go` persists chat history to `~/.wallfacer/planning/<fingerprint>/threads/<thread-id>/`:
+`internal/agentsession/conversation.go` persists chat history to `~/.wallfacer/agent-sessions/<fingerprint>/threads/<thread-id>/`:
 
-- `messages.jsonl`, append-only newline-delimited JSON of `Message{Role, Content, Timestamp, FocusedSpec, FocusedTask, RawOutput, PlanRound}` records. `FocusedSpec` records the spec path a turn ran against (spec-mode); `FocusedTask` records the task ID (task-mode). The scanner buffer is bumped to 32 MiB because a single assistant round's raw NDJSON easily exceeds `bufio.Scanner`'s default; oversized records are skipped with a warning so one pathological round cannot bury the whole thread.
-- `session.json`, the `SessionInfo{SessionID, LastActive, FocusedSpec, FocusedTask}` blob, written atomically via `atomicfile.WriteJSON`. `SaveSession` / `LoadSession` drive the `--resume` argument on subsequent `Exec` calls. A non-empty `FocusedTask` marks the thread as **task-mode** (task-pinned); see the note below.
+- `messages.jsonl`, append-only newline-delimited JSON of `Message{Role, Content, Timestamp, FocusedSpec, FocusedTask, RawOutput, PlanRound}` records. `FocusedSpec` records the spec path a turn ran against (spec-mode); `FocusedTask` records the task ID (task-mode). The scanner buffer is bumped to 32 MiB because a single assistant round's raw NDJSON easily exceeds `bufio.Scanner`'s default; oversized records are skipped with a warning so one pathological round cannot bury the whole session.
+- `session.json`, the `ResumeInfo{SessionID, LastActive, FocusedSpec, FocusedTask}` blob, written atomically via `atomicfile.WriteJSON`. `SaveSession` / `LoadSession` drive the `--resume` argument on subsequent `Exec` calls. A non-empty `FocusedTask` marks the session as **task-mode** (task-pinned); see the note below.
 
 Helpers `ExtractSessionID`, `ExtractResultText`, `IsStaleSessionError`, and `IsErrorResult` parse the Claude Code NDJSON stream so the handler can distinguish a successful round, a stale session (retry with `BuildHistoryContext()` prepended), and a generic error (skip the assistant append).
 
-### Threads
+### Sessions
 
-`internal/planner/threads.go` introduces multi-thread chat. The `ThreadManager` owns:
+`internal/agentsession/sessions.go` introduces multi-session chat. The `Manager` owns:
 
-- `threads.json`, ordered manifest of `ThreadMeta{ID, Name, Created, Updated, Archived}`.
-- `active.json`, the UI's current active-thread ID.
-- `threads/<id>/`, each thread's `ConversationStore`.
+- `threads.json`, ordered manifest of `SessionMeta{ID, Name, Created, Updated, Archived}`.
+- `active.json`, the UI's current active-session ID.
+- `threads/<id>/`, each session's `ConversationStore`.
 
-Thread IDs are UUIDv7 so they sort chronologically on disk.
+Session IDs are UUIDv7 so they sort chronologically on disk.
 
-On first open of a legacy single-thread layout (`messages.jsonl`/`session.json` sitting directly in the fingerprint root), the manager migrates the files into a new "Chat 1" thread using a crash-safe copy → write-manifest → delete sequence. The manifest write is the commit point; if a crash interrupts the process, the original files are preserved and the migration reruns idempotently on the next load.
+On first open of a legacy single-session layout (`messages.jsonl`/`session.json` sitting directly in the fingerprint root), the manager migrates the files into a new "Chat 1" session using a crash-safe copy → write-manifest → delete sequence. The manifest write is the commit point; if a crash interrupts the process, the original files are preserved and the migration reruns idempotently on the next load.
 
 Operations:
 
 | Method                              | Notes                                                                                  |
 |-------------------------------------|----------------------------------------------------------------------------------------|
-| `List(includeArchived)`             | Returns threads sorted by `Created`.                                                  |
+| `List(includeArchived)`             | Returns sessions sorted by `Created`.                                                  |
 | `Create(name)`                      | Empty name defaults to `"Chat N"` using the highest existing `Chat <n>` + 1.          |
 | `Rename(id, name)` / `Touch(id)`    | Mutate the manifest and bump `Updated`.                                               |
-| `Archive(id)` / `Unarchive(id)`     | Toggle the `Archived` flag; archiving the active thread picks the first non-archived as the new active. Files are retained. |
+| `Archive(id)` / `Unarchive(id)`     | Toggle the `Archived` flag; archiving the active session picks the first non-archived as the new active. Files are retained. |
 | `SetActiveID(id)`                   | Rejects archived or unknown IDs.                                                      |
-| `Store(id)`                         | Lazy-opens a per-thread `ConversationStore`; returns `ErrThreadNotFound` for unknown IDs. |
+| `Store(id)`                         | Lazy-opens a per-session `ConversationStore`; returns `ErrThreadNotFound` for unknown IDs. |
 
-The planner enforces a **global FIFO**: `IsBusy` is a single boolean guarding the entire planner, so only one thread can run an exec at any time. The UI can freely switch tabs while a turn is in flight, polling endpoints consult `BusyThreadID` to decide whether the caller's SSE stream gets the raw stdout or a `204 No Content`.
+The runtime enforces a **global FIFO**: `IsBusy` is a single boolean guarding the entire runtime, so only one session can run an exec at any time. The UI can freely switch tabs while a turn is in flight, polling endpoints consult `BusyThreadID` to decide whether the caller's SSE stream gets the raw stdout or a `204 No Content`.
 
-### Task-Mode Threads
+### Task-Mode Sessions
 
-A thread is either **spec-mode** (pinned to a spec path via `FocusedSpec`) or **task-mode** (pinned to a board task via `FocusedTask`). Task-mode is the replacement for the old prompt-refinement flow: instead of dedicated `/api/tasks/{id}/refine*` routes, the user iterates a backlog task's prompt by chatting in a task-pinned thread, and the agent calls back into the server to write the prompt (see `POST /api/agent/tool/update_task_prompt` under Handler Plumbing).
+A session is either **spec-mode** (pinned to a spec path via `FocusedSpec`) or **task-mode** (pinned to a board task via `FocusedTask`). Task-mode is the replacement for the old prompt-refinement flow: instead of dedicated `/api/tasks/{id}/refine*` routes, the user iterates a backlog task's prompt by chatting in a task-pinned session, and the agent calls back into the server to write the prompt (see `POST /api/agent/tool/update_task_prompt` under Handler Plumbing).
 
-`ThreadManager.CascadeArchiveForTask(taskID)` auto-archives every non-archived task-mode thread pinned to a task once that task moves past backlog, stamping `AutoArchivedByTaskLifecycle` on the meta so the tool endpoint can return a precise error rather than a generic 404. The inverse, `CascadeUnarchiveForTask(taskID)`, unarchives those threads if the task returns to backlog.
+`Manager.CascadeArchiveForTask(taskID)` auto-archives every non-archived task-mode session pinned to a task once that task moves past backlog, stamping `AutoArchivedByTaskLifecycle` on the meta so the tool endpoint can return a precise error rather than a generic 404. The inverse, `CascadeUnarchiveForTask(taskID)`, unarchives those sessions if the task returns to backlog.
 
 ### Slash Commands
 
-`internal/planner/commands.go` registers twelve built-in commands. Each command has a name, description, usage string, and a Go text/template in `internal/planner/commands_templates/`:
+`internal/agentsession/commands.go` registers twelve built-in commands. Each command has a name, description, usage string, and a Go text/template in `internal/agentsession/commands_templates/`:
 
 | Command            | Template                  | Purpose                                                      |
 |--------------------|---------------------------|--------------------------------------------------------------|
@@ -275,39 +275,39 @@ Every task carries `SpecSourcePath` so the completion hook can find its way back
 
 `UnarchiveSpec` locates the archive commit via `git log --format=%H -1 --grep '^<relPath>: archive' -- <relPath>` and runs `git revert --no-edit`. A successful revert restores every descendant's pre-archive status losslessly. If the grep finds nothing (spec was archived by hand, outside the UI) or the revert hits a conflict (`revertArchiveCommit` aborts cleanly via `git revert --abort`), the handler falls back to a single-spec `archived → drafted` transition via `spec.UpdateFrontmatter` and `commitSpecTransition`.
 
-### Planning Chat
+### Agent Session Chat
 
-`internal/handler/planning.go` exposes the chat endpoints. Every turn goes through `assemblePlanningPrompt(workspaces, focusedSpec, base)` which layers three system prompts:
+`internal/handler/agentsession.go` exposes the chat endpoints. Every turn goes through `assembleAgentPrompt(workspaces, focusedSpec, base)` which layers three system prompts:
 
 ```
-[planning_system][archivedSpecGuard][base]
+[spec_system][archivedSpecGuard][base]
 ```
 
-- `selectPlanningSystemPrompt(workspaces)` picks the "empty" prompt when every workspace's `BuildTree` yields no non-archived parseable specs and the "nonempty" prompt otherwise. Evaluated per-turn so archiving the last spec takes effect on the very next message. I/O errors (permission denied, EIO) default to the **nonempty** variant on the principle that falsely signalling "no specs" would invite the agent to scaffold against an unknown tree.
+- `selectSpecSystemPrompt(workspaces)` picks the "empty" prompt when every workspace's `BuildTree` yields no non-archived parseable specs and the "nonempty" prompt otherwise. Evaluated per-turn so archiving the last spec takes effect on the very next message. I/O errors (permission denied, EIO) default to the **nonempty** variant on the principle that falsely signalling "no specs" would invite the agent to scaffold against an unknown tree.
 - `archivedSpecGuard(workspaces, focusedSpec)` returns a guard prefix only when the focused spec's status is `archived`, instructing the agent to refuse writes. Empty string otherwise.
 
-The assembled prompt is passed to `planner.Exec` with `--verbose --output-format stream-json`; an `--resume <session-id>` flag is appended when `LoadSession()` yields a non-empty session. If the round fails with `IsStaleSessionError`, the handler clears the session (keeping history) and retries with `BuildHistoryContext()` prepended.
+The assembled prompt is passed to `runtime.Exec` with `--verbose --output-format stream-json`; an `--resume <session-id>` flag is appended when `LoadSession()` yields a non-empty session. If the round fails with `IsStaleSessionError`, the handler clears the session (keeping history) and retries with `BuildHistoryContext()` prepended.
 
 After a successful round, the handler:
 
-1. Persists per-round usage via `persistPlanningRoundUsage` (best-effort; errors logged).
+1. Persists per-round usage via `persistAgentRoundUsage` (best-effort; errors logged).
 2. Scans the assistant-authored text for `/spec-new` directives (see below).
 3. Calls `commitPlanningRound` for each workspace with any staged specs changes.
 4. Appends the assistant message with `PlanRound = max(round)` so the UI can attach an "Undo" affordance.
-5. Touches the thread so recent-activity sort works.
+5. Touches the session so recent-activity sort works.
 
 Commits write scope-prefixed subjects `<primary-path>(plan): <imperative>` plus the `Plan-Round: N` and `Plan-Thread: <id>` trailers. `hostGitIdentityOverrides` forces the host's global `user.name`/`user.email` so a sandbox-polluted repo-local config never poisons the author.
 
 ### Task Prompt Tool
 
-`internal/handler/planning_tool.go` exposes `POST /api/agent/tool/update_task_prompt`, the HTTP bridge the planning agent calls (in task-mode) to write a backlog task's prompt. It is the prompt-refinement path that replaced the removed `/api/tasks/{id}/refine*` routes.
+`internal/handler/agentsession_tool.go` exposes `POST /api/agent/tool/update_task_prompt`, the HTTP bridge the agent session calls (in task-mode) to write a backlog task's prompt. It is the prompt-refinement path that replaced the removed `/api/tasks/{id}/refine*` routes.
 
 The request body is `{task_id, prompt, thread_id}`. The handler validates the chain before touching the store:
 
 - `task_id` must parse as a UUID (400 otherwise).
 - `thread_id` must resolve to a live `ConversationStore` (404 otherwise).
-- If the thread was auto-archived by task lifecycle (`Archived && AutoArchivedByTaskLifecycle`), it returns **422** with "task has moved past backlog; start a new task to refine a new prompt."
-- The thread's session must be task-mode (`FocusedTask` non-empty) and its pinned task must equal `task_id`; either mismatch is **422**.
+- If the session was auto-archived by task lifecycle (`Archived && AutoArchivedByTaskLifecycle`), it returns **422** with "task has moved past backlog; start a new task to refine a new prompt."
+- The session's resume state must be task-mode (`FocusedTask` non-empty) and its pinned task must equal `task_id`; either mismatch is **422**.
 
 On success it counts existing `EventTypePromptRound` events to derive the next round number, calls `store.UpdateTaskPromptDirect` to overwrite `task.Prompt` (returning the previous prompt and a resume hint), and inserts a `prompt_round` event built by `store.NewPromptRoundEvent(threadID, round, prevPrompt, newPrompt, resumeHint)`. The response is `{prev_prompt, round}`.
 
@@ -327,7 +327,7 @@ Each directive captures:
 
 ### Planning Undo
 
-`internal/handler/planning_undo.go` reverses a prior planning round via `git revert` rather than `git reset --hard` so concurrent thread activity is preserved.
+`internal/handler/planning_undo.go` reverses a prior planning round via `git revert` rather than `git reset --hard` so concurrent session activity is preserved.
 
 Every planning round carries three commit attributes:
 
@@ -335,7 +335,7 @@ Every planning round carries three commit attributes:
 - `Plan-Round: N` trailer (parsed by `planRoundTrailer`).
 - `Plan-Thread: <id>` trailer (parsed by `planThreadTrailer`).
 
-`findLatestThreadPlanCommit(ctx, ws, threadID)` greps commit bodies for `^Plan-Round:`, filters to matching `Plan-Thread:` entries, and uses a revert-aware walk (rounds toggled on/off by forward and revert commits) to pick the most recent commit of the caller's thread that is still "applied". Critically, the caller's thread is targeted even when another thread committed after it, each thread's rounds are independently revertible.
+`findLatestThreadPlanCommit(ctx, ws, threadID)` greps commit bodies for `^Plan-Round:`, filters to matching `Plan-Thread:` entries, and uses a revert-aware walk (rounds toggled on/off by forward and revert commits) to pick the most recent commit of the caller's session that is still "applied". Critically, the caller's session is targeted even when another session committed after it, each session's rounds are independently revertible.
 
 The revert runs in three stages:
 
@@ -352,9 +352,9 @@ The Plan Mode UI lives in the Vue SPA under `frontend/src/`:
 - `views/PlanPage.vue` + `components/plan/SpecFocusedView.vue`, layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; preserves the focused spec across refresh via the `?spec=<path>` query string on the `/plan` route.
 - `components/plan/SpecTreePanel.vue`, tree rendering. Groups roots by track, pins the roadmap entry when `TreeResponse.Index` is present, and draws status badges and per-spec progress indicators using `TreeResponse.Progress`.
 - `views/MapPage.vue`, dependency DAG map. Renders the `depends_on` graph using the adjacency data from `TreeResponse`.
-- `components/plan/PlanningChatPanel.vue`, chat pane. Streams `GET /api/agent/messages/stream` responses, handles slash-command autocomplete against `GET /api/agent/commands`, renders the thread tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
+- `components/plan/AgentChatPanel.vue`, chat pane. Streams `GET /api/agent/messages/stream` responses, handles slash-command autocomplete against `GET /api/agent/commands`, renders the session tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
 
-These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/stream`) and the thread CRUD endpoints (`/api/agent/sessions`) to stay in sync with server-side state.
+These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/stream`) and the session CRUD endpoints (`/api/agent/sessions`) to stay in sync with server-side state.
 
 ## See Also
 
