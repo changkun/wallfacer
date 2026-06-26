@@ -1,15 +1,14 @@
 ---
 title: Deferred Chat Creation
-status: drafted
+status: complete
 depends_on: []
 affects:
   - frontend/src/composables/useChatSession.ts
   - frontend/src/components/plan/SessionList.vue
-  - frontend/src/components/plan/PlanningChatPanel.vue
   - frontend/src/components/plan/SpecChatPopup.vue
 effort: small
 created: 2026-06-25
-updated: 2026-06-25
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
@@ -104,3 +103,46 @@ Value-only store tests pass while the UI is frozen (known happy-dom blind spot),
 so verify in a real browser: (a) draft is blank and nothing persists until send,
 (b) the user bubble survives the promote-and-send sequence, (c) `Chat N` flips to
 the AI title after the first turn.
+
+## Outcome (2026-06-26)
+
+Shipped across `feat(chat): defer thread creation until first message`
+(`a5895de9`) and `fix(chat): guard history loads with a token, not a fragile
+suppress flag` (`033f6ac4`). All acceptance criteria met. The implementation
+followed the frontend-only plan but diverged in a few details worth recording.
+
+- **Endpoints.** Sessions are managed via `/api/agent/sessions` (POST to create
+  the thread in `promoteDraft`, PATCH `.../{id}` `{state:'active'}` to activate),
+  not the `/api/planning/threads` path named in the draft body. The composable
+  is `useChatSession.ts`; `draft`, `createThread`, and `promoteDraft` live there
+  and all surfaces inherit them.
+
+- **Optimistic-bubble race (interaction #2) — different fix.** The plan proposed
+  *sequencing* promotion so the blank `loadHistory` settles before the optimistic
+  push. Shipped instead with a monotonic `historyToken` guard: every
+  `loadHistory` captures the token and bails if it changed, and the optimistic
+  user-bubble push bumps it. This is robust to ordering rather than dependent on
+  it — a late fire-and-forget load (the watcher's, or one triggered by
+  `loadThreads` during promotion) can no longer wipe the just-sent message.
+
+- **AI-title surfacing (interaction #3) — `refreshTitleSoon`, not `loadThreads`.**
+  Rather than a single `loadThreads()` after the turn, the rename is surfaced by
+  `refreshTitleSoon(threadID)`: a bounded poll (1.5s, then up to 10 tries at 3s)
+  that calls `agentStore.refreshBusy()` and stops once the name is no longer
+  `Chat N`. `loadThreads` was deliberately avoided because it yanks the active
+  selection; `refreshBusy` picks up the in-place rename without reassigning
+  `activeThreadId`. Cancelled on unmount via `titleTimer`.
+
+- **Draft-entry detach (interaction #1)** was extracted into a `detachStream()`
+  helper shared by `createThread` (and mirrored in `switchToThread`): it clears
+  the retry timer, aborts the local `streamHandle`, and sets `streaming = false`,
+  leaving the background turn running server-side under `busyThreadId`.
+
+- **Surfaces.** Only two surfaces defer creation: `SessionList.vue` (sub-sidebar,
+  with the `chat-session-new--active` highlight on the New-chat control while a
+  draft is open) and `SpecChatPopup.vue` (header shows `New chat` during draft).
+  The legacy `PlanningChatPanel.vue` listed in the original `affects` was removed
+  from the codebase before this landed, so it needed no change.
+
+- **Out of scope held:** `migrateOrInit` still seeds an empty `Chat 1` on a
+  brand-new workspace — accepted as before.
