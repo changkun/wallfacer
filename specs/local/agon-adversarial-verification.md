@@ -105,8 +105,10 @@ opt-in / diff-size gating), not by weakening the critic.
 - [ ] **Usage attribution.** `RunCriticRound` returns `TokenUsage`;
   `HarnessCritic` populates `CriticResult.Usage`; `runAgon` accumulates onto the
   task so agon cost is visible to budgets/dashboards.
-- [ ] **Config knobs.** Expose `ForkCount`/`MaxRounds`/`CostCapTokens` in
-  `GET/PATCH /api/config` (the token-budget dial).
+- [x] **Config knobs (env).** `WALLFACER_AGON_FORKS` / `_ROUNDS` / `_COST_CAP`
+  override the defaults via `agonTuning`; documented in the configuration guide.
+  _(commit: make fork count, rounds, and cost cap configurable)_. A `/api/config`
+  + frontend surface is a later nicety.
 - [ ] **Reset `AgonUnresolved` on resume.** Mirror the test-result reset once the
   resume → re-verify lifecycle is traced; currently deferred.
 - [ ] **Criteria threading (goal #7).** Blocked on `Task.Criteria`
