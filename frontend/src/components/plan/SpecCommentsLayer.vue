@@ -182,6 +182,17 @@ const replyBody = ref('');
 function place() {
   const root = props.bodyEl;
   if (!root) { markers.value = []; anchorTops.value = new Map(); return; }
+  // When the sign-in gate is closed the surface is hidden, but highlights are
+  // painted directly into the body DOM (not the template), so they would survive
+  // a logout. The instance's GET keeps returning threads via the connector token
+  // regardless of the browser session, so guard the paint here, not on the data:
+  // strip any marks and bail when signed out.
+  if (!signedIn.value) {
+    clearHighlights(root);
+    markers.value = [];
+    anchorTops.value = new Map();
+    return;
+  }
   // Recompute the content's offset within the host (changes when the bar/banner
   // appear or wrap) so the rail and markers stay aligned to the prose.
   contentOffsetTop.value = root.offsetTop;
@@ -210,6 +221,14 @@ watch(
   () => { void nextTick(place); },
   { immediate: true },
 );
+
+// Re-run the pass when the sign-in gate flips: the thread-set watcher does not
+// fire (the set is unchanged), so a logout would otherwise leave the highlights
+// painted. On login, refetch so the marks repaint with current data.
+watch(signedIn, (v) => {
+  if (v) void refresh();
+  void nextTick(place);
+});
 
 // Reflect the open thread onto inline marks without a full rewrap.
 watch(openThreadId, () => {
@@ -323,7 +342,7 @@ function lineOf(node: Node | null): number {
 }
 
 function onSelectionChange() {
-  if (!available.value || composing.value) return;
+  if (!available.value || !signedIn.value || composing.value) return;
   // Ignore churn while typing into the composer.
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) return;
