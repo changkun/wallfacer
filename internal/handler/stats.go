@@ -228,7 +228,7 @@ func filterTasksByWorkspace(tasks []store.Task, ws string) ([]store.Task, bool) 
 	return filtered, len(filtered) > 0
 }
 
-// aggregateAgentSessionStats scans `<configDir>/planning/*/usage.jsonl` for per-
+// aggregateAgentSessionStats scans `<configDir>/agent-sessions/*/usage.jsonl` for per-
 // group agent-session round records and folds them into AgentSessionGroupStat values.
 // Only records whose Timestamp is strictly after since are included (zero
 // since means all records). The currently active workspace group is resolved

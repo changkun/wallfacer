@@ -499,7 +499,7 @@ func TestListAgentSessions_DefaultMode(t *testing.T) {
 }
 
 // pinThreadToTask saves a task-mode session for a thread, making it look like
-// the thread is actively planning for the given task.
+// the thread is actively working on the given task.
 func pinThreadToTask(t *testing.T, tm *agentsession.Manager, threadID, taskID string) {
 	t.Helper()
 	cs, err := tm.Store(threadID)
