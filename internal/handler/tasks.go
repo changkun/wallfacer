@@ -841,7 +841,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 		// Reject status changes on tasks that have an in-flight plan turn.
 		if oldStatus != newStatus {
-			if locked, threadID := h.isTaskLockedByPlanner(id.String()); locked {
+			if locked, threadID := h.isTaskLockedByAgent(id.String()); locked {
 				httpjson.Write(w, http.StatusConflict, map[string]string{
 					"error":     "task is locked by an in-flight plan turn",
 					"thread_id": threadID,

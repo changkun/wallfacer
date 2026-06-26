@@ -316,7 +316,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 							h.incAutopilotAction("auto_promoter", "skipped_dependency")
 							continue
 						}
-						if locked, threadID := h.isTaskLockedByPlanner(t.ID.String()); locked {
+						if locked, threadID := h.isTaskLockedByAgent(t.ID.String()); locked {
 							h.incAutopilotAction("auto_promoter", "skipped_locked")
 							logger.Handler.Debug("auto-promote: skipping locked task",
 								"task", t.ID, "thread", threadID)
@@ -431,7 +431,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 
 				// Re-check under the Phase-2 lock: a plan turn may have started
 				// between Phase 1 and Phase 2 and pinned this task.
-				if locked, threadID := h.isTaskLockedByPlanner(c.task.ID.String()); locked {
+				if locked, threadID := h.isTaskLockedByAgent(c.task.ID.String()); locked {
 					h.incAutopilotAction("auto_promoter", "skipped_locked")
 					logger.Handler.Debug("auto-promote Phase 2: skipping locked task",
 						"task", c.task.ID, "thread", threadID)

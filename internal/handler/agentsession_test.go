@@ -519,7 +519,7 @@ func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	raw := planningSuccessStdout(120, 40, 15, 5, 0.0123)
-	h.persistPlanningRoundUsage(raw)
+	h.persistAgentRoundUsage(raw)
 
 	key := store.AgentSessionGroupKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -557,8 +557,8 @@ func TestPlanningHandler_IncrementsTurn(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
-	h.persistPlanningRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
-	h.persistPlanningRoundUsage(planningSuccessStdout(20, 8, 0, 0, 0.002))
+	h.persistAgentRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
+	h.persistAgentRoundUsage(planningSuccessStdout(20, 8, 0, 0, 0.002))
 
 	key := store.AgentSessionGroupKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -578,7 +578,7 @@ func TestPlanningHandler_FailedExecDoesNotPersist(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	errLine := []byte(`{"type":"result","stop_reason":"end_turn","result":"boom","session_id":"s1","is_error":true,"total_cost_usd":0.001}`)
-	h.persistPlanningRoundUsage(errLine)
+	h.persistAgentRoundUsage(errLine)
 
 	key := store.AgentSessionGroupKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -662,7 +662,7 @@ func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	h.configDir = blocker
 
 	// Must not panic.
-	h.persistPlanningRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
+	h.persistAgentRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
 }
 
 // TestSendPlanningMessage_BothFocusedFields verifies that setting both
@@ -969,30 +969,30 @@ func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
 	}
 
 	// Not busy yet — should return false.
-	if locked, _ := h.isTaskLockedByPlanner(taskID); locked {
-		t.Error("isTaskLockedByPlanner: want false when not busy")
+	if locked, _ := h.isTaskLockedByAgent(taskID); locked {
+		t.Error("isTaskLockedByAgent: want false when not busy")
 	}
 
 	// Mark the planner busy on this thread.
 	h.planner.SetBusy(true, threadID)
 	defer h.planner.SetBusy(false, "")
 
-	locked, gotThreadID := h.isTaskLockedByPlanner(taskID)
+	locked, gotThreadID := h.isTaskLockedByAgent(taskID)
 	if !locked {
-		t.Error("isTaskLockedByPlanner: want true while exec in flight")
+		t.Error("isTaskLockedByAgent: want true while exec in flight")
 	}
 	if gotThreadID != threadID {
 		t.Errorf("thread_id = %q, want %q", gotThreadID, threadID)
 	}
 
 	// A different task ID should not be locked.
-	if locked2, _ := h.isTaskLockedByPlanner("other-task-id"); locked2 {
-		t.Error("isTaskLockedByPlanner: want false for unrelated task")
+	if locked2, _ := h.isTaskLockedByAgent("other-task-id"); locked2 {
+		t.Error("isTaskLockedByAgent: want false for unrelated task")
 	}
 
 	// Clear busy — should return false again.
 	h.planner.SetBusy(false, "")
-	if locked3, _ := h.isTaskLockedByPlanner(taskID); locked3 {
-		t.Error("isTaskLockedByPlanner: want false after exec ends")
+	if locked3, _ := h.isTaskLockedByAgent(taskID); locked3 {
+		t.Error("isTaskLockedByAgent: want false after exec ends")
 	}
 }
