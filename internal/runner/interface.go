@@ -8,6 +8,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
@@ -60,6 +61,11 @@ type Interface interface {
 	// spec against a task's actual changes; the drift pipeline consumes the
 	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
+
+	// RunCriticRound runs a one-shot stateless agent invocation for an agon
+	// critic turn. Returns raw markdown text. Token usage is not attributed to
+	// any task (agon aggregates it separately).
+	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, deadline time.Duration) (string, error)
 
 	// Agent-session title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.
