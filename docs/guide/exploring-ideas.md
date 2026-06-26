@@ -2,11 +2,11 @@
 
 Plan mode is where you explore ideas conversationally with an AI agent before committing to structured specs or tasks.
 
-The planning chat lives inside Plan mode. It is backed by a planning agent that can read your codebase, create files, and run commands. The same planner also powers task-mode prompt refinement (see [Refinement & Ideation](refinement-and-ideation.md)).
+The agent chat lives inside Plan mode. It is backed by an agent that can read your codebase, create files, and run commands. The same agent also powers task-mode prompt refinement (see [Refinement & Ideation](refinement-and-ideation.md)).
 
 ```mermaid
 flowchart LR
-  user["You"] -->|message / slash command| agent["Planning Agent<br/>(host process)"]
+  user["You"] -->|message / slash command| agent["Agent<br/>(host process)"]
   agent -->|reads| code["Workspace code"]
   agent -->|writes| specs["specs/"]
   specs -->|SSE snapshot| explorer["Spec Explorer"]
@@ -28,7 +28,7 @@ sequenceDiagram
   You->>Agent: Follow up or use /command
 ```
 
-### Opening the Planning Chat
+### Opening the Agent Chat
 
 Switch to Plan mode by pressing **P** (or click **Plan** in the left sidebar nav). In the three-pane layout (workspace with specs), the chat is a floating, draggable, resizable popup that hovers over the focused spec view. Press **C**, or click the chat toggle in the focused-view header, to open or close it; its position and size persist across sessions. When the workspace has no specs yet, the layout switches to chat-first and the chat fills the workspace as a docked panel (the **C** shortcut is inactive there).
 
@@ -42,7 +42,7 @@ Responses stream in real time. Assistant text renders as markdown with syntax-hi
 
 ### Drafting a Spec from Chat (`/spec-new`)
 
-When the planning agent wants to start a new spec, it emits a single `/spec-new <path> [title="..."] [status=...] [effort=...]` directive on its own line, followed by the spec body. The server recognizes the directive **only when it is not inside a fenced code block**, so the agent can quote the grammar in documentation or examples without triggering a scaffold.
+When the agent wants to start a new spec, it emits a single `/spec-new <path> [title="..."] [status=...] [effort=...]` directive on its own line, followed by the spec body. The server recognizes the directive **only when it is not inside a fenced code block**, so the agent can quote the grammar in documentation or examples without triggering a scaffold.
 
 On recognition, the server calls the shared spec scaffolder to create the file with valid YAML frontmatter, then appends the agent's body text after it. The path must live under `specs/<track>/<slug>.md`; other locations are rejected with a `system` message in the chat. The agent's raw response (including the directive line) still streams to the chat unchanged. The directive is a parallel side-effect, not a stream rewrite.
 
@@ -89,7 +89,7 @@ Click **Clear** in the chat header to discard all messages in the current thread
 
 ### Empty vs Non-empty Workspace
 
-The planning agent's system prompt has two variants. The **empty** variant kicks in when the workspace has zero non-archived specs and actively encourages `/spec-new` to bootstrap the first draft; the **nonempty** variant is the normal case and assumes you are iterating on an existing tree. Selection happens per-turn rather than being cached at session start, so archiving the last spec flips the agent's behavior on the very next message, with no restart or clear required.
+The agent's system prompt has two variants. The **empty** variant kicks in when the workspace has zero non-archived specs and actively encourages `/spec-new` to bootstrap the first draft; the **nonempty** variant is the normal case and assumes you are iterating on an existing tree. Selection happens per-turn rather than being cached at session start, so archiving the last spec flips the agent's behavior on the very next message, with no restart or clear required.
 
 ### Threads
 
@@ -98,7 +98,7 @@ The chat supports multiple named threads per workspace group. Tabs sit above the
 - Click **+** to create a new thread (default name `Chat N`). Click the pencil icon (or double-click the tab) to rename inline: Enter commits, Escape cancels.
 - Click **×** on a tab to archive it (the in-flight thread cannot be archived; interrupt it first). Archived threads are hidden from the tab bar but their files are retained; a **▾** menu next to **+** lists archived threads for restore.
 - Each thread keeps its own agent session and history. Switching tabs does not abort an in-flight agent; its output continues to land in its own thread. When a background thread finishes, its tab shows a small unread dot.
-- Only one agent turn runs at a time across all threads, since they share the single planner. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the running turn completes (global FIFO).
+- Only one agent turn runs at a time across all threads, since they share the single agent. A message sent to a background tab while another thread is in flight is queued locally and fires automatically once the running turn completes (global FIFO).
 
 ### Undo
 
@@ -110,19 +110,19 @@ Click the undo button on an assistant bubble to revert the planning round it pro
 
 ### Session Persistence
 
-Conversations persist on disk at `~/.wallfacer/planning/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace paths. Each thread lives under `threads/<thread-id>/` with its own `messages.jsonl` and `session.json`. Reopening the app or refreshing the page restores the full thread manifest and the last active tab for the same workspace group. Installations from before multi-thread support are migrated transparently on first run (the existing conversation appears as `Chat 1`).
+Conversations persist on disk at `~/.wallfacer/agent-sessions/<fingerprint>/`, where `<fingerprint>` is derived from the active workspace paths. Each thread lives under `threads/<thread-id>/` with its own `messages.jsonl` and `session.json`. Reopening the app or refreshing the page restores the full thread manifest and the last active tab for the same workspace group. Installations from before multi-thread support are migrated transparently on first run (the existing conversation appears as `Chat 1`).
 
 ### Session Recovery
 
 The agent process exits between turns, so its session is resumed on the next message. If the session cannot be resumed (it expired, or the server restarted), the system automatically replays the conversation history as context instead. You do not need to re-enter previous messages.
 
-### Planning Agent
+### Agent Runtime
 
-The planner is a singleton, workspace-scoped agent keyed by a fingerprint of the active workspaces. It uses the same harness as task agents (Claude or Codex). Each message execs a fresh host process in the workspace; continuity comes from session resume (with history replay as a fallback), not a reused process. Nothing runs until you send the first message in a workspace group.
+The agent runtime is a singleton, workspace-scoped agent keyed by a fingerprint of the active workspaces. It uses the same harness as task agents (Claude or Codex). Each message execs a fresh host process in the workspace; continuity comes from session resume (with history replay as a fallback), not a reused process. Nothing runs until you send the first message in a workspace group.
 
-Because threads share the single planner, only one agent turn runs at a time globally. Messages sent to background threads while another is in flight are queued FIFO and fire automatically as the running round completes. When the active workspace group changes, `UpdateWorkspaces` re-scopes the planner to the new workspace set; open threads keep their history intact.
+Because threads share the single agent runtime, only one agent turn runs at a time globally. Messages sent to background threads while another is in flight are queued FIFO and fire automatically as the running round completes. When the active workspace group changes, `UpdateWorkspaces` re-scopes the agent runtime to the new workspace set; open threads keep their history intact.
 
-Stopping the planner from **Settings → Planning** ends any in-flight turn but does not touch conversation history; the next message simply starts a fresh process.
+Stopping the agent from **Settings → Planning** ends any in-flight turn but does not touch conversation history; the next message simply starts a fresh process.
 
 ### Send Mode Toggle
 
@@ -141,7 +141,7 @@ When a spec is selected in the explorer (left pane), the agent automatically rec
 
 ## See Also
 
-- [The Autonomy Spectrum](autonomy-spectrum.md) -- where the planning chat fits in the overall workflow
+- [The Autonomy Spectrum](autonomy-spectrum.md) -- where the agent chat fits in the overall workflow
 - [Designing Specs](designing-specs.md) -- structured design with specs
 - [Refinement & Ideation](refinement-and-ideation.md) -- AI-assisted prompt improvement for tasks
 - [Plan Mode Internals](../internals/plan-mode.md) -- packages, SSE protocol, and undo plumbing

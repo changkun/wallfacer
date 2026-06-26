@@ -83,9 +83,9 @@ See the [CLI Reference](#cli-reference) for the full subcommand and flag list.
 
 See [Designing Specs](designing-specs.md) for the full Plan mode guide.
 
-### Planning Chat
+### Agent Chat
 
-See [Exploring Ideas](exploring-ideas.md) for the full planning chat guide.
+See [Exploring Ideas](exploring-ideas.md) for the full agent chat guide.
 
 ### Keyboard Shortcuts
 
@@ -315,7 +315,7 @@ These variables are optional; the CLI binaries are resolved via `$PATH` by defau
 | `WALLFACER_OVERSIGHT_INTERVAL` | `0` | Minutes between periodic oversight generation while a task runs (0 = only at completion) |
 | `WALLFACER_AUTO_PUSH` | `false` | Enable automatic `git push` after task completion |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push triggers |
-| `WALLFACER_PLANNING_WINDOW_DAYS` | `30` | Default window (in days) for the planning-cost analytics display. `0` means all time. Only affects the UI's default period selection; the server always returns the full record set until the UI requests a narrower window via `?days=N`. |
+| `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window (in days) for the agent-session cost analytics display. `0` means all time. Only affects the UI's default period selection; the server always returns the full record set until the UI requests a narrower window via `?days=N`. The old name `WALLFACER_PLANNING_WINDOW_DAYS` still works as a deprecated alias. |
 | `WALLFACER_TERMINAL_ENABLED` | `true` | Enable the integrated host terminal panel. The Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. Supports multiple concurrent sessions with a tab bar: click "+" to add sessions, click tabs to switch, click x to close. Set to `false` to disable. |
 
 #### Data & Pagination
