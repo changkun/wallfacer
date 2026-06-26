@@ -561,6 +561,62 @@ func (h *Handler) MarkStaleTransition(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UnstaleSpec transitions a spec from stale back to drafted — the "re-activate
+// for rework" action. The state machine allows stale → drafted; all other
+// source statuses are rejected with 422.
+func (h *Handler) UnstaleSpec(w http.ResponseWriter, r *http.Request) {
+	if !h.requireVisibleWorkspace(w, r) {
+		return
+	}
+	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	workspaces := h.currentWorkspaces()
+	if len(workspaces) == 0 {
+		http.Error(w, "no workspaces configured", http.StatusInternalServerError)
+		return
+	}
+
+	absPath := findSpecFile(workspaces, req.Path)
+	if absPath == "" {
+		http.Error(w, "spec file not found in any workspace", http.StatusNotFound)
+		return
+	}
+
+	s, err := spec.ParseFile(absPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("parse error: %v", err), http.StatusBadRequest)
+		return
+	}
+	if err := spec.StatusMachine.Validate(s.Status, spec.StatusDrafted); err != nil {
+		http.Error(w, fmt.Sprintf("cannot unstale spec at status %q (must be stale)", s.Status),
+			http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err := spec.UpdateFrontmatter(absPath, map[string]any{
+		"status":  string(spec.StatusDrafted),
+		"updated": time.Now(),
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("update frontmatter: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := commitSpecTransition(r.Context(), workspaces, absPath, req.Path, spec.StatusDrafted); err != nil {
+		slog.Warn("unstale transition commit failed", "path", req.Path, "err", err)
+	}
+
+	httpjson.Write(w, http.StatusOK, specTransitionResponse{
+		Path:   req.Path,
+		Status: string(spec.StatusDrafted),
+	})
+}
+
 // DismissStaleCandidate bumps a spec's updated timestamp without changing its
 // status — the "I looked, it's fine" action for a stale candidate. The next
 // scan ignores commits older than the new timestamp.

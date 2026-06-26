@@ -211,6 +211,9 @@ const canArchive = computed(
       status.value === 'complete' ||
       status.value === 'stale'),
 );
+const showUnstale = computed(
+  () => !focusedIsIndex.value && status.value === 'stale' && !isArchived.value,
+);
 
 // ── Action buttons ─────────────────────────────────────────────────
 
@@ -394,6 +397,20 @@ async function onUnarchive() {
   }
 }
 
+async function onUnstale() {
+  if (!focusedSpecPath.value) return;
+  actionBusy.value = true;
+  try {
+    await api('POST', '/api/specs/transition', { action: 'unstale', path: focusedSpecPath.value });
+    await loadCurrent();
+    toast.push('Spec re-activated as drafted', { kind: 'success' });
+  } catch (e) {
+    toast.push('Unstale failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+  } finally {
+    actionBusy.value = false;
+  }
+}
+
 async function undoToast(toast: { id: number; action: ArchiveAction }) {
   const reverseAction = toast.action.action === 'archive' ? 'unarchive' : 'archive';
   if (await callSpecTransition(reverseAction, toast.action.path)) {
@@ -501,6 +518,14 @@ defineExpose({ dispatchFocused, breakdownFocused });
           @click="openDispatchedTask"
         >→ task {{ dispatchedTaskId.slice(0, 8) }}</button>
         <span class="sf-spacer" />
+        <button
+          v-if="showUnstale"
+          type="button"
+          class="sf-action"
+          :disabled="actionBusy"
+          title="Re-activate this spec as drafted"
+          @click="onUnstale"
+        >Re-activate</button>
         <button
           v-if="canArchive"
           type="button"

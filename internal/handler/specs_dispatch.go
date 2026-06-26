@@ -62,6 +62,8 @@ func (h *Handler) SpecTransition(w http.ResponseWriter, r *http.Request) {
 		h.ValidateSpecTransition(w, r)
 	case "stale":
 		h.MarkStaleTransition(w, r)
+	case "unstale":
+		h.UnstaleSpec(w, r)
 	case "dismiss-stale":
 		h.DismissStaleCandidate(w, r)
 	case "force-complete":
@@ -69,7 +71,7 @@ func (h *Handler) SpecTransition(w http.ResponseWriter, r *http.Request) {
 	case "migrate":
 		h.MigrateSpec(w, r)
 	default:
-		http.Error(w, "action must be one of: dispatch, undispatch, archive, unarchive, validate, stale, dismiss-stale, force-complete, migrate", http.StatusBadRequest)
+		http.Error(w, "action must be one of: dispatch, undispatch, archive, unarchive, validate, stale, unstale, dismiss-stale, force-complete, migrate", http.StatusBadRequest)
 	}
 }
 

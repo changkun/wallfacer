@@ -186,6 +186,34 @@ func TestMarkStale_RejectsVague(t *testing.T) {
 	}
 }
 
+func TestUnstaleSpec_Success(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	stale := strings.Replace(testSpecValidated, "status: validated", "status: stale", 1)
+	writeTestSpec(t, ws, "specs/local/stale.md", stale)
+
+	w := doTransition(t, h.UnstaleSpec, "specs/local/stale.md")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/stale.md"); got != spec.StatusDrafted {
+		t.Errorf("status = %q, want %q", got, spec.StatusDrafted)
+	}
+}
+
+func TestUnstaleSpec_RejectsDrafted(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	drafted := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
+	writeTestSpec(t, ws, "specs/local/draft.md", drafted)
+
+	w := doTransition(t, h.UnstaleSpec, "specs/local/draft.md")
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusUnprocessableEntity, w.Body.String())
+	}
+	if got := readStatus(t, ws, "specs/local/draft.md"); got != spec.StatusDrafted {
+		t.Errorf("status mutated to %q, want unchanged drafted", got)
+	}
+}
+
 func TestDismissStaleCandidate_BumpsUpdatedKeepsStatus(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 	complete := strings.Replace(testSpecValidated, "status: validated", "status: complete", 1)
