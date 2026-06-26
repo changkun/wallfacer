@@ -55,7 +55,15 @@ function toggleAutomationMenu(e: MouseEvent) {
   };
   automationOpen.value = true;
 }
-const selectedTask = ref<Task | null>(null);
+// Track the open task by id, not by a held object reference. A `task-updated`
+// SSE delta replaces the task object in the store (stores/tasks.ts updateTask),
+// so a captured reference goes stale and the detail panel would keep rendering
+// the old status — no visual feedback on Start/Done/etc. Deriving from the
+// store keeps the open panel live as the task transitions.
+const selectedTaskId = ref<string | null>(null);
+const selectedTask = computed<Task | null>(() =>
+  selectedTaskId.value ? store.tasks.find((t) => t.id === selectedTaskId.value) ?? null : null,
+);
 // Optional tab to open the detail modal on, carried via ?tab= (command-palette
 // tab-switch jumps). Read once when the task opens.
 const initialTab = computed(() => (typeof route.query.tab === 'string' ? route.query.tab : ''));
@@ -64,14 +72,13 @@ const initialTab = computed(() => (typeof route.query.tab === 'string' ? route.q
 // can surface a task. Resolves the id against the loaded task list.
 function syncSelectedFromQuery() {
   const id = typeof route.query.task === 'string' ? route.query.task : '';
-  if (!id) { selectedTask.value = null; return; }
-  if (selectedTask.value?.id === id) return;
-  const t = store.tasks.find((x) => x.id === id);
-  if (t) selectedTask.value = t;
+  if (!id) { selectedTaskId.value = null; return; }
+  if (selectedTaskId.value === id) return;
+  if (store.tasks.some((x) => x.id === id)) selectedTaskId.value = id;
 }
 
 function closeDetail() {
-  selectedTask.value = null;
+  selectedTaskId.value = null;
   if (route.query.task || route.query.tab) {
     const q = { ...route.query };
     delete q.task; delete q.tab;
@@ -203,7 +210,7 @@ watch(
 );
 
 function selectTask(t: Task) {
-  selectedTask.value = t;
+  selectedTaskId.value = t.id;
 }
 
 async function onBacklogChange(evt: { moved?: { element: Task } }) {
