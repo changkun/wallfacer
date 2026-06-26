@@ -9,7 +9,7 @@ affects:
   - frontend/src/components/plan/
 effort: large
 created: 2026-06-14
-updated: 2026-06-25
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
