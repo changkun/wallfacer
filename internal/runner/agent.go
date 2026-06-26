@@ -47,7 +47,7 @@ type runAgentOpts struct {
 	// own their own span accounting can disable this.
 	EmitSpanEvents bool
 	// TrackUsage controls whether runAgent calls AccumulateSubAgentUsage
-	// + AppendTurnUsage on success. Task-free callers (planner commit,
+	// + AppendTurnUsage on success. Task-free callers (agent-session commit,
 	// health probes) set this to false.
 	TrackUsage bool
 	// Turn, when non-zero, is recorded as the TurnUsageRecord's turn

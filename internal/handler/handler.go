@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -20,7 +21,6 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/lazyval"
-	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/routine"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -187,7 +187,7 @@ type Handler struct {
 	ideationMu           sync.Mutex
 	ideationExploitRatio float64
 
-	planner         *agentsession.Runtime
+	agentSession         *agentsession.Runtime
 	commandRegistry *agentsession.CommandRegistry
 
 	// routineEngine multiplexes per-routine scheduled fires. Nil until
@@ -293,10 +293,10 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	return h
 }
 
-// SetPlanner sets the planner instance for planning sandbox operations.
-// Called by the server after both the handler and planner are constructed.
-func (h *Handler) SetPlanner(p *agentsession.Runtime) {
-	h.planner = p
+// SetAgentSession sets the agent-session runtime for agent-session operations.
+// Called by the server after both the handler and runtime are constructed.
+func (h *Handler) SetAgentSession(p *agentsession.Runtime) {
+	h.agentSession = p
 	h.commandRegistry = agentsession.NewCommandRegistry()
 }
 
@@ -356,9 +356,9 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	h.workspaces = snap.Workspaces
 	h.snapshotMu.Unlock()
 
-	// Update the planner's workspaces when the workspace group changes.
-	if h.planner != nil {
-		h.planner.UpdateWorkspaces(snap.Workspaces, snap.Key)
+	// Update the agent session's workspaces when the workspace group changes.
+	if h.agentSession != nil {
+		h.agentSession.UpdateWorkspaces(snap.Workspaces, snap.Key)
 	}
 
 	// Switching groups must also swap the automation toggle state so a

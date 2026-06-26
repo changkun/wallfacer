@@ -179,8 +179,8 @@ func (h *Handler) buildTaskModeSystemPrompt(ctx context.Context, taskID string) 
 // GetAgentSessionStatus reports whether the agent session is running.
 func (h *Handler) GetAgentSessionStatus(w http.ResponseWriter, _ *http.Request) {
 	running := false
-	if h.planner != nil {
-		running = h.planner.IsRunning()
+	if h.agentSession != nil {
+		running = h.agentSession.IsRunning()
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{
 		"running": running,
@@ -193,15 +193,15 @@ func (h *Handler) StartAgentSession(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
-	if h.planner == nil {
+	if h.agentSession == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
-	if h.planner.IsRunning() {
+	if h.agentSession.IsRunning() {
 		httpjson.Write(w, http.StatusOK, map[string]any{"running": true})
 		return
 	}
-	if err := h.planner.Start(r.Context()); err != nil {
+	if err := h.agentSession.Start(r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -210,8 +210,8 @@ func (h *Handler) StartAgentSession(w http.ResponseWriter, r *http.Request) {
 
 // StopAgentSession stops the agent session container.
 func (h *Handler) StopAgentSession(w http.ResponseWriter, _ *http.Request) {
-	if h.planner != nil {
-		h.planner.Stop()
+	if h.agentSession != nil {
+		h.agentSession.Stop()
 	}
 	httpjson.Write(w, http.StatusOK, map[string]any{"stopped": true})
 }
@@ -269,11 +269,11 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
-	if h.planner == nil {
+	if h.agentSession == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
-	if h.planner.IsBusy() {
+	if h.agentSession.IsBusy() {
 		httpjson.Write(w, http.StatusConflict, map[string]any{
 			"error": "agent is busy",
 		})
@@ -442,15 +442,15 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-start the agent session if not already running.
-	if !h.planner.IsRunning() {
-		if err := h.planner.Start(r.Context()); err != nil {
+	if !h.agentSession.IsRunning() {
+		if err := h.agentSession.Start(r.Context()); err != nil {
 			http.Error(w, "failed to start agent session: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	h.planner.SetBusy(true, threadID)
-	ll := h.planner.StartLiveLog()
+	h.agentSession.SetBusy(true, threadID)
+	ll := h.agentSession.StartLiveLog()
 
 	// Run exec in background goroutine. Use a detached context because the
 	// HTTP request context is cancelled as soon as the 202 response is sent.
@@ -460,14 +460,14 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			// frontend receives the stream EOF and immediately drains its
 			// message queue, the backend is already ready to accept the next
 			// request (otherwise the queued message races and gets a 409).
-			h.planner.SetBusy(false, "")
-			h.planner.CloseLiveLog()
+			h.agentSession.SetBusy(false, "")
+			h.agentSession.CloseLiveLog()
 			if rec := recover(); rec != nil {
 				slog.Error("agent exec panic", "recover", rec)
 			}
 		}()
 
-		handle, err := h.planner.Exec(context.Background(), cmd)
+		handle, err := h.agentSession.Exec(context.Background(), cmd)
 		if err != nil {
 			slog.Error("agent exec failed", "error", err)
 			return
@@ -513,9 +513,9 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			if historyCtx != "" {
 				retryPrompt = historyCtx + retryPrompt
 			}
-			ll2 := h.planner.StartLiveLog()
+			ll2 := h.agentSession.StartLiveLog()
 			retryCmd := []string{"-p", retryPrompt, "--verbose", "--output-format", "stream-json"}
-			retryHandle, retryErr := h.planner.Exec(context.Background(), retryCmd)
+			retryHandle, retryErr := h.agentSession.Exec(context.Background(), retryCmd)
 			if retryErr != nil {
 				slog.Error("agent retry exec failed", "error", retryErr)
 				return
@@ -524,7 +524,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			rawStdout, _ = io.ReadAll(retryTee)
 			_, _ = io.ReadAll(retryHandle.Stderr())
 			_, _ = retryHandle.Wait()
-			h.planner.CloseLiveLog()
+			h.agentSession.CloseLiveLog()
 
 			sessionID = agentsession.ExtractSessionID(rawStdout)
 			if sessionID != "" {
@@ -654,7 +654,7 @@ func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, first
 	if err != nil || !agentsession.IsDefaultThreadName(meta.Name) {
 		return
 	}
-	title, err := h.runner.GeneratePlanningThreadTitle(context.Background(), firstMessage)
+	title, err := h.runner.GenerateAgentSessionTitle(context.Background(), firstMessage)
 	if err != nil {
 		slog.Warn("agent session auto-title failed", "thread", threadID, "err", err)
 		return
@@ -674,7 +674,7 @@ func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, first
 // query parameter does not match the thread that owns the exec.
 func (h *Handler) StreamAgentMessages(w http.ResponseWriter, r *http.Request) {
 	// Hidden workspace: nothing to stream, matching /api/config.
-	if h.planner == nil || h.workspaceHiddenFromRequest(r) {
+	if h.agentSession == nil || h.workspaceHiddenFromRequest(r) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -689,7 +689,7 @@ func (h *Handler) StreamAgentMessages(w http.ResponseWriter, r *http.Request) {
 	// connecting here and the exec goroutine creating the live log.
 	var lr *livelog.Reader
 	for range 20 { // up to ~2s
-		lr = h.planner.LogReader(threadID)
+		lr = h.agentSession.LogReader(threadID)
 		if lr != nil {
 			break
 		}
@@ -747,12 +747,12 @@ func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) 
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
-	if h.planner == nil {
+	if h.agentSession == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	if threadID := strings.TrimSpace(r.URL.Query().Get("thread")); threadID != "" {
-		owner := h.planner.BusyThreadID()
+		owner := h.agentSession.BusyThreadID()
 		if owner != "" && owner != threadID {
 			httpjson.Write(w, http.StatusConflict, map[string]any{
 				"error": "a different thread is currently running",
@@ -760,7 +760,7 @@ func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-	if err := h.planner.Interrupt(); err != nil {
+	if err := h.agentSession.Interrupt(); err != nil {
 		httpjson.Write(w, http.StatusConflict, map[string]any{"error": err.Error()})
 		return
 	}

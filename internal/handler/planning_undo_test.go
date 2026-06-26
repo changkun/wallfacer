@@ -293,7 +293,7 @@ func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	h.planner = p
+	h.agentSession = p
 
 	ctx := context.Background()
 	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
@@ -363,7 +363,7 @@ func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	h.planner = p
+	h.agentSession = p
 
 	ctx := context.Background()
 	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
@@ -425,7 +425,7 @@ func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
 	h := newTestHandler(t)
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	h.planner = p
+	h.agentSession = p
 
 	ctx := context.Background()
 	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})
@@ -464,7 +464,7 @@ func TestUndo_FileMode_Unchanged(t *testing.T) {
 	// Attach a planner whose active thread is in spec-mode (no FocusedTask).
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	h.planner = p
+	h.agentSession = p
 
 	specThreadID := p.Sessions().ActiveID()
 	// Do NOT set FocusedTask — this keeps the thread in spec-mode.
@@ -502,7 +502,7 @@ func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
 
 	p := newPlannerWithStore(t)
 	_ = p.Start(context.Background())
-	h.planner = p
+	h.agentSession = p
 
 	ctx := context.Background()
 	tsk, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 60})

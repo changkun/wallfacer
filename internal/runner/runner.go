@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/flow"
@@ -26,7 +27,6 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/syncmap"
 	"latere.ai/x/wallfacer/internal/pkg/trackedwg"
 	"latere.ai/x/wallfacer/internal/pkg/yamlwatch"
-	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -162,9 +162,9 @@ type Runner struct {
 	backgroundWg           trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
-	autosubmitFn           func() bool      // returns true when auto-submit is enabled
-	ideationExploitRatioFn func() float64   // returns the current exploitation ratio (0–1)
-	planner                *agentsession.Runtime // planning sandbox for ideation and chat; may be nil
+	autosubmitFn           func() bool           // returns true when auto-submit is enabled
+	ideationExploitRatioFn func() float64        // returns the current exploitation ratio (0–1)
+	agentSession                *agentsession.Runtime // agent session for ideation and chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
@@ -297,10 +297,10 @@ func (r *Runner) SetIdeationExploitRatioFunc(fn func() float64) {
 	r.ideationExploitRatioFn = fn
 }
 
-// SetPlanner registers the planning sandbox so that ideation runs through
-// the long-lived planning worker container instead of ephemeral containers.
-func (r *Runner) SetPlanner(p *agentsession.Runtime) {
-	r.planner = p
+// SetAgentSession registers the agent session so that ideation runs through
+// the long-lived agent-session worker container instead of ephemeral containers.
+func (r *Runner) SetAgentSession(p *agentsession.Runtime) {
+	r.agentSession = p
 }
 
 // ideationExploitRatio returns the current exploitation ratio (0-1) for ideation.

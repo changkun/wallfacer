@@ -19,10 +19,10 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/runner"
 
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -1663,7 +1663,7 @@ func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
 	}
 
 	// Pin the planner thread to this task and mark it busy (in-flight turn).
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -1671,8 +1671,8 @@ func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
 	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: task.ID.String()})
-	h.planner.SetBusy(true, threadID)
-	defer h.planner.SetBusy(false, "")
+	h.agentSession.SetBusy(true, threadID)
+	defer h.agentSession.SetBusy(false, "")
 
 	// tryAutoPromote must skip the locked task even though there is capacity.
 	h.tryAutoPromote(ctx)

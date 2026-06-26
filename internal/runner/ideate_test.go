@@ -1219,7 +1219,7 @@ func TestIdeationViaPlanner(t *testing.T) {
 		Workspaces:  r.workspaces,
 		Fingerprint: "test-fp",
 	})
-	r.SetPlanner(p)
+	r.SetAgentSession(p)
 
 	// Planner is not started — auto-start should happen inside RunIdeation.
 	if p.IsRunning() {
@@ -1266,7 +1266,7 @@ func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
 		Workspaces:  r.workspaces,
 		Fingerprint: "test-fp",
 	})
-	r.SetPlanner(p)
+	r.SetAgentSession(p)
 
 	ctx := context.Background()
 	// RunIdeation should not panic or retry with Codex — it should return

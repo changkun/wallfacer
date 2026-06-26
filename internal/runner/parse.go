@@ -23,7 +23,7 @@ func parseOutput(raw string) (*agentOutput, error) {
 	}
 	// Scan NDJSON backwards for the terminal result line (non-empty
 	// stop_reason), falling back to the last valid JSON object. Every line is a
-	// candidate here — unlike the planner, runner output carries no type gate.
+	// candidate here — unlike the agent session, runner output carries no type gate.
 	out, ok := ndjson.PreferResultLine(raw, true, nil,
 		func(o *agentOutput) bool { return o.StopReason != "" })
 	if !ok {

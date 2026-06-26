@@ -16,13 +16,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
-	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -4503,7 +4503,7 @@ func TestPatchTask_RejectedWhenLocked(t *testing.T) {
 	}
 
 	// Pin the thread to this task and start an in-flight turn.
-	tm := h.planner.Sessions()
+	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
 		t.Fatal("expected at least one thread")
@@ -4511,8 +4511,8 @@ func TestPatchTask_RejectedWhenLocked(t *testing.T) {
 	threadID := threads[0].ID
 	cs, _ := tm.Store(threadID)
 	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: task.ID.String()})
-	h.planner.SetBusy(true, threadID)
-	defer h.planner.SetBusy(false, "")
+	h.agentSession.SetBusy(true, threadID)
+	defer h.agentSession.SetBusy(false, "")
 
 	// Attempt to move the task to in_progress — should be rejected with 409.
 	body := `{"status":"in_progress"}`

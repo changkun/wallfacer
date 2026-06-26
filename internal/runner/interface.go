@@ -53,7 +53,7 @@ type Interface interface {
 	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error)
 
 	// Commit-message generation (task-free flavor). Used by callers that do
-	// not have a task ID in scope, e.g. the planning commit pipeline.
+	// not have a task ID in scope, e.g. the plan commit pipeline.
 	GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error)
 
 	// Drift assessment (task-free flavor). Runs a one-shot agent comparing a
@@ -61,12 +61,12 @@ type Interface interface {
 	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
-	// Planning-thread title generation (task-free flavor). Names a chat
+	// Agent-session title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.
-	GeneratePlanningThreadTitle(ctx context.Context, firstUserMessage string) (string, error)
+	GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error)
 
 	// Auto-push for a single workspace (task-free flavor). Used by callers
-	// that do not have a task ID in scope, e.g. the planning commit pipeline.
+	// that do not have a task ID in scope, e.g. the plan commit pipeline.
 	MaybeAutoPushWorkspace(ctx context.Context, ws string)
 
 	// Ideation.

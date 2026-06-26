@@ -55,9 +55,9 @@ type MockRunner struct {
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
-	// GeneratePlanningThreadTitleFn lets tests stub the task-free planning
+	// GenerateAgentSessionTitleFn lets tests stub the task-free agent-session
 	// thread title generation. When nil, the method returns ("", nil).
-	GeneratePlanningThreadTitleFn func(ctx context.Context, firstUserMessage string) (string, error)
+	GenerateAgentSessionTitleFn func(ctx context.Context, firstUserMessage string) (string, error)
 }
 
 // compile-time assertion.
@@ -239,11 +239,11 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 	return spec.DriftVerdict{}, nil
 }
 
-// GeneratePlanningThreadTitle delegates to GeneratePlanningThreadTitleFn when
+// GenerateAgentSessionTitle delegates to GenerateAgentSessionTitleFn when
 // set; the default returns ("", nil) so callers skip the rename.
-func (m *MockRunner) GeneratePlanningThreadTitle(ctx context.Context, firstUserMessage string) (string, error) {
-	if m.GeneratePlanningThreadTitleFn != nil {
-		return m.GeneratePlanningThreadTitleFn(ctx, firstUserMessage)
+func (m *MockRunner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error) {
+	if m.GenerateAgentSessionTitleFn != nil {
+		return m.GenerateAgentSessionTitleFn(ctx, firstUserMessage)
 	}
 	return "", nil
 }
