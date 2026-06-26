@@ -73,7 +73,7 @@ func TestSmokeReleaseEmitsEvidence(t *testing.T) {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("/api/debug/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `<!doctype html><html><head><script src="%s"></script></head><body></body></html>`, asset)
+		_, _ = fmt.Fprintf(w, `<!doctype html><html><head><script src="%s"></script></head><body></body></html>`, asset)
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
