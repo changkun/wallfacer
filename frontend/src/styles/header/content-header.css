@@ -412,7 +412,7 @@
    column rather than empty canvas. */
 .col-bg {
   background: var(--bg-sunk);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   padding: var(--sp-4) var(--sp-3) var(--sp-3);
   gap: var(--sp-2);
   /* Recessed well: cards sit visibly above the tray floor. */
