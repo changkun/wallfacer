@@ -164,7 +164,7 @@ type Runner struct {
 	onStopReason           func(taskID uuid.UUID, stopReason string)
 	autosubmitFn           func() bool           // returns true when auto-submit is enabled
 	ideationExploitRatioFn func() float64        // returns the current exploitation ratio (0–1)
-	agentSession                *agentsession.Runtime // agent session for ideation and chat; may be nil
+	agentSession           *agentsession.Runtime // agent session for ideation and chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by

@@ -187,7 +187,7 @@ type Handler struct {
 	ideationMu           sync.Mutex
 	ideationExploitRatio float64
 
-	agentSession         *agentsession.Runtime
+	agentSession    *agentsession.Runtime
 	commandRegistry *agentsession.CommandRegistry
 
 	// routineEngine multiplexes per-routine scheduled fires. Nil until

@@ -52,12 +52,12 @@ type ServerConfig struct {
 
 // ServerComponents holds the initialized server components returned by initServer.
 type ServerComponents struct {
-	Srv     *http.Server
-	Ln      net.Listener
-	Runner  *runner.Runner
+	Srv          *http.Server
+	Ln           net.Listener
+	Runner       *runner.Runner
 	AgentSession *agentsession.Runtime
-	Ctx     context.Context
-	Stop    context.CancelFunc
+	Ctx          context.Context
+	Stop         context.CancelFunc
 
 	// ActualPort is the TCP port the listener is bound to.
 	ActualPort int
@@ -433,13 +433,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	}
 
 	return &ServerComponents{
-		Srv:        srv,
-		Ln:         ln,
-		Runner:     r,
-		AgentSession:    p,
-		Ctx:        ctx,
-		Stop:       stop,
-		ActualPort: actualPort,
+		Srv:          srv,
+		Ln:           ln,
+		Runner:       r,
+		AgentSession: p,
+		Ctx:          ctx,
+		Stop:         stop,
+		ActualPort:   actualPort,
 	}
 }
 
