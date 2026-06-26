@@ -774,6 +774,13 @@ func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 
+	// Reserve the in-flight slot so a manual trigger neither double-fires on a
+	// double-click nor stacks on top of an auto-agon run for the same task.
+	if !h.beginAgon(id) {
+		http.Error(w, "agon verification already running for this task", http.StatusConflict)
+		return
+	}
+
 	// Compute the planned state directory for the response. The engine will
 	// create a session subdirectory inside it; the exact path is set on the
 	// task after the run completes via UpdateTaskAgon.
@@ -784,6 +791,7 @@ func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 
 	go func() {
+		defer h.endAgon(id)
 		if err := h.runAgon(context.Background(), *task); err != nil {
 			logger.Handler.Warn("agon: manual verification run failed",
 				"task", id, "error", err)
