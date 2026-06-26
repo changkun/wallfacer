@@ -1,4 +1,4 @@
-// Slash command + @-file autocomplete for the planning-chat composer.
+// Slash command + @-file autocomplete for the agent-session chat composer.
 // Extracted from AgentChatPanel.vue so the bulky state + keyboard
 // matrix lives in one place; the SFC just wires events.
 //
@@ -97,7 +97,7 @@ export function useAgentAutocomplete(opts: {
     slashOpen.value = false;
 
     // Mention detection + ranking via the shared lib/mentions helpers, so the
-    // planning composer ranks identically to the other @-mention surface
+    // agent composer ranks identically to the other @-mention surface
     // (useMentions) instead of an unranked substring match.
     const mq = mentionQueryAt(value, pos);
     if (mq) {

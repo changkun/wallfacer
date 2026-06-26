@@ -1,9 +1,9 @@
-// useChatSession — the planning-chat conversation lifecycle, extracted from
+// useChatSession — the agent-session chat lifecycle, extracted from
 // AgentChatPanel so multiple surfaces (the dedicated Chat view, the spec-mode
 // floating popup, the legacy docked panel) drive identical behaviour from one
 // implementation. Owns the rendered message list, streaming, the per-thread send
 // queue, thread switching/rename/archive, and per-round undo. Reads and writes
-// the planning store; introduces no new persistent state.
+// the agent store; introduces no new persistent state.
 //
 // A host component calls useChatSession() once in setup and passes the returned
 // object to <ChatMessageList :session> and wires <ChatComposer @send @interrupt>
@@ -75,13 +75,13 @@ export interface ChatSession {
 }
 
 export function useChatSession(): ChatSession {
-  const planning = useAgentStore();
+  const agentStore = useAgentStore();
   const tasks = useTaskStore();
   const dialog = useDialogStore();
   const {
     threads, threadOrder, activeThreadId,
     streaming, streamingThreadId, busyThreadId, focusedSpecPath,
-  } = storeToRefs(planning);
+  } = storeToRefs(agentStore);
 
   const messagesEl = ref<HTMLElement | null>(null);
   const userScrolledUp = ref(false);
@@ -334,7 +334,7 @@ export function useChatSession(): ChatSession {
     let tries = 0;
     const tick = async () => {
       tries++;
-      await planning.refreshBusy();
+      await agentStore.refreshBusy();
       const cur = threads.value[threadID];
       if (!cur || !/^Chat \d+$/.test(cur.name) || tries >= 10) {
         titleTimer = null;
@@ -557,7 +557,7 @@ export function useChatSession(): ChatSession {
     }
     const id = created.id;
     draft.value = false;
-    await planning.loadThreads();
+    await agentStore.loadThreads();
     // Activate the new thread and load its (empty) history. Any racing load —
     // the watcher's, or one loadThreads above may have triggered — is made safe
     // by historyToken: the optimistic push in sendMessage bumps it, so a late
@@ -659,7 +659,7 @@ export function useChatSession(): ChatSession {
         appendSystem('Archive failed: HTTP ' + res.status);
         return;
       }
-      await planning.loadThreads();
+      await agentStore.loadThreads();
       if (activeThreadId.value && activeThreadId.value !== id) await loadHistory();
       else if (threadOrder.value.length > 0) await switchToThread(threadOrder.value[0]);
       else renderedMessages.value = [];
@@ -671,7 +671,7 @@ export function useChatSession(): ChatSession {
   async function unarchiveThread(id: string) {
     try {
       await api('PATCH', '/api/agent/sessions/' + encodeURIComponent(id), { state: 'visible' });
-      await planning.loadThreads();
+      await agentStore.loadThreads();
       await switchToThread(id);
       archiveMenuOpen.value = false;
     } catch (e) {
@@ -701,7 +701,7 @@ export function useChatSession(): ChatSession {
         appendSystem('Delete failed: HTTP ' + res.status);
         return;
       }
-      await planning.loadThreads();
+      await agentStore.loadThreads();
     } catch (e) {
       appendSystem('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
     }
@@ -755,7 +755,7 @@ export function useChatSession(): ChatSession {
         `↺ Undid round ${body.round ?? '?'}${body.summary ? ' — ' + body.summary : ''}`,
       );
       // Best-effort tree refresh.
-      void planning.fetchTree();
+      void agentStore.fetchTree();
     } catch (e) {
       appendSystem('Undo failed: ' + (e instanceof Error ? e.message : 'network error'));
     }
@@ -814,14 +814,14 @@ export function useChatSession(): ChatSession {
     () => JSON.stringify(tasks.config?.workspaces ?? []),
     () => {
       void (async () => {
-        await planning.loadThreads();
+        await agentStore.loadThreads();
         await loadHistory();
       })();
     },
   );
 
   onMounted(async () => {
-    await planning.loadThreads();
+    await agentStore.loadThreads();
     await loadHistory();
   });
 
