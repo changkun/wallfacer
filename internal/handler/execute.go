@@ -792,7 +792,7 @@ func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 	go func() {
 		defer h.endAgon(id)
-		if err := h.runAgon(context.Background(), *task); err != nil {
+		if err := h.runAgon(context.Background(), s, *task); err != nil {
 			logger.Handler.Warn("agon: manual verification run failed",
 				"task", id, "error", err)
 		}
