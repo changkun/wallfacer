@@ -1,6 +1,6 @@
 ---
 title: Inline Diff Review Comments
-status: drafted
+status: archived
 depends_on: []
 affects:
   - frontend/src/components/TaskDetail.vue
@@ -16,6 +16,14 @@ dispatched_task_id: null
 ---
 
 # Inline Diff Review Comments
+
+Archived (2026-06-26). Folded back into the revived, canonical
+[[inline-diff-feedback]] (`specs/local/inline-diff-feedback.md`), which now carries
+this Vue-targeted design plus the new login-gating requirement (the inline review
+surface is restricted to signed-in users, enforced server-side like spec comments)
+and owns the `submitFeedback` `feedback`/`message` key-bug fix this spec had
+deferred. Implement from inline-diff-feedback.md; this file is kept only for
+history.
 
 Supersedes the archived [[inline-diff-feedback]]
 (`specs/local/inline-diff-feedback.md`), which was written against the deleted
