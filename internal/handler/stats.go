@@ -27,7 +27,7 @@ type StatsResponse struct {
 	ByFailureCategory map[store.FailureCategory]UsageStat `json:"by_failure_category"`
 	TopTasks          []TaskCostEntry                     `json:"top_tasks"`
 	DailyUsage        []DayStat                           `json:"daily_usage"`
-	AgentSessions          map[string]AgentSessionGroupStat        `json:"agent_sessions"`
+	AgentSessions     map[string]AgentSessionGroupStat    `json:"agent_sessions"`
 }
 
 // AgentSessionGroupStat aggregates agent-session round usage for one workspace group.
@@ -101,7 +101,7 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		ByActivity:        make(map[store.SandboxActivity]UsageStat),
 		ByWorkspace:       make(map[string]UsageStat),
 		ByFailureCategory: make(map[store.FailureCategory]UsageStat),
-		AgentSessions:          make(map[string]AgentSessionGroupStat),
+		AgentSessions:     make(map[string]AgentSessionGroupStat),
 	}
 
 	dailyMap := make(map[string]*DayStat)
@@ -242,8 +242,8 @@ func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, sin
 	if configDir == "" {
 		return result
 	}
-	planningDir := store.AgentSessionsRoot(configDir)
-	entries, err := os.ReadDir(planningDir)
+	agentSessionDir := store.AgentSessionsRoot(configDir)
+	entries, err := os.ReadDir(agentSessionDir)
 	if err != nil {
 		return result
 	}
@@ -283,7 +283,7 @@ func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, sin
 		stat.Timeline = timeline
 		if key == activeKey {
 			stat.Paths = slices.Clone(activeWorkspaces)
-			stat.Label = planningGroupLabel(activeWorkspaces)
+			stat.Label = agentSessionGroupLabel(activeWorkspaces)
 		} else {
 			stat.Label = key
 		}
@@ -292,9 +292,9 @@ func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, sin
 	return result
 }
 
-// planningGroupLabel builds a human-readable label from a workspace group's
+// agentSessionGroupLabel builds a human-readable label from a workspace group's
 // paths by joining their basenames. Empty input yields an empty string.
-func planningGroupLabel(paths []string) string {
+func agentSessionGroupLabel(paths []string) string {
 	if len(paths) == 0 {
 		return ""
 	}
