@@ -1,6 +1,6 @@
 ---
 title: Shared Postgres Store and Migrations
-status: complete
+status: archived
 depends_on:
   - specs/cloud/latere-integration/coordination-plane/spec-comments.md
 affects:
