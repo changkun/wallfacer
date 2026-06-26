@@ -271,15 +271,6 @@ graph LR
 Use relative links from the parent spec to the child spec files. If the parent
 already has a breakdown section, replace its contents.
 
-**Tasks mode: auto-validate the parent.** Requesting an implementation
-breakdown is an explicit signal to proceed. After the child task specs are
-written, if the parent spec is still `drafted`, transition it to `validated`
-(set `status: validated` and bump `updated`). This mirrors the focused-view
-Validate action and keeps the validation gate meaningful — a parent whose
-leaves are ready to dispatch is itself settled. Skip the bump if the parent is
-already `validated` or later. Design mode does not auto-validate (the parent
-still needs iteration).
-
 ## Step 7: Commit
 
 Stage the new folder, child spec files, and the updated parent spec. Commit:
@@ -299,4 +290,4 @@ Report to the user:
 - Suggested next steps:
   - Design mode: "Iterate on sub-designs, then `/wf-spec-breakdown <child> tasks`
     when each is validated"
-  - Tasks mode: "Run `/wf-review-breakdown <spec>` to validate, then dispatch"
+  - Tasks mode: "Run `/wf-spec-review-breakdown <spec>` to validate, then dispatch"

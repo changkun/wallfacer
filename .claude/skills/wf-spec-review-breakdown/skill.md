@@ -1,5 +1,5 @@
 ---
-name: wf-review-breakdown
+name: wf-spec-review-breakdown
 description: Validate a task breakdown for correctness — check dependency ordering, task sizing, gap coverage, and boundary conflicts. Use after wf-spec-breakdown to catch issues before implementation.
 argument-hint: <spec-file.md or task-folder/>
 allowed-tools: Read, Grep, Glob, Agent, Bash(ls *)
@@ -21,9 +21,9 @@ whose name matches the directory).
 ## Step 1: Load the breakdown
 
 1. Read the parent spec in full. **Parse its YAML frontmatter** to extract
-   `title`, `status`, `track`, `depends_on`, `affects`, `effort`.
+   `title`, `status`, `depends_on`, `affects`, `effort`.
 2. Read every child spec file in the subdirectory. **Parse each child's YAML
-   frontmatter** — extract `title`, `status`, `track`, `depends_on`, `affects`,
+   frontmatter** — extract `title`, `status`, `depends_on`, `affects`,
    `effort`, `dispatched_task_id`.
 3. Read `specs/README.md` for track context and cross-spec dependencies.
 

@@ -62,32 +62,48 @@ For dispatch, build the task's `DependsOn` list:
 3. For dependencies that are neither complete nor dispatched, omit them but
    flag a warning — the task won't have a dependency edge for these.
 
-## Step 4: Execute
+## Step 4: Execute (via the server transition API)
+
+The server owns dispatch atomically — it creates the board task with a
+pre-assigned UUID, resolves dependency edges, sets the spec `validated`, writes
+`dispatched_task_id`, and commits the frontmatter, all in one transaction (a
+folder/non-leaf path expands into its subtree leaves and promotes drafted
+ancestors to `validated`). Do not hand-roll task creation or edit frontmatter
+yourself when the server is reachable.
 
 ### Dispatch:
 
-Call `POST /api/specs/dispatch` with the spec path(s). If the endpoint doesn't
-exist yet (pre-implementation), fall back to:
-
-1. Call `POST /api/tasks` (or `POST /api/tasks/batch` for multi-dispatch) with:
-   - `prompt`: the spec body (everything below the frontmatter)
-   - `goal`: the spec title
-   - `depends_on`: the resolved task UUIDs from Step 3
-2. On success, update the spec file's frontmatter: set `dispatched_task_id` to
-   the returned task UUID and `updated` to today's date.
+`POST /api/specs/transition` with:
+```json
+{ "action": "dispatch", "paths": ["<workspace-relative spec path>"], "run": false }
+```
+- `paths` takes one or more specs (batch). `run: true` also moves the created
+  task to `in_progress` immediately; default `false` leaves it queued.
+- The response carries the created task UUID(s). The server has already written
+  `dispatched_task_id` + `status: validated` and committed — you do not edit the
+  file or commit.
 
 ### Undispatch:
 
-1. Cancel the linked task via `POST /api/tasks/{id}/cancel`.
-2. Clear the spec's `dispatched_task_id` (set to `null`).
-3. Set the spec's `status` back to `validated` if it was changed.
-4. Update `updated` to today's date.
+`POST /api/specs/transition` with `{ "action": "undispatch", "paths": ["<path>"] }`.
+The server cancels the linked task if still active, clears `dispatched_task_id`,
+resets `status` to `validated`, and commits.
+
+### Fallback (server unreachable only):
+
+If `POST /api/specs/transition` is not reachable, fall back to `POST /api/tasks`
+(or `/api/tasks/batch`) with `prompt` = the spec body, `goal` = the title,
+`depends_on` = the resolved task UUIDs (Step 3); then edit the spec frontmatter
+(`dispatched_task_id`, `updated`) by hand and commit. Flag clearly that this path
+loses the server's atomicity (a failed task create can leave a dangling link).
 
 ## Step 5: Update spec file
 
-Use Edit to update the spec file's YAML frontmatter in place. Only modify the
-fields that changed (`dispatched_task_id`, `updated`, optionally `status`). Do
-not touch the markdown body.
+Normally there is nothing to do here — the transition API already wrote and
+committed the frontmatter (`dispatched_task_id`, `status`, `updated`). Only on the
+unreachable-server fallback do you edit the YAML frontmatter in place (changed
+fields only — `dispatched_task_id`, `updated`, optionally `status`), leaving the
+markdown body untouched.
 
 ## Step 6: Summary
 
@@ -101,10 +117,12 @@ Report to the user:
 
 - This skill is the bridge between the spec world and the task board. It should
   feel like a single action, not a multi-step process.
-- Prefer the atomic `POST /api/specs/dispatch` endpoint when available. Fall
-  back to manual task creation + spec update only if the endpoint isn't
-  implemented yet.
-- For batch dispatch (multiple specs), resolve all dependency wiring before
-  creating any tasks, then create them atomically via `POST /api/tasks/batch`.
-- Do NOT push or commit. The spec file update is a local file change. The user
-  decides when to commit.
+- Prefer the atomic `POST /api/specs/transition` (`action: dispatch`) endpoint —
+  it creates the task, sets `validated` + `dispatched_task_id`, and commits in one
+  transaction. Fall back to manual task creation + spec edit only when the server
+  is unreachable.
+- For batch dispatch, pass multiple specs in one `paths` array so the server wires
+  dependencies and creates tasks together.
+- The transition API commits its own frontmatter change. Do not push. On the
+  unreachable-server fallback only, the hand-edited frontmatter is a local change
+  the user decides when to commit.

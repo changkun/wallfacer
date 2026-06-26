@@ -1,5 +1,5 @@
 ---
-name: refine
+name: wf-spec-refine
 description: Refine a spec markdown file by removing already-completed items and updating remaining items to reflect the current project state. Optionally accepts feedback after the file path to guide specific changes (e.g., rewrite scope, change priorities, add/remove items). Use when a spec has drifted from reality and needs to be brought up to date.
 argument-hint: <spec-file.md> [feedback...]
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(git log *), Bash(git show *), Bash(git diff *), Bash(ls *)
@@ -29,7 +29,7 @@ of removing them per rule 3a).
 ## Step 1: Read the spec
 
 Read the spec file identified in Step 0. **Parse YAML frontmatter** to extract
-`title`, `status`, `track`, `depends_on`, `affects`, `effort`, `created`,
+`title`, `status`, `depends_on`, `affects`, `effort`, `created`,
 `updated`, `author`, `dispatched_task_id`.
 
 Note the current lifecycle state — this guides the refinement:

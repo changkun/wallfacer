@@ -1,5 +1,5 @@
 ---
-name: wf-review-impl
+name: wf-spec-review-impl
 description: Review an implementation against its spec or task. Check that acceptance criteria are met, no unintended changes were made, and tests cover the requirements. Use after implement-spec or after a task completes.
 argument-hint: <spec-file.md or task-file.md> [commit-range]
 allowed-tools: Read, Grep, Glob, Agent, Bash(git diff *), Bash(git log *), Bash(git show *), Bash(go test *), Bash(ls *)
@@ -21,7 +21,7 @@ spec's task breakdown or the commit tagged in the task's status change to "Done"
 ## Step 1: Load the requirements
 
 1. Read the spec or task file in full. **Parse YAML frontmatter** to extract
-   `title`, `status`, `track`, `depends_on`, `affects`, `effort`.
+   `title`, `status`, `depends_on`, `affects`, `effort`.
 2. Extract acceptance criteria, "What to do" steps, "Tests" requirements, and
    "Boundaries" constraints from the body.
 3. Use the `affects` list from frontmatter as the expected set of files that
