@@ -1,6 +1,6 @@
 ---
 title: Shared Postgres Store and Migrations
-status: validated
+status: complete
 depends_on:
   - specs/cloud/latere-integration/coordination-plane/spec-comments.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - go.mod
 effort: medium
 created: 2026-06-25
-updated: 2026-06-25
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
@@ -198,11 +198,8 @@ gate `commentstore_contract_test.go` already uses.
 Implementation fully shipped on `main`, 2026-06-25. Commits `518ceb91` (package +
 migrations + deps) and `c2fb54f2` (coordinator/CLI switch to the injected pool).
 Verified against a real Postgres 16 container; all touched-package tests pass.
-Frontmatter stays `validated`, not `complete`: per the document model the
-`validated → complete` jump is rejected, `complete` is reachable only through the
-drift-pipeline `testing` gate (the pipeline is the sole writer of `testing`), so
-the code shipping does not by itself promote the spec. Promotion is left to that
-gate.
+Frontmatter promoted to `complete` 2026-06-26 after full implementation was
+confirmed shipped on `main`.
 
 ### What was done
 

@@ -1,6 +1,6 @@
 ---
 title: Multi-User Collaboration (Org-Scoped Board)
-status: drafted
+status: stale
 depends_on:
   - specs/foundations/storage-backends.md
 affects:
@@ -16,7 +16,7 @@ affects:
   - docs/guide/
 effort: xlarge
 created: 2026-04-18
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
