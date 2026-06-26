@@ -45,12 +45,6 @@ const props = defineProps<{
   specPath: string;
 }>();
 
-const emit = defineEmits<{
-  // True while the margin rail occupies the right gutter, so the parent reserves
-  // padding (shared with the floating TOC) to keep prose clear of it.
-  (e: 'reserve', value: boolean): void;
-}>();
-
 const auth = useAuthStore();
 
 // available gates the whole layer. It starts false and flips true only after a
@@ -224,10 +218,12 @@ onUnmounted(() => {
 // fresh card lands near its anchor instead of stacking at the top.
 const RAIL_FALLBACK_H = 60;
 const RAIL_GAP = 10;
-// Below this pane width the content column (52em ≈ 728px) + rail + the TOC
-// reserve no longer fit, so the rail would overlap the prose: fold it by
-// default (the inline marks stay the affordance). 28(pad) + 728 + 16(inset) +
-// 280(rail) + 208(toc reserve) ≈ 1260.
+// Below this pane width the content column (52em ≈ 728px) and the rail no longer
+// fit side by side, so the rail would overlap the prose: fold it by default (the
+// inline marks stay the affordance). The rail lives in the natural right gutter
+// beyond the capped prose (no parent padding reserve), so comments alone need
+// 28(pad) + 728 + 16(inset) + 280(rail) ≈ 1052; 1260 keeps headroom for the case
+// where the floating TOC also reserves a gutter that shrinks the host.
 const RAIL_MIN_PANE = 1260;
 
 const cardHeights = ref<Map<string, number>>(new Map());
@@ -245,8 +241,8 @@ function toggleFold() { userFold.value = !railFolded.value; }
 watch(narrow, () => { if (!composing.value) userFold.value = null; });
 
 // Track the scrolling pane's width (the .sf-body), not the host content box:
-// the host's content width shrinks when the rail reserves its gutter, which
-// would oscillate the fold decision; the pane width is stable across folds.
+// the host's content width shrinks when the floating TOC reserves its gutter,
+// which would oscillate the fold decision; the pane width is stable across folds.
 let paneRo: ResizeObserver | undefined;
 function observePane() {
   if (typeof ResizeObserver === 'undefined') return;
@@ -270,13 +266,6 @@ const railCards = computed(() => {
   const tops = layoutCards(boxes, RAIL_GAP);
   return list.map((t) => ({ thread: t, top: tops.get(t.id) ?? 0 }));
 });
-
-// Reserve the gutter while the rail shows cards (mirrors FloatingToc's reserve).
-watch(
-  () => railCards.value.length > 0 && !railFolded.value,
-  (occupies) => emit('reserve', occupies),
-  { immediate: true },
-);
 
 // Per-card height measurement. The observer feeds offsetHeight into a reactive
 // map; railCards re-runs layoutCards on any change (expand/collapse, streamed
@@ -360,6 +349,12 @@ function onSelectionChangeDebounced() {
 // selection's start line, the same coordinate space as the thread cards.
 const composeTop = ref(0);
 
+// Template refs for the compose/reply inputs. The `autofocus` attribute only
+// fires for elements present at initial document parse, never for these
+// dynamically-mounted cards, so focus is driven programmatically on open.
+const composeEl = ref<HTMLTextAreaElement | null>(null);
+const replyEl = ref<HTMLTextAreaElement | null>(null);
+
 function startCompose() {
   composing.value = true;
   newBody.value = '';
@@ -371,6 +366,8 @@ function startCompose() {
     const block = blockForLine(collectSourceBlocks(root), sel.startLine);
     composeTop.value = block ? block.top : 0;
   }
+  // Focus after the card renders so users type immediately, no extra click.
+  nextTick(() => composeEl.value?.focus());
 }
 
 async function submitNew() {
@@ -411,6 +408,8 @@ function toggleThread(id: string) {
   replyBody.value = '';
   // Clicking an inline mark while the rail is folded should reveal its card.
   if (opening && railFolded.value) userFold.value = false;
+  // Focus the reply box on open so users type a reply without an extra click.
+  if (opening) nextTick(() => replyEl.value?.focus());
 }
 
 async function submitReply() {
@@ -578,11 +577,11 @@ defineExpose({ openCount, showResolved, available });
       >
         <blockquote class="sc-quote">{{ selection.exact }}</blockquote>
         <textarea
+          ref="composeEl"
           v-model="newBody"
           class="sc-textarea"
           rows="3"
           placeholder="Add a comment. Markdown supported."
-          autofocus
           @keydown.meta.enter="submitNew"
           @keydown.ctrl.enter="submitNew"
         />
@@ -655,6 +654,7 @@ defineExpose({ openCount, showResolved, available });
           </div>
           <div class="sc-reply">
             <textarea
+              ref="replyEl"
               v-model="replyBody"
               class="sc-textarea"
               rows="2"
@@ -891,13 +891,14 @@ defineExpose({ openCount, showResolved, available });
 }
 
 /* Margin comment rail: cards float in the right gutter of the scrolling body,
-   each absolutely positioned at its anchor's resolved top (see layoutCards). It
-   sits left of the floating TOC; the body reserves the gutter via 'reserve'. */
+   each absolutely positioned at its anchor's resolved top (see layoutCards). The
+   rail sits in the natural gutter to the right of the capped prose (52em); no
+   parent padding reserve is needed (RAIL_MIN_PANE folds it when the gutter would
+   be too narrow). */
 .sc-rail {
   position: absolute;
   top: 0;
-  /* Inset from the host edge so the rail clears the floating TOC, whose padding
-     and border (~18px) the shared gutter reserve does not count. */
+  /* Small inset from the host's right edge so the rail does not abut the pane. */
   right: 16px;
   width: var(--sc-rail-w, 280px);
   height: 0;
