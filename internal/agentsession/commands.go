@@ -54,7 +54,7 @@ func Slugify(title string) string {
 //go:embed commands_templates/*.tmpl
 var commandTemplatesFS embed.FS
 
-// Command describes a slash command available in the planning chat.
+// Command describes a slash command available in the agent session.
 type Command struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

@@ -15,7 +15,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
-// Message is a single entry in the planning conversation log.
+// Message is a single entry in the agent-session conversation log.
 type Message struct {
 	Role        string    `json:"role"`                   // "user" or "assistant"
 	Content     string    `json:"content"`                // message text
@@ -23,7 +23,7 @@ type Message struct {
 	FocusedSpec string    `json:"focused_spec,omitempty"` // spec path focused at the time (spec-mode)
 	FocusedTask string    `json:"focused_task,omitempty"` // task ID focused at the time (task-mode)
 	RawOutput   string    `json:"raw_output,omitempty"`   // raw NDJSON output (assistant only)
-	// PlanRound, when non-zero, identifies the planning git commit this
+	// PlanRound, when non-zero, identifies the plan git commit this
 	// assistant message produced — the commit carries a matching
 	// `Plan-Round: N` trailer and a `<primary-path>(plan): …` subject.
 	// Zero means the round wrote nothing to specs/ (or the message is
@@ -39,8 +39,8 @@ type ResumeInfo struct {
 	FocusedTask string    `json:"focused_task,omitempty"` // last focused task ID (task-mode)
 }
 
-// ConversationStore persists planning chat messages and session state
-// to ~/.wallfacer/planning/<fingerprint>/. Messages are stored as
+// ConversationStore persists agent-session chat messages and session state
+// to ~/.wallfacer/agent-sessions/<fingerprint>/. Messages are stored as
 // newline-delimited JSON for append efficiency; session info is stored
 // as a single JSON file written atomically.
 type ConversationStore struct {

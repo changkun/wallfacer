@@ -4,9 +4,9 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 )
 
-// RoundUsage captures the token and cost fields from a single planning round's
+// RoundUsage captures the token and cost fields from a single agent-session round's
 // stream-json output. It mirrors the shape of agent usage reporting without
-// pulling in the internal/store package, so the planner stays free of a
+// pulling in the internal/store package, so the runtime stays free of a
 // persistence dependency.
 type RoundUsage struct {
 	InputTokens              int
@@ -18,9 +18,9 @@ type RoundUsage struct {
 }
 
 // resultLine is the subset of the agent stream-json "result" message that the
-// planner needs to record per-round usage. The field layout matches the
+// runtime needs to record per-round usage. The field layout matches the
 // agentOutput shape used by internal/runner, but we decode locally to avoid
-// pulling runner-side types into the planner.
+// pulling runner-side types into the runtime.
 type resultLine struct {
 	Type         string  `json:"type"`
 	StopReason   string  `json:"stop_reason"`
