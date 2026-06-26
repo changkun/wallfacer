@@ -42,6 +42,23 @@ func (h *Handler) SetCoordinationToggle(t CoordinationToggle) {
 	h.snapshotMu.Unlock()
 }
 
+// SetCoordinationLogout attaches the sign-out hook that clears the coordination
+// token, so logging out of the board stops the connector (the WebSocket drops on
+// the next gate recheck and never re-dials without a token). Without it, logout
+// clears only the browser cookie and the connector keeps pulling into the relay.
+func (h *Handler) SetCoordinationLogout(fn func()) {
+	h.snapshotMu.Lock()
+	h.coordLogout = fn
+	h.snapshotMu.Unlock()
+}
+
+// coordinationLogout returns the configured sign-out hook, or nil.
+func (h *Handler) coordinationLogout() func() {
+	h.snapshotMu.RLock()
+	defer h.snapshotMu.RUnlock()
+	return h.coordLogout
+}
+
 func (h *Handler) coordinationToggle() CoordinationToggle {
 	h.snapshotMu.RLock()
 	defer h.snapshotMu.RUnlock()

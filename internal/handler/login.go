@@ -73,6 +73,11 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 // Falls back to a bare cookie clear + redirect to "/" when auth is not
 // configured, so the endpoint remains safe to link to unconditionally.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	// Clear the coordination token first so the connector stops dialing and
+	// drops its live connection: signing out must also stop pulling comments.
+	if fn := h.coordinationLogout(); fn != nil {
+		fn()
+	}
 	if h.auth == nil {
 		auth.ClearSession(w)
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -89,6 +94,11 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // falls back to a bare cookie clear (the cookie name doesn't depend on
 // provider state).
 func (h *Handler) LogoutNotify(w http.ResponseWriter, r *http.Request) {
+	// Central sign-out must also stop the connector: clear the coordination token
+	// so it drops the connection and never re-dials without a token.
+	if fn := h.coordinationLogout(); fn != nil {
+		fn()
+	}
 	if h.auth != nil {
 		h.auth.HandleLogoutNotify(w, r)
 		return
