@@ -36,6 +36,11 @@ func TestReleaseWorkflowWiresEvidence(t *testing.T) {
 		"name: Download release evidence",
 		"cat evidence/release-evidence.md >> notes.md",
 		"--notes-file notes.md",
+		// release body prefers the hand-written note for the tag, so the
+		// published changelog is not capped at the auto-generated previous-tag
+		// scope. Requires a checkout so the file is on disk.
+		`note="docs/releases/${TAG}.md"`,
+		"uses: actions/checkout",
 	} {
 		if !strings.Contains(yml, want) {
 			t.Errorf("release.yml missing evidence wiring: %q", want)
