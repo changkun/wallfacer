@@ -197,7 +197,7 @@ func TestTaskBudgetFieldsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSandboxActivityPlanning(t *testing.T) {
+func TestSandboxActivityAgentSession(t *testing.T) {
 	found := false
 	for _, a := range SandboxActivities {
 		if a == SandboxActivityAgentSession {
