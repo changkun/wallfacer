@@ -88,17 +88,20 @@ opt-in / diff-size gating), not by weakening the critic.
   `Cwd` (→ `RunCriticRound` sets the agent `WorkDir`) so the critic reads the
   full codebase, not just the patch; `AgonVerifier` rotates critic harnesses
   (Claude/Codex) by `forkIdx`. _(commit: run critics in the worktree…)_
-- [ ] **Critics that run tests (coupled follow-up).** The `claude -p` critic is
-  read-only by default, so today it *reads* the codebase but cannot build/run
-  tests. Enabling that needs an **agon** change (critic driver opts into
-  Bash/test tools) **and** the **throwaway `git worktree`** isolation so test
-  side-effects never touch the real tree. Enabling tools also re-introduces the
-  proposer mutation risk, so it ships together with:
-- [ ] **agon: read-only proposer option.** `claude.WithProposerReadOnly()`
-  (restrict tools) so the fork-session proposer can argue/concede but never edit
-  the live worktree. Update agon `specs/37` / add a sibling spec. (Currently
-  low-urgency: headless `claude --print` auto-denies write tools by default, so
-  the proposer is already effectively read-only until tools are opted in.)
+- [x] **Critics run in a throwaway worktree (test-capable, isolated).**
+  Correction to the prior item: wallfacer's claude harness runs agents with
+  `--dangerously-skip-permissions`, so the critic is *not* read-only — pointing
+  it at the real worktree gave it write access. `AgonVerifier` now creates a
+  throwaway `git worktree` at HEAD (`newCriticWorktree`) and runs all critics
+  there; they can build/run tests with zero risk to the task branch. The
+  proposer keeps the real worktree (fork-session is cwd-scoped). _(commit: run
+  critics in a throwaway worktree)_
+- [x] **agon: read-only proposer option** (agon repo, spec 38).
+  `claude.WithProposerReadOnly()` bars Write/Edit/MultiEdit/NotebookEdit/Bash so
+  the fork-session proposer (which shares the real worktree) can argue/concede
+  but never edit it. Shipped in agon; **wallfacer wiring pending** a go.mod bump
+  to the agon release that contains it (the proposer is already effectively
+  read-only meanwhile — its path passes no `--dangerously-skip-permissions`).
 - [ ] **Usage attribution.** `RunCriticRound` returns `TokenUsage`;
   `HarnessCritic` populates `CriticResult.Usage`; `runAgon` accumulates onto the
   task so agon cost is visible to budgets/dashboards.
