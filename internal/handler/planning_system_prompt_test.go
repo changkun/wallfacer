@@ -31,7 +31,7 @@ func TestSelectPlanningSystemPrompt_EmptyTree(t *testing.T) {
 	// falls through to the empty variant.
 	_, ws := newTestHandlerWithWorkspaces(t)
 
-	got := selectPlanningSystemPrompt([]string{ws})
+	got := selectSpecSystemPrompt([]string{ws})
 	if !strings.Contains(got, "/spec-new") {
 		t.Errorf("empty-tree prompt missing /spec-new hint; got: %q", got)
 	}
@@ -44,7 +44,7 @@ func TestSelectPlanningSystemPrompt_NonEmptyTree(t *testing.T) {
 	_, ws := newTestHandlerWithWorkspaces(t)
 	writeTestSpec(t, ws, "specs/local/one.md", testSpecValidated)
 
-	got := selectPlanningSystemPrompt([]string{ws})
+	got := selectSpecSystemPrompt([]string{ws})
 	if !strings.Contains(got, "existing") {
 		t.Errorf("non-empty prompt should mention 'existing'; got: %q", got)
 	}
@@ -63,7 +63,7 @@ func TestSelectPlanningSystemPrompt_IgnoresArchived(t *testing.T) {
 	writeTestSpec(t, ws, "specs/local/a.md", testSpecArchived)
 	writeTestSpec(t, ws, "specs/local/b.md", testSpecArchived)
 
-	got := selectPlanningSystemPrompt([]string{ws})
+	got := selectSpecSystemPrompt([]string{ws})
 	if !strings.Contains(strings.ToLower(got), "clean slate") {
 		t.Errorf("archived-only tree should select empty variant; got: %q", got)
 	}
@@ -77,14 +77,14 @@ func TestSelectPlanningSystemPrompt_MixedWorkspaces(t *testing.T) {
 	_, wsActive := newTestHandlerWithWorkspaces(t)
 	writeTestSpec(t, wsActive, "specs/local/live.md", testSpecValidated)
 
-	got := selectPlanningSystemPrompt([]string{wsEmpty, wsActive})
+	got := selectSpecSystemPrompt([]string{wsEmpty, wsActive})
 	if strings.Contains(strings.ToLower(got), "clean slate") {
 		t.Errorf("one active spec across any workspace should pick non-empty; got: %q", got)
 	}
 
 	// Reverse order — selection is still per-call, not workspace-order
 	// dependent, so the same non-empty variant should win.
-	got2 := selectPlanningSystemPrompt([]string{wsActive, wsEmpty})
+	got2 := selectSpecSystemPrompt([]string{wsActive, wsEmpty})
 	if got != got2 {
 		t.Errorf("selection should be order-insensitive; got %q vs %q", got, got2)
 	}
@@ -107,7 +107,7 @@ func TestAssemblePlanningPrompt_PrependsEmptyVariant(t *testing.T) {
 	}
 	// No focused-archived spec → archivedSpecGuard contributes nothing,
 	// so the prompt is just [planning_system_empty][\n\n][base].
-	if !strings.HasPrefix(got, prompts.PlanningSystemEmpty()) {
+	if !strings.HasPrefix(got, prompts.SpecSystemEmpty()) {
 		t.Errorf("planning_system_empty must wrap the turn from the outside; got prefix: %q", got[:min(120, len(got))])
 	}
 }
@@ -125,7 +125,7 @@ func TestAssemblePlanningPrompt_PrependsNonemptyVariant(t *testing.T) {
 	if !strings.HasSuffix(got, base) {
 		t.Errorf("user message must remain as the suffix; got: %q", got)
 	}
-	if !strings.HasPrefix(got, prompts.PlanningSystemNonempty()) {
+	if !strings.HasPrefix(got, prompts.SpecSystemNonempty()) {
 		t.Errorf("planning_system_nonempty must wrap the turn from the outside; got prefix: %q", got[:min(120, len(got))])
 	}
 	if strings.Contains(strings.ToLower(got), "clean slate") {
@@ -148,7 +148,7 @@ func TestAssemblePlanningPrompt_GuardSitsBetween(t *testing.T) {
 
 	got := assemblePlanningPrompt([]string{ws}, "specs/local/dead.md", base)
 
-	systemIdx := strings.Index(got, prompts.PlanningSystemEmpty())
+	systemIdx := strings.Index(got, prompts.SpecSystemEmpty())
 	guardIdx := strings.Index(got, "This spec is archived")
 	baseIdx := strings.Index(got, base)
 	if systemIdx == -1 {
