@@ -28,14 +28,16 @@ func NewHarnessCritic(r runner.Interface, sb harness.ID) adversarial.Critic {
 	return &HarnessCritic{runner: r, sb: sb}
 }
 
-// Round assembles the critic prompt and runs it as a one-shot agent call.
+// Round assembles the critic prompt and runs it as a one-shot agent call in
+// the critic's working directory (in.Cwd), so the critic can read the full
+// codebase rather than only the diff patch embedded in the prompt.
 func (c *HarnessCritic) Round(ctx context.Context, in adversarial.CriticInput) (*adversarial.CriticResult, error) {
 	prompt := adversarial.AssemblePrompt(in)
 	deadline := in.Deadline
 	if deadline <= 0 {
 		deadline = 5 * time.Minute
 	}
-	text, err := c.runner.RunCriticRound(ctx, prompt, c.sb, deadline)
+	text, err := c.runner.RunCriticRound(ctx, prompt, c.sb, in.Cwd, deadline)
 	if err != nil {
 		return nil, err
 	}

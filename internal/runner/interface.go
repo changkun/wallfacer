@@ -63,9 +63,11 @@ type Interface interface {
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
 	// RunCriticRound runs a one-shot stateless agent invocation for an agon
-	// critic turn. Returns raw markdown text. Token usage is not attributed to
-	// any task (agon aggregates it separately).
-	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, deadline time.Duration) (string, error)
+	// critic turn in the given working directory (cwd), so the critic can read
+	// the full codebase rather than only the diff patch. cwd may be empty for a
+	// patch-only critic. Returns raw markdown text. Token usage is not
+	// attributed to any task (agon aggregates it separately).
+	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error)
 
 	// Agent-session title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.

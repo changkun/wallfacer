@@ -20,7 +20,7 @@ import (
 // CriticInput.Deadline (default 5 minutes in the engine).
 // The sb parameter selects which harness drives the critic invocation;
 // pass harness.Claude for the default path.
-func (r *Runner) RunCriticRound(ctx context.Context, prompt string, sb harness.ID, deadline time.Duration) (string, error) {
+func (r *Runner) RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error) {
 	if deadline > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, deadline)
@@ -30,7 +30,7 @@ func (r *Runner) RunCriticRound(ctx context.Context, prompt string, sb harness.I
 	containerName := "wallfacer-agon-critic-" + uuid.NewString()[:8]
 	labels := map[string]string{"wallfacer.task.activity": "agon_critic"}
 
-	output, err := r.runCommitContainer(ctx, containerName, prompt, sb, labels)
+	output, err := r.runOneShotContainer(ctx, containerName, prompt, sb, cwd, labels)
 	if err != nil {
 		return "", fmt.Errorf("agon critic: %w", err)
 	}
