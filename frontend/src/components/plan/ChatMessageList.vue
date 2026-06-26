@@ -1,12 +1,11 @@
 <script setup lang="ts">
 // ChatMessageList — the scrollable conversation. A signature wallfacer look,
-// not a Claude clone: assistant turns are led by the pixel brand mark and flow
-// as full-width prose; user turns are right-aligned high-contrast pills. Pure
-// presentation over a ChatSession; mounted by the Chat view, the docked panel,
-// and the spec-mode popup alike.
+// not a Claude clone: assistant turns flow as full-width prose (no per-message
+// avatar, so the text uses the full width); user turns are right-aligned
+// high-contrast pills. Pure presentation over a ChatSession; mounted by the
+// Chat view, the docked panel, and the spec-mode popup alike.
 import { activityIcon, activitySummary } from '../../lib/agentBubble';
 import { formatTokens, formatCost } from '../../lib/agentUsage';
-import BrandMark from '../BrandMark.vue';
 import type { ChatSession } from '../../composables/useChatSession';
 
 const props = defineProps<{ session: ChatSession; emptyText?: string }>();
@@ -31,11 +30,8 @@ const s = props.session;
           <div class="pcp-usermsg">{{ m.rawText }}</div>
         </div>
 
-        <!-- Assistant turn: pixel-mark signature + full-width prose -->
+        <!-- Assistant turn: full-width prose, no per-message avatar -->
         <div v-else class="pcp-turn pcp-turn--assistant" :class="{ 'pcp-turn--reverted': m.reverted }">
-          <div class="pcp-agent-mark">
-            <BrandMark :size="15" />
-          </div>
           <div class="pcp-agent-body">
             <div v-if="m.errorText" class="pcp-bubble-error">{{ m.errorText }}</div>
             <!-- Trajectory leads the answer: while streaming, the steps render
