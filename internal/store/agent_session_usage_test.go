@@ -10,7 +10,7 @@ import (
 	"latere.ai/x/wallfacer/internal/prompts"
 )
 
-func TestAppendPlanningUsage_RoundtripsRecord(t *testing.T) {
+func TestAppendAgentSessionUsage_RoundtripsRecord(t *testing.T) {
 	root := t.TempDir()
 	key := AgentSessionGroupKey([]string{"/repo/a"})
 
@@ -42,7 +42,7 @@ func TestAppendPlanningUsage_RoundtripsRecord(t *testing.T) {
 	}
 }
 
-func TestReadPlanningUsage_MissingFileReturnsEmpty(t *testing.T) {
+func TestReadAgentSessionUsage_MissingFileReturnsEmpty(t *testing.T) {
 	root := t.TempDir()
 	key := AgentSessionGroupKey([]string{"/repo/never-written"})
 
@@ -55,7 +55,7 @@ func TestReadPlanningUsage_MissingFileReturnsEmpty(t *testing.T) {
 	}
 }
 
-func TestReadPlanningUsage_FiltersBySince(t *testing.T) {
+func TestReadAgentSessionUsage_FiltersBySince(t *testing.T) {
 	root := t.TempDir()
 	key := AgentSessionGroupKey([]string{"/repo/a"})
 
@@ -82,7 +82,7 @@ func TestReadPlanningUsage_FiltersBySince(t *testing.T) {
 	}
 }
 
-func TestPlanningUsageDir_UsesInstructionsKey(t *testing.T) {
+func TestAgentSessionUsageDir_UsesInstructionsKey(t *testing.T) {
 	paths := []string{"/repo/a", "/repo/b"}
 	// Use an order-swapped list to confirm the key is order-insensitive
 	// (matches InstructionsKey which sorts before hashing).
@@ -102,7 +102,7 @@ func TestPlanningUsageDir_UsesInstructionsKey(t *testing.T) {
 	}
 }
 
-func TestAppendPlanningUsage_CreatesDir(t *testing.T) {
+func TestAppendAgentSessionUsage_CreatesDir(t *testing.T) {
 	root := t.TempDir()
 	key := AgentSessionGroupKey([]string{"/repo/fresh"})
 
