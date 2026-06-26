@@ -580,7 +580,7 @@ func NewStateChangeData(from, to TaskStatus, trigger Trigger, extra map[string]s
 }
 
 // PromptRoundData is the payload for EventTypePromptRound events.
-// It records one planning-thread round: the thread that drove the change,
+// It records one agent-session round: the thread that drove the change,
 // the round counter, the old and new prompt text, and whether the agent
 // should be resumed immediately after the update.
 type PromptRoundData struct {

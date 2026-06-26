@@ -16,7 +16,7 @@ import (
 
 // allowedRoutineSpawnKinds bounds what a user (or the system-ideation
 // bootstrap) may set as a routine's spawn_kind at the API boundary. It
-// prevents routines from spawning, say, planning-session tasks that would
+// prevents routines from spawning, say, agent-session tasks that would
 // confuse the lifecycle machinery.
 var allowedRoutineSpawnKinds = []store.TaskKind{
 	store.TaskKindTask,

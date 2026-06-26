@@ -19,7 +19,7 @@ func (h *Handler) workspaceHiddenFromRequest(r *http.Request) bool {
 
 // requireVisibleWorkspace writes a 403 and returns false when the active
 // workspace is hidden from the caller. Workspace-scoped mutation handlers
-// (planning sends, spec archive/dispatch) call it as an early guard so a
+// (agent-session sends, spec archive/dispatch) call it as an early guard so a
 // session with no visible workspace cannot mutate a hidden one.
 func (h *Handler) requireVisibleWorkspace(w http.ResponseWriter, r *http.Request) bool {
 	if !h.workspaceHiddenFromRequest(r) {

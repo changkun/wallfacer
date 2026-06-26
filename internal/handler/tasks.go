@@ -809,7 +809,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 		// Cancel is a side-effecting transition (kill container, clean
 		// worktrees, cascade to routine children) that bypasses the state
-		// machine. Intercept it before the routine guard and planner-lock
+		// machine. Intercept it before the routine guard and agent-session-lock
 		// check below so cancelling a routine card still runs its cascade,
 		// matching the old POST /api/tasks/{id}/cancel behaviour.
 		if newStatus == store.TaskStatusCancelled {

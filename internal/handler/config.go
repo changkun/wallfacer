@@ -339,7 +339,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	// Background passes outlive the HTTP request, so they must run on a
 	// detached context: r.Context() is cancelled the moment UpdateConfig
-	// returns (mirrors the planning exec goroutine).
+	// returns (mirrors the agent exec goroutine).
 	applyBoolToggle(context.Background(), req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
 	applyBoolToggle(context.Background(), req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
