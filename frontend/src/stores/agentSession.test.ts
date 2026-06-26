@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useAgentStore, type SpecNode } from './agentSession';
+import { useAgentStore, isDefaultThreadName, truncateTitle, type SpecNode } from './agentSession';
 import { useToastStore } from './toast';
 
 function node(path: string): SpecNode {
   return { path, spec: {}, children: [], is_leaf: true, depth: 0 };
+}
+
+// Stub fetch so api() (which reads res.text() then JSON.parses) sees this body.
+function stubFetchJSON(body: unknown) {
+  globalThis.fetch = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(body),
+  })) as unknown as typeof fetch;
 }
 
 describe('agentStore.applyTree bootstrap choreography', () => {
@@ -69,5 +78,78 @@ describe('agentStore.applyTree bootstrap choreography', () => {
     agentStore.applyTree({ nodes: [] });
     vi.advanceTimersByTime(200);
     expect(toast.toasts).toHaveLength(0);
+  });
+});
+
+describe('truncateTitle / isDefaultThreadName', () => {
+  it('keeps a short message verbatim, collapsing whitespace', () => {
+    expect(truncateTitle('  fix   the   auth  bug ')).toBe('fix the auth bug');
+  });
+
+  it('ellipsizes past the limit (… replaces, never appends past max)', () => {
+    const out = truncateTitle('a'.repeat(80), 48);
+    expect(out).toBe('a'.repeat(47) + '…');
+    expect(out.length).toBe(48);
+  });
+
+  it('recognises only seeded "Chat N" names as default', () => {
+    expect(isDefaultThreadName('Chat 1')).toBe(true);
+    expect(isDefaultThreadName('Chat 42')).toBe(true);
+    expect(isDefaultThreadName('Chat')).toBe(false);
+    expect(isDefaultThreadName('fix the auth bug')).toBe(false);
+  });
+});
+
+describe('refreshBusy provisional-title clobber safety', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  // The provisional title (user's first message) must survive every poll while
+  // the server name is still the default "Chat N" — otherwise the very poll that
+  // watches for the AI title would yank the provisional back to "Chat 1".
+  it('keeps a provisional name while the server name is still default', async () => {
+    const store = useAgentStore();
+    stubFetchJSON({ threads: [{ id: 't1', name: 'Chat 1', archived: false }] });
+    await store.loadThreads();
+
+    // Promotion-time: client shows the prompt and marks the title pending.
+    store.threads['t1'].name = 'help me refactor the auth layer';
+    store.threads['t1'].titlePending = true;
+
+    // Server still reports the default name (auto-titler hasn't landed yet).
+    stubFetchJSON({ threads: [{ id: 't1', name: 'Chat 1', archived: false }], busy_thread_id: '' });
+    await store.refreshBusy();
+
+    expect(store.threads['t1'].name).toBe('help me refactor the auth layer');
+    expect(store.threads['t1'].titlePending).toBe(true);
+  });
+
+  it('adopts the real title and clears the pending flag once it lands', async () => {
+    const store = useAgentStore();
+    stubFetchJSON({ threads: [{ id: 't1', name: 'Chat 1', archived: false }] });
+    await store.loadThreads();
+    store.threads['t1'].name = 'help me refactor the auth layer';
+    store.threads['t1'].titlePending = true;
+
+    stubFetchJSON({ threads: [{ id: 't1', name: 'Refactor auth layer', archived: false }], busy_thread_id: '' });
+    await store.refreshBusy();
+
+    expect(store.threads['t1'].name).toBe('Refactor auth layer');
+    expect(store.threads['t1'].titlePending).toBe(false);
+  });
+
+  it('preserves the provisional across a loadThreads rebuild while server is default', async () => {
+    const store = useAgentStore();
+    stubFetchJSON({ threads: [{ id: 't1', name: 'Chat 1', archived: false }] });
+    await store.loadThreads();
+    store.threads['t1'].name = 'help me refactor the auth layer';
+    store.threads['t1'].titlePending = true;
+
+    stubFetchJSON({ threads: [{ id: 't1', name: 'Chat 1', archived: false }] });
+    await store.loadThreads();
+
+    expect(store.threads['t1'].name).toBe('help me refactor the auth layer');
+    expect(store.threads['t1'].titlePending).toBe(true);
   });
 });

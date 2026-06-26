@@ -69,6 +69,28 @@ export interface AgentSession {
   // every message), so the session list buckets and sorts by it.
   created: number;
   updated: number;
+  // True while the thread shows a client-side provisional title (the user's
+  // first message, truncated) and is still waiting for the backend auto-titler
+  // to land the real name. Decouples "what we display" from "are we still
+  // awaiting a title?": a provisional name looks non-default, so the name regex
+  // alone can no longer answer the latter. refreshBusy clears this once the
+  // server name goes non-default; a manual rename clears it too.
+  titlePending?: boolean;
+}
+
+// A still-default agent-session name ("Chat 1", "Chat 12", …). The backend seeds
+// new threads this way and auto-titles them after the first message; the
+// frontend uses this to tell an un-titled thread from one carrying a real (AI or
+// user-provisional) title.
+export function isDefaultThreadName(name: string): boolean {
+  return /^Chat \d+$/.test(name);
+}
+
+// truncateTitle renders a single-line provisional thread title from a user's
+// first message: whitespace collapsed, trimmed, and ellipsized past `max`.
+export function truncateTitle(text: string, max = 48): string {
+  const s = text.replace(/\s+/g, ' ').trim();
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
 }
 
 export interface AgentMessage {
@@ -310,7 +332,14 @@ export const useAgentStore = defineStore('agentSession', () => {
       for (const t of res.threads ?? []) {
         const cur = threads.value[t.id];
         if (!cur) continue;
-        if (cur.name !== t.name) cur.name = t.name;
+        // Adopt the server name only when it's a real (non-default) title: a
+        // server "Chat N" must never clobber a local provisional or manual name.
+        // Landing a real title also clears the pending flag, which is what stops
+        // the refreshTitleSoon poll.
+        if (!isDefaultThreadName(t.name) && cur.name !== t.name) {
+          cur.name = t.name;
+          cur.titlePending = false;
+        }
         const updated = parseTime(t.updated);
         if (updated && updated !== cur.updated) cur.updated = updated;
       }
@@ -331,9 +360,15 @@ export const useAgentStore = defineStore('agentSession', () => {
       const archived: AgentSession[] = [];
       for (const t of all) {
         const prev = threads.value[t.id];
+        // Preserve a client-side provisional title across a list rebuild: while
+        // the server name is still default, keep the locally-shown prompt and
+        // the pending flag, so a stray loadThreads during the brief
+        // awaiting-AI-title window doesn't flash the name back to "Chat N".
+        const keepProvisional = !!prev?.titlePending && isDefaultThreadName(t.name);
         const rec: AgentSession = {
           id: t.id,
-          name: t.name,
+          name: keepProvisional ? prev!.name : t.name,
+          titlePending: keepProvisional,
           archived: !!t.archived,
           mode: (t.mode as AgentSession['mode']) ?? prev?.mode ?? '',
           task_id: t.task_id ?? prev?.task_id ?? '',
