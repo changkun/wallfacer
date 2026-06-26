@@ -1,6 +1,6 @@
 ---
 title: Inline Diff Feedback
-status: drafted
+status: complete
 depends_on: []
 affects:
   - frontend/src/lib/diff.ts
@@ -359,4 +359,57 @@ formatted message fits within `BodyLimitFeedback` (512 KiB).
 
 ## Outcome
 
-(To be filled after dispatch/implementation.)
+Complete (2026-06-26). Implemented directly in-session (not dispatched to the
+task board) as seven scoped commits: spec consolidation (`cf84e25`), the
+feedback key-bug fix (`88e5bee`), the backend principal gate (`d5d44c1`), diff
+line numbers (`3457d49`), the comment store + formatter (`c3c80b8`), the
+Changes-tab UI (`bda463d`), and a README prose fix. Full `internal/cli` and
+`internal/handler` Go suites and the full frontend suite (556 tests) pass;
+`go build ./...` is clean.
+
+### What Shipped
+
+- **Backend (no new endpoint):** `SubmitFeedback` added to `requiresPrincipal`
+  in `internal/cli/server.go`, so `RequirePrincipalMiddleware` 401s the feedback
+  route for a signed-out browser when auth is configured and is a no-op in local
+  mode. `TestRequiresPrincipal` covers the classification.
+- **Frontend lib:** `frontend/src/lib/diff.ts` derives `oldLine`/`newLine` per
+  diff line; `frontend/src/lib/diffComments.ts` is `formatBatchFeedback`.
+- **Frontend store:** `frontend/src/stores/diffComments.ts` (Pinia, composition
+  style) holds client-only comments keyed by task with CRUD + `forTask`/`forLine`.
+- **Frontend UI:** new `frontend/src/components/DiffLineRow.vue` (~95 lines:
+  gutter + inline editor, fragment root, shared by both render branches);
+  `TaskDetail.vue` gains the `canReview`/`reviewing` gate, the review panel,
+  `flashLine`, and batch submit; `frontend/src/styles/diffs.css` gains the
+  gutter/editor/panel styles.
+- **Tests:** backend `TestRequiresPrincipal`; frontend — diff line-number cases,
+  store CRUD/getter cases, formatter matrix (line-only/general-only/both/none +
+  multi-file grouping), the feedback-key component test, and the inline-review
+  add→panel→submit flow plus the signed-out-gating case.
+- **Bonus fix:** the pre-existing `submitFeedback` `{ feedback }` → `{ message }`
+  key mismatch (Overview feedback was 400'ing end to end) is fixed with a test.
+
+### Design Evolution
+
+1. **Gate verification.** The spec's acceptance #2 called for a `BuildMux`-level
+   test asserting the route 401s without a principal. Shipped a *classification*
+   test (`requiresPrincipal("SubmitFeedback") == true`) and leaned on the existing
+   `TestRequirePrincipalMiddleware_AuthConfigured` (which already proves the 401);
+   the composition covers the same ground with less duplication.
+2. **Per-line render factoring.** The spec offered "a child `DiffLineRow`
+   component or a shared sub-template." Went with the child component (multi-root
+   fragment: the `.diff-line` span then the optional editor block) so both the
+   highlighted and plain `<pre>` branches share one path.
+3. **Panel editing.** Editing a comment from the panel opens an inline editor
+   *in the panel* (separate from the gutter editor on the line); both call
+   `store.update`. The gutter editor handles add-and-edit-on-line.
+4. **Login gate boundary.** Implemented exactly as the revised spec specifies —
+   backend `requiresPrincipal` as the boundary, `canReview = !authEnabled ||
+   !!auth.me` as the SPA mirror — no dedicated feedback endpoint.
+
+### Follow-ups
+
+- Real-browser visual check of the absolute gutter inside the `font-size:0`
+  `<pre>` and the inline editor flowing under a line (jsdom applies no layout, so
+  the component tests prove behavior, not appearance). `flashLine` (uses
+  `CSS.escape`) is also a browser-only path not exercised by the suite.
