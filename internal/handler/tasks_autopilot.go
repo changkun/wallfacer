@@ -1113,30 +1113,44 @@ func (h *Handler) endAgon(id uuid.UUID) {
 	h.agonMu.Unlock()
 }
 
+// agonCandidate pairs a waiting task with the store that owns it, captured at
+// scan time. The owning store is threaded through to the completion write so a
+// workspace-group switch during the multi-minute run cannot redirect the
+// result to a different store (which would silently drop it).
+type agonCandidate struct {
+	task  store.Task
+	store *store.Store
+}
+
 // tryAutoAgon scans all waiting tasks that have a SessionID and have not yet
 // been verified by agon (AgonUnresolved == nil), then fires a goroutine for
 // each that is not already running and fits within maxConcurrentAgon. Does
-// nothing when agon is disabled.
+// nothing when agon is disabled or its circuit breaker is open.
 func (h *Handler) tryAutoAgon(ctx context.Context) {
 	if !h.AgonEnabled() {
 		return
 	}
+	if h.breakers["auto-agon"].isOpen() {
+		return
+	}
 
-	var candidates []store.Task
+	var candidates []agonCandidate
 	h.forCurrentStore(func(s *store.Store, _ []string) {
-		candidates = s.ListWaitingTasksWithSession(ctx)
+		for _, t := range s.ListWaitingTasksWithSession(ctx) {
+			candidates = append(candidates, agonCandidate{task: t, store: s})
+		}
 	})
 
-	for _, t := range candidates {
-		if !h.beginAgon(t.ID) {
+	for _, c := range candidates {
+		if !h.beginAgon(c.task.ID) {
 			continue
 		}
-		t := t // capture loop variable
+		c := c // capture loop variable
 		go func() {
-			defer h.endAgon(t.ID)
-			if err := h.runAgon(ctx, t); err != nil {
+			defer h.endAgon(c.task.ID)
+			if err := h.runAgon(ctx, c.store, c.task); err != nil {
 				logger.Handler.Warn("agon: verification run failed",
-					"task", t.ID, "error", err)
+					"task", c.task.ID, "error", err)
 			}
 		}()
 	}
@@ -1152,10 +1166,11 @@ const (
 )
 
 // runAgon executes one agon adversarial verification run for a task and
-// persists the result. The task must have a non-nil SessionID and at least
-// one worktree path. Returns nil on success; on error the AgonUnresolved
-// field is left nil so the next tick retries.
-func (h *Handler) runAgon(ctx context.Context, t store.Task) error {
+// persists the result onto the given store (captured at scan time so a group
+// switch mid-run cannot redirect the write). The task must have a non-nil
+// SessionID and at least one worktree path. Returns nil on success; on error
+// the AgonUnresolved field is left nil so the next tick retries.
+func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) error {
 	if t.SessionID == nil || *t.SessionID == "" {
 		return nil
 	}
@@ -1187,17 +1202,21 @@ func (h *Handler) runAgon(ctx context.Context, t store.Task) error {
 
 	result, err := h.verifier.Verify(ctx, input)
 	if err != nil {
+		h.breakers["auto-agon"].recordFailure(&t.ID, err.Error())
 		return err
 	}
+	h.breakers["auto-agon"].recordSuccess()
 	if result == nil {
 		// Verifier skipped (e.g., no session). Do not mark as run.
 		return nil
 	}
 
-	var s *store.Store
-	h.forCurrentStore(func(st *store.Store, _ []string) { s = st })
-	if s == nil {
-		return fmt.Errorf("agon: no active store for task %s", t.ID)
+	// Only persist if the task is still waiting: a run that completes after the
+	// task was resumed, submitted, or failed would otherwise stamp a stale
+	// result onto a task whose worktree has already moved on.
+	ft, err := s.GetTask(ctx, t.ID)
+	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting {
+		return nil
 	}
 	return s.UpdateTaskAgon(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir)
 }

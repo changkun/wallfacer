@@ -234,7 +234,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		}
 	}
 
-	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync"}
+	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-agon"}
 	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
 	for _, name := range watcherNames {
 		if wb, ok := h.breakers[name]; ok {

@@ -146,6 +146,94 @@ func TestBeginAgon_DedupAndCap(t *testing.T) {
 	}
 }
 
+// waitingTaskWithSession creates a waiting task that has a session ID and a
+// (non-git) worktree path, the minimum for runAgon to reach the verifier.
+func waitingTaskWithSession(t *testing.T, s *store.Store) store.Task {
+	t.Helper()
+	ctx := context.Background()
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "verify", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	if err := s.UpdateTaskResult(ctx, task.ID, "done", "sess-1", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult: %v", err)
+	}
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{t.TempDir(): t.TempDir()}, "branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+	fresh, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	return *fresh
+}
+
+func TestRunAgon_PersistsWhenWaiting(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	unresolved := 3
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: unresolved, Headline: "boom"}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.AgonUnresolved == nil || *got.AgonUnresolved != unresolved {
+		t.Errorf("AgonUnresolved = %v, want %d", got.AgonUnresolved, unresolved)
+	}
+	if got.AgonHeadline != "boom" {
+		t.Errorf("AgonHeadline = %q, want %q", got.AgonHeadline, "boom")
+	}
+}
+
+// TestRunAgon_SkipsPersistWhenNotWaiting proves a run that finishes after the
+// task already left waiting (resumed, submitted, failed) does not stamp a stale
+// result onto it.
+func TestRunAgon_SkipsPersistWhenNotWaiting(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 5, Headline: "stale"}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+
+	// Task leaves waiting before the (mock, instantaneous) run completes.
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	if v.called != 1 {
+		t.Fatalf("verifier called %d times, want 1", v.called)
+	}
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.AgonUnresolved != nil {
+		t.Errorf("AgonUnresolved = %v, want nil (no stale write)", *got.AgonUnresolved)
+	}
+}
+
 // blockingVerifier counts Verify calls and parks inside Verify until released,
 // so a test can observe a run in flight and assert no duplicate is launched.
 type blockingVerifier struct {

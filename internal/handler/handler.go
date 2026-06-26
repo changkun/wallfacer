@@ -265,6 +265,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			"auto-test":    newWatcherBreaker(),
 			"auto-submit":  newWatcherBreaker(),
 			"auto-sync":    newWatcherBreaker(),
+			"auto-agon":    newWatcherBreaker(),
 		},
 		agonInFlight: make(map[uuid.UUID]struct{}),
 	}
