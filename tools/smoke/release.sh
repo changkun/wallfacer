@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
 # Post-deploy release smoke checks for wf.latere.ai.
-# Called by .github/workflows/deploy-wallfacerd.yml after kubectl rollout
-# status succeeds.
+# Called by the deploy job in .github/workflows/release.yml after
+# `kubectl rollout status` succeeds. When OUTPUT_MD is set it also emits a
+# release-evidence markdown block (tag, commit, build/deploy links, served
+# asset, smoke result) that the release job appends to the GitHub release.
 #
 # Required tools: curl, grep.
 #
