@@ -1,6 +1,6 @@
 ---
 title: Agent Session Vocabulary (Generalize "Planning")
-status: complete
+status: archived
 depends_on: [shared/agent-abstraction.md, shared/harness-abstraction.md]
 affects: [internal/agentsession/, internal/handler/, internal/apicontract/, internal/envconfig/, internal/store/, frontend/src/stores/, frontend/src/components/plan/, frontend/src/components/analytics/, frontend/src/composables/, frontend/src/lib/, docs/, AGENTS.md]
 effort: xlarge
