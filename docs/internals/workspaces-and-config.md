@@ -129,7 +129,7 @@ Activities consulted by the env-file tier (`Runner.sandboxFromEnvForActivity()`,
 | `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
 | `idea_agent` | `WALLFACER_SANDBOX_IDEA_AGENT` | Brainstorm/ideation agent |
 
-The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `planning`, `test`, and `oversight-test`. These are not switched on by the env-file tier (the resolution switch covers only the six rows above). `test` and `oversight-test` exist for usage attribution, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent.
+The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `agent-session`, `test`, and `oversight-test`. These are not switched on by the env-file tier (the resolution switch covers only the six rows above). `test` and `oversight-test` exist for usage attribution, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent.
 
 ### Host CLI resolution
 
@@ -171,7 +171,7 @@ The `Config` struct covers all known keys. Key categories:
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox` (all typed `harness.ID`) |
 | **Host backend** | `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
-| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `PlanningWindowDays` (`WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
+| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 | **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
 

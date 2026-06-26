@@ -15,7 +15,7 @@ Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `C
 ```mermaid
 graph TB
     subgraph Browser
-        UI["Browser UI<br/>(Vue 3 + TypeScript SPA)<br/>Board + Plan (spec explorer, minimap, planning chat)"]
+        UI["Browser UI<br/>(Vue 3 + TypeScript SPA)<br/>Board + Plan (spec explorer, minimap, agent chat)"]
     end
 
     subgraph Server["Go Server (stdlib net/http)"]
@@ -23,7 +23,7 @@ graph TB
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
         Automation["Automation Loops<br/>promote / test / submit<br/>sync / retry / routines"]
-        Plan["Plan Mode<br/>spec tree + planner<br/>dispatch + undo"]
+        Plan["Plan Mode<br/>spec tree + agent session<br/>dispatch + undo"]
 
         Handler --> Runner
         Handler --> Plan
@@ -36,7 +36,7 @@ graph TB
     subgraph Infra["Host"]
         Agents["Agent CLIs (host os/exec)<br/>claude / codex / cursor<br/>CWD = task worktree"]
         Worktrees["Per-task Git Worktrees<br/>~/.wallfacer/worktrees/<br/>task/ID branches"]
-        SpecsFS["specs/ (markdown + frontmatter)<br/>planning threads<br/>~/.wallfacer/planning/&lt;fp&gt;/"]
+        SpecsFS["specs/ (markdown + frontmatter)<br/>agent sessions<br/>~/.wallfacer/agent-sessions/&lt;fp&gt;/"]
         Agents --- Worktrees
     end
 
@@ -367,7 +367,7 @@ Every `internal/` package and its role in the system:
 | `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec, auth, web) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `RunAuth()`, `RunWeb()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
-| `eval` | Offline evaluation trajectories for planning/agent regression checks | `Trajectory`, `Run()` |
+| `eval` | Offline evaluation trajectories for agent-session regression checks | `Trajectory`, `Run()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
 | `flow` | Merged built-in + user-authored flow registry; composes agents into ordered step chains | `Registry`, `Flow`, `Step`, `NewBuiltinRegistry()` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
@@ -381,7 +381,7 @@ Every `internal/` package and its role in the system:
 | `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support; persistent workspace group configurations | `Manager`, `Snapshot`, `Group`, `NewManager()`, `NewStatic()`, `LoadGroups()`, `SaveGroups()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `StartFlow()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
-| `planner` | Long-lived workspace-scoped planning lifecycle; per-thread `messages.jsonl` + `session.json` under `~/.wallfacer/planning/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Planner`, `ThreadManager`, `ConversationStore`, `CommandRegistry`, `ThreadMeta`, `Slugify`, `Expand` |
+| `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
 | `routine` | Routine scheduler engine that fires routine-kind tasks (ideation, user-defined) on their configured cadence | `Engine`, `Start()`, `Trigger()` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; six-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
 
@@ -454,15 +454,15 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |
 | `sandbox_gate.go` | Harness usability checks (auth validation before task launch) |, (internal helpers) |
 | `watcher.go` | Shared two-phase watcher helper used by the autopilot loops in `tasks_autopilot.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |
-| `planning.go` | Planning chat agent: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/agent/messages`, `GET /api/agent/messages/stream`, `POST /api/agent/messages/interrupt`, `GET /api/agent/commands` |
-| `planning_tool.go` | Plan task-mode tools, including prompt refinement | `POST /api/agent/tool/update_task_prompt` |
-| `planning_threads.go` | Planning chat thread CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/agent/sessions`, `PATCH /api/agent/sessions/{id}` |
-| `planning_undo.go` | Undo the caller thread's most recent planning round via `git revert`; cancels board tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/agent/undo` |
+| `agentsession.go` | Agent session chat: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/agent/messages`, `GET /api/agent/messages/stream`, `POST /api/agent/messages/interrupt`, `GET /api/agent/commands` |
+| `agentsession_tool.go` | Plan task-mode tools, including prompt refinement | `POST /api/agent/tool/update_task_prompt` |
+| `agentsession_threads.go` | Agent session CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/agent/sessions`, `PATCH /api/agent/sessions/{id}` |
+| `planning_undo.go` | Undo the caller session's most recent planning round via `git revert`; cancels board tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/agent/undo` |
 | `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/transition` |
 | `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
 | `terminal.go` | WebSocket terminal relay for the host shell | `GET /api/terminal/ws` |
 
-There is no `refine.go` (prompt refinement is the planning tool above) and no `containers.go` / `GET /api/containers` endpoint.
+There is no `refine.go` (prompt refinement is the agent session tool above) and no `containers.go` / `GET /api/containers` endpoint.
 
 ## Structured Logging
 

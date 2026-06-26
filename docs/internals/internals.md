@@ -38,7 +38,7 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 [API & Transport](api-and-transport.md)
 
-Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, planning, spec tree, explorer, image, and OAuth endpoints.
+Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, agent session, spec tree, explorer, image, and OAuth endpoints.
 
 ### 6. Automation
 
@@ -50,7 +50,7 @@ Background watchers, the autopilot promotion loop, auto-test, auto-submit, auto-
 
 [Plan Mode](plan-mode.md)
 
-Spec document model, spec tree building, planning sandbox, slash commands, dispatch pipeline, archive/unarchive, planning undo via git revert, and the SSE spec tree stream.
+Spec document model, spec tree building, agent-session sandbox, slash commands, dispatch pipeline, archive/unarchive, planning undo via git revert, and the SSE spec tree stream.
 
 ### 8. Workspaces & Configuration
 
