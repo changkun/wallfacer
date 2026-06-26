@@ -59,10 +59,9 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-/* ── Assistant turn: pixel-mark signature + prose ──────────────────── */
+/* ── Assistant turn: full-width prose, no avatar ───────────────────── */
 
 .pcp-turn--assistant {
-  gap: 12px;
   align-items: flex-start;
 }
 
@@ -70,20 +69,6 @@
   opacity: 0.45;
   text-decoration: line-through;
   text-decoration-color: var(--ink-4);
-}
-
-.pcp-agent-mark {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  margin-top: 1px;
-  background: color-mix(in oklab, var(--accent) 12%, var(--bg-card));
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent),
-              0 2px 8px color-mix(in oklab, var(--accent) 18%, transparent);
 }
 
 .pcp-agent-body {
