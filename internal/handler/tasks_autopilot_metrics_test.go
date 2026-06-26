@@ -11,6 +11,7 @@ import (
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newTestHandlerWithRegistry creates a Handler backed by a temp-dir store,
@@ -24,7 +25,7 @@ func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 

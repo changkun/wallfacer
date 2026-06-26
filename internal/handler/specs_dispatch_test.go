@@ -15,6 +15,7 @@ import (
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 const testSpecValidated = `---
@@ -784,7 +785,7 @@ func TestDispatchSpecs_RunStatusWriteFailureSkipsRunner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFilesystemBackend: %v", err)
 	}
-	s, err := store.NewStore(&failOnInProgressBackend{StorageBackend: fsBackend})
+	s, err := storetest.NewStore(t, &failOnInProgressBackend{StorageBackend: fsBackend})
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

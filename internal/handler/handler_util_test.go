@@ -10,7 +10,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // --- currentWorkspaces fallback path ---
@@ -61,7 +61,7 @@ func TestIncAutopilotPhase2Miss_WithRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 		t.Fatal(err)

@@ -16,6 +16,7 @@ import (
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newTestHandlerWithEnv creates a Handler backed by a temp-dir store and a
@@ -29,7 +30,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 
 func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) {
 	t.Helper()
-	s, err := store.NewFileStore(t.TempDir())
+	s, err := storetest.NewFileStore(t, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

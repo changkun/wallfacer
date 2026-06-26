@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 func newAuthTestServer(t *testing.T) *httptest.Server {
@@ -19,7 +19,7 @@ func newAuthTestServer(t *testing.T) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}

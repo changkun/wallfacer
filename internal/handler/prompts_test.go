@@ -11,7 +11,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newTestHandlerWithPrompts creates a Handler wired with a real prompts.Manager
@@ -21,7 +21,7 @@ func newTestHandlerWithPrompts(t *testing.T) (*Handler, *prompts.Manager) {
 	dir := t.TempDir()
 	promptsDir := filepath.Join(dir, "prompts")
 
-	s, err := store.NewFileStore(filepath.Join(dir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(dir, "data"))
 	if err != nil {
 		t.Fatal(err)
 	}

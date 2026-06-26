@@ -14,6 +14,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // --- /api/ideate shims ---
@@ -292,7 +293,7 @@ func newTestHandlerWithStoreDirAndMock(t *testing.T, mock *runner.MockRunner) (*
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(storeDir)
+	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 		t.Fatal(err)

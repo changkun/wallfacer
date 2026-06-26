@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -62,7 +63,7 @@ func TestListTasks_WorkspaceIsolation_StaleCache(t *testing.T) {
 	// storeA: the "current" workspace — has one task.
 	dirA, _ := os.MkdirTemp("", "ws-isolation-a-*")
 	t.Cleanup(func() { _ = os.RemoveAll(dirA) })
-	storeA, err := store.NewFileStore(dirA)
+	storeA, err := storetest.NewFileStore(t, dirA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +81,7 @@ func TestListTasks_WorkspaceIsolation_StaleCache(t *testing.T) {
 	// still sitting in h.store after the workspace switch hasn't propagated yet).
 	dirB, _ := os.MkdirTemp("", "ws-isolation-b-*")
 	t.Cleanup(func() { _ = os.RemoveAll(dirB) })
-	storeB, err := store.NewFileStore(dirB)
+	storeB, err := storetest.NewFileStore(t, dirB)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +117,7 @@ func TestStreamTasks_WorkspaceIsolation_StaleCache(t *testing.T) {
 
 	dirA, _ := os.MkdirTemp("", "ws-isolation-stream-a-*")
 	t.Cleanup(func() { _ = os.RemoveAll(dirA) })
-	storeA, err := store.NewFileStore(dirA)
+	storeA, err := storetest.NewFileStore(t, dirA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +133,7 @@ func TestStreamTasks_WorkspaceIsolation_StaleCache(t *testing.T) {
 
 	dirB, _ := os.MkdirTemp("", "ws-isolation-stream-b-*")
 	t.Cleanup(func() { _ = os.RemoveAll(dirB) })
-	storeB, err := store.NewFileStore(dirB)
+	storeB, err := storetest.NewFileStore(t, dirB)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +201,7 @@ func TestStreamTasks_WorkspaceIsolation_SubscriptionMatchesSnapshot(t *testing.T
 
 	dirA, _ := os.MkdirTemp("", "ws-isolation-sub-a-*")
 	t.Cleanup(func() { _ = os.RemoveAll(dirA) })
-	storeA, err := store.NewFileStore(dirA)
+	storeA, err := storetest.NewFileStore(t, dirA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +217,7 @@ func TestStreamTasks_WorkspaceIsolation_SubscriptionMatchesSnapshot(t *testing.T
 
 	dirB, _ := os.MkdirTemp("", "ws-isolation-sub-b-*")
 	t.Cleanup(func() { _ = os.RemoveAll(dirB) })
-	storeB, err := store.NewFileStore(dirB)
+	storeB, err := storetest.NewFileStore(t, dirB)
 	if err != nil {
 		t.Fatal(err)
 	}

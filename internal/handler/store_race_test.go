@@ -9,6 +9,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -28,7 +29,7 @@ func TestHandler_StoreFieldRaceWithApplySnapshot(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s, err := store.NewFileStore(dir)
+		s, err := storetest.NewFileStore(t, dir)
 		if err != nil {
 			t.Fatal(err)
 		}
