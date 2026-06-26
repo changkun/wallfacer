@@ -108,14 +108,6 @@ const coordToggleAvailable = ref(false);
 const enabling = ref(false);
 const coordState = ref<string>('');
 
-// signedIn gates the comment surface on the BROWSER session (GET /api/me). The
-// backend is the security boundary: RequirePrincipalMiddleware 401s the comment
-// endpoints without a session, and sign-out clears the coordination token so the
-// connector stops pulling. This client-side mirror only makes the chrome and the
-// DOM-painted inline highlights clear immediately on logout instead of lingering
-// until the next fetch. coordState drives the connection indicator separately.
-const signedIn = computed(() => !!auth.me?.principal_id);
-
 async function fetchStatus() {
   try {
     const s = await api<{
@@ -173,17 +165,6 @@ const replyBody = ref('');
 function place() {
   const root = props.bodyEl;
   if (!root) { markers.value = []; anchorTops.value = new Map(); return; }
-  // When the sign-in gate is closed the surface is hidden, but highlights are
-  // painted directly into the body DOM (not the template), so they would survive
-  // a logout. The instance's GET keeps returning threads via the connector token
-  // regardless of the browser session, so guard the paint here, not on the data:
-  // strip any marks and bail when signed out.
-  if (!signedIn.value) {
-    clearHighlights(root);
-    markers.value = [];
-    anchorTops.value = new Map();
-    return;
-  }
   // Recompute the content's offset within the host (changes when the bar/banner
   // appear or wrap) so the rail and markers stay aligned to the prose.
   contentOffsetTop.value = root.offsetTop;
@@ -212,14 +193,6 @@ watch(
   () => { void nextTick(place); },
   { immediate: true },
 );
-
-// Re-run the pass when the sign-in gate flips: the thread-set watcher does not
-// fire (the set is unchanged), so a logout would otherwise leave the highlights
-// painted. On login, refetch so the marks repaint with current data.
-watch(signedIn, (v) => {
-  if (v) void refresh();
-  void nextTick(place);
-});
 
 // Reflect the open thread onto inline marks without a full rewrap.
 watch(openThreadId, () => {
@@ -333,7 +306,7 @@ function lineOf(node: Node | null): number {
 }
 
 function onSelectionChange() {
-  if (!available.value || !signedIn.value || composing.value) return;
+  if (!available.value || composing.value) return;
   // Ignore churn while typing into the composer.
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) return;
@@ -501,9 +474,11 @@ defineExpose({ openCount, showResolved, available });
 </script>
 
 <template>
-  <!-- Gated on sign-in: when the user is not signed in, no comment surface
-       appears at all (you cannot comment, so it should not show). -->
-  <template v-if="available && signedIn">
+  <!-- `available` flips true only after a successful GET /api/spec-comments,
+       which the backend 401s without a browser session (RequirePrincipalMiddleware).
+       So this gate is the signed-in-and-serving signal: a logged-out browser gets
+       no surface at all, enforced server-side, not just hidden here. -->
+  <template v-if="available">
     <!-- Opt-in prompt: coordination is off by default (the data boundary). -->
     <div v-if="coordToggleAvailable && !optedIn" class="sc-banner sc-banner--optin">
       <span>Spec comments are off. Enable to comment and see your team's comments.</span>
