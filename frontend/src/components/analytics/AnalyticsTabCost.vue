@@ -28,14 +28,14 @@ interface WorkspaceBucket extends Bucket {}
 
 interface DailyEntry { date: string; cost_usd: number }
 
-interface PlanningTimelineEntry { date: string; cost_usd: number }
+interface AgentSessionTimelineEntry { date: string; cost_usd: number }
 
 interface AgentSessionGroup {
   label?: string;
   paths?: string[];
   round_count?: number;
   usage?: Bucket;
-  timeline?: PlanningTimelineEntry[];
+  timeline?: AgentSessionTimelineEntry[];
 }
 
 interface TopTask { id: string; title: string; status: string; cost_usd: number }
@@ -95,13 +95,13 @@ function workspaceLabel(p: string) {
   return parts[parts.length - 1] || p;
 }
 
-function sortedPlanningKeys() {
+function sortedAgentSessionKeys() {
   const m = data.value?.agent_sessions || {};
   return Object.keys(m).sort((a, b) =>
     ((m[b].usage?.cost_usd) || 0) - ((m[a].usage?.cost_usd) || 0));
 }
 
-function sparklinePoints(timeline?: PlanningTimelineEntry[]) {
+function sparklinePoints(timeline?: AgentSessionTimelineEntry[]) {
   if (!timeline || timeline.length === 0) return '';
   const W = 80, H = 20;
   let max = 0;
@@ -181,7 +181,7 @@ async function fetchAndRender() {
   }
 }
 
-async function seedPlanningPeriod() {
+async function seedAgentSessionPeriod() {
   if (agentSessionPeriodInitialized.value) return;
   agentSessionPeriodInitialized.value = true;
   try {
@@ -194,7 +194,7 @@ async function seedPlanningPeriod() {
 }
 
 onMounted(async () => {
-  await seedPlanningPeriod();
+  await seedAgentSessionPeriod();
   fetchAndRender();
 });
 
@@ -337,7 +337,7 @@ watch(agentSessionWindowDays, () => fetchAndRender());
           </div>
         </div>
 
-        <div v-if="sortedPlanningKeys().length" style="margin-bottom: 20px">
+        <div v-if="sortedAgentSessionKeys().length" style="margin-bottom: 20px">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
             <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Agent Sessions</div>
             <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
@@ -362,7 +362,7 @@ watch(agentSessionWindowDays, () => fetchAndRender());
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="key in sortedPlanningKeys()" :key="key">
+                <tr v-for="key in sortedAgentSessionKeys()" :key="key">
                   <td style="padding: 6px 10px; font-weight: 500;">
                     <span
                       :title="((data.agent_sessions || {})[key].paths || []).join('\n') || key"
