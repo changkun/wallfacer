@@ -1,6 +1,6 @@
 ---
 title: "GitHub Repo Selection"
-status: drafted
+status: stale
 depends_on:
   - specs/intent/github-integration/oauth-token-store.md
   - specs/cloud/latere-integration/coordination-plane/repo-identity.md

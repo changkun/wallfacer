@@ -1,6 +1,6 @@
 ---
 title: "Runtime Integration: Cella Backend"
-status: drafted
+status: stale
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/identity/authentication.md
@@ -12,7 +12,7 @@ affects:
   - internal/envconfig/
 effort: large
 created: 2026-05-30
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

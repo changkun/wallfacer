@@ -1,6 +1,6 @@
 ---
 title: "GitHub Read Surface: PRs, Issues, and Comments"
-status: drafted
+status: stale
 depends_on:
   - specs/intent/github-integration/oauth-token-store.md
 affects:

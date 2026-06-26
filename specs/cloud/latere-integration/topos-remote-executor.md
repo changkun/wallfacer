@@ -1,6 +1,6 @@
 ---
 title: Topos as a Remote Agent Executor
-status: drafted
+status: stale
 depends_on:
   - specs/cloud/latere-integration.md
   - specs/cloud/latere-integration/cella-runtime.md
@@ -15,7 +15,7 @@ affects:
   - docs/cloud/
 effort: large
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

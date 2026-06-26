@@ -1,6 +1,6 @@
 ---
 title: RBAC Scope Matrix
-status: drafted
+status: stale
 depends_on:
   - specs/identity/multi-user-collaboration.md
   - specs/identity/authentication.md
@@ -11,7 +11,7 @@ affects:
   - internal/handler/
 effort: medium
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

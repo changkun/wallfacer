@@ -1,6 +1,6 @@
 ---
 title: Remote control of signed-in local wallfacer instances
-status: drafted
+status: stale
 depends_on:
   - specs/cloud/latere-integration/coordination-plane.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - internal/handler/
 effort: large
 created: 2026-04-19
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

@@ -1,6 +1,6 @@
 ---
 title: "GitHub Integration: OAuth-Backed Repo, PR, and Issue Surface"
-status: drafted
+status: stale
 depends_on:
   - specs/identity/authentication.md
   - specs/cloud/latere-integration/coordination-plane/repo-identity.md
